@@ -12,6 +12,11 @@ pub const PARENT: &str = "parent";
 /// agent may take a name that would read as one.
 pub const ROOM: char = '#';
 
+/// Two names, compared by the agent roster.
+pub fn same(a: &str, b: &str) -> bool {
+    a == b
+}
+
 /// How many names one base may take before a caller is asked to pick another.
 const MAX_NAMES: usize = 64;
 
@@ -283,6 +288,32 @@ fn split(sessions: &[SessionSummary]) -> (Vec<String>, Vec<String>) {
 mod tests {
     use super::*;
     use crate::tests::Fleet;
+
+    #[test]
+    fn case_variants_cannot_claim_an_existing_or_reserved_name() {
+        assert_eq!(free("Reviewer", &["reviewer".into()]), Some("Reviewer-2".into()));
+        for name in ["Parent", "PARENT", "parent"] {
+            assert!(check(name).is_err(), "{name} is reserved");
+        }
+    }
+
+    #[tokio::test]
+    async fn case_variants_resolve_children_siblings_rooms_and_parent() {
+        let fleet = Fleet::default();
+        let root = fleet.root();
+        let reviewer = fleet.child(&root, "reviewer");
+        let builder = fleet.child(&root, "builder");
+        let room = fleet.room(&root, "#design");
+        let host = fleet.handle();
+        assert_eq!(resolve(&host, &root, " @REVIEWER ").await.unwrap().id, reviewer);
+        assert_eq!(agent(&host, &builder, "Reviewer").await.unwrap().id, reviewer);
+        assert_eq!(child(&host, &root, "Reviewer").await.unwrap().id, reviewer);
+        assert_eq!(mine(&host, &root, "@Reviewer").await.unwrap().id, reviewer);
+        assert_eq!(resolve(&host, &reviewer, "@Parent").await.unwrap().id, root);
+        assert_eq!(resolve(&host, &reviewer, "#DESIGN").await.unwrap().id, room);
+        let own = fleet.child(&builder, "REVIEWER");
+        assert_eq!(agent(&host, &builder, "Reviewer").await.unwrap().id, own);
+    }
 
     #[test]
     fn the_first_name_of_a_base_is_the_base_itself() {
