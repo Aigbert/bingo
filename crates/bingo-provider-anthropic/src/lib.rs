@@ -272,7 +272,7 @@ fn settings_schema() -> schemars::Schema {
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.provider.anthropic",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &["provider:anthropic"],
     requires: &[],
     config: Some(ConfigClaim {

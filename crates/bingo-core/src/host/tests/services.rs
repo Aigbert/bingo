@@ -17,14 +17,31 @@ async fn a_service_is_a_typed_value_under_a_key_and_crosses_only_if_it_opened_a_
     };
     let plugins = vec![TestPlugin::boxed(
         &COUNTER,
-        vec![Contribution::service(&ServiceKey::new("test.counter"), Arc::new(7u32), None)],
+        vec![Contribution::service(
+            &ServiceKey::new("test.counter"),
+            Arc::new(7u32),
+            None,
+        )],
     )];
     let host = Host::build(plugins, HostConfig::new(env())).await.unwrap();
     let handle = host.handle();
-    assert_eq!(handle.service::<u32>(&bingo_sdk::ServiceKey::new("test.counter")).as_deref(), Some(&7));
-    assert!(handle.service::<String>(&bingo_sdk::ServiceKey::new("test.counter")).is_none());
+    assert_eq!(
+        handle
+            .service::<u32>(&bingo_sdk::ServiceKey::new("test.counter"))
+            .as_deref(),
+        Some(&7)
+    );
+    assert!(
+        handle
+            .service::<String>(&bingo_sdk::ServiceKey::new("test.counter"))
+            .is_none()
+    );
     assert!(handle.service_wire("test.counter").is_none());
-    assert!(handle.service::<u32>(&bingo_sdk::ServiceKey::new("test.absent")).is_none());
+    assert!(
+        handle
+            .service::<u32>(&bingo_sdk::ServiceKey::new("test.absent"))
+            .is_none()
+    );
 }
 
 /// A service an external process declares cannot be there when the plugins

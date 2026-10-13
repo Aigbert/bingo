@@ -58,10 +58,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Command, Contribution, Hook, Plugin, PluginError, PluginManifest, Registrar,
-    Tool, ToolTraits,
+    Command, Contribution, Hook, Plugin, PluginError, PluginManifest, Registrar, Tool, ToolTraits,
 };
 
+use bingo_services::team as team_service;
 pub use command::AgentsCommand;
 pub use definition::Definition;
 pub use dismiss::DismissAgentTool;
@@ -73,13 +73,12 @@ pub use note::NOTE;
 pub use spawn::SpawnAgentTool;
 pub use stop::StopAgentTool;
 pub use team::{SeatHook, TeamCommand, TeamFile};
-use bingo_services::team as team_service;
 pub use thinking::SetThinkingTool;
 
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.agents",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "tool:SpawnAgent",
         "tool:SendMessage",
@@ -104,7 +103,11 @@ static MANIFEST: PluginManifest = PluginManifest {
 /// Both service faces refer to the same file owner.
 fn team_file() -> Contribution {
     let owner: Arc<dyn team_service::TeamFile> = Arc::new(TeamFile);
-    Contribution::service(&team_service::KEY, owner.clone(), Some(team_service::wire(owner)))
+    Contribution::service(
+        &team_service::KEY,
+        owner.clone(),
+        Some(team_service::wire(owner)),
+    )
 }
 
 /// What every tool here is but one. They read the session tree and post into

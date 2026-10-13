@@ -64,7 +64,9 @@ pub enum TeamError {
 /// (ADR-0031 §5). `/room` and `OpenRoom` are unaffected: a declared room is
 /// the only thing that file was ever asked about.
 pub async fn rooms(host: &HostHandle, cwd: &Path) -> Result<Vec<Entry>, TeamError> {
-    let Some(file) = team::find(host) else { return Ok(Vec::new()); };
+    let Some(file) = team::find(host) else {
+        return Ok(Vec::new());
+    };
     declared(&file.section(cwd, ROOMS).await?)
 }
 
@@ -234,7 +236,10 @@ mod tests {
     /// plugin has none of its own to add, because it never opened the file.
     #[tokio::test]
     async fn a_team_file_the_owner_refused_is_refused_here_in_its_own_words() {
-        let host = crate::tests::service_host(team::KEY.name(), Stub::refusing("/w/team.json: { not json"));
+        let host = crate::tests::service_host(
+            team::KEY.name(),
+            Stub::refusing("/w/team.json: { not json"),
+        );
         let refused = rooms(&host, Path::new("/w"))
             .await
             .expect_err("a file that will not parse");

@@ -189,7 +189,10 @@ impl ToolContext {
     }
 
     /// A service another plugin registered, by key.
-    pub fn service<T: ?Sized + Any + Send + Sync>(&self, key: &crate::ServiceKey<T>) -> Option<Arc<T>> {
+    pub fn service<T: ?Sized + Any + Send + Sync>(
+        &self,
+        key: &crate::ServiceKey<T>,
+    ) -> Option<Arc<T>> {
         self.host.service(key)
     }
 }

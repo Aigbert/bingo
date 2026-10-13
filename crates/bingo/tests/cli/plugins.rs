@@ -229,7 +229,10 @@ fn a_missing_used_service_is_named_without_disabling_its_consumer() {
     assert_eq!(listed.status.code(), Some(0), "{}", stderr(&listed));
     assert_eq!(stderr(&listed), "");
     let said = stdout(&listed);
-    let consumer = row(&said, "bingo.provider.acp");
+    let consumer = row(&said, "bingo.acp");
     assert_eq!(consumer[2], "on");
-    assert!(consumer[3].contains("mcp.servers"), "{said}");
+    assert!(
+        consumer[3].contains("missing used services: mcp.servers"),
+        "{said}"
+    );
 }

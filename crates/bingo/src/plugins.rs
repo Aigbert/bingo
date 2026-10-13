@@ -49,7 +49,7 @@ pub fn run(
     let switched_off = switches(&composed, layers)?;
     let listed = listing(&composed, env, cwd, &switched_off);
     let said = match action {
-        Action::List => list(&listed),
+        Action::List => list_with_uses(&listed, &composed),
         Action::Enable { name } => switched(env, &composed, &listed, name, true)?,
         Action::Disable { name } => switched(env, &composed, &listed, name, false)?,
     };
@@ -124,10 +124,52 @@ fn installed(found: Found, switched_off: &BTreeSet<String>) -> PluginStatus {
     }
 }
 
-/// One line per plugin, tab-separated as `bingo mcp list` is, so a shell reads
-/// it as easily as a person does.
-fn list(listed: &[PluginStatus]) -> String {
-    listed.iter().map(row).collect::<Vec<_>>().join("\n")
+/// One line per plugin, with unavailable optional services in the reason column.
+fn list_with_uses(listed: &[PluginStatus], composed: &[Box<dyn Plugin>]) -> String {
+    let provided: BTreeSet<&str> = composed
+        .iter()
+        .filter(|plugin| {
+            listed
+                .iter()
+                .any(|status| status.id == plugin.manifest().id && status.enabled)
+        })
+        .flat_map(|plugin| {
+            plugin
+                .manifest()
+                .provides
+                .iter()
+                .filter_map(|key| key.strip_prefix("service:"))
+        })
+        .collect();
+    listed
+        .iter()
+        .map(|status| {
+            let mut line = row(status);
+            let missing = missing_uses(status, composed, &provided);
+            if !missing.is_empty() {
+                line.push_str(&format!("missing used services: {}", missing.join(", ")));
+            }
+            line
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn missing_uses<'a>(
+    status: &PluginStatus,
+    composed: &'a [Box<dyn Plugin>],
+    provided: &BTreeSet<&str>,
+) -> Vec<&'a str> {
+    if !status.enabled {
+        return Vec::new();
+    }
+    composed
+        .iter()
+        .find(|plugin| plugin.manifest().id == status.id)
+        .into_iter()
+        .flat_map(|plugin| plugin.manifest().uses.iter().copied())
+        .filter(|key| !provided.contains(key))
+        .collect()
 }
 
 fn row(status: &PluginStatus) -> String {
@@ -198,10 +240,13 @@ mod tests {
     /// rather than a word standing in for one.
     #[test]
     fn a_listing_is_one_tab_separated_line_per_plugin() {
-        let said = list(&[
-            status("bingo.tools.web", true, None),
-            status("wordcount", false, Some(SWITCHED_OFF)),
-        ]);
+        let said = list_with_uses(
+            &[
+                status("bingo.tools.web", true, None),
+                status("wordcount", false, Some(SWITCHED_OFF)),
+            ],
+            &[],
+        );
         assert_eq!(
             said,
             format!("bingo.tools.web\t0.1.0\ton\t\nwordcount\t0.1.0\toff\t{SWITCHED_OFF}")

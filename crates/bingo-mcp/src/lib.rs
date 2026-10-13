@@ -32,20 +32,20 @@ use bingo_sdk::{
     Registrar, ToolSource,
 };
 
+use bingo_services::mcp;
 pub use client::{Asker, Client};
 pub use command::McpCommand;
 pub use config::{Server, Settings};
 pub use dial::CONNECT_TIMEOUT;
 pub use manager::{Line, Manager, Status};
 pub use rows::Rows;
-use bingo_services::mcp;
 pub use source::McpSource;
 pub use tool::{McpTool, tool_name};
 
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.mcp",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "tools:mcp",
         "command:mcp",

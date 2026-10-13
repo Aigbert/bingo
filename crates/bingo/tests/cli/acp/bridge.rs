@@ -600,3 +600,32 @@ fn a_row_this_agent_cannot_take_is_skipped_and_named() {
         said[0]
     );
 }
+
+#[test]
+fn acp_reads_only_enabled_rows_from_the_real_mcp_owner() {
+    let Some(agent) = fake_agent() else { return };
+    let Some(echo) = echo_server() else { return };
+    let adapter = Scripted::configured(
+        agent,
+        json!({ "sessionId": "typed-services", "capabilities": { "resume": true },
+            "turns": [{ "updates": [chunk("ready")], "stopReason": "end_turn" }] }),
+        json!({}),
+        json!({ "mcpServers": {
+            "enabled": { "command": echo, "env": { "SERVICE_TOKEN": "fixture" } },
+            "disabled": { "command": echo }
+        }, "disabledMcpServers": ["disabled"] }),
+    );
+    let out = adapter.turn("read the configured rows");
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(!frames_of(&out).is_empty(), "stdout is NDJSON frames");
+    let rows = injected(&adapter);
+    let names: Vec<_> = rows
+        .iter()
+        .map(|row| row["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["bingo", "enabled"]);
+    assert_eq!(
+        rows[1]["env"],
+        json!([{ "name": "SERVICE_TOKEN", "value": "fixture" }])
+    );
+}

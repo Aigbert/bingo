@@ -82,7 +82,7 @@ pub use tool::{SkillArgs, SkillTool};
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.skills",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "command:skills",
         "tool:Skill",

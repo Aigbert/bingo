@@ -99,10 +99,19 @@ impl ServiceHost {
 
     /// A host holding one service with a typed face and no wire face: what a
     /// test needs to say that crossing is the owner's choice (ADR-0031 §3).
-    pub fn holding<T: ?Sized + Any + Send + Sync>(key: &crate::ServiceKey<T>, value: Arc<T>) -> HostHandle {
+    pub fn holding<T: ?Sized + Any + Send + Sync>(
+        key: &crate::ServiceKey<T>,
+        value: Arc<T>,
+    ) -> HostHandle {
         let host = ServiceHost::default();
         // A fresh map refuses nothing: `add` only refuses a key it already has.
-        let _ = host.0.add(key.name().to_string(), Service { value: Arc::new(value), wire: None });
+        let _ = host.0.add(
+            key.name().to_string(),
+            Service {
+                value: Arc::new(value),
+                wire: None,
+            },
+        );
         HostHandle(Arc::new(host))
     }
 }

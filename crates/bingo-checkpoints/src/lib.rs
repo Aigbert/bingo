@@ -38,7 +38,7 @@ pub use store::Checkpoints;
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.checkpoints",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "hook:checkpoints",
         "command:rewind",

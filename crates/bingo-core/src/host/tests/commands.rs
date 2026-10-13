@@ -6,7 +6,7 @@ use crate::settings;
 static CONTEXT: PluginManifest = PluginManifest {
     id: "test.context",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["compactor"],
     requires: &[],
     config: None,
@@ -269,7 +269,7 @@ async fn the_catalogue_reads_the_sources_too() {
     static SOURCES: PluginManifest = PluginManifest {
         id: "test.sources",
         version: "0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &["tools:scripted", "commands:scripted"],
         requires: &[],
         config: None,

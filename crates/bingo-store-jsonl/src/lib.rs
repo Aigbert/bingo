@@ -122,7 +122,7 @@ impl SessionStore for JsonlStore {
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.store.jsonl",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &["store:jsonl"],
     requires: &[],
     config: None,

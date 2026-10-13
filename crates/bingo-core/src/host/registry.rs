@@ -63,7 +63,10 @@ pub struct Registry {
     pub notices: Vec<(String, String)>,
 }
 
-fn declared_service(manifest: &PluginManifest, contribution: &Contribution) -> Result<(), HostError> {
+fn declared_service(
+    manifest: &PluginManifest,
+    contribution: &Contribution,
+) -> Result<(), HostError> {
     if let Contribution::Service { key, .. } = contribution {
         let capability = format!("service:{key}");
         if !manifest.provides.contains(&capability.as_str()) {
@@ -377,7 +380,7 @@ mod tests {
     static NEEDS: PluginManifest = PluginManifest {
         id: "test.needs",
         version: "0.0.0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &[],
         requires: &["service:x"],
         config: None,
@@ -385,7 +388,7 @@ mod tests {
     static GIVES: PluginManifest = PluginManifest {
         id: "test.gives",
         version: "0.0.0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &["service:x"],
         requires: &[],
         config: None,
@@ -393,7 +396,7 @@ mod tests {
     static CHAIN: PluginManifest = PluginManifest {
         id: "test.chain",
         version: "0.0.0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &["service:y"],
         requires: &["service:missing"],
         config: None,
@@ -401,7 +404,7 @@ mod tests {
     static LEANS: PluginManifest = PluginManifest {
         id: "test.leans",
         version: "0.0.0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &[],
         requires: &["service:y"],
         config: None,
@@ -409,7 +412,7 @@ mod tests {
     static STORE: PluginManifest = PluginManifest {
         id: "test.store",
         version: "0.0.0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &["store:memory"],
         requires: &[],
         config: None,

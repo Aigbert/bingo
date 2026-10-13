@@ -1,17 +1,23 @@
 //! The live MCP configuration behind the shared service contract.
-use std::sync::Arc;
+use crate::manager::Manager;
 use async_trait::async_trait;
 use bingo_services::mcp::{self, Servers};
 use serde_json::{Map, Value};
-use crate::manager::Manager;
+use std::sync::Arc;
 
-pub struct Rows { manager: Arc<Manager> }
+pub struct Rows {
+    manager: Arc<Manager>,
+}
 impl Rows {
-    pub fn new(manager: Arc<Manager>) -> Self { Self { manager } }
+    pub fn new(manager: Arc<Manager>) -> Self {
+        Self { manager }
+    }
 }
 #[async_trait]
 impl Servers for Rows {
-    async fn servers(&self) -> Map<String, Value> { self.manager.rows().await }
+    async fn servers(&self) -> Map<String, Value> {
+        self.manager.rows().await
+    }
 }
 
 #[cfg(test)]

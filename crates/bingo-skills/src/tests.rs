@@ -93,7 +93,7 @@ pub(crate) fn host_with_pages(written: &[(&str, Pages)]) -> HostHandle {
                 .add(
                     Pages::key(id).name().to_string(),
                     bingo_sdk::service::Service {
-                        value: Arc::new(Arc::new(*pages)), 
+                        value: Arc::new(Arc::new(*pages)),
                         wire: None,
                     },
                 )

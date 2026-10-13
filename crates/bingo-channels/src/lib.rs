@@ -69,7 +69,7 @@ pub use tool::{SEND_FILE, SendFile, SendFileSource};
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.surface.channels",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "surface:channels",
         "tool:SendFile",

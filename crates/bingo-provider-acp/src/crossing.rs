@@ -17,8 +17,8 @@ use std::sync::Arc;
 
 use agent_client_protocol_schema::v1::{AgentCapabilities, McpCapabilities, McpServer};
 use bingo_sdk::{HostHandle, Level, SessionId};
-use serde_json::{Map, Value};
 use bingo_services::mcp;
+use serde_json::{Map, Value};
 
 use crate::bridge::{Bridge, Token};
 use crate::config::Adapter;
@@ -163,9 +163,10 @@ mod tests {
         match rows {
             Some(rows) => {
                 let host = ServiceHost::handle();
-                host.open_service(mcp::KEY.name(), Arc::new(Configured(rows))).unwrap();
+                host.open_service(mcp::KEY.name(), Arc::new(Configured(rows)))
+                    .unwrap();
                 host
-            },
+            }
             None => ServiceHost::handle(),
         }
     }

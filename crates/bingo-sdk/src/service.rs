@@ -14,8 +14,8 @@
 
 use std::any::Any;
 use std::borrow::Cow;
-use std::marker::PhantomData;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use async_trait::async_trait;
@@ -37,11 +37,17 @@ pub struct ServiceKey<T: ?Sized> {
 
 impl<T: ?Sized> ServiceKey<T> {
     pub const fn new(name: &'static str) -> Self {
-        Self { name: Cow::Borrowed(name), marker: PhantomData }
+        Self {
+            name: Cow::Borrowed(name),
+            marker: PhantomData,
+        }
     }
 
     pub fn named(name: String) -> Self {
-        Self { name: Cow::Owned(name), marker: PhantomData }
+        Self {
+            name: Cow::Owned(name),
+            marker: PhantomData,
+        }
     }
 
     pub const fn name(&self) -> &str {
@@ -180,7 +186,9 @@ mod tests {
     }
 
     impl Counter for u32 {
-        fn count(&self) -> u32 { *self }
+        fn count(&self) -> u32 {
+            *self
+        }
     }
 
     #[test]
@@ -191,10 +199,19 @@ mod tests {
         let found = host.service(&KEY).expect("the registered trait");
         assert!(Arc::ptr_eq(&found, &value));
         assert_eq!(found.count(), 7);
-        assert!(host.service(&ServiceKey::<String>::new(KEY.name())).is_none());
-        assert!(host.service(&ServiceKey::<dyn Counter>::new("absent")).is_none());
+        assert!(
+            host.service(&ServiceKey::<String>::new(KEY.name()))
+                .is_none()
+        );
+        assert!(
+            host.service(&ServiceKey::<dyn Counter>::new("absent"))
+                .is_none()
+        );
         let crate::Contribution::Service { key, value, wire } =
-            crate::Contribution::service(&KEY, value, None) else { panic!("a service") };
+            crate::Contribution::service(&KEY, value, None)
+        else {
+            panic!("a service")
+        };
         assert_eq!(key, KEY.name());
         assert!(value.is::<Arc<dyn Counter>>());
         assert!(wire.is_none());
@@ -219,7 +236,7 @@ mod tests {
     }
 
     fn typed() -> Arc<dyn Any + Send + Sync> {
-        Arc::new("a live object".to_string())
+        Arc::new(Arc::new("a live object".to_string()))
     }
 
     /// The in-process lane, untouched: a service is a typed value under a key,
@@ -236,7 +253,7 @@ mod tests {
                 },
             )
             .expect("a free key");
-        assert!(services.value("kv").is_some_and(|v| v.is::<String>()));
+        assert!(services.value("kv").is_some_and(|v| v.is::<Arc<String>>()));
         assert!(
             services.wire("kv").is_none(),
             "crossing is the owner's choice"

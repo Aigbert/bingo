@@ -41,7 +41,7 @@ pub use rule::Rule;
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.permissions",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "policy:permissions",
         "command:permission",
@@ -292,9 +292,9 @@ mod tests {
             ]
         );
         assert!(
-            MANIFEST
-                .provides
-                .contains(&format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()).as_str()),
+            MANIFEST.provides.contains(
+                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()).as_str()
+            ),
             "the page's key is spelled the one way (ADR-0054 §1)"
         );
         let claim = MANIFEST.config.expect("a config claim");

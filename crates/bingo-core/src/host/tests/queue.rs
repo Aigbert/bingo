@@ -7,7 +7,7 @@ use super::*;
 static GATE: PluginManifest = PluginManifest {
     id: "test.gate",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["policy:gate"],
     requires: &[],
     config: None,

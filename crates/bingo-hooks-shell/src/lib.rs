@@ -72,7 +72,7 @@ pub use hook::ShellHooks;
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.hooks.shell",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &["hook:shell", "service:bingo.hooks.shell.pages"],
     requires: &[],
     config: Some(ConfigClaim {

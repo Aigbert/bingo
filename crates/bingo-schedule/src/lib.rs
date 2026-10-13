@@ -60,7 +60,7 @@ pub use tools::{ScheduleCreateTool, ScheduleForgetTool, ScheduleListTool, WakeTo
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.schedule",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "tool:ScheduleCreate",
         "tool:ScheduleList",

@@ -33,7 +33,7 @@ pub use judgement::{JudgementContributor, TEXT};
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.persona",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &["context:persona:judgement", "service:bingo.persona.pages"],
     requires: &[],
     // One block, so one key: what it says. Whether it is said at all is the

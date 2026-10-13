@@ -54,7 +54,7 @@ impl Plugin for TestPlugin {
 static PROVIDER: PluginManifest = PluginManifest {
     id: "test.provider",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["provider:scripted"],
     requires: &[],
     config: None,
@@ -63,7 +63,7 @@ static PROVIDER: PluginManifest = PluginManifest {
 static TOOLS: PluginManifest = PluginManifest {
     id: "test.tools",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["tool:Echo"],
     requires: &["provider:scripted"],
     config: None,
@@ -72,7 +72,7 @@ static TOOLS: PluginManifest = PluginManifest {
 static NEEDY: PluginManifest = PluginManifest {
     id: "test.needy",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &[],
     requires: &["service:missing"],
     config: None,
@@ -81,7 +81,7 @@ static NEEDY: PluginManifest = PluginManifest {
 static STORE: PluginManifest = PluginManifest {
     id: "test.store",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["store:memory"],
     requires: &[],
     config: None,
@@ -573,7 +573,7 @@ async fn a_plugin_receives_only_the_settings_it_claimed() {
     static CLAIMING: PluginManifest = PluginManifest {
         id: "test.claiming",
         version: "0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &[],
         requires: &[],
         config: Some(ConfigClaim {
@@ -669,7 +669,7 @@ async fn a_declared_window_is_the_ruler_the_turn_measures_with() {
 static HOOKS: PluginManifest = PluginManifest {
     id: "test.hooks",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["hook:lister"],
     requires: &[],
     config: None,

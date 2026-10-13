@@ -662,7 +662,7 @@ impl Provider for FakeProvider {
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.provider.fake",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &["provider:fake"],
     requires: &[],
     config: None,

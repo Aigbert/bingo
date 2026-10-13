@@ -49,7 +49,7 @@ pub use tools::{
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.experience",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "tool:ExperienceCommit",
         "tool:ExperienceQuery",

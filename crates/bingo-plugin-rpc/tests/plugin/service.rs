@@ -146,7 +146,10 @@ async fn a_second_plugin_claiming_the_same_key_is_reported_and_the_first_keeps_i
     let (_, text) = started.heard("SERVICE_TAKEN").await;
     assert!(text.contains("kv"), "{text}");
     assert!(
-        started.host.service::<ServiceHandle>(&bingo_sdk::ServiceKey::new("kv")).is_some(),
+        started
+            .host
+            .service::<ServiceHandle>(&bingo_sdk::ServiceKey::new("kv"))
+            .is_some(),
         "the key is still served by whoever claimed it first"
     );
     started.manager.shutdown().await;

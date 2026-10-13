@@ -55,7 +55,7 @@ pub use update::TaskUpdateTool;
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.tasks",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "tool:TaskCreate",
         "tool:TaskUpdate",

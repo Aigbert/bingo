@@ -63,7 +63,7 @@ fn transport(args: &Value) -> Result<(), KernelError> {
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.surface.rpc",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &["surface:rpc"],
     requires: &[],
     config: None,

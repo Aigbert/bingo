@@ -951,3 +951,28 @@ fn ears(frames: &[Frame]) -> Vec<(String, u64)> {
         })
         .collect()
 }
+
+#[test]
+fn rooms_read_the_real_team_owner_without_any_agent_roles() {
+    let home = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
+    std::fs::write(
+        home.path().join(".bingo/team.json"),
+        r#"{"rooms":[{"name":"design","purpose":"typed service contract"}]}"#,
+    )
+    .unwrap();
+    let script = script(r#"{"responses":[{"steps":[{"text":"ready"}]}]}"#);
+    let out = run(bingo()
+        .envs(home_env(home.path()))
+        .env("BINGO_FAKE_SCRIPT", script.path())
+        .args(["--print", "--output-format", "json", "--cwd"])
+        .arg(home.path())
+        .arg("hello"));
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(!frames_of(&out).is_empty(), "stdout is NDJSON frames");
+    let root = root_of(&out);
+    let room = session_dir(home.path(), &format!("rooms/{root}/design"))
+        .expect("the real rooms consumer read the agents owner's section");
+    let summary = summary_of(&room).unwrap();
+    assert_eq!(summary["parent"]["session"], serde_json::json!(root));
+}

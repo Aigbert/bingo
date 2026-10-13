@@ -1,9 +1,9 @@
 //! The team file owner implements the shared typed contract.
-use std::path::Path;
+use crate::team::file;
 use async_trait::async_trait;
 use bingo_services::team::{self, TeamError};
 use serde_json::Value;
-use crate::team::file;
+use std::path::Path;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TeamFile;
@@ -11,7 +11,9 @@ pub struct TeamFile;
 #[async_trait]
 impl team::TeamFile for TeamFile {
     async fn section(&self, cwd: &Path, key: &str) -> Result<Value, TeamError> {
-        file::section(cwd, key).map(|section| section.unwrap_or(Value::Null)).map_err(|error| TeamError(error.message))
+        file::section(cwd, key)
+            .map(|section| section.unwrap_or(Value::Null))
+            .map_err(|error| TeamError(error.message))
     }
 }
 
@@ -98,5 +100,39 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+}
+
+#[cfg(all(test, any(unix, windows)))]
+mod native_path_tests {
+    use super::*;
+    use std::sync::Arc;
+
+    #[cfg(unix)]
+    fn native_name() -> std::ffi::OsString {
+        use std::os::unix::ffi::OsStringExt;
+        std::ffi::OsString::from_vec(vec![0xff])
+    }
+
+    #[cfg(windows)]
+    fn native_name() -> std::ffi::OsString {
+        use std::os::windows::ffi::OsStringExt;
+        std::ffi::OsString::from_wide(&[0xd800])
+    }
+
+    #[tokio::test]
+    async fn a_typed_owner_reads_a_directory_json_cannot_name() {
+        let home = tempfile::tempdir().unwrap();
+        let cwd = home.path().join(native_name());
+        std::fs::create_dir_all(cwd.join(".bingo")).unwrap();
+        std::fs::write(cwd.join(".bingo/team.json"), r#"{"rooms":[]}"#).unwrap();
+        let owner: Arc<dyn team::TeamFile> = Arc::new(TeamFile);
+        let host = bingo_sdk::testing::ServiceHost::holding(&team::KEY, owner);
+        let section = team::find(&host)
+            .unwrap()
+            .section(&cwd, "rooms")
+            .await
+            .unwrap();
+        assert_eq!(section, serde_json::json!([]));
     }
 }

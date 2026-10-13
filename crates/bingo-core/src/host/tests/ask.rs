@@ -11,7 +11,7 @@ use super::*;
 static STANCE: PluginManifest = PluginManifest {
     id: "test.stance",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["policy:stance"],
     requires: &[],
     config: None,

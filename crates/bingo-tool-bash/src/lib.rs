@@ -396,7 +396,7 @@ impl Tool for BashTool {
 static MANIFEST: PluginManifest = PluginManifest {
     id: jobs::PLUGIN,
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "tool:Bash",
         "tool:BashOutput",

@@ -866,7 +866,7 @@ async fn a_renamed_session_comes_back_under_its_name() {
 static SEATER: PluginManifest = PluginManifest {
     id: "test.seater",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["hook:seater"],
     requires: &[],
     config: None,

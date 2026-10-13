@@ -89,7 +89,7 @@ pub const SURFACE: &str = "room";
 static MANIFEST: PluginManifest = PluginManifest {
     id: PLUGIN,
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[bingo_services::team::KEY.name()],
     provides: &[
         "command:room",
         "hook:rooms",

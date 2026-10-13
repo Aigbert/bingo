@@ -43,7 +43,7 @@ pub use memory::{MemoryCommand, MemoryContributor};
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.context",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "compactor:summary",
         "context:instructions",

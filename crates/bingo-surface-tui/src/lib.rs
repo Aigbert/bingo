@@ -198,7 +198,7 @@ fn entering(e: std::io::Error) -> KernelError {
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.surface.tui",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &["surface:tui", "service:bingo.surface.tui.pages"],
     requires: &[],
     // `update.check` (ADR-0043 §4) and `tui.measure` (design §7): the box is
