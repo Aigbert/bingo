@@ -6,10 +6,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Answer, AnswerSpec, Attachment, CancellationToken, Catalog, CatalogEntry, CatalogKind,
-    CommandContext, ContextQuery, ContextUsage, Env, HostHandle, InteractionKind, Item, ItemBody,
-    ItemId, KernelError, ModelCapabilities, Page, Pages, Prompter, SessionId, SessionSummary,
-    ToolContext, ToolHost, TurnId, Usage,
+    Answer, AnswerSpec, CancellationToken, Catalog, CatalogEntry, CatalogKind, CommandContext,
+    ContextQuery, ContextUsage, Env, HostHandle, InteractionKind, Item, ItemBody, ItemId,
+    KernelError, ModelCapabilities, Page, Pages, Prompter, SessionId, SessionSummary, ToolContext,
+    ToolHost, TurnId, Usage,
 };
 use jiff::Timestamp;
 
