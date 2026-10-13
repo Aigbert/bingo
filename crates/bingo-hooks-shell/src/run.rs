@@ -12,11 +12,7 @@ use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
 
-#[cfg(windows)]
-use process_wrap::tokio::JobObject;
-#[cfg(unix)]
-use process_wrap::tokio::ProcessGroup;
-use process_wrap::tokio::{ChildWrapper, CommandWrap, KillOnDrop};
+use bingo_process::Tree;
 use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
@@ -55,7 +51,7 @@ pub enum RunError {
     Spawn {
         shell: std::path::PathBuf,
         #[source]
-        source: std::io::Error,
+        source: bingo_process::SpawnError,
     },
     #[error("timed out after {}ms", .0.as_millis())]
     Timeout(Duration),
@@ -65,7 +61,7 @@ pub enum RunError {
 
 pub async fn run(request: Request<'_>) -> Result<Completed, RunError> {
     let mut child = spawn(&request)?;
-    let pipes = Pipes::attach(child.as_mut(), request.input.to_string());
+    let pipes = Pipes::attach(&mut child, request.input.to_string());
     match tokio::time::timeout(request.timeout, child.wait()).await {
         Ok(status) => {
             let code = status.map_err(RunError::Wait)?.code().unwrap_or(-1);
@@ -79,7 +75,7 @@ pub async fn run(request: Request<'_>) -> Result<Completed, RunError> {
     }
 }
 
-fn spawn(request: &Request<'_>) -> Result<Box<dyn ChildWrapper>, RunError> {
+fn spawn(request: &Request<'_>) -> Result<Tree, RunError> {
     let shell = bingo_process::shell::resolve()?;
     let mut command = Command::new(shell.path());
     command
@@ -90,15 +86,7 @@ fn spawn(request: &Request<'_>) -> Result<Box<dyn ChildWrapper>, RunError> {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut wrapped = CommandWrap::from(command);
-    // One handle for the whole tree, so a hook that outlives its own shell is
-    // still taken with it: a process group on unix, a job object on Windows.
-    #[cfg(unix)]
-    wrapped.wrap(ProcessGroup::leader());
-    #[cfg(windows)]
-    wrapped.wrap(JobObject);
-    wrapped.wrap(KillOnDrop);
-    wrapped.spawn().map_err(|source| RunError::Spawn {
+    bingo_process::tree(command).map_err(|source| RunError::Spawn {
         shell: shell.path().to_path_buf(),
         source,
     })
@@ -106,7 +94,7 @@ fn spawn(request: &Request<'_>) -> Result<Box<dyn ChildWrapper>, RunError> {
 
 /// `SIGKILL` to the whole group — the wrapper's `start_kill` is a `killpg` — then
 /// reap what is left, bounded so an escapee cannot hold the turn.
-async fn kill(child: &mut Box<dyn ChildWrapper>) {
+async fn kill(child: &mut Tree) {
     let _ = child.start_kill();
     let _ = tokio::time::timeout(DRAIN, child.wait()).await;
 }
@@ -119,10 +107,10 @@ struct Pipes {
 }
 
 impl Pipes {
-    fn attach(child: &mut dyn ChildWrapper, input: String) -> Self {
-        let stdin = child.stdin().take();
-        let stdout = child.stdout().take();
-        let stderr = child.stderr().take();
+    fn attach(child: &mut Tree, input: String) -> Self {
+        let stdin = child.take_stdin();
+        let stdout = child.take_stdout();
+        let stderr = child.take_stderr();
         Self {
             feed: tokio::spawn(async move {
                 let Some(mut stdin) = stdin else { return };

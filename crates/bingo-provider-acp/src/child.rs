@@ -14,11 +14,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::Stdio;
 
-#[cfg(windows)]
-use process_wrap::tokio::JobObject;
-#[cfg(unix)]
-use process_wrap::tokio::ProcessGroup;
-use process_wrap::tokio::{ChildWrapper, CommandWrap, KillOnDrop};
+use bingo_process::Tree;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio::process::{ChildStdin, ChildStdout};
 
@@ -26,20 +22,7 @@ use crate::error::AcpError;
 
 /// A running adapter. The pipes come out once, into the connection; what stays
 /// here is the handle whose drop ends the tree.
-pub struct Adapter {
-    child: Box<dyn ChildWrapper>,
-}
-
-impl Drop for Adapter {
-    fn drop(&mut self) {
-        // A reaped child's group id is no longer ours to signal: the number
-        // may already name somebody else's work.
-        if self.child.id().is_none() {
-            return;
-        }
-        let _ = self.child.start_kill();
-    }
-}
+pub type Adapter = Tree;
 
 /// What a spawn hands back: the tree, and the two ends of its conversation.
 pub struct Spawned {
@@ -57,28 +40,28 @@ pub fn spawn(
     env: &BTreeMap<String, String>,
     cwd: &Path,
 ) -> Result<Spawned, AcpError> {
-    let mut child = wrapped(command, args, env, cwd).spawn().map_err(|e| {
+    let mut child = bingo_process::tree(process(command, args, env, cwd)).map_err(|e| {
         AcpError::Spawn(format!(
             "could not start the ACP adapter `{command}`: {e}. \
              The first-tier adapters are node packages; `npx` must be on PATH."
         ))
     })?;
-    drain_stderr(child.as_mut());
-    let reader = take_pipe(child.stdout().take(), "stdout")?;
-    let writer = take_pipe(child.stdin().take(), "stdin")?;
+    drain_stderr(&mut child);
+    let reader = take_pipe(child.take_stdout(), "stdout")?;
+    let writer = take_pipe(child.take_stdin(), "stdin")?;
     Ok(Spawned {
-        adapter: Adapter { child },
+        adapter: child,
         reader,
         writer,
     })
 }
 
-fn wrapped(
+fn process(
     command: &str,
     args: &[String],
     env: &BTreeMap<String, String>,
     cwd: &Path,
-) -> CommandWrap {
+) -> tokio::process::Command {
     let mut process = tokio::process::Command::new(command);
     process
         .args(args)
@@ -87,16 +70,7 @@ fn wrapped(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut wrapped = CommandWrap::from(process);
-    // One handle for the whole tree, so an ended session takes the npx tree
-    // with it. The two platforms spell that differently: a process group on
-    // unix, a job object on Windows.
-    #[cfg(unix)]
-    wrapped.wrap(ProcessGroup::leader());
-    #[cfg(windows)]
-    wrapped.wrap(JobObject);
-    wrapped.wrap(KillOnDrop);
-    wrapped
+    process
 }
 
 fn take_pipe<T>(pipe: Option<T>, which: &str) -> Result<T, AcpError> {
@@ -105,8 +79,8 @@ fn take_pipe<T>(pipe: Option<T>, which: &str) -> Result<T, AcpError> {
 
 /// An adapter logs to stderr, sometimes a lot of it. Nothing here reads those
 /// lines for meaning; they are read so the pipe never fills.
-fn drain_stderr(child: &mut dyn ChildWrapper) {
-    let Some(mut stderr) = child.stderr().take() else {
+fn drain_stderr(child: &mut Tree) {
+    let Some(mut stderr) = child.take_stderr() else {
         return;
     };
     tokio::spawn(async move {
@@ -167,7 +141,7 @@ mod tests {
             lines.next_line().await.expect("a line").as_deref(),
             Some("heard hello")
         );
-        let id = adapter.child.id();
+        let id = adapter.id();
         assert!(id.is_some(), "a live child has a pid");
         drop(adapter);
     }

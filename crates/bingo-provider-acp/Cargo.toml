@@ -12,6 +12,7 @@ description = "Agent Client Protocol adapters as model providers"
 workspace = true
 
 [dependencies]
+bingo-process.workspace = true
 bingo-services.workspace = true
 bingo-sdk.workspace = true
 # ADR-0035 §2: the message types are the contract; the transport is ours. The
@@ -28,7 +29,6 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 schemars.workspace = true
-process-wrap.workspace = true
 jiff.workspace = true
 # M39 (ADR-0036 §3): the MCP server half of the crate this workspace already
 # pins for its MCP client. `server` brings the async-read/write transport the
