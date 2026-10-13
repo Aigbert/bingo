@@ -297,6 +297,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bingo-alarm"
+version = "0.6.6"
+dependencies = [
+ "bingo-sdk",
+ "jiff",
+ "tokio",
+]
+
+[[package]]
 name = "bingo-auth-oauth"
 version = "0.6.6"
 dependencies = [
@@ -393,6 +402,18 @@ version = "0.6.6"
 dependencies = [
  "tempfile",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "bingo-collab"
+version = "0.6.6"
+dependencies = [
+ "bingo-sdk",
+ "bingo-services",
+ "jiff",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
