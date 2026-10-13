@@ -78,14 +78,14 @@ behaviour and pins it with tests that will survive that refactor.
 
 ## Exit criteria
 
-- [ ] The withdrawn-text tests fail before brick 2 and pass after:
+- [x] The withdrawn-text tests fail before brick 2 and pass after:
       `cargo test -p bingo-core retry` output pasted, both runs.
-- [ ] Resume after a retry does not resend withdrawn text (test above).
-- [ ] A failing append is never applied, broadcast or observed, and the
+- [x] Resume after a retry does not resend withdrawn text (test above).
+- [x] A failing append is never applied, broadcast or observed, and the
       session ends with `SessionClosed { Error }` seen by a subscriber.
-- [ ] A failing summary write after a good journal line is `Ok` and the
+- [x] A failing summary write after a good journal line is `Ok` and the
       line replays.
-- [ ] All gates of the execution protocol, including the Windows check
+- [x] All gates of the execution protocol, including the Windows check
       for `bingo-core` and `bingo-store-jsonl`.
 
 ## Non-goals
@@ -112,3 +112,39 @@ must not acknowledge failed writes. Existing `ScriptedProvider` records
 requests; no provider dependency is needed. `summary::write` renames a
 temporary file, so a read-only destination does not fail reliably on Unix.
 Use a destination directory to test the same failure portably.
+
+## Verified (2026-10-13)
+
+Regression outputs below are before / after implementation. Gates exited 0.
+Workspace: 4,958 passed; three existing ignores (100MiB stress, storyboard play/preview).
+ACP token tests ran alone via `RUST_TEST_THREADS=1`; no test was newly skipped.
+```text
+$ cargo test -p bingo-core retry
+ test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 402 filtered out; finished in 0.03s
+ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 402 filtered out; finished in 0.01s
+$ cargo test -p bingo-core storage_failure
+ test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 406 filtered out; finished in 0.07s
+ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 406 filtered out; finished in 0.00s
+$ cargo test -p bingo-store-jsonl summary_failure
+ test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 37 filtered out; finished in 0.02s
+ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 37 filtered out; finished in 0.00s
+$ cargo fmt --all -- --check
+(no output; exit 0)
+$ cargo check --workspace --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.27s
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.97s
+$ RUST_TEST_THREADS=1 cargo test --workspace --locked
+ test result: ok. 410 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.12s
+ test a_second_concurrent_stream_on_one_token_is_refused ... ok
+$ scripts/check_discipline.sh
+ discipline ok
+$ scripts/budget.sh
+ budget ok
+$ cargo deny check
+ advisories ok, bans ok, licenses ok, sources ok
+$ cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.92s
+$ cargo check -p bingo-store-jsonl --all-targets --target x86_64-pc-windows-msvc
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.56s
+```
