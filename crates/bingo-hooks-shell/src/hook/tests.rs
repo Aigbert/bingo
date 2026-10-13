@@ -9,7 +9,7 @@ use bingo_sdk::{
 use jiff::Timestamp;
 use serde_json::json;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// A hook set, the directory it works in, and the session it runs for.
 struct Fixture {
@@ -241,11 +241,13 @@ async fn a_hook_past_its_deadline_is_killed_and_decides_nothing() {
     let f = Fixture::new(json!({"PreToolUse": [{"hooks": [
         {"type": "command", "command": "sleep 30", "timeout": 0}
     ]}]}));
-    let started = Instant::now();
-    let outcome = f.hooks.before_tool(&mut bash(), &f.cx).await;
-    let elapsed = started.elapsed();
+    let outcome = tokio::time::timeout(
+        Duration::from_secs(1),
+        f.hooks.before_tool(&mut bash(), &f.cx),
+    )
+    .await
+    .expect("the expired hook did not finish");
     assert_eq!(outcome, HookOutcome::Continue);
-    assert!(elapsed < Duration::from_secs(1), "took {elapsed:?}");
 }
 
 #[tokio::test]
@@ -261,12 +263,12 @@ async fn output_that_is_not_json_decides_nothing() {
 async fn a_large_input_and_a_hook_that_never_reads_it_still_finishes() {
     let f = Fixture::new(pre_tool_use(&["exit 0"]));
     let mut big = call("Write", json!({"content": "x".repeat(64 * 1024)}));
-    let started = Instant::now();
     assert_eq!(
-        f.hooks.before_tool(&mut big, &f.cx).await,
+        tokio::time::timeout(Duration::from_secs(5), f.hooks.before_tool(&mut big, &f.cx))
+            .await
+            .expect("it hung"),
         HookOutcome::Continue
     );
-    assert!(started.elapsed() < Duration::from_secs(5), "it hung");
 }
 
 #[tokio::test]
@@ -597,10 +599,12 @@ async fn a_session_end_hook_does_not_hold_the_teardown() {
     let f = Fixture::new(json!({"SessionEnd": [{"hooks": [
         {"type": "command", "command": "sleep 30"}
     ]}]}));
-    let started = Instant::now();
-    f.hooks.on_session(Phase::End, &f.cx).await;
-    let elapsed = started.elapsed();
-    assert!(elapsed < Duration::from_secs(3), "took {elapsed:?}");
+    tokio::time::timeout(
+        Duration::from_secs(3),
+        f.hooks.on_session(Phase::End, &f.cx),
+    )
+    .await
+    .expect("the session end hook held teardown");
 }
 
 #[test]
