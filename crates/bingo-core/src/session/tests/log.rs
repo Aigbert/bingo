@@ -160,6 +160,7 @@ async fn a_resumed_session_restates_its_extensions_for_the_observers() {
     let seen = Arc::new(Seen::default());
     let provider = ScriptedProvider::new(vec![]);
     let observer = seen.clone();
+    let spec = Arc::new(crate::spec::spec_of(&state));
     let second = resume(journal, None, Services::none(), move |_| {
         let mut cfg = config(provider, vec![], Arc::new(NoHost));
         cfg.model = None;
