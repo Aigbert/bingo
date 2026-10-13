@@ -88,6 +88,7 @@ export function runtime(peer: Peer, register: Register) {
       return request => before(event, request);
     };
     return { protocol: 2, name: params.pluginName, version: '0.1.0', capabilities,
+      commands: negotiated.has('callback/run') ? [{name:`${params.pluginName}:ui`,aliases:[],hint:'',args:{kind:'none'},instant:true,hidden:true,family:'ui'}] : [],
       links: catalogue ? [] : [...hooked, ...observed].map(point => ({ point, after: true })),
       subscriptions: catalogue && hooks.entries.length ? [{ patterns: [...new Set(hooks.entries.map(entry => entry.pattern))], prefilter: null }] : [] } as InitializeResult;
   });

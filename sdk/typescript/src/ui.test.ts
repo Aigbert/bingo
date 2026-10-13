@@ -45,3 +45,16 @@ test('Escape raises close in the mod and removes only its current closable pane'
   assert.deepEqual(calls.at(-1).params,{session:'session',id:'counter'});
   assert.deepEqual(await handlers.fire('session',{handler:'unknown',event:'close'},port,dispatch),{stale:true});
 });
+
+test('the Node runtime declares its own hidden UI handler command', async () => {
+  const { Peer } = await import('./rpc.ts');
+  const { runtime } = await import('./plugin.ts');
+  let process: InstanceType<typeof Peer>;
+  const host = new Peer(message => { void process.receive(message); });
+  process = new Peer(message => { void host.receive(message); });
+  const running = runtime(process, () => {});
+  try {
+    const initialized: any = await host.request('initialize', {protocol:2,pluginName:'counter',pluginRoot:'.',config:{},capabilities:['callback/run','host/ui/invalidate']});
+    assert.deepEqual(initialized.commands, [{name:'counter:ui',aliases:[],hint:'',args:{kind:'none'},instant:true,hidden:true,family:'ui'}]);
+  } finally {running.close();process.close();host.close();}
+});
