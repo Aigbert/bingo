@@ -982,3 +982,5 @@ mod hook_contract;
 
 #[path = "../chain/turn_tests.rs"]
 mod chain;
+
+mod agent_turn;
