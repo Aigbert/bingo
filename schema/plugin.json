@@ -4078,6 +4078,7 @@
         "prompt.submit",
         "tool.check",
         "tool.call",
+        "model.complete",
         "turn.step",
         "prompt.compose",
         "session.compact",

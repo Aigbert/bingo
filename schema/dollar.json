@@ -1,0 +1,3866 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Messages": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "page": {
+          "$ref": "#/$defs/HistoryPage"
+        }
+      },
+      "required": [
+        "session",
+        "page"
+      ]
+    },
+    "SessionId": {
+      "type": "string",
+      "description": "One persisted context: one journal, one actor."
+    },
+    "HistoryPage": {
+      "type": "object",
+      "properties": {
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ItemId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 0
+        },
+        "maxBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0,
+          "description": "Optional byte budget for the whole JSON-RPC response; absent preserves\n`limit == 0` meaning all, not an implicit bounded page."
+        },
+        "generation": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Reject a stale page after a rewind/compaction rather than mixing views."
+        }
+      }
+    },
+    "ItemId": {
+      "type": "string",
+      "description": "One unit in the transcript order."
+    },
+    "HistoryChunk": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Item"
+          }
+        },
+        "next": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ItemId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "generation": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "oversized": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OversizedItem"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "This item alone cannot fit the requested page. Fetch it explicitly in\nparts before following `next`, which excludes that item."
+        }
+      },
+      "required": [
+        "items",
+        "generation"
+      ]
+    },
+    "Item": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ItemId"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "round": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 0
+        },
+        "status": {
+          "$ref": "#/$defs/ItemStatus"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "intent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntentId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The client intent that produced this item, when one did (user items)."
+        },
+        "body": {
+          "$ref": "#/$defs/ItemBody"
+        },
+        "meta": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "startedAt",
+        "body"
+      ]
+    },
+    "TurnId": {
+      "type": "string",
+      "description": "One run of the turn loop, closed exactly once."
+    },
+    "ItemStatus": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "interrupted"
+      ]
+    },
+    "IntentId": {
+      "type": "string",
+      "description": "A client-minted write id; the outcome arrives as `IntentAck`."
+    },
+    "ItemBody": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "parts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ContentPart"
+              }
+            },
+            "origin": {
+              "$ref": "#/$defs/Origin"
+            },
+            "kind": {
+              "type": "string",
+              "const": "user"
+            }
+          },
+          "required": [
+            "kind",
+            "parts",
+            "origin"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "assistant"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "providerMetadata": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "reasoning"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "callId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "input": true,
+            "output": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolOutput"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "progress": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "durationMs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "quiet": {
+              "type": "boolean"
+            },
+            "kind": {
+              "type": "string",
+              "const": "toolCall"
+            }
+          },
+          "required": [
+            "kind",
+            "callId",
+            "name",
+            "input"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string"
+            },
+            "output": {
+              "type": "string"
+            },
+            "exit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "cwd": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "shell"
+            }
+          },
+          "required": [
+            "kind",
+            "command",
+            "output",
+            "cwd"
+          ],
+          "description": "A shell line a person ran themselves (`!<command>`, ADR-0008 §5): no\nturn was spent on it and no model asked for it. `exit` is the code the\ncommand came to; `None` says it never reached one — its timeout or an\ninterrupt ended it, and `output` carries the line that says which."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "args": {
+              "default": null
+            },
+            "result": true,
+            "kind": {
+              "type": "string",
+              "const": "action"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "description": "A long-running non-turn operation (login, reconnect, team start)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "summary": {
+              "type": "string"
+            },
+            "replaced": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "before": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "after": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "durationMs": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "compaction"
+            }
+          },
+          "required": [
+            "kind",
+            "summary",
+            "replaced",
+            "before",
+            "after",
+            "durationMs"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "toTurn": {
+              "$ref": "#/$defs/TurnId"
+            },
+            "dropped": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "rewind"
+            }
+          },
+          "required": [
+            "kind",
+            "toTurn",
+            "dropped"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "marker": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "interruption"
+            }
+          },
+          "required": [
+            "kind",
+            "marker"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "level": {
+              "$ref": "#/$defs/Level"
+            },
+            "code": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "notice"
+            }
+          },
+          "required": [
+            "kind",
+            "level",
+            "code",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "interaction": {
+              "$ref": "#/$defs/InteractionId"
+            },
+            "question": {
+              "type": "string"
+            },
+            "answer": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "questionAnswer"
+            }
+          },
+          "required": [
+            "kind",
+            "interaction",
+            "question",
+            "answer"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "interaction": {
+              "$ref": "#/$defs/InteractionId"
+            },
+            "tool": {
+              "type": "string"
+            },
+            "decision": {
+              "$ref": "#/$defs/DecisionKind"
+            },
+            "feedback": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "permissionReceipt"
+            }
+          },
+          "required": [
+            "kind",
+            "interaction",
+            "tool",
+            "decision"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string"
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "asset"
+            }
+          },
+          "required": [
+            "kind",
+            "asset"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "A payload this build cannot read, carried without interpretation."
+        }
+      ]
+    },
+    "ContentPart": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "text"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        },
+        {
+          "$ref": "#/$defs/Image",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "image"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "input": true,
+            "type": {
+              "type": "string",
+              "const": "toolUse"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "name",
+            "input"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "toolUseId": {
+              "type": "string"
+            },
+            "parts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ContentPart"
+              }
+            },
+            "isError": {
+              "type": "boolean",
+              "default": false
+            },
+            "type": {
+              "type": "string",
+              "const": "toolResult"
+            }
+          },
+          "required": [
+            "type",
+            "toolUseId",
+            "parts"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "providerMetadata": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "reasoning"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        }
+      ]
+    },
+    "Image": {
+      "type": "object",
+      "properties": {
+        "mediaType": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string",
+          "description": "Base64 payload."
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where the same bytes are on this machine, when they are anywhere: a\npicture read off a disk, or one a surface wrote before handing it on\n(ADR-0052). A location, not a second copy — absent from the wire and\nthe journal when there is none, so a picture without one is the\nbytes it always was."
+        }
+      },
+      "required": [
+        "mediaType",
+        "data"
+      ],
+      "description": "A picture handed to the model, already the shape the journal keeps and a\nprovider's request encodes: one struct, so a surface that reads a picture\noff disk, a wire client that already holds the bytes, and a tool result\nthat returns one all produce the same thing."
+    },
+    "Origin": {
+      "type": "object",
+      "properties": {
+        "voice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Voice"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "surface": {
+          "type": "string"
+        },
+        "principal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conversation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "surface"
+      ],
+      "description": "Who submitted the input, as every surface records it."
+    },
+    "Voice": {
+      "type": "string",
+      "enum": [
+        "said",
+        "note",
+        "quiet",
+        "aside"
+      ],
+      "description": "How a producer intends an utterance to be drawn."
+    },
+    "ToolOutput": {
+      "type": "object",
+      "properties": {
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentPart"
+          }
+        },
+        "isError": {
+          "type": "boolean"
+        },
+        "display": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/View"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "parts"
+      ],
+      "description": "What a tool returned: the parts the model sees, plus what a person sees\ninstead when the tool has something better than the text (ADR-0013 §2)."
+    },
+    "View": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "text"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "markdown"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "lang": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "code"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unified": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "diff"
+            }
+          },
+          "required": [
+            "kind",
+            "unified"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "list"
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "headers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "table"
+            }
+          },
+          "required": [
+            "kind",
+            "headers",
+            "rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "keyValue"
+            }
+          },
+          "required": [
+            "kind",
+            "rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "total": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0,
+              "description": "Unbounded when absent: the surface shows activity, not a fraction."
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "progress"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "tone": {
+              "$ref": "#/$defs/Tone",
+              "default": "neutral"
+            },
+            "kind": {
+              "type": "string",
+              "const": "badge"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "nodes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TreeNode"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "tree"
+            }
+          },
+          "required": [
+            "kind",
+            "nodes"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/View"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "stack"
+            }
+          },
+          "required": [
+            "kind",
+            "children"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/View"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "columns"
+            }
+          },
+          "required": [
+            "kind",
+            "children"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "child": {
+              "$ref": "#/$defs/View"
+            },
+            "kind": {
+              "type": "string",
+              "const": "panel"
+            }
+          },
+          "required": [
+            "kind",
+            "title",
+            "child"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ActionItem"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "actions"
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "customKind": {
+              "type": "string"
+            },
+            "data": true,
+            "fold": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "custom"
+            }
+          },
+          "required": [
+            "kind",
+            "customKind",
+            "data",
+            "fold"
+          ],
+          "description": "A word this sdk does not have (ADR-0038 §1): `kind` is the emitter's\nown name for the element, namespaced by its plugin (`demo.sparkline`),\n`data` is whatever shape that plugin documents, and `fold` is the text\nevery surface that has not learned the kind shows instead.\n\nIt is also where an unknown `kind` off the wire lands, and then `data`\nis the whole node as it arrived — nothing said is lost, whether or not\nthis sdk has the word for it."
+        }
+      ]
+    },
+    "Tone": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "neutral",
+            "good",
+            "bad"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "attention",
+          "description": "Wants a person: a surface makes it move."
+        }
+      ],
+      "description": "The one styling hook a plugin has; the surface owns the colour."
+    },
+    "TreeNode": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "badge": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tone": {
+          "$ref": "#/$defs/Tone",
+          "default": "neutral"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TreeNode"
+          }
+        }
+      },
+      "required": [
+        "label"
+      ]
+    },
+    "ActionItem": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/Action"
+        },
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 1,
+          "description": "A single-key hint; the surface may use another key."
+        }
+      },
+      "required": [
+        "label",
+        "action"
+      ],
+      "description": "A button: the surface fires `Input::Action` with `action` (ADR-0008 §1)."
+    },
+    "Action": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "args": {
+          "default": null
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command."
+    },
+    "Level": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warn",
+        "error"
+      ]
+    },
+    "InteractionId": {
+      "type": "string",
+      "description": "A pending question or permission, answered once by id."
+    },
+    "DecisionKind": {
+      "type": "string",
+      "enum": [
+        "allow",
+        "allowSession",
+        "deny"
+      ]
+    },
+    "OversizedItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ItemId"
+        },
+        "totalBytes": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "checksum": {
+          "type": "string",
+          "description": "FNV-1a 64 of the exact serialized Item UTF-8, lowercase hex."
+        }
+      },
+      "required": [
+        "id",
+        "totalBytes",
+        "checksum"
+      ],
+      "description": "The actor's factual observation; only the RPC server can add a\nconnection-scoped availability token after pinning an immutable Item."
+    },
+    "Session": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
+    "ClientIdentity": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "surface": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "surface"
+      ]
+    },
+    "UsageView": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/Usage"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContextUsage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastTurn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Usage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
+    "Usage": {
+      "type": "object",
+      "properties": {
+        "inputTokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "outputTokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "cacheReadTokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 0
+        },
+        "cacheWriteTokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 0
+        },
+        "reasoningTokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 0
+        }
+      },
+      "required": [
+        "inputTokens",
+        "outputTokens"
+      ],
+      "description": "Token counts as the provider reports them, the three input counts kept\napart: `input_tokens` is what the model read fresh, the cache counts are\nwhat it read from or wrote to a cached prefix. The whole input side is\n`input_total()`."
+    },
+    "ContextUsage": {
+      "type": "object",
+      "properties": {
+        "used": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Tokens the next request would carry, anchored on the server's last count."
+        },
+        "window": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "The input side of the model's window: what is left once the output\nbudget is reserved (ADR-0006)."
+        },
+        "trigger": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "`used` at which the older turns are summarised, equal to `window`\nwhere the kernel draws no line because the endpoint holds the context\nand cuts it itself (ADR-0055 §2)."
+        }
+      },
+      "required": [
+        "used",
+        "window",
+        "trigger"
+      ],
+      "description": "The one ruler for context: used tokens, the model window, and the point at\nwhich compaction triggers."
+    },
+    "Send": {
+      "type": "object",
+      "properties": {
+        "to": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "input": {
+          "$ref": "#/$defs/Input"
+        },
+        "delivery": {
+          "$ref": "#/$defs/Delivery"
+        }
+      },
+      "required": [
+        "to",
+        "input",
+        "delivery"
+      ]
+    },
+    "Input": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "images": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Image"
+              },
+              "description": "The pictures the ask carries, in the order they reach the journal\n(ADR-0040): exactly as they will be journaled, because a surface\nresolves a picture and the kernel does no file I/O for input."
+            },
+            "origin": {
+              "$ref": "#/$defs/Origin"
+            },
+            "delivery": {
+              "$ref": "#/$defs/Delivery",
+              "description": "Whether a running turn may be steered with it (ADR-0008 §2,\namended M68). `Wake` is the line every client has always sent, so\nit is the default and nothing is written for it."
+            },
+            "kind": {
+              "type": "string",
+              "const": "text"
+            }
+          },
+          "required": [
+            "kind",
+            "text",
+            "origin"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "$ref": "#/$defs/Action"
+            },
+            "kind": {
+              "type": "string",
+              "const": "action"
+            }
+          },
+          "required": [
+            "kind",
+            "action"
+          ]
+        }
+      ],
+      "description": "The one submission entry. The kernel parses `/`, `!` and `@` in text and\ndecides turn, queue, steer or deliver; a client never chooses."
+    },
+    "Delivery": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "wake",
+          "description": "An idle target opens a turn on it; a busy one absorbs it at the next barrier."
+        },
+        {
+          "type": "string",
+          "const": "hold",
+          "description": "It waits in the queue for whatever opens the next turn."
+        }
+      ],
+      "description": "How a line reaches a session's queue: a peer's message (ADR-0010 §1) and\na person's own line are the same question, so they are the same word."
+    },
+    "Extend": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "key": {
+          "type": "string"
+        },
+        "value": true
+      },
+      "required": [
+        "session",
+        "key",
+        "value"
+      ]
+    },
+    "Authorize": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "kind": {
+          "$ref": "#/$defs/InteractionKind"
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AnswerSpec"
+          }
+        }
+      },
+      "required": [
+        "session",
+        "kind",
+        "answers"
+      ]
+    },
+    "InteractionKind": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tool": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "preview": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Preview"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sessionScope": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The rule `AllowSession` would install, when one would silence the prompt."
+            },
+            "kind": {
+              "type": "string",
+              "const": "permission"
+            }
+          },
+          "required": [
+            "kind",
+            "tool",
+            "summary"
+          ]
+        },
+        {
+          "$ref": "#/$defs/Question",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "question"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "description": "One question on its own. It holds [`Question`] flattened, so the frame\nit makes is the one it always was."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What the whole set is about, in the asker's own words: an MCP\nserver's elicitation says which server is asking. A set the model\nopened has nothing to add to its own questions and names none."
+            },
+            "questions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Question"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "form"
+            }
+          },
+          "required": [
+            "kind",
+            "questions"
+          ],
+          "description": "A set of questions put at once and answered together (M53). Every\nquestion is the same [`Question`] a lone one is."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "confirm"
+            }
+          },
+          "required": [
+            "kind",
+            "title",
+            "detail"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string"
+            },
+            "flow": {
+              "$ref": "#/$defs/LoginFlow"
+            },
+            "kind": {
+              "type": "string",
+              "const": "login"
+            }
+          },
+          "required": [
+            "kind",
+            "provider",
+            "flow"
+          ]
+        }
+      ]
+    },
+    "Preview": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "unified": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "diff"
+            }
+          },
+          "required": [
+            "kind",
+            "unified"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string"
+            },
+            "cwd": {
+              "type": "string"
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "command"
+            }
+          },
+          "required": [
+            "kind",
+            "command",
+            "cwd"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "url"
+            }
+          },
+          "required": [
+            "kind",
+            "url"
+          ]
+        }
+      ]
+    },
+    "QuestionOption": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnswerRole"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What picking it would mean to a session that answers for the person\n(ADR-0039 §2). Unmarked options are a person's alone."
+        },
+        "preview": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A few lines of monospace shown beside the option while the cursor is\non it — the layout or the snippet picking it would mean (M53)."
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ]
+    },
+    "AnswerRole": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "allowing",
+          "description": "\"Let it happen.\""
+        },
+        {
+          "type": "string",
+          "const": "refusing",
+          "description": "The refusal a question falls to when nobody answers it."
+        }
+      ],
+      "description": "The two options a session may answer a question with when nobody is asked\n(ADR-0039 §2). The asker names them in its own words; the kernel reads\nwhich is which and never the words."
+    },
+    "Question": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string"
+        },
+        "header": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A short tag a surface may show before the question (`Auth method`)."
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QuestionOption"
+          }
+        },
+        "freeText": {
+          "type": "boolean",
+          "default": false
+        },
+        "multi": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "question",
+        "options"
+      ],
+      "description": "One question put to a person: what is asked, what may be picked, and\nwhether words of one's own or more than one option count. A lone question\nand one of a form are the same thing (M53)."
+    },
+    "LoginFlow": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "browser"
+            }
+          },
+          "required": [
+            "kind",
+            "url"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "device"
+            }
+          },
+          "required": [
+            "kind",
+            "url",
+            "code"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "paste"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "AnswerSpec": {
+      "type": "string",
+      "enum": [
+        "allowOnce",
+        "allowSession",
+        "deny",
+        "choice",
+        "text",
+        "confirm",
+        "cancel",
+        "form"
+      ]
+    },
+    "Answer": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "allowOnce"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "scope": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "allowSession"
+            }
+          },
+          "required": [
+            "kind",
+            "scope"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "feedback": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "deny"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "other": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "choice"
+            }
+          },
+          "required": [
+            "kind",
+            "ids"
+          ],
+          "description": "The options ticked and, beside them, the words a person typed of their\nown (M59): a question may be answered both ways at once, and dropping\neither half loses what they said. An old frame carries no `other` and\nreads as the ticks alone. Words with nothing ticked are\n[`Answer::Text`], which is what a question answered in words alone has\nalways been."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "text"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "confirm"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "cancel"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answers": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Answer"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "form"
+            }
+          },
+          "required": [
+            "kind",
+            "answers"
+          ],
+          "description": "A form's answers, one per question in the order they were asked; a\nquestion nobody answered is [`Answer::Cancel`] in its place (M53)."
+        }
+      ]
+    },
+    "Submit": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "input": {
+          "$ref": "#/$defs/Input"
+        }
+      },
+      "required": [
+        "session",
+        "input"
+      ]
+    },
+    "PromptView": {
+      "type": "object",
+      "properties": {
+        "queue": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QueueEntry"
+          }
+        },
+        "last": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "queue"
+      ]
+    },
+    "QueueEntry": {
+      "type": "object",
+      "properties": {
+        "intent": {
+          "$ref": "#/$defs/IntentId"
+        },
+        "position": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "preview": {
+          "type": "string"
+        },
+        "steerable": {
+          "type": "boolean"
+        },
+        "origin": {
+          "$ref": "#/$defs/Origin"
+        }
+      },
+      "required": [
+        "intent",
+        "position",
+        "preview",
+        "steerable",
+        "origin"
+      ]
+    },
+    "Catalog": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/CatalogKind"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CatalogEntry"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "entries"
+      ]
+    },
+    "CatalogKind": {
+      "type": "string",
+      "enum": [
+        "models",
+        "providers",
+        "tools",
+        "commands",
+        "plugins"
+      ]
+    },
+    "CatalogEntry": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "meta": {
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ]
+    },
+    "Invoke": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "call": {
+          "$ref": "#/$defs/ToolCall"
+        }
+      },
+      "required": [
+        "session",
+        "call"
+      ]
+    },
+    "ToolCall": {
+      "type": "object",
+      "properties": {
+        "callId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "input": true
+      },
+      "required": [
+        "callId",
+        "name",
+        "input"
+      ],
+      "description": "A call the model asked for, before or after the gate."
+    },
+    "RegisterTool": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "spec": {
+          "$ref": "#/$defs/ToolSpec"
+        },
+        "callback": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "spec",
+        "callback"
+      ]
+    },
+    "ToolSpec": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "inputSchema": true,
+        "meta": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "What a catalogue may show beside the tool (an MCP tool's `server`);\nnever sent to a model."
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "inputSchema"
+      ],
+      "description": "A tool as the model sees it."
+    },
+    "Run": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "name": {
+          "type": "string"
+        },
+        "args": true
+      },
+      "required": [
+        "session",
+        "name",
+        "args"
+      ]
+    },
+    "RegisterCommand": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "spec": {
+          "$ref": "#/$defs/CommandSpec"
+        },
+        "callback": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "spec",
+        "callback"
+      ]
+    },
+    "CommandSpec": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "hint": {
+          "type": "string",
+          "description": "A one-line description for the command menu; argument syntax belongs in `args`."
+        },
+        "args": {
+          "$ref": "#/$defs/ArgSpec"
+        },
+        "instant": {
+          "type": "boolean",
+          "description": "May run while a turn is busy (read-only commands).",
+          "default": false
+        },
+        "family": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "hint",
+        "args",
+        "family"
+      ]
+    },
+    "ArgSpec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "none"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "hint": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "free"
+            }
+          },
+          "required": [
+            "kind",
+            "hint"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "catalog"
+            }
+          },
+          "required": [
+            "kind",
+            "source"
+          ],
+          "description": "Completed from a catalog kind the command validates against."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArgSpec"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "words"
+            }
+          },
+          "required": [
+            "kind",
+            "values"
+          ],
+          "description": "One of the words the command lists itself, in the order it offers\nthem. A surface completes from the list; the kernel carries it.\n\n`then` says what the word after one of `values` is — the name\n`/plugins enable` takes, the server `/mcp reconnect` takes — and is\nabsent for a command whose argument ends at the first word, so every\nspec written before it reads the same (ADR-0008 §6a)."
+        }
+      ]
+    },
+    "ConfigView": {
+      "type": "object",
+      "properties": {
+        "kernel": {
+          "default": null
+        },
+        "plugins": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      },
+      "description": "Configuration as a client sees it: the kernel's keys and each plugin's claimed slice."
+    },
+    "Read": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "key"
+      ]
+    },
+    "Setting": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "key": {
+          "type": "string"
+        },
+        "value": true
+      },
+      "required": [
+        "session",
+        "key",
+        "value"
+      ]
+    },
+    "Complete": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request": {
+          "$ref": "#/$defs/ModelRequest"
+        }
+      },
+      "required": [
+        "session",
+        "request"
+      ]
+    },
+    "ModelRequest": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "maxTokens": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "system": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SystemBlock"
+          }
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Message"
+          }
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolSpec"
+          }
+        },
+        "reasoning": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Effort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whose turn this is. A stateless provider ignores it; one that keeps a\nconversation of its own per session — an ACP adapter holding one agent\nsession per bingo session (ADR-0035 §3), a stateful wire like the\nResponses API — has no other way to know which conversation it is\nanswering. `None` is a request built by hand or a side question, which\nbelongs to no session."
+        },
+        "providerOptions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "required": [
+        "model",
+        "maxTokens",
+        "system",
+        "messages",
+        "tools"
+      ]
+    },
+    "SystemBlock": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "cache": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "description": "One cacheable segment of the system prompt."
+    },
+    "Message": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentPart"
+          }
+        },
+        "providerOptions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "required": [
+        "role",
+        "parts"
+      ]
+    },
+    "Role": {
+      "type": "string",
+      "enum": [
+        "user",
+        "assistant"
+      ]
+    },
+    "Effort": {
+      "type": "string",
+      "enum": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xHigh",
+        "max"
+      ],
+      "description": "Reasoning effort, in the vocabulary providers converge on."
+    },
+    "Completed": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelEvent"
+          }
+        }
+      },
+      "required": [
+        "events"
+      ]
+    },
+    "ModelEvent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "type": {
+              "type": "string",
+              "const": "streamStart"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "model": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "responseMetadata"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "textStart"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "delta": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "textDelta"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "delta"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "textEnd"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "reasoningStart"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "delta": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "reasoningDelta"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "delta"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "providerMetadata": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "reasoningEnd"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "toolInputStart"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "delta": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "toolInputDelta"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "delta"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "toolInputEnd"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "input": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "toolCall"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "name",
+            "input"
+          ],
+          "description": "The complete call. `input` is the raw JSON text; the loop parses it once."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "used": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "window": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "context"
+            }
+          },
+          "required": [
+            "type",
+            "used",
+            "window"
+          ],
+          "description": "What the endpoint says it is holding for this session: its own count,\nagainst its own window (ADR-0055 §2). Sent as often as it likes; the\nlast one of a round is what that round reports."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "before": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "after": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "compacted"
+            }
+          },
+          "required": [
+            "type",
+            "before",
+            "after"
+          ],
+          "description": "A cut the endpoint made in the context it holds (ADR-0055 §3). The\njournal lost nothing by it: it is a row, not a rewrite."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "usage": {
+              "$ref": "#/$defs/Usage"
+            },
+            "finishReason": {
+              "$ref": "#/$defs/FinishReason"
+            },
+            "type": {
+              "type": "string",
+              "const": "finish"
+            }
+          },
+          "required": [
+            "type",
+            "usage",
+            "finishReason"
+          ]
+        }
+      ],
+      "description": "Provider stream events. Never published; the accumulator folds them into items."
+    },
+    "FinishReason": {
+      "type": "object",
+      "properties": {
+        "unified": {
+          "$ref": "#/$defs/UnifiedFinish"
+        },
+        "raw": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "unified"
+      ]
+    },
+    "UnifiedFinish": {
+      "type": "string",
+      "enum": [
+        "stop",
+        "length",
+        "toolCalls",
+        "contentFilter",
+        "error",
+        "other"
+      ]
+    },
+    "Classify": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "session",
+        "text",
+        "labels"
+      ]
+    },
+    "Fork": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "prompt"
+      ]
+    },
+    "StateGet": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "key"
+      ]
+    },
+    "StateValue": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "value": true
+      },
+      "required": [
+        "version",
+        "value"
+      ]
+    },
+    "StateSet": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "value": true,
+        "ifVersion": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "scope",
+        "key",
+        "value"
+      ]
+    },
+    "Millis": {
+      "type": "object",
+      "properties": {
+        "ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "ms"
+      ]
+    },
+    "Timer": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "callback": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "ms",
+        "callback"
+      ]
+    },
+    "DollarInputs": {
+      "type": "object",
+      "properties": {
+        "session.messages": {
+          "$ref": "#/$defs/Messages"
+        },
+        "session.cwd": {
+          "$ref": "#/$defs/Session"
+        },
+        "session.root": {
+          "$ref": "#/$defs/Session"
+        },
+        "session.model": {
+          "$ref": "#/$defs/Session"
+        },
+        "session.turns": {
+          "$ref": "#/$defs/Session"
+        },
+        "session.id": {
+          "$ref": "#/$defs/Session"
+        },
+        "session.surfaces": {
+          "$ref": "#/$defs/Session"
+        },
+        "session.usage": {
+          "$ref": "#/$defs/Session"
+        },
+        "session.version": {
+          "type": "null"
+        },
+        "session.compact": {
+          "$ref": "#/$defs/Session"
+        },
+        "session.send": {
+          "$ref": "#/$defs/Send"
+        },
+        "session.append": {
+          "$ref": "#/$defs/Extend"
+        },
+        "session.authorize": {
+          "$ref": "#/$defs/Authorize"
+        },
+        "turn.abort": {
+          "$ref": "#/$defs/Session"
+        },
+        "prompt.submit": {
+          "$ref": "#/$defs/Submit"
+        },
+        "prompt.read": {
+          "$ref": "#/$defs/Session"
+        },
+        "tool.list": {
+          "type": "null"
+        },
+        "tool.call": {
+          "$ref": "#/$defs/Invoke"
+        },
+        "tool.register": {
+          "$ref": "#/$defs/RegisterTool"
+        },
+        "command.list": {
+          "type": "null"
+        },
+        "command.run": {
+          "$ref": "#/$defs/Run"
+        },
+        "command.register": {
+          "$ref": "#/$defs/RegisterCommand"
+        },
+        "config.list": {
+          "$ref": "#/$defs/Session"
+        },
+        "config.read": {
+          "$ref": "#/$defs/Read"
+        },
+        "config.set": {
+          "$ref": "#/$defs/Setting"
+        },
+        "model.complete": {
+          "$ref": "#/$defs/Complete"
+        },
+        "model.classify": {
+          "$ref": "#/$defs/Classify"
+        },
+        "model.fork": {
+          "$ref": "#/$defs/Fork"
+        },
+        "state.get": {
+          "$ref": "#/$defs/StateGet"
+        },
+        "state.set": {
+          "$ref": "#/$defs/StateSet"
+        },
+        "store.get": {
+          "$ref": "#/$defs/StateGet"
+        },
+        "store.set": {
+          "$ref": "#/$defs/StateSet"
+        },
+        "store.delete": {
+          "$ref": "#/$defs/StateGet"
+        },
+        "store.keys": {
+          "type": "null"
+        },
+        "clock.now": {
+          "type": "null"
+        },
+        "clock.sleep": {
+          "$ref": "#/$defs/Millis"
+        },
+        "clock.after": {
+          "$ref": "#/$defs/Timer"
+        },
+        "clock.every": {
+          "$ref": "#/$defs/Timer"
+        }
+      },
+      "required": [
+        "session.messages",
+        "session.cwd",
+        "session.root",
+        "session.model",
+        "session.turns",
+        "session.id",
+        "session.surfaces",
+        "session.usage",
+        "session.version",
+        "session.compact",
+        "session.send",
+        "session.append",
+        "session.authorize",
+        "turn.abort",
+        "prompt.submit",
+        "prompt.read",
+        "tool.list",
+        "tool.call",
+        "tool.register",
+        "command.list",
+        "command.run",
+        "command.register",
+        "config.list",
+        "config.read",
+        "config.set",
+        "model.complete",
+        "model.classify",
+        "model.fork",
+        "state.get",
+        "state.set",
+        "store.get",
+        "store.set",
+        "store.delete",
+        "store.keys",
+        "clock.now",
+        "clock.sleep",
+        "clock.after",
+        "clock.every"
+      ],
+      "additionalProperties": false
+    },
+    "DollarResults": {
+      "type": "object",
+      "properties": {
+        "session.messages": {
+          "$ref": "#/$defs/HistoryChunk"
+        },
+        "session.cwd": {
+          "type": "string"
+        },
+        "session.root": {
+          "type": "string"
+        },
+        "session.model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session.turns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TurnId"
+          }
+        },
+        "session.id": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "session.surfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ClientIdentity"
+          }
+        },
+        "session.usage": {
+          "$ref": "#/$defs/UsageView"
+        },
+        "session.version": {
+          "type": "string"
+        },
+        "session.compact": {
+          "$ref": "#/$defs/IntentId"
+        },
+        "session.send": {
+          "type": "null"
+        },
+        "session.append": {
+          "type": "null"
+        },
+        "session.authorize": {
+          "$ref": "#/$defs/Answer"
+        },
+        "turn.abort": {
+          "type": "null"
+        },
+        "prompt.submit": {
+          "$ref": "#/$defs/IntentId"
+        },
+        "prompt.read": {
+          "$ref": "#/$defs/PromptView"
+        },
+        "tool.list": {
+          "$ref": "#/$defs/Catalog"
+        },
+        "tool.call": {
+          "$ref": "#/$defs/ToolOutput"
+        },
+        "tool.register": {
+          "type": "string"
+        },
+        "command.list": {
+          "$ref": "#/$defs/Catalog"
+        },
+        "command.run": {
+          "$ref": "#/$defs/IntentId"
+        },
+        "command.register": {
+          "type": "string"
+        },
+        "config.list": {
+          "$ref": "#/$defs/ConfigView"
+        },
+        "config.read": true,
+        "config.set": {
+          "type": "null"
+        },
+        "model.complete": {
+          "$ref": "#/$defs/Completed"
+        },
+        "model.classify": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model.fork": {
+          "$ref": "#/$defs/Completed"
+        },
+        "state.get": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StateValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state.set": {
+          "$ref": "#/$defs/StateValue"
+        },
+        "store.get": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StateValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "store.set": {
+          "$ref": "#/$defs/StateValue"
+        },
+        "store.delete": {
+          "type": "boolean"
+        },
+        "store.keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "clock.now": {
+          "type": "string"
+        },
+        "clock.sleep": {
+          "type": "null"
+        },
+        "clock.after": {
+          "type": "string"
+        },
+        "clock.every": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session.messages",
+        "session.cwd",
+        "session.root",
+        "session.model",
+        "session.turns",
+        "session.id",
+        "session.surfaces",
+        "session.usage",
+        "session.version",
+        "session.compact",
+        "session.send",
+        "session.append",
+        "session.authorize",
+        "turn.abort",
+        "prompt.submit",
+        "prompt.read",
+        "tool.list",
+        "tool.call",
+        "tool.register",
+        "command.list",
+        "command.run",
+        "command.register",
+        "config.list",
+        "config.read",
+        "config.set",
+        "model.complete",
+        "model.classify",
+        "model.fork",
+        "state.get",
+        "state.set",
+        "store.get",
+        "store.set",
+        "store.delete",
+        "store.keys",
+        "clock.now",
+        "clock.sleep",
+        "clock.after",
+        "clock.every"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "methods": {
+    "session.messages": {
+      "noun": "session",
+      "method": "messages",
+      "door": {
+        "face": "bingo.plugin.session"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Messages"
+      },
+      "result": {
+        "$ref": "#/$defs/HistoryChunk"
+      }
+    },
+    "session.cwd": {
+      "noun": "session",
+      "method": "cwd",
+      "door": {
+        "face": "bingo.plugin.session"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "type": "string"
+      }
+    },
+    "session.root": {
+      "noun": "session",
+      "method": "root",
+      "door": {
+        "face": "bingo.plugin.session"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "type": "string"
+      }
+    },
+    "session.model": {
+      "noun": "session",
+      "method": "model",
+      "door": {
+        "face": "bingo.plugin.session"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "session.turns": {
+      "noun": "session",
+      "method": "turns",
+      "door": {
+        "face": "bingo.plugin.session"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/TurnId"
+        }
+      }
+    },
+    "session.id": {
+      "noun": "session",
+      "method": "id",
+      "door": {
+        "face": "bingo.plugin.session"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "$ref": "#/$defs/SessionId"
+      }
+    },
+    "session.surfaces": {
+      "noun": "session",
+      "method": "surfaces",
+      "door": {
+        "face": "bingo.plugin.session"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ClientIdentity"
+        }
+      }
+    },
+    "session.usage": {
+      "noun": "session",
+      "method": "usage",
+      "door": {
+        "face": "bingo.plugin.session"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "$ref": "#/$defs/UsageView"
+      }
+    },
+    "session.version": {
+      "noun": "session",
+      "method": "version",
+      "door": {
+        "face": "bingo.plugin.session"
+      },
+      "unsafe": false,
+      "input": {
+        "type": "null"
+      },
+      "result": {
+        "type": "string"
+      }
+    },
+    "session.compact": {
+      "noun": "session",
+      "method": "compact",
+      "door": {
+        "kernel": "session.compact"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "$ref": "#/$defs/IntentId"
+      }
+    },
+    "session.send": {
+      "noun": "session",
+      "method": "send",
+      "door": {
+        "kernel": "session.send"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Send"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "session.append": {
+      "noun": "session",
+      "method": "append",
+      "door": {
+        "kernel": "session.append"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Extend"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "session.authorize": {
+      "noun": "session",
+      "method": "authorize",
+      "door": {
+        "face": "bingo.plugin.session"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Authorize"
+      },
+      "result": {
+        "$ref": "#/$defs/Answer"
+      }
+    },
+    "turn.abort": {
+      "noun": "turn",
+      "method": "abort",
+      "door": {
+        "face": "bingo.plugin.turn"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "prompt.submit": {
+      "noun": "prompt",
+      "method": "submit",
+      "door": {
+        "kernel": "prompt.submit"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Submit"
+      },
+      "result": {
+        "$ref": "#/$defs/IntentId"
+      }
+    },
+    "prompt.read": {
+      "noun": "prompt",
+      "method": "read",
+      "door": {
+        "face": "bingo.plugin.prompt"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "$ref": "#/$defs/PromptView"
+      }
+    },
+    "tool.list": {
+      "noun": "tool",
+      "method": "list",
+      "door": {
+        "face": "bingo.plugin.tool"
+      },
+      "unsafe": false,
+      "input": {
+        "type": "null"
+      },
+      "result": {
+        "$ref": "#/$defs/Catalog"
+      }
+    },
+    "tool.call": {
+      "noun": "tool",
+      "method": "call",
+      "door": {
+        "kernel": "tool.call"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Invoke"
+      },
+      "result": {
+        "$ref": "#/$defs/ToolOutput"
+      }
+    },
+    "tool.register": {
+      "noun": "tool",
+      "method": "register",
+      "door": {
+        "face": "bingo.plugin.tool"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/RegisterTool"
+      },
+      "result": {
+        "type": "string"
+      }
+    },
+    "command.list": {
+      "noun": "command",
+      "method": "list",
+      "door": {
+        "face": "bingo.plugin.command"
+      },
+      "unsafe": false,
+      "input": {
+        "type": "null"
+      },
+      "result": {
+        "$ref": "#/$defs/Catalog"
+      }
+    },
+    "command.run": {
+      "noun": "command",
+      "method": "run",
+      "door": {
+        "kernel": "command.run"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Run"
+      },
+      "result": {
+        "$ref": "#/$defs/IntentId"
+      }
+    },
+    "command.register": {
+      "noun": "command",
+      "method": "register",
+      "door": {
+        "face": "bingo.plugin.command"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/RegisterCommand"
+      },
+      "result": {
+        "type": "string"
+      }
+    },
+    "config.list": {
+      "noun": "config",
+      "method": "list",
+      "door": {
+        "face": "bingo.plugin.config"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "$ref": "#/$defs/ConfigView"
+      }
+    },
+    "config.read": {
+      "noun": "config",
+      "method": "read",
+      "door": {
+        "face": "bingo.plugin.config"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Read"
+      },
+      "result": true
+    },
+    "config.set": {
+      "noun": "config",
+      "method": "set",
+      "door": {
+        "kernel": "config.set"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Setting"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "model.complete": {
+      "noun": "model",
+      "method": "complete",
+      "door": {
+        "kernel": "model.complete"
+      },
+      "unsafe": true,
+      "input": {
+        "$ref": "#/$defs/Complete"
+      },
+      "result": {
+        "$ref": "#/$defs/Completed"
+      }
+    },
+    "model.classify": {
+      "noun": "model",
+      "method": "classify",
+      "door": {
+        "face": "bingo.plugin.model"
+      },
+      "unsafe": true,
+      "input": {
+        "$ref": "#/$defs/Classify"
+      },
+      "result": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "model.fork": {
+      "noun": "model",
+      "method": "fork",
+      "door": {
+        "face": "bingo.plugin.model"
+      },
+      "unsafe": true,
+      "input": {
+        "$ref": "#/$defs/Fork"
+      },
+      "result": {
+        "$ref": "#/$defs/Completed"
+      }
+    },
+    "state.get": {
+      "noun": "state",
+      "method": "get",
+      "door": {
+        "face": "bingo.plugin.state"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/StateGet"
+      },
+      "result": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/StateValue"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "state.set": {
+      "noun": "state",
+      "method": "set",
+      "door": {
+        "face": "bingo.plugin.state"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/StateSet"
+      },
+      "result": {
+        "$ref": "#/$defs/StateValue"
+      }
+    },
+    "store.get": {
+      "noun": "store",
+      "method": "get",
+      "door": {
+        "face": "bingo.plugin.store"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/StateGet"
+      },
+      "result": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/StateValue"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "store.set": {
+      "noun": "store",
+      "method": "set",
+      "door": {
+        "face": "bingo.plugin.store"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/StateSet"
+      },
+      "result": {
+        "$ref": "#/$defs/StateValue"
+      }
+    },
+    "store.delete": {
+      "noun": "store",
+      "method": "delete",
+      "door": {
+        "face": "bingo.plugin.store"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/StateGet"
+      },
+      "result": {
+        "type": "boolean"
+      }
+    },
+    "store.keys": {
+      "noun": "store",
+      "method": "keys",
+      "door": {
+        "face": "bingo.plugin.store"
+      },
+      "unsafe": false,
+      "input": {
+        "type": "null"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "clock.now": {
+      "noun": "clock",
+      "method": "now",
+      "door": {
+        "face": "bingo.plugin.clock"
+      },
+      "unsafe": false,
+      "input": {
+        "type": "null"
+      },
+      "result": {
+        "type": "string"
+      }
+    },
+    "clock.sleep": {
+      "noun": "clock",
+      "method": "sleep",
+      "door": {
+        "face": "bingo.plugin.clock"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Millis"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "clock.after": {
+      "noun": "clock",
+      "method": "after",
+      "door": {
+        "face": "bingo.plugin.clock"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Timer"
+      },
+      "result": {
+        "type": "string"
+      }
+    },
+    "clock.every": {
+      "noun": "clock",
+      "method": "every",
+      "door": {
+        "face": "bingo.plugin.clock"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Timer"
+      },
+      "result": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -633,6 +633,7 @@ dependencies = [
  "bingo-core",
  "bingo-digest",
  "bingo-plugin-host",
+ "bingo-schema-ts",
  "bingo-sdk",
  "futures",
  "getrandom 0.4.3",

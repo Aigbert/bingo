@@ -14,48 +14,21 @@ it: natives in process, and M133's `dollar.ts` under node.
 
 0. **Node re-entry prerequisite (authorized 2026-10-14).** Preserve the shared fixture and bounded assertion; carry per-invocation hook identity across reverse RPC. Bind it at the bridge, isolate concurrent calls, and land a separate fix before runtime features.
 
-1. **The table, as a contract.** `crates/bingo-mods/src/dollar/table.rs` has one row per method: `(noun, method, door, unsafe, input,
-   result)`. A door is `Kernel(&'static Entry)`, whose door already raises a chain of this meaning, so `$` calls it and raises nothing more;
-   or `Face`, a method of a face the runtime registers, raised through the service-wire door by M136's wrapper (ADR-0078 §1). M136's
-   one-namespace rule keeps a name to one owner. A `BINGO_UPDATE_SCHEMA` test writes `schema/dollar.json`, and M133's `render` turns it into
-   `sdk/typescript/src/dollar-types.ts`. Failing test: on M111's test host, a fixture mod calls every row once, a link hooked at each name
-   sees exactly one call, and a row raised twice fails it.
-2. **Kernel doors.** `prompt.submit` is `submit`; `session.append` is `extend`; `session.send` is `HostApi::deliver`, which raises it, and
-   the target's actor then raises `session.receive` (M136); `session.compact` and `command.run` submit `Input::Action`; `tool.call` is
-   `HostApi::invoke`, which runs `tool.check` and `AfterTool` (M131). `config.set` is `HostApi::reconfigure`, routed through M136's
-   `config::set`, so the chain is raised once wherever a setting changes. `model.complete` joins the catalogue as a chain at
-   `HostApi::complete`, so a process plugin's `host/model/complete` and a mod's call raise it alike, inside a turn or outside one (M132).
-3. **Reads from the fold.** The runtime is a client (ADR-0002). For each session it serves, it opens the stream lazily as `ClientIdentity`
-   `mods` and folds it with `SessionState::apply`. A pure `read(&state, method) -> Value` answers, with table tests:
-   `session.id`, `cwd`, `model`, `turns`, `usage` (context and last-turn usage); `config.list`/`read` (`ConfigView`);
-   `prompt.read` (queue and last submitted text). `session.messages` pages through `history`; `session.surfaces` folds
-   attach/detach; `session.root` is discovery's project directory; `session.version` is the workspace version. Nothing is kept beside the fold.
-4. **Face writes.** `session.authorize` asks through `HostApi::ask`; `tool.list` and `command.list` are `catalog(Tools)` and
-   `catalog(Commands)`. `turn.abort` interrupts; a person's `esc` raises nothing and waits on no link (ADR-0068), only a mod's abort is an
-   event.
-5. **`$.plugin`.** `{ name, root }`, from the mod's manifest, frozen and set at load. It is a property, not a method: it has no row and
-   raises nothing. Under node, `dollar.ts` builds it from `initialize`, whose params already carry `plugin_name` beside `plugin_root`
-   (M137).
-6. **`tool.register` and `command.register`.** The runtime's `ToolSource` names each tool with `bingo-plugin-host`'s `tool_name`
-   (`plugin__<mod>__<name>`); an undeclared property fails closed (not read-only, not concurrency-safe). A call runs M137's reload check,
-   then the handler on the mod's thread under the hook budget; a throw is the tool's error. The `CommandSource` registers commands
-   unprefixed, as plugin-rpc's are; the later duplicate drop and its notice stay.
-7. **`state` and `store` (ADR-0078 §6).** A face over M137's library store: session/global scope, versioned,
-   with `ifVersion` returning the held version on conflict; 4 MiB per plugin in all. The door binds and pins `plugin` for
-   modules and processes: others may rewrite `state.set`, but a direct foreign write is refused. `host/state/*` calls the face
-   when present. Each hook's read log records `(plugin, scope, key, version)` for M140's render subscriptions.
-8. **`clock`.** `now` is `jiff`'s timestamp; `sleep`, `after` and `every` run on tokio time, paused in tests (M111). A callback runs as a
-   hook under the budget; timers drop at a reload and at `session.end`; `every` has a floor of 1 s, a setting.
-9. **`model.classify` and `model.fork`**, pure bricks over `complete`: `classify_request(text, labels)` and `pick(answer, labels) ->
-   Option<label>` (no label is refused in words); `fork_request(history, prompt)` from `history`. Like `complete`, both need the `model`
-   grant through `admits` and are billed by `UsageCharged` (M132): to the running turn, or to the session when none runs.
-10. **Node parity.** `dollar.ts` calls each `Face` row as `service/call` to the runtime's face keys, and each `Kernel` row by its protocol-2
-   verb. A fixture mod calls one method of every noun, and gives the same output under both transports.
+1. **The table, as a contract.** `crates/bingo-mods/src/dollar/table.rs` has one row per method: `(noun, method, door, unsafe, input, result)`. A door is `Kernel(&'static Entry)`, whose door already raises a chain of this meaning, so `$` calls it and raises nothing more; or `Face`, a method of a face the runtime registers, raised through the service-wire door by M136's wrapper (ADR-0078 §1). M136's one-namespace rule keeps a name to one owner. A `BINGO_UPDATE_SCHEMA` test writes `schema/dollar.json`, and M133's `render` turns it into `sdk/typescript/src/dollar-types.ts`. Failing test: on M111's test host, a fixture mod calls every row once, a link hooked at each name sees exactly one call, and a row raised twice fails it.
+2. **Kernel doors.** `prompt.submit` is `submit`; `session.append` is `extend`; `session.send` is `HostApi::deliver`, which raises it, and the target's actor then raises `session.receive` (M136); `session.compact` and `command.run` submit `Input::Action`; `tool.call` is `HostApi::invoke`, which runs `tool.check` and `AfterTool` (M131). `config.set` is `HostApi::reconfigure`, routed through M136's `config::set`, so the chain is raised once wherever a setting changes. `model.complete` joins the catalogue as a chain at `HostApi::complete`, so a process plugin's `host/model/complete` and a mod's call raise it alike, inside a turn or outside one (M132).
+3. **Reads from the fold.** The runtime is a client (ADR-0002). For each session it serves, it opens the stream lazily as `ClientIdentity` `mods` and folds it with `SessionState::apply`. A pure `read(&state, method) -> Value` answers, with table tests: `session.id`, `cwd`, `model`, `turns`, `usage` (context and last-turn usage); `config.list`/`read` (`ConfigView`); `prompt.read` (queue and last submitted text). `session.messages` pages through `history`; `session.surfaces` folds attach/detach; `session.root` is discovery's project directory; `session.version` is the workspace version. Nothing is kept beside the fold.
+4. **Face writes.** `session.authorize` asks through `HostApi::ask`; `tool.list` and `command.list` are `catalog(Tools)` and `catalog(Commands)`. `turn.abort` interrupts; a person's `esc` raises nothing and waits on no link (ADR-0068), only a mod's abort is an event.
+5. **`$.plugin`.** `{ name, root }`, from the mod's manifest, frozen and set at load. It is a property, not a method: it has no row and raises nothing. Under node, `dollar.ts` builds it from `initialize`, whose params already carry `plugin_name` beside `plugin_root` (M137).
+6. **`tool.register` and `command.register`.** The runtime's `ToolSource` names each tool with `bingo-plugin-host`'s `tool_name` (`plugin__<mod>__<name>`); an undeclared property fails closed (not read-only, not concurrency-safe). A call runs M137's reload check, then the handler on the mod's thread under the hook budget; a throw is the tool's error. The `CommandSource` registers commands unprefixed, as plugin-rpc's are; the later duplicate drop and its notice stay.
+7. **`state` and `store` (ADR-0078 §6).** A face over M137's library store: session/global scope, versioned, with `ifVersion` returning the held version on conflict; 4 MiB per plugin in all. The door binds and pins `plugin` for modules and processes: others may rewrite `state.set`, but a direct foreign write is refused. `host/state/*` calls the face when present. Each hook's read log records `(plugin, scope, key, version)` for M140's render subscriptions.
+8. **`clock`.** `now` is `jiff`'s timestamp; `sleep`, `after` and `every` run on tokio time, paused in tests (M111). A callback runs as a hook under the budget; timers drop at a reload and at `session.end`; `every` has a floor of 1 s, a setting.
+9. **`model.classify` and `model.fork`**, pure bricks over `complete`: `classify_request(text, labels)` and `pick(answer, labels) -> Option<label>` (no label is refused in words); `fork_request(history, prompt)` from `history`. Like `complete`, both need the `model` grant through `admits` and are billed by `UsageCharged` (M132): to the running turn, or to the session when none runs.
+10. **Node parity.** `dollar.ts` calls each `Face` row as `service/call` to the runtime's face keys, and each `Kernel` row by its protocol-2 verb. A fixture mod calls one method of every noun, and gives the same output under both transports.
 
 ## Files
 
 - `crates/bingo-mods/src/dollar/*.rs` (new), `src/{lib,link,chain,engine,thread,module,manager,plugin,load,config}.rs`, `src/{thread.js,manager/reload.rs}`, `tests/{contracts,plugin}.rs`, `tests/mods/nouns/*` (new), `guide.md`, `Cargo.toml`
-- `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/tests/complete.rs,host/tests/catalogue.rs}`
+- `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/completion.rs,host/tests/complete.rs,host/tests/catalogue.rs}`
 - `crates/bingo-plugin-host/src/{state,ops,host,invocation,lib}.rs`
 - `crates/bingo-plugin-rpc/src/{host,service,bridge,schema,wire_ts,context,connection,intercept,lib}.rs`
 - `schema/{dollar,plugin,events}.json`, `sdk/typescript/src/{cross,rpc,dollar,dollar-types,plugin,wire,events}.ts`, SDK noun tests
@@ -142,4 +115,10 @@ CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo --all-ta
 aws-lc-sys: fatal error: 'stdlib.h' file not found
 cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked
 Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.12s
+cargo test -p bingo-core --lib --offline a_completion_crosses_its_kernel_chain_once
+left: 0; right: 1
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 498 filtered out; finished in 0.04s
+cargo test -p bingo-core --lib --locked a_denied_setting_changes_neither_the_session_nor_the_file
+direct reconfigure bypassed config.set
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 498 filtered out; finished in 0.05s
 ```

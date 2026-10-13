@@ -11,17 +11,23 @@ fn request() -> Completion {
 }
 
 async fn fixture(link: bool) -> (Arc<Host>, Attachment, Arc<ScriptedProvider>) {
-    let provider = ScriptedProvider::new(vec![
-        Script::Events(text("side")),
-        Script::Events(text("main")),
-    ]);
-    let mut contributions = vec![Contribution::Provider(provider.clone())];
+    let mut contributions = Vec::new();
     if link {
         contributions.push(Contribution::Interceptor {
             external: None,
             link: Arc::new(SideCall),
         });
     }
+    build(contributions).await
+}
+
+async fn build(contributions: Vec<Contribution>) -> (Arc<Host>, Attachment, Arc<ScriptedProvider>) {
+    let provider = ScriptedProvider::new(vec![
+        Script::Events(text("side")),
+        Script::Events(text("main")),
+    ]);
+    let mut contributions = contributions;
+    contributions.push(Contribution::Provider(provider.clone()));
     let mut config = HostConfig::new(env()).with_layer("cli", json!({"model":"m"}));
     config.layers.push(
         crate::settings::Layer::new(
@@ -126,5 +132,44 @@ async fn complete_inside_a_turn_is_in_its_terminal_usage() {
             _ => {}
         }
     }
+    host.shutdown().await;
+}
+
+struct CountComplete(Arc<std::sync::atomic::AtomicUsize>);
+#[async_trait]
+impl Interceptor for CountComplete {
+    fn id(&self) -> &str {
+        "count-complete"
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher::at(bingo_sdk::catalogue::MODEL_COMPLETE)
+    }
+    async fn chain(
+        &self,
+        _: &bingo_sdk::catalogue::Entry,
+        _: &HookContext,
+        mut input: Value,
+        next: Next<'_, Value, Value>,
+    ) -> Result<Value, KernelError> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(input["plugin"], "stub");
+        input["request"]["maxTokens"] = json!(8);
+        next.run(input).await
+    }
+}
+
+#[tokio::test]
+async fn a_completion_crosses_its_kernel_chain_once() {
+    let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let (host, attachment, provider) = build(vec![Contribution::Interceptor {
+        external: None,
+        link: Arc::new(CountComplete(count.clone())),
+    }])
+    .await;
+    host.complete(&attachment.session, None, request())
+        .await
+        .unwrap();
+    assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(provider.requests()[0].max_tokens, 8);
     host.shutdown().await;
 }
