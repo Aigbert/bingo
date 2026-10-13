@@ -160,7 +160,7 @@ lines are unchanged.
 
 ## 4. The feel: crew
 
-**[ ] C1. Every agent has a face**: a sigil and a hue, both derived from its
+**[x] C1. Every agent has a face**: a sigil and a hue, both derived from its
 name by one pure function, so the same agent looks the same across runs,
 sessions and surfaces, and nothing is stored. Sigils `◆ ● ▲ ■ ◗ ✦`; five
 hues — lime, teal, violet, orchid, pink (`#c2d86a #5cc8b4 #b39cf2 #dc8cf0
@@ -171,18 +171,18 @@ hues — lime, teal, violet, orchid, pink (`#c2d86a #5cc8b4 #b39cf2 #dc8cf0
 `NO_COLOR` loses nothing. A collision is harmless; the name is always
 beside it.
 
-**[ ] C2. Where the face appears**: the child row (`◗ reviewer(review the
+**[x] C2. Where the face appears**: the child row (`◗ reviewer(review the
 manifest)` in place of `⏺`), the session list's dot column, a room post's
 author, an `@name` in any prose (the named agent's hue), and the crew
 strip.
 
-**[ ] C3. The crew strip** is the status line's middle while any agent under
+**[x] C3. The crew strip** is the status line's middle while any agent under
 this session is alive: `◗ reviewer  ✦ scout owes #design  +2`. It replaces
 the `N running` count — the same fact, now with names. One that needs the
 person pulses; below 100 columns the strip is sigils only. A notice takes
 the slot for its four seconds and gives it back; `ctrl+g` opens the list.
 
-**[ ] C4. A room reads as a chat.** Consecutive posts by one author draw the
+**[x] C4. A room reads as a chat.** Consecutive posts by one author draw the
 name once; a post addressed to the reader is marked `→ you`; `#room` and
 `@name` are in their colours. The room's members stand on one dim row
 under its first message instead of in a rail card.
@@ -197,9 +197,9 @@ M148 implements the slot and removal rules above (2026-10-14).
 A mod's pane, once asked for, sits where it declares and fits (`above`,
 `side`, `overlay` or a rect; ADR-0081 §7, M151).
 
-2026-10-14: M150 implements C1–C4 in code and passes its unit contracts,
-but terminal acceptance remains pending after the protocol stop recorded in
-[M150](../plans/M150-the-crew-on-screen.md); the boxes stay unticked. FNV-1a over UTF-8 fixes the face
+2026-10-14: [M150](../plans/M150-the-crew-on-screen.md) verifies C1–C4
+with unit contracts and the eight-case fake-provider terminal matrix.
+FNV-1a over UTF-8 fixes the face
 (`fixtures/faces.json` in the TUI crate); ASCII uses `@ # % & + =`.
 Dark pink and light teal are adjusted above to meet the 36° hue-distance
 and 4.5:1 contrast constraints on the raised tints. State words follow

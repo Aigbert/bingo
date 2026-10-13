@@ -116,7 +116,7 @@ The ears drawn there are the ones the roster declared, and only the ones it had 
 
 **2026-10-14 (M147):** a child row and a session-list row count what the session wrote: `↓ 8.1k` is output tokens, never repeated input or cache reads. The status line keeps its distinct meaning: context used/window. All three use the same compact count formatter.
 
-**2026-10-14 (M150 implementation; terminal acceptance pending), teams and sessions:** agents have a stable face derived
+**2026-10-14 (M150), teams and sessions:** agents have a stable face derived
 from their name: FNV-1a 32-bit over UTF-8, `h % 6` selects `◆ ● ▲ ■ ◗ ✦`
 (ASCII `@ # % & + =`), `(h >> 8) % 5` selects lime, teal, violet, orchid,
 pink. The fixture is `crates/bingo-surface-tui/fixtures/faces.json`.
@@ -497,8 +497,9 @@ What a change is checked against, in this order: `TestBackend` snapshots for eve
   list. Room posts group authors, identify calls on the holder and show their
   members. Mention colours and cached rows follow the folded tree; no plugin
   record or wire shape changes. The composer and status regions stay fixed.
-  The dedicated crew tmux matrix remains unverified; M150 stopped under
-  protocol step 6.
+  The owned-socket fake-provider drive passes at 120×40 and 80×24 in
+  dark, light, NO_COLOR and ASCII. Event regressions keep the selected room
+  through child asks, answers, turn transitions and posts.
 
 ## 11. The opening
 

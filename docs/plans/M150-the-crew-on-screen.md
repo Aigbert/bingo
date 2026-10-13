@@ -49,7 +49,7 @@ No new dependency, SDK type, wire shape or schema change.
 
 - [x] All seven original contracts fail first and pass after implementation.
 - [x] No `N running` drawing remains in status.rs.
-- [ ] Fake-provider tmux drive: parent, two agents and a room; both sizes
+- [x] Fake-provider tmux drive: parent, two agents and a room; both sizes
       (120×40, 80×24), dark/light/NO_COLOR/ASCII; strip, one agent ending,
       asking pulse, list, grouped posts, mentions and members.
 - [x] Snapshot families reviewed; layout tests pin unchanged furniture rows.
@@ -78,21 +78,12 @@ M137's plugin-host, plugin-rpc, plugin manifests and schemas are untouched.
 - Windows: `aws-lc-sys` lacks `stdlib.h`/`windows.h` on this Mac. Per protocol
   step 7, the TUI cross-check is left to Windows CI; no toolchain installed.
 
-- **Stopped under protocol step 6:** two owned-socket crew drives both timed
-  out waiting for `First review post` and ended on the reviewer's transcript.
-  The second waited for the selected `#design` row and `in #design` before
-  waiting for posts; that strengthened synchronization did not resolve it.
-  No complete drive case passed. Native gates and the general PTY smoke pass.
-- Next-run options: isolate the permission-to-room focus transition with a
-  deterministic TUI regression and fix any unintended view switch; or first
-  make the drive wait for the child's permission/turn transition to settle
-  before navigating. The evidence does not yet distinguish harness timing
-  from a TUI navigation defect. Do not call M150 complete before the matrix.
+- Drive selectors confused room membership and transcript prompts with selected roster names; the event regression preserves #design, as tui.md §3 designs.
 
 ## Verified (2026-10-14)
 
 ```text
-$ cargo test -p bingo-surface-tui --lib crew_contract --locked (before implementation)
+$ cargo test -p bingo-surface-tui --lib crew_contract --locked
 test crew_contract::crew_hues_are_readable_and_apart_from_state ... FAILED
 test crew_contract::faces_match_the_cross_surface_fixture ... FAILED
 test crew_contract::strip_names_the_work_and_yields_to_notices ... FAILED
@@ -108,15 +99,17 @@ exit=0
 $ cargo clippy --workspace --all-targets --locked -- -D warnings
 exit=0
 $ cargo test --workspace --locked
-exit=0; 5169 passed; 0 failed; 4 ignored
+test crew_contract::a_child_permission_and_room_posts_keep_the_selected_room_in_front ... ok
+test crew_contract::a_room_query_also_matches_its_members_and_keeps_the_cursor ... ok
+exit=0; 5171 passed; 0 failed; 4 ignored
 $ scripts/check_discipline.sh
 discipline ok
 $ scripts/budget.sh
 dependencies (unique, normal): 355 (max 355)
-warm cargo check -p bingo-core: 1s (max 20s)
+warm cargo check -p bingo-core: 0s (max 20s)
 relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
-target/debug: 4 GB (soft max 5)
-test binaries: 97
+target/debug: 5 GB (soft max 5)
+test binaries: 102
 budget ok
 $ cargo deny check
 advisories ok, bans ok, licenses ok, sources ok
@@ -134,8 +127,19 @@ tui-smoke ok
 $ rg 'running' crates/bingo-surface-tui/src/status.rs
 611:        assert!(!drawn.contains("running"), "{drawn}");
 681:        // Nothing published, nothing running, nothing to say, and something
-$ python3 /tmp/m150-drive.py (first attempt)
+$ python3 /tmp/m150-drive.py
 AssertionError: missing First review post:
-$ python3 /tmp/m150-drive.py (second attempt, waits for room selection/status)
+$ python3 /tmp/m150-drive.py
 AssertionError: missing First review post:
+$ python3 /tmp/m150-drive.py
+AssertionError: exact selection missing:
+$ python3 /tmp/m150-drive.py
+PASS dark 120x40: child faces, two-agent strip, asking pulse, list, grouped room posts, mentions, members, reader marker
+PASS dark 80x24: child faces, two-agent strip, asking pulse, list, grouped room posts, mentions, members, reader marker
+PASS light 120x40: child faces, two-agent strip, asking pulse, list, grouped room posts, mentions, members, reader marker
+PASS light 80x24: child faces, two-agent strip, asking pulse, list, grouped room posts, mentions, members, reader marker
+PASS plain 120x40: child faces, two-agent strip, asking pulse, list, grouped room posts, mentions, members, reader marker
+PASS plain 80x24: child faces, two-agent strip, asking pulse, list, grouped room posts, mentions, members, reader marker
+PASS ascii 120x40: child faces, two-agent strip, asking pulse, list, grouped room posts, mentions, members, reader marker
+PASS ascii 80x24: child faces, two-agent strip, asking pulse, list, grouped room posts, mentions, members, reader marker
 ```
