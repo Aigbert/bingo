@@ -65,21 +65,36 @@ pub const BUILT_IN: &str = "built in";
 pub const SWITCHED_OFF: &str = "switched off in the settings";
 
 /// The directory that supplied an external plugin.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
-pub enum PluginOrigin { User, Project, Explicit }
+pub enum PluginOrigin {
+    User,
+    Project,
+    Explicit,
+}
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
-pub enum PluginRuntime { Process, Module }
+pub enum PluginRuntime {
+    Process,
+    Module,
+}
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 pub struct PluginGrant {
     pub tier: crate::Tier,
     pub uses: BTreeSet<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 pub struct PluginExecution {
     pub origin: PluginOrigin,
     pub runtime: PluginRuntime,
@@ -87,7 +102,9 @@ pub struct PluginExecution {
     pub grant: PluginGrant,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 pub struct PluginRegistration {
     pub name: String,
     pub version: String,
@@ -222,11 +239,13 @@ pub trait PluginSource: Send + Sync {
     fn id(&self) -> &str;
     async fn plugins(&self) -> Vec<PluginStatus>;
     /// Claim pending generations once, before they may contribute links.
-    async fn registrations(&self, _trust: &std::collections::BTreeMap<String, crate::PluginTrust>) -> Vec<PluginRegistration> {
+    async fn registrations(
+        &self,
+        _trust: &std::collections::BTreeMap<String, crate::PluginTrust>,
+    ) -> Vec<PluginRegistration> {
         Vec::new()
     }
     async fn registered(&self, _name: &str, _grant: Result<PluginGrant, String>) {}
-
 }
 
 /// What a plugin hands the host. One enum so the in-process path and a future

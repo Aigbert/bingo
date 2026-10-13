@@ -412,3 +412,18 @@ test events_ts::tests::committed_events_are_generated ... ok
 test wire_ts::tests::committed_wire_is_generated ... ok
 test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.34s
 ```
+
+`cargo test -p bingo-core chain::registration::`:
+```text
+test chain::registration::tests::registration_can_only_lower_tier_and_drop_nouns ... FAILED
+thread 'chain::registration::tests::registration_can_only_lower_tier_and_drop_nouns' (7741391) panicked at crates/bingo-core/src/chain/registration.rs:19:17:
+assertion `left == right` failed
+  left: false
+ right: true
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 497 filtered out; finished in 0.03s
+```
+
+`cargo test -p bingo-core chain:: --locked`:
+```text
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 479 filtered out; finished in 0.01s
+```

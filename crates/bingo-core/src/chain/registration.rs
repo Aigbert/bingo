@@ -2,8 +2,48 @@
 use bingo_sdk::*;
 
 pub(crate) fn reduced(before: &PluginGrant, after: &PluginGrant) -> bool {
-    let _ = (before, after);
-    false
+    rank(after.tier) <= rank(before.tier) && after.uses.is_subset(&before.uses)
+}
+
+fn rank(tier: Tier) -> u8 {
+    match tier {
+        Tier::Tighten => 0,
+        Tier::Rewrite => 1,
+        Tier::Full => 2,
+    }
+}
+
+pub(crate) fn values(before: &serde_json::Value, after: &serde_json::Value) -> bool {
+    match (
+        serde_json::from_value::<PluginGrant>(before.clone()),
+        serde_json::from_value::<PluginGrant>(after.clone()),
+    ) {
+        (Ok(before), Ok(after)) => reduced(&before, &after),
+        _ => false,
+    }
+}
+
+pub(crate) async fn register(
+    input: PluginRegistration,
+    links: &[super::Link],
+    cx: &HookContext,
+) -> Result<PluginGrant, String> {
+    let report = super::Report::default();
+    let result = super::json::dispatch(
+        catalogue::PLUGIN_REGISTER,
+        links,
+        cx,
+        input,
+        Next::new(|input: PluginRegistration| Box::pin(async move { Ok(input.execution.grant) })),
+        report.clone(),
+    )
+    .await;
+    for item in report.take() {
+        if let ItemBody::Notice { level, code, text } = item {
+            let _ = cx.host.notice(level, &code, &text).await;
+        }
+    }
+    result.map_err(|error| error.message)
 }
 
 #[cfg(test)]
@@ -14,8 +54,14 @@ mod tests {
         let tiers = [Tier::Tighten, Tier::Rewrite, Tier::Full];
         for (i, before) in tiers.iter().enumerate() {
             for (j, after) in tiers.iter().enumerate() {
-                let before = PluginGrant { tier: *before, uses: ["state".into(), "model".into()].into() };
-                let mut after = PluginGrant { tier: *after, uses: ["state".into()].into() };
+                let before = PluginGrant {
+                    tier: *before,
+                    uses: ["state".into(), "model".into()].into(),
+                };
+                let mut after = PluginGrant {
+                    tier: *after,
+                    uses: ["state".into()].into(),
+                };
                 assert_eq!(reduced(&before, &after), j <= i);
                 after.uses.insert("process".into());
                 assert!(!reduced(&before, &after));

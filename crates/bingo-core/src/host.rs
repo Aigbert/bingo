@@ -204,6 +204,7 @@ impl Host {
             }
         });
         host.start_plugins().await?;
+        interception::register_pending(&host).await;
         refresh::in_background(&host);
         Ok(host)
     }

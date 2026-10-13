@@ -179,14 +179,17 @@ async fn plugins(registry: &Registry) -> Vec<CatalogEntry> {
 /// One plugin as a client reads it: whether it runs, why not, and which
 /// listing it came from — the row `/plugins` draws, in a catalogue's shape.
 fn plugin_entry(status: &PluginStatus) -> CatalogEntry {
+    let mut meta =
+        json!({ "enabled": status.enabled, "reason": status.reason, "from": status.from });
+    if let (Some(execution), Some(meta)) = (&status.execution, meta.as_object_mut())
+        && let Ok(Value::Object(fields)) = serde_json::to_value(execution)
+    {
+        meta.extend(fields);
+    }
     CatalogEntry {
         id: status.id.clone(),
         label: format!("{} {}", status.id, status.version),
-        meta: json!({
-            "enabled": status.enabled,
-            "reason": status.reason,
-            "from": status.from,
-        }),
+        meta,
     }
 }
 

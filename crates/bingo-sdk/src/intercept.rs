@@ -65,6 +65,9 @@ pub struct ExternalInterceptor {
 pub trait InterceptorSource: Send + Sync {
     fn id(&self) -> &str;
     async fn interceptors(&self) -> Vec<ExternalInterceptor>;
+    async fn tier(&self, _plugin: &str) -> Option<Tier> {
+        None
+    }
 }
 
 /// The continuation cannot be cloned or called twice.

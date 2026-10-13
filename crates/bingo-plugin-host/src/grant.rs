@@ -1,6 +1,6 @@
 //! A directory and the person's explicit trust bound the requested nouns.
+pub use bingo_sdk::{PluginGrant as Grant, PluginOrigin as Origin};
 use bingo_sdk::{PluginTrust, Tier};
-pub use bingo_sdk::{PluginOrigin as Origin, PluginGrant as Grant};
 use std::collections::BTreeSet;
 
 pub const UNSAFE: &[&str] = &["process", "http", "env", "model"];

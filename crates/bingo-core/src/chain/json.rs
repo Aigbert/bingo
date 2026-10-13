@@ -31,7 +31,9 @@ impl Point for Json {
         let original = input.value.clone();
         let result_pins = original.clone();
         let next = Next::at(next.tier(), move |value| {
-            let valid = (continued_entry.valid_input)(&value);
+            let valid = (continued_entry.valid_input)(&value)
+                && (continued_entry.as_ref() != catalogue::PLUGIN_REGISTER
+                    || super::registration::values(&original, &value));
             let pinned = catalogue::pinned_changed(&original, &value, continued_entry.pinned);
             Box::pin(async move {
                 if let Some(field) = pinned {
@@ -63,6 +65,11 @@ impl Point for Json {
                 && let Some(field) = catalogue::pinned_changed(&result_pins, &result, entry.pinned)
             {
                 return Err(invalid(&format!("pinned field {field}")));
+            }
+            if entry.as_ref() == catalogue::PLUGIN_REGISTER
+                && !super::registration::values(&result_pins, &result)
+            {
+                return Err(invalid("plugin.register: grants may only be reduced"));
             }
             if !(entry.valid_result)(&result) {
                 return Err(invalid(&entry.name));
