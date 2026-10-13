@@ -52,14 +52,14 @@ mod hooks;
 /// the requests it sends the host.
 #[derive(Default)]
 struct State {
-    calls: Vec<(String, i64)>,
-    streams: Vec<(String, i64)>,
+    calls: Vec<(String, bingo_plugin_rpc::codec::Id)>,
+    streams: Vec<(String, bingo_plugin_rpc::codec::Id)>,
     cancelled: Vec<String>,
     store: BTreeMap<String, String>,
     /// Service calls this process asked the host for, each with the tool call
     /// that is waiting to say what came back — or nothing, for one this
     /// process asked on its own account.
-    pending: Vec<(i64, Option<i64>)>,
+    pending: Vec<(i64, Option<bingo_plugin_rpc::codec::Id>)>,
     asked: i64,
 }
 
@@ -252,7 +252,7 @@ fn declared(options: &Options) -> BTreeMap<String, ServiceSpec> {
 
 /// The host asking this process for its own service: `set {key, value}` writes
 /// and answers nothing, `get {key}` answers what was written or nothing.
-fn served(id: i64, params: Value, state: &mut State) {
+fn served(id: bingo_plugin_rpc::codec::Id, params: Value, state: &mut State) {
     let Ok(params) = serde_json::from_value::<ServiceCallParams>(params) else {
         fail(id, RpcError::new(INVALID_PARAMS, "not a service call"));
         return;
@@ -307,11 +307,11 @@ fn announce(options: &Options, state: &mut State) {
 /// This process asking the host for a service call. The tool call that wanted
 /// it stays open until the answer arrives: one line is read at a time here, so
 /// nothing may wait inside one.
-fn crossed(asked: &Value, call: Option<i64>, state: &mut State) {
+fn crossed(asked: &Value, call: Option<bingo_plugin_rpc::codec::Id>, state: &mut State) {
     let id = state.next_id();
     state.pending.push((id, call));
     send(&Message::Request(Request::new(
-        id,
+        bingo_plugin_rpc::codec::Id::Number(id),
         name::SERVICE_CALL,
         asked.clone(),
     )));
@@ -324,7 +324,7 @@ fn came_back(response: Response, state: &mut State) {
     let Some(at) = state
         .pending
         .iter()
-        .position(|(asked, _)| Some(*asked) == response.id)
+        .position(|(asked, _)| Some(bingo_plugin_rpc::codec::Id::Number(*asked)) == response.id)
     else {
         return;
     };
@@ -423,7 +423,7 @@ fn why(reason: &CompactReason) -> &'static str {
 
 /// Whether to keep reading: an input of `{"die": true}` ends the process
 /// without answering, which is what a killed plugin looks like from outside.
-fn call(id: i64, params: Value, state: &mut State) -> bool {
+fn call(id: bingo_plugin_rpc::codec::Id, params: Value, state: &mut State) -> bool {
     let Ok(params) = serde_json::from_value::<ToolCallParams>(params) else {
         fail(id, RpcError::new(INVALID_PARAMS, "not a tool call"));
         return true;
@@ -520,7 +520,7 @@ fn cancel_stream(params: &Value, state: &mut State) {
 /// this response is — `hold` answers nothing until it is cancelled, `die` ends
 /// the process mid-stream, `fail` closes with the error the trait speaks, and
 /// anything else is a response. Whether to keep reading.
-fn stream(id: i64, params: Value, state: &mut State) -> bool {
+fn stream(id: bingo_plugin_rpc::codec::Id, params: Value, state: &mut State) -> bool {
     let Ok(params) = serde_json::from_value::<ProviderStreamParams>(params) else {
         fail(id, RpcError::new(INVALID_PARAMS, "not a stream"));
         return true;
@@ -626,7 +626,7 @@ fn delta(call: &str, event: ModelEvent) {
     ));
 }
 
-fn close(id: i64, error: Option<ProviderError>) {
+fn close(id: bingo_plugin_rpc::codec::Id, error: Option<ProviderError>) {
     let Ok(result) = serde_json::to_value(ProviderStreamResult { error }) else {
         return;
     };
@@ -658,11 +658,11 @@ fn notify(call_id: &str, tail: &str) {
     ));
 }
 
-fn answer(id: i64, result: Value) {
+fn answer(id: bingo_plugin_rpc::codec::Id, result: Value) {
     send(&Message::Response(Response::ok(id, result)));
 }
 
-fn fail(id: i64, error: RpcError) {
+fn fail(id: bingo_plugin_rpc::codec::Id, error: RpcError) {
     send(&Message::Response(Response::failed(Some(id), error)));
 }
 

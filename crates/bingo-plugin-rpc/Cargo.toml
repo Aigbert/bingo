@@ -12,6 +12,7 @@ description = "The cross-process plugin bridge for bingo: a plugin.json spawns a
 workspace = true
 
 [dependencies]
+bingo-jsonrpc.workspace = true
 bingo-process.workspace = true
 # M109 (ADR-0062 §2): the same off-thread picture bound as every producer.
 bingo-pictures.workspace = true

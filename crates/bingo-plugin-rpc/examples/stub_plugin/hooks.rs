@@ -51,7 +51,7 @@ fn claims(id: &str, points: Vec<HookPoint>, tool: Option<&str>) -> HookSpec {
 /// the `kv` service serves, so a test reads it out of this process's own
 /// memory — and then whichever hook owns the id answers. `silent` never does,
 /// which is what a hook past its deadline looks like from the host's side.
-pub fn decide(id: i64, params: Value, store: &mut Store) {
+pub fn decide(id: bingo_plugin_rpc::codec::Id, params: Value, store: &mut Store) {
     let Ok(params) = serde_json::from_value::<HookDecideParams>(params) else {
         fail(id, RpcError::new(INVALID_PARAMS, "not a hook decision"));
         return;
