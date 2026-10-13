@@ -72,6 +72,7 @@ kernel holds.
 - `crates/bingo-sdk/src/{store,transcript}/**`, `{store.rs,transcript.rs,host.rs,lib.rs}`
 - `crates/bingo-store-jsonl/src/{lib.rs,journal.rs,checkpoint.rs,checkpoint/**}`
 - `crates/bingo-core/src/{session.rs,session/*.rs,host/resume.rs}`
+- `crates/bingo/tests/cli/{jobs,agents}.rs::journal_text` (journal files only)
 - Workspace/crate `Cargo.toml`, `Cargo.lock`, `scripts/budget.toml` (+1 member)
 - tests/fixtures beside each, core host tests; `docs/adr/{0066,0005}*.md`, `docs/plans/M107-*.md`
 
@@ -107,14 +108,9 @@ kernel holds.
 - 2026-10-13 decision: use ADR-0066 §4's clarified model/client window
   invariant and a checkpoint-specific state codec; client wire unchanged.
 
-- **STOP (2026-10-13, protocol step 6):** three CLI watch tests fail.
-  `crates/bingo/tests/cli/jobs.rs::journal_text` reads every data file;
-  `checkpoint.json` repeats `journal.jsonl` text, doubling notice counts.
-  This out-of-Files helper needs behavior changes, not type-fixture updates.
-- Options: authorize restricting that helper to `journal.jsonl` (recommended,
-  assertions unchanged), or change the checkpoint state contract. Neither done.
+- 2026-10-13 decision: restrict jobs/agents test journal helpers to `journal.jsonl`; assertions unchanged.
 
-## Verified (2026-10-13; stopped at workspace test gate)
+## Verified (2026-10-13; remaining gates pending)
 
 - Branch `m114-resume-starts-at-a-checkpoint`, base `1335830b`; clean on entry.
   Temporary probes (`cargo test -p bingo-sdk m114_reverification --locked
