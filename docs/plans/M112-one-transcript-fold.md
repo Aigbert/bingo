@@ -2,141 +2,144 @@
 
 ## Goal
 
-ADR-0064 §1–4. One `Transcript` type in `bingo-sdk` owns the item list
-and its rules; `SessionState` embeds it, `ContextView` becomes its model
-view, and the turn applies its own events through it. A turn no longer
-starts by cloning the journal and re-folding it from the first frame.
-After M108 the three folds agree on `TurnRetrying`; after this one
-there is only one fold to agree.
+ADR-0064 §1–4. One sdk `Transcript` owns the client items and model order.
+`SessionState` embeds it; `ContextView` renders its model order; the turn
+folds its own events through it. Starting a turn neither clones the journal
+nor replays it. Model input and client wire bytes stay unchanged.
 
 ## Bricks, in build order
 
-1. **The contract, failing.** In `bingo-sdk`, a `transcript` module with
-   the type's public surface stubbed (`Transcript::new`, `apply(&Event)
-   -> Applied`, `items() -> &[Arc<Item>]`, `get(&ItemId)`, `generation()`,
-   `model_items() -> impl Iterator<Item = &Item>`) and the property test:
-   - generate frame sequences over item start/update/complete,
-     `TurnRetrying`, `Rewound`, `Compacted` (with known and unknown
-     boundaries), using ids from a small pool so updates hit;
-   - assert: incremental fold == fold from scratch; the item order and
-     content equal what today's `SessionState::apply` produces (a
-     reference implementation kept in the test, copied from today's
-     code before it is removed); no dropped id survives; the model order
-     equals the frame-based `ContextView::items` oracle.
-   Add `proptest` to `bingo-sdk`'s dev-dependencies (already a
-   workspace dependency; no new crate in the tree).
-2. **`Transcript`.** `Vec<Arc<Item>>` plus `HashMap<ItemId, usize>`;
-   removal rebuilds the index (removal is rare: retry, rewind). Model ids
-   have their own order and membership index; apply each compaction once
-   to that order. Serialize the existing client fields; deserialize rebuilds
-   client indexes (model replay comes from events, not a client snapshot).
-3. **`SessionState` embeds it.** Replace `items: Vec<Item>` and
-   `history_generation` with `transcript: Transcript`, flattened so the
-   serialised form is unchanged (fixture: today's `SessionState` JSON
-   from an RPC snapshot test must round-trip byte-equal). Every reader of
-   `state.items` moves to `state.transcript.items()`; rewind's
-   `dropped(&self.state.items, ..)` takes the transcript.
-4. **The model view.** `ContextView::model_view(&Transcript) ->
-   Vec<Message>` renders the model order and skips external tool calls.
-   Move the production splice into the sdk; retain today's frame-based
-   `ContextView::items` and its splice under `cfg(test)` as independent
-   oracles. Add the named two-compaction regression. Existing slice-based
-   hook/contributor/compactor APIs receive model items on demand.
-5. **The turn folds through it.** `TurnRun.history: Vec<Frame>` becomes
-   `TurnRun.transcript: Transcript` (a clone is a vector of `Arc`s).
-   The turn's `self.items`, `upsert`, its compaction splice and the
-   retry `retain` are replaced by applying the event it emits to its own
-   `Transcript` before `host.emit` — one function, `emit_and_fold`, so
-   the two cannot be called apart. `Running::spawn` passes
-   `actor.state.transcript.clone()`; `actor.journal` is no longer read
-   by the turn.
-6. **Measure.** A bench-style test (not a timing assertion): build a
-   10 000-item session. Exercise the same snapshot constructor as spawn:
-   it accepts no frames or journal; assert `Arc::ptr_eq` and increased
-   strong counts, so no item body is copied. No wall-clock assertion.
-7. ADR-0064 §1–4 accepted (the tree sections stay proposed until M120);
-   dated note on ADR-0002 §3.
+1. **Contract, failing.** Stub `Transcript::{new, apply, items, get,
+   generation, model_items}`; property tests generate item start/update/
+   completion, retry, rewind and known/unknown compaction boundaries with
+   reused ids. Compare every prefix with scratch replay, the frozen client
+   reducer and today's frame-based `ContextView::items`. No dropped id
+   survives. Keep that model oracle under `cfg(test)` through M112.
+   Add `proptest` as an sdk dev edge: already in the workspace and lockfile,
+   no new external crate. Pin existing `SessionState` JSON bytes first.
+2. **Transcript.** `Vec<Arc<Item>>`, an id/index map, generation, model ids
+   in order and their membership index. Apply each compaction once with
+   the existing splice; unknown model boundaries make no cut. Retry and
+   rewind remove from both orders. Authoritative updates upsert by id.
+   Serialize existing client fields; deserialize rebuilds client indexes.
+3. **SessionState.** Flatten `transcript`, remove its own items/generation,
+   delegate item events, and migrate every reader and fixture. Preserve the
+   RPC schema and byte-equal snapshot round trips.
+4. **Model view.** `ContextView::model_view(&Transcript)` renders model
+   items, retaining existing external-tool filtering. Move the production
+   splice into sdk; keep the independent test oracle and its splice.
+   Slice-based hook/contributor/compactor APIs receive items on demand.
+5. **Turn.** `TurnRun` takes a transcript snapshot. One `emit_and_fold`
+   applies each event before `host.emit`; remove local upsert/splice/retain
+   and redundant generation. `Running::spawn` clones no frames.
+6. **Measure.** Exercise the same snapshot constructor as spawn with
+   10,000 items. It accepts no journal/frames; pointer equality and strong
+   counts prove shared, unchanged bodies. No timing assertion.
+7. Accept ADR-0064 §1–4 after all gates (tree §5–6 stays proposed for M120)
+   and add the dated amendment note to ADR-0002 §3.
 
 ## Files
 
 - `crates/bingo-sdk/src/{transcript.rs,transcript/*.rs,state.rs,lib.rs}`
-- `crates/bingo-sdk/src/host.rs` (the removed model-fold API doc reference)
+- `crates/bingo-sdk/src/host.rs` (removed model-fold API doc reference)
 - `crates/bingo-sdk/Cargo.toml`, workspace `Cargo.toml` and `Cargo.lock`
 - `crates/bingo-core/src/{context.rs,turn.rs,turn/*.rs,rewind.rs}`
-- `crates/bingo-core/src/session.rs`, `session/{running.rs,spawn.rs,title.rs}`
 - `crates/bingo-core/src/turn/tests.rs`, `turn/tests/*.rs`
-- every reader of `SessionState::items` (`rg -n '\.items\b' crates` —
-  surfaces read it: TUI, print, channels, rpc, demo-ui)
+- `crates/bingo-core/src/session.rs`, `session/{running.rs,spawn.rs,title.rs}`
+- Every reader of `SessionState::items` or generation, including plugin
+  queries, surface fixtures, and integration tests (`rg -n '\.items\b' crates`)
 - `docs/adr/0064-*.md`, `docs/adr/0002-event-stream.md`
 
 ## Exit criteria
 
-- [ ] The property test passes with ≥ 1 000 cases (output pasted).
-- [ ] `rg -n 'ContextView::items|history: actor.journal' crates` finds
-      only test code.
-- [ ] `rg -n 'fn upsert|fn splice_compaction' crates` finds one
-      production definition of each rule, in `bingo-sdk`; test oracles excepted.
-- [ ] `SessionState` JSON is byte-equal to before for the RPC fixtures.
-- [ ] The M108 retry and resume tests pass unchanged.
-- [ ] All gates, `scripts/tui-smoke.sh` included (surfaces changed).
+- [x] Client/replay and model-oracle properties pass with ≥1,000 cases.
+- [x] `rg -n 'ContextView::items|history: actor.journal' crates`: test code only.
+- [x] `rg -n 'fn upsert|fn splice_compaction' crates`: one production rule
+      each, in sdk; the frozen test oracle is the only other splice.
+- [x] Existing `SessionState`/RPC fixture JSON is byte-equal; schema unchanged.
+- [x] M108 retry and resume tests pass with their assertions unchanged.
+- [ ] All gates, including TUI smoke: Windows C headers unavailable; stopped
+      under protocol step 6. Remaining Windows checks and smoke are pending.
 
 ## Non-goals
 
-- The tree fold (M120); the checkpoint and windowed memory (M114);
-  removing `Actor::journal` (M114 does, with catch-up from the store).
-- Any change to what the model is sent.
+Tree fold (M120), checkpoints/windowed memory or removing `Actor::journal`
+(M114), plugin API changes, and changing what the model is sent.
 
 ## Risks
 
-- `SessionState` is on the wire (ADR-0007); `#[serde(flatten)]` with a
-  custom `Transcript` serialiser must not change field order or
-  `skip_serializing_if` behaviour — the byte-equal fixture is the guard.
-- `Arc<Item>` changes `&mut Item` access in the turn (status updates in
-  `gate`); use `Arc::make_mut` on the turn's own copy.
-- Re-verify at start: M108 has landed; `ContextView`, `TurnRun`,
-  `Running::spawn` by name.
+- Client snapshots preserve the wire and do not seed a model: the model
+  order comes from event replay. Keep copy-on-write deltas snapshot-safe.
+- Re-verified against `72036be6` (M108): indexed retry removal is present;
+  plugin APIs still take `&[Item]`. Adapt their call sites, not their traits.
+- The first stop found that latest-cut-only resurrected `s1`: sequential
+  replay gave `[s2, b]`, latest-only projection `[s2, b, s1]`. The user
+  selected model order (option A); ADR-0064 was amended in `e28969f3`
+  before code. The named two-compaction regression now passes.
+- **STOP, 2026-10-13 (protocol step 6):** the Windows `bingo-channels`
+  gate fails in existing `aws-lc-sys` C compilation: `stdlib.h` and
+  `windows.h` are unavailable to the cross compiler. Fixing the toolchain
+  is outside Files. Options: provision a Windows C cross-toolchain, or
+  execute the remaining Windows checks in a Windows-capable environment.
+  Do not change TLS dependencies or waive gates to hide this failure.
+  ADR acceptance and the ADR-0002 note remain pending verification.
 
-- **STOP (2026-10-13, protocol step 6):** re-verification at `72036be6`
-  found that ADR-0064 §1–2's full client item list plus only the latest
-  `(boundary, kept, summary)` cut cannot preserve the existing model view.
-  `ContextView::items` applies cuts sequentially; `splice_compaction`
-  moves each summary before the boundary, while `SessionState` keeps
-  summaries in insertion order. Applying just the latest cut resurrects
-  an earlier summary. This contradicts the Non-goal of changing model input.
-- Reproduction using the current fold and splice in `context.rs`:
-  complete `a`, `b`, `s1`; compact at `b`, keep nothing, summary `s1`;
-  complete `s2`; compact at `b`, keep nothing, summary `s2`.
-  The client list is `[a, b, s1, s2]`; sequential model replay is
-  `[s2, b]`; applying only the latest cut to the client list is
-  `[s2, b, s1]`. Omitting the first cut leaves the same client items
-  and latest cut but changes the required model result to `[s2, b, s1]`:
-  the proposed stored facts do not distinguish these histories.
-- **Resolved (2026-10-13):** the user selected A: own the model order beside
-  the client list over shared items. ADR-0064 was amended in `e28969f3`.
-  The frame-based model fold stays a test oracle through this milestone.
-- Re-verified against `72036be6`: slice-based plugin contracts still take
-  `&[Item]`; adapt at call sites without changing those public contracts.
-  Reader scope includes paging mutations, title lookup, plugin queries,
-  integration tests, and surface test fixtures. No new external crate;
-  `proptest` is an existing workspace dev dependency.
+## Verified (2026-10-13 — implementation tested, milestone blocked)
 
-## Verified (2026-10-13 — blocked, not complete)
+Branch `m112-one-transcript-fold`; no branch switch, push, merge or PR.
+Contract commit `8bc741aa`; fold `78fc2a6b`; integration `3932a35a`;
+standalone serialization fix `648516e6`; fixture cleanup `e3719b8f`.
+Full workspace: 4,967 passed, 0 failed, 3 existing ignores; ACP tests ran
+serially (`RUST_TEST_THREADS=1`). The PTY redraw race passed alone and in
+that successful workspace run. Subsequent fixture-only discipline cleanup
+passed the focused screen/RPC tests below. Logs are in `target/m112-*.log`.
 
-- Worktree clean at entry; branch `m112-one-transcript-fold`, HEAD
-  `72036be6`. M108's indexed retry removal is present. No branch switch.
-- A temporary diagnostic test was added inside `context.rs` to replay
-  the sequence above and compare it with the proposed latest-only splice.
-  Command (exit 101; expected assertion failure, not a timing failure):
-  `cargo test -p bingo-core --locked m112_latest_cut_preserves_repeated_compaction -- --exact context::tests::m112_latest_cut_preserves_repeated_compaction --nocapture`
-  ```text
-  running 1 test
-  assertion `left == right` failed
-    left: ["s2", "b", "s1"]
-   right: ["s2", "b"]
-  test context::tests::m112_latest_cut_preserves_repeated_compaction ... FAILED
-  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 410 filtered out; finished in 0.02s
-  ```
-- Removed the temporary diagnostic after recording its result; production
-  code, dependencies, and ADR decisions are unchanged. Exit criteria remain
-  unticked. Implementation and all gates are deferred because step 6
-  requires stopping on a Decision conflict. No push, merge, or PR.
+```text
+$ cargo test -p bingo-sdk --offline transcript::tests -- --nocapture
+# Stub: empty transcript instead of inserted items; snapshot length 0, not 10000.
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 91 filtered out; finished in 0.02s
+$ cargo test -p bingo-core --locked context::tests::two_compactions_do_not_resurrect_the_first_summary -- --exact
+# Stub model view is empty; the oracle contains s2, b.
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 411 filtered out; finished in 0.02s
+$ RUST_TEST_THREADS=1 PROPTEST_CASES=1000 cargo test --workspace --locked
+ test context::tests::transcript_model_matches_frame_oracle ... ok
+ test context::tests::two_compactions_do_not_resurrect_the_first_summary ... ok
+ test session::tests::retry::retry_withdrawal_survives_resume ... ok
+ test session::tests::retry::retry_withdrawal_survives_the_next_turn ... ok
+ test turn::tests::turn_start_shares_ten_thousand_bodies_without_a_journal ... ok
+ test transcript::tests::transcript_matches_client_and_replay ... ok
+ test state::tests::transcript_snapshot_keeps_the_wire_bytes ... ok
+ test host::session_open_fixture_keeps_its_wire_bytes ... ok
+ test result: ok. 413 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.66s
+ test result: ok. 96 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.77s
+$ cargo test -p bingo --test pty --locked esc_twice_rewinds_the_turn_and_the_file_it_wrote -- --exact --test-threads=1
+ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 3.00s
+$ cargo test -p bingo-surface-tui --locked screens::the_rewind_picker -- --exact
+ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1149 filtered out; finished in 0.08s
+$ cargo test -p bingo --test rpc --locked
+ test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.10s
+$ cargo fmt --all -- --check
+(no output; exit 0)
+$ cargo check --workspace --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.16s
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.23s
+$ scripts/check_discipline.sh
+ discipline ok
+$ scripts/budget.sh
+ dependencies (unique, normal): 342 (max  342)
+ warm cargo check -p bingo-core: 0s (max  20s)
+ budget ok
+$ cargo deny check
+ advisories ok, bans ok, licenses ok, sources ok
+$ cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.98s
+$ cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.11s
+$ cargo check -p bingo-agents --all-targets --target x86_64-pc-windows-msvc
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.46s
+$ cargo check -p bingo-channels --all-targets --target x86_64-pc-windows-msvc
+fatal error: 'stdlib.h' file not found
+fatal error: 'windows.h' file not found
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+```
