@@ -81,7 +81,7 @@ no new dependency.
   `crates/bingo-permissions/src/lib.rs`
 - `crates/bingo-surface-tui/src/{status,activity,rail,panel,transcript,blocks,input,run,ui}.rs`;
   `{tasks,shells,wake,permission}.rs` deleted; `screens/{tasks,shells}.rs`,
-  `lib.rs`, `test_support.rs`, `test_lanes.rs`, slot rendering tests
+  `lib.rs`, `test_support.rs`, `test_lanes.rs`, `theme.rs` (token file map), slot rendering tests
 - `docs/design/tui.md`, `docs/adr/{0013,0019,0070}-*.md`
 
 ## Exit criteria
@@ -109,12 +109,7 @@ no new dependency.
 
 ## Risks
 
-- **STOP (2026-10-13, protocol step 6):** TUI tests fail in
-  `crates/bingo-surface-tui/src/theme.rs::every_token_is_spent_where_the_design_says`.
-  Its assertion pins token use to source files, including deleted `tasks.rs`
-  and `shells.rs`; this is outside Files and is not a type-constructor fixture.
-  Options: authorize adding this assertion to scope and update its file map
-  for the slot renderers, or leave M121 stopped. No ADR Decision changed.
+- Decision (2026-10-13): user authorizes `theme.rs` file-map updates for slot renderers, preserving exact token-use assertions.
 
 - `Tone::Attention` reads "wants a person"; an in-progress task is not
   that. If a reviewer refuses the stretch, the alternative is a
@@ -133,7 +128,7 @@ no new dependency.
 - Producer fixtures: `bingo-tasks/fixtures/pre-m121.json`; bash job test
   constructors in `src/{kill,read,notify}.rs` mechanically gain an item id.
 
-## Verified (2026-10-13; incomplete, stopped)
+## Verified (2026-10-13; in progress)
 - `cargo test -p bingo-sdk slot`: first `FAILED. 1 passed; 3 failed`;
   after implementation `ok. 4 passed; 0 failed` (with/placed assertions).
 - `cargo test -p bingo-sdk --test record quiet_tool_calls`: first `FAILED`;
