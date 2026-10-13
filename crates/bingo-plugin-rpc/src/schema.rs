@@ -150,18 +150,15 @@ mod tests {
     }
 
     #[test]
-    fn protocol_two_can_describe_a_module_without_a_process_entry() {
+    fn the_manifest_freeze_keeps_both_launch_alternatives() {
         let before = frozen();
+        assert!(before["$defs"]["Manifest"]["oneOf"].is_array());
         let mut after = before.clone();
-        after["$defs"]["Manifest"]["properties"]["module"] = json!({"type": "string"});
-        after["$defs"]["Manifest"]["required"]
+        after["$defs"]["Manifest"]["oneOf"]
             .as_array_mut()
-            .expect("the frozen manifest has required fields")
-            .retain(|field| field != "entry");
-        assert!(
-            preserves(&before, &after),
-            "ADR-0078 module-only manifests conflict with the ADR-0075 frozen required entry"
-        );
+            .unwrap()
+            .pop();
+        assert!(!preserves(&before, &after));
     }
 
     #[test]
@@ -217,14 +214,18 @@ mod tests {
                 std::fs::create_dir_all(parent).expect("the schema directory");
             }
             std::fs::write(&path, rendered()).expect("the schema is writable");
-            // Authorized pre-release removal: ADR-0075/0076, 2026-10-13.
-            let baseline = frozen();
-            if baseline["$defs"]["EndpointCapabilities"]["properties"]
-                .get("holdsContext")
-                .is_some()
+            // M137's authorized pre-release amendment changes only the manifest.
+            let mut baseline = frozen();
+            if baseline["$defs"]["Manifest"]["required"]
+                .as_array()
+                .is_some_and(|fields| fields.contains(&json!("entry")))
             {
-                std::fs::write(path.with_file_name("plugin-2.json"), rendered())
-                    .expect("the unreleased baseline is writable");
+                baseline["$defs"]["Manifest"] = document()["$defs"]["Manifest"].clone();
+                std::fs::write(
+                    path.with_file_name("plugin-2.json"),
+                    format!("{}\n", serde_json::to_string_pretty(&baseline).unwrap()),
+                )
+                .expect("the unreleased baseline is writable");
             }
             return;
         }

@@ -329,18 +329,19 @@ impl Manager {
         Installed {
             name,
             version,
-            bridge: on.then(|| self.bridge(found, host)),
+            bridge: on.then(|| self.bridge(found, host)).flatten(),
         }
     }
 
-    fn bridge(&self, found: Found, host: HostHandle) -> Arc<Bridge> {
+    fn bridge(&self, found: Found, host: HostHandle) -> Option<Arc<Bridge>> {
+        let entry = found.manifest.entry().ok()?.rooted(&found.root);
         let config = self.settings.get(&found.name).cloned().unwrap_or_default();
         let watched = self.directories.contains(&found.root);
         let root = found.root.clone();
         let bridge = Arc::new(Bridge::new(
             found.name,
             found.root.clone(),
-            found.manifest.entry.rooted(&found.root),
+            entry,
             config,
             found.manifest.call_timeout,
             Setting {
@@ -363,7 +364,7 @@ impl Manager {
                     .push(notice::Notice::warn("PLUGIN_UNREADABLE", error.to_string())),
             }
         }
-        bridge
+        Some(bridge)
     }
 }
 

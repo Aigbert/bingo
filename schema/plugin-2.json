@@ -3588,36 +3588,75 @@
     },
     "Manifest": {
       "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "What the plugin calls itself. It must be the name of the directory\nholding it: the path is what one layer overrides another by, so two\nspellings of the name would be two answers to \"which plugin is this\"."
+      "description": "What one directory under `plugins/` declares about itself.\n\nUnknown keys are kept rather than refused: a manifest written for a later\nhost must still start on this one.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "entry": {
+              "$ref": "#/$defs/Entry"
+            },
+            "name": {
+              "type": "string",
+              "description": "What the plugin calls itself. It must be the name of the directory\nholding it: the path is what one layer overrides another by, so two\nspellings of the name would be two answers to \"which plugin is this\"."
+            },
+            "version": {
+              "type": "string"
+            },
+            "config": {
+              "description": "A JSON Schema for this plugin's own settings — the slice a person\nwrites under `plugins.<name>`, which reaches the process as\n`initialize.config`. It is what a person reads; nothing in this\nworkspace validates a document against a schema."
+            },
+            "callTimeout": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 1,
+              "description": "Maximum seconds for tool/call and command/run; absent allows ten minutes."
+            },
+            "module": false
+          },
+          "required": [
+            "entry",
+            "name",
+            "version"
+          ]
         },
-        "version": {
-          "type": "string"
-        },
-        "entry": {
-          "$ref": "#/$defs/Entry"
-        },
-        "config": {
-          "description": "A JSON Schema for this plugin's own settings — the slice a person\nwrites under `plugins.<name>`, which reaches the process as\n`initialize.config`. It is what a person reads; nothing in this\nworkspace validates a document against a schema."
-        },
-        "callTimeout": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint64",
-          "minimum": 1,
-          "description": "Maximum seconds for tool/call and command/run; absent allows ten minutes."
+        {
+          "type": "object",
+          "properties": {
+            "module": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string",
+              "description": "What the plugin calls itself. It must be the name of the directory\nholding it: the path is what one layer overrides another by, so two\nspellings of the name would be two answers to \"which plugin is this\"."
+            },
+            "version": {
+              "type": "string"
+            },
+            "config": {
+              "description": "A JSON Schema for this plugin's own settings — the slice a person\nwrites under `plugins.<name>`, which reaches the process as\n`initialize.config`. It is what a person reads; nothing in this\nworkspace validates a document against a schema."
+            },
+            "callTimeout": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 1,
+              "description": "Maximum seconds for tool/call and command/run; absent allows ten minutes."
+            },
+            "entry": false
+          },
+          "required": [
+            "module",
+            "name",
+            "version"
+          ]
         }
-      },
-      "required": [
-        "name",
-        "version",
-        "entry"
-      ],
-      "description": "What one directory under `plugins/` declares about itself.\n\nUnknown keys are kept rather than refused: a manifest written for a later\nhost must still start on this one."
+      ]
     },
     "Message": {
       "type": "object",

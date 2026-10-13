@@ -16,7 +16,7 @@ Current paths and required adapters replace the original plan's stale paths.
 1. **Shared library.** Move manifest, discovery, tool names, file stamps,
    state (`swap`, shelf layout, `StateValue`) and discovery notices into
    library-tier `bingo-plugin-host`. Preserve RPC re-exports and existing
-   tests. Add `module` alongside the optional process entry; pure
+   tests. Require exactly one of `module` or `entry`; pure
    `runtime_of(manifest, mods_stand)` selects exactly one runtime per name.
 2. **Failing contracts.** Pin module manifests and runtime selection first.
    Fixture mods: `hello` answers `tool.call`; `loop` loops; `hog` exceeds
@@ -70,7 +70,7 @@ Current paths and required adapters replace the original plan's stale paths.
 11. **Parity.** Until M138, dollar maps M133's status, state/store, model
     complete, session deliver/extend and service faces to existing doors.
     ts-status adds module hooks/register.ts and imports bingo. Run M133's
-    scenario in process and with mods disabled, falling back to node.
+    scenario in process and under node using a process-manifest fixture.
 
 ## Files
 
@@ -119,18 +119,10 @@ file-watcher dependencies, watching non-explicit directories; no live tests.
 - Current catalogue has only enabled/reason/from; plugin.register is absent.
   Shared state uses bingo-jsonrpc library errors, never a plugin dependency.
 - M148 owns SDK state.rs and TUI/demo/rooms/schedule; leave them untouched.
-- **Stopped 2026-10-14, protocol step 6: manifest/schema boundary.** The
-  shared Manifest and frozen schema/plugin-2.json require entry.command.
-  ADR-0078 §2 requires a module without a process entry. Removing entry from
-  required fails schema::tests::preserves, which pins every structural key.
-  ADR-0075 authorizes only the named earlier pre-release exceptions, not
-  this relaxation. The module contract and compatibility probe fail below.
-  Option A: authorize a narrow pre-release exception for module manifests
-  (entry optional only when module exists), with generator/baseline tests.
-  Option B: preserve the process wire manifest exactly and define a distinct
-  module-manifest schema boundary with shared underlying parsing/state.
-  Neither exception nor schema split has been implemented. Runtime work and
-  ADR acceptance remain pending the decision; the extraction is committed.
+- Resolved 2026-10-14 by the person's delegate: one Manifest, exactly one
+  entry/module, named refusals for both/neither; amend only its pre-release
+  baseline in the same commit as generated plugin.json/plugin-2.json.
+  Process reload fixture constructors change mechanically with Launch.
 
 ## Verified (2026-10-14)
 
@@ -197,3 +189,36 @@ Remaining gates were not run: protocol stop before runtime implementation.
 | `cargo deny check` | Not run; no external dependency added. |
 | `cargo check -p bingo-plugin-host --all-targets --target x86_64-pc-windows-msvc` | Not run. |
 | `cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc` | Not run. |
+
+
+`cargo test -p bingo-plugin-host --test module_manifest` (before implementation):
+```text
+both_and_neither_name_the_plugin_and_launch_forms ... FAILED
+exactly one launch form: Manifest { name: "hello", version: "0.1.0", entry: Entry { command: "node", args: [], env: {} }, config: None, call_timeout: None }
+entry_only_and_module_only_round_trip ... FAILED
+one launch form: Error("missing field `entry`", line: 5, column: 1)
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+`BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema::tests::the_committed_schema_is_this_document -- --exact`:
+```text
+test schema::tests::the_committed_schema_is_this_document ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 124 filtered out; finished in 0.03s
+```
+
+`BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc wire_ts::`:
+```text
+test wire_ts::tests::committed_wire_is_generated ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 124 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.00s
+```
+
+`cargo test -p bingo-plugin-host -p bingo-plugin-rpc`:
+```text
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.30s
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```

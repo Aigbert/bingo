@@ -389,6 +389,14 @@ impl Bridge {
     }
 
     pub async fn reload(self: &Arc<Self>, manifest: crate::Manifest) {
+        let Ok(entry) = manifest.entry() else {
+            self.notices.push(Notice::warn(
+                "PLUGIN_RELOAD",
+                format!("{}: runtime changed; restart required", self.name),
+            ));
+            self.stop().await;
+            return;
+        };
         let _guard = self.lifecycle.lock().await;
         let old = {
             let mut state = self.state.lock().await;
@@ -402,7 +410,7 @@ impl Bridge {
             live.connection.stop().await;
         }
         *self.launch.write().unwrap_or_else(|e| e.into_inner()) =
-            (manifest.entry.rooted(&self.root), manifest.call_timeout);
+            (entry.rooted(&self.root), manifest.call_timeout);
         let outcome = self.handshake().await;
         let restart = match (&old, &outcome) {
             (Some(old), Ok(new)) => old.providers != new.providers || old.services != new.services,

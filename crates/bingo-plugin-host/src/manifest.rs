@@ -18,15 +18,17 @@ pub const PLUGIN_ROOT: &str = "${PLUGIN_ROOT}";
 ///
 /// Unknown keys are kept rather than refused: a manifest written for a later
 /// host must still start on this one.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(transform = exclusive_launch)]
 pub struct Manifest {
     /// What the plugin calls itself. It must be the name of the directory
     /// holding it: the path is what one layer overrides another by, so two
     /// spellings of the name would be two answers to "which plugin is this".
     pub name: String,
     pub version: String,
-    pub entry: Entry,
+    #[serde(flatten)]
+    pub launch: Launch,
     /// A JSON Schema for this plugin's own settings — the slice a person
     /// writes under `plugins.<name>`, which reaches the process as
     /// `initialize.config`. It is what a person reads; nothing in this
@@ -36,6 +38,92 @@ pub struct Manifest {
     /// Maximum seconds for tool/call and command/run; absent allows ten minutes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub call_timeout: Option<std::num::NonZeroU64>,
+}
+
+fn exclusive_launch(schema: &mut schemars::Schema) {
+    let map = schema.ensure_object();
+    let properties = map.remove("properties").unwrap_or_default();
+    let required = map.remove("required").unwrap_or_default();
+    let Some(branches) = map.get_mut("oneOf").and_then(Value::as_array_mut) else {
+        return;
+    };
+    let names: Vec<_> = branches
+        .iter()
+        .filter_map(|branch| branch["required"][0].as_str().map(str::to_owned))
+        .collect();
+    for branch in branches {
+        let own = branch["required"][0]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        if let Some(fields) = branch["properties"].as_object_mut() {
+            if let Some(common) = properties.as_object() {
+                fields.extend(common.clone());
+            }
+            for name in &names {
+                if name != &own {
+                    fields.insert(name.clone(), Value::Bool(false));
+                }
+            }
+        }
+        if let (Some(fields), Some(common)) =
+            (branch["required"].as_array_mut(), required.as_array())
+        {
+            fields.extend(common.clone());
+        }
+    }
+}
+
+/// Exactly one way for the host to run the plugin.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Launch {
+    Entry(Entry),
+    Module(String),
+}
+
+impl Manifest {
+    pub fn entry(&self) -> Result<&Entry, String> {
+        match &self.launch {
+            Launch::Entry(entry) => Ok(entry),
+            Launch::Module(_) => Err(format!("{}: module requires a module runtime", self.name)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Manifest {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = Value::deserialize(deserializer)?;
+        let name = value
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("<unnamed>");
+        parse(&value).map_err(|why| serde::de::Error::custom(format!("{name}: {why}")))
+    }
+}
+
+fn parse(value: &Value) -> Result<Manifest, String> {
+    let launch = match (value.get("entry"), value.get("module")) {
+        (Some(entry), None) => {
+            Launch::Entry(serde_json::from_value(entry.clone()).map_err(|e| e.to_string())?)
+        }
+        (None, Some(module)) => {
+            Launch::Module(serde_json::from_value(module.clone()).map_err(|e| e.to_string())?)
+        }
+        _ => return Err("expected exactly one of entry or module".into()),
+    };
+    Ok(Manifest {
+        name: field(value, "name")?,
+        version: field(value, "version")?,
+        launch,
+        config: field(value, "config")?,
+        call_timeout: field(value, "callTimeout")?,
+    })
+}
+
+fn field<T: serde::de::DeserializeOwned>(value: &Value, key: &str) -> Result<T, String> {
+    serde_json::from_value(value.get(key).cloned().unwrap_or(Value::Null))
+        .map_err(|why| format!("{key}: {why}"))
 }
 
 /// The process to spawn.
@@ -111,8 +199,8 @@ mod tests {
         }))
         .expect("a manifest");
         assert_eq!(manifest.name, "wordcount");
-        assert_eq!(manifest.entry.command, "python3");
-        assert!(manifest.entry.env.is_empty());
+        assert_eq!(manifest.entry().unwrap().command, "python3");
+        assert!(manifest.entry().unwrap().env.is_empty());
         assert_eq!(manifest.config, None);
     }
 

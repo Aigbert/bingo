@@ -236,6 +236,6 @@ mod tests {
         let found = discover(&[dir.path().to_path_buf()], &Notices::default());
         assert_eq!(found[0].name, "wordcount");
         assert_eq!(found[0].root, dir.path().join("wordcount"));
-        assert_eq!(found[0].manifest.entry.command, "python3");
+        assert_eq!(found[0].manifest.entry().unwrap().command, "python3");
     }
 }
