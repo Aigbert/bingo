@@ -1,6 +1,6 @@
 # ADR-0076 — An agent is not a model
 
-Status: proposed · 2026-10-13 · Plan: M134 · Amends: ADR-0035 §1, §4, §5; ADR-0039 §3; ADR-0055 §1
+Status: accepted · 2026-10-13 · Plan: M134 · Amends: ADR-0035 §1, §4, §5; ADR-0039 §3; ADR-0055 §1
 
 ## Context
 
