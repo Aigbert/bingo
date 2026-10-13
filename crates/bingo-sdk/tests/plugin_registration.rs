@@ -11,3 +11,11 @@ fn registration_pins_identity_and_describes_the_grant() {
     assert!(!(entry.valid_result)(&json!({"tier":"admin", "uses":[]})));
     assert_eq!(entry.pinned, ["/name", "/version", "/origin", "/runtime"]);
 }
+
+#[test]
+fn registration_has_a_denial_with_a_reason() {
+    let entry = catalogue::find("plugin.register").unwrap();
+    assert!((entry.valid_result)(
+        &json!({"reason":"disabled by local policy"})
+    ));
+}

@@ -697,3 +697,13 @@ Not run after the protocol stop:
 cargo test -p bingo-plugin-rpc --test plugin --locked
 test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
 ```
+
+```text
+cargo test -p bingo-sdk --test plugin_registration --locked
+registration_has_a_denial_with_a_reason ... FAILED
+assertion failed: (entry.valid_result)(&json!({"reason":"disabled by local policy"}))
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+cargo test -p bingo-mods --test grants --locked
+registration_can_deny_a_module_with_a_named_reason ... FAILED
+assertion `left == right` failed: target enabled; left: Bool(true), right: false
+```
