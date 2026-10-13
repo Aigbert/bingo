@@ -1,7 +1,7 @@
 //! Filesystem tools: the ones a coding turn cannot do without.
 
 mod ask;
-mod diff;
+use bingo_shelf::diff;
 mod edit;
 mod glob;
 mod grep;

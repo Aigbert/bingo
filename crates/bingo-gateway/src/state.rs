@@ -12,13 +12,12 @@ use super::paths::Paths;
 use super::pidfile::{self, Record};
 use super::probe::Probe;
 
-/// The gateway of one data dir, as the pidfile and the process table together
-/// describe it.
+/// The gateway of one data dir, as its record and ownership describe it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum State {
-    /// A record, and the process it names is there.
+    /// A record with a held claim, or a live legacy process.
     Running(Record),
-    /// A record whose process is gone: a gateway that did not stop cleanly.
+    /// A record without ownership: a gateway that did not stop cleanly.
     Stale(Record),
     /// No record at all, which is what a clean stop leaves.
     Stopped,
@@ -29,7 +28,7 @@ impl State {
         let record = pidfile::read(&paths.pidfile())
             .map_err(|e| KernelError::new(ErrorCode::Internal, e))?;
         Ok(match record {
-            Some(record) if probe.alive(record.pid) => State::Running(record),
+            Some(record) if running(paths, &record, probe)? => State::Running(record),
             Some(record) => State::Stale(record),
             None => State::Stopped,
         })
@@ -44,6 +43,14 @@ impl State {
     }
 }
 
+fn running(paths: &Paths, record: &Record, probe: &dyn Probe) -> Result<bool, KernelError> {
+    if !record.claimed {
+        return Ok(probe.alive(record.pid));
+    }
+    bingo_claim::probe(paths.data_dir(), pidfile::PROTOCOL)
+        .map_err(|e| KernelError::new(ErrorCode::Internal, e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -55,6 +62,7 @@ mod tests {
         paths.ensure().expect("the directory");
         let record = Record {
             pid,
+            claimed: false,
             version: "0.1.0".into(),
             started: Timestamp::now(),
         };

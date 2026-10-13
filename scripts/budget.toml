@@ -93,6 +93,7 @@
 # majors, which deny.toml warns on and does not refuse.
 # M110 (ADR-0063): bingo-process adds one member and no external crate.
 # M109 (ADR-0072 §5): bingo-claim adds one member, no external crate.
-max_dependencies = 344
+# M129 (ADR-0072 §6): bingo-shelf adds one member, no external crate.
+max_dependencies = 345
 max_core_check_seconds = 20
 max_target_gb = 5

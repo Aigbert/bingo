@@ -81,13 +81,36 @@ fn recognize(file: &mut File, path: &Path, marker: &str) -> Result<(), ClaimErro
     }
 }
 
-fn acquire(file: &File, path: &Path) -> Result<(), ClaimError> {
+/// Open a permanent, unmarked sidecar and take its exclusive OS lock.
+/// Contention is `None`; dropping the returned file releases ownership.
+pub fn lock(path: &Path) -> io::Result<Option<File>> {
+    let file = File::options()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)?;
+    if lock_file(&file)? {
+        Ok(Some(file))
+    } else {
+        Ok(None)
+    }
+}
+
+fn lock_file(file: &File) -> io::Result<bool> {
     match file.try_lock() {
-        Ok(()) => Ok(()),
-        Err(TryLockError::WouldBlock) => Err(ClaimError::WouldBlock {
+        Ok(()) => Ok(true),
+        Err(TryLockError::WouldBlock) => Ok(false),
+        Err(TryLockError::Error(error)) => Err(error),
+    }
+}
+
+fn acquire(file: &File, path: &Path) -> Result<(), ClaimError> {
+    match lock_file(file).map_err(|e| ClaimError::io(path, e))? {
+        true => Ok(()),
+        false => Err(ClaimError::WouldBlock {
             path: path.to_path_buf(),
         }),
-        Err(TryLockError::Error(error)) => Err(ClaimError::io(path, error)),
     }
 }
 

@@ -6,8 +6,8 @@
 //! pidfile goes with the last `Drop`. A killed gateway skips every one of those
 //! and leaves a data dir that looks occupied by a process that is gone.
 //!
-//! The wait is for the pidfile to disappear rather than for the process, since
-//! the file going is the proof that the `Drop`s ran.
+//! Modern records are live only while their OS claim is held. Legacy records
+//! retain the process-table checks used by older gateways.
 
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -40,7 +40,7 @@ pub async fn stop(paths: &Paths, home: &Path, probe: &dyn Probe) -> Result<Strin
         )),
         State::Stale(record) => clear(paths, &record),
         State::Running(record) => {
-            signal(&record, probe)?;
+            signal(paths, &record, probe)?;
             gone(paths, &record, probe).await
         }
     }
@@ -80,6 +80,13 @@ fn clear(paths: &Paths, record: &Record) -> Result<String, KernelError> {
     let path = paths.pidfile();
     std::fs::remove_file(&path)
         .map_err(|e| KernelError::new(ErrorCode::Internal, format!("{}: {e}", path.display())))?;
+    if record.claimed {
+        return Ok(format!(
+            "Nothing was running: the gateway claim is free. The record for pid {} ({}) has been cleared.",
+            record.pid,
+            path.display()
+        ));
+    }
     Ok(format!(
         "Nothing was running: pid {} is gone and did not stop cleanly. \
          Its record ({}) has been cleared.\n\
@@ -96,8 +103,13 @@ fn clear(paths: &Paths, record: &Record) -> Result<String, KernelError> {
 /// alive but is not a bingo is never signalled: the alternative is `stop`
 /// killing a stranger's process because a stale file named its number
 /// (M17 R-liveness).
-fn signal(record: &Record, probe: &dyn Probe) -> Result<(), KernelError> {
-    if !probe::is_bingo(probe, record.pid) {
+fn signal(paths: &Paths, record: &Record, probe: &dyn Probe) -> Result<(), KernelError> {
+    if record.claimed {
+        let current = State::read(paths, probe)?;
+        if current.running() != Some(record) {
+            return Ok(());
+        }
+    } else if !probe::is_bingo(probe, record.pid) {
         return Err(KernelError::new(
             ErrorCode::InvalidInput,
             format!(
@@ -113,12 +125,12 @@ fn signal(record: &Record, probe: &dyn Probe) -> Result<(), KernelError> {
         .map_err(|e| KernelError::new(ErrorCode::Internal, e))
 }
 
-/// Wait for the pidfile to go, which is what says the plugins were stopped
-/// rather than the process merely killed.
+/// Wait until this record no longer owns the gateway.
 async fn gone(paths: &Paths, record: &Record, probe: &dyn Probe) -> Result<String, KernelError> {
     let started = Instant::now();
     loop {
-        if matches!(State::read(paths, probe)?, State::Stopped) {
+        let state = State::read(paths, probe)?;
+        if state.running() != Some(record) {
             return Ok(format!(
                 "The gateway has stopped: pid {} gave back its pidfile and its locks.",
                 record.pid
@@ -150,6 +162,7 @@ mod tests {
     fn record(pid: u32) -> Record {
         Record {
             pid,
+            claimed: false,
             version: "0.1.0".into(),
             started: Timestamp::now(),
         }

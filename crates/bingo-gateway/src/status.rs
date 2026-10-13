@@ -47,6 +47,10 @@ fn headline(state: &State, now: Timestamp) -> String {
                 uptime(record.started, now)
             )
         }
+        State::Stale(record) if record.claimed => format!(
+            "not running: pid {} no longer owns the gateway claim. The next `start` can replace its record.",
+            record.pid
+        ),
         State::Stale(record) => format!(
             "not running: the pidfile names pid {}, which is gone. \
              It did not stop cleanly — `bingo gateway doctor --fix`.",
@@ -124,6 +128,7 @@ mod tests {
     fn record(pid: u32, version: &str) -> Record {
         Record {
             pid,
+            claimed: false,
             version: version.into(),
             started: at("2026-08-31T09:00:00Z"),
         }

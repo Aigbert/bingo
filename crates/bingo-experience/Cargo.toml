@@ -12,6 +12,7 @@ description = "Experience plugin for bingo: procedural playbooks as files, recal
 workspace = true
 
 [dependencies]
+bingo-shelf.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
 schemars.workspace = true
@@ -22,12 +23,6 @@ thiserror.workspace = true
 serde-saphyr.workspace = true
 # M14: `created` and an outcome's `at` are timestamps, and `/experience` shows an age.
 jiff.workspace = true
-# M14: the tree's id facility mints an entry's slug (ADR-0014 §2).
-ulid.workspace = true
-# M14: the commit card shows the file it would write as a diff, rendered the
-# way `bingo-tool-fs` renders one. Already in the tree, so it costs no crate.
-similar.workspace = true
-
 [dev-dependencies]
 bingo-sdk = { workspace = true, features = ["testing"] }
 # M14: the tokenizer's contract is a property over arbitrary CJK/ASCII mixes.

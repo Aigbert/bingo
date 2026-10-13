@@ -1,0 +1,9 @@
+{
+  "spec": "every 30m",
+  "text": "check whether the nightly build is green",
+  "cwd": "/work/project",
+  "permissionMode": "acceptEdits",
+  "enabled": true,
+  "created": "1970-01-01T00:00:00Z",
+  "lastFired": "1970-01-01T01:00:00Z"
+}

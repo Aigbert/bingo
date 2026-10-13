@@ -1,6 +1,9 @@
 # ADR-0072 — Mechanism lives in the library tier
 
-Status: proposed · 2026-10-13 · Plans: M109 (claim), M110 (shell), M127, M128, M129 · Supersedes: ADR-0056 §5
+Status: accepted · 2026-10-13 · Plan: M129 · Plans: M109 (claim), M110 (shell), M127, M128, M129 · Supersedes: ADR-0056 §5
+
+Implementation note (2026-10-13): M129 completes §5–6; §2–4 remain
+assigned to M127/M128. Gateway/tool-fs Windows checks remain for CI.
 
 ## Context
 

@@ -15,19 +15,14 @@ pub use wake::WakeTool;
 use bingo_sdk::ToolError;
 
 use crate::entry::Entry;
-use crate::id::{self, Named};
 use crate::store::Shelf;
+use bingo_shelf::id::{self, Named};
 
 /// The entry a prefix names, or a sentence the model can act on. An id
 /// nobody has is not a failed call — it is an answer.
 pub(crate) fn find<'a>(shelf: &'a Shelf, prefix: &str) -> Result<&'a Entry, String> {
-    let named = id::resolve(&shelf.ids(), prefix);
-    match named {
-        Named::One(id) => shelf
-            .entries
-            .iter()
-            .find(|entry| entry.id == id)
-            .ok_or_else(|| format!("no schedule is called {id}")),
+    match id::resolve(&shelf.entries, prefix, |entry| entry.id.as_str()) {
+        Named::One(entry) => Ok(entry),
         Named::Unknown => Err(format!(
             "No schedule has an id starting with \"{prefix}\". \
              ScheduleList shows them all."

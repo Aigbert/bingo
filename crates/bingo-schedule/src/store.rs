@@ -9,129 +9,72 @@
 
 use std::path::{Path, PathBuf};
 
+pub use bingo_shelf::Unreadable;
+use bingo_shelf::{Codec, CodecError, Loaded};
+
 use crate::entry::Entry;
-use crate::id;
 
 pub const DIRECTORY: &str = "schedules";
+pub type Shelf = Loaded<Entry>;
 
-const EXTENSION: &str = "json";
-
-/// Every entry the store has, and every file that was meant to be one.
-#[derive(Debug, Default)]
-pub struct Shelf {
-    /// In id order: what `/schedule` lists and what a prefix resolves
-    /// against are the same order for everyone.
-    pub entries: Vec<Entry>,
-    pub unreadable: Vec<Unreadable>,
+pub trait ScheduleShelf {
+    fn ids(&self) -> Vec<&str>;
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Unreadable {
-    pub file: String,
-    pub why: String,
-}
-
-impl Shelf {
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
-
-    pub fn ids(&self) -> Vec<&str> {
+impl ScheduleShelf for Shelf {
+    fn ids(&self) -> Vec<&str> {
         self.entries.iter().map(|entry| entry.id.as_str()).collect()
     }
 }
 
-/// Where the entries live. One directory for the whole store: a schedule
-/// names its own working directory, so it is not filed under one.
+#[derive(Debug)]
+struct Json;
+
+impl Codec for Json {
+    type Record = Entry;
+    const EXT: &'static str = "json";
+
+    fn encode(entry: &Entry) -> Result<String, CodecError> {
+        entry.document().map_err(|e| CodecError(e.to_string()))
+    }
+
+    fn decode(id: &str, text: &str) -> Result<Entry, CodecError> {
+        let mut entry: Entry = serde_json::from_str(text).map_err(|e| CodecError(e.to_string()))?;
+        entry.id = id.to_string();
+        Ok(entry)
+    }
+}
+
 #[derive(Debug)]
 pub struct Store {
-    dir: PathBuf,
+    shelf: bingo_shelf::Shelf<Json>,
 }
 
 impl Store {
     pub fn new(data_dir: &Path) -> Self {
         Self {
-            dir: data_dir.join(DIRECTORY),
+            shelf: bingo_shelf::Shelf::new(data_dir.join(DIRECTORY)),
         }
     }
 
-    /// The directory. It may not exist: nothing here creates it until
-    /// something is written.
     pub fn dir(&self) -> &Path {
-        &self.dir
+        self.shelf.dir()
     }
-
-    /// Where one entry lives. The file may not exist; the id is the name.
     pub fn path(&self, id: &str) -> PathBuf {
-        self.dir.join(format!("{id}.{EXTENSION}"))
+        self.shelf.path(id)
     }
-
     pub fn load(&self) -> Shelf {
-        let Ok(files) = std::fs::read_dir(&self.dir) else {
-            return Shelf::default();
-        };
-        let mut shelf = Shelf::default();
-        for file in files.flatten() {
-            let path = file.path();
-            if path.extension().is_none_or(|ext| ext != EXTENSION) {
-                continue;
-            }
-            match read(&path) {
-                Ok(entry) => shelf.entries.push(entry),
-                Err(why) => shelf.unreadable.push(Unreadable {
-                    file: file.file_name().to_string_lossy().into_owned(),
-                    why,
-                }),
-            }
-        }
-        shelf.entries.sort_by(|a, b| a.id.cmp(&b.id));
-        shelf.unreadable.sort_by(|a, b| a.file.cmp(&b.file));
-        shelf
+        self.shelf.load()
     }
-
-    /// The entry's file, written whole or not at all.
     pub fn save(&self, entry: &Entry) -> std::io::Result<PathBuf> {
-        let document = entry.document().map_err(std::io::Error::other)?;
-        std::fs::create_dir_all(&self.dir)?;
-        let path = self.path(&entry.id);
-        let tmp = self.dir.join(format!(".{}.tmp", entry.id));
-        std::fs::write(&tmp, document)?;
-        match std::fs::rename(&tmp, &path) {
-            Ok(()) => Ok(path),
-            Err(e) => {
-                let _ = std::fs::remove_file(&tmp);
-                Err(e)
-            }
-        }
+        self.shelf.save(&entry.id, entry)
     }
-
-    /// Forget one entry. A file that is already gone is not an error.
     pub fn delete(&self, id: &str) -> std::io::Result<()> {
-        match std::fs::remove_file(self.path(id)) {
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            other => other,
-        }
+        self.shelf.delete(id)
     }
-
-    /// An id no file in this store has yet.
     pub fn mint(&self) -> String {
-        std::iter::repeat_with(id::mint)
-            .find(|id| !self.path(id).exists())
-            .unwrap_or_else(id::mint)
+        self.shelf.mint()
     }
-}
-
-/// One file as an entry, or why it is not one. The stem is the id: it is
-/// stored nowhere inside the file, so renaming the file renames the entry.
-fn read(path: &Path) -> Result<Entry, String> {
-    let id = path
-        .file_stem()
-        .map(|stem| stem.to_string_lossy().into_owned())
-        .ok_or_else(|| "no file name".to_string())?;
-    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let mut entry: Entry = serde_json::from_str(&text).map_err(|e| e.to_string())?;
-    entry.id = id;
-    Ok(entry)
 }
 
 #[cfg(test)]
