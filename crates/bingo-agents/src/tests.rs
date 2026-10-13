@@ -3,18 +3,16 @@
 //! records what a tool asked it to do, and the three contexts the sdk hands a
 //! tool, a command and a hook.
 
-use std::any::Any;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use async_trait::async_trait;
 use bingo_sdk::{
     Activation, Answer, AnswerSpec, Attachment, CancellationToken, Catalog, CatalogEntry,
-    CatalogKind, ClientIdentity, CloseReason, CommandContext, Delivery, Driver, Env, ErrorCode,
-    Event, Frame, FrameStream, GatewayStream, HistoryChunk, HistoryPage, HookContext, HostApi,
-    HostHandle, Input, IntentId, IntentOutcome, InteractionId, InteractionKind, InterruptReason,
-    InterruptScope, Item, ItemBody, ItemId, ItemStatus, KernelError, OpenOptions, ParentLink,
-    Prompter, Seq, SessionChange, SessionFilter, SessionHandle, SessionId, SessionPort,
+    CommandContext, Delivery, Driver, Env, ErrorCode, Event, Frame, FrameStream, HistoryChunk,
+    HistoryPage, HookContext, HostHandle, Input, IntentId, IntentOutcome, InteractionId,
+    InteractionKind, InterruptReason, InterruptScope, Item, ItemBody, ItemId, ItemStatus,
+    KernelError, ParentLink, Prompter, Seq, SessionChange, SessionHandle, SessionId, SessionPort,
     SessionSelector, SessionSpec, SessionState, SessionSummary, ToolContext, ToolHost, ToolOutput,
     TurnId, TurnOrigin, TurnStatus, Usage,
 };
@@ -140,7 +138,7 @@ impl Fleet {
     }
 
     pub(crate) fn handle(&self) -> HostHandle {
-        HostHandle(Arc::new(self.clone()))
+        self.scripted().handle()
     }
 
     /// A session with no parent, as a surface opens one.
@@ -329,158 +327,156 @@ impl Fleet {
     }
 }
 
-#[async_trait]
-impl HostApi for Fleet {
-    async fn sessions(&self, filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        Ok(self
-            .sessions()
-            .iter()
-            .map(|live| live.summary.clone())
-            .filter(|summary| match &filter.parent {
-                Some(parent) => summary.parent.as_ref().map(|p| &p.session) == Some(parent),
-                None => true,
+impl Fleet {
+    fn scripted(&self) -> bingo_sdk::testing::TestHost {
+        let host = bingo_sdk::testing::TestHost::default();
+        self.script_sessions(&host);
+        self.script_open(&host);
+        host.on_close(
+            |_session, _reason| async move { unreachable!("this plugin closes no session") },
+        );
+        self.script_delete(&host);
+        self.script_deliver(&host);
+        self.script_reconfigure(&host);
+        host.on_extend(|_session, _plugin, _kind, _payload| async move {
+            unreachable!("this plugin extends no session")
+        });
+        host.on_signal(|_session, _plugin, _kind, _payload| async move {
+            unreachable!("this plugin signals no session")
+        });
+        host.on_catalog(|kind| async move {
+            Ok(Catalog {
+                kind,
+                entries: ["Read", "Write", "AskUserQuestion", "SpawnAgent"]
+                    .map(str::to_string)
+                    .into_iter()
+                    .map(|name| CatalogEntry {
+                        id: name.clone(),
+                        label: name,
+                        meta: serde_json::Value::Null,
+                    })
+                    .collect(),
             })
-            .collect())
+        });
+        host
     }
 
-    /// A child by id, or a new one from its spec — refused, as the kernel
-    /// would, when the key is held.
-    async fn open(
-        &self,
-        selector: SessionSelector,
-        _who: ClientIdentity,
-        _options: OpenOptions,
-    ) -> Result<Attachment, KernelError> {
-        let id = match selector {
-            SessionSelector::ById { id } => {
-                locked(&self.0.opened).push(id.clone());
-                id
-            }
-            SessionSelector::Create { spec } => {
-                locked(&self.0.spawned).push(spec.clone());
-                let held = locked(&self.0.locked)
+    fn script_sessions(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_sessions(move |filter| {
+            let fixture = fixture.clone();
+            async move {
+                Ok(fixture
+                    .sessions()
                     .iter()
-                    .any(|key| Some(key.as_str()) == spec.key.as_deref());
-                if held {
+                    .map(|live| live.summary.clone())
+                    .filter(|summary| match &filter.parent {
+                        Some(parent) => summary.parent.as_ref().map(|p| &p.session) == Some(parent),
+                        None => true,
+                    })
+                    .collect())
+            }
+        });
+    }
+
+    fn script_open(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_open(move |selector, _who, _options| {
+            let fixture = fixture.clone();
+            async move {
+                let id = match selector {
+                    SessionSelector::ById { id } => {
+                        locked(&fixture.0.opened).push(id.clone());
+                        id
+                    }
+                    SessionSelector::Create { spec } => {
+                        locked(&fixture.0.spawned).push(spec.clone());
+                        let held = locked(&fixture.0.locked)
+                            .iter()
+                            .any(|key| Some(key.as_str()) == spec.key.as_deref());
+                        if held {
+                            return Err(KernelError::new(
+                                ErrorCode::SessionLocked,
+                                "session key is in use",
+                            ));
+                        }
+                        fixture.spawn(&spec)
+                    }
+                    _ => unreachable!("this plugin opens a child by id or by spec"),
+                };
+                let sessions = fixture.sessions();
+                let live = sessions
+                    .iter()
+                    .find(|live| live.summary.id == id)
+                    .ok_or_else(|| {
+                        KernelError::new(ErrorCode::SessionNotFound, "no such session")
+                    })?;
+                let snapshot = fixture.snapshot(live);
+                drop(sessions);
+                Ok(Attachment {
+                    session: id.clone(),
+                    snapshot,
+                    history: None,
+                    events: fixture.frames(&id),
+                    handle: SessionHandle(Arc::new(Port {
+                        fleet: fixture.clone(),
+                        session: id,
+                    })),
+                })
+            }
+        });
+    }
+
+    fn script_delete(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_delete(move |session| {
+            let fixture = fixture.clone();
+            async move {
+                let session = &session;
+                let mut sessions = fixture.sessions();
+                let Some(at) = sessions.iter().position(|l| &l.summary.id == session) else {
                     return Err(KernelError::new(
-                        ErrorCode::SessionLocked,
-                        "session key is in use",
+                        ErrorCode::SessionNotFound,
+                        "no such session",
+                    ));
+                };
+                sessions.remove(at);
+                drop(sessions);
+                locked(&fixture.0.deleted).push(session.clone());
+                Ok(())
+            }
+        });
+    }
+
+    fn script_deliver(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_deliver(move |to, _intent, input, delivery| {
+            let fixture = fixture.clone();
+            async move {
+                let to = &to;
+                locked(&fixture.0.delivered).push((to.clone(), input, delivery));
+                Ok(())
+            }
+        });
+    }
+
+    fn script_reconfigure(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_reconfigure(move |session, change| {
+            let fixture = fixture.clone();
+            async move {
+                let session = &session;
+                let known = fixture.sessions().iter().any(|l| &l.summary.id == session);
+                if !known {
+                    return Err(KernelError::new(
+                        ErrorCode::SessionNotFound,
+                        "no such session",
                     ));
                 }
-                self.spawn(&spec)
+                locked(&fixture.0.reconfigured).push((session.clone(), change));
+                Ok(())
             }
-            _ => unreachable!("this plugin opens a child by id or by spec"),
-        };
-        let sessions = self.sessions();
-        let live = sessions
-            .iter()
-            .find(|live| live.summary.id == id)
-            .ok_or_else(|| KernelError::new(ErrorCode::SessionNotFound, "no such session"))?;
-        let snapshot = self.snapshot(live);
-        drop(sessions);
-        Ok(Attachment {
-            session: id.clone(),
-            snapshot,
-            history: None,
-            events: self.frames(&id),
-            handle: SessionHandle(Arc::new(Port {
-                fleet: self.clone(),
-                session: id,
-            })),
-        })
-    }
-
-    async fn close(&self, _session: &SessionId, _reason: CloseReason) -> Result<(), KernelError> {
-        unreachable!("this plugin closes no session")
-    }
-
-    /// The session is gone from the list, as the kernel's is; one the fleet
-    /// never had is refused, as the kernel refuses it.
-    async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
-        let mut sessions = self.sessions();
-        let Some(at) = sessions.iter().position(|l| &l.summary.id == session) else {
-            return Err(KernelError::new(
-                ErrorCode::SessionNotFound,
-                "no such session",
-            ));
-        };
-        sessions.remove(at);
-        drop(sessions);
-        locked(&self.0.deleted).push(session.clone());
-        Ok(())
-    }
-
-    async fn deliver(
-        &self,
-        to: &SessionId,
-        _intent: IntentId,
-        input: Input,
-        delivery: Delivery,
-    ) -> Result<(), KernelError> {
-        locked(&self.0.delivered).push((to.clone(), input, delivery));
-        Ok(())
-    }
-
-    /// A session this fleet does not know is refused, as the kernel refuses
-    /// one: a tool that moves a knob has to name a session that is there.
-    async fn reconfigure(
-        &self,
-        session: &SessionId,
-        change: SessionChange,
-    ) -> Result<(), KernelError> {
-        let known = self.sessions().iter().any(|l| &l.summary.id == session);
-        if !known {
-            return Err(KernelError::new(
-                ErrorCode::SessionNotFound,
-                "no such session",
-            ));
-        }
-        locked(&self.0.reconfigured).push((session.clone(), change));
-        Ok(())
-    }
-
-    async fn extend(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this plugin extends no session")
-    }
-
-    async fn signal(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this plugin signals no session")
-    }
-
-    /// Three tools, one of them the one a child may never have.
-    async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
-        Ok(Catalog {
-            kind,
-            entries: ["Read", "Write", "AskUserQuestion", "SpawnAgent"]
-                .map(str::to_string)
-                .into_iter()
-                .map(|name| CatalogEntry {
-                    id: name.clone(),
-                    label: name,
-                    meta: serde_json::Value::Null,
-                })
-                .collect(),
-        })
-    }
-
-    fn gateway_events(&self) -> GatewayStream {
-        Box::pin(futures::stream::empty())
-    }
-
-    fn service_any(&self, _key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
-        None
+        });
     }
 }
 
