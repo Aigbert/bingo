@@ -135,6 +135,11 @@ async fn a_free_claim_is_stale_and_stop_never_signals_its_live_pid() {
         State::read(&paths, &table).unwrap(),
         State::Stale(_)
     ));
+    let status = bingo_gateway::status::status(&paths, home.path(), &table).unwrap();
+    assert!(
+        status.contains("no longer owns the gateway claim"),
+        "{status}"
+    );
     bingo_gateway::stop::stop(&paths, home.path(), &table)
         .await
         .unwrap();

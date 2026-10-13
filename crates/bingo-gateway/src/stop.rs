@@ -6,8 +6,8 @@
 //! pidfile goes with the last `Drop`. A killed gateway skips every one of those
 //! and leaves a data dir that looks occupied by a process that is gone.
 //!
-//! The wait is for the pidfile to disappear rather than for the process, since
-//! the file going is the proof that the `Drop`s ran.
+//! Modern records are live only while their OS claim is held. Legacy records
+//! retain the process-table checks used by older gateways.
 
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -80,6 +80,13 @@ fn clear(paths: &Paths, record: &Record) -> Result<String, KernelError> {
     let path = paths.pidfile();
     std::fs::remove_file(&path)
         .map_err(|e| KernelError::new(ErrorCode::Internal, format!("{}: {e}", path.display())))?;
+    if record.claimed {
+        return Ok(format!(
+            "Nothing was running: the gateway claim is free. The record for pid {} ({}) has been cleared.",
+            record.pid,
+            path.display()
+        ));
+    }
     Ok(format!(
         "Nothing was running: pid {} is gone and did not stop cleanly. \
          Its record ({}) has been cleared.\n\
@@ -118,8 +125,7 @@ fn signal(paths: &Paths, record: &Record, probe: &dyn Probe) -> Result<(), Kerne
         .map_err(|e| KernelError::new(ErrorCode::Internal, e))
 }
 
-/// Wait for the pidfile to go, which is what says the plugins were stopped
-/// rather than the process merely killed.
+/// Wait until this record no longer owns the gateway.
 async fn gone(paths: &Paths, record: &Record, probe: &dyn Probe) -> Result<String, KernelError> {
     let started = Instant::now();
     loop {

@@ -12,13 +12,12 @@ use super::paths::Paths;
 use super::pidfile::{self, Record};
 use super::probe::Probe;
 
-/// The gateway of one data dir, as the pidfile and the process table together
-/// describe it.
+/// The gateway of one data dir, as its record and ownership describe it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum State {
-    /// A record, and the process it names is there.
+    /// A record with a held claim, or a live legacy process.
     Running(Record),
-    /// A record whose process is gone: a gateway that did not stop cleanly.
+    /// A record without ownership: a gateway that did not stop cleanly.
     Stale(Record),
     /// No record at all, which is what a clean stop leaves.
     Stopped,
