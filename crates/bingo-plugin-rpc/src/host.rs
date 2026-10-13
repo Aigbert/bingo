@@ -71,11 +71,18 @@ impl Server {
             .unwrap_or_default();
         let reads = self.contexts.reads(&context);
         let rendering = self.contexts.rendering(&context);
+        let asked = self.contexts.asked(&context);
         let calling = self.contexts.bind(&self.plugin, context).map_err(failed)?;
         reads
             .scope(bingo_plugin_host::invocation::scope(
                 calling,
-                bingo_plugin_host::state::rendering(rendering, self.answer_bound(method, params)),
+                bingo_sdk::render::under_input(
+                    asked,
+                    bingo_plugin_host::state::rendering(
+                        rendering,
+                        self.answer_bound(method, params),
+                    ),
+                ),
             ))
             .await
     }

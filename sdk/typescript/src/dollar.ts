@@ -1,8 +1,9 @@
 import type { Callbacks, Callback } from './callbacks.ts';
+import { ui } from './ui.ts';
 import { dollarRoutes } from './dollar-types.ts';
 import type { DollarInputs, DollarResults } from './dollar-types.ts';
 import type { Rpc } from './rpc.ts';
-import type { HookSite, StateValue, ModelRequest, Completed, Input, Tone, ToolSpec, CommandSpec } from './wire.ts';
+import type { HookSite, StateValue, ModelRequest, Completed, Input, ToolSpec, CommandSpec } from './wire.ts';
 
 export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root: string } = { name: '', root: '' }, callbacks?: Callbacks): Dollar {
   const store = (scope: string) => ({
@@ -13,11 +14,7 @@ export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root:
   const api = {
     state: store(site.session),
     store: store('global'),
-    ui: {
-      status: (text: string | null, options: { key?: string; tone?: Tone } = {}) =>
-        rpc.request<null>('host/place', { session: site.session, slot: options.key ?? 'status',
-          view: text === null ? null : { kind: 'status', text, tone: options.tone ?? 'neutral', until: null } }),
-    },
+    ui: ui(rpc, site),
     model: {
       complete: (request: ModelRequest) => rpc.request<Completed>('host/model/complete', {
         session: site.session, turn: site.turn, request,
@@ -100,7 +97,7 @@ export type Dollar = Replace<HostNouns, {
     deliver(input: Input, wake?: boolean): Promise<null>;
     extend(key: string, value: unknown): Promise<null>;
   };
-  ui: {status(text: string | null, options?: {key?: string; tone?: Tone}): Promise<null>};
+  ui: ReturnType<typeof ui>;
 }>;
 // A service face augments this type without widening the host's built-in nouns.
 export type WithServices<Services> = Dollar & Services;

@@ -47,3 +47,30 @@ export class Handlers {
     finally { if (this.pending.get(handler.port) === run) this.pending.delete(handler.port); }
   }
 }
+
+import type { HookSite, Tone, Level, InteractionKind, AnswerSpec, Answer, Slot, SurfaceName } from './wire.ts';
+export type OpenPane = {id: string; title: string; focus?: boolean; closeOnEscape?: boolean; holdToasts?: boolean; rows?: number; props?: unknown};
+export function ui(rpc: Rpc, site: HookSite) {
+  const call = <T>(method: string, params: unknown): Promise<T> =>
+    rpc.request<{result:T}>('service/call', {key:'bingo.plugin.ui', method, params}).then(reply => reply.result);
+  const toast = (method: string, text: string, options: {duration?:number} = {}) =>
+    call<null>(method, {session:site.session,text,...options});
+  return {
+    status: (text: string | null, options: {key?:string; tone?:Tone} = {}) =>
+      rpc.request<null>('host/place', {session:site.session,slot:options.key ?? 'status',
+        view:text === null ? null : {kind:'status',text,tone:options.tone ?? 'neutral',until:null}}),
+    toast: (text: string, options?: {duration?:number}) => toast('toast', text, options),
+    notify: (text: string, options?: {duration?:number}) => toast('notify', text, options),
+    open: (options: OpenPane) => call<Record<string,never>>('open', {...options,session:site.session}),
+    close: (id: string) => call<null>('close', {session:site.session,id}),
+    panes: () => call<Slot[]>('panes', {session:site.session}),
+    invalidate: (requests: string | string[]) => rpc.request<null>('host/ui/invalidate',
+      {session:site.session,requests:typeof requests === 'string' ? [requests] : requests}),
+    resolve: async (event: {surface:SurfaceName}) => {
+      const table = await call<{kind:string;props:string[]}[]>('resolve', {surface:event.surface});
+      return Object.fromEntries(table.map(element => [element.kind, element.kind])) as Record<string,string>;
+    },
+    notice: (text: string, options: {level?:Level} = {}) => call<null>('notice', {text,...options}),
+    ask: (kind: InteractionKind, answers: AnswerSpec[]) => call<Answer>('ask', {session:site.session,kind,answers}),
+  };
+}

@@ -23,6 +23,7 @@ pub(crate) struct Chains(Arc<Mutex<BTreeMap<String, Invocation>>>);
 struct Invocation {
     calling: Vec<CallingHook>,
     rendering: bool,
+    asked: bool,
     reads: BTreeMap<Option<usize>, bingo_plugin_host::state::ReadLog>,
 }
 
@@ -33,6 +34,7 @@ impl Chains {
             Invocation {
                 calling: invocation::current(),
                 rendering: false,
+                asked: bingo_sdk::render::asked(),
                 reads: BTreeMap::new(),
             },
         );
@@ -42,6 +44,19 @@ impl Chains {
         }
     }
 
+    pub fn asked(&self, context: &Context) -> bool {
+        context
+            .parent
+            .as_ref()
+            .and_then(|parent| {
+                self.0
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .get(parent)
+                    .map(|invocation| invocation.asked)
+            })
+            .unwrap_or(false)
+    }
     pub fn rendering(&self, context: &Context) -> bool {
         context
             .parent

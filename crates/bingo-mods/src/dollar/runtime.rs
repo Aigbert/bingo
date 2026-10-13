@@ -50,6 +50,13 @@ impl Runtime {
         crate::ui::install(host, runtime.clone())?;
         Ok(runtime)
     }
+    pub(crate) async fn snapshot(
+        &self,
+        host: &HostHandle,
+        session: &SessionId,
+    ) -> Result<SessionState, String> {
+        Ok(self.sessions.get(host, session).await?.snapshot())
+    }
     pub(crate) fn tools(&self) -> Vec<Arc<dyn Tool>> {
         self.registered.tools()
     }

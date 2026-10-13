@@ -125,8 +125,12 @@ fn start_gate(actor: &mut Actor) {
     actor.tracker.spawn(invocation::scope(calling, async move {
         let intent = waiting.intent.clone();
         let report = crate::chain::Report::default();
-        let work =
-            AssertUnwindSafe(evaluate(waiting, lookup, hooks, cx, report.clone())).catch_unwind();
+        let asked = commands::asked(&waiting.input) && !matches!(waiting.kind, Kind::Deliver(_));
+        let work = AssertUnwindSafe(bingo_sdk::render::under_input(
+            asked,
+            evaluate(waiting, lookup, hooks, cx, report.clone()),
+        ))
+        .catch_unwind();
         let verdict = match supervised(work, &cancel).await {
             _ if cancel.is_cancelled() => Verdict::Rejected(commands::interrupted()),
             Some(Ok(verdict)) => verdict,
