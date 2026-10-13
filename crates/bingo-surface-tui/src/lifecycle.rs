@@ -2,8 +2,21 @@
 use bingo_collab::lifecycle::Lifecycle;
 use bingo_sdk::TurnStatus;
 
-pub fn said(lifecycle: Lifecycle, _last: Option<&TurnStatus>, _spent: &str) -> String {
-    lifecycle.word().to_string()
+pub fn said(lifecycle: Lifecycle, last: Option<&TurnStatus>, spent: &str) -> String {
+    let mut words = vec![lifecycle.word()];
+    if lifecycle == Lifecycle::Idle
+        && let Some(last) = last
+    {
+        words.push(match last {
+            TurnStatus::Completed => "completed",
+            TurnStatus::Interrupted { .. } => "interrupted",
+            TurnStatus::Failed { .. } => "failed",
+        });
+    }
+    if !spent.is_empty() {
+        words.push(spent);
+    }
+    words.join(" · ")
 }
 
 #[cfg(test)]

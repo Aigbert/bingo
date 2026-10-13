@@ -737,7 +737,11 @@ fn result(call: &Call<'_>, rows: &Rows<'_>) -> Vec<Line<'static>> {
 /// what it is doing — read from its own state, never copied into this one.
 fn child_row(child: &SessionState, input: &Value, rows: &Rows<'_>) -> Vec<Line<'static>> {
     let mut out = speaks(
-        tree::bullet_style(tree::Status::of(child), tree::asking(child)),
+        tree::bullet_style(
+            bingo_collab::lifecycle::Lifecycle::of_state(child),
+            tree::asking(child),
+            child.last_status(),
+        ),
         vec![signature(
             &tree::name(child),
             &summarize(input),

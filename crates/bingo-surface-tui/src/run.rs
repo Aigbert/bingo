@@ -1372,7 +1372,7 @@ mod tests {
         ));
         assert_eq!(
             run.session.tree.rows()[1].status,
-            Some(tree::Status::Stored),
+            Some(bingo_collab::lifecycle::Lifecycle::Stored),
             "replayed, not live"
         );
 

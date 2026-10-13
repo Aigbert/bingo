@@ -32,8 +32,9 @@ use crate::matching;
 use crate::seats::{self, Ear, Owes, Seat};
 use crate::status;
 use crate::theme;
-use crate::tree::{self, Row, Status, Tree};
+use crate::tree::{self, Row, Tree};
 use crate::window;
+use bingo_collab::lifecycle::Lifecycle;
 
 /// Cells between a name and what its row says.
 const SAYS_AT: usize = 2;
@@ -61,7 +62,7 @@ pub struct Listing<'r, 'a> {
 }
 
 /// The sessions that answer a model, then the ones that answer nobody: the
-/// same fact `Status::of` reports, which is what makes a room a room. Each run
+/// same fact `Lifecycle::of_state` reports, which is what makes a room a room. Each run
 /// is narrowed to what the query matches, so the two are ranked apart and a
 /// label still stands over the run it names.
 pub fn listing<'r, 'a>(tree: &Tree, rows: &'r [Row<'a>], query: &str) -> Listing<'r, 'a> {
@@ -281,7 +282,14 @@ fn windowed(listed: Vec<(Line<'static>, Option<Cursor>)>, at: usize, room: usize
 fn session_line(tree: &Tree, row: &Row<'_>, name: usize, on: bool, now: Now) -> Line<'static> {
     let state = tree.state(row.session);
     let seat = state.and_then(|state| seats::seat(tree, state));
-    let mut spans = vec![theme::cursor_span(on), dot(row, seat.as_ref())];
+    let mut spans = vec![
+        theme::cursor_span(on),
+        dot(
+            row,
+            seat.as_ref(),
+            state.and_then(SessionState::last_status),
+        ),
+    ];
     spans.extend(named(&row.name, name, on));
     spans.extend(says(row, state, seat, now));
     Line::from(spans)
@@ -312,7 +320,7 @@ fn named(name: &str, column: usize, on: bool) -> Vec<Span<'static>> {
 /// The dot a session's row wears, and the sigil a live seat wears instead. The
 /// colour is the roster's own either way, so the glyph adds a fact rather than
 /// replacing one.
-fn dot(row: &Row<'_>, seat: Option<&Seat>) -> Span<'static> {
+fn dot(row: &Row<'_>, seat: Option<&Seat>, last: Option<&bingo_sdk::TurnStatus>) -> Span<'static> {
     let live = matches!(seat.map(|seat| seat.ear), Some(Ear::Live));
     let glyph = match live {
         true => LIVE,
@@ -321,7 +329,7 @@ fn dot(row: &Row<'_>, seat: Option<&Seat>) -> Span<'static> {
     let cell = theme::bullet().width().max(LIVE.width());
     Span::styled(
         format!("{glyph}{} ", " ".repeat(cell.saturating_sub(glyph.width()))),
-        tree::bullet_style(row.status, row.attention),
+        tree::bullet_style(row.status, row.attention, last),
     )
 }
 
@@ -357,30 +365,25 @@ fn says(
     gap(dotted(said))
 }
 
-/// What a session is doing, as a row says it. One that has not run a turn yet
-/// says what it was asked instead: it is the whole of what there is to know
-/// about it, and a row that said `idle` would waste the line.
+/// The same word and verdict as the child's transcript row.
 fn doing(row: &Row<'_>, state: Option<&SessionState>) -> String {
-    let Some(status) = row.status else {
-        return String::new();
-    };
-    match (status, state) {
-        // A row the store answered with has no state here to read.
-        (_, None) => status.label().to_string(),
-        (Status::Idle, Some(state)) => {
-            tree::brief(state).unwrap_or_else(|| status.label().to_string())
-        }
-        _ => status.label().to_string(),
-    }
+    state.map_or_else(
+        || {
+            row.status
+                .map_or(String::new(), |status| status.word().to_string())
+        },
+        |state| tree::describe(state, ""),
+    )
 }
 
 /// `3 tools · 1.2k tokens · 40s`: what a session has spent on its work. A
 /// session that has not started spent nothing worth a column, and the clock is
 /// left out where it has not moved — nothing is learned from `0s`.
 fn spent(row: &Row<'_>, state: Option<&SessionState>) -> String {
-    let Some(state) =
-        state.filter(|_| matches!(row.status, Some(Status::Running) | Some(Status::Done)))
-    else {
+    let Some(state) = state.filter(|state| {
+        matches!(row.status, Some(Lifecycle::Working))
+            || (row.status == Some(Lifecycle::Idle) && state.last_status().is_some())
+    }) else {
         return String::new();
     };
     let mut said = tree::spent(state);
@@ -570,7 +573,10 @@ mod tests {
             seats::seat(&tree, tree.state(reviewer.session).expect("it")).as_ref(),
         );
         assert!(glyph.content.starts_with('~'), "{glyph:?}");
-        assert_eq!(glyph.style, tree::bullet_style(reviewer.status, false));
+        assert_eq!(
+            glyph.style,
+            tree::bullet_style(reviewer.status, false, None)
+        );
     }
 
     /// The ear nearly every seat wears is the one no row says (ADR-0034 §6):
