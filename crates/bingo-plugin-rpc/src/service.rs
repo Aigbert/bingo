@@ -377,6 +377,25 @@ mod tests {
         assert_eq!(error.code, INVALID_PARAMS);
     }
 
+    #[tokio::test]
+    async fn an_undeclared_service_noun_is_refused_before_the_call() {
+        struct Hidden;
+        #[async_trait]
+        impl WireService for Hidden {
+            async fn call(&self, _: &str, _: Value) -> Result<Value, ServiceError> {
+                Ok(json!("must not run"))
+            }
+        }
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_catalog(|kind| async move { Ok(bingo_sdk::Catalog {kind, entries:vec![bingo_sdk::CatalogEntry {
+            id:"caller".into(), label:"caller".into(), meta:json!({"enabled":true,"tier":"rewrite","uses":[]})
+        }]}) });
+        host.handle().open_service("hidden", Arc::new(Hidden)).unwrap();
+        let answer = hub(host.handle()).call(asked("hidden", "get")).await;
+        assert!(answer.is_err(), "undeclared service ran: {answer:?}");
+        assert!(answer.unwrap_err().message.contains("hidden grant"));
+    }
+
     /// A declaration is a map, so what a bridge publishes is one service per
     /// key; this is the walk the bridge does, kept honest.
     #[test]
