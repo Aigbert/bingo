@@ -73,6 +73,7 @@ mod keys;
 mod late;
 mod layers;
 mod layout;
+mod lifecycle;
 mod markdown;
 mod matching;
 mod mentions;
