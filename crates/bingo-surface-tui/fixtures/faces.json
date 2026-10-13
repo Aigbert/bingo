@@ -1,0 +1,142 @@
+[
+  {
+    "name": "reviewer",
+    "hash": 829999642,
+    "sigil": "◗",
+    "ascii": "+",
+    "hue": 1
+  },
+  {
+    "name": "scout",
+    "hash": 3273829637,
+    "sigil": "✦",
+    "ascii": "=",
+    "hue": 2
+  },
+  {
+    "name": "parent",
+    "hash": 3939368189,
+    "sigil": "✦",
+    "ascii": "=",
+    "hue": 1
+  },
+  {
+    "name": "writer",
+    "hash": 2228000106,
+    "sigil": "◆",
+    "ascii": "@",
+    "hue": 0
+  },
+  {
+    "name": "builder",
+    "hash": 3828680000,
+    "sigil": "▲",
+    "ascii": "%",
+    "hue": 1
+  },
+  {
+    "name": "tester",
+    "hash": 3348513014,
+    "sigil": "▲",
+    "ascii": "%",
+    "hue": 3
+  },
+  {
+    "name": "planner",
+    "hash": 1390391395,
+    "sigil": "●",
+    "ascii": "#",
+    "hue": 1
+  },
+  {
+    "name": "researcher",
+    "hash": 1844902523,
+    "sigil": "✦",
+    "ascii": "=",
+    "hue": 0
+  },
+  {
+    "name": "designer",
+    "hash": 3572601220,
+    "sigil": "◗",
+    "ascii": "+",
+    "hue": 3
+  },
+  {
+    "name": "watcher",
+    "hash": 2917853599,
+    "sigil": "●",
+    "ascii": "#",
+    "hue": 0
+  },
+  {
+    "name": "critic",
+    "hash": 973897757,
+    "sigil": "✦",
+    "ascii": "=",
+    "hue": 3
+  },
+  {
+    "name": "keeper",
+    "hash": 1504111039,
+    "sigil": "●",
+    "ascii": "#",
+    "hue": 3
+  },
+  {
+    "name": "helper",
+    "hash": 567528493,
+    "sigil": "●",
+    "ascii": "#",
+    "hue": 3
+  },
+  {
+    "name": "fox",
+    "hash": 3069416270,
+    "sigil": "▲",
+    "ascii": "%",
+    "hue": 2
+  },
+  {
+    "name": "bingo",
+    "hash": 691857180,
+    "sigil": "◆",
+    "ascii": "@",
+    "hue": 2
+  },
+  {
+    "name": "Scout",
+    "hash": 1759490469,
+    "sigil": "■",
+    "ascii": "&",
+    "hue": 4
+  },
+  {
+    "name": "",
+    "hash": 2166136261,
+    "sigil": "●",
+    "ascii": "#",
+    "hue": 4
+  },
+  {
+    "name": "北海",
+    "hash": 2204791389,
+    "sigil": "■",
+    "ascii": "&",
+    "hue": 1
+  },
+  {
+    "name": "réviseur",
+    "hash": 2606197271,
+    "sigil": "✦",
+    "ascii": "=",
+    "hue": 3
+  },
+  {
+    "name": "agent-42",
+    "hash": 166409783,
+    "sigil": "✦",
+    "ascii": "=",
+    "hue": 3
+  }
+]

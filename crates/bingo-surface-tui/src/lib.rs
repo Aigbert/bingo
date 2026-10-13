@@ -56,6 +56,7 @@ mod composer;
 mod count;
 mod dialog;
 mod effect;
+mod face;
 mod focus;
 mod fold;
 mod foot;
@@ -326,3 +327,6 @@ mod test_support;
 mod embers;
 #[cfg(test)]
 mod identity;
+
+#[cfg(test)]
+mod crew_contract;
