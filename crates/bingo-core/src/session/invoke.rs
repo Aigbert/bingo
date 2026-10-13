@@ -17,9 +17,15 @@ use bingo_sdk::*;
 use tokio::sync::oneshot;
 
 use super::mailbox::Mailbox;
+use super::running::Door;
 use crate::executor::{self, Gate, PendingCall};
 use crate::gate::{GateInput, gate_call};
 use crate::turn::TurnConfig;
+
+/// What the caller of a call dropped with a turn that completed on its own is
+/// told: the turn is over, and nobody interrupted anything.
+pub(super) const TURN_ENDED_MARKER: &str =
+    "[Call dropped: its turn ended before the call finished, and no turn is in flight to serve it]";
 
 /// Where a bridged call's outcome goes, or the refusal in its place. It goes
 /// here and nowhere else: the caller already holds it, and a copy in the
@@ -32,6 +38,7 @@ pub(super) struct Serving {
     pub(super) turn: TurnId,
     pub(super) cancel: CancellationToken,
     pub(super) stopped: Arc<std::sync::atomic::AtomicBool>,
+    pub(super) door: Door,
     pub(super) config: Arc<TurnConfig>,
     pub(super) tool: Arc<dyn Tool>,
 }
@@ -47,6 +54,8 @@ pub(super) struct Bridged {
     /// where it stands.
     pub(super) cancel: CancellationToken,
     pub(super) stopped: Arc<std::sync::atomic::AtomicBool>,
+    /// The door it came in by, which knows how its turn ended.
+    pub(super) door: Door,
     pub(super) tool: Arc<dyn Tool>,
     pub(super) item: ItemId,
     pub(super) call: ToolCall,
@@ -66,8 +75,19 @@ impl Bridged {
                 duration_ms: 0,
             },
         };
+        let outcome = self.dropped_because(outcome);
         self.mailbox.call_finished(outcome.clone());
         let _ = reply.send(Ok(outcome));
+    }
+
+    /// A call the turn's token dropped says why. The token fires for a
+    /// person's `esc` and for a turn that completed on its own alike; only the
+    /// first is an interruption, and the door knows which it was.
+    fn dropped_because(&self, mut outcome: ToolOutcome) -> ToolOutcome {
+        if outcome.status == ItemStatus::Interrupted && self.door.completed() {
+            outcome.output = ToolOutput::error(TURN_ENDED_MARKER);
+        }
+        outcome
     }
 
     async fn run(&self) -> ToolOutcome {

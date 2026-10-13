@@ -1,8 +1,9 @@
-//! The door into a running turn (ADR-0036 §2). Every test here holds the
-//! model's stream open — `Script::Hang` never ends — so what is asserted is
-//! that a call is served *beside* a turn that is still streaming, which is the
-//! whole point of the door: whoever handed the call in is blocked on the
-//! answer before it can go on.
+//! The door into a running turn (ADR-0036 §2). The tests that serve a call
+//! hold the model's stream open — `Script::Hang` never ends — so what is
+//! asserted is that a call is served *beside* a turn that is still streaming,
+//! which is the whole point of the door: whoever handed the call in is blocked
+//! on the answer before it can go on. Once the stream has ended the door is
+//! shut, and the last two tests are about that end.
 
 use super::*;
 use crate::executor::INTERRUPTED_MARKER;
@@ -427,4 +428,127 @@ async fn a_bridged_after_tool_block_completes_at_the_round_boundary() {
     .await
     .expect("completed");
     assert_eq!(state.last_status(), Some(&TurnStatus::Completed));
+}
+
+/// A Stop hook that holds the turn after its stream has ended and asked for
+/// no tool: the turn is completing, and it will run no call again.
+struct HeldStop {
+    entered: Arc<tokio::sync::Notify>,
+    release: Arc<tokio::sync::Notify>,
+}
+
+#[async_trait::async_trait]
+impl Hook for HeldStop {
+    fn id(&self) -> &str {
+        "held-stop"
+    }
+    fn matcher(&self) -> HookMatcher {
+        HookMatcher {
+            points: vec![HookPoint::Stop],
+            tool: None,
+        }
+    }
+    async fn on_stop(&self, _: &HookContext) -> HookOutcome {
+        self.entered.notify_one();
+        self.release.notified().await;
+        HookOutcome::Continue
+    }
+}
+
+/// The door is open while the model is speaking, and only then: a call that
+/// arrives once the stream has ended — an ACP agent's call after its
+/// `end_turn` — is refused with the same reason as one between turns, never
+/// let in to be dropped when the turn it was handed to completes.
+#[tokio::test]
+async fn a_call_after_the_stream_ended_is_refused_while_the_turn_completes() {
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let hook = Arc::new(HeldStop {
+        entered: entered.clone(),
+        release: release.clone(),
+    });
+    let mailbox = start_with(
+        ScriptedProvider::new(vec![Script::Events(text("done"))]),
+        vec![Arc::new(EchoTool { read_only: true })],
+        move |cfg| cfg.hooks = crate::turn::HookSet::fixed(vec![hook.clone()]),
+    );
+    let (mut state, mut events) = mailbox.attach().await.expect("attached");
+    mailbox.submit(IntentId::mint(), Input::text("hi", Origin::surface("test")));
+    entered.notified().await;
+
+    let refused = mailbox
+        .invoke(call("Echo", 1))
+        .await
+        .expect_err("the stream has ended: the turn runs no call again");
+    assert_eq!(refused.code, ErrorCode::NotReady);
+    assert!(
+        refused.message.contains("no turn is in flight"),
+        "{refused:?}"
+    );
+
+    release.notify_one();
+    drive(&mut events, &mut state, turn_completed).await;
+    assert_eq!(state.last_status(), Some(&TurnStatus::Completed));
+    assert!(
+        !state.transcript.items().iter().any(|item| item.external()),
+        "the door refused before it opened an item"
+    );
+}
+
+/// A call let in while the model was speaking can still be running when the
+/// turn completes on its own — the caller's call and the stream's end travel
+/// separate roads. It is dropped with the turn, and the caller is told the
+/// turn ended: nobody pressed esc.
+#[tokio::test]
+async fn a_call_still_running_when_its_turn_completes_is_not_called_an_interrupt() {
+    let release = Arc::new(tokio::sync::Notify::new());
+    let link = Arc::new(HeldStep(release.clone()));
+    let mailbox = start_with(streaming(), vec![Arc::new(Hanging)], move |cfg| {
+        cfg.hooks.links.push(crate::chain::Link {
+            interceptor: link.clone(),
+            external: None,
+            tier: Tier::Full,
+        });
+    });
+    let (mut state, mut events) = mid_turn(&mailbox).await;
+    let asked = tokio::spawn({
+        let mailbox = mailbox.clone();
+        async move { mailbox.invoke(call("Hanging", 1)).await }
+    });
+    drive(
+        &mut events,
+        &mut state,
+        |f| matches!(&f.event, Event::ItemUpdated { item } if item.external()),
+    )
+    .await;
+
+    release.notify_one();
+    let outcome = asked
+        .await
+        .expect("the door's task lived")
+        .expect("an outcome, not silence");
+    let said = outcome.output.parts[0]
+        .as_text()
+        .unwrap_or_default()
+        .to_string();
+    assert!(outcome.output.is_error);
+    assert_ne!(said, INTERRUPTED_MARKER, "nobody interrupted it");
+    assert!(said.contains("turn ended"), "{said}");
+
+    drive(&mut events, &mut state, turn_completed).await;
+    assert_eq!(state.last_status(), Some(&TurnStatus::Completed));
+    // The call is closed on its own account, after the turn it outlived.
+    drive(
+        &mut events,
+        &mut state,
+        |f| matches!(&f.event, Event::ItemCompleted { item } if item.id == outcome.item),
+    )
+    .await;
+    let item = item_of(&state, &outcome.item);
+    assert_eq!(item.status, outcome.status);
+    assert!(
+        matches!(&item.body, ItemBody::ToolCall { output: Some(output), .. }
+            if output.parts[0].as_text() == Some(said.as_str())),
+        "the journal says the same as the caller was told: {item:?}"
+    );
 }
