@@ -86,12 +86,12 @@ no new dependency.
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-sdk slot` passes; the failing first run is pasted.
+- [x] `cargo test -p bingo-sdk slot` passes; the failing first run is pasted.
 - [ ] `rg 'is_list|is_set|tasks::quiet|wake::counting' crates/bingo-surface-tui/src`
       finds nothing.
 - [ ] `rg '"bingo\.(tasks|tools\.bash|schedule|permissions)"' crates/bingo-surface-tui/src crates/bingo-core/src crates/bingo-surface-print/src`
       finds only `#[cfg(test)]` code.
-- [ ] A bingo-tasks test reads a pre-M121 array journal and writes the object.
+- [x] A bingo-tasks test reads a pre-M121 array journal and writes the object.
 - [ ] Each producer asserts its slots beside its record; the stranger
       test passes; shift+tab fires `Input::Action { name: "permission" }`.
 - [ ] `screens/` snapshots are unchanged except the ended-job row and the
@@ -109,15 +109,18 @@ no new dependency.
 
 ## Risks
 
+- **STOP (2026-10-13, protocol step 6):** TUI tests fail in
+  `crates/bingo-surface-tui/src/theme.rs::every_token_is_spent_where_the_design_says`.
+  Its assertion pins token use to source files, including deleted `tasks.rs`
+  and `shells.rs`; this is outside Files and is not a type-constructor fixture.
+  Options: authorize adding this assertion to scope and update its file map
+  for the slot renderers, or leave M121 stopped. No ADR Decision changed.
+
 - `Tone::Attention` reads "wants a person"; an in-progress task is not
   that. If a reviewer refuses the stretch, the alternative is a
   `Checklist` word, which amends ADR-0013 §1. Decide before brick 4.
-- A session journaled before M121 holds a task array and a wake with no
-  `slots`: no band and no countdown until the next write. A resumed wake
-  is dead anyway (ADR-0071 §3).
-- `placed` runs every frame: it parses only payloads with `slots`.
-- An ended job's row says the display's fold ("Started in the background
-  as …"), not "Ran in the background". Say it in the commit body.
+- Old task arrays/wakes have no slots until the next write; resumed wakes are dead.
+- An ended job falls back to "Started in the background as …"; record this in the commit.
 - Re-verified at `50a885ed`: consumers and `ActionItem` still match; M112
   folds through `Transcript`, M113 pins records in sdk `tests/record.rs`.
   Call creation lives in the accumulator, publication in `turn/stream.rs`,
@@ -129,3 +132,19 @@ no new dependency.
   `transcript/pictured.rs`. All paths are under `crates/`.
 - Producer fixtures: `bingo-tasks/fixtures/pre-m121.json`; bash job test
   constructors in `src/{kill,read,notify}.rs` mechanically gain an item id.
+
+## Verified (2026-10-13; incomplete, stopped)
+- `cargo test -p bingo-sdk slot`: first `FAILED. 1 passed; 3 failed`;
+  after implementation `ok. 4 passed; 0 failed` (with/placed assertions).
+- `cargo test -p bingo-sdk --test record quiet_tool_calls`: first `FAILED`;
+  after implementation `ok. 1 passed; 0 failed` (quiet flag was discarded).
+- Producer `slots_` tests first failed for absent slots/object; then
+  `cargo test -p bingo-tasks -p bingo-tool-bash -p bingo-schedule -p bingo-permissions --no-fail-fast`:
+  `ok` (75 tasks, 146 bash, 112 schedule, 103 permissions unit tests).
+- `cargo test -p bingo-surface-tui a_stranger_places`: first `missing stranger status`;
+  after conversion `ok. 1 passed; 0 failed`.
+- `cargo test -p bingo-surface-tui --lib`: `FAILED. 1120 passed; 5 failed; 2 ignored`.
+  Failures: theme file map (stop), permission-cycle expectation, old shell-signal
+  fixture, ended-shell wording, renamed hidden-scene snapshot. Full gates,
+  Windows, PTY/tmux and remaining criteria are unverified. Consumer edits remain
+  uncommitted; ADR-0070 remains proposed. Nothing pushed, merged or opened as a PR.
