@@ -79,13 +79,17 @@ impl SessionStore for JsonlStore {
         }
         let dir = self.existing(session)?;
         journal::append(&dir, frame)?;
-        match &frame.event {
+        let derived = match &frame.event {
             Event::SessionUpdated { summary } => summary::write(&dir, summary),
             // A message is worth no frame of its own, so the derived file — not
             // the journal — is what stays fresh between one head and the next.
             event if event.completes_a_message() => summary::count_message(&dir),
             _ => Ok(()),
+        };
+        if let Err(error) = derived {
+            tracing::warn!(%session, %error, "journal appended but summary update failed");
         }
+        Ok(())
     }
 
     async fn replay(&self, session: &SessionId, since: Seq) -> Result<Vec<Frame>, KernelError> {
