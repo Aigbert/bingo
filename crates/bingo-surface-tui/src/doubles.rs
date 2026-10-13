@@ -3,16 +3,14 @@
 //! keeps what it was asked to paint — the bytes included, because the bell,
 //! the title, a selection and a notification never paint a cell.
 
-use std::any::Any;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Activation, ArgSpec, Attachment, Catalog, CatalogEntry, CatalogKind, ClientIdentity,
-    CloseReason, CommandSpec, Delivery, FrameStream, GatewayEvent, GatewayStream, HistoryChunk,
-    HistoryPage, HostApi, HostHandle, Input, IntentId, InterruptScope, KernelError, OpenOptions,
-    Seq, SessionFilter, SessionHandle, SessionId, SessionPort, SessionSelector, SessionState,
+    Activation, ArgSpec, Attachment, Catalog, CatalogEntry, CatalogKind, CommandSpec, FrameStream,
+    GatewayEvent, HistoryChunk, HistoryPage, HostHandle, Input, IntentId, InterruptScope,
+    KernelError, Seq, SessionHandle, SessionId, SessionPort, SessionSelector, SessionState,
     SessionSummary,
 };
 use futures::StreamExt;
@@ -134,7 +132,7 @@ impl TestHost {
     ) -> (HostHandle, Arc<TestSession>) {
         let session = scripted(frames, std::time::Duration::ZERO);
         let host = Self::over(Arc::clone(&session), stored, Vec::new());
-        (HostHandle(Arc::new(host)), session)
+        (Arc::new(host).scripted().handle(), session)
     }
 
     /// A host whose frames arrive `pace` apart: what a storm of deltas looks
@@ -145,7 +143,7 @@ impl TestHost {
     ) -> (HostHandle, Arc<TestSession>) {
         let session = scripted(frames, pace);
         let host = Self::over(Arc::clone(&session), Vec::new(), Vec::new());
-        (HostHandle(Arc::new(host)), session)
+        (Arc::new(host).scripted().handle(), session)
     }
 
     /// A host that says something happened to the whole process while the
@@ -153,7 +151,7 @@ impl TestHost {
     pub fn announcing(announcements: Vec<GatewayEvent>) -> (HostHandle, Arc<TestSession>) {
         let session = scripted(Vec::new(), std::time::Duration::ZERO);
         let host = Self::over(Arc::clone(&session), Vec::new(), announcements);
-        (HostHandle(Arc::new(host)), session)
+        (Arc::new(host).scripted().handle(), session)
     }
 
     /// The root's mailbox and the child's, which `open(ById)` answers with.
@@ -161,7 +159,7 @@ impl TestHost {
         let session = scripted(frames, std::time::Duration::ZERO);
         let host = Self::over(Arc::clone(&session), Vec::new(), Vec::new());
         let child = Arc::clone(&host.child);
-        (HostHandle(Arc::new(host)), session, child)
+        (Arc::new(host).scripted().handle(), session, child)
     }
 
     fn over(
@@ -188,130 +186,134 @@ fn scripted(frames: Vec<bingo_sdk::Frame>, pace: std::time::Duration) -> Arc<Tes
     })
 }
 
-#[async_trait]
-impl HostApi for TestHost {
-    async fn sessions(&self, _filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        let mut all = vec![summary()];
-        all.extend(self.stored.iter().cloned());
-        Ok(all)
+impl TestHost {
+    fn scripted(self: &Arc<Self>) -> bingo_sdk::testing::TestHost {
+        let host = bingo_sdk::testing::TestHost::default();
+        self.script_sessions(&host);
+        self.script_open(&host);
+        self.script_close(&host);
+        host.on_delete(|_session| async move { Ok(()) });
+        host.on_deliver(|_to, _intent, _input, _delivery| async move {
+            unreachable!("this double delivers nothing")
+        });
+        host.on_extend(|_session, _plugin, _kind, _payload| async move {
+            unreachable!("this double extends nothing")
+        });
+        host.on_signal(|_session, _plugin, _kind, _payload| async move {
+            unreachable!("this double signals nothing")
+        });
+        self.script_catalog(&host);
+        self.script_gateway_events(&host);
+        host
     }
 
-    /// The tree's stream comes with the root; a child is opened for its
-    /// mailbox alone, so its stream is empty.
-    async fn open(
-        &self,
-        selector: SessionSelector,
-        _who: ClientIdentity,
-        _options: OpenOptions,
-    ) -> Result<Attachment, KernelError> {
-        if matches!(&selector, SessionSelector::ById { id } if id == &child_id()) {
-            return Ok(Attachment {
-                session: child_id(),
-                snapshot: SessionState::new(child_summary("reviewer")),
-                history: None,
-                events: Box::pin(futures::stream::empty()),
-                handle: SessionHandle(Arc::clone(&self.child) as Arc<dyn SessionPort>),
-            });
-        }
-        Ok(Attachment {
-            session: SessionId::from_raw("ses_1"),
-            snapshot: state(),
-            history: None,
-            events: self.session.live(),
-            handle: SessionHandle(Arc::clone(&self.session) as Arc<dyn SessionPort>),
-        })
+    fn script_sessions(self: &Arc<Self>, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_sessions(move |_filter| {
+            let fixture = fixture.clone();
+            async move {
+                let mut all = vec![summary()];
+                all.extend(fixture.stored.iter().cloned());
+                Ok(all)
+            }
+        });
     }
 
-    async fn close(&self, session: &SessionId, _reason: CloseReason) -> Result<(), KernelError> {
-        self.closed
-            .lock()
-            .expect("no poisoned lock")
-            .push(session.clone());
-        Ok(())
-    }
-
-    async fn delete(&self, _session: &SessionId) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    async fn deliver(
-        &self,
-        _to: &SessionId,
-        _intent: IntentId,
-        _input: Input,
-        _delivery: Delivery,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double delivers nothing")
-    }
-
-    async fn extend(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double extends nothing")
-    }
-
-    async fn signal(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double signals nothing")
-    }
-
-    async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
-        let entries = match kind {
-            CatalogKind::Commands => vec![CatalogEntry {
-                id: "model".into(),
-                label: "model".into(),
-                meta: serde_json::to_value(CommandSpec {
-                    name: "model".into(),
-                    aliases: vec![],
-                    hint: "[provider/]model".into(),
-                    args: ArgSpec::Catalog {
-                        source: "models".into(),
-                    },
-                    instant: true,
-                    family: "kernel".into(),
+    fn script_open(self: &Arc<Self>, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_open(move |selector, _who, _options| {
+            let fixture = fixture.clone();
+            async move {
+                if matches!(&selector, SessionSelector::ById { id } if id == &child_id()) {
+                    return Ok(Attachment {
+                        session: child_id(),
+                        snapshot: SessionState::new(child_summary("reviewer")),
+                        history: None,
+                        events: Box::pin(futures::stream::empty()),
+                        handle: SessionHandle(Arc::clone(&fixture.child) as Arc<dyn SessionPort>),
+                    });
+                }
+                Ok(Attachment {
+                    session: SessionId::from_raw("ses_1"),
+                    snapshot: state(),
+                    history: None,
+                    events: fixture.session.live(),
+                    handle: SessionHandle(Arc::clone(&fixture.session) as Arc<dyn SessionPort>),
                 })
-                .expect("a serialisable spec"),
-            }],
-            // A second model appears once this host has announced that the
-            // catalogue changed: a refresh, as a client sees one.
-            _ => ["fake/fake-1"]
-                .into_iter()
-                .chain(
-                    self.announced
-                        .load(Ordering::SeqCst)
-                        .then_some("fake/fake-2"),
-                )
-                .map(|id| CatalogEntry {
-                    id: id.into(),
-                    label: id.split('/').next_back().unwrap_or(id).into(),
-                    meta: Value::Null,
-                })
-                .collect(),
-        };
-        Ok(Catalog { kind, entries })
+            }
+        });
     }
 
-    fn gateway_events(&self) -> GatewayStream {
-        let announcements =
-            std::mem::take(&mut *self.announcements.lock().expect("no poisoned lock"));
-        let announced = Arc::clone(&self.announced);
-        Box::pin(futures::stream::iter(announcements).map(move |event| {
-            announced.store(true, Ordering::SeqCst);
-            event
-        }))
+    fn script_close(self: &Arc<Self>, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_close(move |session, _reason| {
+            let fixture = fixture.clone();
+            async move {
+                let session = &session;
+                fixture
+                    .closed
+                    .lock()
+                    .expect("no poisoned lock")
+                    .push(session.clone());
+                Ok(())
+            }
+        });
     }
 
-    fn service_any(&self, _key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
-        None
+    fn script_catalog(self: &Arc<Self>, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_catalog(move |kind| {
+            let fixture = fixture.clone();
+            async move {
+                let entries = match kind {
+                    CatalogKind::Commands => vec![CatalogEntry {
+                        id: "model".into(),
+                        label: "model".into(),
+                        meta: serde_json::to_value(CommandSpec {
+                            name: "model".into(),
+                            aliases: vec![],
+                            hint: "[provider/]model".into(),
+                            args: ArgSpec::Catalog {
+                                source: "models".into(),
+                            },
+                            instant: true,
+                            family: "kernel".into(),
+                        })
+                        .expect("a serialisable spec"),
+                    }],
+                    // A second model appears once this host has announced that the
+                    // catalogue changed: a refresh, as a client sees one.
+                    _ => ["fake/fake-1"]
+                        .into_iter()
+                        .chain(
+                            fixture
+                                .announced
+                                .load(Ordering::SeqCst)
+                                .then_some("fake/fake-2"),
+                        )
+                        .map(|id| CatalogEntry {
+                            id: id.into(),
+                            label: id.split('/').next_back().unwrap_or(id).into(),
+                            meta: Value::Null,
+                        })
+                        .collect(),
+                };
+                Ok(Catalog { kind, entries })
+            }
+        });
+    }
+
+    fn script_gateway_events(self: &Arc<Self>, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_gateway_events(move || {
+            let announcements =
+                std::mem::take(&mut *fixture.announcements.lock().expect("no poisoned lock"));
+            let announced = Arc::clone(&fixture.announced);
+            Box::pin(futures::stream::iter(announcements).map(move |event| {
+                announced.store(true, Ordering::SeqCst);
+                event
+            }))
+        });
     }
 }
 
