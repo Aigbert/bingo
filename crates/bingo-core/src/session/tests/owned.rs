@@ -40,7 +40,15 @@ async fn stopped_turn(cfg: TurnConfig, hung: Arc<Hung>, text: &str) {
     // The round trip proves the actor has processed the interrupt before time advances.
     bounded(mailbox.summary()).await.unwrap();
     tokio::time::advance(GRACE + Duration::from_millis(1)).await;
-    bounded(drive(&mut events, &mut state, turn_completed)).await;
+    let frames = bounded(frames_until(&mut events, &mut state, turn_completed)).await;
+    for frame in frames {
+        if let Event::ItemStarted { item } = frame.event {
+            assert_eq!(
+                state.transcript.get(&item.id).unwrap().status,
+                ItemStatus::Interrupted
+            );
+        }
+    }
     assert_eq!(
         state.last_status(),
         Some(&TurnStatus::Interrupted {
@@ -224,7 +232,7 @@ async fn gate_fifo_keeps_prose_command_prose_in_arrival_order() {
 async fn close_joins_a_hung_command_within_the_grace() {
     let hung = Hung::at(HookPoint::Submit);
     let mailbox = configured(tool_config(), vec![hung.clone()]);
-    mailbox.attach().await.unwrap();
+    drop(mailbox.attach().await.unwrap());
     mailbox.submit(IntentId::mint(), input("/hang"));
     bounded(hung.entered.notified()).await;
     mailbox.close(CloseReason::Client);
