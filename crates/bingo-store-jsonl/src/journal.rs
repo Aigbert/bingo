@@ -251,3 +251,6 @@ mod tests {
 
 #[cfg(test)]
 mod compatibility;
+
+#[cfg(test)]
+mod versions;
