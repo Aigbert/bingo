@@ -266,3 +266,48 @@ fn an_external_plugins_tier_is_listed_from_user_settings_only() {
     assert!(stderr(&listed).contains("grants belong in user settings"));
     assert!(!stdout(&listed).contains("ignored"));
 }
+
+#[test]
+fn the_demo_is_opt_in_and_legacy_settings_report_the_new_switch() {
+    let home = tempfile::tempdir().unwrap();
+    let absent = run(plugins(home.path()).arg("list"));
+    assert_eq!(absent.status.code(), Some(0), "{}", stderr(&absent));
+    assert!(!stdout(&absent).contains("bingo.demo.ui"));
+    std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
+    std::fs::write(user_settings(home.path()), "demoUi = true\n").unwrap();
+    let legacy = scripted(home.path(), &script(UNUSED), "/board");
+    assert_eq!(legacy.status.code(), Some(0), "{}", stderr(&legacy));
+    assert!(
+        stderr(&legacy).contains("enabledPlugins"),
+        "{}",
+        stderr(&legacy)
+    );
+    std::fs::write(
+        user_settings(home.path()),
+        "[enabledPlugins]\n\"bingo.demo.ui\" = true\n",
+    )
+    .unwrap();
+    let switched = run(plugins(home.path()).arg("list"));
+    assert_eq!(switched.status.code(), Some(0), "{}", stderr(&switched));
+    assert_eq!(row(&stdout(&switched), "bingo.demo.ui")[2], "on");
+}
+
+#[test]
+fn surface_values_match_the_help_snapshot() {
+    let out = run(bingo().arg("--help"));
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stderr(&out), "");
+    let help = stdout(&out);
+    let values: Vec<_> = help
+        .lines()
+        .filter_map(|line| line.find("[possible values:").map(|at| &line[at..]))
+        .collect();
+    assert_eq!(
+        values,
+        [
+            "[possible values: text, json, stream-json]",
+            "[possible values: text, stream-json]",
+            "[possible values: stdio]",
+        ]
+    );
+}

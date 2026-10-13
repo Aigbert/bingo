@@ -453,7 +453,7 @@ fn permission_mode(state: &SessionState) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render::Mode;
+    use crate::OutputFormat as Mode;
     use crate::render::tests::{Sinks, play, play_with, text_turn};
     use crate::tests::{assistant, frame, session_state, tool_call};
     use bingo_sdk::{

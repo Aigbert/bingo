@@ -398,7 +398,7 @@ pub fn options(prompt: Option<&str>, home: &std::path::Path) -> bingo_sdk::Surfa
             spec: Default::default(),
         },
         prompt: prompt.map(str::to_owned),
-        args: Value::Null,
+
         env: Arc::new(bingo_sdk::Env::rooted(home)),
     }
 }

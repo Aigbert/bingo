@@ -64,3 +64,5 @@ before a host exists.
 
 Refs: ADR-0001 (crate map), ADR-0012 §1 (library tier), ADR-0041
 (the aws-lc-sys note), ADR-0042 §2 (a library may depend on a library).
+
+Amended 2026-10-14 by ADR-0069 §6 (M126): §4’s `update.check` is read by the TUI at registration from its merged claimed slice; the bin no longer resolves it or passes a JSON argument.

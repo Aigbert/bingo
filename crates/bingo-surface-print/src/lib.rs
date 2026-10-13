@@ -14,6 +14,7 @@
 
 mod hosted;
 mod input;
+mod options;
 mod render;
 mod stream_json;
 
@@ -31,8 +32,9 @@ use bingo_sdk::{
 use futures::StreamExt;
 use tokio::sync::mpsc;
 
-use input::Format;
-use render::{Mode, Renderer};
+use InputFormat as Format;
+pub use options::{InputFormat, Options, OutputFormat, PromptTool};
+use render::Renderer;
 pub use render::{error_report, notice_report};
 
 /// The surface id, and the origin every input it submits carries.
@@ -102,8 +104,10 @@ impl Console for Terminal {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct PrintSurface;
+#[derive(Debug, Default, Clone)]
+pub struct PrintSurface {
+    options: Options,
+}
 
 #[async_trait]
 impl Surface for PrintSurface {
@@ -119,7 +123,7 @@ impl Surface for PrintSurface {
         let mut console = Terminal;
         let mut out = io::stdout();
         let mut err = io::stderr();
-        drive(&host, opts, &mut console, &mut out, &mut err).await
+        drive(&host, opts, &self.options, &mut console, &mut out, &mut err).await
     }
 }
 
@@ -128,6 +132,7 @@ impl Surface for PrintSurface {
 pub(crate) async fn drive(
     host: &HostHandle,
     opts: SurfaceOptions,
+    options: &Options,
     console: &mut (dyn Console + Send),
     out: &mut (dyn Write + Send),
     err: &mut (dyn Write + Send),
@@ -136,12 +141,11 @@ pub(crate) async fn drive(
         selector,
         cwd,
         prompt,
-        args,
         ..
     } = opts;
-    let mode = Mode::from_args(&args);
+    let mode = options.output_format;
     let renderer = Renderer::new(mode, console.human(), tool_names(host).await);
-    let start = start(Format::from_args(&args), prompt, &args, &cwd, console).await?;
+    let start = start(options.input_format, prompt, &options.images, &cwd, console).await?;
     let attachment = host
         .open(
             selector,
@@ -165,8 +169,12 @@ pub(crate) async fn drive(
             run.single().await
         }
         Start::Hosted { first, lines } => {
-            run.hosted(lines, first, input::prompts_on_stdio(&args))
-                .await
+            run.hosted(
+                lines,
+                first,
+                options.permission_prompt_tool == Some(PromptTool::Stdio),
+            )
+            .await
         }
     }
 }
@@ -187,14 +195,14 @@ enum Start {
 async fn start(
     format: Format,
     prompt: Option<String>,
-    args: &serde_json::Value,
+    sources: &[String],
     cwd: &std::path::Path,
     console: &mut (dyn Console + Send),
 ) -> Result<Start, KernelError> {
     match format {
         Format::Text => Ok(Start::Once {
             prompt: prompt_from(prompt, console)?,
-            images: images_from(args, cwd).await?,
+            images: images_from(sources, cwd).await?,
         }),
         Format::StreamJson => Ok(Start::Hosted {
             first: prompt,
@@ -339,21 +347,13 @@ fn prompt_from(
     Ok(prompt)
 }
 
-/// `--image`'s sources (`args.images`), read at the edge: a path off this
+/// `--image`'s sources, read at the edge: a path off this
 /// machine or a URL this machine fetches (ADR-0041 §3), and one that does not
 /// read is the run's answer, before a session is opened for it. A relative
 /// path is the session's, so `--cwd` moves it with everything else.
-async fn images_from(
-    args: &serde_json::Value,
-    cwd: &std::path::Path,
-) -> Result<Vec<Image>, KernelError> {
-    let words = args
-        .get("images")
-        .and_then(serde_json::Value::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or(&[]);
-    let mut images = Vec::with_capacity(words.len());
-    for word in words.iter().filter_map(serde_json::Value::as_str) {
+async fn images_from(sources: &[String], cwd: &std::path::Path) -> Result<Vec<Image>, KernelError> {
+    let mut images = Vec::with_capacity(sources.len());
+    for word in sources {
         // Nothing is kept: a run that prints once and ends has nothing to
         // read a second time (M61).
         let image = bingo_pictures::load(&bingo_pictures::Source::parse(word, cwd), None)
@@ -603,8 +603,16 @@ static MANIFEST: PluginManifest = PluginManifest {
     config: None,
 };
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct PrintPlugin;
+#[derive(Debug, Default, Clone)]
+pub struct PrintPlugin {
+    options: Options,
+}
+
+impl PrintPlugin {
+    pub fn new(options: Options) -> Self {
+        Self { options }
+    }
+}
 
 #[async_trait]
 impl Plugin for PrintPlugin {
@@ -613,7 +621,9 @@ impl Plugin for PrintPlugin {
     }
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
-        registrar.surface(Arc::new(PrintSurface) as Arc<dyn Surface>);
+        registrar.surface(Arc::new(PrintSurface {
+            options: self.options.clone(),
+        }) as Arc<dyn Surface>);
         Ok(())
     }
 }
@@ -1112,16 +1122,18 @@ pub(crate) mod tests {
         }
     }
 
-    pub(crate) fn options(prompt: Option<&str>, args: serde_json::Value) -> SurfaceOptions {
-        SurfaceOptions {
-            cwd: "/tmp".into(),
-            selector: SessionSelector::ById {
-                id: SessionId::from_raw("ses_1"),
+    pub(crate) fn options(prompt: Option<&str>, options: Options) -> (SurfaceOptions, Options) {
+        (
+            SurfaceOptions {
+                cwd: "/tmp".into(),
+                selector: SessionSelector::ById {
+                    id: SessionId::from_raw("ses_1"),
+                },
+                prompt: prompt.map(str::to_owned),
+                env: Arc::new(bingo_sdk::Env::rooted("/tmp")),
             },
-            prompt: prompt.map(str::to_owned),
-            args,
-            env: Arc::new(bingo_sdk::Env::rooted("/tmp")),
-        }
+            options,
+        )
     }
 
     pub(crate) struct Run {
@@ -1131,11 +1143,15 @@ pub(crate) mod tests {
         pub(crate) session: Arc<TestSession>,
     }
 
-    async fn play(frames: Vec<Frame>, console: &mut TestConsole, opts: SurfaceOptions) -> Run {
+    async fn play(
+        frames: Vec<Frame>,
+        console: &mut TestConsole,
+        opts: (SurfaceOptions, Options),
+    ) -> Run {
         let (host, session) = TestHost::with(frames);
         let mut out: Vec<u8> = Vec::new();
         let mut err: Vec<u8> = Vec::new();
-        let exit = drive(&host, opts, console, &mut out, &mut err).await;
+        let exit = drive(&host, opts.0, &opts.1, console, &mut out, &mut err).await;
         Run {
             exit,
             out: String::from_utf8_lossy(&out).into_owned(),
@@ -1149,7 +1165,7 @@ pub(crate) mod tests {
         play(
             frames,
             &mut TestConsole::headless(),
-            options(Some("hi"), json!({})),
+            options(Some("hi"), Options::default()),
         )
         .await
     }
@@ -1163,7 +1179,7 @@ pub(crate) mod tests {
         play(
             frames,
             &mut TestConsole::typing(lines),
-            options(Some("hi"), json!({})),
+            options(Some("hi"), Options::default()),
         )
         .await
     }
@@ -1279,7 +1295,13 @@ pub(crate) mod tests {
                 completed(2),
             ],
             &mut TestConsole::headless(),
-            options(Some("hi"), json!({ "outputFormat": "json" })),
+            options(
+                Some("hi"),
+                Options {
+                    output_format: OutputFormat::Json,
+                    ..Options::default()
+                },
+            ),
         )
         .await;
         assert_eq!(run.exit, Ok(Exit { code: 0 }));
@@ -1304,7 +1326,13 @@ pub(crate) mod tests {
                 completed(2),
             ],
             &mut TestConsole::headless(),
-            options(Some("hi"), json!({ "outputFormat": "stream-json" })),
+            options(
+                Some("hi"),
+                Options {
+                    output_format: OutputFormat::StreamJson,
+                    ..Options::default()
+                },
+            ),
         )
         .await;
         assert_eq!(run.exit, Ok(Exit { code: 0 }));
@@ -1408,7 +1436,7 @@ pub(crate) mod tests {
         let (host, _) = TestHost::with(Vec::new());
         let attachment = host
             .open(
-                options(None, json!({})).selector,
+                options(None, Options::default()).0.selector,
                 ClientIdentity {
                     surface: SURFACE_ID.into(),
                     name: "test".into(),
@@ -1421,7 +1449,7 @@ pub(crate) mod tests {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let mut attached = Attached::open(
             attachment,
-            Renderer::new(Mode::Json, false, Vec::new()),
+            Renderer::new(OutputFormat::Json, false, Vec::new()),
             &mut console,
             &mut out,
             &mut err,
@@ -1474,7 +1502,13 @@ pub(crate) mod tests {
         let run = play(
             a_tree_with_a_childs_prompt(),
             &mut TestConsole::headless(),
-            options(Some("hi"), json!({ "outputFormat": "json" })),
+            options(
+                Some("hi"),
+                Options {
+                    output_format: OutputFormat::Json,
+                    ..Options::default()
+                },
+            ),
         )
         .await;
         assert_eq!(run.exit, Ok(Exit { code: 0 }));
@@ -1685,7 +1719,12 @@ pub(crate) mod tests {
     async fn the_prompt_is_read_from_stdin_when_the_command_line_has_none() {
         let mut console = TestConsole::headless();
         console.stdin = "from stdin\n".into();
-        let run = play(vec![completed(1)], &mut console, options(None, json!({}))).await;
+        let run = play(
+            vec![completed(1)],
+            &mut console,
+            options(None, Options::default()),
+        )
+        .await;
         assert_eq!(run.exit, Ok(Exit { code: 0 }));
         assert!(matches!(
             &run.session.submitted()[0],
@@ -1710,7 +1749,12 @@ pub(crate) mod tests {
                 usage: Usage::default(),
             },
         );
-        let run = play(vec![failed], &mut console, options(Some("hi"), json!({}))).await;
+        let run = play(
+            vec![failed],
+            &mut console,
+            options(Some("hi"), Options::default()),
+        )
+        .await;
         assert_eq!(run.exit, Ok(Exit { code: 1 }));
         assert_eq!(
             run.err,
@@ -1723,7 +1767,13 @@ pub(crate) mod tests {
         let run = play(
             vec![completed(1)],
             &mut TestConsole::headless(),
-            options(Some("look"), json!({ "images": ["/nowhere/shot.txt"] })),
+            options(
+                Some("look"),
+                Options {
+                    images: vec!["/nowhere/shot.txt".into()],
+                    ..Options::default()
+                },
+            ),
         )
         .await;
         let Err(error) = run.exit else {
@@ -1752,7 +1802,13 @@ pub(crate) mod tests {
         let run = play(
             vec![completed(1)],
             &mut TestConsole::headless(),
-            options(Some("look"), json!({ "images": [path.to_string_lossy()] })),
+            options(
+                Some("look"),
+                Options {
+                    images: vec![path.to_string_lossy().into_owned()],
+                    ..Options::default()
+                },
+            ),
         )
         .await;
         let images = submitted_pictures(&run, "look");
@@ -1771,7 +1827,13 @@ pub(crate) mod tests {
         let run = play(
             vec![completed(1)],
             &mut TestConsole::headless(),
-            options(Some("look"), json!({ "images": [path.to_string_lossy()] })),
+            options(
+                Some("look"),
+                Options {
+                    images: vec![path.to_string_lossy().into_owned()],
+                    ..Options::default()
+                },
+            ),
         )
         .await;
         assert_eq!(submitted_pictures(&run, "look")[0].media_type, "image/png");
@@ -1787,8 +1849,14 @@ pub(crate) mod tests {
             bingo_pictures::testing::png_bytes(2, 2),
         )
         .unwrap();
-        let mut opts = options(Some("look"), json!({ "images": ["shot.png"] }));
-        opts.cwd = dir.path().to_path_buf();
+        let mut opts = options(
+            Some("look"),
+            Options {
+                images: vec!["shot.png".into()],
+                ..Options::default()
+            },
+        );
+        opts.0.cwd = dir.path().to_path_buf();
         let run = play(vec![completed(1)], &mut TestConsole::headless(), opts).await;
         assert_eq!(submitted_pictures(&run, "look").len(), 1);
     }
@@ -1798,7 +1866,7 @@ pub(crate) mod tests {
         let run = play(
             vec![completed(1)],
             &mut TestConsole::headless(),
-            options(None, json!({})),
+            options(None, Options::default()),
         )
         .await;
         assert_eq!(
@@ -1870,7 +1938,9 @@ pub(crate) mod tests {
             bingo_sdk::Env::rooted("/tmp"),
             Default::default(),
         );
-        PrintPlugin.register(&mut registrar).expect("register");
+        PrintPlugin::default()
+            .register(&mut registrar)
+            .expect("register");
         let contributions = registrar.into_contributions();
         assert_eq!(contributions.len(), 1);
         match &contributions[0] {
@@ -1880,6 +1950,9 @@ pub(crate) mod tests {
             }
             other => panic!("expected a surface, got {other:?}"),
         }
-        assert_eq!(PrintPlugin.manifest().provides, &["surface:print"]);
+        assert_eq!(
+            PrintPlugin::default().manifest().provides,
+            &["surface:print"]
+        );
     }
 }

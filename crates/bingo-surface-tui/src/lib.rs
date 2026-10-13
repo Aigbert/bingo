@@ -136,7 +136,32 @@ pub use theme::PROBE_THROUGH;
 pub const SURFACE_ID: &str = "tui";
 
 #[derive(Debug, Default, Clone, Copy)]
-pub struct TuiSurface;
+pub struct TuiSurface {
+    options: Options,
+    settings: settings::Settings,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Options {
+    pub print_on_exit: bool,
+    pub picture_cache_days: Option<u64>,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            print_on_exit: true,
+            picture_cache_days: None,
+        }
+    }
+}
+
+impl Options {
+    pub(crate) fn cache_days(self) -> u64 {
+        self.picture_cache_days
+            .unwrap_or(bingo_pictures::cache::DAYS)
+    }
+}
 
 #[async_trait]
 impl Surface for TuiSurface {
@@ -149,9 +174,9 @@ impl Surface for TuiSurface {
     }
 
     async fn run(&self, host: HostHandle, opts: SurfaceOptions) -> Result<Exit, KernelError> {
-        let print = print_on_exit(&opts);
+        let print = self.options.print_on_exit;
         let mut screen = terminal::Tui::enter().map_err(entering)?;
-        let ended = run::drive(&host, opts, &mut screen, run::terminal_keys()).await;
+        let ended = run::drive(&host, opts, *self, &mut screen, run::terminal_keys()).await;
         // The terminal goes back whether the loop ended or failed.
         let _ = screen.leave();
         let ended = ended?;
@@ -172,14 +197,6 @@ fn way_back(session: &bingo_sdk::SessionId) -> String {
     format!("\nResume this session with:\n  bingo --resume {session}")
 }
 
-/// `--no-print-on-exit` is the one thing the bin says about this surface.
-fn print_on_exit(opts: &SurfaceOptions) -> bool {
-    opts.args
-        .get("noPrintOnExit")
-        .and_then(serde_json::Value::as_bool)
-        != Some(true)
-}
-
 fn entering(e: std::io::Error) -> KernelError {
     KernelError::new(
         bingo_sdk::ErrorCode::Internal,
@@ -193,12 +210,6 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     uses: &[],
     provides: &["surface:tui", "service:bingo.surface.tui.pages"],
     requires: &[],
-    // `update.check` (ADR-0043 §4) and `tui.measure` (design §7): the box is
-    // where a newer release is said and the transcript is where prose is
-    // measured, so this is the surface that claims both keys. The bin reads
-    // the answers out of the layers, as it does for every key that decides
-    // something before a host exists, and hands them over with the rest of
-    // the args.
     config: Some(ConfigClaim {
         keys: &[
             (bingo_update::SETTING, Merge::Replace),
@@ -209,7 +220,22 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
 };
 
 #[derive(Debug, Default, Clone, Copy)]
-pub struct TuiPlugin;
+pub struct TuiPlugin {
+    options: Options,
+}
+
+impl TuiPlugin {
+    pub fn new(options: Options) -> Self {
+        Self { options }
+    }
+
+    fn surface(&self, registrar: &Registrar) -> Result<TuiSurface, PluginError> {
+        Ok(TuiSurface {
+            options: self.options,
+            settings: registrar.config()?,
+        })
+    }
+}
 
 #[async_trait]
 impl Plugin for TuiPlugin {
@@ -218,7 +244,7 @@ impl Plugin for TuiPlugin {
     }
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
-        registrar.surface(Arc::new(TuiSurface) as Arc<dyn Surface>);
+        registrar.surface(Arc::new(self.surface(registrar)?) as Arc<dyn Surface>);
         registrar.add(guide::contribution(registrar));
         Ok(())
     }
@@ -228,6 +254,30 @@ impl Plugin for TuiPlugin {
 mod plugin_tests {
     use super::*;
     use bingo_sdk::{Contribution, Env, Pages};
+
+    #[test]
+    fn registration_retains_both_claimed_settings() {
+        let registrar = Registrar::new(
+            MANIFEST.id,
+            serde_json::json!({"tui": {"measure": 72}, "update": {"check": false}}),
+            Env::rooted(std::env::temp_dir()),
+            Default::default(),
+        );
+        let surface = TuiPlugin::default().surface(&registrar).unwrap();
+        assert_eq!(surface.settings.measure(), Some(72));
+        assert!(!surface.settings.update.check);
+    }
+
+    #[test]
+    fn registration_validates_the_claimed_settings() {
+        let mut registrar = Registrar::new(
+            MANIFEST.id,
+            serde_json::json!({"tui": {"measure": "wide"}}),
+            Env::rooted(std::env::temp_dir()),
+            Default::default(),
+        );
+        assert!(TuiPlugin::default().register(&mut registrar).is_err());
+    }
 
     #[test]
     fn the_manifest_says_what_it_provides_and_the_two_keys_it_claims() {
@@ -244,7 +294,9 @@ mod plugin_tests {
             Env::rooted(std::env::temp_dir().join("bingo-tui-test")),
             Default::default(),
         );
-        TuiPlugin.register(&mut registrar).expect("register");
+        TuiPlugin::default()
+            .register(&mut registrar)
+            .expect("register");
         let contributions = registrar.into_contributions();
         assert_eq!(contributions.len(), MANIFEST.provides.len());
         match &contributions[0] {

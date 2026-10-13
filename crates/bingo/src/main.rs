@@ -3,6 +3,7 @@
 
 mod acp_proxy;
 mod channels;
+mod composition;
 mod env;
 mod login;
 mod mcp;
@@ -41,14 +42,18 @@ use bingo_sdk::{
 };
 use bingo_skills::SkillsPlugin;
 use bingo_store_jsonl::JsonlStorePlugin;
-use bingo_surface_print::{PrintPlugin, error_report, notice_report};
+use bingo_surface_print::{
+    InputFormat, OutputFormat, PrintPlugin, PromptTool, error_report, notice_report,
+};
 use bingo_surface_rpc::RpcPlugin;
 use bingo_surface_tui::TuiPlugin;
 use bingo_tasks::TasksPlugin;
 use bingo_tool_bash::BashPlugin;
 use bingo_tool_fs::FsPlugin;
 use bingo_tool_web::WebPlugin;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::builder::TypedValueParser;
+use clap::{Parser, Subcommand};
+use composition::Composition;
 use serde_json::{Map, Value, json};
 
 #[derive(Parser, Debug)]
@@ -65,17 +70,17 @@ struct Cli {
     print: bool,
 
     /// What `--print` writes to stdout.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
+    #[arg(long, default_value = "text", value_parser = clap::builder::PossibleValuesParser::new(OutputFormat::VALUES).try_map(|word| word.parse::<OutputFormat>()))]
     output_format: OutputFormat,
 
     /// What `--print` reads from stdin: one prompt, or Claude Code's host
     /// protocol, a turn per line (ADR-0007).
-    #[arg(long, value_enum, default_value_t = InputFormat::Text)]
+    #[arg(long, default_value = "text", value_parser = clap::builder::PossibleValuesParser::new(InputFormat::VALUES).try_map(|word| word.parse::<InputFormat>()))]
     input_format: InputFormat,
 
     /// Who answers permission prompts headlessly. `stdio` is the host on the
     /// other end of `--input-format stream-json`.
-    #[arg(long, value_name = "TOOL")]
+    #[arg(long, value_name = "TOOL", value_parser = clap::builder::PossibleValuesParser::new(PromptTool::VALUES).try_map(|word| word.parse::<PromptTool>()))]
     permission_prompt_tool: Option<PromptTool>,
 
     /// A picture to hand the model beside the `--print` prompt: a path, or an
@@ -139,8 +144,8 @@ struct Cli {
     no_print_on_exit: bool,
 
     /// Register the demo plugin: `/board`, `DemoProgress`, and the three
-    /// lanes of ADR-0013 to look at. Off unless this or the `demoUi` setting
-    /// says otherwise.
+    /// lanes of ADR-0013 to look at. Off unless this or
+    /// `enabledPlugins["bingo.demo.ui"]` says otherwise.
     #[arg(long, global = true)]
     demo_ui: bool,
 
@@ -282,55 +287,6 @@ enum Credential<'a> {
     },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
-enum OutputFormat {
-    Text,
-    Json,
-    /// Claude Code's envelope, for hosts that already speak it (ADR-0007).
-    StreamJson,
-}
-
-impl OutputFormat {
-    fn as_str(self) -> &'static str {
-        match self {
-            OutputFormat::Text => "text",
-            OutputFormat::Json => "json",
-            OutputFormat::StreamJson => "stream-json",
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
-enum InputFormat {
-    /// One prompt: the argument, or the whole of stdin.
-    Text,
-    /// Claude Code's host protocol, one JSON object per line (ADR-0007).
-    StreamJson,
-}
-
-impl InputFormat {
-    fn as_str(self) -> &'static str {
-        match self {
-            InputFormat::Text => "text",
-            InputFormat::StreamJson => "stream-json",
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
-enum PromptTool {
-    /// The host on the other end of the stream-json protocol.
-    Stdio,
-}
-
-impl PromptTool {
-    fn as_str(self) -> &'static str {
-        match self {
-            PromptTool::Stdio => "stdio",
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -374,10 +330,10 @@ async fn run(cli: Cli) -> Result<i32, KernelError> {
     // pidfile goes only once every plugin has given its own claims back.
     let mut resident = resident(work, &cwd)?;
     let config = host_config(&cli, &cwd, &platforms)?;
-    let demo = demo_ui(&cli, &config.layers);
-    let listening = channels_wanted(&cli, &config.layers, &platforms)?;
-    let decided = Decided::of(&config.layers)?;
-    let host = Host::build(plugins(demo, &platforms)?, config)
+    let merged = composition::merged(&config.layers, &platforms)?;
+    let listening = composition::listening(&cli, &merged, &platforms)?;
+    let composition = Composition::for_cli(&cli, &merged);
+    let host = Host::build(plugins(composition, &platforms)?, config)
         .await
         .map_err(|e| KernelError::new(ErrorCode::Internal, e.to_string()))?;
     report_notices(&host);
@@ -385,7 +341,7 @@ async fn run(cli: Cli) -> Result<i32, KernelError> {
         return code;
     }
     let env = Arc::new(environment(&cwd));
-    let (id, options) = surface_for(work, cli, &cwd, &env, interactive, decided)?;
+    let (id, options) = surface_for(work, cli, &cwd, &env, interactive)?;
     let beside = match listening && id != bingo_channels::SURFACE_ID {
         true => start_channels(&host, channel_options(cwd, env)),
         false => None,
@@ -419,14 +375,13 @@ fn surface_for(
     cwd: &std::path::Path,
     env: &Arc<Env>,
     interactive: bool,
-    decided: Decided,
 ) -> Result<(&'static str, SurfaceOptions), KernelError> {
     let (cwd, env) = (cwd.to_path_buf(), env.clone());
     Ok(match work {
         Work::Rpc { stdio } => ("rpc", serve_options(stdio, cwd, env)?),
         Work::Channels | Work::Gateway => (bingo_channels::SURFACE_ID, channel_options(cwd, env)),
-        Work::Session if interactive => ("tui", surface_options(cli, cwd, env, decided)),
-        Work::Session => ("print", surface_options(cli, cwd, env, decided)),
+        Work::Session if interactive => ("tui", surface_options(cli, cwd, env)),
+        Work::Session => ("print", surface_options(cli, cwd, env)),
     })
 }
 
@@ -564,7 +519,8 @@ async fn switched_plugins(
     }
     let layers = settings::load(env, cwd, cli.settings.as_deref())
         .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e.to_string()))?;
-    let composed = plugins(demo_ui(cli, &layers), platforms)?;
+    let merged = composition::merged(&layers, platforms)?;
+    let composed = plugins(Composition::for_cli(cli, &merged), platforms)?;
     plugins::run(action, env, cwd, &layers, composed)
 }
 
@@ -582,47 +538,6 @@ async fn channel_secret(
 ) -> Result<i32, KernelError> {
     println!("{}", channels::secret(env, adapter, platforms).await?);
     Ok(0)
-}
-
-/// Whether a start may ask whether a newer release is out (ADR-0043 §4). The
-/// highest layer that mentions the key decides; absent, it may. The library
-/// owns the spelling.
-fn update_wanted(layers: &[settings::Layer]) -> bool {
-    layers
-        .iter()
-        .rev()
-        .find(|layer| layer.value.contains_key(bingo_update::SETTING))
-        .is_none_or(|layer| bingo_update::wanted(&Value::Object(layer.value.clone())))
-}
-
-/// The widest a line of prose is drawn, or nothing at all — the width the
-/// transcript has (design §7). The highest layer that mentions the key
-/// decides, as `update.check` does; the surface owns the spelling.
-fn tui_measure(layers: &[settings::Layer]) -> Option<usize> {
-    layers
-        .iter()
-        .rev()
-        .find(|layer| {
-            layer
-                .value
-                .contains_key(bingo_surface_tui::settings::SETTING)
-        })
-        .and_then(|layer| bingo_surface_tui::settings::measure(&Value::Object(layer.value.clone())))
-}
-
-/// Whether a chat is being listened on: the flag, else any settings layer
-/// that names an adapter. The plugin owns the spelling of the key.
-fn channels_wanted(
-    cli: &Cli,
-    layers: &[settings::Layer],
-    platforms: &Platforms,
-) -> Result<bool, KernelError> {
-    let mut wanted = !cli.channels.is_empty();
-    for layer in layers {
-        wanted |= bingo_channels::wanted(&Value::Object(layer.value.clone()), platforms)
-            .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e))?;
-    }
-    Ok(wanted)
 }
 
 /// The chat surface beside the one that owns the terminal. It is
@@ -652,7 +567,6 @@ fn channel_options(cwd: PathBuf, env: Arc<Env>) -> SurfaceOptions {
         selector: SessionSelector::Latest { cwd: cwd.clone() },
         cwd,
         prompt: None,
-        args: Value::Null,
         env,
     }
 }
@@ -713,7 +627,6 @@ fn serve_options(stdio: bool, cwd: PathBuf, env: Arc<Env>) -> Result<SurfaceOpti
         },
         cwd,
         prompt: None,
-        args: json!({ "transport": "stdio" }),
         env,
     })
 }
@@ -730,21 +643,6 @@ fn environment(cwd: &std::path::Path) -> Env {
     Env::rooted(std::env::home_dir().unwrap_or_else(|| cwd.to_path_buf()))
 }
 
-/// Whether the demo plugin is wanted: the flag, else the highest settings
-/// layer that names the key. The plugin list is composed before a host
-/// exists, so the bin reads this one key itself; the plugin owns its
-/// spelling and its meaning.
-fn demo_ui(cli: &Cli, layers: &[settings::Layer]) -> bool {
-    if cli.demo_ui {
-        return true;
-    }
-    layers
-        .iter()
-        .rev()
-        .find(|layer| layer.value.contains_key(bingo_demo_ui::SETTING))
-        .is_some_and(|layer| bingo_demo_ui::wanted(&Value::Object(layer.value.clone())))
-}
-
 /// The platforms shared by every channel configuration reader.
 fn platforms(env: &Env) -> Platforms {
     let mut platforms: Platforms = vec![Arc::new(bingo_channel_feishu::Platform)];
@@ -755,7 +653,10 @@ fn platforms(env: &Env) -> Platforms {
 }
 
 /// Every plugin this build ships, in registration order.
-fn plugins(demo_ui: bool, platforms: &Platforms) -> Result<Vec<Box<dyn Plugin>>, KernelError> {
+fn plugins(
+    composition: Composition,
+    platforms: &Platforms,
+) -> Result<Vec<Box<dyn Plugin>>, KernelError> {
     // The fake provider exists for the scripted harness alone: without
     // `BINGO_FAKE_SCRIPT` it is not registered, so a packaged binary never
     // lists it and never defaults to it.
@@ -785,16 +686,16 @@ fn plugins(demo_ui: bool, platforms: &Platforms) -> Result<Vec<Box<dyn Plugin>>,
         Box::new(AgentsPlugin::default()),
         Box::new(RoomsPlugin::default()),
         Box::new(TasksPlugin),
-        Box::new(ExperiencePlugin),
+        Box::new(ExperiencePlugin::default()),
         Box::new(SchedulePlugin::default()),
         Box::new(CheckpointsPlugin::default()),
-        Box::new(PrintPlugin),
-        Box::new(RpcPlugin),
-        Box::new(TuiPlugin),
+        Box::new(PrintPlugin::new(composition.print)),
+        Box::new(RpcPlugin::new(composition.rpc)),
+        Box::new(TuiPlugin::new(composition.tui)),
         Box::new(ChannelsPlugin::new(platforms.clone())),
     ]);
-    if demo_ui {
-        all.push(Box::new(DemoUiPlugin));
+    if composition.demo {
+        all.push(Box::new(DemoUiPlugin::default()));
     }
     Ok(all)
 }
@@ -811,7 +712,7 @@ async fn added_provider(env: &Env, platforms: &Platforms) -> Result<i32, KernelE
 /// the manifests the plugins publish (`provider:<id>`): a name to refuse is
 /// nothing this file knows on its own.
 fn provider_ids(platforms: &Platforms) -> Result<BTreeSet<String>, KernelError> {
-    Ok(plugins(false, platforms)?
+    Ok(plugins(Composition::default(), platforms)?
         .iter()
         .flat_map(|plugin| plugin.manifest().provides)
         .filter_map(|provided| provided.strip_prefix("provider:"))
@@ -842,56 +743,13 @@ fn host_config(
     Ok(config)
 }
 
-fn surface_options(cli: Cli, cwd: PathBuf, env: Arc<Env>, decided: Decided) -> SurfaceOptions {
+fn surface_options(cli: Cli, cwd: PathBuf, env: Arc<Env>) -> SurfaceOptions {
     SurfaceOptions {
         selector: selector(&cli, cwd.clone()),
         cwd,
         prompt: cli.prompt,
-        args: json!({
-            "outputFormat": cli.output_format.as_str(),
-            "inputFormat": cli.input_format.as_str(),
-            "permissionPromptTool": cli.permission_prompt_tool.map(PromptTool::as_str),
-            "noPrintOnExit": cli.no_print_on_exit,
-            "updateCheck": decided.updates,
-            "images": cli.image,
-            "pictureCacheDays": decided.cache_days,
-            "measure": decided.measure,
-        }),
         env,
     }
-}
-
-/// What the settings layers settled before a host existed: the keys that
-/// decide something for a surface, which is handed the answers with the rest
-/// of its arguments rather than reading them for itself (ADR-0003 §2). Each
-/// is read the same way — the highest layer that names the key wins — and the
-/// plugin that claims the key owns its spelling.
-#[derive(Clone, Copy, Debug)]
-struct Decided {
-    /// How long a fetched picture is kept (`pictures.cacheDays`, M61).
-    cache_days: Option<u64>,
-    /// Whether a start may ask whether a newer release is out (ADR-0043 §4).
-    updates: bool,
-    /// The widest a line of prose is drawn (`tui.measure`, design §7).
-    measure: Option<usize>,
-}
-
-impl Decided {
-    fn of(layers: &[settings::Layer]) -> Result<Self, KernelError> {
-        Ok(Self {
-            cache_days: picture_cache_days(layers)?,
-            updates: update_wanted(layers),
-            measure: tui_measure(layers),
-        })
-    }
-}
-
-/// How long a fetched picture is kept, as the settings layers have it (M61).
-/// The surface that builds a loader reads it out of its own options; the
-/// default is the cache's, so a run that is told nothing is told nothing.
-fn picture_cache_days(layers: &[settings::Layer]) -> Result<Option<u64>, KernelError> {
-    settings::picture_cache_days(layers)
-        .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e.to_string()))
 }
 
 /// Which session the run is about: a new one unless told to reopen.
@@ -920,14 +778,18 @@ fn mcp_layer(path: &std::path::Path) -> Result<settings::Layer, KernelError> {
     let layer = settings::read_layer(path)
         .map_err(|e| invalid(e.to_string()))?
         .ok_or_else(|| invalid(format!("--mcp-config: {} does not exist", path.display())))?;
-    let servers = layer.value.get("mcpServers").cloned().ok_or_else(|| {
-        invalid(format!(
-            "--mcp-config: {} has no mcpServers",
-            path.display()
-        ))
-    })?;
+    let servers = layer
+        .value
+        .get(bingo_mcp::SETTING)
+        .cloned()
+        .ok_or_else(|| {
+            invalid(format!(
+                "--mcp-config: {} has no mcpServers",
+                path.display()
+            ))
+        })?;
     let mut only = Map::new();
-    only.insert("mcpServers".into(), servers);
+    only.insert(bingo_mcp::SETTING.into(), servers);
     Ok(settings::Layer::new("mcp-config", only))
 }
 
@@ -972,25 +834,106 @@ mod tests {
         )
     }
 
-    /// The measure is read the way `update.check` is: one key, one reading,
-    /// and the highest layer that names it decides (ADR-0003 §2).
+    #[test]
+    fn composition_matches_the_merged_settings_table() {
+        let cli = Cli::parse_from(["bingo"]);
+        let platforms = platforms(&Env::rooted(std::env::temp_dir()));
+        let claims: Vec<_> = plugins(
+            Composition {
+                demo: true,
+                ..Default::default()
+            },
+            &platforms,
+        )
+        .unwrap()
+        .iter()
+        .filter_map(|plugin| settings::Claim::from_manifest(plugin.manifest()))
+        .collect();
+        for (lower, higher, demo, chat) in [
+            (json!({}), json!({}), false, false),
+            (
+                json!({}),
+                json!({"enabledPlugins": {"bingo.demo.ui": true}}),
+                true,
+                false,
+            ),
+            (json!({"demoUi": true}), json!({}), true, false),
+            (
+                json!({"channels": {"feishu": {"appId": "test"}}}),
+                json!({"channels": null}),
+                false,
+                false,
+            ),
+            (
+                json!({"channels": {"feishu": {"appId": "test"}}}),
+                json!({"channels": {"coalesce": {"minChars": 12}}}),
+                false,
+                true,
+            ),
+        ] {
+            let layers = [layer("user", lower), layer("project", higher)];
+            let merged = settings::merge(&layers, &claims).unwrap();
+            let slice = &merged.plugins[ChannelsPlugin::new(platforms.clone()).manifest().id];
+            assert_eq!(bingo_channels::wanted(slice, &platforms).unwrap(), chat);
+            assert_eq!(
+                composition::demo(cli.demo_ui, &merged),
+                demo,
+                "demo: {layers:?}"
+            );
+            assert_eq!(
+                composition::listening(&cli, &merged, &platforms).unwrap(),
+                chat,
+                "chat: {layers:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn tui_settings_are_deep_merged_before_registration() {
+        let layers = [
+            layer(
+                "user",
+                json!({"tui": {"measure": 72}, "update": {"check": false}}),
+            ),
+            layer("project", json!({"tui": {}, "update": {}})),
+        ];
+        let claim = settings::Claim::from_manifest(TuiPlugin::default().manifest()).unwrap();
+        let merged = settings::merge(&layers, &[claim]).unwrap();
+        let settings: bingo_surface_tui::settings::Settings =
+            serde_json::from_value(merged.plugins[TuiPlugin::default().manifest().id].clone())
+                .unwrap();
+        assert_eq!(settings.measure(), Some(72));
+        assert!(!settings.update.check);
+    }
+
+    fn merged_measure(layers: &[settings::Layer]) -> Option<usize> {
+        let claim = settings::Claim::from_manifest(TuiPlugin::default().manifest()).unwrap();
+        let merged = settings::merge(layers, &[claim]).unwrap();
+        serde_json::from_value::<bingo_surface_tui::settings::Settings>(
+            merged.plugins[TuiPlugin::default().manifest().id].clone(),
+        )
+        .unwrap()
+        .measure()
+    }
+
+    /// A higher leaf wins; unrelated keys leave it alone.
     #[test]
     fn the_highest_layer_that_names_the_measure_is_the_one_read() {
-        assert_eq!(tui_measure(&[]), None);
-        assert_eq!(tui_measure(&[layer("user", json!({}))]), None);
+        assert_eq!(merged_measure(&[]), None);
+        assert_eq!(merged_measure(&[layer("user", json!({}))]), None);
         assert_eq!(
-            tui_measure(&[layer("user", json!({ "tui": { "measure": 80 } }))]),
+            merged_measure(&[layer("user", json!({ "tui": { "measure": 80 } }))]),
             Some(80)
         );
         assert_eq!(
-            tui_measure(&[
+            merged_measure(&[
                 layer("user", json!({ "tui": { "measure": 80 } })),
                 layer("project", json!({ "tui": { "measure": 100 } })),
             ]),
             Some(100)
         );
         assert_eq!(
-            tui_measure(&[
+            merged_measure(&[
                 layer("user", json!({ "tui": { "measure": 80 } })),
                 layer("project", json!({ "model": "gpt-5" })),
             ]),
@@ -998,7 +941,7 @@ mod tests {
             "a layer that says nothing about it does not answer for it"
         );
         assert_eq!(
-            tui_measure(&[
+            merged_measure(&[
                 layer("user", json!({ "tui": { "measure": 80 } })),
                 layer("cli", json!({ "tui": { "measure": 0 } })),
             ]),

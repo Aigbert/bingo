@@ -19,7 +19,6 @@
 use std::time::Instant;
 
 use bingo_sdk::{ErrorCode, KernelError, Level, SessionState};
-use serde_json::Value;
 
 use super::{Reply, Run, stdio};
 use crate::graphics::picture::Source;
@@ -27,15 +26,6 @@ use crate::graphics::{Cell, Graphics, Picture, Pixels, Stored, Transport, linked
 use crate::terminal::Screen;
 use crate::ui::Ui;
 use crate::viewer;
-
-/// How many days a fetched picture is kept, as the run was told
-/// (`pictures.cacheDays`, read off the settings layers before any host) — and
-/// the cache's own fortnight where it was told nothing.
-pub(super) fn cache_days(args: &Value) -> u64 {
-    args.get("pictureCacheDays")
-        .and_then(Value::as_u64)
-        .unwrap_or(bingo_pictures::cache::DAYS)
-}
 
 /// The bytes that make the terminal hold the pictures this frame placed, cut
 /// to the cells each of them covers.

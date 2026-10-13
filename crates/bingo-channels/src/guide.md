@@ -75,3 +75,11 @@ Channel claims use OS locks on permanent `channels/*.lock` files. A crash
 releases ownership automatically; never remove a modern claim file. An old
 bare-PID or empty claim is refused unchanged. Stop every bingo using that
 data directory, inspect and remove the named legacy file, then restart.
+
+## Settings layers
+
+Channel settings use the kernel's deep merge. Objects in two layers merge
+field by field; a higher layer can turn a lower layer's channel off with
+`null` in a JSON settings file (`{"channels": {"feishu": null}}`), or clear
+all channels with `{"channels": null}`. An empty object preserves lower
+fields. `--channels` still explicitly starts listening.

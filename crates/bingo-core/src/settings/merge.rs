@@ -13,6 +13,8 @@ use super::{Claim, KERNEL_KEYS, KernelSettings, Layer, Merged, SettingsError, Un
 type Sourced<'a> = (&'a str, &'a Value);
 
 pub fn merge(layers: &[Layer], claims: &[Claim]) -> Result<Merged, SettingsError> {
+    let normalized = canonical_pictures(layers);
+    let layers = normalized.as_slice();
     let owners = owners(claims)?;
     let modes = modes(claims);
     let unknown = unknown_keys(layers, &owners);
@@ -42,6 +44,22 @@ pub fn merge(layers: &[Layer], claims: &[Claim]) -> Result<Merged, SettingsError
         plugins,
         unknown,
     })
+}
+
+/// Both accepted cache-day spellings denote one leaf before layers merge.
+fn canonical_pictures(layers: &[Layer]) -> Vec<Layer> {
+    layers
+        .iter()
+        .cloned()
+        .map(|mut layer| {
+            if let Some(Value::Object(pictures)) = layer.value.get_mut("pictures")
+                && let Some(value) = pictures.remove("cache_days")
+            {
+                pictures.insert("cacheDays".into(), value);
+            }
+            layer
+        })
+        .collect()
 }
 
 /// Top-level key → the plugin that claimed it; the kernel keys are taken.
@@ -239,6 +257,7 @@ fn kernel_settings(
     layers: &[Layer],
 ) -> Result<KernelSettings, SettingsError> {
     Ok(KernelSettings {
+        picture_cache_days: cache_days(merged, layers)?,
         provider: typed(merged, layers, "provider")?,
         model: typed(merged, layers, "model")?,
         thinking: typed(merged, layers, "thinking")?,
@@ -247,6 +266,14 @@ fn kernel_settings(
         plugin_trust: user_grants(layers)?,
         enabled_plugins: typed(merged, layers, crate::plugins::KEY)?.unwrap_or_default(),
     })
+}
+
+fn cache_days(merged: &Map<String, Value>, layers: &[Layer]) -> Result<Option<u64>, SettingsError> {
+    let Some(pictures) = merged.get("pictures") else {
+        return Ok(None);
+    };
+    let source = last_source(layers, "pictures");
+    super::said(&Layer::new(source, Map::new()), pictures)
 }
 
 fn user_grants(

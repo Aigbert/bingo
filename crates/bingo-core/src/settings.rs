@@ -25,10 +25,7 @@ use format::Format;
 pub use merge::merge;
 pub use migrate::{Migration, migrate_all, migrate_one};
 
-/// The keys the kernel owns. It reads all but `pictures` itself, which is
-/// read by whoever builds a picture loader ([`picture_cache_days`]) and is a
-/// kernel key so that no plugin may claim it and nobody who sets it is told it
-/// is unknown (ADR-0003 §2).
+/// The keys the kernel owns and resolves before handing each plugin its slice.
 pub const KERNEL_KEYS: &[&str] = &[
     "provider",
     "model",
@@ -100,6 +97,8 @@ impl Claim {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct KernelSettings {
+    /// How long a surface keeps fetched pictures; absent uses the cache default.
+    pub picture_cache_days: Option<u64>,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub thinking: Option<Effort>,
@@ -183,20 +182,9 @@ pub enum SettingsError {
 /// default belongs to the cache that keeps the pictures, not to the file that
 /// configures it, and `0` means never keep one.
 ///
-/// The highest layer that names `pictures` speaks for it, which is what the
-/// merge would have produced for a single scalar (ADR-0003 §3) — and a `null`
-/// or an empty object there clears what the layers below said, as a `null`
-/// does everywhere else. It is read off the layers rather than out of
-/// [`Merged`] because the process that hands the number to a surface composes
-/// those layers before a host, and so before any claim, exists.
+/// Read through the kernel's merge, like every other kernel setting.
 pub fn picture_cache_days(layers: &[Layer]) -> Result<Option<u64>, SettingsError> {
-    let mut days = None;
-    for layer in layers {
-        if let Some(pictures) = layer.value.get("pictures") {
-            days = said(layer, pictures)?;
-        }
-    }
-    Ok(days)
+    Ok(merge(layers, &[])?.kernel.picture_cache_days)
 }
 
 /// What one layer's `pictures` says about the cache's life. An unrecognised
@@ -676,13 +664,30 @@ mod tests {
     /// A `null` clears what the layers below said, as it does everywhere else.
     #[test]
     fn a_null_over_a_life_gives_the_default_back() {
-        for higher in [json!(null), json!({}), json!({ "cacheDays": null })] {
+        for higher in [json!(null), json!({ "cacheDays": null })] {
             let layers = [
                 layer("user", json!({ "pictures": { "cacheDays": 30 } })),
                 layer("project", json!({ "pictures": higher.clone() })),
             ];
             assert_eq!(picture_cache_days(&layers).unwrap(), None, "{higher}");
         }
+    }
+
+    #[test]
+    fn an_empty_picture_object_preserves_the_lower_leaf() {
+        let layers = [
+            layer("user", json!({"pictures": {"cache_days": 30}})),
+            layer("project", json!({"pictures": {}})),
+        ];
+        assert_eq!(
+            merge(&layers, &[]).unwrap().kernel.picture_cache_days,
+            Some(30)
+        );
+        let layers = [
+            layers[0].clone(),
+            layer("project", json!({"pictures": {"cacheDays": 2}})),
+        ];
+        assert_eq!(picture_cache_days(&layers).unwrap(), Some(2));
     }
 
     /// A typo inside `pictures` is not a top-level key, so nothing else would

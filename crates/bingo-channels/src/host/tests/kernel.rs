@@ -256,7 +256,7 @@ pub fn options(cwd: &str) -> SurfaceOptions {
         // placeholder it never reads.
         selector: SessionSelector::Latest { cwd: cwd.into() },
         prompt: None,
-        args: serde_json::Value::Null,
+
         env: Arc::new(Env::rooted(cwd)),
     }
 }

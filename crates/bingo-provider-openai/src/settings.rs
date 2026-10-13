@@ -7,19 +7,26 @@
 use std::collections::BTreeMap;
 
 use schemars::JsonSchema;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// One OpenAI-shaped endpoint: the `openai` key itself, or one named
 /// instance of it.
-#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase", default)]
 pub struct OpenAiEndpoint {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base_url: Option<String>,
     /// Whether image parts reach the model. `false` for a proxy that strips
     /// them: what the *model* can see is the kernel catalogue's to say
     /// (ADR-0004), this is only what the endpoint forwards.
+    #[serde(skip_serializing_if = "is_true")]
     pub images: bool,
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
 }
 
 impl Default for OpenAiEndpoint {

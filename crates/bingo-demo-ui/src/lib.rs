@@ -1,5 +1,5 @@
 //! A demo plugin: the three lanes of ADR-0013, end to end, in one small
-//! crate. It is off unless `--demo-ui` (or the `demoUi` setting) turns it on,
+//! crate. It is off unless `--demo-ui` or `enabledPlugins` turns it on,
 //! and it exists to be read — this is the shape a plugin has when it wants to
 //! put something rich, live or interactive on a screen it knows nothing about.
 //!
@@ -26,7 +26,7 @@ mod command;
 mod journal;
 mod progress;
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
 use bingo_sdk::{
@@ -86,8 +86,10 @@ static MANIFEST: PluginManifest = PluginManifest {
 /// Registers the tool and the three commands. It keeps nothing of its own:
 /// the board lives in the session's journal, and the bar lives for as long as
 /// the stream carries it.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct DemoUiPlugin;
+#[derive(Debug, Default)]
+pub struct DemoUiPlugin {
+    legacy: OnceLock<bool>,
+}
 
 #[async_trait]
 impl Plugin for DemoUiPlugin {
@@ -96,9 +98,21 @@ impl Plugin for DemoUiPlugin {
     }
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+        // 2026-10-13: remove this legacy read after the next release (M126).
+        let slice: serde_json::Value = registrar.config()?;
+        let _ = self.legacy.set(slice.get(SETTING).is_some());
         registrar.tool(Arc::new(DemoProgressTool) as Arc<dyn Tool>);
         for command in [command::SHOW, command::TICK_COMMAND, command::RESET_COMMAND] {
             registrar.add(Contribution::Command(Arc::new(command) as Arc<dyn Command>));
+        }
+        Ok(())
+    }
+
+    async fn start(&self, _host: bingo_sdk::HostHandle) -> Result<(), PluginError> {
+        if self.legacy.get() == Some(&true) {
+            eprintln!(
+                "[notice] DEPRECATED_SETTING demoUi is deprecated; use enabledPlugins[\"bingo.demo.ui\"] = true"
+            );
         }
         Ok(())
     }
@@ -152,11 +166,13 @@ mod plugin_tests {
     fn registering_reads_nothing_and_contributes_what_the_manifest_promises() {
         let mut registrar = Registrar::new(
             PLUGIN,
-            serde_json::Value::Null,
+            serde_json::json!({}),
             Env::rooted("/tmp"),
             Default::default(),
         );
-        DemoUiPlugin.register(&mut registrar).expect("register");
+        DemoUiPlugin::default()
+            .register(&mut registrar)
+            .expect("register");
         let contributions = registrar.into_contributions();
         assert_eq!(contributions.len(), MANIFEST.provides.len());
         let names: Vec<String> = contributions

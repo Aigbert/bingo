@@ -8,14 +8,11 @@
 //!
 //! One claim carries one schema (`ConfigClaim`), so both keys are described by
 //! one type: the `update` half is `bingo_update`'s own, spelled here only for
-//! the field the schema hangs it on. The binary reads both off the settings
-//! layers — every key that decides something before a host exists is read
-//! there (ADR-0003 §2) — and hands the answers to this surface with the rest
-//! of its arguments.
+//! the field the schema hangs it on. The surface reads its merged slice at
+//! registration and retains it for the run.
 
 use schemars::JsonSchema;
 use serde::Deserialize;
-use serde_json::Value;
 
 /// The top-level key. Spelled like the surface it belongs to and kept apart
 /// from [`crate::SURFACE_ID`]: what a person writes in a settings file does
@@ -51,29 +48,25 @@ pub fn schema() -> schemars::Schema {
     schemars::schema_for!(Settings)
 }
 
-/// The measure a person set, out of one layer of the settings. Nothing at all
-/// is the region's own width.
-pub fn measure(settings: &Value) -> Option<usize> {
-    serde_json::from_value::<Settings>(settings.clone())
-        .ok()
-        .and_then(|settings| settings.tui.measure)
-        .filter(|measure| *measure > 0)
-        .and_then(|measure| usize::try_from(measure).ok())
-}
-
-/// The measure the bin gave this run, out of its own arguments — beside
-/// `updateCheck`, and read once at the start as that is. A harness that builds
-/// its own options says nothing and draws the width it has.
-pub(crate) fn given(args: &Value) -> Option<usize> {
-    args.get("measure")
-        .and_then(Value::as_u64)
-        .and_then(|measure| usize::try_from(measure).ok())
+impl Settings {
+    pub fn measure(self) -> Option<usize> {
+        self.tui
+            .measure
+            .filter(|measure| *measure > 0)
+            .and_then(|measure| usize::try_from(measure).ok())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn measure(value: &serde_json::Value) -> Option<usize> {
+        serde_json::from_value::<Settings>(value.clone())
+            .ok()
+            .and_then(Settings::measure)
+    }
 
     #[test]
     fn prose_has_the_width_it_is_drawn_in_until_a_person_names_one() {
@@ -116,14 +109,6 @@ mod tests {
             serde_json::from_value::<Settings>(json!({ "update": { "chek": false } })).is_err(),
             "the update half is read as strictly through this type as its own"
         );
-    }
-
-    #[test]
-    fn what_the_bin_handed_over_is_what_the_run_draws_at() {
-        assert_eq!(given(&json!({ "measure": 100 })), Some(100));
-        assert_eq!(given(&json!({ "measure": null })), None);
-        assert_eq!(given(&json!({})), None, "a harness fills its terminal");
-        assert_eq!(given(&Value::Null), None);
     }
 
     /// One claim, one schema: it describes both keys the manifest names, or a

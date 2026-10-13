@@ -39,33 +39,6 @@
 use bingo_sdk::Image;
 use serde_json::{Value, json};
 
-/// Where a run's prompts come from: `args.inputFormat`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum Format {
-    /// One prompt: the command-line argument, or the whole of stdin.
-    #[default]
-    Text,
-    /// The host protocol, one JSON object per line, for as long as stdin is open.
-    StreamJson,
-}
-
-impl Format {
-    /// `args.inputFormat`, defaulting to text for anything unknown.
-    pub(crate) fn from_args(args: &Value) -> Self {
-        match args.get("inputFormat").and_then(Value::as_str) {
-            Some("stream-json") => Format::StreamJson,
-            _ => Format::Text,
-        }
-    }
-}
-
-/// `--permission-prompt-tool stdio`: the host answers permission prompts on
-/// this protocol. Any other value names a tool this surface cannot call, and
-/// is no reason to stop refusing prompts.
-pub(crate) fn prompts_on_stdio(args: &Value) -> bool {
-    args.get("permissionPromptTool").and_then(Value::as_str) == Some("stdio")
-}
-
 /// One line of the host protocol.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Line {
@@ -651,29 +624,5 @@ mod tests {
                 "response": { "subtype": "error", "request_id": "req_9", "error": "no" },
             })
         );
-    }
-
-    #[test]
-    fn the_input_format_argument_picks_the_source() {
-        assert_eq!(
-            Format::from_args(&json!({ "inputFormat": "stream-json" })),
-            Format::StreamJson
-        );
-        assert_eq!(
-            Format::from_args(&json!({ "inputFormat": "text" })),
-            Format::Text
-        );
-        assert_eq!(Format::from_args(&Value::Null), Format::Text);
-    }
-
-    #[test]
-    fn only_the_stdio_prompt_tool_is_this_surface_s_to_answer() {
-        assert!(prompts_on_stdio(
-            &json!({ "permissionPromptTool": "stdio" })
-        ));
-        assert!(!prompts_on_stdio(
-            &json!({ "permissionPromptTool": "mcp__auth" })
-        ));
-        assert!(!prompts_on_stdio(&Value::Null));
     }
 }

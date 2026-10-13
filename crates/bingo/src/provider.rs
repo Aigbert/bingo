@@ -36,8 +36,8 @@ impl Protocol {
     /// The settings key that holds this protocol's endpoints.
     fn key(self) -> &'static str {
         match self {
-            Protocol::OpenAi => "openai",
-            Protocol::Anthropic => "anthropic",
+            Protocol::OpenAi => bingo_provider_openai::SETTING,
+            Protocol::Anthropic => bingo_provider_anthropic::SETTING,
         }
     }
 
@@ -52,7 +52,11 @@ impl Protocol {
 
 /// The keys that hold instances; `codex` has no `apiKey`, so this command
 /// does not write one, but a name taken there is taken.
-const INSTANCE_KEYS: [&str; 3] = ["anthropic", "codex", "openai"];
+const INSTANCE_KEYS: [&str; 3] = [
+    bingo_provider_anthropic::SETTING,
+    bingo_provider_openai::CODEX_SETTING,
+    bingo_provider_openai::SETTING,
+];
 
 /// Ask, then write. `registered` is what this build already answers to, so a
 /// name is refused here — before anything is written — as well as at the boot
@@ -197,11 +201,18 @@ fn insert(
                 "`{key}.instances` in the settings is not an object"
             ))
         })?;
-    let mut instance = Map::new();
-    if let Some(base_url) = base_url {
-        instance.insert("baseUrl".into(), Value::String(base_url));
+    let instance = match protocol {
+        Protocol::OpenAi => serde_json::to_value(bingo_provider_openai::OpenAiEndpoint {
+            base_url,
+            ..Default::default()
+        }),
+        Protocol::Anthropic => serde_json::to_value(bingo_provider_anthropic::AnthropicEndpoint {
+            base_url,
+            ..Default::default()
+        }),
     }
-    instances.insert(name.to_string(), Value::Object(instance));
+    .map_err(|e| internal(e.to_string()))?;
+    instances.insert(name.to_string(), instance);
     Ok(())
 }
 
@@ -279,7 +290,7 @@ mod tests {
                     "apiKey": "sk-mine",
                     "instances": {
                         "proxy1": {},
-                        "proxy2": { "baseUrl": "http://127.0.0.1:8080" },
+                        "proxy2": serde_json::to_value(bingo_provider_openai::OpenAiEndpoint { base_url: Some("http://127.0.0.1:8080".into()), ..Default::default() }).unwrap(),
                     },
                 },
                 "anthropic": { "instances": { "claude-proxy": {} } },
