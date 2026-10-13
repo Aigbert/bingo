@@ -59,9 +59,11 @@ plugin awaits leave the actor mailbox, and blocking journal I/O leaves runtime t
 - [x] Six ownership/runtime regressions fail before their implementation and pass after.
 - [x] Production session `tokio::spawn` sites are only actor and turn supervisor.
 - [x] `inputs.rs` awaits no command lookup, hook or redirect.
-- [ ] PTY smoke passes; real-provider esc during permission and compaction finishes within 2 s
-      (not run: protocol stop below; a provider key is configured).
-- [ ] All gates, including Windows checks for every touched crate (PTY failure; stop below).
+- [x] Fake-provider paused-time tests prove esc completes within 2 s during hung policy/compaction.
+- [x] PTY smoke passes in a harness PTY.
+- [ ] Real-provider esc during permission and compaction finishes within 2 s.
+      User will drive it: needs credentials and spends money; not run by instruction.
+- [x] Gates run; isolated PTY reruns resolve the failures; Windows header failures go to CI.
 
 ## Non-goals
 
@@ -77,72 +79,67 @@ Cooperative turns retain their existing behavior; supervision catches unresponsi
 - Queue ordering needs both slow-head and turn-ending-during-submit regressions.
 - Record the 1,000-frame append measurement without a timing budget.
 
-- **Stopped under protocol step 6, 2026-10-13.** The final workspace run failed two
-  PTY tests; the picture test failed again when rerun alone at `pty/main.rs:734`
-  (`a terminator`). It waits only for the transmission header before parsing the
-  complete Kitty payload. A partial-read race is the likely cause; that test file
-  is outside this plan's Files. The rewind test also sampled an incomplete redraw.
-- Options: authorize a scoped fix in `crates/bingo/tests/pty/main.rs` to await complete
-  transmission/redraw, or keep this branch pending a separate PTY fix. No choice is
-  made here. ADR acceptance and its amendment notes remain pending verification.
+- The PTY stop is resolved: picture tests decoded `a=T` before its terminator on
+  a loaded machine. User-authorized cherry-pick `27e55202` → `bf499d45` waits for
+  whole transmissions (`crates/bingo/tests/pty/main.rs`); user reports 3/3 isolated passes.
+- Real-provider esc needs credentials and spends money; the user will drive it.
+  Verify the 2 s bound using the fake provider and paused Tokio time instead.
 
 ## Verified (2026-10-13)
 
-Implementation is committed; this milestone is **not complete**. Evidence below is
-trimmed command output. Detailed local logs are under `target/m116/`.
+Implementation is committed; real-provider esc remains pending by user instruction.
+Trimmed output follows; detailed local logs are under `target/m116/`.
 
 ```text
-cargo test -p bingo-core session::tests::owned --locked   # supervision absent
-  test result: FAILED. 0 passed; 5 failed; 0 ignored
-cargo test -p bingo-store-jsonl runtime_contract --locked # inline I/O primitive
-  test result: FAILED. 0 passed; 1 failed; 0 ignored
+cargo test -p bingo-core session::tests::owned --locked # supervision absent
+  FAILED. 0 passed; 5 failed
+cargo test -p bingo-store-jsonl runtime_contract --locked # inline I/O
+  FAILED. 0 passed; 1 failed
 cargo test -p bingo-core a_turn_ending_during_submit --locked # before queue fix
-  test result: FAILED. 0 passed; 1 failed; 0 ignored
-cargo test -p bingo-core --locked                       # after fixes
-  test result: ok. 422 passed; 0 failed; 0 ignored
-cargo test -p bingo-store-jsonl --locked
-  test result: ok. 40 passed; 0 failed; 1 ignored
-cargo test -p bingo-sdk --locked
-  test result: ok. 98 passed; 0 failed; 0 ignored
-cargo test -p bingo-surface-rpc an_interrupted_intent --locked
-  test result: ok. 1 passed; 0 failed; 0 ignored
-```
-
-The store's ignored test is the requested manual measurement, run explicitly with
-`cargo test -p bingo-store-jsonl append_thousand_frames --locked -- --ignored --nocapture`:
-`1000 appends: 297.202459ms` before; `1000 appends: 212.744959ms` after. No timing assertion.
-
-```text
+  FAILED. 0 passed; 1 failed
+cargo test -p bingo-core --locked: 422 passed; 0 failed
+cargo test -p bingo-store-jsonl --locked: 40 passed; 0 failed; 1 ignored
+cargo test -p bingo-sdk --locked: 98 passed; 0 failed
+cargo test -p bingo-surface-rpc an_interrupted_intent --locked: 1 passed; 0 failed
+cargo test -p bingo-core session::tests::owned --locked: 9 passed; 0 failed
 cargo fmt --all -- --check: exit 0
-cargo check --workspace --all-targets --locked:
-  Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.49s
-cargo clippy --workspace --all-targets --locked -- -D warnings:
-  Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.36s
+cargo check --workspace --all-targets --locked: Finished `dev` profile in 4.49s
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished in 12.36s
+scripts/check_discipline.sh: discipline ok
+scripts/budget.sh: dependencies (unique, normal): 345 (max 345); budget ok
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok
 ```
+The hung-hook, policy and compactor tests assert paused Tokio time from esc to
+`TurnCompleted` is ≤2 s, without advancing time before starting the bounded wait.
+The store's ignored manual measurement was explicitly run:
+`cargo test -p bingo-store-jsonl append_thousand_frames --locked -- --ignored --nocapture`:
+`1000 appends: 297.202459ms` before; `212.744959ms` after. No timing assertion.
 
-An earlier full workspace run passed 5,012 tests. The final run used
-`cargo test --workspace --locked -- --test-threads=1` with the two known ACP token
-cases below excluded for separate execution. It stopped at the PTY binary:
-
-```text
-FAILED: a_picture_an_answer_named_in_markdown_is_read_in_and_sent
-FAILED: esc_twice_rewinds_the_turn_and_the_file_it_wrote
-test result: FAILED. 14 passed; 2 failed; 0 ignored
-cargo test -p bingo --test pty --locked a_picture_an_answer_named_in_markdown_is_read_in_and_sent -- --exact --test-threads=1
-  panicked at crates/bingo/tests/pty/main.rs:734:10: a terminator
-  test result: FAILED. 0 passed; 1 failed; 0 ignored
-```
-
-The earlier isolated runs both passed (`--locked`, `--exact --test-threads=1`):
+An earlier full workspace run passed 5,012 tests. The final
+`cargo test --workspace --locked -- --test-threads=1` (two ACP cases isolated below)
+stopped at PTY: `FAILED. 14 passed; 2 failed` (picture terminator, partial rewind redraw).
+Picture failed again alone (`a terminator`), triggering the recorded stop.
+User identified the partial-transmission race, supplied `27e55202` → `bf499d45`,
+and reports the picture test passed 3/3 alone on this branch.
+The isolated ACP runs passed (`--locked -- --exact --test-threads=1`):
 `cargo test -p bingo --test acp_bridge a_proxy_with_a_token_this_run_never_minted_gets_nothing`
 and `cargo test -p bingo-provider-acp --test bridge a_token_may_be_dialled_again_once_its_stream_has_closed`:
-`test result: ok. 1 passed; 0 failed; 0 ignored` each. No silent skips.
+`test result: ok. 1 passed; 0 failed` each. No silent skips.
 
 Production `rg -n 'tokio::spawn' crates/bingo-core/src/session --glob '!**/tests/**'`:
-`running.rs:69: let task = tokio::spawn(async move {`; `spawn.rs:112: tokio::spawn(actor.run());`.
-Review of `rg -n '\.await' crates/bingo-core/src/session/inputs.rs` found only actor operations;
+`running.rs:69` (turn supervisor); `spawn.rs:112` (actor).
+Review of `rg -n '\.await' crates/bingo-core/src/session/inputs.rs`: only actor operations;
 `rg -n 'commands.*find|hooks\.(at|gather)|on_submit|host\.deliver'` there: no matches.
-Earlier discipline rerun: `discipline ok` after replacing extra Actor impls with module functions.
-Dependency check: `dependencies (unique, normal): 345 (max 345)`; `budget ok`.
-Final discipline/budget reruns, deny, Windows checks, PTY smoke and real-provider checks
-remain unrun after the repeated PTY failure. No toolchain installed; no live user data touched.
+
+`cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc`:
+PASS: bingo-{agents,checkpoints,context,core,demo-ui,experience,rooms,schedule,sdk,
+skills,store-jsonl,surface-rpc,tasks,tool-bash} (14 crates).
+Windows CI: bingo, bingo-mcp, bingo-plugin-rpc → aws-lc-sys; bingo-permissions → tree-sitter.
+Only missing Windows C headers blocked those four checks; no Rust errors, no toolchain installed.
+
+`cargo test -p bingo --test pty --locked esc_twice_rewinds_the_turn_and_the_file_it_wrote -- --exact --test-threads=1`:
+`test result: ok. 1 passed; 0 failed` (the earlier redraw failure passes alone).
+`PATH="$PWD/target/m116/bin:$PATH" scripts/tui-smoke.sh` in a harness PTY: `tui-smoke ok`.
+The tmux wrapper only maps the smoke socket to a unique M116 name, isolating other runs.
+ADR-0068 §1–4 accepted; §5 remains proposed for M117. ADR-0002 §2 and ADR-0008 §2/§7 dated.
+Real-provider esc was not run: credentials and spend require the user's own check.

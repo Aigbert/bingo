@@ -1,6 +1,6 @@
 # ADR-0068 — Every task has an owner
 
-Status: proposed · 2026-10-13 · Plans: M116, M117 · Amends: ADR-0002 §2,
+Status: §1–4 accepted (M116); §5 proposed (M117) · 2026-10-13 · Amends: ADR-0002 §2,
 ADR-0008 §2, §7, ADR-0035 §6
 
 ## Context
