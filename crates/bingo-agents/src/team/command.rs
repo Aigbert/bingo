@@ -1,6 +1,7 @@
 //! `/team`: the roles this project declares, and which of them are seated.
 
 use async_trait::async_trait;
+use bingo_collab::lifecycle::Lifecycle;
 use bingo_sdk::{
     ArgSpec, Command, CommandContext, CommandOutcome, CommandSpec, KernelError, SessionSummary,
     View,
@@ -13,7 +14,6 @@ use crate::{list, names};
 pub const HEADERS: [&str; 4] = ["role", "agent", "session", "state"];
 
 /// A role nobody has seated yet has no session to name.
-const NOT_SEATED: &str = "not seated";
 
 /// A role that names no definition and is its own.
 const NO_DEFINITION: &str = "-";
@@ -69,7 +69,9 @@ fn row(role: &Role, seated: Option<&SessionSummary>) -> Vec<String> {
         role.name.clone(),
         role.agent.clone().unwrap_or_else(|| NO_DEFINITION.into()),
         seated.map(|s| s.id.to_string()).unwrap_or_default(),
-        seated.map_or(NOT_SEATED, list::state).to_string(),
+        seated
+            .map_or(Lifecycle::Unseated.word(), list::state)
+            .to_string(),
     ]
 }
 
@@ -115,7 +117,7 @@ mod tests {
                     "reviewer".to_string(),
                     "reviewer".into(),
                     reviewer.to_string(),
-                    "busy".into()
+                    "working".into()
                 ],
                 vec![
                     "scout".to_string(),

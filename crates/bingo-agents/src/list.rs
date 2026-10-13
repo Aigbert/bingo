@@ -3,6 +3,7 @@
 //! asked for — this plugin keeps no list of its own.
 
 use async_trait::async_trait;
+use bingo_collab::lifecycle::Lifecycle;
 use bingo_sdk::{
     SessionSummary, Tone, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, TreeNode,
     View, input_schema,
@@ -24,10 +25,13 @@ const NONE: &str = "-";
 const DESCRIPTION: &str = "\
 List the agents you can write to: the ones you started, and — listed apart, \
 under `Beside you` — the ones started alongside you by the same agent. Each \
-row is a name, a session, whether it is working or idle, the model it runs \
+row is a name, a session, its lifecycle state, the model it runs \
 on, how many messages it has said and the tokens it has spent. Use it \
 before writing to one whose name you are unsure of, to see whether the ones \
-you started are still running, or to see what each has cost.";
+you started are working or asking, or to see what each has cost. \
+States are working, asking (an open prompt), idle, stored and not seated. \
+Listings call stored agents idle because a message reopens them; /team \
+uses not seated for an empty role.";
 
 /// What the agents the caller did not start are gathered under, in the
 /// listing and in the tree beside it (ADR-0024 §3).
@@ -63,7 +67,7 @@ pub fn rows(children: &[SessionSummary]) -> Vec<Vec<String>> {
 
 /// What a session is doing, in the one word every roster shows.
 pub fn state(child: &SessionSummary) -> &'static str {
-    if child.busy { "busy" } else { "idle" }
+    Lifecycle::of_summary(child).map_or("", Lifecycle::word)
 }
 
 /// The roster as the model reads it, one agent per line: the caller's own
@@ -71,7 +75,7 @@ pub fn state(child: &SessionSummary) -> &'static str {
 /// two are addressed the same way but are not the same thing (ADR-0024 §3).
 fn listing(mine: &[SessionSummary], beside: &[SessionSummary]) -> String {
     if mine.is_empty() && beside.is_empty() {
-        return "No agents are running. SpawnAgent starts one.".to_string();
+        return "No agents are seated. SpawnAgent starts one.".to_string();
     }
     let mut block = Vec::new();
     if !mine.is_empty() {
@@ -108,14 +112,15 @@ fn roster(mine: &[SessionSummary], beside: &[SessionSummary]) -> Option<View> {
 
 /// One agent as a node: its name, and what it is doing as a badge. The tone
 /// is `good` for one that is working and neutral for one that is not —
-/// `attention` is for what wants a person (ADR-0013 §1), and neither does.
+/// `attention` is for an open prompt that wants a person (ADR-0013 §1).
 fn node(child: &SessionSummary) -> TreeNode {
     TreeNode {
         label: names::name_of(child).to_string(),
         badge: Some(state(child).to_string()),
-        tone: match child.busy {
-            true => Tone::Good,
-            false => Tone::Neutral,
+        tone: match Lifecycle::of_summary(child) {
+            Some(Lifecycle::Asking) => Tone::Attention,
+            Some(Lifecycle::Working) => Tone::Good,
+            _ => Tone::Neutral,
         },
         children: Vec::new(),
     }
@@ -216,7 +221,7 @@ mod tests {
 
         let text = listed(&fleet, &root).await;
         assert!(
-            text.contains(&format!("reviewer  {reviewer}  busy")),
+            text.contains(&format!("reviewer  {reviewer}  working")),
             "{text}"
         );
         assert!(text.contains("scout"), "{text}");
@@ -275,7 +280,7 @@ mod tests {
             answered(&fleet, &root).await.display,
             Some(View::Tree {
                 nodes: vec![
-                    node_of("reviewer", "busy", Tone::Good),
+                    node_of("reviewer", "working", Tone::Good),
                     node_of("scout", "idle", Tone::Neutral),
                 ]
             }),
@@ -289,7 +294,7 @@ mod tests {
                     label: BESIDE.into(),
                     badge: None,
                     tone: Tone::Neutral,
-                    children: vec![node_of("reviewer", "busy", Tone::Good)],
+                    children: vec![node_of("reviewer", "working", Tone::Good)],
                 }]
             }),
             "a teammate is a teammate, under a node that says so"

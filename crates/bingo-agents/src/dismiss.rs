@@ -6,6 +6,7 @@
 use std::path::Path;
 
 use async_trait::async_trait;
+use bingo_collab::lifecycle::Lifecycle;
 use bingo_sdk::{
     ErrorCode, HostHandle, KernelError, SessionId, Subject, Tool, ToolContext, ToolError,
     ToolOutput, ToolSpec, ToolTraits, input_schema,
@@ -22,7 +23,7 @@ pub const DISMISS_AGENT: &str = "DismissAgent";
 const DESCRIPTION: &str = "\
 Dismiss a sub-agent you started: its session is deleted, journal and all, \
 and its name is free again. Only an idle agent is dismissed — one still \
-working is refused; `StopAgent` ends its turn first, or wait for it. An \
+working or asking is refused; `StopAgent` ends its turn first, or wait for it. An \
 agent beside you is not yours to dismiss. A room that seated it keeps the \
 name on its roster and skips it; a role `.bingo/team.json` declares is \
 seated afresh, empty, the next time the project opens. To keep an agent \
@@ -43,12 +44,13 @@ pub async fn dismiss(
 ) -> Result<String, KernelError> {
     let child = names::mine(host, caller, name).await?;
     let name = names::name_of(&child).to_string();
-    if child.busy {
+    if let Some(state @ (Lifecycle::Working | Lifecycle::Asking)) = Lifecycle::of_summary(&child) {
         return Err(KernelError::new(
             ErrorCode::NotReady,
             format!(
-                "{name} is busy: a session is not deleted under a running turn. \
-                 `{STOP_AGENT}` ends its turn, or wait for it to finish."
+                "{name} is {}: a session is not deleted under a turn or open prompt. \
+                 `{STOP_AGENT}` ends its turn, or answer the prompt before dismissal.",
+                state.word()
             ),
         ));
     }
@@ -168,7 +170,7 @@ mod tests {
         let out = called(&fleet, &root, "reviewer").await;
         assert!(out.is_error, "{out:?}");
         let text = out.parts[0].as_text().unwrap_or_default();
-        assert!(text.contains("reviewer is busy"), "{text}");
+        assert!(text.contains("reviewer is working"), "{text}");
         assert!(text.contains(STOP_AGENT), "{text}");
         assert!(fleet.deleted().is_empty(), "nothing was deleted");
     }

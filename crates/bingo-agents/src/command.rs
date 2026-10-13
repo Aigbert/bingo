@@ -111,7 +111,7 @@ mod tests {
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0][0], "reviewer");
         assert_eq!(rows[0][1], reviewer.to_string());
-        assert_eq!(rows[0][2], "busy");
+        assert_eq!(rows[0][2], "working");
         assert_eq!(rows[1][2], "idle");
     }
 
