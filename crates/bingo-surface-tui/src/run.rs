@@ -370,9 +370,9 @@ async fn tick(next: Option<Instant>) {
 /// The complaint a run earns the first time a draw costs several frames;
 /// `None` while drawing keeps up, or once it has already been said.
 fn slow_draw(took: Duration, already: bool) -> Option<String> {
-    (!already && took >= SLOW_DRAW).then(|| {
+    (!cfg!(debug_assertions) && !already && took >= SLOW_DRAW).then(|| {
         format!(
-            "drawing took {}ms; a debug build or a slow terminal does this",
+            "drawing took {}ms; a slow terminal can cause this",
             took.as_millis()
         )
     })
@@ -460,7 +460,7 @@ impl Run {
         if let Some(text) = slow_draw(took, self.sluggish) {
             self.sluggish = true;
             self.behind = true;
-            self.ui.notify(Level::Warn, text, Instant::now());
+            self.ui.notify(Level::Info, text, Instant::now());
         }
     }
 
@@ -2787,14 +2787,21 @@ mod tests {
         );
         assert_eq!(run.next_draw(), None);
         run.grumble(SLOW_DRAW);
-        assert_eq!(run.next_draw(), Some(run.painted + TICK));
+        assert_eq!(
+            run.next_draw(),
+            (!cfg!(debug_assertions)).then_some(run.painted + TICK)
+        );
     }
 
     #[test]
     fn a_slow_draw_is_owned_up_to_once_and_a_quick_one_never() {
         assert_eq!(slow_draw(Duration::from_millis(3), false), None);
-        let said = slow_draw(SLOW_DRAW, false).expect("several frames is worth a word");
-        assert!(said.contains("ms"), "{said}");
+        let said = slow_draw(SLOW_DRAW, false);
+        assert_eq!(said.is_some(), !cfg!(debug_assertions));
+        if let Some(said) = said {
+            assert!(said.contains("ms"), "{said}");
+            assert!(!said.contains("debug"));
+        }
         assert_eq!(slow_draw(Duration::from_secs(1), true), None, "said once");
     }
 

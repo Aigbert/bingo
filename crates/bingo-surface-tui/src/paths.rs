@@ -96,7 +96,11 @@ fn elide(path: &str, max: usize) -> String {
     if path.width() <= max {
         return path.to_string();
     }
-    let (head, rest) = path.split_once('/').unwrap_or(("", path));
+    let from = usize::from(path.starts_with('/'));
+    let (head, rest) = match path[from..].find('/') {
+        Some(at) => (&path[..from + at], &path[from + at + 1..]),
+        None => ("", path),
+    };
     let mut kept = String::new();
     for segment in rest.rsplit('/') {
         let candidate = match kept.is_empty() {
