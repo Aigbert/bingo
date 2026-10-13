@@ -341,6 +341,7 @@ impl Turn<'_> {
         self.record(ItemBody::User {
             parts,
             origin: Origin {
+                voice: None,
                 surface,
                 principal: None,
                 conversation: None,
