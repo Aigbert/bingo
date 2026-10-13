@@ -24,11 +24,17 @@ impl Root {
 
     pub fn source(&self, name: &str) -> Result<String, String> {
         if name == "bingo" {
-            return crate::strip::strip(
+            let hooks = crate::strip::strip(
                 Path::new("on.ts"),
                 include_str!("../../../sdk/typescript/src/on.ts"),
             )
-            .map_err(|why| why.to_string());
+            .map_err(|why| why.to_string())?;
+            let dollar = crate::strip::strip(
+                Path::new("dollar.ts"),
+                include_str!("../../../sdk/typescript/src/dollar.ts"),
+            )
+            .map_err(|why| why.to_string())?;
+            return Ok(format!("{hooks}\n{dollar}"));
         }
         let path = self.path(name)?;
         let mut source = String::new();

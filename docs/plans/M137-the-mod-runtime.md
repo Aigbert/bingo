@@ -179,21 +179,6 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 124 filtered out
 error: test failed, to rerun pass `-p bingo-plugin-rpc --lib`
 ```
 
-Remaining gates were not run: protocol stop before runtime implementation.
-
-| Command | Result |
-|---|---|
-| `cargo fmt --all -- --check` | Not run. |
-| `cargo check --workspace --all-targets --locked` | Not run. |
-| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Not run. |
-| `cargo test --workspace --locked` | Not run; two intentional contract failures remain. |
-| `scripts/check_discipline.sh` | Not run. |
-| `scripts/budget.sh` | Passed before and after extraction; output above. |
-| `cargo deny check` | Not run; no external dependency added. |
-| `cargo check -p bingo-plugin-host --all-targets --target x86_64-pc-windows-msvc` | Not run. |
-| `cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc` | Not run. |
-
-
 `cargo test -p bingo-plugin-host --test module_manifest` (before implementation):
 ```text
 both_and_neither_name_the_plugin_and_launch_forms ... FAILED
@@ -336,4 +321,28 @@ ok 13 - catalogue subscriptions wrap a service event added after initialization
 # pass 13
 # fail 0
 # skipped 0
+```
+
+`cargo test -p bingo-mods --test engine`:
+```text
+test a_fixture_registers_on_its_own_runtime ... FAILED
+called `Result::unwrap()` on an `Err` value: Fault { kind: "load", message: "module thread is not implemented" }
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+`cargo test -p bingo-mods -p bingo-plugin-host`:
+```text
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+`cargo clippy -p bingo-mods -p bingo-plugin-host --all-targets --locked -- -D warnings`:
+```text
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.21s
 ```
