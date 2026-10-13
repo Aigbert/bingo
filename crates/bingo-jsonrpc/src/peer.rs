@@ -152,11 +152,13 @@ impl Drop for Peer {
 }
 
 async fn read(reader: impl AsyncRead + Unpin, shared: Arc<Shared>, sender: Sender) {
+    let mut requests = tokio::task::JoinSet::new();
     let mut input = FramedRead::new(reader, lines(MAX_LINE));
     let error = loop {
         let line = tokio::select! {
             () = shared.stop.cancelled() => return,
             line = input.next() => line,
+            _ = requests.join_next(), if !requests.is_empty() => continue,
         };
         let line = match line {
             Some(Ok(line)) => line,
@@ -173,9 +175,15 @@ async fn read(reader: impl AsyncRead + Unpin, shared: Arc<Shared>, sender: Sende
             },
             message => message,
         };
-        tokio::select! {
-            () = shared.stop.cancelled() => return,
-            () = shared.handler.handle(message, sender.clone()) => {},
+        if matches!(message, Message::Request(_)) {
+            let handler = shared.handler.clone();
+            let sender = sender.clone();
+            requests.spawn(async move { handler.handle(message, sender).await });
+        } else {
+            tokio::select! {
+                () = shared.stop.cancelled() => return,
+                () = shared.handler.handle(message, sender.clone()) => {},
+            }
         }
     };
     shared.close(error);

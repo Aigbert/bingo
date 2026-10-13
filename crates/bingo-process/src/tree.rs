@@ -49,11 +49,13 @@ impl Tree {
     }
 
     pub fn start_kill(&mut self) -> io::Result<()> {
+        if self.id().is_none() { return Ok(()); }
         self.0.start_kill()
     }
 
     /// Ask first on unix; Windows has no signal a program can answer.
     pub async fn terminate(&mut self, grace: Duration) -> io::Result<ExitStatus> {
+        if self.id().is_none() { return self.wait().await; }
         #[cfg(unix)]
         {
             let _ = self.0.signal(15);
