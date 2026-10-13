@@ -54,3 +54,16 @@ async fn state_versions_refuse_stale_writes_and_survive_a_restart() {
     assert_eq!(value["result"], first["result"]);
     manager.shutdown().await;
 }
+
+#[tokio::test]
+async fn contribution_notifications_replace_the_whole_list() {
+    let started = started_with(&[("stub", &[])]).await;
+    let tool = only_tool(&started.manager).await;
+    let (_, result) = call(&tool, json!({"announce":{"method":"tools/changed","params":{"tools":[]}}}), started.project.path()).await;
+    result.unwrap();
+    assert!(started.manager.tools().await.is_empty());
+    let (_, result) = call(&tool, json!({"announce":{"method":"commands/changed","params":{"commands":[]}}}), started.project.path()).await;
+    result.unwrap();
+    assert!(started.manager.commands().await.is_empty());
+    started.manager.shutdown().await;
+}

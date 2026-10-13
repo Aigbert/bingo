@@ -436,6 +436,11 @@ fn call(id: bingo_plugin_rpc::codec::Id, params: Value, state: &mut State) -> bo
         fail(id, RpcError::new(INVALID_PARAMS, "not a tool call"));
         return true;
     };
+    if let Some(note) = params.input.get("announce") {
+        send(&Message::Notification(bingo_plugin_rpc::codec::Notification::new(
+            note["method"].as_str().unwrap_or("unknown"), note["params"].clone(),
+        )));
+    }
     if params.input.get("die").is_some() {
         return false;
     }
