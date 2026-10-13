@@ -204,7 +204,7 @@ mod tests {
         )
         .await;
         let probed = probe(
-            &reqwest::Client::new(),
+            &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
             &format!("{}/mcp", server.uri()),
             HeaderMap::new(),
         )
@@ -225,7 +225,7 @@ mod tests {
         mcp(&server, ResponseTemplate::new(200).set_body_string("{}")).await;
         assert_eq!(
             probe(
-                &reqwest::Client::new(),
+                &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
                 &format!("{}/mcp", server.uri()),
                 HeaderMap::new()
             )
@@ -244,7 +244,7 @@ mod tests {
             mcp(&server, ResponseTemplate::new(status)).await;
             assert_eq!(
                 probe(
-                    &reqwest::Client::new(),
+                    &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
                     &format!("{}/mcp", server.uri()),
                     HeaderMap::new()
                 )
@@ -259,7 +259,7 @@ mod tests {
     #[tokio::test]
     async fn a_server_nothing_is_listening_on_is_a_transport_failure() {
         let probed = probe(
-            &reqwest::Client::new(),
+            &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
             "http://127.0.0.1:1/mcp",
             HeaderMap::new(),
         )

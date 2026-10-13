@@ -30,13 +30,16 @@ async fn signed_in(server: &MockServer) {
 
 async fn feishu(server: &MockServer) -> Feishu {
     signed_in(server).await;
-    Feishu::new(Config {
-        app_id: "cli_a".into(),
-        app_secret: "secret".into(),
-        base: server.uri(),
-        attachments: std::path::PathBuf::from("/nonexistent-bingo-feishu-attachments"),
-        command_mappings: BTreeMap::new(),
-    })
+    Feishu::new(
+        bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+        Config {
+            app_id: "cli_a".into(),
+            app_secret: "secret".into(),
+            base: server.uri(),
+            attachments: std::path::PathBuf::from("/nonexistent-bingo-feishu-attachments"),
+            command_mappings: BTreeMap::new(),
+        },
+    )
 }
 
 async fn bodies(server: &MockServer, at: &str) -> Vec<serde_json::Value> {
@@ -136,13 +139,16 @@ async fn the_capabilities_are_the_ones_this_platform_really_has() {
 
 #[tokio::test]
 async fn a_channel_with_no_credential_refuses_before_it_dials() {
-    let bare = Feishu::new(Config {
-        app_id: "cli_a".into(),
-        app_secret: String::new(),
-        base: "http://127.0.0.1:1".into(),
-        attachments: std::path::PathBuf::from("/nonexistent-bingo-feishu-attachments"),
-        command_mappings: BTreeMap::new(),
-    });
+    let bare = Feishu::new(
+        bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+        Config {
+            app_id: "cli_a".into(),
+            app_secret: String::new(),
+            base: "http://127.0.0.1:1".into(),
+            attachments: std::path::PathBuf::from("/nonexistent-bingo-feishu-attachments"),
+            command_mappings: BTreeMap::new(),
+        },
+    );
     let (post, _arrivals) = tokio::sync::mpsc::channel(1);
     let error = bare
         .run(
@@ -160,13 +166,16 @@ async fn a_channel_with_no_credential_refuses_before_it_dials() {
 
 #[test]
 fn terminal_controls_have_feishu_command_defaults() {
-    let feishu = Feishu::new(Config {
-        app_id: "cli_a".into(),
-        app_secret: "secret".into(),
-        base: "http://127.0.0.1:1".into(),
-        attachments: std::path::PathBuf::from("/nonexistent-bingo-feishu-attachments"),
-        command_mappings: BTreeMap::new(),
-    });
+    let feishu = Feishu::new(
+        bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+        Config {
+            app_id: "cli_a".into(),
+            app_secret: "secret".into(),
+            base: "http://127.0.0.1:1".into(),
+            attachments: std::path::PathBuf::from("/nonexistent-bingo-feishu-attachments"),
+            command_mappings: BTreeMap::new(),
+        },
+    );
     assert_eq!(feishu.command("/new"), Some(ChannelCommand::NewSession));
     assert_eq!(feishu.command("/stop"), Some(ChannelCommand::Stop));
     assert_eq!(feishu.command("new"), None);
@@ -176,16 +185,19 @@ fn terminal_controls_have_feishu_command_defaults() {
 
 #[test]
 fn terminal_controls_can_be_extended_from_feishu_settings() {
-    let feishu = Feishu::new(Config {
-        app_id: "cli_a".into(),
-        app_secret: "secret".into(),
-        base: "http://127.0.0.1:1".into(),
-        attachments: std::path::PathBuf::from("/nonexistent-bingo-feishu-attachments"),
-        command_mappings: BTreeMap::from([
-            ("/fresh".into(), "/clear".into()),
-            ("halt".into(), "escape".into()),
-        ]),
-    });
+    let feishu = Feishu::new(
+        bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+        Config {
+            app_id: "cli_a".into(),
+            app_secret: "secret".into(),
+            base: "http://127.0.0.1:1".into(),
+            attachments: std::path::PathBuf::from("/nonexistent-bingo-feishu-attachments"),
+            command_mappings: BTreeMap::from([
+                ("/fresh".into(), "/clear".into()),
+                ("halt".into(), "escape".into()),
+            ]),
+        },
+    );
     assert_eq!(feishu.command("/fresh"), Some(ChannelCommand::NewSession));
     assert_eq!(feishu.command("/halt"), Some(ChannelCommand::Stop));
     assert_eq!(feishu.command("fresh"), None);

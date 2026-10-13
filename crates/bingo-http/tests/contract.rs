@@ -1,5 +1,5 @@
-use std::time::Duration;
 use bingo_http::{Bounds, CONNECT_TIMEOUT, FRAME, IDLE_TIMEOUT, client};
+use std::time::Duration;
 
 #[test]
 fn the_bounds_preserve_the_transport_contract() {

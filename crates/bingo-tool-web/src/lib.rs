@@ -42,9 +42,6 @@ pub use search::{SearchArgs, WebSearchTool};
 /// What one request may take, from the connection to the last byte.
 const TIMEOUT: Duration = Duration::from_secs(60);
 
-/// Hops a fetch follows before it decides the page is not coming.
-const MAX_REDIRECTS: usize = 10;
-
 /// Both endpoints serve something thinner to a caller that announces itself as
 /// a robot, so the client asks the way a browser asks.
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
@@ -120,12 +117,11 @@ impl Plugin for WebPlugin {
 }
 
 /// The client both tools make their requests with.
-pub fn client() -> Result<Client, reqwest::Error> {
-    Client::builder()
-        .redirect(reqwest::redirect::Policy::limited(MAX_REDIRECTS))
-        .timeout(TIMEOUT)
-        .user_agent(USER_AGENT)
-        .build()
+pub fn client() -> Result<Client, bingo_http::HttpError> {
+    bingo_http::client(bingo_http::Bounds {
+        connect: bingo_http::CONNECT_TIMEOUT,
+        call: Some(TIMEOUT),
+    })
 }
 
 /// A backend with no key to give is a search that fails on every call; saying
@@ -271,7 +267,12 @@ pub(crate) mod tests {
             search: Backend::Brave,
             brave_api_key: None,
         };
-        let error = backend(&web, None, Client::new()).err();
+        let error = backend(
+            &web,
+            None,
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
+        )
+        .err();
         assert!(
             matches!(&error, Some(PluginError::Config(m))
                 if m.contains("BRAVE_API_KEY") && m.contains("web.braveApiKey")),
@@ -285,7 +286,12 @@ pub(crate) mod tests {
             search: Backend::Brave,
             brave_api_key: Some("key".into()),
         };
-        let backend = backend(&web, Some("key".into()), Client::new()).expect("a backend");
+        let backend = backend(
+            &web,
+            Some("key".into()),
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
+        )
+        .expect("a backend");
         assert!(format!("{backend:?}").starts_with("Brave"));
     }
 

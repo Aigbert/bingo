@@ -40,7 +40,12 @@ pub fn chunks(response: reqwest::Response) -> Chunks {
     }))
 }
 
-pub fn model_stream<D: Decode>(chunks: Chunks, clock: Clock, cancel: CancellationToken, decoder: D) -> ModelStream {
+pub fn model_stream<D: Decode>(
+    chunks: Chunks,
+    clock: Clock,
+    cancel: CancellationToken,
+    decoder: D,
+) -> ModelStream {
     let body = Body {
         chunks,
         parser: SseParser::new(),
@@ -162,4 +167,3 @@ impl<D: Decode> Body<D> {
         self.failure = Some(error);
     }
 }
-

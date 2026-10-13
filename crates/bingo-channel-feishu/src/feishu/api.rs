@@ -73,27 +73,15 @@ impl std::fmt::Debug for Api {
     }
 }
 
-/// How long one call may take before it is a failure rather than a wait.
-///
-/// A conversation delivers its ops in order on one task, so a request with no
-/// deadline is a conversation with no deadline: one half-open TLS connection
-/// and that chat never speaks again, with nothing to show for it. A refused
-/// send is recoverable — the next frame is still delivered — and a hung one is
-/// not, so every call gets a limit.
-const CALL: std::time::Duration = std::time::Duration::from_secs(30);
-const CONNECT: std::time::Duration = std::time::Duration::from_secs(10);
-
 impl Api {
-    pub fn new(base: impl Into<String>, app_id: &str, app_secret: &str) -> Self {
+    pub fn new(
+        http: reqwest::Client,
+        base: impl Into<String>,
+        app_id: &str,
+        app_secret: &str,
+    ) -> Self {
         Self {
-            http: reqwest::Client::builder()
-                .timeout(CALL)
-                .connect_timeout(CONNECT)
-                // A builder fails only where the platform has no TLS to
-                // configure, and then an un-timed client is still better than
-                // no channel at all.
-                .build()
-                .unwrap_or_else(|_| reqwest::Client::new()),
+            http,
             base: base.into(),
             tokens: Tokens::new(app_id, app_secret),
         }
@@ -279,7 +267,12 @@ mod tests {
             .expect(1)
             .mount(&server)
             .await;
-        let api = Api::new(server.uri(), "cli_a", "secret");
+        let api = Api::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+            server.uri(),
+            "cli_a",
+            "secret",
+        );
         let answer = api
             .post("/open-apis/im/v1/messages", json!({}))
             .await
@@ -299,7 +292,12 @@ mod tests {
             )
             .mount(&server)
             .await;
-        let api = Api::new(server.uri(), "cli_a", "secret");
+        let api = Api::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+            server.uri(),
+            "cli_a",
+            "secret",
+        );
         let error = api.put("/x", json!({})).await.expect_err("a refusal");
         assert!(error.transient(), "{error}");
         assert_eq!(
@@ -321,7 +319,12 @@ mod tests {
             )
             .mount(&server)
             .await;
-        let api = Api::new(server.uri(), "cli_a", "secret");
+        let api = Api::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+            server.uri(),
+            "cli_a",
+            "secret",
+        );
         let error = api.post("/x", json!({})).await.expect_err("a refusal");
         assert!(!error.transient(), "{error}");
         assert!(matches!(
@@ -342,7 +345,12 @@ mod tests {
             .expect(1)
             .mount(&server)
             .await;
-        let api = Api::new(server.uri(), "cli_a", "secret");
+        let api = Api::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+            server.uri(),
+            "cli_a",
+            "secret",
+        );
         let (url, config) = api.endpoint("secret").await.expect("an endpoint");
         assert_eq!(url, "wss://example.invalid/x");
         assert_eq!(config.ping_interval, std::time::Duration::from_secs(60));

@@ -8,15 +8,10 @@
 //! The variable belongs to the default instance alone: one ambient key must
 //! not feed every proxy, so a named instance is built without one.
 //!
-//! The openai plugin holds the same brick. It is written twice because a
-//! plugin may not import a plugin (ADR-0001) and only the library tier could
-//! hold it for both; `bingo-auth-oauth` is where it belongs the day an ADR
-//! says so.
-
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use bingo_auth_oauth::{CredentialStore, Entry};
+use crate::{CredentialStore, Entry};
 use bingo_sdk::{
     Answer, AnswerSpec, AuthStatus, InteractionKind, LoginFlow, LoginMethod, Prompter,
     ProviderError,

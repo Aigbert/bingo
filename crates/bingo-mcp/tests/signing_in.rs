@@ -171,7 +171,12 @@ fn manager(server: &MockServer) -> (Arc<Manager>, tempfile::TempDir) {
     let data = tempfile::tempdir().expect("a temporary data directory");
     let configured =
         BTreeMap::from([("remote".to_string(), http(format!("{}/mcp", server.uri())))]);
-    let manager = Arc::new(Manager::new(configured, &[], data.path().to_path_buf()));
+    let manager = Arc::new(Manager::new(
+        bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+        configured,
+        &[],
+        data.path().to_path_buf(),
+    ));
     (manager, data)
 }
 
@@ -353,7 +358,12 @@ async fn a_header_a_person_wrote_themselves_fails_rather_than_needing_a_sign_in(
             oauth: None,
         },
     )]);
-    let manager = Arc::new(Manager::new(configured, &[], data.path().to_path_buf()));
+    let manager = Arc::new(Manager::new(
+        bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+        configured,
+        &[],
+        data.path().to_path_buf(),
+    ));
     manager.dial_enabled().await;
 
     let Status::Failed { why } = state(&manager).await else {

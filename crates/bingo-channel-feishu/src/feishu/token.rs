@@ -130,7 +130,7 @@ mod tests {
     async fn a_fresh_token_is_used_without_asking_the_issuer_again() {
         let server = issuer(7200).await;
         let tokens = Tokens::new("cli_a", "secret");
-        let http = reqwest::Client::new();
+        let http = bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client");
         let now = Instant::now();
         assert_eq!(
             tokens
@@ -153,7 +153,7 @@ mod tests {
     async fn a_token_inside_the_renewal_margin_is_renewed() {
         let server = issuer(7200).await;
         let tokens = Tokens::new("cli_a", "secret");
-        let http = reqwest::Client::new();
+        let http = bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client");
         tokens
             .bearer(&http, &server.uri(), Instant::now())
             .await
@@ -168,7 +168,7 @@ mod tests {
     async fn eight_callers_at_once_make_one_request() {
         let server = issuer(7200).await;
         let tokens = std::sync::Arc::new(Tokens::new("cli_a", "secret"));
-        let http = reqwest::Client::new();
+        let http = bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client");
         let now = Instant::now();
         let callers: Vec<_> = (0..8)
             .map(|_| {

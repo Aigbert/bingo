@@ -1,7 +1,11 @@
-use std::time::Duration;
 use bingo_http::round_trip;
 use bingo_sdk::ProviderError;
-use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::{TcpListener, TcpSocket, TcpStream}, time::Instant};
+use std::time::Duration;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpSocket, TcpStream},
+    time::Instant,
+};
 
 /// Small enough that the kernel cannot swallow the request whole, so the
 /// peer's pace is the upload's pace.
@@ -37,12 +41,12 @@ fn peer() -> (TcpListener, String) {
     (listener, format!("http://{address}"))
 }
 
-fn talking_to(_url: &str) -> reqwest::Client {
+fn client() -> reqwest::Client {
     bingo_http::client(bingo_http::Bounds::STREAMED).expect("a bounded client")
 }
 
-fn uploading(provider: &reqwest::Client, url: &str) -> reqwest::RequestBuilder {
-    provider.post(url).body("x".repeat(UPLOAD))
+fn uploading(client: &reqwest::Client, url: &str) -> reqwest::RequestBuilder {
+    client.post(url).body("x".repeat(UPLOAD))
 }
 
 /// The request head, one byte at a time so that none of the body is
@@ -112,9 +116,9 @@ async fn a_mute_peer(listener: TcpListener) {
 async fn a_slow_upload_is_not_a_silence() {
     let (listener, url) = peer();
     let reading = tokio::spawn(a_trickle(listener, GAP));
-    let provider = talking_to(&url);
+    let client = client();
     let started = Instant::now();
-    let sent = round_trip(uploading(&provider, &url), IDLE).await;
+    let sent = round_trip(uploading(&client, &url), IDLE).await;
     let took = started.elapsed();
     assert!(
         sent.is_ok(),
@@ -131,9 +135,9 @@ async fn a_slow_upload_is_not_a_silence() {
 async fn a_peer_that_stops_reading_ends_the_request() {
     let (listener, url) = peer();
     let deaf = tokio::spawn(a_deaf_peer(listener));
-    let provider = talking_to(&url);
+    let client = client();
     let started = Instant::now();
-    let sent = round_trip(uploading(&provider, &url), IDLE).await;
+    let sent = round_trip(uploading(&client, &url), IDLE).await;
     let took = started.elapsed();
     assert_eq!(sent.err(), Some(ProviderError::Timeout));
     assert!(took >= IDLE, "a silence is not one until it has lasted");
@@ -146,9 +150,9 @@ async fn a_peer_that_stops_reading_ends_the_request() {
 async fn a_server_that_accepts_and_says_nothing_times_out() {
     let (listener, url) = peer();
     let mute = tokio::spawn(a_mute_peer(listener));
-    let provider = talking_to(&url);
+    let client = client();
     let started = Instant::now();
-    let asking = provider.post(url.as_str()).body("hello");
+    let asking = client.post(url.as_str()).body("hello");
     assert_eq!(
         round_trip(asking, IDLE).await.err(),
         Some(ProviderError::Timeout)
@@ -163,8 +167,8 @@ async fn a_server_that_accepts_and_says_nothing_times_out() {
 async fn the_request_head_carries_its_length_and_is_never_chunked() {
     let (listener, url) = peer();
     let reading = tokio::spawn(a_trickle(listener, Duration::ZERO));
-    let provider = talking_to(&url);
-    round_trip(uploading(&provider, &url), IDLE * 10)
+    let client = client();
+    round_trip(uploading(&client, &url), IDLE * 10)
         .await
         .expect("the request lands");
     let head = reading.await.expect("the peer").to_lowercase();
@@ -177,4 +181,3 @@ async fn the_request_head_carries_its_length_and_is_never_chunked() {
         "and chunks nothing: {head}"
     );
 }
-

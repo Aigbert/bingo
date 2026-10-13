@@ -451,7 +451,7 @@ mod tests {
             PROVIDER,
             issuer(&server.uri()),
             store.clone(),
-            reqwest::Client::new(),
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
         );
         Fixture {
             source,

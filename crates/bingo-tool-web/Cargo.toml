@@ -12,6 +12,7 @@ description = "Web tools plugin for bingo: WebFetch, WebSearch"
 workspace = true
 
 [dependencies]
+bingo-http.workspace = true
 bingo-sdk.workspace = true
 # M50: a picture behind a URL is read by the library crate (ADR-0041 §1), the
 # one place bytes become the picture a provider accepts. No decoder here.

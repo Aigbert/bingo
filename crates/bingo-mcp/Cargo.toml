@@ -12,6 +12,7 @@ description = "MCP client plugin for bingo: servers dialled in the background, t
 workspace = true
 
 [dependencies]
+bingo-http.workspace = true
 bingo-process.workspace = true
 bingo-services.workspace = true
 bingo-sdk.workspace = true

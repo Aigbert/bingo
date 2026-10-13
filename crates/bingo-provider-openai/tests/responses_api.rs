@@ -43,7 +43,11 @@ fn request() -> ModelRequest {
 }
 
 fn provider(server: &MockServer) -> OpenAiProvider {
-    OpenAiProvider::with_endpoint(Some(KEY.into()), server.uri())
+    OpenAiProvider::with_endpoint(
+        bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+        Some(KEY.into()),
+        server.uri(),
+    )
 }
 
 /// A mock that answers `POST /v1/responses` only when the request carries the
@@ -471,8 +475,12 @@ async fn the_codex_variant_uses_its_own_path_and_headers() {
         )
         .mount(&server)
         .await;
-    let provider =
-        OpenAiProvider::with_endpoint(Some(token), server.uri()).with_variant(Variant::Codex);
+    let provider = OpenAiProvider::with_endpoint(
+        bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+        Some(token),
+        server.uri(),
+    )
+    .with_variant(Variant::Codex);
     drain(&provider, request()).await;
     let body = sent_body(&server).await;
     assert!(body.get("max_output_tokens").is_none());

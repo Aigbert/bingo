@@ -1,23 +1,6 @@
-//! The bounded client for small OAuth token and discovery requests.
-
-/// Token and discovery requests are small; ten seconds connects and thirty
-/// seconds finishes the whole exchange, including its body.
-const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
-
-/// Like reqwest's default constructor, fail at construction if TLS cannot
-/// initialize. Falling back to an unbounded client would lose the contract.
-pub fn client() -> reqwest::Client {
-    reqwest::Client::builder()
-        .connect_timeout(CONNECT_TIMEOUT)
-        .timeout(REQUEST_TIMEOUT)
-        .build()
-        .unwrap_or_else(|error| panic!("cannot initialize the OAuth HTTP client: {error}"))
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+
     use crate::{AuthError, Challenge, CredentialStore, Entry, TokenSource};
     use std::{sync::Arc, time::Duration};
     use tokio::io::AsyncReadExt;
@@ -74,7 +57,12 @@ mod tests {
                 },
             )
             .unwrap();
-        let source = TokenSource::new("codex", crate::issuer::tests::issuer(&url), store, client());
+        let source = TokenSource::new(
+            "codex",
+            crate::issuer::tests::issuer(&url),
+            store,
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
+        );
         expires(source.access_token(), heard).await;
         server.abort();
     }
@@ -83,7 +71,11 @@ mod tests {
     async fn deadline_bounds_mcp_auth_discovery() {
         let (url, heard, server) = silent().await;
         expires(
-            crate::discover::discover(&client(), &url, &Challenge::default()),
+            crate::discover::discover(
+                &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
+                &url,
+                &Challenge::default(),
+            ),
             heard,
         )
         .await;

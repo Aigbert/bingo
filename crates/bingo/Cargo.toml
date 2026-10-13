@@ -12,6 +12,7 @@ description = "bingo: a local coding-agent harness"
 workspace = true
 
 [dependencies]
+bingo-http.workspace = true
 bingo-channel-feishu.workspace = true
 bingo-channel-adapter.workspace = true
 bingo-sdk.workspace = true

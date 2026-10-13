@@ -59,6 +59,8 @@ fn signed_in(server: &MockServer, directory: &TempDir, access: &str) -> OpenAiPr
         )
         .expect("a write");
     OpenAiProvider::subscription(
+        bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+        bingo_http::client(bingo_http::Bounds::CALL).expect("an OAuth client"),
         "codex",
         CodexEndpoint {
             base_url: Some(server.uri()),
@@ -210,6 +212,8 @@ async fn a_signed_out_subscription_names_the_command_before_any_request() {
     let server = MockServer::start().await;
     let directory = tempfile::tempdir().expect("a temporary directory");
     let provider = OpenAiProvider::subscription(
+        bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+        bingo_http::client(bingo_http::Bounds::CALL).expect("an OAuth client"),
         "codex",
         CodexEndpoint {
             base_url: Some(server.uri()),

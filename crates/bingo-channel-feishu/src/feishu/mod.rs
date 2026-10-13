@@ -133,10 +133,10 @@ impl std::fmt::Debug for Feishu {
 impl Feishu {
     pub const ID: &'static str = "feishu";
 
-    pub fn new(config: Config) -> Self {
+    pub fn new(http: reqwest::Client, config: Config) -> Self {
         let command_mappings = with_default_command_mappings(config.command_mappings);
         Self {
-            api: Api::new(config.base, &config.app_id, &config.app_secret),
+            api: Api::new(http, config.base, &config.app_id, &config.app_secret),
             app_secret: config.app_secret,
             attachments: config.attachments,
             limits: Limits {

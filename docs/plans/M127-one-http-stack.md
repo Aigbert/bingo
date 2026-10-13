@@ -79,11 +79,12 @@ bingo builds has a connect bound, and none falls back to
   `clippy.toml`
 - `crates/bingo-provider-{anthropic,openai}/{Cargo.toml,src/*.rs}`
 - `crates/bingo-auth-oauth/src/{lib,key}.rs` and its test clients (`src/http.rs` keeps deadline tests)
-- `crates/bingo-mcp/src/{auth,dial}.rs`, `crates/bingo/src/{mcp,update,main}.rs`
-- `crates/bingo-channel-feishu/src/feishu/{api,token,platform,tests}.rs`,
+- `crates/bingo-mcp/src/{auth,dial,manager,lib}.rs`, `crates/bingo/src/{mcp,update,main}.rs`
+- `crates/bingo-channel-feishu/src/feishu/**`,
   `crates/bingo-pictures/src/{load,lib}.rs`, `crates/bingo-tool-web/src/*.rs`
 - TUI `src/run/updates.rs` and its manifest: mechanical bounded-client migration
-- Consumer manifests, provider integration tests and constructor-only fixtures;
+- Consumer manifests, provider integration tests and MCP constructor-only fixtures
+  (`src/{command,rows,manager,auth}.rs`, `tests/{server,signing_in}.rs`);
   `docs/adr/{0056,0072}-*.md`
 
 ## Re-verification (2026-10-13, `706a9b2d`)
@@ -99,13 +100,16 @@ different test strings. Key production is identical except comments and
 already parameterizes the provider. Workspace membership uses `crates/*`.
 Keep user agents on requests and reqwest's existing ten-redirect default.
 No provider fixture payload or assertion changes; no live-network tests run.
+The duplicate-definition scan matches `const IDLE_TIMEOUT`; references to
+the shared constant are expected. MCP manager/Feishu adapter constructors
+take the built client, with mechanical caller updates listed above.
 
 ## Exit criteria
 
 - [ ] `cargo clippy --workspace --all-targets --locked -- -D warnings`
       is clean with `disallowed-methods` in place (paste brick 1's run
       beside it).
-- [ ] `rg -l 'fn find_block_end|struct Metered|IDLE_TIMEOUT|struct ApiKey'
+- [ ] `rg -l 'fn find_block_end|struct Metered|const IDLE_TIMEOUT|struct ApiKey'
       crates/bingo-provider-*` finds nothing.
 - [ ] `cargo test -p bingo-http -p bingo-auth-oauth` passes, including
       the moved transport tests.

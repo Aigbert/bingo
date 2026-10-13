@@ -5,9 +5,9 @@ pub mod sse;
 pub mod stream;
 mod transport;
 
-use std::time::Duration;
 use bingo_sdk::{ModelEvent, ProviderError};
 pub use metered::FRAME;
+use std::time::Duration;
 pub use transport::round_trip;
 
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
@@ -20,7 +20,10 @@ pub struct Bounds {
 }
 
 impl Bounds {
-    pub const STREAMED: Self = Self { connect: CONNECT_TIMEOUT, call: None };
+    pub const STREAMED: Self = Self {
+        connect: CONNECT_TIMEOUT,
+        call: None,
+    };
     pub const CALL: Self = Self {
         connect: Duration::from_secs(10),
         call: Some(Duration::from_secs(30)),

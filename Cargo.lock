@@ -241,6 +241,7 @@ dependencies = [
  "bingo-experience",
  "bingo-gateway",
  "bingo-hooks-shell",
+ "bingo-http",
  "bingo-mcp",
  "bingo-permissions",
  "bingo-persona",
@@ -316,6 +317,7 @@ dependencies = [
  "async-trait",
  "aws-lc-rs",
  "base64 0.23.1",
+ "bingo-http",
  "bingo-loopback",
  "bingo-sdk",
  "reqwest",
@@ -352,6 +354,7 @@ dependencies = [
  "async-trait",
  "base64 0.23.1",
  "bingo-channel-adapter",
+ "bingo-http",
  "bingo-pictures",
  "bingo-sdk",
  "futures",
@@ -579,6 +582,7 @@ version = "0.6.6"
 dependencies = [
  "async-trait",
  "bingo-auth-oauth",
+ "bingo-http",
  "bingo-pictures",
  "bingo-process",
  "bingo-sdk",
@@ -633,6 +637,7 @@ name = "bingo-pictures"
 version = "0.6.6"
 dependencies = [
  "base64 0.23.1",
+ "bingo-http",
  "bingo-sdk",
  "futures",
  "image",
@@ -700,10 +705,9 @@ version = "0.6.6"
 dependencies = [
  "async-trait",
  "bingo-auth-oauth",
+ "bingo-http",
  "bingo-sdk",
- "bytes",
  "futures",
- "http-body",
  "insta",
  "jiff",
  "reqwest",
@@ -736,11 +740,10 @@ dependencies = [
  "async-trait",
  "base64 0.23.1",
  "bingo-auth-oauth",
+ "bingo-http",
  "bingo-loopback",
  "bingo-sdk",
- "bytes",
  "futures",
- "http-body",
  "insta",
  "jiff",
  "reqwest",
@@ -907,6 +910,7 @@ version = "0.6.6"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
+ "bingo-http",
  "bingo-loopback",
  "bingo-pictures",
  "bingo-sdk",
@@ -996,6 +1000,7 @@ name = "bingo-tool-web"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-http",
  "bingo-loopback",
  "bingo-pictures",
  "bingo-sdk",

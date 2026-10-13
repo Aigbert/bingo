@@ -21,6 +21,7 @@ testing = []
 workspace = true
 
 [dependencies]
+bingo-http.workspace = true
 bingo-sdk.workspace = true
 # The ten decoders of ADR-0041. Every picture a surface may be handed becomes
 # the one format a terminal takes, here and nowhere else.

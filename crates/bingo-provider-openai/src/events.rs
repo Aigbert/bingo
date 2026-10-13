@@ -379,7 +379,7 @@ fn u64_at(value: &Value, key: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sse::SseParser;
+    use bingo_http::sse::SseParser;
     use serde_json::json;
 
     /// Every event a fixture yields, in order, up to the error that ends it.
@@ -781,5 +781,11 @@ mod tests {
             ),
             Err(ProviderError::Stream { .. })
         ));
+    }
+}
+
+impl bingo_http::Decode for Decoder {
+    fn decode(&mut self, event: &str, data: &str) -> Result<Vec<ModelEvent>, ProviderError> {
+        Decoder::decode(self, event, data)
     }
 }

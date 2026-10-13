@@ -45,10 +45,11 @@ pub(super) fn spawn(replies: mpsc::Sender<Reply>, data_dir: PathBuf) {
 /// One GET with a clock on it. The library reaches no network of its own, so
 /// this is where the client is: five seconds, and this build's own name.
 async fn fetch(url: String) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .timeout(bingo_update::api::TIMEOUT)
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = bingo_http::client(bingo_http::Bounds {
+        connect: bingo_http::CONNECT_TIMEOUT,
+        call: Some(bingo_update::api::TIMEOUT),
+    })
+    .map_err(|e| e.to_string())?;
     client
         .get(url)
         .header(

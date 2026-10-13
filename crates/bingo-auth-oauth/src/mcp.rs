@@ -539,7 +539,7 @@ mod tests {
             HeaderMap::new(),
             None,
             store(home),
-            reqwest::Client::new(),
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
         )
     }
 
@@ -887,7 +887,7 @@ mod tests {
             HeaderMap::new(),
             Some("cl_by_hand".into()),
             store(&home),
-            reqwest::Client::new(),
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
         );
         auth.login(
             Arc::new(Pasting(Mutex::new(None))),
@@ -972,7 +972,7 @@ mod tests {
             headers,
             Some("cl_secret_looking".into()),
             store(&home),
-            reqwest::Client::new(),
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
         );
         let printed = format!("{auth:?}");
         assert!(printed.contains("binlesson"), "{printed}");

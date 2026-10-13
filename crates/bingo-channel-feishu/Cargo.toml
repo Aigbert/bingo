@@ -12,6 +12,7 @@ description = "The Feishu channel platform for bingo"
 workspace = true
 
 [dependencies]
+bingo-http.workspace = true
 bingo-channel-adapter.workspace = true
 bingo-sdk.workspace = true
 bingo-pictures.workspace = true

@@ -271,7 +271,12 @@ mod tests {
 
     async fn api(server: &MockServer) -> Api {
         signed_in(server).await;
-        Api::new(server.uri(), "cli_1", "secret")
+        Api::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+            server.uri(),
+            "cli_1",
+            "secret",
+        )
     }
 
     fn resource(key: &str, kind: Kind) -> Resource {

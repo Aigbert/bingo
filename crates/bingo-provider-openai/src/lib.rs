@@ -26,13 +26,12 @@ pub mod error;
 pub mod events;
 pub mod input;
 pub mod instances;
-pub mod key;
-pub mod metered;
 pub mod models;
 pub mod request;
 pub mod settings;
-pub mod sse;
-pub mod stream;
+#[cfg(test)]
+mod stream_tests;
+use bingo_http::stream;
 pub mod variant;
 
 use std::sync::Arc;
@@ -49,9 +48,9 @@ use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde_json::Value;
 
 use crate::credential::Credential;
-use crate::key::ApiKey;
-use crate::metered::{Clock, meter, quiet};
-use crate::stream::{CONNECT_TIMEOUT, IDLE_TIMEOUT};
+use bingo_auth_oauth::key::ApiKey;
+use bingo_http::metered::Clock;
+
 use crate::variant::{ORIGINATOR, Variant};
 
 pub use crate::settings::{CodexConfig, CodexEndpoint, OpenAiConfig, OpenAiEndpoint, Settings};
@@ -94,12 +93,13 @@ pub struct OpenAiProvider {
 impl OpenAiProvider {
     /// One key-based endpoint under its own name.
     pub fn keyed(
+        http: reqwest::Client,
         id: impl Into<String>,
         key: ApiKey,
         base_url: impl Into<String>,
         images: bool,
     ) -> Self {
-        let mut provider = Self::with_credential(id, Credential::Key(key), base_url);
+        let mut provider = Self::with_credential(http, id, Credential::Key(key), base_url);
         provider.images = images;
         provider
     }
@@ -108,45 +108,51 @@ impl OpenAiProvider {
     /// name so two of them sign in side by side (ADR-0017 §3). The store is
     /// the host's, shared with every other provider that keeps a credential.
     pub fn subscription(
+        http: reqwest::Client,
+        oauth: reqwest::Client,
         id: impl Into<String>,
         endpoint: CodexEndpoint,
         store: Arc<CredentialStore>,
     ) -> Self {
         let id = id.into();
-        let source = TokenSource::new(
-            &id,
-            codex_issuer(endpoint.issuer),
-            store,
-            bingo_auth_oauth::client(),
-        );
+        let source = TokenSource::new(&id, codex_issuer(endpoint.issuer), store, oauth);
         let base_url = endpoint
             .base_url
             .unwrap_or_else(|| CODEX_BASE_URL.to_string());
-        Self::with_credential(id, Credential::Tokens(Arc::new(source)), base_url)
+        Self::with_credential(http, id, Credential::Tokens(Arc::new(source)), base_url)
             .with_variant(Variant::Codex)
     }
 
     /// An endpoint as given, with no store and no environment lookup — what a
     /// test or an embedder uses when the credentials are already resolved.
-    pub fn with_endpoint(api_key: Option<String>, base_url: impl Into<String>) -> Self {
+    pub fn with_endpoint(
+        http: reqwest::Client,
+        api_key: Option<String>,
+        base_url: impl Into<String>,
+    ) -> Self {
         let id = Variant::Default.provider_id();
         let key = ApiKey::detached(id, instances::default_places(None), api_key);
-        Self::with_credential(id, Credential::Key(key), base_url)
+        Self::with_credential(http, id, Credential::Key(key), base_url)
     }
 
     /// The same, over a credential that renews itself.
-    pub fn with_tokens(source: Arc<TokenSource>, base_url: impl Into<String>) -> Self {
+    pub fn with_tokens(
+        http: reqwest::Client,
+        source: Arc<TokenSource>,
+        base_url: impl Into<String>,
+    ) -> Self {
         let id = source.provider().to_string();
-        Self::with_credential(id, Credential::Tokens(source), base_url)
+        Self::with_credential(http, id, Credential::Tokens(source), base_url)
     }
 
     fn with_credential(
+        http: reqwest::Client,
         id: impl Into<String>,
         credential: Credential,
         base_url: impl Into<String>,
     ) -> Self {
         Self {
-            http: http(),
+            http,
             id: id.into(),
             credential,
             base_url: base_url.into().trim_end_matches('/').to_string(),
@@ -221,8 +227,11 @@ impl OpenAiProvider {
         builder: reqwest::RequestBuilder,
     ) -> Result<(reqwest::Response, Clock), ProviderError> {
         let again = builder.try_clone();
-        match self.round_trip(builder, IDLE_TIMEOUT).await {
-            Err(error) if refused(&error) => self.after_refresh(again, error, IDLE_TIMEOUT).await,
+        match self.round_trip(builder, bingo_http::IDLE_TIMEOUT).await {
+            Err(error) if refused(&error) => {
+                self.after_refresh(again, error, bingo_http::IDLE_TIMEOUT)
+                    .await
+            }
             result => result,
         }
     }
@@ -266,19 +275,7 @@ impl OpenAiProvider {
         builder: reqwest::RequestBuilder,
         idle: Duration,
     ) -> Result<(reqwest::Response, Clock), ProviderError> {
-        let clock = Clock::new();
-        let request = meter(builder, &clock)?;
-        let sent = tokio::select! {
-            biased;
-            sent = self.http.execute(request) => sent,
-            () = quiet(&clock, idle) => return Err(ProviderError::Timeout),
-        };
-        let response = sent.map_err(|e| ProviderError::Transport {
-            message: e.to_string(),
-        })?;
-        // The status line is a byte moving too, so the body that follows is
-        // given its whole idle rather than what the upload left of it.
-        clock.stamp();
+        let (response, clock) = bingo_http::round_trip(builder, idle).await?;
         if response.status().is_success() {
             return Ok((response, clock));
         }
@@ -369,6 +366,7 @@ impl Provider for OpenAiProvider {
             stream::chunks(response),
             clock,
             cancel,
+            events::Decoder::new(),
         ))
     }
 
@@ -483,17 +481,6 @@ async fn refusal(response: reqwest::Response) -> ProviderError {
     error::classify(status, &body, retry_after.as_deref())
 }
 
-/// One client per provider, carrying the only bound on the phase that has
-/// nothing to meter yet: reaching the server (ADR-0056 §1). A builder that
-/// will not build loses that bound, not the provider — the endpoint is still
-/// reachable without it.
-fn http() -> reqwest::Client {
-    reqwest::Client::builder()
-        .connect_timeout(CONNECT_TIMEOUT)
-        .build()
-        .unwrap_or_else(|_| reqwest::Client::new())
-}
-
 fn settings_schema() -> schemars::Schema {
     schemars::schema_for!(Settings)
 }
@@ -526,7 +513,11 @@ impl Plugin for OpenAiPlugin {
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
         let settings: Settings = registrar.config()?;
-        for provider in instances::providers(settings, registrar.env())? {
+        let http = bingo_http::client(bingo_http::Bounds::STREAMED)
+            .map_err(|e| PluginError::Failed(e.to_string()))?;
+        let oauth = bingo_http::client(bingo_http::Bounds::CALL)
+            .map_err(|e| PluginError::Failed(e.to_string()))?;
+        for provider in instances::providers(http, oauth, settings, registrar.env())? {
             registrar.provider(provider);
         }
         Ok(())
@@ -552,7 +543,11 @@ pub(crate) mod tests {
     /// A provider the ambient environment cannot reach into, so the assertions
     /// hold on a machine that already exports `OPENAI_API_KEY`.
     fn hermetic(key: Option<&str>) -> OpenAiProvider {
-        OpenAiProvider::with_endpoint(key.map(str::to_string), DEFAULT_BASE_URL)
+        OpenAiProvider::with_endpoint(
+            bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+            key.map(str::to_string),
+            DEFAULT_BASE_URL,
+        )
     }
 
     /// A subscription provider over a store in a temporary directory: the
@@ -571,6 +566,8 @@ pub(crate) mod tests {
             store.write("codex", entry).expect("a write");
         }
         OpenAiProvider::subscription(
+            bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+            bingo_http::client(bingo_http::Bounds::CALL).expect("an OAuth client"),
             "codex",
             CodexEndpoint {
                 base_url: None,
@@ -742,6 +739,8 @@ pub(crate) mod tests {
     #[test]
     fn the_codex_settings_key_moves_both_endpoints_for_a_proxy() {
         let provider = OpenAiProvider::subscription(
+            bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+            bingo_http::client(bingo_http::Bounds::CALL).expect("an OAuth client"),
             "codex",
             CodexEndpoint {
                 base_url: Some("http://127.0.0.1:8080/".into()),
@@ -758,6 +757,8 @@ pub(crate) mod tests {
         );
         assert_eq!(
             OpenAiProvider::subscription(
+                bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+                bingo_http::client(bingo_http::Bounds::CALL).expect("an OAuth client"),
                 "codex",
                 CodexEndpoint::default(),
                 Arc::new(CredentialStore::new(PathBuf::from("/tmp")))
@@ -899,7 +900,11 @@ pub(crate) mod tests {
     #[test]
     fn the_base_url_defaults_and_a_setting_overrides_it_without_a_trailing_slash() {
         assert_eq!(hermetic(None).base_url(), DEFAULT_BASE_URL);
-        let custom = OpenAiProvider::with_endpoint(None, "http://127.0.0.1:8080/");
+        let custom = OpenAiProvider::with_endpoint(
+            bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+            None,
+            "http://127.0.0.1:8080/",
+        );
         assert_eq!(custom.base_url(), "http://127.0.0.1:8080");
     }
 
@@ -986,7 +991,13 @@ pub(crate) mod tests {
             store.clone(),
             None,
         );
-        let provider = OpenAiProvider::keyed("openai", key, DEFAULT_BASE_URL, true);
+        let provider = OpenAiProvider::keyed(
+            bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+            "openai",
+            key,
+            DEFAULT_BASE_URL,
+            true,
+        );
         assert_eq!(
             provider
                 .login(Arc::new(Pasting), Some(LoginMethod::Paste))
@@ -1019,191 +1030,6 @@ pub(crate) mod tests {
             "Signed in to codex as me@example.com."
         );
         assert_eq!(receipt("codex", None), "Signed in to codex.");
-    }
-
-    // The three phases over a real socket (ADR-0056 §1). Not wiremock: it
-    // reads the whole request before anything answers, which is the one thing
-    // these assertions are about. Every bound below is the peer's own pacing
-    // multiplied out, never a wall clock.
-
-    use std::time::Instant;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::{TcpListener, TcpSocket, TcpStream};
-
-    /// Small enough that the kernel cannot swallow the request whole, so the
-    /// peer's pace is the upload's pace.
-    const PEER_BUFFER: u32 = 64 * 1024;
-
-    /// What the slow peer takes in one go — several frames' worth, so it is
-    /// the peer that paces the clock and not the frame size.
-    const SIP: usize = 256 * 1024;
-
-    /// Bigger than the buffers on either side, so the body is still going out
-    /// while the assertions watch it: 32 sips, and 32 gaps to go with them.
-    const UPLOAD: usize = 8 * 1024 * 1024;
-
-    /// The gap the slow peer leaves between two sips, and the silence a test
-    /// allows. Twenty-five gaps: a machine that stalls for twenty-four of them
-    /// still passes, and the upload still outlasts the silence it is given.
-    const GAP: Duration = Duration::from_millis(20);
-    const IDLE: Duration = Duration::from_millis(500);
-
-    const ANSWER: &[u8] = b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}";
-
-    /// A listener on the loopback, and the url that reaches it.
-    fn peer() -> (TcpListener, String) {
-        let socket = TcpSocket::new_v4().expect("a socket");
-        socket
-            .set_recv_buffer_size(PEER_BUFFER)
-            .expect("a small receive buffer");
-        socket
-            .bind("127.0.0.1:0".parse().expect("a loopback address"))
-            .expect("a port");
-        let listener = socket.listen(1).expect("a listener");
-        let address = listener.local_addr().expect("the port it took");
-        (listener, format!("http://{address}"))
-    }
-
-    fn talking_to(url: &str) -> OpenAiProvider {
-        OpenAiProvider::with_endpoint(Some("sk-test".into()), url)
-    }
-
-    fn uploading(provider: &OpenAiProvider, url: &str) -> reqwest::RequestBuilder {
-        provider.http.post(url).body("x".repeat(UPLOAD))
-    }
-
-    /// The request head, one byte at a time so that none of the body is
-    /// swallowed with it.
-    async fn head(socket: &mut TcpStream) -> String {
-        let mut seen = Vec::new();
-        let mut byte = [0u8; 1];
-        while !seen.ends_with(b"\r\n\r\n") && socket.read_exact(&mut byte).await.is_ok() {
-            seen.push(byte[0]);
-        }
-        String::from_utf8_lossy(&seen).into_owned()
-    }
-
-    fn declared_length(head: &str) -> usize {
-        head.to_lowercase()
-            .lines()
-            .find_map(|line| {
-                line.strip_prefix("content-length:")
-                    .map(str::trim)
-                    .map(str::to_string)
-            })
-            .and_then(|value| value.parse().ok())
-            .unwrap_or_else(|| panic!("no content length in {head:?}"))
-    }
-
-    /// Reads the request a sip at a time, `gap` apart, and answers only once
-    /// the whole of it has arrived. Hands back the head it read. The sip is
-    /// exact rather than whatever happens to have landed, so the drain rate is
-    /// the peer's own and not the kernel's.
-    async fn a_trickle(listener: TcpListener, gap: Duration) -> String {
-        let (mut socket, _) = listener.accept().await.expect("a connection");
-        let head = head(&mut socket).await;
-        let mut left = declared_length(&head);
-        let mut sip = vec![0u8; SIP];
-        while left > 0 {
-            tokio::time::sleep(gap).await;
-            let take = SIP.min(left);
-            if socket.read_exact(&mut sip[..take]).await.is_err() {
-                break;
-            }
-            left -= take;
-        }
-        socket.write_all(ANSWER).await.expect("the answer");
-        head
-    }
-
-    /// Takes one mouthful and never reads again, holding the connection open
-    /// so that nothing but the guard can end the request.
-    async fn a_deaf_peer(listener: TcpListener) {
-        let (mut socket, _) = listener.accept().await.expect("a connection");
-        head(&mut socket).await;
-        let mut sip = vec![0u8; SIP];
-        let _ = socket.read(&mut sip).await;
-        std::future::pending::<()>().await;
-    }
-
-    /// Reads everything and answers nothing.
-    async fn a_mute_peer(listener: TcpListener) {
-        let (mut socket, _) = listener.accept().await.expect("a connection");
-        let mut sink = Vec::new();
-        let _ = socket.read_to_end(&mut sink).await;
-    }
-
-    /// The 8.8 MB replay of ADR-0056 in miniature: the peer takes longer than
-    /// the whole idle to read the body, and the request still lands.
-    #[tokio::test]
-    async fn a_slow_upload_is_not_a_silence() {
-        let (listener, url) = peer();
-        let reading = tokio::spawn(a_trickle(listener, GAP));
-        let provider = talking_to(&url);
-        let started = Instant::now();
-        let sent = provider.round_trip(uploading(&provider, &url), IDLE).await;
-        let took = started.elapsed();
-        assert!(
-            sent.is_ok(),
-            "a moving upload is never cut: {:?}",
-            sent.err()
-        );
-        assert!(took > IDLE, "it outlived its own idle: {took:?}");
-        reading.await.expect("the peer");
-    }
-
-    /// A peer that stops reading has gone quiet: the request ends as the
-    /// `Timeout` the turn loop's ladder knows, and not before the idle.
-    #[tokio::test]
-    async fn a_peer_that_stops_reading_ends_the_request() {
-        let (listener, url) = peer();
-        let deaf = tokio::spawn(a_deaf_peer(listener));
-        let provider = talking_to(&url);
-        let started = Instant::now();
-        let sent = provider.round_trip(uploading(&provider, &url), IDLE).await;
-        let took = started.elapsed();
-        assert_eq!(sent.err(), Some(ProviderError::Timeout));
-        assert!(took >= IDLE, "a silence is not one until it has lasted");
-        deaf.abort();
-    }
-
-    /// A server that takes the whole request and then says nothing is the
-    /// silence the guard was always for: a headless run must not hang on it.
-    #[tokio::test]
-    async fn a_server_that_accepts_and_says_nothing_times_out() {
-        let (listener, url) = peer();
-        let mute = tokio::spawn(a_mute_peer(listener));
-        let provider = talking_to(&url);
-        let started = Instant::now();
-        let asking = provider.http.post(url.as_str()).body("hello");
-        assert_eq!(
-            provider.round_trip(asking, IDLE).await.err(),
-            Some(ProviderError::Timeout)
-        );
-        assert!(started.elapsed() >= IDLE);
-        mute.abort();
-    }
-
-    /// An exact size hint is what keeps `Content-Length` on the request; a
-    /// chunked body is a different request, and a relay may refuse it.
-    #[tokio::test]
-    async fn the_request_head_carries_its_length_and_is_never_chunked() {
-        let (listener, url) = peer();
-        let reading = tokio::spawn(a_trickle(listener, Duration::ZERO));
-        let provider = talking_to(&url);
-        provider
-            .round_trip(uploading(&provider, &url), IDLE * 10)
-            .await
-            .expect("the request lands");
-        let head = reading.await.expect("the peer").to_lowercase();
-        assert!(
-            head.contains(&format!("content-length: {UPLOAD}")),
-            "the head declares the whole body: {head}"
-        );
-        assert!(
-            !head.contains("transfer-encoding"),
-            "and chunks nothing: {head}"
-        );
     }
 
     struct NoPrompter;

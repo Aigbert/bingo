@@ -35,7 +35,12 @@ mod tests {
     fn manager(servers: Value, disabled: &[String]) -> Arc<Manager> {
         let servers: BTreeMap<String, Server> =
             serde_json::from_value(servers).expect("readable rows");
-        Arc::new(Manager::new(servers, disabled, std::env::temp_dir()))
+        Arc::new(Manager::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+            servers,
+            disabled,
+            std::env::temp_dir(),
+        ))
     }
 
     /// The recorded answer: the `mcpServers` key's own shape, keyed by name,

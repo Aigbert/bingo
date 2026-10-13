@@ -479,6 +479,7 @@ mod tests {
     #[test]
     fn the_spec_holds_the_queue_and_names_every_verb() {
         let manager = Arc::new(Manager::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
             Default::default(),
             &[],
             std::env::temp_dir().join("bingo-mcp-command-tests"),
@@ -540,6 +541,7 @@ mod tests {
     #[test]
     fn the_word_after_a_verb_is_a_configured_server() {
         let manager = Arc::new(Manager::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
             configured(),
             &[],
             std::env::temp_dir().join("bingo-mcp-command-names-tests"),
@@ -562,6 +564,7 @@ mod tests {
     #[tokio::test]
     async fn a_verb_that_signs_in_refuses_a_server_that_signs_in_to_nothing() {
         let manager = Arc::new(Manager::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
             configured(),
             &[],
             std::env::temp_dir().join("bingo-mcp-command-signin-tests"),

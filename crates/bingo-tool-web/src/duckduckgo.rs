@@ -43,6 +43,7 @@ impl DuckDuckGo {
         let response = self
             .http
             .get(endpoint)
+            .header(header::USER_AGENT, crate::USER_AGENT)
             .header(header::ACCEPT, "text/html,application/xhtml+xml")
             .send()
             .await

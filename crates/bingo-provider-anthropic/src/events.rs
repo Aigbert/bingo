@@ -324,7 +324,7 @@ fn u64_at(value: &Value, key: &str) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sse::SseParser;
+    use bingo_http::sse::SseParser;
 
     /// Every event a fixture yields, in order, up to the error that ends it.
     pub(crate) fn replay(fixture: &str) -> (Vec<ModelEvent>, Option<ProviderError>) {
@@ -587,5 +587,11 @@ mod tests {
             decoder.decode("content_block_start", r#"{"index":0}"#),
             Err(ProviderError::Stream { .. })
         ));
+    }
+}
+
+impl bingo_http::Decode for Decoder {
+    fn decode(&mut self, event: &str, data: &str) -> Result<Vec<ModelEvent>, ProviderError> {
+        Decoder::decode(self, event, data)
     }
 }
