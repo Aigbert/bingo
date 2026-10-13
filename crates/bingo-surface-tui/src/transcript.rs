@@ -353,6 +353,7 @@ fn item_lines(
     fold: Fold,
 ) -> Block {
     match &item.body {
+        ItemBody::Unknown { .. } => Block::default(),
         ItemBody::User { parts, origin } => said::lines(item, parts, origin, fold, rows).into(),
         ItemBody::Assistant { text } => assistant(text, item.status, fold, rows, cue),
         // An agent that runs its own tools journals each finished call as a

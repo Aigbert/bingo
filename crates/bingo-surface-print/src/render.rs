@@ -213,7 +213,8 @@ impl Renderer {
             | Event::CatalogChanged { .. }
             | Event::Extension { .. }
             | Event::Signal { .. }
-            | Event::Lagged { .. } => {}
+            | Event::Lagged { .. }
+            | Event::Unknown { .. } => {}
         }
         Ok(())
     }
@@ -286,7 +287,8 @@ impl Renderer {
             | ItemBody::Rewind { .. }
             | ItemBody::QuestionAnswer { .. }
             | ItemBody::PermissionReceipt { .. }
-            | ItemBody::Asset { .. } => {}
+            | ItemBody::Asset { .. }
+            | ItemBody::Unknown { .. } => {}
         }
         Ok(())
     }

@@ -113,6 +113,13 @@ exhaustive matches anywhere may gain the ADR-0065 Unknown behavior; list
 every site here. Stop only when a site's behavior needs a new decision.
 The test-helper blocker is resolved. Additional sites so far:
 - `crates/bingo-core/src/test_support.rs::kind`: label Unknown in tests.
+- `crates/bingo-surface-print/src/render.rs::{text,completed}`: silent.
+- `crates/bingo-surface-print/src/stream_json.rs::{line,completed}`: omit.
+- `crates/bingo-surface-tui/src/transcript.rs::item_lines`: empty block.
+- `crates/bingo-sdk/src/state.rs::apply`: `Applied::Nothing`.
+- `crates/bingo-core/src/context.rs::Folder::item`: skip model content.
+- `crates/bingo-sdk/tests/record.rs::{fixture_name,item_fixture_name}`:
+  reject Unknown for known fixtures; opaque fixtures have their own tests.
 
 Evidence collected so far (trimmed; these are not all milestone gates):
 
