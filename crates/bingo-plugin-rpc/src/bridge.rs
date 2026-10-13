@@ -493,8 +493,8 @@ impl Bridge {
         let result: InitializeResult =
             serde_json::from_value(answer).map_err(|e| format!("initialize: {e}"))?;
         check_protocol(&result)?;
-        connection.initialize_lists(result.tools.clone(), result.commands.clone());
         connection.negotiate(&result.capabilities);
+        connection.initialize_lists(result.tools.clone(), result.commands.clone());
         Ok(result)
     }
 }

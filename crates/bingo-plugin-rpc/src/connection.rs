@@ -101,8 +101,14 @@ struct Router {
     running: Mutex<HashMap<String, Running>>,
     streaming: Mutex<HashMap<String, Sender<ModelEvent>>>,
     serving: Option<Serving>,
-    tools: Mutex<Vec<bingo_sdk::ToolSpec>>,
-    commands: Mutex<Vec<bingo_sdk::CommandSpec>>,
+    lists: Mutex<Lists>,
+}
+
+#[derive(Default, Debug)]
+struct Lists {
+    ready: bool,
+    tools: Option<Vec<bingo_sdk::ToolSpec>>,
+    commands: Option<Vec<bingo_sdk::CommandSpec>>,
 }
 
 impl Router {
@@ -137,20 +143,12 @@ impl Router {
     }
 
     async fn notification(&self, plugin: &str, notification: Notification) {
-        if let Some(serving) = &self.serving {
-            if serving.calls.permits(&notification.method).is_err() { return; }
+        if matches!(notification.method.as_str(), name::TOOLS_CHANGED | name::COMMANDS_CHANGED) {
+            self.changed(notification);
+            return;
         }
+        if !self.permits(&notification.method) { return; }
         match notification.method.as_str() {
-            name::TOOLS_CHANGED => {
-                if let Ok(params) = serde_json::from_value::<crate::wire::ToolsChanged>(notification.params) {
-                    *self.tools.lock().unwrap_or_else(|e| e.into_inner()) = params.tools;
-                }
-            }
-            name::COMMANDS_CHANGED => {
-                if let Ok(params) = serde_json::from_value::<crate::wire::CommandsChanged>(notification.params) {
-                    *self.commands.lock().unwrap_or_else(|e| e.into_inner()) = params.commands;
-                }
-            }
             name::TOOL_PROGRESS => match serde_json::from_value(notification.params) {
                 Ok(params) => self.progress(params),
                 Err(error) => tracing::warn!(plugin, %error, "a progress line that is not one"),
@@ -160,6 +158,24 @@ impl Router {
                 Err(error) => tracing::warn!(plugin, %error, "a delta that is not an event"),
             },
             other => tracing::debug!(plugin, method = other, "an unknown notification"),
+        }
+    }
+
+    fn permits(&self, method: &str) -> bool {
+        self.serving.as_ref().is_none_or(|serving| serving.calls.permits(method).is_ok())
+    }
+
+    fn changed(&self, notification: Notification) {
+        let mut lists = self.lists.lock().unwrap_or_else(|e| e.into_inner());
+        if lists.ready && !self.permits(&notification.method) { return; }
+        match notification.method.as_str() {
+            name::TOOLS_CHANGED => {
+                if let Ok(params) = serde_json::from_value::<crate::wire::ToolsChanged>(notification.params) { lists.tools = Some(params.tools); }
+            }
+            name::COMMANDS_CHANGED => {
+                if let Ok(params) = serde_json::from_value::<crate::wire::CommandsChanged>(notification.params) { lists.commands = Some(params.commands); }
+            }
+            _ => {}
         }
     }
 
@@ -263,14 +279,18 @@ impl Connection {
     }
 
     pub fn initialize_lists(&self, tools: Vec<bingo_sdk::ToolSpec>, commands: Vec<bingo_sdk::CommandSpec>) {
-        *self.router.tools.lock().unwrap_or_else(|e| e.into_inner()) = tools;
-        *self.router.commands.lock().unwrap_or_else(|e| e.into_inner()) = commands;
+        let mut lists = self.router.lists.lock().unwrap_or_else(|e| e.into_inner());
+        if !self.router.permits(name::TOOLS_CHANGED) { lists.tools = None; }
+        if !self.router.permits(name::COMMANDS_CHANGED) { lists.commands = None; }
+        lists.tools.get_or_insert(tools);
+        lists.commands.get_or_insert(commands);
+        lists.ready = true;
     }
     pub fn tools(&self) -> Vec<bingo_sdk::ToolSpec> {
-        self.router.tools.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.router.lists.lock().unwrap_or_else(|e| e.into_inner()).tools.clone().unwrap_or_default()
     }
     pub fn commands(&self) -> Vec<bingo_sdk::CommandSpec> {
-        self.router.commands.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.router.lists.lock().unwrap_or_else(|e| e.into_inner()).commands.clone().unwrap_or_default()
     }
 
     pub fn negotiate(&self, capabilities: &std::collections::BTreeSet<crate::wire::Cap>) {
