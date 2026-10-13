@@ -9,6 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::Transcript;
 use crate::event::*;
 use crate::ids::{IntentId, InteractionId, ItemId, Seq, TurnId};
 use crate::model::Usage;
@@ -21,10 +22,8 @@ pub struct SessionState {
     pub summary: SessionSummary,
     #[serde(default)]
     pub config: ConfigView,
-    #[serde(default)]
-    pub history_generation: u64,
-    /// Items in transcript order, including every non-terminal one.
-    pub items: Vec<Item>,
+    #[serde(flatten)]
+    pub transcript: Transcript,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turn: Option<LiveTurn>,
     #[serde(default)]
@@ -120,8 +119,7 @@ impl SessionState {
             seq: Seq::ZERO,
             summary,
             config: ConfigView::default(),
-            history_generation: 0,
-            items: Vec::new(),
+            transcript: Transcript::new(),
             turn: None,
             queue: Vec::new(),
             interactions: Vec::new(),
@@ -157,19 +155,7 @@ impl SessionState {
     }
 
     pub fn item(&self, id: &ItemId) -> Option<&Item> {
-        self.items.iter().rev().find(|i| &i.id == id)
-    }
-
-    fn item_mut(&mut self, id: &ItemId) -> Option<&mut Item> {
-        self.items.iter_mut().rev().find(|i| &i.id == id)
-    }
-
-    fn upsert(&mut self, item: &Item) -> Applied {
-        match self.item_mut(&item.id) {
-            Some(slot) => *slot = item.clone(),
-            None => self.items.push(item.clone()),
-        }
-        Applied::Item(item.id.clone())
+        self.transcript.get(id)
     }
 
     pub fn apply(&mut self, frame: &Frame) -> Applied {
@@ -185,40 +171,29 @@ impl SessionState {
         if frame.event.completes_a_message() {
             self.count_a_message();
         }
+        let applied = self.transcript.apply(&frame.event);
         match &frame.event {
             Event::SessionUpdated { summary } => self.session_updated(summary),
             Event::SessionClosed { .. } => self.session_closed(),
             Event::TurnStarted { turn, origin, .. } => self.turn_started(turn, *origin, frame.ts),
-            Event::TurnRetrying {
-                attempt,
-                max,
-                dropped,
-                ..
-            } => self.turn_retrying(*attempt, *max, dropped),
+            Event::TurnRetrying { attempt, max, .. } => self.turn_retrying(*attempt, *max),
             Event::TurnUsage { usage, context, .. } => self.turn_usage(*usage, *context),
             Event::TurnCompleted {
                 turn,
                 status,
                 usage,
             } => self.turn_completed(turn, status, *usage, frame.ts),
-            Event::ItemStarted { item }
-            | Event::ItemUpdated { item }
-            | Event::ItemCompleted { item } => self.upsert(item),
-            Event::ItemDelta {
-                item, kind, data, ..
-            } => self.item_delta(item, *kind, data),
+            Event::ItemStarted { .. }
+            | Event::ItemUpdated { .. }
+            | Event::ItemCompleted { .. }
+            | Event::ItemDelta { .. } => applied,
             Event::QueueChanged { entries, .. } => self.queue_changed(entries),
             Event::InteractionOpened { interaction } => self.interaction_opened(interaction),
             Event::InteractionResolved { id, .. } | Event::InteractionCancelled { id, .. } => {
                 self.interaction_closed(id)
             }
             Event::IntentAck { intent, .. } => Applied::Intent(intent.clone()),
-            Event::Compacted { generation, .. } => self.history_advanced(*generation, &[]),
-            Event::Rewound {
-                generation,
-                dropped,
-                ..
-            } => self.history_advanced(*generation, dropped),
+            Event::Compacted { .. } | Event::Rewound { .. } => applied,
             Event::ConfigChanged { config } => self.config_changed(config),
             Event::CatalogChanged { .. } => Applied::Nothing,
             Event::Notice { .. } => Applied::Notice,
@@ -302,8 +277,7 @@ impl SessionState {
         Applied::Turn
     }
 
-    fn turn_retrying(&mut self, attempt: u32, max: u32, dropped: &[ItemId]) -> Applied {
-        self.items.retain(|i| !dropped.contains(&i.id));
+    fn turn_retrying(&mut self, attempt: u32, max: u32) -> Applied {
         if let Some(t) = self.turn.as_mut() {
             t.retrying = Some(Retry { attempt, max });
         }
@@ -347,24 +321,6 @@ impl SessionState {
         Applied::Turn
     }
 
-    fn item_delta(&mut self, item: &ItemId, kind: DeltaKind, data: &str) -> Applied {
-        let Some(target) = self.item_mut(item) else {
-            return Applied::Nothing;
-        };
-        if target.is_terminal() {
-            return Applied::Nothing;
-        }
-        match (&mut target.body, kind) {
-            (ItemBody::Assistant { text }, DeltaKind::Text) => text.push_str(data),
-            (ItemBody::Reasoning { text, .. }, DeltaKind::Reasoning) => text.push_str(data),
-            (ItemBody::ToolCall { progress, .. }, DeltaKind::Tail) => {
-                *progress = Some(data.to_string())
-            }
-            _ => return Applied::Nothing,
-        }
-        Applied::Item(item.clone())
-    }
-
     fn queue_changed(&mut self, entries: &[QueueEntry]) -> Applied {
         self.queue = entries.to_vec();
         Applied::Queue
@@ -379,13 +335,6 @@ impl SessionState {
     fn interaction_closed(&mut self, id: &InteractionId) -> Applied {
         self.interactions.retain(|i| &i.id != id);
         Applied::Interaction(id.clone())
-    }
-
-    /// Both history events move the generation; only a rewind drops what it undid.
-    fn history_advanced(&mut self, generation: u64, dropped: &[ItemId]) -> Applied {
-        self.history_generation = generation;
-        self.items.retain(|i| !dropped.contains(&i.id));
-        Applied::History
     }
 
     fn config_changed(&mut self, config: &ConfigView) -> Applied {
@@ -422,6 +371,35 @@ mod tests {
             busy: false,
             messages: None,
         }
+    }
+
+    #[test]
+    fn transcript_snapshot_keeps_the_wire_bytes() {
+        let mut state = SessionState::new(summary());
+        state.apply(&frame(
+            1,
+            Event::ItemCompleted {
+                item: assistant("i1", "hello", ItemStatus::Completed),
+            },
+        ));
+        state.apply(&frame(
+            2,
+            Event::Compacted {
+                generation: 3,
+                boundary: ItemId::from_raw("i1"),
+                summary: ItemId::from_raw("missing"),
+                kept: vec![],
+            },
+        ));
+        let wire = serde_json::to_string(&state).unwrap();
+        assert_eq!(
+            wire,
+            r#"{"seq":2,"summary":{"id":"ses_1","cwd":"/tmp","driver":"model","createdAt":"2023-11-14T22:13:20Z","updatedAt":"2023-11-14T22:13:20Z","usage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheWriteTokens":0,"reasoningTokens":0},"busy":false,"messages":1},"config":{"kernel":null,"plugins":{}},"historyGeneration":3,"items":[{"id":"i1","turn":"trn_1","round":0,"status":"completed","startedAt":"2023-11-14T22:13:20Z","body":{"kind":"assistant","text":"hello"}}],"queue":[],"interactions":[],"unread":false,"closed":false}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&serde_json::from_str::<SessionState>(&wire).unwrap()).unwrap(),
+            wire
+        );
     }
 
     fn frame(seq: u64, event: Event) -> Frame {
@@ -557,7 +535,7 @@ mod tests {
         assert!(st.closed);
         st.apply(&frame(3, Event::SessionUpdated { summary: summary() }));
         assert!(!st.closed, "a summary comes only from a running session");
-        assert_eq!(st.items.len(), 1, "the close rewrote nothing");
+        assert_eq!(st.transcript.items().len(), 1, "the close rewrote nothing");
     }
 
     #[test]
@@ -771,8 +749,8 @@ mod tests {
                 files_restored: vec![],
             },
         ));
-        assert_eq!(st.items.len(), 1);
-        assert_eq!(st.history_generation, 1);
+        assert_eq!(st.transcript.items().len(), 1);
+        assert_eq!(st.transcript.generation(), 1);
     }
 
     fn signal(seq: u64, kind: &str, payload: Value) -> Frame {

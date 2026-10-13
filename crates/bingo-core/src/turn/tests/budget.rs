@@ -45,8 +45,7 @@ fn run_on(
         cfg,
         TurnRun {
             turn: TurnId::from_raw("trn_2"),
-            history,
-            generation: 0,
+            transcript: transcript(&history),
             cancel: CancellationToken::new(),
             kind: TurnKind::Respond,
         },
@@ -185,8 +184,7 @@ async fn failed_and_cancelled_summary_usage_is_billed_once_without_cutting() {
             &cfg,
             TurnRun {
                 turn: TurnId::mint(),
-                history: frames,
-                generation: 0,
+                transcript: transcript(&frames),
                 cancel,
                 kind: TurnKind::Compact { instructions: None },
             },
@@ -275,8 +273,7 @@ async fn manual_threshold_and_overflow_receive_the_assembled_parent_request() {
             &cfg,
             TurnRun {
                 turn: TurnId::mint(),
-                history: frames,
-                generation: 0,
+                transcript: transcript(&frames),
                 cancel: CancellationToken::new(),
                 kind,
             },

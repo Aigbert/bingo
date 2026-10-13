@@ -193,7 +193,12 @@ fn head(text: &str) -> String {
 /// What a room owes, as one snapshot of it has it. The posts and the
 /// membership come from the same place, so neither can drift from the other.
 pub fn of_state(state: &SessionState) -> Vec<Mention> {
-    let posts: Vec<Post> = state.items.iter().filter_map(Post::of).collect();
+    let posts: Vec<Post> = state
+        .transcript
+        .items()
+        .iter()
+        .filter_map(|item| Post::of(item))
+        .collect();
     mentions(&posts, &room::members_of(state))
 }
 

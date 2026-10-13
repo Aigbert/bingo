@@ -132,7 +132,7 @@ fn the_resume_picker_scrolls_under_the_row_the_keyboard_is_on() {
 /// than its eight rows.
 fn crowded_rewind(selected: usize) -> (bingo_sdk::SessionState, Ui, Now) {
     let mut state = state();
-    state.items = (1..=14)
+    state.transcript = (1..=14)
         .map(|i| {
             let mut asked = user(&format!("itm_{i}"), &format!("turn {i:02}: do the thing"));
             asked.turn = Some(TurnId::from_raw(format!("trn_{i}")));

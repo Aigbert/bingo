@@ -816,14 +816,21 @@ fn a_highlighted_code_block() {
 #[test]
 fn the_rewind_picker() {
     let mut state = folded(answered());
-    for item in state.items.iter_mut() {
-        item.turn = Some(TurnId::from_raw("trn_1"));
-    }
-    state.items.push({
-        let mut asked = user("itm_3", "now write me a note and run the tests");
-        asked.turn = Some(TurnId::from_raw("trn_2"));
-        asked
-    });
+    state.transcript = state
+        .transcript
+        .items()
+        .iter()
+        .map(|item| {
+            let mut item = item.as_ref().clone();
+            item.turn = Some(TurnId::from_raw("trn_1"));
+            item
+        })
+        .collect();
+    let mut asked = user("itm_3", "now write me a note and run the tests");
+    asked.turn = Some(TurnId::from_raw("trn_2"));
+    state
+        .transcript
+        .apply(&bingo_sdk::Event::ItemCompleted { item: asked });
     let (mut ui, now) = scene();
     shown(
         &mut ui,

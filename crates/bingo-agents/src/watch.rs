@@ -105,7 +105,8 @@ pub async fn next_reply(
 /// The text a turn produced: its assistant items, in the order it wrote them.
 fn reply_to(state: &SessionState, turn: &TurnId) -> String {
     let texts: Vec<&str> = state
-        .items
+        .transcript
+        .items()
         .iter()
         .filter(|item| item.turn.as_ref() == Some(turn))
         .filter_map(|item| match &item.body {
@@ -128,7 +129,8 @@ fn reply_to(state: &SessionState, turn: &TurnId) -> String {
 fn last_reply(state: &SessionState) -> Option<Reply> {
     let status = state.last_status().cloned()?;
     let text = state
-        .items
+        .transcript
+        .items()
         .iter()
         .rev()
         .find_map(|item| item.turn.as_ref())

@@ -158,7 +158,13 @@ async fn a_pasted_credential_signs_in_and_the_receipt_is_recorded() {
         panic!("not applied: {ack:?}");
     };
     let item = ItemId::from_raw(result["item"].as_str().unwrap());
-    let recorded = client.state.items.iter().find(|i| i.id == item).unwrap();
+    let recorded = client
+        .state
+        .transcript
+        .items()
+        .iter()
+        .find(|i| i.id == item)
+        .unwrap();
     assert_eq!(
         recorded.body,
         ItemBody::Action {
@@ -271,7 +277,13 @@ async fn login_names_a_registered_provider_and_logout_answers_a_receipt() {
         panic!("not applied: {ack:?}");
     };
     let item = ItemId::from_raw(result["item"].as_str().unwrap());
-    let recorded = client.state.items.iter().find(|i| i.id == item).unwrap();
+    let recorded = client
+        .state
+        .transcript
+        .items()
+        .iter()
+        .find(|i| i.id == item)
+        .unwrap();
     assert!(matches!(
         &recorded.body,
         ItemBody::Action { name, result: Some(receipt), .. }

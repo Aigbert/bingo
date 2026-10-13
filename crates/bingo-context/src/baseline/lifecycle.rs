@@ -80,7 +80,7 @@ async fn a_replayed_baseline_needs_no_private_contributor_state() {
     assert_eq!(fixture.capture().await, first);
     assert_eq!(fixture.journal.state().seq.0, 2);
     assert!(
-        fixture.journal.state().items.is_empty(),
+        fixture.journal.state().transcript.items().is_empty(),
         "no user snapshots"
     );
 }

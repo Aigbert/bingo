@@ -242,7 +242,7 @@ async fn compact_is_a_turn_of_its_own_carrying_the_instructions() {
             .iter()
             .any(|f| matches!(f.event, Event::Compacted { .. }))
     );
-    assert_eq!(client.state.history_generation, 1);
+    assert_eq!(client.state.transcript.generation(), 1);
     let calls = compactor.calls.lock().unwrap();
     assert!(matches!(
         &calls[0].0,

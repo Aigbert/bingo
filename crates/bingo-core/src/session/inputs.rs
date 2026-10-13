@@ -430,7 +430,7 @@ impl Actor {
     }
 
     fn item(&self, id: &ItemId) -> Option<Item> {
-        self.state.items.iter().find(|item| &item.id == id).cloned()
+        self.state.transcript.get(id).cloned()
     }
 
     // ----- queue -----

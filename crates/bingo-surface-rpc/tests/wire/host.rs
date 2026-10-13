@@ -401,7 +401,7 @@ impl HostApi for TestHost {
                 generation: if self.session.history_item.is_some() {
                     3
                 } else {
-                    self.snapshot.history_generation
+                    self.snapshot.transcript.generation()
                 },
             }),
             events,
@@ -497,4 +497,16 @@ pub fn who() -> ClientIdentity {
 
 pub fn selector() -> SessionSelector {
     SessionSelector::ById { id: session_id() }
+}
+
+#[test]
+fn session_open_fixture_keeps_its_wire_bytes() {
+    let wire = serde_json::to_string(&fresh_state()).unwrap();
+    let expected = format!(
+        r#"{{"seq":0,"summary":{},"config":{{"kernel":null,"plugins":{{}}}},"historyGeneration":0,"items":[],"queue":[],"interactions":[],"unread":false,"closed":false}}"#,
+        serde_json::to_string(&summary()).unwrap(),
+    );
+    assert_eq!(wire, expected);
+    let restored: SessionState = serde_json::from_str(&wire).unwrap();
+    assert_eq!(serde_json::to_string(&restored).unwrap(), expected);
 }

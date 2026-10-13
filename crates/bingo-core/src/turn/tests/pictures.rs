@@ -138,8 +138,7 @@ async fn a_picture_at_the_top_of_what_the_person_said_ages_the_same_way() {
         &cfg,
         TurnRun {
             turn: TurnId::from_raw("trn_1"),
-            history: frames,
-            generation: 0,
+            transcript: transcript(&frames),
             cancel: CancellationToken::new(),
             kind: TurnKind::Respond,
         },

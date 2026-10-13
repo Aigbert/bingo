@@ -259,8 +259,8 @@ impl Blocks {
             None => boxed,
         };
         let mut kept = 0;
-        for (at, item) in state.items.iter().enumerate() {
-            let place = Place::of(&state.items, at);
+        for (at, item) in state.transcript.items().iter().enumerate() {
+            let place = Place::of(state.transcript.items(), at);
             kept += self.block(kept, item, &place, agents, rows);
         }
         // Whatever is left behind the last item was rewound away.
@@ -544,7 +544,7 @@ mod tests {
 
     fn many(n: usize) -> SessionState {
         let mut state = state();
-        state.items = (0..n)
+        state.transcript = (0..n)
             .map(|i| {
                 assistant(
                     &format!("itm_{i}"),
@@ -702,9 +702,9 @@ mod tests {
     #[test]
     fn the_item_that_is_still_arriving_is_the_only_one_drawn_again() {
         let mut state = many(3);
-        state
-            .items
-            .push(assistant("itm_live", "half a s", ItemStatus::Running));
+        state.transcript.apply(&bingo_sdk::Event::ItemCompleted {
+            item: assistant("itm_live", "half a s", ItemStatus::Running),
+        });
         let mut blocks = cache();
         sync(&mut blocks, &state, 80);
         assert_eq!(blocks.renders(), 4);
@@ -794,13 +794,17 @@ mod tests {
     #[test]
     fn a_thought_a_newer_one_joined_gives_its_block_back() {
         let mut state = state();
-        state.items = vec![thought("itm_1", "The manifest first.", 2)];
+        state.transcript = vec![thought("itm_1", "The manifest first.", 2)]
+            .into_iter()
+            .collect();
         let mut blocks = cache();
         let alone = sync(&mut blocks, &state, 60);
         let top = head(&state, 60);
         assert_eq!(blocks.at(top), Some(ItemId::from_raw("itm_1")));
 
-        state.items.push(thought("itm_2", "Then the crate map.", 3));
+        state.transcript.apply(&bingo_sdk::Event::ItemCompleted {
+            item: thought("itm_2", "Then the crate map.", 3),
+        });
         let joined = sync(&mut blocks, &state, 60);
         let lines: Vec<String> = blocks
             .window(0, joined)
@@ -829,7 +833,10 @@ mod tests {
         let mut state = many(4);
         let mut blocks = cache();
         sync(&mut blocks, &state, 60);
-        state.items.truncate(2);
+        state.transcript = state.transcript.items()[..2]
+            .iter()
+            .map(|item| item.as_ref().clone())
+            .collect();
         sync(&mut blocks, &state, 60);
         assert_eq!(
             blocks.blocks.len(),
@@ -873,14 +880,18 @@ mod tests {
     #[test]
     fn a_flash_owes_frames_until_its_resting_form_is_drawn() {
         let mut state = state();
-        state.items = vec![assistant("itm_1", "half a s", ItemStatus::Running)];
+        state.transcript = vec![assistant("itm_1", "half a s", ItemStatus::Running)]
+            .into_iter()
+            .collect();
         let mut blocks = cache();
         let (_, now) = scene();
         sync_at(&mut blocks, &state, 60, now);
         assert!(blocks.moving(), "an answer still arriving is moving");
 
         // It finishes, so its own words move for the frames after (§6).
-        state.items = vec![assistant("itm_1", "half a second", ItemStatus::Completed)];
+        state.transcript = vec![assistant("itm_1", "half a second", ItemStatus::Completed)]
+            .into_iter()
+            .collect();
         sync_at(&mut blocks, &state, 60, now);
         assert!(blocks.moving(), "the completion is still landing");
         sync_at(&mut blocks, &state, 60, later(now, 16));

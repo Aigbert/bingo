@@ -31,10 +31,10 @@ pub fn is_thought(item: &Item) -> bool {
 /// something a person read between them, so it breaks the run — a call that
 /// draws no row of its own (M74's task calls) breaks it too, because a run is
 /// a fact about the transcript's order and not about what each item spends.
-pub fn run_before(items: &[Item], at: usize) -> &[Item] {
+pub fn run_before<T: std::borrow::Borrow<Item>>(items: &[T], at: usize) -> &[T] {
     let end = at.min(items.len());
     let mut from = end;
-    while from > 0 && is_thought(&items[from - 1]) {
+    while from > 0 && is_thought(items[from - 1].borrow()) {
         from -= 1;
     }
     &items[from..end]
@@ -42,8 +42,10 @@ pub fn run_before(items: &[Item], at: usize) -> &[Item] {
 
 /// Whether the item after `at` is a thought — which is what says the item at
 /// `at` is not the last of its run.
-pub fn next_is_thought(items: &[Item], at: usize) -> bool {
-    items.get(at + 1).is_some_and(is_thought)
+pub fn next_is_thought<T: std::borrow::Borrow<Item>>(items: &[T], at: usize) -> bool {
+    items
+        .get(at + 1)
+        .is_some_and(|item| is_thought(item.borrow()))
 }
 
 /// Whether this item's own block is the one on the screen. Every item's is,
@@ -53,7 +55,7 @@ pub fn ends_its_run(state: &SessionState, item: &Item) -> bool {
     if !is_thought(item) {
         return true;
     }
-    !at(state, &item.id).is_some_and(|i| next_is_thought(&state.items, i))
+    !at(state, &item.id).is_some_and(|i| next_is_thought(state.transcript.items(), i))
 }
 
 /// What a run says, as one thought: the texts of its thoughts in order, a
@@ -81,7 +83,7 @@ pub fn took(run: &[&Item]) -> SignedDuration {
 /// Empty for anything that is not a thought, and for an id this state does not
 /// hold.
 pub fn run_of<'a>(state: &'a SessionState, id: &ItemId) -> Vec<&'a Item> {
-    let items = &state.items;
+    let items = state.transcript.items();
     let Some(here) = at(state, id).filter(|i| is_thought(&items[*i])) else {
         return Vec::new();
     };
@@ -90,12 +92,16 @@ pub fn run_of<'a>(state: &'a SessionState, id: &ItemId) -> Vec<&'a Item> {
     while to < items.len() && is_thought(&items[to]) {
         to += 1;
     }
-    items[from..to].iter().collect()
+    items[from..to].iter().map(AsRef::as_ref).collect()
 }
 
 /// Where an item sits in the transcript.
 fn at(state: &SessionState, id: &ItemId) -> Option<usize> {
-    state.items.iter().position(|item| &item.id == id)
+    state
+        .transcript
+        .items()
+        .iter()
+        .position(|item| &item.id == id)
 }
 
 #[cfg(test)]
@@ -250,7 +256,8 @@ mod tests {
         ]);
         let ended = |id: &str| {
             state
-                .items
+                .transcript
+                .items()
                 .iter()
                 .find(|item| item.id == ItemId::from_raw(id))
                 .is_some_and(|item| ends_its_run(&state, item))

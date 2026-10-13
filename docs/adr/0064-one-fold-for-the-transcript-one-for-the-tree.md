@@ -2,6 +2,8 @@
 
 Status: proposed · 2026-10-13 · Plans: M112 (transcript), M120 (tree) · Amends: ADR-0002 §3
 
+2026-10-13: §1 (the transcript) landed in M112; the tree fold remains proposed for M120.
+
 ## Context
 
 ADR-0002 §3 named two reducers over one journal: `SessionState::apply`
@@ -35,15 +37,19 @@ No kernel door is opened: this moves an existing fact into one type.
 
 1. **`bingo_sdk::transcript::Transcript` is the one fold of items.** It
    owns the item list, an `ItemId → index` map, the history generation,
-   the latest compaction cut, and the rules: upsert by id;
-   `TurnRetrying.dropped` and `Rewound.dropped` remove items; `Compacted`
-   records its cut (boundary, kept, summary; an unknown boundary is not
-   a cut it can make). Items are `Arc<Item>`, so a snapshot is a vector
-   of pointers.
+   the model order (the ids the model sees, in order, kept beside the
+   client list over the same `Arc<Item>`s), and the rules: upsert by id;
+   a new item joins both orders; `TurnRetrying.dropped` and
+   `Rewound.dropped` remove ids from both orders. Each `Compacted` cut
+   is applied to the model order once, as it is folded, by the splice
+   `ContextView` uses today; an unknown boundary makes no cut.
+   The model order is not derivable from the client list plus any one
+   cut (two cuts yield `[s2, b]`, not `[s2, b, s1]`), so it is its own
+   fact, not a copy. Items are `Arc<Item>`, so a snapshot shares bodies.
 2. **Two views of one fold.** `SessionState` embeds the `Transcript` and
    stops keeping `items` and `history_generation` of its own; a client
    sees every item, as today. `ContextView` becomes the *model view*: it
-   applies the compaction cut, skips external tool calls
+   renders the model order, skips external tool calls
    (`Item::external()`), and renders `Message`s. It no longer reads
    frames.
 3. **The turn folds through it.** The turn is handed a `Transcript`
@@ -53,7 +59,10 @@ No kernel door is opened: this moves an existing fact into one type.
 4. **A property test is the contract:** for any frame sequence, folding
    incrementally equals folding from scratch, `SessionState`'s items
    equal the transcript's, and the model view never contains an id that
-   a `TurnRetrying` or `Rewound` dropped.
+   a `TurnRetrying` or `Rewound` dropped. For any frame sequence, the
+   transcript's model view equals today's frame-based
+   `ContextView::items`; keep that function under `cfg(test)` as the
+   oracle through M112, with a named two-compaction regression.
 5. **`bingo_sdk::tree::TreeState` is the one fold of the tree.** It folds
    `(SessionId, Frame)` and `GatewayEvent`s for one root and its
    descendants. One creation rule: a child appears on its

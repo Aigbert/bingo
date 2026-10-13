@@ -733,7 +733,7 @@ pub fn notice(level: Level, text: &str) -> Event {
 /// A transcript with more lines than any test screen has rows.
 pub fn long_transcript(items: usize) -> SessionState {
     let mut state = state();
-    state.items = (0..items)
+    state.transcript = (0..items)
         .map(|i| user(&format!("itm_{i}"), &format!("line {i}")))
         .collect();
     state

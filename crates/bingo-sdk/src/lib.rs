@@ -2,8 +2,8 @@
 //!
 //! The kernel (`bingo-core`) is one consumer of these types among many; every
 //! plugin crate and every surface depends on this crate alone (ADR-0001).
-//! One frame type crosses kernel → client; two pure reducers derive the
-//! client view and the provider context from the same journal (ADR-0002).
+//! One frame type crosses kernel → client; one transcript fold supplies the
+//! client view and the provider context (ADR-0002, ADR-0064).
 
 pub mod bytes;
 pub mod command;
@@ -28,6 +28,7 @@ pub mod surface;
 pub mod testing;
 pub mod tokens;
 pub mod tool;
+pub mod transcript;
 pub mod view;
 
 pub use command::{ArgSpec, Command, CommandContext, CommandOutcome, CommandSpec};
@@ -59,6 +60,7 @@ pub use tool::{
     Env, ResultLimit, Subject, Tool, ToolCall, ToolContext, ToolError, ToolHost, ToolOutcome,
     ToolTraits, input_schema,
 };
+pub use transcript::Transcript;
 pub use view::{ActionItem, Tone, TreeNode, View};
 
 /// Re-exported so plugins share one cancellation type without naming tokio-util.

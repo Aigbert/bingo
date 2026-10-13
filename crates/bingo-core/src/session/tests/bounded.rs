@@ -21,11 +21,11 @@ async fn bounded_attachment_keeps_the_atomic_cut_and_an_explicit_older_cursor() 
         .unwrap();
     let (snapshot, history, mut events) = mailbox.attach_bounded(Some(512 * 1024)).await.unwrap();
     let history = history.unwrap();
-    assert_eq!(snapshot.items.len(), 1);
-    assert_eq!(snapshot.items[0].id, recent);
+    assert_eq!(snapshot.transcript.items().len(), 1);
+    assert_eq!(snapshot.transcript.items()[0].id, recent);
     assert_eq!(history.before, Some(recent.clone()));
     assert!(history.has_more);
-    assert_eq!(history.generation, snapshot.history_generation);
+    assert_eq!(history.generation, snapshot.transcript.generation());
 
     let new = mailbox
         .record(ItemBody::Notice {

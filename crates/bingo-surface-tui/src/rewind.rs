@@ -1,7 +1,7 @@
 //! `esc esc` on an empty composer: the turns of this transcript, newest first,
 //! and `⏎` to go back to one (design §3 — the rewind picker is a card).
 //!
-//! The turns are derived from `state.items` every frame: an item carries the
+//! The turns are derived from `state.transcript.items()` every frame: an item carries the
 //! turn it belongs to, so the boundaries are already in the transcript and
 //! nothing here keeps a second list of them.
 //!
@@ -53,7 +53,7 @@ impl Turn {
 /// The turns of this transcript, newest first.
 pub fn turns(state: &SessionState) -> Vec<Turn> {
     let mut out: Vec<Turn> = Vec::new();
-    for item in &state.items {
+    for item in state.transcript.items() {
         let Some(id) = item.turn.clone() else {
             continue;
         };
@@ -172,7 +172,7 @@ mod tests {
 
     fn transcript() -> SessionState {
         let mut state = state();
-        state.items = vec![
+        state.transcript = vec![
             in_turn(
                 "itm_1",
                 "trn_1",
@@ -184,7 +184,9 @@ mod tests {
                 assistant("itm_2", "One package.", ItemStatus::Completed),
             ),
             in_turn("itm_3", "trn_2", user("itm_3", "write me a note")),
-        ];
+        ]
+        .into_iter()
+        .collect();
         state
     }
 
@@ -218,7 +220,7 @@ mod tests {
     #[test]
     fn a_turn_a_command_opened_is_named_by_the_line_that_was_typed() {
         let mut state = state();
-        state.items = vec![in_turn(
+        state.transcript = vec![in_turn(
             "itm_1",
             "trn_1",
             delivered(
@@ -227,7 +229,9 @@ mod tests {
                 None,
                 "/guide the wire format\n\nRead this before answering about bingo itself.",
             ),
-        )];
+        )]
+        .into_iter()
+        .collect();
         assert_eq!(turns(&state)[0].label(), "/guide the wire format");
     }
 
@@ -237,14 +241,16 @@ mod tests {
     #[test]
     fn a_shell_line_is_not_the_prompt_a_turn_answered() {
         let mut state = state();
-        state.items = vec![
+        state.transcript = vec![
             in_turn("itm_1", "trn_1", user("itm_1", "why is the build red?")),
             in_turn(
                 "itm_2",
                 "trn_1",
                 shell("itm_2", "cargo build", "error[E0004]\n", Some(101)),
             ),
-        ];
+        ]
+        .into_iter()
+        .collect();
         let turns = turns(&state);
         assert_eq!(turns.len(), 1);
         assert_eq!(turns[0].label(), "why is the build red?");
@@ -254,18 +260,22 @@ mod tests {
     #[test]
     fn a_shell_line_between_turns_opens_no_row_of_its_own() {
         let mut state = state();
-        state.items = vec![shell("itm_1", "ls", "a\nb\n", Some(0))];
+        state.transcript = vec![shell("itm_1", "ls", "a\nb\n", Some(0))]
+            .into_iter()
+            .collect();
         assert!(turns(&state).is_empty());
     }
 
     #[test]
     fn a_turn_nobody_opened_by_typing_is_named_by_its_own_id() {
         let mut state = state();
-        state.items = vec![in_turn(
+        state.transcript = vec![in_turn(
             "itm_1",
             "trn_9",
             assistant("itm_1", "on my own", ItemStatus::Completed),
-        )];
+        )]
+        .into_iter()
+        .collect();
         assert_eq!(turns(&state)[0].label(), "trn_9");
     }
 

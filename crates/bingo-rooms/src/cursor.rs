@@ -81,7 +81,12 @@ pub struct Unread {
 impl Unread {
     /// What a seat has not read, from the room's own snapshot and nothing else.
     pub fn of(room: &SessionState, member: &str) -> Unread {
-        let posts: Vec<Post> = room.items.iter().filter_map(Post::of).collect();
+        let posts: Vec<Post> = room
+            .transcript
+            .items()
+            .iter()
+            .filter_map(|item| Post::of(item))
+            .collect();
         let unread = unread(&posts, of_state(room, member).as_ref());
         Unread {
             head: unread.last().map(|post| post.id.clone()),
@@ -200,10 +205,12 @@ mod tests {
     #[test]
     fn a_seat_reads_the_others_and_its_own_post_still_moves_the_cursor() {
         let mut room = SessionState::new(summary("ses_room", Some("#design"), None));
-        room.items = vec![
+        room.transcript = vec![
             posted_item("first", Some("reviewer")),
             posted_item("mine", Some("scout")),
-        ];
+        ]
+        .into_iter()
+        .collect();
 
         let unread = Unread::of(&room, "scout");
         assert_eq!(
@@ -217,7 +224,7 @@ mod tests {
         );
         assert_eq!(
             unread.head.as_ref(),
-            Some(&room.items[1].id),
+            Some(&room.transcript.items()[1].id),
             "and the cursor still moves past it"
         );
     }

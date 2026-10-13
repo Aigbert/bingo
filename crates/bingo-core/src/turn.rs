@@ -28,9 +28,7 @@ use stream::Streamed;
 pub use stream::{MAX_RETRY_DELAY, MAX_SERVER_RETRY_DELAY, backoff};
 
 use crate::accumulator::Finished;
-use crate::context::{
-    ContextView, HOOK_PREFIX, KERNEL_SURFACE, budget, elide, estimate_tokens, splice_compaction,
-};
+use crate::context::{ContextView, HOOK_PREFIX, KERNEL_SURFACE, budget, elide, estimate_tokens};
 use crate::executor::{self, Gate, PendingCall};
 use crate::gate::{GateInput, gate_call, hook_applies};
 use crate::models::vision;
@@ -62,11 +60,26 @@ pub trait TurnHost: Send + Sync {
 #[derive(Debug)]
 pub struct TurnRun {
     pub turn: TurnId,
-    /// The durable journal so far; the turn folds its context from it.
-    pub history: Vec<Frame>,
-    pub generation: u64,
+    /// The actor's folded transcript; item bodies are shared with its snapshot.
+    pub transcript: Transcript,
     pub cancel: CancellationToken,
     pub kind: TurnKind,
+}
+
+impl TurnRun {
+    pub fn new(
+        turn: TurnId,
+        transcript: &Transcript,
+        cancel: CancellationToken,
+        kind: TurnKind,
+    ) -> Self {
+        Self {
+            turn,
+            transcript: transcript.clone(),
+            cancel,
+            kind,
+        }
+    }
 }
 
 /// What a turn is for: answering, or only making room (ADR-0008 §4).
@@ -94,7 +107,7 @@ struct Turn<'a> {
     /// The tools, contributors and strategy this turn runs with, resolved once
     /// when it started (ADR-0009).
     late: Late,
-    items: Vec<Item>,
+    transcript: Transcript,
     round: u32,
     retries: u32,
     recoveries: u32,
@@ -102,7 +115,6 @@ struct Turn<'a> {
     overflow_compacted: bool,
     /// Accepted cuts can reissue context without making the whole request fit.
     threshold_compactions: u32,
-    generation: u64,
     usage: Usage,
     hook_cx: HookContext,
     ruler: Ruler,
@@ -157,7 +169,7 @@ fn mint(turn: &TurnId, round: u32, body: ItemBody, status: ItemStatus) -> Item {
 /// A turn stopped before it had gathered enough to be one. The marker still
 /// reaches the transcript and the clients: what a person sees when they press
 /// esc does not depend on how far the turn had got.
-fn stopped_early(host: &dyn TurnHost, turn: &TurnId, mut items: Vec<Item>) -> TurnOutcome {
+fn stopped_early(host: &dyn TurnHost, turn: &TurnId, mut transcript: Transcript) -> TurnOutcome {
     let item = mint(
         turn,
         0,
@@ -166,14 +178,13 @@ fn stopped_early(host: &dyn TurnHost, turn: &TurnId, mut items: Vec<Item>) -> Tu
         },
         ItemStatus::Completed,
     );
-    host.emit(Event::ItemCompleted { item: item.clone() });
-    items.push(item);
+    emit_and_fold(&mut transcript, host, Event::ItemCompleted { item });
     TurnOutcome {
         status: TurnStatus::Interrupted {
             reason: InterruptReason::UserCancel,
         },
         usage: Usage::default(),
-        items,
+        items: transcript.model_items().cloned().collect(),
     }
 }
 
@@ -190,9 +201,9 @@ fn unanswered(items: Vec<Item>) -> TurnOutcome {
 }
 
 pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> TurnOutcome {
-    let items = ContextView::items(&run.history);
+    let mut transcript = run.transcript;
     let Some(model) = cfg.model.clone() else {
-        return unanswered(items);
+        return unanswered(transcript.model_items().cloned().collect());
     };
     let hook_cx = HookContext {
         host: cfg.host.clone(),
@@ -203,15 +214,19 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
         model: Some(model.id.clone()),
     };
     let Some(late) = racing(&run.cancel, Late::gather(cfg)).await else {
-        return stopped_early(host, &run.turn, items);
+        return stopped_early(host, &run.turn, transcript);
     };
     host.offered(late.tools.clone());
     for name in &late.shadowed {
-        host.emit(Event::Notice {
-            level: Level::Warn,
-            code: "TOOL_SHADOWED".into(),
-            text: format!("a second tool called {name} was dropped"),
-        });
+        emit_and_fold(
+            &mut transcript,
+            host,
+            Event::Notice {
+                level: Level::Warn,
+                code: "TOOL_SHADOWED".into(),
+                text: format!("a second tool called {name} was dropped"),
+            },
+        );
     }
     let mut turn = Turn {
         cfg,
@@ -225,14 +240,13 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
         id: run.turn,
         cancel: run.cancel,
         late,
-        items,
+        transcript,
         round: 0,
         retries: 0,
         recoveries: 0,
         empty_retry_used: false,
         overflow_compacted: false,
         threshold_compactions: 0,
-        generation: run.generation,
         usage: Usage::default(),
         hook_cx,
     };
@@ -247,8 +261,13 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
     TurnOutcome {
         status,
         usage: turn.usage,
-        items: turn.items,
+        items: turn.transcript.model_items().cloned().collect(),
     }
+}
+
+fn emit_and_fold(transcript: &mut Transcript, host: &dyn TurnHost, event: Event) {
+    transcript.apply(&event);
+    host.emit(event);
 }
 
 impl Turn<'_> {
@@ -306,8 +325,13 @@ impl Turn<'_> {
     async fn start_hooks(&self) -> Option<()> {
         let hooks = self.racing(self.hooks(HookPoint::Turn)).await?;
         for hook in hooks {
-            self.racing(hook.on_turn(Phase::Start, &self.id, &self.items, &self.hook_cx))
-                .await?;
+            self.racing(hook.on_turn(
+                Phase::Start,
+                &self.id,
+                &self.transcript.model_items().cloned().collect::<Vec<_>>(),
+                &self.hook_cx,
+            ))
+            .await?;
         }
         Some(())
     }
@@ -319,16 +343,12 @@ impl Turn<'_> {
     fn record(&mut self, body: ItemBody) -> ItemId {
         let item = self.fresh(body, ItemStatus::Completed);
         let id = item.id.clone();
-        self.items.push(item.clone());
-        self.host.emit(Event::ItemCompleted { item });
+        emit_and_fold(
+            &mut self.transcript,
+            self.host,
+            Event::ItemCompleted { item },
+        );
         id
-    }
-
-    fn upsert(&mut self, item: &Item) {
-        match self.items.iter_mut().find(|i| i.id == item.id) {
-            Some(slot) => *slot = item.clone(),
-            None => self.items.push(item.clone()),
-        }
     }
 
     fn user_piece(&mut self, parts: Vec<ContentPart>, surface: String) {
@@ -356,7 +376,7 @@ impl Turn<'_> {
             host: &self.cfg.host,
             turn: &self.id,
             round: self.round,
-            items: &self.items,
+            items: &self.transcript.model_items().cloned().collect::<Vec<_>>(),
             usage,
             capabilities: &self.model.capabilities,
             cwd: &self.cfg.cwd,
@@ -381,12 +401,16 @@ impl Turn<'_> {
     }
 
     /// A warning on the ephemeral stream: the person sees it, the journal does not.
-    fn warn(&self, code: &str, text: impl Into<String>) {
-        self.host.emit(Event::Notice {
-            level: Level::Warn,
-            code: code.into(),
-            text: text.into(),
-        });
+    fn warn(&mut self, code: &str, text: impl Into<String>) {
+        emit_and_fold(
+            &mut self.transcript,
+            self.host,
+            Event::Notice {
+                level: Level::Warn,
+                code: code.into(),
+                text: text.into(),
+            },
+        );
     }
 
     fn tool_specs(&self) -> Vec<ToolSpec> {
@@ -431,11 +455,15 @@ impl Turn<'_> {
     /// The person is told once per turn when the window is nearly spent.
     fn warn_once(&mut self, usage: &ContextUsage) {
         if let Some(text) = self.ruler.warning(usage) {
-            self.host.emit(Event::Notice {
-                level: Level::Warn,
-                code: "CONTEXT_WARNING".into(),
-                text,
-            });
+            emit_and_fold(
+                &mut self.transcript,
+                self.host,
+                Event::Notice {
+                    level: Level::Warn,
+                    code: "CONTEXT_WARNING".into(),
+                    text,
+                },
+            );
         }
     }
 
@@ -474,7 +502,8 @@ impl Turn<'_> {
     /// Let the contributors speak, then measure. A first round that is already
     /// over the compaction threshold compacts before it sends anything.
     async fn assemble_request(&mut self) -> Option<(ModelRequest, ContextUsage)> {
-        let preliminary = self.measure(&self.cfg.system, &ContextView::fold_items(&self.items));
+        let preliminary =
+            self.measure(&self.cfg.system, &ContextView::model_view(&self.transcript));
         let extra_system = self
             .contribute(
                 |p| matches!(p, Placement::System { .. } | Placement::RoundStart),
@@ -483,7 +512,7 @@ impl Turn<'_> {
             .await?;
         let mut system = self.cfg.system.clone();
         system.extend(extra_system);
-        let full = self.without_images(ContextView::fold_items(&self.items));
+        let full = self.without_images(ContextView::model_view(&self.transcript));
         let recent = self.without_old_images(full);
         let messages = self.elide_after_overflow(recent);
         let usage = self.measure(&system, &messages);
@@ -568,11 +597,15 @@ impl Turn<'_> {
     fn account(&mut self, finished: &Finished, usage: ContextUsage) {
         self.usage.add(finished.usage);
         let context = self.measured(finished, usage);
-        self.host.emit(Event::TurnUsage {
-            turn: self.id.clone(),
-            usage: finished.usage,
-            context,
-        });
+        emit_and_fold(
+            &mut self.transcript,
+            self.host,
+            Event::TurnUsage {
+                turn: self.id.clone(),
+                usage: finished.usage,
+                context,
+            },
+        );
     }
 
     /// What the round leaves in the context. Where the endpoint holds it, its
@@ -679,7 +712,7 @@ impl Turn<'_> {
                 });
             }
         }
-        let usage = self.measure(&self.cfg.system, &ContextView::fold_items(&self.items));
+        let usage = self.measure(&self.cfg.system, &ContextView::model_view(&self.transcript));
         self.contribute(|p| matches!(p, Placement::Barrier), &usage)
             .await?;
         Some(())
@@ -724,7 +757,7 @@ impl Turn<'_> {
             return false;
         }
         let cx = CompactContext {
-            items: &self.items,
+            items: &self.transcript.model_items().cloned().collect::<Vec<_>>(),
             usage,
             capabilities: &self.model.capabilities,
             provider: self.model.provider.clone(),
@@ -764,8 +797,8 @@ impl Turn<'_> {
     /// Record the summary, announce the cut, and apply it to the transcript.
     fn absorb_compaction(&mut self, c: Compaction, took: std::time::Duration) {
         let replaced = self
-            .items
-            .iter()
+            .transcript
+            .model_items()
             .take_while(|i| i.id != c.boundary)
             .filter(|i| !c.kept.contains(&i.id))
             .count() as u32;
@@ -776,19 +809,17 @@ impl Turn<'_> {
             after: c.after,
             duration_ms: took.as_millis() as u64,
         });
-        self.generation += 1;
-        self.host.emit(Event::Compacted {
-            generation: self.generation,
-            boundary: c.boundary.clone(),
-            summary: summary.clone(),
-            kept: c.kept.clone(),
-        });
-        let cut = self
-            .items
-            .iter()
-            .position(|i| i.id == c.boundary)
-            .unwrap_or(0);
-        splice_compaction(&mut self.items, cut, &c.kept, &summary);
+        let generation = self.transcript.generation() + 1;
+        emit_and_fold(
+            &mut self.transcript,
+            self.host,
+            Event::Compacted {
+                generation,
+                boundary: c.boundary.clone(),
+                summary: summary.clone(),
+                kept: c.kept.clone(),
+            },
+        );
     }
 
     async fn gate(&mut self, finished: &Finished) -> Vec<PendingCall> {
@@ -825,13 +856,13 @@ impl Turn<'_> {
                 self.record(receipt);
             }
             if gated.gate == Gate::Allowed
-                && let Some(item) = self.items.iter_mut().find(|i| &i.id == item_id)
+                && let Some(mut item) = self.transcript.get(item_id).cloned()
             {
                 item.status = ItemStatus::Running;
                 if let ItemBody::ToolCall { input, .. } = &mut item.body {
                     *input = gated.call.input.clone();
                 }
-                self.host.emit(Event::ItemUpdated { item: item.clone() });
+                emit_and_fold(&mut self.transcript, self.host, Event::ItemUpdated { item });
             }
             calls.push(PendingCall {
                 item: item_id.clone(),
@@ -856,9 +887,8 @@ impl Turn<'_> {
         let session = cfg.session.id.clone();
         let turn = self.id.clone();
         let cancel = self.cancel.clone();
-        let host = self.host;
-        let mut completed: Vec<Item> = Vec::new();
-        let outcomes = executor::execute(
+
+        executor::execute(
             calls,
             &cancel,
             |pc| ToolContext {
@@ -873,7 +903,7 @@ impl Turn<'_> {
                 call: cfg.tool_host.clone(),
             },
             |o| {
-                if let Some(mut item) = self.items.iter().find(|i| i.id == o.item).cloned() {
+                if let Some(mut item) = self.transcript.get(&o.item).cloned() {
                     item.status = o.status;
                     item.completed_at = Some(Timestamp::now());
                     if let ItemBody::ToolCall {
@@ -887,16 +917,15 @@ impl Turn<'_> {
                         *duration_ms = Some(o.duration_ms);
                         *progress = None;
                     }
-                    host.emit(Event::ItemCompleted { item: item.clone() });
-                    completed.push(item);
+                    emit_and_fold(
+                        &mut self.transcript,
+                        self.host,
+                        Event::ItemCompleted { item },
+                    );
                 }
             },
         )
-        .await;
-        for item in &completed {
-            self.upsert(item);
-        }
-        outcomes
+        .await
     }
 
     /// Let the `AfterTool` hooks see each result; one of them may stop the turn.
@@ -906,7 +935,7 @@ impl Turn<'_> {
             return stop_after;
         };
         for o in outcomes {
-            let Some(item) = self.items.iter().find(|i| i.id == o.item) else {
+            let Some(item) = self.transcript.get(&o.item) else {
                 continue;
             };
             let ItemBody::ToolCall {

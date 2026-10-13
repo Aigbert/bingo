@@ -166,8 +166,7 @@ fn run(
         cfg,
         TurnRun {
             turn: TurnId::from_raw("trn_1"),
-            history: history("hello"),
-            generation: 0,
+            transcript: transcript(&history("hello")),
             cancel,
             kind: TurnKind::Respond,
         },
@@ -621,8 +620,7 @@ async fn a_model_without_vision_gets_a_note_where_the_image_was() {
         &cfg,
         TurnRun {
             turn: TurnId::from_raw("trn_1"),
-            history: frames,
-            generation: 0,
+            transcript: transcript(&frames),
             cancel: CancellationToken::new(),
             kind: TurnKind::Respond,
         },
@@ -784,8 +782,7 @@ async fn a_source_strategy_compacts_when_nothing_in_process_holds_the_slot() {
         &cfg,
         TurnRun {
             turn: TurnId::from_raw("trn_1"),
-            history: history("hello"),
-            generation: 0,
+            transcript: transcript(&history("hello")),
             cancel: CancellationToken::new(),
             kind: TurnKind::Compact { instructions: None },
         },
@@ -915,8 +912,7 @@ async fn compaction_hooks_bracket_the_cut() {
         &cfg,
         TurnRun {
             turn: TurnId::from_raw("trn_1"),
-            history: history("hello"),
-            generation: 0,
+            transcript: transcript(&history("hello")),
             cancel: CancellationToken::new(),
             kind: TurnKind::Compact { instructions: None },
         },
@@ -925,4 +921,41 @@ async fn compaction_hooks_bracket_the_cut() {
     .await;
     assert_eq!(hook.calls(), vec!["compact:Start", "compact:End"]);
     assert!(host.kinds().contains(&"compacted".to_string()));
+}
+
+fn transcript(frames: &[Frame]) -> Transcript {
+    let mut transcript = Transcript::new();
+    for frame in frames {
+        transcript.apply(&frame.event);
+    }
+    transcript
+}
+
+#[test]
+fn turn_start_shares_ten_thousand_bodies_without_a_journal() {
+    let mut folded = Transcript::new();
+    let template = history("body")
+        .into_iter()
+        .find_map(|frame| match frame.event {
+            Event::ItemCompleted { item } => Some(item),
+            _ => None,
+        })
+        .unwrap();
+    for n in 0..10_000 {
+        let mut item = template.clone();
+        item.id = ItemId::from_raw(format!("i{n}"));
+        folded.apply(&Event::ItemCompleted { item });
+    }
+    // The constructor accepts no frames and has no journal to clone or fold.
+    let run = TurnRun::new(
+        TurnId::from_raw("t"),
+        &folded,
+        CancellationToken::new(),
+        TurnKind::Respond,
+    );
+    assert_eq!(run.transcript.items().len(), 10_000);
+    for (original, shared) in folded.items().iter().zip(run.transcript.items()) {
+        assert!(Arc::ptr_eq(original, shared));
+        assert_eq!(Arc::strong_count(original), 2);
+    }
 }

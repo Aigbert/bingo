@@ -359,7 +359,12 @@ mod tests {
 
     /// The last thing said in a room, which is where a seat level with it is.
     fn head_of(fleet: &Fleet, room: &SessionId) -> Option<ItemId> {
-        fleet.state(room).items.last().map(|item| item.id.clone())
+        fleet
+            .state(room)
+            .transcript
+            .items()
+            .last()
+            .map(|item| item.id.clone())
     }
 
     /// The whole of ADR-0034 §4: everything since the cursor, under one label,

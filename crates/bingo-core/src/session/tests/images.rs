@@ -37,7 +37,7 @@ fn oversized_image() -> Image {
 }
 
 fn first_parts(state: &SessionState) -> &[ContentPart] {
-    let ItemBody::User { parts, .. } = &state.items[0].body else {
+    let ItemBody::User { parts, .. } = &state.transcript.items()[0].body else {
         panic!("a user item first");
     };
     parts
@@ -107,7 +107,7 @@ async fn an_unknown_media_type_is_invalid_input() {
         Event::IntentAck { outcome: IntentOutcome::Rejected { error }, .. }
             if error.code == ErrorCode::InvalidInput && error.message.contains("image/tiff")
     ));
-    assert!(state.items.is_empty());
+    assert!(state.transcript.items().is_empty());
 }
 
 #[tokio::test]
@@ -129,5 +129,5 @@ async fn an_oversize_image_is_invalid_input() {
         Event::IntentAck { outcome: IntentOutcome::Rejected { error }, .. }
             if error.code == ErrorCode::InvalidInput && error.message.contains("too large")
     ));
-    assert!(state.items.is_empty());
+    assert!(state.transcript.items().is_empty());
 }

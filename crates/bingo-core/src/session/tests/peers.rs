@@ -22,7 +22,7 @@ async fn a_wake_delivery_to_an_idle_session_opens_a_peer_turn_that_says_who_spok
             "ack:TurnStarted"
         ]
     );
-    let ItemBody::User { origin, .. } = &state.items[0].body else {
+    let ItemBody::User { origin, .. } = &state.transcript.items()[0].body else {
         panic!("a user item first");
     };
     assert_eq!(origin.principal.as_deref(), Some("reviewer"));
@@ -228,12 +228,15 @@ async fn a_redirect_hook_sends_the_line_elsewhere_and_acks_where_it_went() {
         Event::IntentAck { intent: i, outcome: IntentOutcome::Applied { result } }
             if i == &intent && result == &json!({ "redirected": b.id() })
     ));
-    assert!(state_a.items.is_empty(), "nothing was recorded here");
+    assert!(
+        state_a.transcript.items().is_empty(),
+        "nothing was recorded here"
+    );
 
     let frames = frames_until(&mut events_b, &mut state_b, turn_completed).await;
     assert_eq!(turn_origin(&frames), Some(TurnOrigin::Peer));
     assert_eq!(user_texts(&state_b), ["hello"], "the address is stripped");
-    let ItemBody::User { origin, .. } = &state_b.items[0].body else {
+    let ItemBody::User { origin, .. } = &state_b.transcript.items()[0].body else {
         panic!("a user item first");
     };
     assert_eq!(

@@ -36,13 +36,7 @@ impl Running {
         cancel: CancellationToken,
         kind: TurnKind,
     ) -> Self {
-        let run = TurnRun {
-            turn: turn.clone(),
-            history: actor.journal.clone(),
-            generation: actor.state.history_generation,
-            cancel: cancel.clone(),
-            kind,
-        };
+        let run = TurnRun::new(turn.clone(), &actor.state.transcript, cancel.clone(), kind);
         let cfg = Arc::clone(&actor.config);
         let mailbox = actor.mailbox.clone();
         let host = TurnMail {

@@ -185,6 +185,6 @@ async fn storage_failure_stops_a_batch_before_spawning_a_turn() {
     );
     assert_eq!(store.appends.load(Ordering::SeqCst), before + 1);
     assert_eq!(actor.journal.len(), before);
-    assert!(actor.state.items.is_empty());
+    assert!(actor.state.transcript.items().is_empty());
     assert!(actor.running.is_none());
 }

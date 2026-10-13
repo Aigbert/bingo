@@ -39,7 +39,8 @@ async fn a_stored_session_reopens_on_another_host_with_its_history() {
     );
     assert!(
         b.snapshot
-            .items
+            .transcript
+            .items()
             .iter()
             .any(|i| matches!(&i.body, ItemBody::Assistant { text } if text == "first answer")),
         "the old items are in the snapshot"
@@ -160,7 +161,8 @@ async fn a_resumed_session_is_told_which_child_was_mid_turn() {
 
     let said: Vec<String> = b
         .snapshot
-        .items
+        .transcript
+        .items()
         .iter()
         .filter_map(|item| match &item.body {
             ItemBody::Notice { code, text, .. } if code == "CHILD_TURN_LOST" => Some(text.clone()),
@@ -223,11 +225,11 @@ async fn a_resumed_session_with_no_lost_child_says_nothing() {
         .await
         .unwrap();
     assert!(
-        !b.snapshot.items.iter().any(
+        !b.snapshot.transcript.items().iter().any(
             |item| matches!(&item.body, ItemBody::Notice { code, .. } if code == "CHILD_TURN_LOST")
         ),
         "{:?}",
-        b.snapshot.items
+        b.snapshot.transcript.items()
     );
 }
 

@@ -534,7 +534,7 @@ pub trait HostApi: Send + Sync {
     /// Undo a turn and everything after it (ADR-0045 §1). The kernel appends
     /// `ItemBody::Rewind { to_turn, dropped }` as its own item and publishes
     /// `Event::Rewound`, so the items from that turn's first onward leave the
-    /// model's view (`ContextView::items`) and every client's fold
+    /// model order and every client's fold
     /// (`SessionState::apply`) at once. The journal is never rewritten: what
     /// happened stays, and the item that undid it is the record of the undoing
     /// (ADR-0002 §3).

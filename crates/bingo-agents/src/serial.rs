@@ -100,7 +100,8 @@ fn bounced(item: &Item, room: &str) -> Option<String> {
 /// The posts of a room the caller was there to hear, each with where the room
 /// holds it: everyone else's, from the moment its own session opened.
 fn awaited(room: &SessionState, caller: &SessionState, speaker: &str) -> Vec<(usize, Post)> {
-    room.items
+    room.transcript
+        .items()
         .iter()
         .enumerate()
         .filter(|(_, item)| {
@@ -129,7 +130,12 @@ fn post_of(item: &Item) -> Option<Post> {
 /// holds at or before the one the cursor names (ADR-0034 §5). A seat with no
 /// cursor, or one the room does not hold, has read nothing.
 fn read(room: &SessionState, awaited: &[(usize, Post)], cursor: Option<ItemId>) -> usize {
-    let Some(head) = cursor.and_then(|id| room.items.iter().position(|item| item.id == id)) else {
+    let Some(head) = cursor.and_then(|id| {
+        room.transcript
+            .items()
+            .iter()
+            .position(|item| item.id == id)
+    }) else {
         return 0;
     };
     awaited.iter().filter(|(at, _)| *at <= head).count()
@@ -138,17 +144,22 @@ fn read(room: &SessionState, awaited: &[(usize, Post)], cursor: Option<ItemId>) 
 /// The caller's journal as the model that made this call saw it. What a
 /// barrier absorbed after the model spoke is not what it wrote against, and
 /// the item the call was issued from is where the two part.
-fn before<'a>(caller: &'a SessionState, cut: &ItemId) -> &'a [Item] {
-    match caller.items.iter().position(|item| &item.id == cut) {
-        Some(at) => &caller.items[..at],
-        None => &caller.items,
+fn before<'a>(caller: &'a SessionState, cut: &ItemId) -> &'a [std::sync::Arc<Item>] {
+    match caller
+        .transcript
+        .items()
+        .iter()
+        .position(|item| &item.id == cut)
+    {
+        Some(at) => &caller.transcript.items()[..at],
+        None => caller.transcript.items(),
     }
 }
 
 /// The furthest a bounce has already read this room out to the caller. A
 /// journaled bounce is a reading of the room through the tool-result lane, so
 /// it counts as seen and the very next attempt is unlocked.
-fn quoted(items: &[Item], room: &str) -> usize {
+fn quoted(items: &[std::sync::Arc<Item>], room: &str) -> usize {
     items
         .iter()
         .filter_map(|item| match &item.body {
@@ -242,7 +253,7 @@ mod tests {
         let mut summary = summary("ses_x", Some(name), None);
         summary.created_at = at(second);
         let mut state = SessionState::new(summary);
-        state.items = items;
+        state.transcript = items.into_iter().collect();
         state
     }
 
@@ -368,7 +379,7 @@ mod tests {
         let awaited = awaited(&room, &journal("builder", 0, Vec::new()), "builder");
         assert_eq!(awaited.len(), 2, "its own post is not one it awaits");
 
-        let at = |n: usize| Some(room.items[n].id.clone());
+        let at = |n: usize| Some(room.transcript.items()[n].id.clone());
         assert_eq!(read(&room, &awaited, None), 0, "a seat with no cursor");
         assert_eq!(read(&room, &awaited, at(0)), 1);
         assert_eq!(read(&room, &awaited, at(1)), 1, "its own post moved it");

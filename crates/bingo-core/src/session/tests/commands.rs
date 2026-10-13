@@ -172,7 +172,7 @@ async fn a_command_that_is_not_instant_waits_and_holds_the_prose_behind_it() {
     assert!(applied < started, "{labels:?}");
     assert_eq!(slow.calls(), vec![String::new()]);
     assert_eq!(
-        state.items.last().map(|i| i.body.clone()),
+        state.transcript.items().last().map(|i| i.body.clone()),
         Some(ItemBody::Assistant {
             text: "after".into()
         })
@@ -201,7 +201,7 @@ async fn a_prompt_outcome_opens_a_turn_with_the_commands_own_intent() {
         ack_of(&frames, &intent),
         Some(IntentOutcome::TurnStarted { .. })
     ));
-    let user = &state.items[0];
+    let user = &state.transcript.items()[0];
     assert_eq!(user.intent.as_ref(), Some(&intent));
     let ItemBody::User { parts, origin } = &user.body else {
         panic!("a prompt is journaled as a user item");
@@ -329,7 +329,7 @@ async fn a_compaction_turn_compacts_and_closes_and_is_refused_while_a_turn_runs(
             "turnCompleted:Completed",
         ]
     );
-    assert_eq!(state.history_generation, 1);
+    assert_eq!(state.transcript.generation(), 1);
 
     mailbox.submit(
         IntentId::mint(),

@@ -77,8 +77,12 @@ async fn a_rewind_appends_the_item_and_takes_the_turn_out_of_every_fold() {
     for frame in &frames {
         state.apply(frame);
     }
-    assert_eq!(state.items.len(), 4, "two asks and two answers");
-    let removed_cursor = state.items[2].id.clone();
+    assert_eq!(
+        state.transcript.items().len(),
+        4,
+        "two asks and two answers"
+    );
+    let removed_cursor = state.transcript.items()[2].id.clone();
 
     let dropped = host.rewind(&session, &second).await.expect("a rewind");
     assert_eq!(dropped, 2, "the ask and the answer of the second turn");
@@ -104,7 +108,12 @@ async fn a_rewind_appends_the_item_and_takes_the_turn_out_of_every_fold() {
         "and the event names the items"
     );
 
-    let bodies: Vec<&ItemBody> = state.items.iter().map(|item| &item.body).collect();
+    let bodies: Vec<&ItemBody> = state
+        .transcript
+        .items()
+        .iter()
+        .map(|item| &item.body)
+        .collect();
     assert_eq!(bodies.len(), 3, "the first turn and the rewind: {bodies:?}");
     assert!(
         !bodies
@@ -112,14 +121,14 @@ async fn a_rewind_appends_the_item_and_takes_the_turn_out_of_every_fold() {
             .any(|body| matches!(body, ItemBody::Assistant { text } if text == "second answer")),
         "the client's fold dropped what the rewind undid: {bodies:?}"
     );
-    assert_eq!(state.history_generation, 1);
+    assert_eq!(state.transcript.generation(), 1);
     let stale = attachment
         .handle
         .history(HistoryPage {
             before: Some(removed_cursor),
             limit: 10,
             max_bytes: Some(4096),
-            generation: Some(state.history_generation),
+            generation: Some(state.transcript.generation()),
         })
         .await
         .expect_err("the removed item is no longer a bounded cursor");
@@ -131,7 +140,7 @@ async fn a_rewind_appends_the_item_and_takes_the_turn_out_of_every_fold() {
                 before: None,
                 limit: 10,
                 max_bytes: Some(4096),
-                generation: Some(state.history_generation),
+                generation: Some(state.transcript.generation()),
             })
             .await
             .is_ok(),

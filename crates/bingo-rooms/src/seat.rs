@@ -358,9 +358,10 @@ async fn start_reading(
 /// The last thing said in a room, which is where a seat joining it starts.
 fn head_of(standing: &SessionState) -> Option<ItemId> {
     standing
-        .items
+        .transcript
+        .items()
         .iter()
-        .filter_map(crate::mentions::Post::of)
+        .filter_map(|item| crate::mentions::Post::of(item))
         .next_back()
         .map(|post| post.id)
 }
@@ -871,7 +872,12 @@ mod tests {
             Some("reviewer"),
             crate::tests::ts(),
         );
-        let head = fleet.state(&id).items.last().map(|item| item.id.clone());
+        let head = fleet
+            .state(&id)
+            .transcript
+            .items()
+            .last()
+            .map(|item| item.id.clone());
 
         let roster = join(
             &fleet.handle(),

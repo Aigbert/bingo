@@ -392,10 +392,14 @@ pub fn activity(state: &SessionState) -> Option<String> {
 /// spawn carried in a sub-agent. A session nobody has asked anything says
 /// nothing rather than a placeholder.
 pub fn brief(state: &SessionState) -> Option<String> {
-    state.items.iter().find_map(|item| match &item.body {
-        ItemBody::User { parts, origin } if !origin.is_context() => opening(parts),
-        _ => None,
-    })
+    state
+        .transcript
+        .items()
+        .iter()
+        .find_map(|item| match &item.body {
+            ItemBody::User { parts, origin } if !origin.is_context() => opening(parts),
+            _ => None,
+        })
 }
 
 /// The first line with something on it, of everything a message said in text.
@@ -412,7 +416,8 @@ fn opening(parts: &[bingo_sdk::ContentPart]) -> Option<String> {
 /// `3 tools · 1.2k tokens`.
 pub fn spent(state: &SessionState) -> String {
     let tools = state
-        .items
+        .transcript
+        .items()
         .iter()
         .filter(|item| matches!(item.body, ItemBody::ToolCall { .. }))
         .count();
@@ -427,9 +432,10 @@ pub fn spent(state: &SessionState) -> String {
 /// How long it has been at it: the first item it started to the last it
 /// finished, which is the only clock a client has for somebody else's work.
 pub fn seconds(state: &SessionState) -> i64 {
-    let first = state.items.first().map(|item| item.started_at);
+    let first = state.transcript.items().first().map(|item| item.started_at);
     let last = state
-        .items
+        .transcript
+        .items()
         .iter()
         .filter_map(|item| item.completed_at)
         .max();
@@ -787,7 +793,7 @@ mod tests {
         let child = tree.state(&child_id()).expect("still in the tree");
         assert_eq!(Status::of(child), Some(Status::Idle));
         assert_eq!(
-            child.items.len(),
+            child.transcript.items().len(),
             1,
             "what it said before the close is still there"
         );

@@ -166,14 +166,30 @@ mod tests {
             .expect("a memory");
         assert_eq!(journal.contribute(&contributor, cwd.path()).await, first);
 
-        journal.state().history_generation += 1;
+        journal
+            .state()
+            .transcript
+            .apply(&bingo_sdk::Event::Compacted {
+                generation: 1,
+                boundary: bingo_sdk::ItemId::from_raw("missing"),
+                summary: bingo_sdk::ItemId::from_raw("missing"),
+                kept: vec![],
+            });
         let changed = journal.contribute(&contributor, cwd.path()).await;
         assert_eq!(text(&changed[0]), text(&first[0]));
         assert!(text(&changed[1]).contains("new preference"));
         std::fs::write(dir::index(&user), "").expect("clear index");
         assert_eq!(journal.contribute(&contributor, cwd.path()).await, changed);
 
-        journal.state().history_generation += 1;
+        journal
+            .state()
+            .transcript
+            .apply(&bingo_sdk::Event::Compacted {
+                generation: 2,
+                boundary: bingo_sdk::ItemId::from_raw("missing"),
+                summary: bingo_sdk::ItemId::from_raw("missing"),
+                kept: vec![],
+            });
         let cleared = journal.contribute(&contributor, cwd.path()).await;
         assert_eq!(cleared, first);
         assert_eq!(journal.state().seq.0, 3, "one capture per generation");

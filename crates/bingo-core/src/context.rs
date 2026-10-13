@@ -1,9 +1,10 @@
-//! The second reducer: journal → provider messages. Also the one ruler for
+//! The model view of the transcript. Also the one ruler for
 //! context size, used by the compaction trigger and by every display.
 
 pub mod budget;
 pub mod elide;
 
+#[cfg(test)]
 use std::collections::{HashMap, HashSet};
 
 use bingo_sdk::*;
@@ -15,12 +16,22 @@ use serde_json::Value;
 pub struct ContextView;
 
 impl ContextView {
+    pub fn model_view(transcript: &Transcript) -> Vec<Message> {
+        let mut out = Folder::default();
+        for item in transcript.model_items() {
+            out.item(item);
+        }
+        out.finish()
+    }
+
     /// Apply `Compacted` and `Rewound` to the items in a journal, then fold.
+    #[cfg(test)]
     pub fn fold(frames: &[Frame]) -> Vec<Message> {
         Self::fold_items(&Self::items(frames))
     }
 
     /// The transcript after compaction and rewind, in order.
+    #[cfg(test)]
     pub fn items(frames: &[Frame]) -> Vec<Item> {
         let mut items: Vec<Item> = Vec::new();
         let mut positions: HashMap<ItemId, usize> = HashMap::new();
@@ -58,6 +69,7 @@ impl ContextView {
         items
     }
 
+    #[cfg(test)]
     pub fn fold_items(items: &[Item]) -> Vec<Message> {
         let mut out = Folder::default();
         for item in items {
@@ -67,6 +79,7 @@ impl ContextView {
     }
 }
 
+#[cfg(test)]
 fn item_positions(items: &[Item]) -> HashMap<ItemId, usize> {
     items
         .iter()
@@ -77,12 +90,8 @@ fn item_positions(items: &[Item]) -> HashMap<ItemId, usize> {
 
 /// The one splice a compaction performs: before `cut` only `kept` survives, the
 /// summary item takes the seam, the tail is untouched.
-pub(crate) fn splice_compaction(
-    items: &mut Vec<Item>,
-    cut: usize,
-    kept: &[ItemId],
-    summary: &ItemId,
-) {
+#[cfg(test)]
+fn splice_compaction(items: &mut Vec<Item>, cut: usize, kept: &[ItemId], summary: &ItemId) {
     let summary_item = items
         .iter()
         .position(|i| &i.id == summary)
@@ -1050,6 +1059,90 @@ mod tests {
         );
         assert_eq!(msgs[0].parts[1].as_text(), Some("first"));
         assert!(msgs[0].parts[2].as_text().unwrap().starts_with("[Summary"));
+    }
+
+    #[test]
+    fn two_compactions_do_not_resurrect_the_first_summary() {
+        let summary = |id: &str| {
+            item(
+                id,
+                ItemBody::Compaction {
+                    summary: id.into(),
+                    replaced: 1,
+                    before: 100,
+                    after: 20,
+                    duration_ms: 0,
+                },
+            )
+        };
+        let all = [
+            user("a", "old"),
+            user("b", "tail"),
+            summary("s1"),
+            summary("s2"),
+        ];
+        let cut = |id: &str, generation| Event::Compacted {
+            generation,
+            boundary: ItemId::from_raw("b"),
+            kept: vec![],
+            summary: ItemId::from_raw(id),
+        };
+        let mut frames = frames_of(&all[..3]);
+        let mut frame = frames[0].clone();
+        frame.seq = Seq(7);
+        frame.event = cut("s1", 1);
+        frames.push(frame.clone());
+        frame.seq = Seq(8);
+        frame.event = Event::ItemCompleted {
+            item: all[3].clone(),
+        };
+        frames.push(frame.clone());
+        frame.seq = Seq(9);
+        frame.event = cut("s2", 2);
+        frames.push(frame);
+        let mut transcript = Transcript::new();
+        for frame in &frames {
+            transcript.apply(&frame.event);
+        }
+        assert_eq!(
+            ContextView::items(&frames)
+                .iter()
+                .map(|i| i.id.as_str())
+                .collect::<Vec<_>>(),
+            ["s2", "b"]
+        );
+        assert_eq!(
+            transcript.model_items().cloned().collect::<Vec<_>>(),
+            ContextView::items(&frames)
+        );
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::test_runner::Config::with_cases(1000))]
+        #[test]
+        fn transcript_model_matches_frame_oracle(codes in proptest::collection::vec((0u8..7, 0u8..8, 0u8..8), 1..100)) {
+            let mut transcript = Transcript::new();
+            let mut frames = Vec::new();
+            for (n, (kind, id, other)) in codes.into_iter().enumerate() {
+                let id_of = |n| ItemId::from_raw(format!("i{n}"));
+                let item = user(&format!("i{id}"), &other.to_string());
+                let event = match kind {
+                    0 => Event::ItemStarted { item },
+                    1 => Event::ItemUpdated { item },
+                    2 => Event::ItemCompleted { item },
+                    3 => Event::TurnRetrying { turn: TurnId::from_raw("t"), attempt: 1,
+                        max: 2, delay_ms: 0, reason: "retry".into(), dropped: vec![id_of(id)] },
+                    4 => Event::Rewound { generation: n as u64, to_turn: TurnId::from_raw("t"),
+                        dropped: vec![id_of(id)], files_restored: vec![] },
+                    _ => Event::Compacted { generation: n as u64, boundary: id_of(id),
+                        kept: vec![id_of(other)], summary: id_of((other + 1) % 8) },
+                };
+                transcript.apply(&event);
+                frames.push(Frame { seq: Seq(n as u64 + 1), ts: Timestamp::UNIX_EPOCH,
+                    session: SessionId::from_raw("s"), cause: None, event });
+                proptest::prop_assert_eq!(transcript.model_items().cloned().collect::<Vec<_>>(), ContextView::items(&frames));
+            }
+        }
     }
 
     #[test]

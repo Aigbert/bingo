@@ -11,11 +11,16 @@ use bingo_sdk::{Item, ItemId, TurnId};
 ///
 /// `None` when this transcript has no such turn: there is nothing to go back
 /// to, which is a refusal rather than an empty cut.
-pub fn dropped(items: &[Item], to_turn: &TurnId) -> Option<Vec<ItemId>> {
+pub fn dropped(items: &[impl std::borrow::Borrow<Item>], to_turn: &TurnId) -> Option<Vec<ItemId>> {
     let opened = items
         .iter()
-        .position(|item| item.turn.as_ref() == Some(to_turn))?;
-    Some(items[opened..].iter().map(|item| item.id.clone()).collect())
+        .position(|item| item.borrow().turn.as_ref() == Some(to_turn))?;
+    Some(
+        items[opened..]
+            .iter()
+            .map(|item| item.borrow().id.clone())
+            .collect(),
+    )
 }
 
 #[cfg(test)]
@@ -74,6 +79,6 @@ mod tests {
     #[test]
     fn a_turn_this_transcript_never_had_is_nothing_to_go_back_to() {
         assert!(dropped(&transcript(), &TurnId::from_raw("trn_9")).is_none());
-        assert!(dropped(&[], &TurnId::from_raw("trn_1")).is_none());
+        assert!(dropped(&[] as &[Item], &TurnId::from_raw("trn_1")).is_none());
     }
 }
