@@ -182,3 +182,6 @@ impl HostApi for ServiceHost {
             .map_err(|why| KernelError::new(ErrorCode::InvalidInput, why))
     }
 }
+
+#[cfg(test)]
+mod tests;
