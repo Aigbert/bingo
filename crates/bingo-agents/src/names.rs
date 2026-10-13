@@ -4,18 +4,7 @@
 
 use bingo_sdk::{ErrorCode, HostHandle, KernelError, SessionFilter, SessionId, SessionSummary};
 
-/// The name a child uses for the session that spawned it.
-pub const PARENT: &str = "parent";
-
-/// What a room's title starts with. A room is a session nobody answers
-/// (ADR-0011 §1); it is written `#name` wherever a name is written, and no
-/// agent may take a name that would read as one.
-pub const ROOM: char = '#';
-
-/// Two names, compared by the agent roster.
-pub fn same(a: &str, b: &str) -> bool {
-    a.to_lowercase() == b.to_lowercase()
-}
+pub use bingo_collab::name::{PARENT, ROOM, same};
 
 /// How many names one base may take before a caller is asked to pick another.
 const MAX_NAMES: usize = 64;
@@ -40,27 +29,8 @@ pub fn free(base: &str, taken: &[String]) -> Option<String> {
 /// is refused because `resolve` would read it as the address it already is,
 /// and a leading `#` because it would read as a room.
 pub fn check(name: &str) -> Result<&str, KernelError> {
-    let name = name.trim();
-    let bad = name.is_empty() || name.contains('/') || name.chars().any(char::is_whitespace);
-    if bad {
-        return Err(KernelError::new(
-            ErrorCode::InvalidInput,
-            format!("{name:?} is not a name: one word, no slashes"),
-        ));
-    }
-    if same(name, PARENT) {
-        return Err(KernelError::new(
-            ErrorCode::InvalidInput,
-            format!("{PARENT:?} is what a child calls whoever spawned it; pick another name"),
-        ));
-    }
-    if name.starts_with(ROOM) {
-        return Err(KernelError::new(
-            ErrorCode::InvalidInput,
-            format!("{name:?} reads as a room; an agent's name starts with a letter"),
-        ));
-    }
-    Ok(name)
+    bingo_collab::Name::parse(name)?;
+    Ok(name.trim())
 }
 
 /// The children of `session`, as the host lists them.

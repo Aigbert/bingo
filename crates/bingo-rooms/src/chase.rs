@@ -26,7 +26,7 @@ use crate::room::Room;
 /// How long a member has to answer before the first nudge, and between them —
 /// and, with no second constant for it, how long a patient seat may hold a
 /// room's posts before the deadline wakes it (ADR-0029 §2).
-pub(crate) const PATIENCE: Duration = Duration::from_secs(300);
+pub(crate) use bingo_collab::ear::PATIENCE;
 
 /// How many nudges a debt is worth in the process that heard it asked.
 const NUDGES: u8 = 3;

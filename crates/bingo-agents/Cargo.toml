@@ -12,6 +12,7 @@ description = "Sub-agents plugin for bingo: an agent is a child session, four to
 workspace = true
 
 [dependencies]
+bingo-collab.workspace = true
 bingo-services.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true

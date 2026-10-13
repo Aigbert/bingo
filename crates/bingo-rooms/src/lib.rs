@@ -48,9 +48,8 @@ pub mod guide;
 mod hook;
 mod listen;
 mod mentions;
-mod name;
+use bingo_collab::name;
 
-pub use name::same as same_name;
 mod owed;
 mod placement;
 mod post;
@@ -81,7 +80,7 @@ pub use tool::{CloseRoomTool, OpenRoomTool, SeatTool, UnseatTool};
 
 /// This plugin's id: the owner of a room's key, and the plugin a room's
 /// membership is published under.
-pub const PLUGIN: &str = "bingo.rooms";
+pub use bingo_collab::room::PLUGIN;
 
 /// The surface a room's messages come from; a person's say `tui` or `print`.
 pub const SURFACE: &str = "room";

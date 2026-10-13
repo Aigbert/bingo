@@ -73,7 +73,7 @@ async fn ended(cx: &CommandContext, name: Option<&str>) -> Result<CommandOutcome
             format!("`/room {} <name>` needs the room to close", name::CLOSE),
         ));
     };
-    let title = name::title(name::check(name)?);
+    let title = name::title(name::check_room(name)?);
     let rooms = room::under(&cx.host, &cx.session).await?;
     let Some((id, room)) = rooms.iter().find(|(_, room)| room.title == title).cloned() else {
         return Err(door::unreachable(&title, &rooms));
