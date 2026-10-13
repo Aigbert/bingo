@@ -1,19 +1,14 @@
 //! A one-session host that folds extension frames with the SDK reducer.
 
-use std::any::Any;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use async_trait::async_trait;
-use bingo_sdk::testing::NoHost;
 use bingo_sdk::{
-    Attachment, Catalog, CatalogKind, ClientIdentity, CloseReason, ContextContributor,
-    ContextPiece, Delivery, Event, Frame, GatewayStream, HostApi, HostHandle, Input, IntentId,
-    KernelError, OpenOptions, Seq, SessionFilter, SessionHandle, SessionId, SessionSelector,
-    SessionState, SessionSummary,
+    Attachment, ContextContributor, ContextPiece, Event, Frame, HostHandle, Input, IntentId,
+    KernelError, Seq, SessionHandle, SessionId, SessionSelector, SessionState,
 };
-use serde_json::Value;
 
 use crate::query::Asked;
 
@@ -46,7 +41,7 @@ impl Journal {
     }
 
     pub(crate) fn handle(&self) -> HostHandle {
-        HostHandle(Arc::new(self.clone()))
+        self.scripted().handle()
     }
 
     pub(crate) fn apply(&self, event: Event) {
@@ -74,98 +69,78 @@ impl Journal {
     }
 }
 
-#[async_trait]
-impl HostApi for Journal {
-    async fn sessions(&self, filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        NoHost.sessions(filter).await
+impl Journal {
+    fn scripted(&self) -> bingo_sdk::testing::TestHost {
+        let host = bingo_sdk::testing::TestHost::default();
+        self.script_open(&host);
+        self.script_extend(&host);
+        self.script_signal(&host);
+        host
     }
 
-    async fn open(
-        &self,
-        selector: SessionSelector,
-        _who: ClientIdentity,
-        _options: OpenOptions,
-    ) -> Result<Attachment, KernelError> {
-        assert!(
-            !self.0.opening.load(Ordering::SeqCst),
-            "startup must never open itself"
-        );
-        let snapshot = self.state().clone();
-        assert_eq!(
-            selector,
-            SessionSelector::ById {
-                id: snapshot.summary.id.clone()
+    fn script_open(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_open(move |selector, _who, _options| {
+            let fixture = fixture.clone();
+            async move {
+                assert!(
+                    !fixture.0.opening.load(Ordering::SeqCst),
+                    "startup must never open itself"
+                );
+                let snapshot = fixture.state().clone();
+                assert_eq!(
+                    selector,
+                    SessionSelector::ById {
+                        id: snapshot.summary.id.clone()
+                    }
+                );
+                Ok(Attachment {
+                    session: snapshot.summary.id.clone(),
+                    snapshot,
+                    history: None,
+                    events: Box::pin(futures::stream::empty()),
+                    handle: SessionHandle(Arc::new(Deaf)),
+                })
             }
-        );
-        Ok(Attachment {
-            session: snapshot.summary.id.clone(),
-            snapshot,
-            history: None,
-            events: Box::pin(futures::stream::empty()),
-            handle: SessionHandle(Arc::new(Deaf)),
-        })
-    }
-
-    async fn close(&self, session: &SessionId, reason: CloseReason) -> Result<(), KernelError> {
-        NoHost.close(session, reason).await
-    }
-
-    async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
-        NoHost.delete(session).await
-    }
-
-    async fn deliver(
-        &self,
-        session: &SessionId,
-        intent: IntentId,
-        input: Input,
-        delivery: Delivery,
-    ) -> Result<(), KernelError> {
-        NoHost.deliver(session, intent, input, delivery).await
-    }
-
-    async fn extend(
-        &self,
-        session: &SessionId,
-        plugin: &str,
-        kind: &str,
-        payload: Value,
-    ) -> Result<(), KernelError> {
-        assert_eq!(session, &self.state().summary.id);
-        self.apply(Event::Extension {
-            plugin: plugin.into(),
-            kind: kind.into(),
-            payload,
         });
-        Ok(())
     }
 
-    async fn signal(
-        &self,
-        session: &SessionId,
-        plugin: &str,
-        kind: &str,
-        payload: Value,
-    ) -> Result<(), KernelError> {
-        assert_eq!(session, &self.state().summary.id);
-        self.apply(Event::Signal {
-            plugin: plugin.into(),
-            kind: kind.into(),
-            payload,
+    fn script_extend(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_extend(move |session, plugin, kind, payload| {
+            let fixture = fixture.clone();
+            async move {
+                let session = &session;
+                let plugin = &plugin;
+                let kind = &kind;
+                assert_eq!(session, &fixture.state().summary.id);
+                fixture.apply(Event::Extension {
+                    plugin: plugin.into(),
+                    kind: kind.into(),
+                    payload,
+                });
+                Ok(())
+            }
         });
-        Ok(())
     }
 
-    async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
-        NoHost.catalog(kind).await
-    }
-
-    fn gateway_events(&self) -> GatewayStream {
-        NoHost.gateway_events()
-    }
-
-    fn service_any(&self, _: &str) -> Option<Arc<dyn Any + Send + Sync>> {
-        None
+    fn script_signal(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_signal(move |session, plugin, kind, payload| {
+            let fixture = fixture.clone();
+            async move {
+                let session = &session;
+                let plugin = &plugin;
+                let kind = &kind;
+                assert_eq!(session, &fixture.state().summary.id);
+                fixture.apply(Event::Signal {
+                    plugin: plugin.into(),
+                    kind: kind.into(),
+                    payload,
+                });
+                Ok(())
+            }
+        });
     }
 }
 
