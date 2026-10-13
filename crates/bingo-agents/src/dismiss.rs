@@ -124,6 +124,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_open_prompt_cannot_be_dismissed() {
+        let fleet = Fleet::default();
+        let root = fleet.root();
+        let child = fleet.child(&root, "reviewer");
+        fleet.set_asking(&child);
+        let out = called(&fleet, &root, "reviewer").await;
+        assert!(out.is_error);
+        assert!(out.parts[0].as_text().unwrap().contains("asking"));
+        assert!(fleet.deleted().is_empty());
+    }
+
+    #[tokio::test]
     async fn an_idle_child_is_deleted_and_gone_from_the_tree() {
         let fleet = Fleet::default();
         let root = fleet.root();

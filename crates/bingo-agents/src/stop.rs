@@ -195,6 +195,23 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn asking_between_turns_is_refused_in_words() {
+        let fleet = Fleet::default();
+        let root = fleet.root();
+        let child = fleet.child(&root, "reviewer");
+        fleet.set_asking(&child);
+        let out = called(&fleet, &root, "reviewer").await;
+        assert!(out.is_error);
+        assert!(
+            out.parts[0]
+                .as_text()
+                .unwrap()
+                .contains("asking between turns")
+        );
+        assert!(fleet.interrupted().is_empty());
+    }
+
+    #[tokio::test]
     async fn a_busy_child_is_interrupted_and_the_receipt_says_how_its_turn_ended() {
         let fleet = Fleet::default();
         let root = fleet.root();

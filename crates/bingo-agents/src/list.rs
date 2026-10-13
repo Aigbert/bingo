@@ -192,6 +192,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_open_prompt_lists_as_asking() {
+        let fleet = Fleet::default();
+        let root = fleet.root();
+        let child = fleet.child(&root, "reviewer");
+        fleet.set_asking(&child);
+        assert!(listed(&fleet, &root).await.contains("asking"));
+        assert_eq!(
+            answered(&fleet, &root).await.display,
+            Some(View::Tree {
+                nodes: vec![node_of("reviewer", "asking", Tone::Attention)]
+            })
+        );
+    }
+
+    #[tokio::test]
     async fn every_child_of_this_session_with_its_state() {
         let fleet = Fleet::default();
         let root = fleet.root();
