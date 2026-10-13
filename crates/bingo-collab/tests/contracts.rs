@@ -41,8 +41,13 @@ fn journal_record_shapes_stay_compatible() {
 }
 
 fn state() -> bingo_sdk::SessionState {
-    let event: bingo_sdk::Event = serde_json::from_str(include_str!("../../bingo-sdk/fixtures/record/event/sessionUpdated.json")).unwrap();
-    let bingo_sdk::Event::SessionUpdated { summary } = event else { panic!("summary") };
+    let event: bingo_sdk::Event = serde_json::from_str(include_str!(
+        "../../bingo-sdk/fixtures/record/event/sessionUpdated.json"
+    ))
+    .unwrap();
+    let bingo_sdk::Event::SessionUpdated { summary } = event else {
+        panic!("summary")
+    };
     bingo_sdk::SessionState::new(summary)
 }
 
@@ -50,19 +55,44 @@ fn state() -> bingo_sdk::SessionState {
 fn room_readers_preserve_the_columns_and_targets_from_fixtures() {
     let mut state = state();
     let records = state.extensions.entry(room::PLUGIN.into()).or_default();
-    records.insert(room::MEMBERS.into(), serde_json::from_str(include_str!("../fixtures/members.json")).unwrap());
-    records.insert("ear:scout".into(), serde_json::from_str(include_str!("../fixtures/ear.json")).unwrap());
-    records.insert("cursor:scout".into(), serde_json::from_str(include_str!("../fixtures/cursor.json")).unwrap());
+    records.insert(
+        room::MEMBERS.into(),
+        serde_json::from_str(include_str!("../fixtures/members.json")).unwrap(),
+    );
+    records.insert(
+        "ear:scout".into(),
+        serde_json::from_str(include_str!("../fixtures/ear.json")).unwrap(),
+    );
+    records.insert(
+        "cursor:scout".into(),
+        serde_json::from_str(include_str!("../fixtures/cursor.json")).unwrap(),
+    );
     assert_eq!(room::members_of(&state), ["scout"]);
     assert_eq!(room::HOLDER, "parent");
-    assert_eq!(room::hearing(&state, "Scout"), room::Hearing::Listening { patience_s: Some(120) });
+    assert_eq!(
+        room::hearing(&state, "Scout"),
+        room::Hearing::Listening {
+            patience_s: Some(120)
+        }
+    );
     assert_eq!(room::unread_count(&state, "scout"), None);
-    let event: bingo_sdk::Event = serde_json::from_str(include_str!("../../bingo-sdk/fixtures/record/event/itemCompleted.json")).unwrap();
-    let bingo_sdk::Event::ItemCompleted { item } = event else { panic!("item") };
+    let event: bingo_sdk::Event = serde_json::from_str(include_str!(
+        "../../bingo-sdk/fixtures/record/event/itemCompleted.json"
+    ))
+    .unwrap();
+    let bingo_sdk::Event::ItemCompleted { item } = event else {
+        panic!("item")
+    };
     for (seq, id) in [(1, "itm_7"), (2, "itm_8")] {
         let mut item = item.clone();
         item.id = bingo_sdk::ItemId::from_raw(id);
-        state.apply(&bingo_sdk::Frame { seq: bingo_sdk::Seq(seq), ts: item.started_at, session: state.summary.id.clone(), cause: None, event: bingo_sdk::Event::ItemCompleted { item } });
+        state.apply(&bingo_sdk::Frame {
+            seq: bingo_sdk::Seq(seq),
+            ts: item.started_at,
+            session: state.summary.id.clone(),
+            cause: None,
+            event: bingo_sdk::Event::ItemCompleted { item },
+        });
     }
     assert_eq!(room::unread_count(&state, "SCOUT"), Some(1));
     assert_eq!(room::unread_count(&state, "missing"), None);

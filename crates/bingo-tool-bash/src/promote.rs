@@ -39,10 +39,6 @@ struct Foreground {
 }
 
 impl Promotions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Listen for a promotion of `call` until the guard is dropped.
     pub fn listen(
         self: &Arc<Self>,
@@ -181,7 +177,7 @@ mod tests {
 
     #[test]
     fn a_listening_call_is_promoted_by_name() {
-        let promotions = Arc::new(Promotions::new());
+        let promotions = Arc::new(Promotions::default());
         let listener = promotions.listen(
             "call_1",
             &bingo_sdk::SessionId::from_raw("ses_1"),
@@ -204,14 +200,14 @@ mod tests {
 
     #[test]
     fn a_call_nobody_is_running_is_not_promoted() {
-        let promotions = Arc::new(Promotions::new());
+        let promotions = Arc::new(Promotions::default());
         assert!(!promotions.promote("call_1"));
         assert!(promotions.open().is_empty());
     }
 
     #[test]
     fn a_call_that_has_ended_can_no_longer_be_promoted() {
-        let promotions = Arc::new(Promotions::new());
+        let promotions = Arc::new(Promotions::default());
         drop(promotions.listen(
             "call_1",
             &bingo_sdk::SessionId::from_raw("ses_1"),
@@ -223,7 +219,7 @@ mod tests {
 
     #[test]
     fn two_calls_are_promoted_apart() {
-        let promotions = Arc::new(Promotions::new());
+        let promotions = Arc::new(Promotions::default());
         let one = promotions.listen(
             "call_1",
             &bingo_sdk::SessionId::from_raw("ses_1"),
@@ -254,7 +250,7 @@ mod tests {
 
     #[tokio::test]
     async fn the_command_flips_the_call_it_names() {
-        let promotions = Arc::new(Promotions::new());
+        let promotions = Arc::new(Promotions::default());
         let listener = promotions.listen(
             "call_1",
             &bingo_sdk::SessionId::from_raw("ses_1"),
@@ -266,7 +262,7 @@ mod tests {
 
     #[tokio::test]
     async fn the_command_says_why_it_promoted_nothing() {
-        let promotions = Arc::new(Promotions::new());
+        let promotions = Arc::new(Promotions::default());
         assert_eq!(
             fired(&promotions, "call_1").await,
             "no shell command is running"
@@ -288,7 +284,7 @@ mod tests {
 
     #[test]
     fn the_command_runs_during_a_turn_and_takes_the_call_id() {
-        let spec = PromoteCommand::new(Arc::new(Promotions::new())).spec();
+        let spec = PromoteCommand::new(Arc::new(Promotions::default())).spec();
         assert_eq!(spec.name, ACTION);
         assert!(spec.instant, "there is only anything to promote mid-turn");
         assert_eq!(spec.family, "shell");

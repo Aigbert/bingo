@@ -62,7 +62,9 @@ use crate::kill::KillShellTool;
 use crate::log::Log;
 use crate::notify::Conditions;
 use crate::output::MAX_OUTPUT_CHARS;
-use crate::promote::{PromoteCommand, Promotions};
+use crate::promote::PromoteCommand;
+#[cfg(test)]
+use crate::promote::Promotions;
 use crate::read::BashOutputTool;
 use crate::run::Running;
 use crate::sink::Sink;

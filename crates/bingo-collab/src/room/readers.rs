@@ -1,9 +1,9 @@
 //! Room facts used to navigate a surface, including legacy card readings.
+use super::{EAR, LISTENERS, MEMBERS, PLUGIN};
+use crate::name::same;
 use bingo_sdk::{ItemBody, SessionState};
 use jiff::Timestamp;
 use serde_json::Value;
-use super::{PLUGIN, MEMBERS, LISTENERS, EAR};
-use crate::name::same;
 
 /// The signal the room's parent carries while any answer is owed.
 const OWED: &str = "owed";
@@ -70,7 +70,9 @@ pub fn unread_count(room: &SessionState, name: &str) -> Option<u64> {
 
 /// The post this seat's mark stopped at, as the room's own journal has it.
 fn read_to<'a>(room: &'a SessionState, name: &str) -> Option<&'a str> {
-    published(room, &crate::cursor::kind(name))?.get("post")?.as_str()
+    published(room, &crate::cursor::kind(name))?
+        .get("post")?
+        .as_str()
 }
 
 /// The posts a room holds, in the order its journal gave them. A post is what
@@ -138,7 +140,9 @@ fn names(listener: &Value, name: &str) -> bool {
 
 /// Debts published on a room's parent, with the oldest first.
 pub fn debts(parent: &SessionState, title: &str) -> Vec<(String, Owes)> {
-    let Some(card) = live(parent, OWED) else { return Vec::new(); };
+    let Some(card) = live(parent, OWED) else {
+        return Vec::new();
+    };
     facts(&card, title).unwrap_or_else(|| table(&card, title))
 }
 
@@ -205,4 +209,3 @@ fn published<'a>(state: &'a SessionState, kind: &str) -> Option<&'a Value> {
 fn live(state: &SessionState, kind: &str) -> Option<Value> {
     state.signals.get(PLUGIN)?.get(kind).cloned()
 }
-
