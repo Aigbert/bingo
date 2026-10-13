@@ -3,6 +3,7 @@
 //! what a person can read back, and the cache prefix in front of it stands
 //! (ADR-0014 §6).
 
+use crate::store::ExperienceShelf;
 use std::sync::Arc;
 
 use async_trait::async_trait;

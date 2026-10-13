@@ -3,6 +3,7 @@
 //! something to search for. The steps are not here — an index is a pointer,
 //! and `ExperienceQuery` is how a playbook is read.
 
+use crate::store::ExperienceShelf;
 use std::sync::Arc;
 
 use async_trait::async_trait;

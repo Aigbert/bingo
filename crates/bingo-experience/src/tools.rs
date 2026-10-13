@@ -15,12 +15,12 @@ pub use query::ExperienceQueryTool;
 use bingo_sdk::ToolError;
 
 use crate::entry::Entry;
-use crate::id::{self, Named};
+use bingo_shelf::id::{self, Named};
 
 /// The entry a prefix names, or a sentence the model can act on. An id
 /// nobody has is not a failed call — it is an answer.
 pub(crate) fn find<'a>(entries: &'a [Entry], prefix: &str) -> Result<&'a Entry, String> {
-    match id::resolve(entries, prefix) {
+    match id::resolve(entries, prefix, |entry| entry.id.as_str()) {
         Named::One(entry) => Ok(entry),
         Named::Unknown => Err(format!(
             "No experience has an id starting with \"{prefix}\". \

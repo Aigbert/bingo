@@ -19,11 +19,10 @@
 pub mod bm25;
 mod command;
 mod contributor;
-mod diff;
+use bingo_shelf::diff;
 pub mod entry;
 mod frontmatter;
 pub mod guide;
-mod id;
 mod project;
 mod rank;
 mod render;

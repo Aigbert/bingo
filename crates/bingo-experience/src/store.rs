@@ -12,34 +12,37 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use crate::entry::Entry;
-use crate::{frontmatter, id, project};
+use crate::{frontmatter, project};
 
 const DIR: &str = "experience";
 
-/// Every entry this project has, and every file that was meant to be one.
-#[derive(Debug, Default)]
-pub struct Shelf {
-    /// In id order: the corpus a ranking indexes into, and what ties fall back
-    /// on, are the same order for everyone.
-    pub entries: Vec<Entry>,
-    pub unreadable: Vec<Unreadable>,
+pub type Shelf = bingo_shelf::Loaded<Entry>;
+
+pub trait ExperienceShelf {
+    fn active(&self) -> impl Iterator<Item = &Entry>;
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Unreadable {
-    pub file: String,
-    pub why: String,
-}
-
-impl Shelf {
-    pub fn active(&self) -> impl Iterator<Item = &Entry> {
+impl ExperienceShelf for Shelf {
+    fn active(&self) -> impl Iterator<Item = &Entry> {
         self.entries
             .iter()
             .filter(|entry| entry.status == crate::entry::Status::Active)
     }
+}
 
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+#[derive(Debug)]
+struct Frontmatter;
+
+impl bingo_shelf::Codec for Frontmatter {
+    type Record = Entry;
+    const EXT: &'static str = "md";
+
+    fn encode(entry: &Entry) -> Result<String, bingo_shelf::CodecError> {
+        Ok(frontmatter::to_markdown(entry))
+    }
+
+    fn decode(id: &str, text: &str) -> Result<Entry, bingo_shelf::CodecError> {
+        frontmatter::parse(id, text).map_err(|e| bingo_shelf::CodecError(e.to_string()))
     }
 }
 
@@ -68,7 +71,7 @@ impl Library {
 
     /// Where one entry lives. The file may not exist; the id is the name.
     pub fn path(&self, cwd: &Path, id: &str) -> PathBuf {
-        self.dir(cwd).join(format!("{id}.md"))
+        self.shelf(cwd).path(id)
     }
 
     /// Whether there is a store at all — the one check a contributor makes
@@ -78,58 +81,23 @@ impl Library {
     }
 
     pub fn load(&self, cwd: &Path) -> Shelf {
-        let dir = self.dir(cwd);
-        let Ok(files) = std::fs::read_dir(&dir) else {
-            return Shelf::default();
-        };
-        let mut shelf = Shelf::default();
-        for file in files.flatten() {
-            let path = file.path();
-            if path.extension().is_none_or(|ext| ext != "md") {
-                continue;
-            }
-            match read(&path) {
-                Ok(entry) => shelf.entries.push(entry),
-                Err(why) => shelf.unreadable.push(Unreadable {
-                    file: file.file_name().to_string_lossy().into_owned(),
-                    why,
-                }),
-            }
-        }
-        shelf.entries.sort_by(|a, b| a.id.cmp(&b.id));
-        shelf.unreadable.sort_by(|a, b| a.file.cmp(&b.file));
-        shelf
+        self.shelf(cwd).load()
     }
 
-    /// The entry's file, written whole or not at all.
     pub fn save(&self, cwd: &Path, entry: &Entry) -> std::io::Result<PathBuf> {
-        let dir = self.dir(cwd);
-        std::fs::create_dir_all(&dir)?;
-        let path = self.path(cwd, &entry.id);
-        let tmp = dir.join(format!(".{}.tmp", entry.id));
-        std::fs::write(&tmp, frontmatter::to_markdown(entry))?;
-        match std::fs::rename(&tmp, &path) {
-            Ok(()) => Ok(path),
-            Err(e) => {
-                let _ = std::fs::remove_file(&tmp);
-                Err(e)
-            }
-        }
+        self.shelf(cwd).save(&entry.id, entry)
     }
 
-    /// Forget one entry. A file that is already gone is not an error.
     pub fn delete(&self, cwd: &Path, id: &str) -> std::io::Result<()> {
-        match std::fs::remove_file(self.path(cwd, id)) {
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            other => other,
-        }
+        self.shelf(cwd).delete(id)
     }
 
-    /// An id no file in this project has yet.
     pub fn mint(&self, cwd: &Path) -> String {
-        std::iter::repeat_with(id::mint)
-            .find(|id| !self.path(cwd, id).exists())
-            .unwrap_or_else(id::mint)
+        self.shelf(cwd).mint()
+    }
+
+    fn shelf(&self, cwd: &Path) -> bingo_shelf::Shelf<Frontmatter> {
+        bingo_shelf::Shelf::new(self.dir(cwd))
     }
 
     fn key(&self, cwd: &Path) -> String {
@@ -139,17 +107,6 @@ impl Library {
             .or_insert_with(|| project::key(cwd))
             .clone()
     }
-}
-
-/// One file as an entry, or why it is not one. The stem is the id: it is
-/// stored nowhere inside the file, so renaming the file renames the entry.
-fn read(path: &Path) -> Result<Entry, String> {
-    let id = path
-        .file_stem()
-        .map(|stem| stem.to_string_lossy().into_owned())
-        .ok_or_else(|| "no file name".to_string())?;
-    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    frontmatter::parse(&id, &text).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
