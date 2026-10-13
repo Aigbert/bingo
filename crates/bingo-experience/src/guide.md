@@ -75,10 +75,11 @@ could not be read. It runs while a turn is busy.
 ## Turning it off
 
 ```toml
-[experience]
-enabled = false
+[enabledPlugins]
+"bingo.experience" = false
 ```
 
-`enabled` is true until a project says otherwise. Off, the plugin contributes
-nothing at all: no tools, no index, no recall, no `/experience`. A typo in the
-block is a startup failure rather than a silence.
+The plugin is on until a project says otherwise. Off, it contributes nothing:
+no tools, no index, no recall, no `/experience`. The switch takes effect at the
+next start. `experience.enabled` remains readable for one release and reports
+a notice naming `enabledPlugins`.

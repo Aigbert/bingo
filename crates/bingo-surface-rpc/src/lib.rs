@@ -15,22 +15,33 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    ErrorCode, Exit, HostHandle, KernelError, Plugin, PluginError, PluginManifest, Registrar,
-    Surface, SurfaceKind, SurfaceOptions,
+    Exit, HostHandle, KernelError, Plugin, PluginError, PluginManifest, Registrar, Surface,
+    SurfaceKind, SurfaceOptions,
 };
-use serde_json::Value;
 
 pub use client::{RemoteKernel, RemoteSession};
 pub use schema::document;
 pub use server::serve;
 
-/// The surface id, and the transport `SurfaceOptions.args` must ask for.
+/// The surface id.
 pub const SURFACE_ID: &str = "rpc";
-const STDIO: &str = "stdio";
+
+#[derive(Debug, Default, Clone, Copy)]
+pub enum Transport {
+    #[default]
+    Stdio,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Options {
+    pub transport: Transport,
+}
 
 /// Owns stdio, has no prompt and no session of its own.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct RpcSurface;
+pub struct RpcSurface {
+    options: Options,
+}
 
 #[async_trait]
 impl Surface for RpcSurface {
@@ -42,21 +53,10 @@ impl Surface for RpcSurface {
         SurfaceKind::Exclusive
     }
 
-    async fn run(&self, host: HostHandle, opts: SurfaceOptions) -> Result<Exit, KernelError> {
-        transport(&opts.args)?;
-        serve(host, tokio::io::stdin(), tokio::io::stdout()).await
-    }
-}
-
-/// A WebSocket carries the same bytes and arrives with the first client that
-/// needs one (ADR-0007); until then the only transport is named explicitly.
-fn transport(args: &Value) -> Result<(), KernelError> {
-    match args.get("transport").and_then(Value::as_str) {
-        Some(STDIO) => Ok(()),
-        other => Err(KernelError::new(
-            ErrorCode::InvalidInput,
-            format!("unsupported rpc transport {other:?}; only {STDIO:?}"),
-        )),
+    async fn run(&self, host: HostHandle, _opts: SurfaceOptions) -> Result<Exit, KernelError> {
+        match self.options.transport {
+            Transport::Stdio => serve(host, tokio::io::stdin(), tokio::io::stdout()).await,
+        }
     }
 }
 
@@ -70,7 +70,15 @@ static MANIFEST: PluginManifest = PluginManifest {
 };
 
 #[derive(Debug, Default, Clone, Copy)]
-pub struct RpcPlugin;
+pub struct RpcPlugin {
+    options: Options,
+}
+
+impl RpcPlugin {
+    pub fn new(options: Options) -> Self {
+        Self { options }
+    }
+}
 
 #[async_trait]
 impl Plugin for RpcPlugin {
@@ -79,7 +87,9 @@ impl Plugin for RpcPlugin {
     }
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
-        registrar.surface(Arc::new(RpcSurface) as Arc<dyn Surface>);
+        registrar.surface(Arc::new(RpcSurface {
+            options: self.options,
+        }) as Arc<dyn Surface>);
         Ok(())
     }
 }
@@ -87,21 +97,10 @@ impl Plugin for RpcPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn only_stdio_is_a_transport() {
-        assert!(transport(&json!({ "transport": "stdio" })).is_ok());
-        for args in [json!({}), json!({ "transport": "ws" }), json!(null)] {
-            let error = transport(&args).expect_err("only stdio is served");
-            assert_eq!(error.code, ErrorCode::InvalidInput);
-        }
-    }
-
     #[test]
     fn the_surface_owns_stdio_alone() {
-        assert_eq!(RpcSurface.id(), SURFACE_ID);
-        assert_eq!(RpcSurface.kind(), SurfaceKind::Exclusive);
+        assert_eq!(RpcSurface::default().id(), SURFACE_ID);
+        assert_eq!(RpcSurface::default().kind(), SurfaceKind::Exclusive);
         assert_eq!(MANIFEST.provides, &["surface:rpc"]);
     }
 }

@@ -291,3 +291,23 @@ fn the_demo_is_opt_in_and_legacy_settings_report_the_new_switch() {
     assert_eq!(switched.status.code(), Some(0), "{}", stderr(&switched));
     assert_eq!(row(&stdout(&switched), "bingo.demo.ui")[2], "on");
 }
+
+#[test]
+fn surface_values_match_the_help_snapshot() {
+    let out = run(bingo().arg("--help"));
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stderr(&out), "");
+    let help = stdout(&out);
+    let values: Vec<_> = help
+        .lines()
+        .filter_map(|line| line.find("[possible values:").map(|at| &line[at..]))
+        .collect();
+    assert_eq!(
+        values,
+        [
+            "[possible values: text, json, stream-json]",
+            "[possible values: text, stream-json]",
+            "[possible values: stdio]",
+        ]
+    );
+}

@@ -29,7 +29,7 @@ mod render;
 pub mod store;
 pub mod tools;
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
 use bingo_sdk::{
@@ -111,8 +111,10 @@ fn on() -> bool {
 /// Registers the four tools, the two prompt blocks and `/experience`, all
 /// over one library rooted in the config directory — and, where a person has
 /// not asked for playbooks, nothing at all.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct ExperiencePlugin;
+#[derive(Debug, Default)]
+pub struct ExperiencePlugin {
+    legacy: OnceLock<bool>,
+}
 
 #[async_trait]
 impl Plugin for ExperiencePlugin {
@@ -121,6 +123,14 @@ impl Plugin for ExperiencePlugin {
     }
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+        // 2026-10-13: remove this legacy read after the next release (M126).
+        let slice: serde_json::Value = registrar.config()?;
+        let _ = self.legacy.set(
+            slice
+                .get(SETTING)
+                .and_then(|value| value.get("enabled"))
+                .is_some(),
+        );
         let settings: Settings = registrar.config()?;
         if !settings.experience.enabled {
             return Ok(());
@@ -140,6 +150,15 @@ impl Plugin for ExperiencePlugin {
             Arc::new(RecallContributor::new(library)) as Arc<dyn ContextContributor>,
         ));
         registrar.add(guide::contribution(registrar));
+        Ok(())
+    }
+
+    async fn start(&self, _host: bingo_sdk::HostHandle) -> Result<(), PluginError> {
+        if self.legacy.get() == Some(&true) {
+            eprintln!(
+                "[notice] DEPRECATED_SETTING experience.enabled is deprecated; use enabledPlugins[\"bingo.experience\"] instead"
+            );
+        }
         Ok(())
     }
 }
@@ -200,7 +219,7 @@ mod plugin_tests {
     #[test]
     fn a_project_that_turned_playbooks_off_is_offered_none() {
         let mut registrar = registrar(json!({"experience": {"enabled": false}}));
-        ExperiencePlugin
+        ExperiencePlugin::default()
             .register(&mut registrar)
             .expect("registering does no i/o");
         assert!(registrar.into_contributions().is_empty());
@@ -209,7 +228,7 @@ mod plugin_tests {
     #[test]
     fn registering_reads_nothing_and_contributes_what_the_manifest_promises() {
         let mut registrar = registrar(json!({"experience": {"enabled": true}}));
-        ExperiencePlugin
+        ExperiencePlugin::default()
             .register(&mut registrar)
             .expect("registering does no i/o");
         let contributions = registrar.into_contributions();

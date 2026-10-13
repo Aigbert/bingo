@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::Value;
 
 use crate::error::KernelError;
 use crate::event::TurnStatus;
@@ -25,8 +24,6 @@ pub struct SurfaceOptions {
     pub selector: SessionSelector,
     /// A first prompt to submit, for headless use.
     pub prompt: Option<String>,
-    /// Surface-specific options, from the command line or config.
-    pub args: Value,
     /// Where this process keeps its files (prompt history, caches). Process-local
     /// by nature, so it is handed to the surface, not asked of the host.
     pub env: Arc<Env>,

@@ -19,27 +19,7 @@ use crate::stream_json::Encoder;
 /// The longest error message a person is asked to read on one line.
 const MAX_ERROR_CHARS: usize = 200;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Mode {
-    /// Prose on stdout, everything else on stderr.
-    #[default]
-    Text,
-    /// One `Frame` per line on stdout, nothing else.
-    Json,
-    /// Claude Code's envelope on stdout, one object per line (ADR-0007 §8).
-    StreamJson,
-}
-
-impl Mode {
-    /// `args.outputFormat`, defaulting to text for anything unknown.
-    pub fn from_args(args: &Value) -> Self {
-        match args.get("outputFormat").and_then(Value::as_str) {
-            Some("json") => Mode::Json,
-            Some("stream-json") => Mode::StreamJson,
-            _ => Mode::Text,
-        }
-    }
-}
+use crate::OutputFormat as Mode;
 
 /// One failure, one line. A person at the terminal reads prose; a program
 /// on the other end of a pipe reads `[error] code=… msg=…`, the contract
@@ -829,23 +809,6 @@ pub(crate) mod tests {
         let sinks = play(Mode::Json, &frames);
         assert_eq!(sinks.err(), "[error] code=TOOL_FAILED msg=boom\n");
         assert_eq!(sinks.out().lines().count(), 1);
-    }
-
-    #[test]
-    fn the_output_format_argument_picks_the_mode() {
-        assert_eq!(
-            Mode::from_args(&serde_json::json!({"outputFormat": "json"})),
-            Mode::Json
-        );
-        assert_eq!(
-            Mode::from_args(&serde_json::json!({"outputFormat": "stream-json"})),
-            Mode::StreamJson
-        );
-        assert_eq!(
-            Mode::from_args(&serde_json::json!({"outputFormat": "text"})),
-            Mode::Text
-        );
-        assert_eq!(Mode::from_args(&Value::Null), Mode::Text);
     }
 
     #[test]

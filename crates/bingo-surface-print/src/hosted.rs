@@ -406,14 +406,12 @@ mod tests {
     };
 
     /// The arguments a host drives this surface with.
-    fn hosted_args(prompt_tool: Option<&str>) -> Value {
-        let mut args = json!({ "inputFormat": "stream-json" });
-        if let Some(tool) = prompt_tool
-            && let Some(object) = args.as_object_mut()
-        {
-            object.insert("permissionPromptTool".into(), json!(tool));
+    fn hosted_args(prompt_tool: Option<&str>) -> crate::Options {
+        crate::Options {
+            input_format: crate::InputFormat::StreamJson,
+            permission_prompt_tool: prompt_tool.map(|word| word.parse().unwrap()),
+            ..crate::Options::default()
         }
-        args
     }
 
     fn user_line(text: &str) -> String {
@@ -434,11 +432,23 @@ mod tests {
         .to_string()
     }
 
-    async fn play_hosted(frames: Vec<Frame>, console: &mut TestConsole, args: Value) -> Run {
+    async fn play_hosted(
+        frames: Vec<Frame>,
+        console: &mut TestConsole,
+        args: crate::Options,
+    ) -> Run {
         let (host, session) = TestHost::live(frames);
         let mut out: Vec<u8> = Vec::new();
         let mut err: Vec<u8> = Vec::new();
-        let exit = drive(&host, options(None, args), console, &mut out, &mut err).await;
+        let exit = drive(
+            &host,
+            options(None, crate::Options::default()).0,
+            &args,
+            console,
+            &mut out,
+            &mut err,
+        )
+        .await;
         Run {
             exit,
             out: String::from_utf8_lossy(&out).into_owned(),
@@ -478,7 +488,7 @@ mod tests {
         let mut out: Vec<u8> = Vec::new();
         let mut err: Vec<u8> = Vec::new();
         let opts = options(Some("first"), hosted_args(None));
-        let exit = drive(&host, opts, &mut console, &mut out, &mut err).await;
+        let exit = drive(&host, opts.0, &opts.1, &mut console, &mut out, &mut err).await;
         assert_eq!(exit, Ok(Exit { code: 0 }));
         assert_eq!(session.prompts(), ["first", "second"]);
     }
@@ -488,9 +498,7 @@ mod tests {
     async fn each_turn_writes_one_result_line_and_no_prose() {
         let mut console = TestConsole::hosted(&[user_line("first"), user_line("second")]);
         let mut args = hosted_args(None);
-        if let Some(object) = args.as_object_mut() {
-            object.insert("outputFormat".into(), json!("stream-json"));
-        }
+        args.output_format = crate::OutputFormat::StreamJson;
         let run = play_hosted(vec![], &mut console, args).await;
         assert_eq!(run.exit, Ok(Exit { code: 0 }));
         let types: Vec<&str> = json_lines(&run.out)
@@ -649,7 +657,7 @@ mod tests {
             Some(request)
         });
         let opts = options(None, hosted_args(Some("stdio")));
-        let exit = drive(&host, opts, &mut console, &mut out, &mut err).await;
+        let exit = drive(&host, opts.0, &opts.1, &mut console, &mut out, &mut err).await;
         assert_eq!(exit, Ok(Exit { code: 0 }));
         let request = asked
             .await
@@ -745,7 +753,7 @@ mod tests {
             refused
         });
         let opts = options(None, hosted_args(None));
-        let exit = drive(&host, opts, &mut console, &mut out, &mut err).await;
+        let exit = drive(&host, opts.0, &opts.1, &mut console, &mut out, &mut err).await;
         assert!(closer.await.expect("the host task"), "nothing was answered");
         assert_eq!(exit, Ok(Exit { code: 0 }));
         assert_eq!(
@@ -783,7 +791,7 @@ mod tests {
             refused
         });
         let opts = options(None, hosted_args(Some("stdio")));
-        let exit = drive(&host, opts, &mut console, &mut out, &mut err).await;
+        let exit = drive(&host, opts.0, &opts.1, &mut console, &mut out, &mut err).await;
         assert!(closer.await.expect("the host task"), "nothing was answered");
         assert_eq!(exit, Ok(Exit { code: 0 }));
         assert_eq!(session.answers()[0].1, Answer::Cancel);

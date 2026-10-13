@@ -208,12 +208,13 @@ pub(crate) struct Farewell {
 pub(crate) async fn drive(
     host: &HostHandle,
     opts: SurfaceOptions,
+    surface: crate::TuiSurface,
     screen: &mut dyn Screen,
     mut keys: Keys,
 ) -> Result<Farewell, KernelError> {
     let (tx, mut replies) = mpsc::channel(16);
     let (mut run, mut events, mut gateway) =
-        standing(host, opts, screen.size(), tx, screen.detection()).await?;
+        standing(host, opts, surface, screen.size(), tx, screen.detection()).await?;
     loop {
         // `biased`, keys first: a person outranks the machine, and a
         // keystroke is never continuously ready, so checking it first
@@ -270,6 +271,7 @@ pub(crate) async fn drive(
 async fn standing(
     host: &HostHandle,
     opts: SurfaceOptions,
+    surface: crate::TuiSurface,
     screen: (u16, u16),
     replies: mpsc::Sender<Reply>,
     detection: crate::render::Detection,
@@ -277,7 +279,7 @@ async fn standing(
     // A run given work on the command line goes and does it, so what the
     // opening is decided from is read before the prompt is spent.
     let asked = opts.prompt.is_some();
-    let (mut run, events) = attach(host, opts, replies).await?;
+    let (mut run, events) = attach(host, opts, surface, replies).await?;
     run.detection = detection;
     notices::raise(&mut run.ui, run.detection.notice(), Instant::now());
     let now = run.detection.now();
@@ -290,6 +292,7 @@ async fn standing(
 async fn attach(
     host: &HostHandle,
     opts: SurfaceOptions,
+    surface: crate::TuiSurface,
     replies: mpsc::Sender<Reply>,
 ) -> Result<(Run, Option<FrameStream>), KernelError> {
     let attachment = host
@@ -309,16 +312,16 @@ async fn attach(
         // that happens is drawn.
         painted: older_than_a_frame(),
         stored: Stored::default(),
-        cache: Cache::under(&opts.env.data_dir, showing::cache_days(&opts.args)),
+        cache: Cache::under(&opts.env.data_dir, surface.options.cache_days()),
         ear: late::Late::default(),
         look: look::Owed::default(),
         behind: false,
         sluggish: false,
         exit: None,
     };
-    run.ui.measure = crate::settings::given(&opts.args);
+    run.ui.measure = surface.settings.measure();
     run.fetch_catalogs();
-    run.ask_for_updates(&opts.args);
+    run.ask_for_updates(surface.settings.update.check);
     if let Some(prompt) = opts.prompt {
         run.effect(Effect::Submit(bingo_sdk::Input::text(
             prompt,
@@ -892,8 +895,8 @@ impl Run {
 
     /// Whether a newer release is out — asked once a day, and only by a run
     /// with a welcome box to say it in (M63).
-    fn ask_for_updates(&self, args: &Value) {
-        if !updates::wanted(args) || !crate::welcome::wanted(self.session.tree.root()) {
+    fn ask_for_updates(&self, wanted: bool) {
+        if !wanted || !crate::welcome::wanted(self.session.tree.root()) {
             return;
         }
         updates::spawn(self.replies.clone(), self.data_dir.clone());
@@ -997,6 +1000,17 @@ pub(crate) fn terminal_keys() -> Keys {
 
 #[cfg(test)]
 mod tests {
+    async fn drive(
+        host: &HostHandle,
+        opts: SurfaceOptions,
+        screen: &mut dyn Screen,
+        keys: Keys,
+    ) -> Result<Farewell, KernelError> {
+        let mut surface = crate::TuiSurface::default();
+        surface.settings.update.check = false;
+        super::drive(host, opts, surface, screen, keys).await
+    }
+
     use super::*;
     use crate::test_support::*;
     use bingo_sdk::{CloseReason, ItemStatus, TurnStatus};
@@ -2742,19 +2756,27 @@ mod tests {
     #[test]
     fn the_cache_keeps_a_fortnight_unless_the_settings_said_otherwise() {
         assert_eq!(
-            showing::cache_days(&serde_json::json!({})),
+            crate::Options::default().cache_days(),
             bingo_pictures::cache::DAYS
         );
         assert_eq!(
-            showing::cache_days(&serde_json::json!({ "pictureCacheDays": null })),
+            crate::Options::default().cache_days(),
             bingo_pictures::cache::DAYS
         );
         assert_eq!(
-            showing::cache_days(&serde_json::json!({ "pictureCacheDays": 3 })),
+            crate::Options {
+                picture_cache_days: Some(3),
+                ..Default::default()
+            }
+            .cache_days(),
             3
         );
         assert_eq!(
-            showing::cache_days(&serde_json::json!({ "pictureCacheDays": 0 })),
+            crate::Options {
+                picture_cache_days: Some(0),
+                ..Default::default()
+            }
+            .cache_days(),
             0
         );
         assert!(
