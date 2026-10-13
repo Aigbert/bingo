@@ -32,8 +32,8 @@ these holds only where a `select!` was remembered.
      `std::sync::Barrier`: a second session on a `current_thread`
      runtime still completes a turn (passes once brick 6's rule holds).
 2. **`ErrorCode::Interrupted`.** Additive (`INTERRUPTED`), with a doc
-   line ("the person stopped it; not a failure"). It gets M113's
-   fixture and the RPC schema snapshot. Nothing else uses it yet.
+   line ("the person stopped it; not a failure"). Pin it in `error.rs`'s
+   wire test and `schema/rpc.json`; M113's fixtures are not in this tree.
 3. **The supervised turn.** `session/running.rs`:
    - `INTERRUPT_GRACE: Duration = 2 s`, beside `AFTER_TURN_DEADLINE`.
    - The task races `run_turn` against
@@ -102,12 +102,12 @@ these holds only where a `select!` was remembered.
 ## Files
 
 - `crates/bingo-core/src/session.rs`, `session/{running,commands,inputs,
-  mailbox}.rs`, `session/gate.rs` (new), `session/tests/owned.rs` (new),
-  `test_support/**`
+  mailbox,spawn,tests}.rs`, `session/gate.rs` (new),
+  `session/tests/{owned,storage}.rs`, `test_support/**`
 - `crates/bingo-sdk/src/{error.rs,command.rs,tool.rs,store.rs,
-  transcript.rs}`, the RPC schema snapshot, M113's fixtures
+  transcript.rs}`, `transcript/tests.rs`, `schema/rpc.json`
 - `crates/bingo-store-jsonl/src/lib.rs`
-- every `CommandContext {` constructor outside the kernel (tests):
+- every `CommandContext {` constructor outside the kernel (production and tests):
   `rg -n 'CommandContext \{' crates`
 - `docs/adr/{0068,0002,0008}*.md`
 
@@ -134,16 +134,17 @@ these holds only where a `select!` was remembered.
 
 ## Risks
 
-- Dropping a turn mid-await can leave a plugin's half-done work, such
-  as a process or a socket. That is the plugin's to bound (M117); the
-  kernel's promise is only that the session moves on.
-- The gate changes input order semantics if done wrong. A test submits
-  prose, a command and prose while a slow `on_submit` hook runs, and
-  asserts acks and turn order match arrival.
-- `CommandContext` gaining a field breaks every struct literal of it:
-  mechanical, its own commit.
-- `spawn_blocking` per frame adds a thread hand-off: measure a 1 000
-  frame append loop before and after and note it (not a budget).
-- Re-verify at start: M112 has landed (`Transcript` exists); the names
-  `Running::spawn`, `turn_finished`, `submit_prose`, `run_queued`,
-  `Commands::spawn`, `interrupt`.
+- Dropping may leave plugin work behind (M117); the kernel promises only that the session moves on.
+- Test prose/command/prose during a slow submit hook: acknowledgements and turns keep arrival order.
+- Update all `CommandContext` literals, including production `bingo-agents/src/team/command.rs`.
+- Record a 1 000-frame append benchmark before and after the blocking-pool change (not a budget).
+- Re-verification at `01789d66` (2026-10-13): M112's `Transcript` and the named session methods
+  exist; M113's fixtures do not. The actor already has a `TaskTracker`; commands still use an
+  untracked `tokio::spawn`.
+- **Stopped under execution protocol step 6, before implementation.** ADR-0068 §2 requires
+  `NOT_READY` with neither a running turn nor a holding command; brick 5 requires cancellation of
+  the gate head then. Options: amend §2 to allow gate cancellation, or retain §2 and revise brick 5
+  and its submit-hook interruption test. Neither is chosen here.
+- ADR-0068 §2 prescribes command join handles on a `JoinSet`; brick 4 prescribes the actor's
+  `TaskTracker` and token map. Resolve by aligning the plan to `JoinSet`, or explicitly amending the
+  ADR to `TaskTracker`. No ADR Decision was edited, and no implementation gates were run.
