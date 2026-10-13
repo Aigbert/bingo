@@ -90,13 +90,22 @@ granted unsafe noun is put on the record. `http` and `process` run on
 
 ## Files
 
-- `crates/bingo-mods/src/dollar/{fs,http,process,env,scope}.rs`, `tests/mods/world/*` (new)
-- `crates/bingo-mods/Cargo.toml` (`bingo-http`, `bingo-process`, `dunce`)
-- `crates/bingo-plugin-host/src/grant.rs` (`refusal`, declared unsafe)
-- `crates/bingo-core/src/host.rs` (the noun index)
-- `crates/bingo-mcp/src/{rows.rs,manager.rs}`, `crates/bingo-agents/src/{spawn.rs,list.rs,library.rs,team/service.rs}`
-- `crates/bingo-plugin-rpc/src/service.rs` (`admits` for processes)
-- `schema/dollar.json`, `sdk/typescript/src/{dollar.ts,dollar-types.ts}`, `crates/bingo/tests/plugin_kit.rs`
+- `crates/bingo-mods/src/dollar/` (world faces, scope, table, contracts),
+  `src/{plugin.rs,manager.rs,manager/reload.rs}`, `tests/mods/world/*`,
+  `tests/world.rs`, `tests/support/mod.rs`, `guide.md`, `Cargo.toml`.
+- `crates/bingo-plugin-host/src/{grant.rs,ops.rs}` (shared admission and
+  caller binding); `crates/bingo-plugin-rpc/src/service.rs`.
+- `crates/bingo-sdk/src/service.rs` (M136's actual registry owner);
+  `crates/bingo-core/src/host.rs` and service contract tests.
+- `crates/bingo-mcp/src/{lib.rs,rows.rs,manager.rs}`, `tests/server.rs`;
+  `crates/bingo-services/src/mcp.rs` (the existing shared face contract).
+- `crates/bingo-agents/src/{lib.rs,spawn.rs,list.rs,library.rs,service.rs}`
+  and their tests; `src/definition.rs` (serializable definition contract).
+- `schema/*.json`, `sdk/typescript/src/{dollar.ts,dollar-types.ts,wire.ts}`,
+  `crates/bingo/tests/plugin_kit.rs`, world parity fixtures.
+- `Cargo.lock` for existing workspace dependency edges only. Reuse
+  `bingo-http`, `bingo-process`, `dunce`, `reqwest` (HTTP client types) and
+  `base64` (binary filesystem results); no new resolved crate.
 
 ## Exit criteria
 
@@ -115,8 +124,8 @@ granted unsafe noun is put on the record. `http` and `process` run on
 - [ ] `cargo test -p bingo --test plugin_kit`: the world fixture gives
       the same output in process and under node.
 - [ ] All gates pass. `cargo check --target x86_64-pc-windows-msvc`
-      passes for core, mcp, agents and plugin-rpc, and CI's `windows`
-      job runs `scope::` (log pasted).
+      checks every touched crate; missing third-party Windows C headers
+      are left to Windows CI under protocol step 7.
 - [ ] `scripts/budget.sh` shows no change in crates.
 
 ## Non-goals
@@ -135,10 +144,15 @@ granted unsafe noun is put on the record. `http` and `process` run on
   person's own act, and the refusal words name the noun.
 - **Windows paths.** `\\?\` against plain prefixes: canonicalise both
   sides with `dunce`, and test it in CI.
-- Re-verify at start:
-  - M127's `client` and `Bounds`;
-  - M128's `tree` and `terminate`;
-  - M138's table, faces and `plugin` binding;
-  - M136's registry and its per-method `unsafe`;
-  - M119's `mcp` and `team` modules;
-  - the agents' spawn path as M134 left it.
+- Re-verified at `5581b978` on 2026-10-14: M108–M138 and M147–M150
+  are present. M127 exports `client(Bounds::CALL)`; M128 exports `tree`
+  and `Tree::terminate`. M138 owns the table in `dollar/table.rs`, faces
+  in `dollar/runtime.rs`, and caller identity in plugin-host `ops.rs`.
+  M136's `Services` lives in sdk `service.rs`, not core `host.rs`.
+  The MCP face lives in services `mcp.rs`; agents currently expose only
+  the separate `team` face, so the agent noun needs its own owner face.
+- Preserve process-plugin default `tighten`; only user/explicit modules
+  default to `rewrite`. Project modules need user-layer grants for unsafe
+  calls, including dynamically unsafe filesystem writes.
+- M140 owns sdk view/render, core chain/render, TUI and surface-rpc.
+  M139 does not edit those; generated files are reconciled at merge.
