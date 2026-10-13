@@ -246,7 +246,7 @@ fn the_cli_composes_the_module_runtime_for_an_explicit_directory() {
         r#"{"name":"hello","version":"1","module":"main.ts"}"#,
     )
     .unwrap();
-    std::fs::write(plugin.join("main.ts"), "export function register(on) { on('tool.call', () => ({parts:[{kind:'text',text:'module result'}],isError:false})); }").unwrap();
+    std::fs::write(plugin.join("main.ts"), "export function register(on) { on('tool.call', () => ({parts:[{type:'text',text:'module result'}],isError:false})); }").unwrap();
     let script = root.path().join("fake.json");
     std::fs::write(&script, r#"{"responses":[{"steps":[{"toolCall":{"name":"Read","input":{"file_path":"missing.txt"}}}]},{"steps":[{"text":"offline"}]}]}"#).unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_bingo"))

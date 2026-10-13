@@ -21,7 +21,7 @@ impl Composition {
             mods: serde_json::from_value(
                 merged
                     .plugins
-                    .get(bingo_plugin_rpc::ID)
+                    .get(bingo_plugin_rpc::PluginRpcPlugin::default().manifest().id)
                     .cloned()
                     .unwrap_or_else(|| serde_json::json!({})),
             )
