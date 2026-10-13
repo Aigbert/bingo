@@ -84,6 +84,7 @@ impl Tool for SkillTool {
     async fn call(&self, input: Value, cx: &ToolContext) -> Result<ToolOutput, ToolError> {
         let args: SkillArgs =
             serde_json::from_value(input).map_err(|e| ToolError::InvalidInput(e.to_string()))?;
+        crate::hook::place(&cx.host, &cx.session, &cx.item, &args.name, args.arguments.as_deref().unwrap_or_default()).await;
         Ok(self.load(&args, &cx.cwd))
     }
 }
