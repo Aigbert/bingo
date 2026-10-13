@@ -106,6 +106,7 @@ async fn a_pulled_counter_invalidates_and_renders_after_a_press() {
             .fold()
             .contains("Count: 1")
     );
+    edit_and_close(&kernel, &mut attachment, &session).await;
     kernel.shutdown().await.unwrap();
     let status = tokio::time::timeout(LIMIT, server.child.wait())
         .await
@@ -124,4 +125,65 @@ fn button(view: &View) -> Action {
             _ => None,
         })
         .unwrap()
+}
+
+async fn edit_and_close(
+    kernel: &bingo_surface_rpc::RemoteKernel,
+    attachment: &mut Attachment,
+    session: &SessionId,
+) {
+    let current = kernel
+        .render(
+            session,
+            RenderRequest {
+                component: Component::Pane,
+                request_id: "counter".into(),
+                surface: SurfaceName::Terminal,
+                props: serde_json::json!({}),
+                viewport: Viewport {
+                    columns: 80,
+                    rows: 8,
+                },
+            },
+        )
+        .await
+        .unwrap();
+    let View::Box { children, .. } = current else {
+        panic!("counter is a Box")
+    };
+    let mut typed = children
+        .iter()
+        .find_map(|child| match child {
+            View::Input { input } => input.on_input.clone(),
+            _ => None,
+        })
+        .unwrap();
+    typed.args["value"] = serde_json::json!("Ada");
+    let intent = IntentId::mint();
+    attachment
+        .handle
+        .submit(intent.clone(), Input::Action { action: typed });
+    assert!(matches!(
+        ack_for(attachment, &intent).await,
+        IntentOutcome::Applied { .. }
+    ));
+    let intent = IntentId::mint();
+    attachment.handle.submit(
+        intent.clone(),
+        Input::Action {
+            action: Action {
+                name: "counter:ui".into(),
+                args: serde_json::json!({"handler":"counter","event":"close"}),
+            },
+        },
+    );
+    assert!(matches!(
+        ack_for(attachment, &intent).await,
+        IntentOutcome::Applied { .. }
+    ));
+    assert!(
+        !slot::placed(&attachment.snapshot)
+            .iter()
+            .any(|placed| matches!(&placed.slot,Slot::Pane{id,..} if id=="counter"))
+    );
 }

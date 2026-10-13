@@ -82,6 +82,9 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     render_strip(frame, regions.strip, strip);
     render_composer(tree.viewed(), ui, frame, regions.composer, now, draft);
     render_status(tree, ui, frame, regions.status, now);
+    if matches!(ui.focus, crate::focus::Focus::Pane(_)) {
+        frame.cursor = None;
+    }
     layers(tree, ui, frame, regions, now);
 }
 

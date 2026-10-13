@@ -150,9 +150,13 @@ pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, now: 
                     .get(&pane.key)
                     .copied()
                     .unwrap_or_default();
-                if let Some(editor) = ui.panes.editors.get(&(pane.key.clone(), index)) {
-                    edited(&mut view, index, editor.text(), &mut 0);
-                }
+                edited(
+                    &mut view,
+                    index,
+                    ui.panes.editors.get(&(pane.key.clone(), index)),
+                    selected,
+                    &mut 0,
+                );
                 lines.extend(views::marked(
                     &view,
                     usize::from(rect.width),
@@ -213,24 +217,79 @@ fn controls(view: &View, out: &mut Vec<Control>) {
         _ => {}
     }
 }
-fn edited(view: &mut View, target: usize, text: &str, index: &mut usize) {
+fn edited(
+    view: &mut View,
+    target: usize,
+    editor: Option<&Composer>,
+    focused: bool,
+    index: &mut usize,
+) {
     match view {
         View::Box { children, layout } if layout.display.as_deref() != Some("none") => {
             for child in children {
-                edited(child, target, text, index);
+                edited(child, target, editor, focused, index);
             }
         }
-        View::Panel { child, .. } => edited(child, target, text, index),
+        View::Panel { child, .. } => edited(child, target, editor, focused, index),
         View::Input { input } => {
             if *index == target {
-                input.value = Some(text.into());
+                if let Some(editor) = editor {
+                    input.value = Some(editor.text().into());
+                }
+                if focused {
+                    mark_label(&mut input.label);
+                    input.value = Some(caret(editor, input.value.as_deref().unwrap_or_default()));
+                }
             }
             *index += 1;
         }
-        View::Select { .. } => *index += 1,
-        View::Button { button, .. } if button.on_press.is_some() => *index += 1,
+        View::Select { select } => {
+            if *index == target && focused {
+                mark_label(&mut select.label);
+            }
+            *index += 1;
+        }
+        View::Button { button, children } if button.on_press.is_some() => {
+            if *index == target && focused {
+                if button.label.is_none() {
+                    button.label = Some(bingo_sdk::view::text_children(children));
+                }
+                mark_label(&mut button.label);
+            }
+            *index += 1;
+        }
         _ => {}
     }
+}
+fn mark_label(label: &mut Option<String>) {
+    *label = Some(format!(
+        "{} {}",
+        theme::cursor(),
+        label.as_deref().unwrap_or_default()
+    ));
+}
+fn caret(editor: Option<&Composer>, value: &str) -> String {
+    use unicode_width::UnicodeWidthChar;
+    let mut resting = Composer::default();
+    resting.set(value);
+    let layout = editor.unwrap_or(&resting).layout(usize::MAX / 2);
+    let mut lines = layout.lines;
+    if let Some(line) = lines.get_mut(layout.cursor.0) {
+        let mut width = 0;
+        let byte = line
+            .char_indices()
+            .find_map(|(byte, c)| {
+                if width >= layout.cursor.1 {
+                    Some(byte)
+                } else {
+                    width += c.width().unwrap_or_default();
+                    None
+                }
+            })
+            .unwrap_or(line.len());
+        line.insert_str(byte, theme::caret());
+    }
+    lines.join("\n")
 }
 pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
     let Focus::Pane(focused) = &ui.focus else {
