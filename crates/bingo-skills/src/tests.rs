@@ -1,18 +1,15 @@
 //! What every test in this crate needs: a tree of skill directories, and the
 //! three contexts the sdk hands a command, a tool and a contributor.
 
-use std::any::Any;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use bingo_sdk::{
     Answer, AnswerSpec, Attachment, CancellationToken, Catalog, CatalogEntry, CatalogKind,
-    ClientIdentity, CloseReason, CommandContext, ContextQuery, ContextUsage, Delivery, Env,
-    GatewayStream, HostApi, HostHandle, Input, IntentId, InteractionKind, Item, ItemBody, ItemId,
-    KernelError, ModelCapabilities, OpenOptions, Page, Pages, Prompter, SessionFilter, SessionId,
-    SessionSelector, SessionSummary, ToolContext, ToolHost, TurnId, Usage,
+    CommandContext, ContextQuery, ContextUsage, Env, HostHandle, InteractionKind, Item, ItemBody,
+    ItemId, KernelError, ModelCapabilities, Page, Pages, Prompter, SessionId, SessionSummary,
+    ToolContext, ToolHost, TurnId, Usage,
 };
 use jiff::Timestamp;
 
@@ -88,101 +85,40 @@ pub(crate) static PAGES: Pages = Pages(&[
 /// A host that is nothing but its loaded plugins and what each of them wrote
 /// about itself: the two doors a page travels through (ADR-0054 §1).
 pub(crate) fn host_with_pages(written: &[(&str, Pages)]) -> HostHandle {
-    HostHandle(Arc::new(PluginHost {
-        plugins: written.iter().map(|(id, _)| (*id).to_string()).collect(),
-        pages: written
-            .iter()
-            .map(|(id, pages)| (Pages::key(id), Arc::new(*pages)))
-            .collect(),
-    }))
-}
-
-/// A command context reads its session, its directory and a host; a skill
-/// command asks the host for the pages and nothing else, so every other answer
-/// here would be a bug.
-struct PluginHost {
-    plugins: Vec<String>,
-    pages: HashMap<String, Arc<Pages>>,
-}
-
-#[async_trait]
-impl HostApi for PluginHost {
-    async fn sessions(&self, _filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        unreachable!("a skill reads no session list")
-    }
-
-    async fn open(
-        &self,
-        _selector: SessionSelector,
-        _who: ClientIdentity,
-        _options: OpenOptions,
-    ) -> Result<Attachment, KernelError> {
-        unreachable!("a skill opens no session")
-    }
-
-    async fn close(&self, _session: &SessionId, _reason: CloseReason) -> Result<(), KernelError> {
-        unreachable!("a skill closes no session")
-    }
-
-    async fn delete(&self, _session: &SessionId) -> Result<(), KernelError> {
-        unreachable!("a skill deletes no session")
-    }
-
-    async fn deliver(
-        &self,
-        _to: &SessionId,
-        _intent: IntentId,
-        _input: Input,
-        _delivery: Delivery,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double delivers nothing")
-    }
-
-    async fn extend(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double extends nothing")
-    }
-
-    async fn signal(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double signals nothing")
-    }
-
-    async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
-        assert_eq!(kind, CatalogKind::Plugins, "a skill reads no other catalog");
-        Ok(Catalog {
-            kind,
-            entries: self
-                .plugins
-                .iter()
-                .map(|id| CatalogEntry {
-                    id: id.clone(),
-                    label: id.clone(),
-                    meta: serde_json::Value::Null,
-                })
-                .collect(),
+    let host = bingo_sdk::testing::TestHost::default();
+    let entries: Vec<_> = written
+        .iter()
+        .map(|(id, pages)| {
+            host.services()
+                .add(
+                    Pages::key(id),
+                    bingo_sdk::service::Service {
+                        value: Arc::new(*pages),
+                        wire: None,
+                    },
+                )
+                .expect("one entry per plugin");
+            CatalogEntry {
+                id: (*id).into(),
+                label: (*id).into(),
+                meta: serde_json::Value::Null,
+            }
         })
-    }
-
-    fn gateway_events(&self) -> GatewayStream {
-        unreachable!("a skill watches no gateway")
-    }
-
-    fn service_any(&self, key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
-        self.pages
-            .get(key)
-            .map(|pages| Arc::clone(pages) as Arc<dyn Any + Send + Sync>)
-    }
+        .collect();
+    host.on_catalog(move |kind| {
+        assert_eq!(kind, CatalogKind::Plugins, "a skill reads no other catalog");
+        let entries = entries.clone();
+        async move { Ok(Catalog { kind, entries }) }
+    });
+    host.on_sessions(|_| async { unreachable!("a skill reads no session list") });
+    host.on_open(|_, _, _| async { unreachable!("a skill opens no session") });
+    host.on_close(|_, _| async { unreachable!("a skill closes no session") });
+    host.on_delete(|_| async { unreachable!("a skill deletes no session") });
+    host.on_deliver(|_, _, _, _| async { unreachable!("this double delivers nothing") });
+    host.on_extend(|_, _, _, _| async { unreachable!("this double extends nothing") });
+    host.on_signal(|_, _, _, _| async { unreachable!("this double signals nothing") });
+    host.on_gateway_events(|| unreachable!("a skill watches no gateway"));
+    host.handle()
 }
 
 pub(crate) fn command_context() -> CommandContext {
