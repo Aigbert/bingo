@@ -37,8 +37,12 @@ async fn prompt(images: bool) -> (Value, Image) {
         let mut stream = provider.stream(request(parts), CancellationToken::new()).await.unwrap();
         while let Some(event) = stream.next().await { event.unwrap(); }
     }).await.expect("the fake agent finishes");
-    let heard = fake.first("session/prompt").unwrap()["prompt"].clone();
+    let mut heard = fake.first("session/prompt").unwrap()["prompt"].clone();
     sessions.close().await;
+    let first = heard[0]["text"].as_str().unwrap();
+    assert!(first.starts_with("You have bingo's own tools over MCP") && first.ends_with("\n\nbefore"),
+        "the opening preamble precedes the first user part: {first}");
+    heard[0]["text"] = json!("before");
     (heard, image)
 }
 

@@ -16,7 +16,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use agent_client_protocol_schema::v1::{
     CancelNotification, ContentBlock, PromptRequest, PromptResponse, SessionId as AcpSessionId,
-    TextContent,
+    ImageContent, TextContent,
 };
 use async_trait::async_trait;
 use bingo_sdk::{
@@ -113,7 +113,7 @@ struct Asking {
     /// has to open a conversation from nothing.
     history: Vec<Message>,
     /// What the person just said, which is all of the fold that crosses.
-    asked: String,
+    asked: Vec<ContentPart>,
     tools: Vec<ToolSpec>,
     reasoning: Option<Effort>,
     model: String,
@@ -163,14 +163,14 @@ impl Asking {
     /// opened child has its own first words, and a turn asked again on one
     /// must say them.
     async fn prompt(&self, link: &Link) -> PromptRequest {
-        let text = match link.take_preamble().await {
-            Some(said) => format!("{said}\n\n{}", self.asked),
-            None => self.asked.clone(),
-        };
-        PromptRequest::new(
-            AcpSessionId::new(link.acp.as_str()),
-            vec![ContentBlock::Text(TextContent::new(text))],
-        )
+        let mut prompt = said(&self.asked, link.capabilities.prompt_capabilities.image);
+        if let Some(preamble) = link.take_preamble().await {
+            match prompt.first_mut() {
+                Some(ContentBlock::Text(first)) => first.text = format!("{preamble}\n\n{}", first.text),
+                _ => prompt.insert(0, ContentBlock::Text(TextContent::new(preamble))),
+            }
+        }
+        PromptRequest::new(AcpSessionId::new(link.acp.as_str()), prompt)
     }
 }
 
@@ -261,27 +261,37 @@ fn nobody() -> ProviderError {
 /// The turns before this one, and what the person just said. ACP is stateful,
 /// so only the second crosses. Consuming: both halves outlive the request they
 /// came from, because the turn may have to be asked again.
-fn split(mut messages: Vec<Message>) -> (Vec<Message>, String) {
+fn split(mut messages: Vec<Message>) -> (Vec<Message>, Vec<ContentPart>) {
     match messages.last() {
         Some(last) if last.role == Role::User => {
-            let asked = said(last);
-            messages.pop();
+            let asked = messages.pop().map(|message| message.parts).unwrap_or_default();
             (messages, asked)
         }
         // No trailing user turn — a continuation the kernel asked for, or a
         // request built by hand. The whole fold is history and there is
         // nothing new to say.
-        _ => (messages, String::new()),
+        _ => (messages, Vec::new()),
     }
 }
 
-fn said(message: &Message) -> String {
-    message
-        .parts
-        .iter()
-        .filter_map(ContentPart::as_text)
-        .collect::<Vec<_>>()
-        .join("\n")
+/// Keep the user's order and decide from the link carrying this attempt.
+fn said(parts: &[ContentPart], images: bool) -> Vec<ContentBlock> {
+    let prompt: Vec<_> = parts.iter().filter_map(|part| match part {
+        ContentPart::Text { text } => Some(ContentBlock::Text(TextContent::new(text.clone()))),
+        ContentPart::Image(image) if images => Some(ContentBlock::Image(ImageContent::new(
+            image.data.clone(), image.media_type.clone(),
+        ))),
+        ContentPart::Image(image) => Some(ContentBlock::Text(TextContent::new(format!(
+            "[picture not sent: {} {}; this agent does not take pictures]",
+            image.media_type, bingo_sdk::bytes::words(image.decoded_len()),
+        )))),
+        _ => None,
+    }).collect();
+    if prompt.is_empty() {
+        vec![ContentBlock::Text(TextContent::new(""))]
+    } else {
+        prompt
+    }
 }
 
 /// The turn, as a stream. The asking runs on a task of its own so the stream
@@ -596,13 +606,13 @@ mod tests {
             Message::text(Role::User, "and the tests?"),
         ];
         let (history, asked) = split(messages.clone());
-        assert_eq!(asked, "and the tests?");
+        assert_eq!(asked, vec![ContentPart::text("and the tests?")]);
         assert_eq!(history.len(), 2);
 
         let mut only_the_first = messages;
         only_the_first.truncate(1);
         let (history, asked) = split(only_the_first);
-        assert_eq!(asked, "rename the module");
+        assert_eq!(asked, vec![ContentPart::text("rename the module")]);
         assert!(history.is_empty(), "a first turn has no history to carry");
     }
 
@@ -619,7 +629,7 @@ mod tests {
             }]),
         ];
         let (history, asked) = split(messages);
-        assert_eq!(asked, "");
+        assert!(asked.is_empty());
         assert_eq!(history.len(), 2);
     }
 
