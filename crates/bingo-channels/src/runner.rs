@@ -13,7 +13,7 @@ use bingo_sdk::{
     Activation, Answer, Applied, Attachment, CancelReason, ClientIdentity, Delivery, ErrorCode,
     Event, Frame, FrameStream, HostHandle, Image, Input, IntentId, InteractionId, KernelError,
     OpenOptions, Origin, SessionChange, SessionHandle, SessionId, SessionSelector, SessionSpec,
-    SessionState,
+    TreeState,
 };
 use futures::StreamExt;
 use tokio::sync::mpsc;
@@ -43,9 +43,8 @@ pub struct Runner {
     conversation: Conversation,
     key: String,
     cwd: std::path::PathBuf,
-    root: SessionId,
     /// One reducer per session in the tree, the root's from the snapshot.
-    states: BTreeMap<SessionId, SessionState>,
+    tree: TreeState,
     events: FrameStream,
     handle: SessionHandle,
     deliverer: Deliverer,
@@ -97,9 +96,8 @@ impl Runner {
             host: host.clone(),
             adapter,
             conversation,
-            root: session.clone(),
             cwd,
-            states: BTreeMap::from([(session, snapshot)]),
+            tree: TreeState::new(snapshot),
             events,
             handle,
             deliverer,
@@ -120,7 +118,7 @@ impl Runner {
     /// goes away — and then this conversation is nobody's to reach.
     pub async fn run(mut self) {
         self.pump().await;
-        self.directory.leave(&self.root);
+        self.directory.leave(&self.tree.root().summary.id);
     }
 
     async fn pump(&mut self) {
@@ -144,41 +142,30 @@ impl Runner {
     }
 
     async fn saw(&mut self, frame: &Frame) {
-        let Some(state) = self.state_of(frame) else {
-            return;
-        };
-        if state.apply(frame) == Applied::Stale {
+        if self.tree.apply(frame) == Applied::Stale {
             return;
         }
         if !self.concerns_this_chat(frame) {
             return;
         }
-        let state = self.states[&frame.session].clone();
-        let ops = self.deliverer.apply(frame, &state, Instant::now());
+        let Some(state) = self.tree.get(&frame.session) else {
+            return;
+        };
+        let ops = self.deliverer.apply(frame, state, Instant::now());
         self.perform(ops).await;
     }
 
     /// A sub-session's prose is its parent's to report; its questions are
     /// nobody else's, so those reach the chat (ADR-0010 §3).
     fn concerns_this_chat(&self, frame: &Frame) -> bool {
-        frame.session == self.root
-            || matches!(
-                frame.event,
-                Event::InteractionOpened { .. }
-                    | Event::InteractionResolved { .. }
-                    | Event::InteractionCancelled { .. }
-            )
-    }
-
-    fn state_of(&mut self, frame: &Frame) -> Option<&mut SessionState> {
-        if !self.states.contains_key(&frame.session) {
-            let Event::SessionUpdated { summary } = &frame.event else {
-                return None;
-            };
-            self.states
-                .insert(frame.session.clone(), SessionState::new(summary.clone()));
-        }
-        self.states.get_mut(&frame.session)
+        self.tree.get(&frame.session).is_some()
+            && (frame.session == self.tree.root().summary.id
+                || matches!(
+                    frame.event,
+                    Event::InteractionOpened { .. }
+                        | Event::InteractionResolved { .. }
+                        | Event::InteractionCancelled { .. }
+                ))
     }
 
     async fn perform(&mut self, ops: Vec<Op>) {
@@ -216,7 +203,7 @@ impl Runner {
         if self.working.is_some() {
             return;
         }
-        let Some(at) = self.directory.parent(&self.root) else {
+        let Some(at) = self.directory.parent(&self.tree.root().summary.id) else {
             return;
         };
         let adapter = Arc::clone(&self.adapter);
@@ -287,11 +274,7 @@ impl Runner {
         text: &str,
         question: Option<Question>,
     ) -> Result<(), ChannelError> {
-        let answer = self
-            .states
-            .get(&self.root)
-            .map(|state| self.adapter.final_answer(text, state))
-            .unwrap_or_else(|| text.to_string());
+        let answer = self.adapter.final_answer(text, self.tree.root());
         let said = self.say(&answer).await;
         let asked = match question {
             Some(question) => self.ask(question).await,
@@ -427,7 +410,7 @@ impl Runner {
         post(
             Arc::clone(&self.adapter),
             self.conversation.clone(),
-            self.directory.parent(&self.root),
+            self.directory.parent(&self.tree.root().summary.id),
             text.to_string(),
             mode,
         )
@@ -442,7 +425,7 @@ impl Runner {
                 parent,
                 ..
             } => {
-                self.directory.under(&self.root, parent);
+                self.directory.under(&self.tree.root().summary.id, parent);
                 self.said(&principal, text, images).await;
             }
             Incoming::Click {
@@ -495,7 +478,7 @@ impl Runner {
         self.stop_current_turn().await;
         if let Err(error) = self
             .host
-            .reconfigure(&self.root, SessionChange::Key(None))
+            .reconfigure(&self.tree.root().summary.id, SessionChange::Key(None))
             .await
         {
             tracing::warn!(%error, key = %self.key, "the old session could not release its route");
@@ -513,7 +496,10 @@ impl Runner {
                 tracing::warn!(%error, key = %self.key, "the new session could not open");
                 if let Err(restore) = self
                     .host
-                    .reconfigure(&self.root, SessionChange::Key(Some(self.key.clone())))
+                    .reconfigure(
+                        &self.tree.root().summary.id,
+                        SessionChange::Key(Some(self.key.clone())),
+                    )
                     .await
                 {
                     tracing::warn!(
@@ -535,7 +521,7 @@ impl Runner {
     }
 
     async fn stop_current_turn(&mut self) {
-        let busy = self.states.get(&self.root).is_some_and(SessionState::busy);
+        let busy = self.tree.root().busy();
         if !busy && self.streaming.is_none() && self.working.is_none() {
             return;
         }
@@ -560,7 +546,7 @@ impl Runner {
     }
 
     fn replace_attachment(&mut self, attachment: Attachment) {
-        let old_root = self.root.clone();
+        let old_root = self.tree.root().summary.id.clone();
         let Attachment {
             session,
             snapshot,
@@ -578,8 +564,7 @@ impl Runner {
                 parent,
             },
         );
-        self.root = session.clone();
-        self.states = BTreeMap::from([(session, snapshot)]);
+        self.tree = TreeState::new(snapshot);
         self.events = events;
         self.handle = handle;
         self.deliverer.reset();
@@ -722,5 +707,60 @@ async fn attach(
             .await
         }
         other => other,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{fixtures, loopback::Loopback};
+    use bingo_sdk::{CloseReason, ParentLink};
+
+    #[tokio::test]
+    async fn a_deleted_child_leaves_the_chat_fold() {
+        let host = bingo_sdk::testing::TestHost::with_sessions(Vec::new()).handle();
+        let adapter = Arc::new(Loopback::new(Default::default()));
+        let mut runner = Runner::open(
+            &host,
+            adapter,
+            Conversation::direct("chat"),
+            "/tmp".into(),
+            Gate::default(),
+            Directory::default(),
+            mpsc::channel(1).1,
+        )
+        .await
+        .unwrap();
+        let mut summary = fixtures::summary();
+        summary.id = SessionId::from_raw("child");
+        summary.parent = Some(ParentLink {
+            session: runner.tree.root().summary.id.clone(),
+            item: None,
+        });
+        let id = summary.id.clone();
+        let announce = Frame {
+            session: id.clone(),
+            ..fixtures::frame(1, Event::SessionUpdated { summary })
+        };
+        runner.saw(&announce).await;
+        assert!(runner.tree.get(&id).is_some());
+        let deleted = Frame {
+            session: id.clone(),
+            ..fixtures::frame(
+                2,
+                Event::SessionClosed {
+                    reason: CloseReason::Deleted,
+                },
+            )
+        };
+        runner.saw(&deleted).await;
+        assert!(runner.tree.get(&id).is_none());
+        runner
+            .saw(&Frame {
+                session: id.clone(),
+                ..fixtures::says(3, "late", "gone")
+            })
+            .await;
+        assert!(runner.tree.get(&id).is_none());
     }
 }
