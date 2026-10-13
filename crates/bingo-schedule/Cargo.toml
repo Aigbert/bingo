@@ -12,6 +12,7 @@ description = "Schedules plugin for bingo: deferred and recurring turns on a ses
 workspace = true
 
 [dependencies]
+bingo-shelf.workspace = true
 bingo-claim.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
@@ -23,11 +24,6 @@ thiserror.workspace = true
 # arithmetic in the machine's own zone, and a DST jump is the reason the
 # spec brick is pure and property-tested (ADR-0019 §2).
 jiff.workspace = true
-# M16: an entry's id is a minted slug, the way an experience's is.
-ulid.workspace = true
-# M16: the creation card shows the entry file it would write as a diff, the
-# way `ExperienceCommit` shows its own. Already in the tree.
-similar.workspace = true
 # The timer loop sleeps to the next fire and wakes on a store change.
 tokio.workspace = true
 # A fire that cannot open a session is a log line, never a panicked loop.

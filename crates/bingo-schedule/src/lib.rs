@@ -24,10 +24,9 @@
 //! pretence of one: every surface shows the same line saying who holds them.
 
 mod command;
-mod diff;
+use bingo_shelf::diff;
 pub mod entry;
 pub mod guide;
-mod id;
 pub mod lock;
 mod render;
 pub mod runner;

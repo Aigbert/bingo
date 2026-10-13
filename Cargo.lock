@@ -676,18 +676,17 @@ dependencies = [
  "async-trait",
  "bingo-claim",
  "bingo-sdk",
+ "bingo-shelf",
  "insta",
  "jiff",
  "proptest",
  "schemars 1.2.2",
  "serde",
  "serde_json",
- "similar 3.2.0",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
- "ulid",
 ]
 
 [[package]]
