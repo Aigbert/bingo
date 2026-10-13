@@ -14,6 +14,8 @@ use serde_json::Value;
 mod fold;
 pub use fold::text_children;
 mod read;
+mod validate;
+pub use validate::{answer_ok, published_ok};
 mod style;
 pub use style::*;
 #[cfg(test)]
@@ -132,7 +134,7 @@ pub enum View {
     },
     #[serde(rename = "Engine")]
     Engine {
-        component: String,
+        component: crate::render::Component,
         props: Value,
     },
     Custom {

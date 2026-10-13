@@ -79,3 +79,5 @@ pub use tokio_util::sync::CancellationToken;
 pub mod catalogue;
 
 pub mod invocation;
+
+pub mod render;
