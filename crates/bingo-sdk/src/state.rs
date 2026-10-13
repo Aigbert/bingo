@@ -49,6 +49,8 @@ pub struct SessionState {
     /// Plugin-owned live state, by plugin then kind: the latest `Signal`
     /// payload, gone on `Null` and after a resume (ADR-0013 §2).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub invalidated: BTreeMap<String, u64>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub signals: BTreeMap<String, BTreeMap<String, Value>>,
 }
 
@@ -129,6 +131,7 @@ impl SessionState {
             closed: false,
             extensions: BTreeMap::new(),
             signals: BTreeMap::new(),
+            invalidated: BTreeMap::new(),
         }
     }
 
@@ -208,6 +211,13 @@ impl SessionState {
                 kind,
                 payload,
             } => self.signalled(plugin, kind, payload),
+            Event::Invalidated { requests } => {
+                for request in requests {
+                    let generation = self.invalidated.entry(request.clone()).or_default();
+                    *generation = generation.saturating_add(1);
+                }
+                Applied::Signal
+            }
             Event::Lagged { .. } => Applied::Lagged,
         }
     }

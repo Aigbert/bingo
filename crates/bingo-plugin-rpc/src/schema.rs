@@ -249,7 +249,8 @@ mod tests {
             std::fs::write(
                 path.with_file_name("plugin-2.json"),
                 format!("{}\n", serde_json::to_string_pretty(&baseline).unwrap()),
-            ).expect("the authorized pre-release baseline is writable");
+            )
+            .expect("the authorized pre-release baseline is writable");
             return;
         }
         let committed = std::fs::read_to_string(&path).unwrap_or_default();
@@ -271,10 +272,14 @@ mod tests {
         loop {
             let mut refs = Vec::new();
             references(baseline, &mut refs);
-            let missing: Vec<_> = refs.into_iter()
+            let missing: Vec<_> = refs
+                .into_iter()
                 .filter_map(|name| name.strip_prefix("#/$defs/").map(str::to_owned))
-                .filter(|name| baseline["$defs"].get(name).is_none()).collect();
-            if missing.is_empty() { break; }
+                .filter(|name| baseline["$defs"].get(name).is_none())
+                .collect();
+            if missing.is_empty() {
+                break;
+            }
             for name in missing {
                 assert!(current["$defs"].get(&name).is_some(), "missing {name}");
                 baseline["$defs"][&name] = current["$defs"][&name].clone();

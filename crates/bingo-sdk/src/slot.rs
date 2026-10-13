@@ -8,6 +8,32 @@ use serde_json::Value;
 use crate::{ActionItem, ItemId, SessionState, Tone, View};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum Shown {
+    Pull {
+        request: crate::render::RenderRequest,
+    },
+    View(View),
+}
+impl From<View> for Shown {
+    fn from(view: View) -> Self {
+        Self::View(view)
+    }
+}
+impl Shown {
+    pub fn view(&self) -> Option<&View> {
+        match self {
+            Self::View(view) => Some(view),
+            Self::Pull { .. } => None,
+        }
+    }
+    pub fn published_ok(&self) -> bool {
+        self.view()
+            .is_none_or(|view| crate::view::published_ok(view).is_ok())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Slot {
     Status {
@@ -18,15 +44,33 @@ pub enum Slot {
     },
     Activity {
         verb: Option<String>,
-        view: View,
+        view: Shown,
     },
     Rail {
         title: String,
-        view: View,
+        view: Shown,
     },
     Panel {
         title: String,
-        view: View,
+        view: Shown,
+    },
+    Pane {
+        id: String,
+        title: String,
+        focus: bool,
+        #[serde(rename = "closeOnEscape")]
+        close_on_escape: bool,
+        #[serde(rename = "holdToasts")]
+        hold_toasts: bool,
+        asked: bool,
+        rows: u16,
+        view: Shown,
+    },
+    Toast {
+        text: String,
+        #[schemars(with = "String")]
+        until: Timestamp,
+        alert: bool,
     },
     Mode {
         current: String,
@@ -45,6 +89,21 @@ pub enum Slot {
     },
 }
 
+impl Slot {
+    pub fn published_ok(&self) -> bool {
+        match self {
+            Self::Activity { view, .. }
+            | Self::Rail { view, .. }
+            | Self::Panel { view, .. }
+            | Self::Pane { view, .. } => view.published_ok(),
+            Self::Row { body, .. } => body
+                .as_ref()
+                .is_none_or(|view| crate::view::published_ok(view).is_ok()),
+            _ => true,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Placed {
     pub plugin: String,
@@ -58,6 +117,7 @@ pub fn with(mut payload: Value, slots: impl IntoIterator<Item = Slot>) -> Value 
     if let Some(object) = payload.as_object_mut() {
         let slots = slots
             .into_iter()
+            .filter(Slot::published_ok)
             .filter_map(|slot| serde_json::to_value(slot).ok())
             .collect();
         object.insert("slots".into(), Value::Array(slots));
@@ -95,8 +155,9 @@ pub fn placed(state: &SessionState) -> Vec<Placed> {
                 .into_iter()
                 .flatten()
                 .filter_map(move |value| {
-                    serde_json::from_value(value.clone())
+                    serde_json::from_value::<Slot>(value.clone())
                         .ok()
+                        .filter(Slot::published_ok)
                         .map(|slot| Placed {
                             plugin: plugin.into(),
                             kind: kind.into(),
