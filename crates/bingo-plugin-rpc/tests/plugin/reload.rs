@@ -41,13 +41,16 @@ async fn a_manifest_change_reloads_once_and_keeps_global_state() {
             Ok(())
         }
     });
-    let manager = Manager::new(
-        Env::rooted(home.path()),
-        Default::default(),
-        Default::default(),
-    )
-    .with_dirs(vec![root.clone()]);
+    let manager = Arc::new(
+        Manager::new(
+            Env::rooted(home.path()),
+            Default::default(),
+            Default::default(),
+        )
+        .with_dirs(vec![root.clone()]),
+    );
     manager.start(project.path(), listener.host.handle()).await;
+    publish(&manager, &listener).await;
     let saved = reverse(
         &manager,
         project.path(),
@@ -71,6 +74,7 @@ async fn a_manifest_change_reloads_once_and_keeps_global_state() {
     tokio::time::timeout(Duration::from_secs(10), reloaded.notified())
         .await
         .unwrap();
+    register(&manager).await;
     assert_eq!(manager.commands().await.len(), 1);
     let read = reverse(
         &manager,

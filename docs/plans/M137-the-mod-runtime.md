@@ -82,8 +82,7 @@ Current paths and required adapters replace the original plan's stale paths.
 - `crates/bingo-plugin-rpc/Cargo.toml`, `src/{manifest,discovery,notice,tool,
   reload,state,host,lib,manager,bridge,source,service,validate,schema,
   wire_ts,events_ts}.rs`: shared mechanisms and runtime/grant adapters.
-  `tests/plugin/{harness,host,reload,services,context,intercept,provider,
-  tools,commands,lifecycle}.rs` and other fixtures driven by that harness: 
+  `tests/plugin/*.rs`: the integration harness and the fixtures it drives;
   register, publish grants and declare uses; preserve every assertion.
 - `crates/bingo-sdk/src/{lib,plugin,intercept,catalogue}.rs`, catalogue/payload.rs,
   tests/plugin_registration.rs;
@@ -693,3 +692,8 @@ Not run after the protocol stop:
 | `cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc` | Not run. |
 | `cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc` | Not run. |
 | `cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc` | Not run. |
+
+```text
+cargo test -p bingo-plugin-rpc --test plugin --locked
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+```
