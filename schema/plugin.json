@@ -2208,7 +2208,7 @@
             "string",
             "null"
           ],
-          "description": "Anchored regex on the tool name for the tool points."
+          "description": "Exact tool name or a trailing `*` prefix for the tool points."
         }
       },
       "required": [
