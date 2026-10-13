@@ -102,3 +102,39 @@ This is the first use of M113's version line.
   M114 checkpoint.rs and its witness verify only the anchor, so its codec
   must advance too. M116 already runs store I/O on a blocking worker.
   Producers already pass bounded Images through; no bridge redesign needed.
+
+- **STOP (2026-10-13, protocol steps 2/6):** the literal under-300-byte
+  journal-line criterion conflicts with the prescribed record shape. The
+  compact v2 user fixture is 374 bytes before newline, with one-character
+  session/item IDs, a one-byte picture, no path/cause/turn/completedAt,
+  and the required frame/item envelope, SHA-256 reference and dimensions.
+  Even omitting optional dimensions leaves 353 bytes. Real IDs add more.
+  Meeting 300 would require changing the envelope/payload encoding beyond
+  ADR-0065 §1 and ADR-0067 §2's reference substitution, or changing the
+  criterion. No such decision was made during implementation.
+  Options for the owner: apply the 300-byte bound to the picture reference
+  itself and separately bound frame overhead; raise the full-line bound;
+  or explicitly decide a compact v2 envelope and its compatibility rules.
+  All implementation work stops here pending that decision.
+
+## Verified (2026-10-13 — stopped, not complete)
+
+Contracts were committed before implementation; the runtime is unchanged.
+
+```text
+cargo test -p bingo-sdk pixel_contract --locked
+  dimensions_set_the_picture_estimate ... FAILED
+  left: 1600
+  right: 5334
+cargo test -p bingo-store-jsonl the_planned_v2_picture_line_is_under_300_bytes --locked
+  the_planned_v2_picture_line_is_under_300_bytes ... FAILED
+  v2 picture frame is 374 bytes, before newline
+```
+
+The first is the expected pre-implementation failure. The second exposes
+an incompatible acceptance criterion using the prescribed fixture alone.
+`cargo fmt --all -- --check` passed (exit 0, no output).
+Other new contracts (replay/deduplication/missing blob/request budget) are
+committed but not yet run; the stop precedes implementation and full gates.
+All exit criteria remain unticked. ADR-0067 remains proposed. No older
+binary was built, no live data was touched, and no push/merge/PR was made.
