@@ -1,9 +1,9 @@
 # ADR-0069 — A seam has a type
 
 Status: accepted · 2026-10-13 · Plan: M119 (§1–4).
-§5–6 remain proposed · Plan: M126.
+§5–6 accepted · 2026-10-14 · Plan: M126.
 Amends: ADR-0001 §5, ADR-0031 §2, §5, ADR-0054 §1, ADR-0057
-(Consequences)
+(Consequences), ADR-0003 §2/§4, ADR-0043 §4
 
 ## Context
 

@@ -2,154 +2,149 @@
 
 ## Goal
 
-ADR-0069 §5–6. The bin hands each surface a JSON object,
-`SurfaceOptions.args`, whose eight keys it writes in
-`crates/bingo/src/main.rs` (`surface_options`: `outputFormat`,
-`inputFormat`, `permissionPromptTool`, `noPrintOnExit`, `updateCheck`,
-`images`, `pictureCacheDays`, `measure`; `serve_options`: `transport`)
-and that print, rpc and the TUI read back by name. Before a host exists
-it settles settings by walks of its own (`update_wanted`, `tui_measure`,
-`demo_ui`: the highest layer naming a key wins; `channels_wanted`:
-`.any()`), while the kernel deep-merges. It re-spells two plugins'
-schemas: `bingo/src/mcp.rs` (`"bingo.mcp"`, `"mcpServers"`) and
-`provider.rs` (`INSTANCE_KEYS`, `instances`, `baseUrl`). A plugin is
-switched four ways.
-
-After this milestone each surface takes its own `Options`, the bin reads
-only what decides the composition and reads it through the kernel's
-merge, every other key is read by the plugin that claims it, and the bin
-imports plugin keys instead of spelling them. No wire change, no new
-dependency.
+Implement ADR-0069 §5–6: surface-owned typed options; one settings merge;
+plugin-owned settings keys and endpoint shapes. No wire change or dependency.
 
 ## Bricks, in build order
 
-1. **Contract tests first**, failing:
-   - a settings table through `bingo_core::settings::merge(layers,
-     claims)` with `Claim::from_manifest` over the static manifests: a
-     higher layer's `channels` turns chat off; the demo is composed on
-     `enabledPlugins["bingo.demo.ui"]: true` or `--demo-ui`, and not when
-     the key is absent; legacy `demoUi: true` still composes it;
-   - the TUI reads `tui.measure` and `update.check` from its slice at
-     `register`, through the deep merge;
-   - `bingo mcp add` writes what `bingo_mcp::Settings` reads, and
-     `bingo provider add` writes what each provider's `instances.rs`
-     reads, both in `crates/bingo/tests/cli`.
-2. **`SurfaceOptions.args` is deleted** (`bingo-sdk/src/surface.rs`).
-   It keeps `cwd`, `selector`, `prompt` and `env`. Every construction
-   (the bin's three, channels, the tests) loses the member.
-3. **Each surface owns its options.** Each is `Default`, for
-   compositions that run no surface (`provider_ids`, `bingo plugins`):
-   - print: `Options { output_format, input_format,
-     permission_prompt_tool, images }`. The three enums and their words
-     live in print and implement `FromStr`; `Cli` parses into them and
-     lists their values from print's constants.
-   - rpc: `Options { transport }`; `transport(&opts.args)` goes.
-   - TUI: `Options { print_on_exit, picture_cache_days }`.
-   `TuiPlugin::new`, `PrintPlugin::new` and `RpcPlugin::new` take them,
-   and `plugins()` takes a `Composition` carrying the three.
-4. **The TUI reads its own keys.** It claims `tui` and `update`
-   (`lib.rs`) and reads both slices at `register` with
-   `Registrar::config::<T>()`, keeping them for `run`.
-   `settings::given`, `run/updates.rs`'s `args` read and
-   `showing::cache_days(&opts.args)` go; the cache days come from
-   `Options`, filled from `KernelSettings` (`picture_cache_days`, added by this milestone).
-5. **The bin resolves once.** `Decided`, `update_wanted`,
-   `tui_measure`, `demo_ui` and `channels_wanted`'s walk are deleted.
-   The bin merges the layers with the static manifests' claims and
-   reads two answers: whether the demo is composed, and whether chat
-   starts (`bingo_channels::wanted` over the merged `channels` slice, or
-   `--channels`). `BINGO_FAKE_SCRIPT` stays an environment variable.
-6. **One switch.** `enabledPlugins` is the only key that switches a
-   plugin (ADR-0057). For one release:
-   - `demoUi: true` composes the demo, and the demo posts a notice
-     naming `enabledPlugins` when its slice holds `demoUi`;
-   - `experience.enabled: false` keeps working as it does at
-     `register`, with the same notice.
-   No settings file is rewritten. A dated line in each plugin says when
-   the legacy read goes.
-7. **The bin stops re-spelling.** `bingo/src/mcp.rs` imports the
-   manifest id and `SETTING` from `bingo-mcp`. `provider.rs` builds
-   `INSTANCE_KEYS` from the provider crates' key constants (openai owns
-   `openai` and `codex`) and writes an instance through that crate's
-   endpoint type (`OpenAiEndpoint` and its anthropic twin), so
-   `baseUrl` is spelled once, where `instances.rs` reads it.
-8. **Records.** ADR-0069 is accepted for §5–6. ADR-0003 §2 and §4,
-   ADR-0057 and ADR-0043 §4 get dated notes. The settings guide pages
-   say `enabledPlugins` for the demo and experience.
+1. Commit regression contracts: composition matches merged settings, higher
+   layers clear channels, explicit demo switches compose it, TUI registration
+   reads its slice, and CLI writers produce settings their plugins read.
+2. Delete `SurfaceOptions.args`; retain cwd, selector, prompt and env.
+   Update constructors and fixtures mechanically (protocol step 6).
+3. Print, RPC and TUI own `Options`, passed to their plugin constructors.
+   Print owns the CLI enums, `FromStr` implementations and possible values.
+   A bin `Composition` carries the three options; unused surfaces use defaults.
+4. TUI reads its claimed `tui` and `update` roots at registration. Measure
+   and update checks come from that slice; cache days come from typed options.
+5. Resolve composition using `settings::merge` and static manifest claims.
+   Remove `Decided` and the bin's settings walks. `KernelSettings` gains
+   picture cache days, with both existing spellings normalized before merging.
+6. `enabledPlugins` is the switch. Demo remains opt-in (`true` or `--demo-ui`).
+   Keep `demoUi` and `experience.enabled` for one release; their plugins emit
+   startup notices naming the replacement. Never rewrite settings for this.
+7. Bin imports MCP's manifest/key and provider key constants; provider add
+   serializes provider-owned endpoint types, omitting default/absent fields.
+8. Accept ADR-0069 §5–6; date notes in ADR-0003 §2/§4, ADR-0043 §4 and ADR-0057.
+   Update the experience and channels guides.
 
 ## Files
 
-- `crates/bingo-sdk/src/surface.rs`, `crates/bingo-core/src/settings{,/merge}.rs`
-- `crates/bingo-surface-print/src/{lib,input,render,options}.rs`, hosted tests
-- `crates/bingo-surface-rpc/src/lib.rs`
-- `crates/bingo-surface-tui/src/{lib,run,settings}.rs`, `run/{showing,updates}.rs`
-- `crates/bingo-channels/src/{lib,settings}.rs`
-- `crates/bingo-demo-ui/src/lib.rs`, `crates/bingo-experience/src/lib.rs`
-- `crates/bingo-mcp/src/lib.rs`, `crates/bingo-provider-{openai,anthropic}/src/{lib,settings,instances}.rs`
-- `crates/bingo/src/{main,composition,mcp,provider,plugins}.rs`, `crates/bingo/tests/cli/`
-- every guide page that names `demoUi` or `experience.enabled`
-- `docs/adr/{0003,0043,0057,0069}-*.md`
+- `bingo-sdk/src/surface.rs`; `bingo-core/src/settings{,/merge}.rs`.
+- Print `lib`, `input`, `render`, `options`, `hosted`, `stream_json`;
+  RPC `lib`; TUI `lib`, `settings`, `run`, `run/{showing,updates}`, `doubles`.
+- Channels host test constructors and guide; demo/experience `lib` and guide.
+- MCP `lib`; provider-openai/anthropic `lib`, `settings`, `instances`.
+- Bin `main`, `composition`, `mcp`, `provider`, `plugins/`, `tests/cli/`.
+- ADRs 0003, 0043, 0057, 0069. Paths above are under `crates/`.
 
 ## Exit criteria
 
-- [ ] The settings table test passes; the failing first run is pasted.
-- [ ] `rg 'opts\.args|\bargs: json!|pub args' crates/bingo-sdk/src crates/bingo-surface-print/src crates/bingo-surface-rpc/src crates/bingo-surface-tui/src crates/bingo/src`
-      finds nothing.
-- [ ] `rg 'fn (update_wanted|tui_measure|channels_wanted|demo_ui)\b|struct Decided' crates/bingo/src`
-      finds nothing.
-- [ ] `rg '"bingo\.mcp"|"mcpServers"|"baseUrl"' crates/bingo/src`
-      finds nothing.
-- [ ] CLI black-box tests pass unchanged for `--print` with every
-      `--output-format`, `--input-format stream-json`,
-      `--permission-prompt-tool stdio` and `--image`, and for
-      `bingo serve --stdio`: exit status, stdout purity, NDJSON validity.
-- [ ] A black-box test: `demoUi: true` composes the demo and writes the
-      notice to stderr; with no key the demo is absent from
-      `bingo plugins`.
-- [ ] `scripts/tui-smoke.sh` passes, and a tmux drive starts the TUI with
-      `tui.measure` and `update.check: false` in a project layer and
-      shows both honoured.
-- [ ] All gates of the upgrade protocol, plus the Windows cross-check
-      for the bin and the three surfaces.
+- [x] Composition settings table passes; failing first run is pasted.
+- [x] No `SurfaceOptions.args` or surface `opts.args`; broad `pub args` /
+  `args: json!` matches only existing command/action arguments.
+- [x] No `Decided`, `update_wanted`, `tui_measure`, `channels_wanted`, `demo_ui`
+  functions in the bin, nor literal `"bingo.mcp"`, `"mcpServers"`, `"baseUrl"`.
+- [x] CLI black-box tests preserve all print formats, stream-json input,
+  stdio permission prompts, images and `serve --stdio`; help pins values.
+- [x] Legacy demo composes and reports `enabledPlugins` on stderr; absent
+  demo is not listed; the new switch lists it.
+- [x] TUI smoke passes and an owned tmux drive proves project-layer measure
+  and disabled update checks are honoured.
+- [x] Upgrade gates pass; every touched crate receives an MSVC check,
+  deferring missing third-party C headers to Windows CI per protocol.
 
 ## Non-goals
 
-- `BINGO_FAKE_SCRIPT` as a setting; it selects a harness.
-- External surfaces over plugin-rpc, and `uses` in `plugin.json` (M132).
-- New settings keys, a settings file format change, or a migration that
-  rewrites a person's files.
+Other milestones, external surfaces, live/credential tests, new dependencies,
+settings-file rewrites, and changing `BINGO_FAKE_SCRIPT` into a preference.
+Never push, merge, open a PR, or touch another run's tmux/processes.
 
 ## Risks
 
-- The deep merge changes two answers: a higher layer can now turn chat
-  off, and `channels` objects in two layers merge instead of either
-  sufficing. Say both in the commit body and in the channels guide.
-- `--help` must still list each flag's values. Print's constants feed
-  `possible_values`; a CLI help snapshot pins it.
-- The demo was on by default nowhere, but a person with `demoUi: true`
-  must see one release of notice before it stops working.
-- Re-verify at start: the `main.rs` functions above by name, M119's
-  `uses` and constructor shape, `Registrar::config` (`sdk/plugin.rs`),
-  `Claim::from_manifest` (`core/settings.rs`), each provider's
-  `instances.rs` and which crate owns `codex`, and that no plugin-rpc
-  message carries `SurfaceOptions`.
+- Higher layers can clear channels; channel objects merge field by field.
+  The channels guide and implementation commit explain both changes.
+- Empty picture objects now preserve lower leaves, consistent with the kernel
+  merge; explicit null still clears. Both cache-day spellings retain precedence.
+- Keep TUI `run.rs` changes to option plumbing; M135 edits that file too.
+- Broad args searches also find SDK command/action args and M123's slot test;
+  those are not surface options and stay. No schema message carries them.
 
 ## Re-verified (2026-10-13, f9eb788a)
 
-- M108–M125 and M127–M134 are present; branch and worktree are clean.
-  M134's ACP is an agent; composition retains its existing constructor.
-- All named layer walks and `SurfaceOptions.args` remain. TUI already claims
-  both roots; only its registration read is missing. Print has `Mode` and
-  `input::Format` today; promote those to the public option enums.
-- `KernelSettings` has no cache-days field: add it in settings/merge and
-  read pictures through the same deep merge, retaining validation and aliases.
-- M130's channels `wanted` takes `Platforms`; use the merged claimed slice.
-  Claims come from the build's manifests, including the opt-in demo.
-- Provider endpoint shapes are in `settings.rs`, re-exported by `lib.rs`;
-  add exported key constants and serialization there. OpenAI owns codex.
-- No plugin-rpc message carries `SurfaceOptions`; regenerate schemas/fixtures
-  only with `BINGO_UPDATE_SCHEMA=1` (including M133's TS wire if affected).
-- Mechanical constructor updates include channels host tests, TUI doubles/run
-  tests and print hosted tests. Keep TUI run.rs changes to option plumbing.
-- Guides are crate-local (`bingo-experience/src/guide.md`, channels guide).
-  No new dependency; no live/credential tests; only this run's tmux session.
+Committed before implementation as `89a0be07`. Clean branch
+`m126-composition-is-typed`; M108–M125 and M127–M134 are present.
+M134 ACP remains an agent. M130 `wanted` takes `Platforms`. TUI already
+claims both roots, but did not read them at registration. Kernel settings
+had no cache-days field. Endpoint types live in provider `settings.rs`;
+OpenAI owns codex. `plugins` is now a directory. No plugin-rpc message carries
+`SurfaceOptions`. Mechanical constructor/import updates include channels
+host tests, TUI doubles/run tests and print hosted/stream-json tests.
+Use `BINGO_UPDATE_SCHEMA=1` for any generated fixture, including M133 TS wire.
+
+## Verified (2026-10-14)
+
+First red runs (`a4190d35`), trimmed:
+```text
+cargo test -p bingo --bin bingo composition_matches_the_merged_settings_table --locked
+assertion `left == right` failed: demo: ... enabledPlugins ... bingo.demo.ui ... true
+  left: false
+ right: true
+cargo test -p bingo-surface-tui registration_validates_the_claimed_settings --locked
+assertion failed: TuiPlugin.register(&mut registrar).is_err()
+```
+Final native gates ran separately, in order. No live/credential-backed tests:
+```text
+cargo fmt --all -- --check
+exit 0 (no output)
+cargo check --workspace --all-targets --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.57s
+cargo clippy --workspace --all-targets --locked -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.67s
+cargo test --workspace --locked -- --test-threads=1 --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed
+exit 0; summed results: 5150 passed; 0 failed; 4 existing ignored
+CLI: test result: ok. 258 passed; 0 failed; 0 ignored
+PTY: test result: ok. 16 passed; 0 failed; 0 ignored
+TUI: test result: ok. 1123 passed; 0 failed; 2 ignored
+cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1
+test result: ok. 1 passed; 0 failed
+cargo test -p bingo-provider-acp --test bridge token --locked -- --test-threads=1
+test result: ok. 3 passed; 0 failed
+scripts/check_discipline.sh
+discipline ok
+scripts/budget.sh
+dependencies (unique, normal): 355 (max  355)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 5 GB (soft max  5)
+budget ok
+cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+```
+The first workspace run found a missing `list` in the new demo test and a
+room test that passed alone; the final serialized run passed both. The next
+run found the guide’s legacy-example check; documenting the supported legacy
+spelling fixed it without changing that test. No PTY retries were needed.
+
+MSVC: ran `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`
+separately for all 12 touched crates (names below omit `bingo-`):
+```text
+core, demo-ui, experience, sdk, surface-rpc: PASS
+bingo: DEFER aws-lc-sys, tree-sitter, tree-sitter-bash; stdio.h/stdlib.h/windows.h missing
+channels, mcp, provider-anthropic, provider-openai, surface-print, surface-tui:
+DEFER aws-lc-sys; stdlib.h/windows.h missing
+```
+Seven C-header checks remain for Windows CI (step 7); no Rust errors.
+Removal searches found only existing command/action args and the slot test.
+
+`scripts/tui-smoke.sh` ran under a new private `TMUX_TMPDIR`: `tui-smoke ok`.
+An owned tmux settings drive printed the following (middle four rows omitted):
+```text
+project tui.measure=30 overrides user measure=96:
+⏺ m12600 m12601 m12602 m12603
+  m12620 m12621 m12622 m12623
+project update.check=false overrides user true: no update.json stamp
+owned tmux settings drive: PASS
+```
+Owned tmux servers and temporary homes were removed. No wire/schema fixture changed.
+No push, merge or PR; stop at M126. Only approved Windows C-header deferrals remain.
