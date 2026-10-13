@@ -2,162 +2,73 @@
 
 ## Goal
 
-ADR-0078 §1. Every event a link can hook gets one name, `<noun>.<verb>`,
-and one entry in `bingo_sdk::catalogue`, generated to `schema/events.json`
-and `sdk/typescript/src/events.ts` in Claude Code's spelling. New chains
-and observations join ADR-0074's seven at existing call sites, and a service
-that declares its face becomes a noun whose calls are events. The runtime
-is M137's. With no link installed, a person sees no change.
+ADR-0078 §1: one SDK catalogue names kernel and service-face events, generates
+JSON Schema and TypeScript, and raises chains and observations at existing doors. M136 only; the embedded runtime is M137. No installed link means unchanged behaviour.
 
-## Bricks, in build order
+## Bricks
 
-1. **Contract and failing tests** (`bingo-sdk`, `catalogue.rs`).
-   `Entry { name, kind: Chain | Observation, input, result, matcher,
-   pinned, acts }`: `input`/`result` are `fn() -> Schema` over the Rust
-   type, never hand-written JSON; `matcher`, the fields the host
-   pre-filters on before crossing; `pinned`, JSON pointers no link may
-   change; `acts`, which of deny, rewrite and answer a link may do.
-   `catalogue!` defines each `pub const` and `ALL` from one list; M131's
-   `LinkPoint` becomes `&'static Entry`, its seven first. Raising takes
-   `&'static Entry`, so an unnamed kernel event does not compile, and
-   `check_discipline.sh` fails an `Entry {` literal outside
-   `catalogue.rs`. A `BINGO_UPDATE_SCHEMA` test writes
-   `schema/events.json`, as for `schema/rpc.json`; it fails first.
-2. **Claude Code's spelling** (ADR-0079 §1). Each entry's types are named
-   as Claude Code names them (`ToolCall`, `Turn`, …) and carry its field
-   names through serde, so `e` reaches a mod unmapped. `tool.call`'s `e`
-   is the tool's input flattened beside the pinned `tool` and
-   `tool_use_id`, and its result carries `isError`. `turn/late.rs`
-   `gather` drops, with one notice, a plugin tool whose input names
-   either field. `crates/bingo/tests/catalogue.rs` composes the built-in
-   plugins and fails if any of their tools' input schemas does.
-3. **Pure bricks, table-tested.** `Pattern::parse` (a name, `ns.*`, `*`,
-   `!p`) and `matches`; `prefilter(scalars, e)` over the `matcher` fields,
-   never excluding what the full matcher admits; `pinned_changed(before,
-   after, pinned)`; M131's `admits` read through `acts`. Patterns and the
-   scalar matcher share M133's `on.ts` case table, moved to
-   `sdk/typescript/test/cases.json`: host and runtimes, one table.
-4. **The JSON chain.** `Interceptor::chain(entry, cx, Value,
-   Next<Value>)` defaults to `next.run(input)`, `observe(entry, cx,
-   &Value)` to nothing; `LinkMatcher` becomes `{ patterns, prefilter }`.
-   M131's `chain::run` checks each link's act and pinned fields against
-   the entry and skips an overstepping link with one notice (plugin,
-   event, field). The seven typed methods' defaults serialize into
-   `chain` (a wrong shape is a skipped link), so a runtime that
-   implements only `chain` hooks every point.
-5. **New kernel chains**, each a kernel link around an existing call site, one
-   module each under `chain/`:
-   - `tool.describe`: the round's specs after `gather`, matcher `name` (the existing ToolSpec field);
-     a link rewrites or drops a spec, never adds one (`name` pinned).
-   - `prompt.autocomplete`: `HostApi::catalog`'s answer (`host.rs:904`);
-     matcher `kind`.
-   - `session.send` at `HostApi::deliver` (`host.rs:792`), before the
-     mailbox, matcher `to`; `session.receive` at the actor's `deliver`
-     (`session/inputs.rs:169`), matcher `origin.surface`. One delivery is
-     raised once out and once in.
-   - `session.append`: the actor's `extend` (`session.rs:230`), matcher
-     `plugin`, `kind`; rewrites only of the link's own plugin's rows.
-   - `turn.complete`: at the turn's end (`session.rs:800`), on the turn's
-     id, outcome, usage and answer text. Its result is text drawn under
-     the answer: the kernel link answers none, `next` resolves to what
-     the links beneath answered, and a non-empty answer is appended as an
-     `Item::Notice` after `TurnCompleted`.
-   - `command.run`: `session/commands.rs` `spawn`; matcher `name`.
-     `command.describe`: the `Commands` catalog entries.
-   - `config.set`: one `config::set` that model/thinking commands and the live
-     plugin switch call, running the chain before anything is
-     reconfigured or remembered; matcher `key`. `config.describe`: the
-     `ConfigView` before `Event::ConfigChanged` is sent.
-6. **Observations.** A pure `observed(&Event) -> Option<(&'static Entry,
-   Value)>` reads `turn.start` (`TurnStarted`) and `session.measure`
-   (`TurnUsage`'s context reading) off the stream; the payload is the
-   frame's own fields. `session.start` and `.end` come from `on_session`
-   (`session.rs:904`); `session.attach` and `.detach` from the client port's creation/drop,
-   carrying its existing `ClientIdentity`. `HostApi::close` has no identity
-   and does not detach; the port owns the actual attachment lifetime.
-   Observers run after the fact under the session's owner (M116).
-7. **Faces.** `WireService::face(&self) -> Option<Face>`, default `None`;
-   `Face { noun, methods }`, each method an `Entry` built at registration
-   with its input and result schema and whether it is unsafe (ADR-0078
-   §5). The external `ServiceSpec` gains `noun`, each method's `result`
-   and `unsafe`, additively. The registry refuses a method whose
-   `<noun>.<method>` the catalogue or another face already names, naming
-   both owners: a face may share a noun with the kernel, never a name.
-   `HostApi::service_wire` returns the face wrapped, so a call raises
-   `<noun>.<method>` with the owner's call as the kernel link; plugin-rpc's
-   `service/call` already goes through it. The `bingo-services` adapters
-   declare faces, so the first noun events
-   (`team.section`, `mcp.servers`) are tested against real owners.
-8. **The wire**, additions to protocol 2: `intercept/<event>` takes any
-   chain entry; additive `subscriptions: LinkMatcher[]` and negotiated
-   `intercept/*` cover dynamically registered faces; observations cross as `hook/observe { event, payload }`.
-9. **TypeScript.** `bingo-schema-ts::render` writes `events.ts` from
-   `schema/events.json`, drift-tested. It exports each event's types
-   under Claude Code's names; `on.ts` types `on(name)` by it, and the
-   `'bingo'` module re-exports them (M137).
+1. Contract and failing tests first: `catalogue!` defines entries and `ALL` once.
+   Entries carry kind, schemas, matcher fields, pins and acts; `LinkPoint` is a static reference. A discipline check rejects stray literals.
+2. Claude spelling: flattened `ToolCall` carries pinned `tool`/`tool_use_id`; output
+   carries `isError`; reject colliding schemas at gather and arguments before flattening.
+3. Pure `Pattern`, conservative scalar `prefilter`, `pinned_changed`, and tier checks;
+   Rust and TypeScript share `test/cases.json`.
+4. JSON `Interceptor::chain`/`observe`; seven typed defaults bridge through it.
+   The existing chain skips invalid shapes, pinned rewrites and excess authority once.
+5. New chains: tool/command descriptions, autocomplete, send/receive, append,
+   completion, command execution and settings. `tool.describe` keeps ToolSpec's `name`.
+   Only owners rewrite their extension rows. Completion text follows `TurnCompleted`.
+   Model/thinking and live plugin switches call `config::set` before any reconfigure/write;
+   the standalone settings CLI has no live session or chain.
+6. Owned, ordered observations: session start/end, client port attach/drop, turn start
+   and `TurnUsage` measurement (never additive `UsageCharged`). A port owns attachment;
+   `HostApi::close` has no client identity. Startup precedes the first attachment.
+7. Service faces declare noun/method schemas and unsafe metadata. Registration rejects
+   names claimed by the kernel or another owner. Wire lookups raise; typed lookups do not.
+   Dynamic faces own schemas/names; static entries keep Rust schema functions without leaks.
+8. Protocol-2 subscriptions and `intercept/*` cover dynamic names; `hook/observe` carries observations. `bingo-schema-ts::render` consumes generated events.json.
 
 ## Files
 
-- `crates/bingo-sdk/src/{catalogue.rs (new),intercept.rs,service.rs,lib.rs}`
-- `crates/bingo-core/src/chain/{describe,autocomplete,deliver,append,complete,command,config,observe}.rs` (new), `chain/mod.rs`
-- `crates/bingo-core/src/{host,session,plugins,config (new),commands/mod,turn/late,session/inputs,session/commands}.rs`
-- `crates/bingo-services/src/{team,mcp}.rs` (M119 owns both wire adapters).
-  Its existing workspace `schemars` dependency is needed to derive each
-  adapter's face schemas from its Rust payloads; no new external crate.
-- `crates/bingo-core/src/session/{gate,mailbox,catalogue (new)}.rs` keep
-  interception on owned tasks; `host/interception.rs` keeps host.rs within its size gate;
-  `commands/{model,think,plugins}.rs` put
-  config interception before reconfiguration. Mechanical matcher fixtures
-  in sdk/core/plugin-rpc tests and the stub plugin follow the new type.
-- Dynamic face entries own declared schemas and names; static kernel entries
-  retain Rust schema functions. The chain borrows entries without leaking them.
-- `crates/bingo-plugin-rpc/src/{intercept,wire,bridge,host,service,schema,lib,events_ts (new)}.rs`
-- `crates/bingo/tests/catalogue.rs` (new), `schema/events.json` (new), `schema/{plugin,plugin-2}.json`
-- `sdk/typescript/src/{events.ts (generated),on.ts,on.test.ts,plugin.ts,rpc.ts,index.ts}`,
-  `sdk/typescript/test/cases.json`, `scripts/check_discipline.sh`
+- SDK: `catalogue.rs`, `catalogue/*`, `intercept.rs`, `intercept/json.rs`, `service.rs`, `service/face.rs`, `lib.rs`.
+- Core: `chain/*`, `host.rs`, `host/interception.rs`, `session.rs`, `session/{catalogue,mailbox,gate,inputs,commands}.rs`, `config.rs`, `commands/{model,think,plugins}.rs`, `plugins.rs`, `turn.rs`, `turn/late.rs`, `lib.rs`.
+- Services: `team.rs`, `mcp.rs`, Cargo.toml/lock. Existing workspace `schemars` derives adapter face schemas; no new external crate.
+- Plugin RPC: `intercept`, `wire`, `bridge`, `host`, `hook`, `service`, `schema`, `events_ts`, `lib`; stub plugin fixtures.
+- Tests: SDK intercept fixtures; core chain/host/session fixtures and new catalogue tests; RPC hook/reload fixtures; `crates/bingo/tests/catalogue.rs`.
+- Generated: `schema/{events,plugin,plugin-2}.json`, `sdk/typescript/src/{events,wire}.ts`.
+- TypeScript: `on`, `on.test`, `plugin`, `rpc`, `rpc.test`, `index`; shared `test/cases.json`; `scripts/check_discipline.sh`; named ADR notes.
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-sdk catalogue::` passes; deleting one entry
-      from `schema/events.json` fails it (shown once, pasted).
-- [ ] `cargo test -p bingo --test catalogue` passes; a fixture tool whose
-      input has `tool_use_id` fails it (shown once).
-- [ ] `cargo test -p bingo-core chain::`: a `rewrite` link changes
-      `tool.describe`'s description and `session.receive`'s text; a
-      pinned change, or a `tighten` answer at `command.run`, is skipped
-      with one notice; a `turn.complete` link's text shows under the
-      answer, its `next` resolving to the text of the link beneath.
-- [ ] On M111's test host, an observer of a one-turn session sees, in
-      order, `session.start`, `session.attach`, `turn.start`,
-      `session.measure`, `session.detach`, `session.end`.
-- [ ] A link sees `mcp.servers` when `mcp`'s face is called through
-      `service_wire`; a second face naming it is refused, both named.
-- [ ] `events_ts::` (plugin-rpc) fails on a hand edit of `events.ts`;
-      `check_discipline.sh` on a stray `Entry {`. Each shown once.
-- [ ] Existing hook, chain, intercept and plugin tests pass unedited;
-      except the authorized stop-name rename; all gates; the MSVC `cargo check` for sdk, core and plugin-rpc.
+- [ ] SDK catalogue tests pass; deleting an events.json entry fails (shown once); final guard rerun pending at stop.
+- [x] Composed binary catalogue passes; reserved `tool_use_id` fixture fails (shown once).
+- [x] Rewrite descriptions/received text; skip pins/tighten answers once; compose completion text beneath the answer.
+- [x] Observe start, attach, turn.start, measure, detach, end in actual lifecycle order.
+- [ ] Real MCP wire face raises `mcp.servers`; duplicate ownership names both owners (MCP passed; SDK collision rerun pending).
+- [x] Generated TypeScript and stray Entry drift fail once; shared matcher/SDK tests pass.
+- [ ] Existing tests and all gates pass; MSVC checks cover touched crates, with step-7 C-header exceptions recorded.
 
 ## Non-goals
 
-- The runtime and `plugin.register` (M137); the `$` methods' op events,
-  which land as faces (M138, M139); `ui.*` (M140, M141); `engine.create`,
-  `classic.*`, `telemetry.*`.
-- `prompt.mention` and `prompt.attachment` (mods-parity §8): surfaces
-  resolve `@`, and a hook sees the result in `prompt.submit`'s input.
-- Noun events on a typed lookup (`service::<T>`): only the wire face
-  raises, so an owner calls itself through `service_wire` (M139, agents).
+Embedded runtime/registration, op/UI events, mention/attachment resolution and typed-service interception. No live/credential tests, publishing or foreign processes.
 
 ## Risks
 
-- Resolved by the user, 2026-10-13: protocol 2 has never shipped. Amend
-  it in place: old `turn.complete` becomes `turn.stop` without changing
-  its shape or behaviour; `turn.complete` takes the catalogue contract.
-  Regenerate current schemas with `BINGO_UPDATE_SCHEMA=1`; amend only
-  these entries and their referenced definitions in `plugin-2.json` in
-  one commit. Keep the additive-only test and record ADR-0075's dated
-  exception. A change after the first protocol-2 release needs protocol 3.
-- Gather links once per round; chain config before writes; never measure
-  `UsageCharged`; keep actor plugin work on M116-owned tasks.
+The user's 2026-10-13 decision resolves the initial protocol stop: v0.6.6 ships protocol 1,
+so unreleased protocol 2 is amended in place. Rename the old hook `turn.stop` unchanged;
+`turn.complete` becomes metadata → completion text. Amend only these frozen entries and
+referenced definitions in one commit, regenerate current schemas with BINGO_UPDATE_SCHEMA=1,
+and retain the additive-only test. ADR-0075 records the dated pre-release exception.
+Keep shared edits local for M134/M125; gather links once per round, own actor work, and keep held deliveries held.
+
+**Stopped 2026-10-14, protocol step 6.** The workspace gate reaches
+`plugin_kit::typescript_acceptance_runs_outside_the_workspace` and fails because
+`plugin validate` prints `InitializeResult.links` but not the new `subscriptions`.
+The proper fix is `bingo-plugin-rpc/src/validate.rs::findings`, outside Files.
+Recommended next scope: report each subscription pattern (including `tool.check`
+and `mcp.*`), add a findings test there, and preserve the existing acceptance assertion.
+Alternative: defer the process subscription migration to a separately scoped change;
+that leaves M136's dynamic wire criterion incomplete. No acceptance assertion was changed.
 
 ## Verified — re-verification only; implementation blocked
 
@@ -178,3 +89,62 @@ Implementation and gates not run: steps 2/6 require stopping on this conflict.
 No schemas regenerated; no live or credential tests run.
 
 Resumed on the user's pre-release amendment decision; the earlier stop is resolved.
+
+## Verified (2026-10-14) — partial; stopped by protocol
+
+Branch `m136-the-event-catalogue`, base `60deb2b9`; implementation through `f819be88`.
+The frozen amendment is solely in `d9aa5cb8`; its additive-only check still passes.
+Initial contracts failed before implementation. Trimmed output below is pasted from logs.
+```text
+cargo test -p bingo-sdk catalogue::                    # initial contract
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 127 filtered out; finished in 0.01s
+cargo test -p bingo-sdk face_names_cannot_be_claimed_twice
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 131 filtered out; finished in 0.02s
+cargo test -p bingo-plugin-rpc initialization_retains_open_catalogue_subscriptions
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 143 filtered out; finished in 0.03s
+cargo test -p bingo-sdk catalogue::                    # preliminary positive
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 127 filtered out; finished in 0.02s
+cargo test -p bingo-core                              # before final gate/queue fixes
+test result: ok. 481 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.96s
+cargo test -p bingo-core host::tests::catalogue --locked
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 480 filtered out; finished in 0.01s
+cargo test -p bingo --test catalogue --locked
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+cargo test -p bingo-plugin-rpc --locked
+test result: ok. 144 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.34s
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+cargo test -p bingo-plugin-rpc protocol_two_keeps_every_frozen_shape --locked
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 143 filtered out; finished in 0.01s
+npm test --prefix sdk/typescript
+ℹ pass 11
+ℹ fail 0
+cargo test -p bingo-sdk catalogue:: --locked            # deliberately deleted entry
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 128 filtered out; finished in 0.04s
+cargo test -p bingo-plugin-rpc events_ts:: --locked     # deliberate hand edit
+assertion `left == right` failed: events.ts drift
+BINGO_TEST_RESERVED_TOOL=1 cargo test -p bingo --test catalogue built_in_tool_inputs_leave_the_envelope_fields_free --locked
+assertion `left == right` failed: fixture collides with the tool.call envelope
+scripts/check_discipline.sh                           # deliberate stray Entry
+crates/bingo-sdk/src/catalogue_negative.rs:1: declare catalogue Entry literals in bingo-sdk/src/catalogue.rs
+discipline FAILED
+cargo fmt --all -- --check                            # final code: exit 0, no output
+cargo check --workspace --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.90s
+cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 27.08s
+cargo test --workspace --locked -- --skip acp::bridge::a_call_with_no_turn_in_flight_is_refused_with_a_reason --test-threads=1
+test result: ok. 252 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 108.21s
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+assertion failed: validated.contains("protocol 2") && validated.contains("tool.check")
+cargo test -p bingo --test cli acp::bridge::a_call_with_no_turn_in_flight_is_refused_with_a_reason --locked -- --exact --nocapture
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 252 filtered out; finished in 0.38s
+scripts/check_discipline.sh                           # preliminary, before final fixes
+discipline ok
+scripts/budget.sh                                     # dependency-change check
+dependencies (unique, normal): 355 (max  355)
+budget ok
+```
+All intentional corruptions were restored; current schemas/types were generated with
+BINGO_UPDATE_SCHEMA=1. Final workspace completion, SDK guard/collision reruns, discipline,
+budget, deny, MSVC and private-tmux smoke remain pending. The prepared smoke was not run.
+ADR-0078 remains proposed pending completion. Only local fixtures were used; no live services/user credentials, push, merge or PR.
