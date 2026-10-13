@@ -55,3 +55,40 @@ async fn a_catalogue_hook_cannot_mint_grants() {
     assert_eq!(fixture.meta["uses"], json!(["state"]));
     host.shutdown().await;
 }
+
+#[tokio::test]
+async fn dollar_state_is_granted_and_each_operation_is_raised_once() {
+    let home = tempfile::tempdir().unwrap();
+    let root = home.path().join("fixture");
+    std::fs::create_dir(&root).unwrap();
+    std::fs::write(root.join("plugin.json"), json!({"name":"fixture", "version":"1", "module":"main.ts", "uses":["state"]}).to_string()).unwrap();
+    std::fs::write(root.join("main.ts"), r#"
+      export function register(on) {
+        let writes = 0;
+        on('fixture.echo', async ($, e) => {
+          await $.state.set('key', e);
+          return {...await $.state.get('key'), writes};
+        });
+        on('state.set', async ($, e, next) => { writes++; return next({...e, value:{...e.value, seen:true}}); });
+      }
+    "#).unwrap();
+    let host = Host::build(vec![Box::new(ModsPlugin::default().with_dirs(vec![root]))], HostConfig::new(Env::rooted(home.path()))).await.unwrap();
+    host.open_service("fixture", std::sync::Arc::new(Echo)).unwrap();
+    let result = host.service_wire("fixture").unwrap().call("echo", json!({"value":1})).await.unwrap();
+    assert_eq!(result, json!({"version":1, "value":{"value":1,"seen":true}, "writes":1}));
+    host.shutdown().await;
+}
+
+#[tokio::test]
+async fn an_undeclared_state_call_is_refused_in_words() {
+    let home = tempfile::tempdir().unwrap();
+    let root = home.path().join("fixture");
+    std::fs::create_dir(&root).unwrap();
+    std::fs::write(root.join("plugin.json"), json!({"name":"fixture", "version":"1", "module":"main.ts"}).to_string()).unwrap();
+    std::fs::write(root.join("main.ts"), "export function register(on) { on('fixture.echo', async ($) => { try { await $.state.get('key'); return {error:'not refused'}; } catch(error) { return {error:String(error)}; } }); }").unwrap();
+    let host = Host::build(vec![Box::new(ModsPlugin::default().with_dirs(vec![root]))], HostConfig::new(Env::rooted(home.path()))).await.unwrap();
+    host.open_service("fixture", std::sync::Arc::new(Echo)).unwrap();
+    let result = host.service_wire("fixture").unwrap().call("echo", json!({})).await.unwrap();
+    assert!(result["error"].as_str().unwrap().contains("state grant"), "{result}");
+    host.shutdown().await;
+}
