@@ -13,14 +13,18 @@ impl Point for Check {
     ) -> BoxFuture<'a, Result<Self::Output, KernelError>> {
         Box::pin(link.tool_check(cx, input, next))
     }
+    fn pinned(before: &ToolCall, after: &ToolCall) -> bool {
+        before.name == after.name && before.call_id == after.call_id
+    }
     fn tool(input: &ToolCall) -> Option<&str> {
         Some(&input.name)
     }
-    fn needs_baseline(tier: Tier, _: &CheckResult) -> bool {
-        tier != Tier::Full
+    fn needs_baseline(tier: Tier, output: &CheckResult) -> bool {
+        tier != Tier::Full && !matches!(output.decision, Decision::Deny { .. })
     }
     fn accepts(tier: Tier, before: Option<&CheckResult>, after: &CheckResult) -> bool {
         tier == Tier::Full
+            || (before.is_none() && matches!(after.decision, Decision::Deny { .. }))
             || before.is_some_and(|before| {
                 before.call == after.call && tightens(&before.decision, &after.decision)
             })
@@ -39,6 +43,9 @@ impl Point for Call {
         next: Next<'a, Self::Input, Self::Output>,
     ) -> BoxFuture<'a, Result<Self::Output, KernelError>> {
         Box::pin(link.tool_call(cx, input, next))
+    }
+    fn pinned(before: &ToolCall, after: &ToolCall) -> bool {
+        before.name == after.name && before.call_id == after.call_id
     }
     fn tool(input: &ToolCall) -> Option<&str> {
         Some(&input.name)
@@ -145,4 +152,50 @@ pub(crate) async fn after(
         }
     }
     stop
+}
+
+pub(crate) async fn after_outcomes(
+    outcomes: &[ToolOutcome],
+    transcript: &Transcript,
+    hooks: &crate::turn::HookSet,
+    cx: &HookContext,
+) -> bool {
+    let hooks = hooks.gather().await;
+    let mut stop = false;
+    for outcome in outcomes {
+        let Some(item) = transcript.get(&outcome.item) else {
+            continue;
+        };
+        let ItemBody::ToolCall {
+            call_id,
+            name,
+            input,
+            ..
+        } = &item.body
+        else {
+            continue;
+        };
+        let call = ToolCall {
+            call_id: call_id.clone(),
+            name: name.clone(),
+            input: input.clone(),
+        };
+        stop |= after(&call, &outcome.output, &hooks, cx).await;
+    }
+    stop
+}
+
+pub(crate) struct AskVia<'a> {
+    pub host: &'a dyn crate::turn::TurnHost,
+    pub item: ItemId,
+}
+#[async_trait::async_trait]
+impl Prompter for AskVia<'_> {
+    async fn ask(
+        &self,
+        kind: InteractionKind,
+        answers: Vec<AnswerSpec>,
+    ) -> Result<Answer, KernelError> {
+        self.host.ask(Some(self.item.clone()), kind, answers).await
+    }
 }

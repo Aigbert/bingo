@@ -17,10 +17,6 @@ use futures::{
     future::{BoxFuture, Shared},
 };
 use std::sync::Mutex;
-use std::time::Duration;
-
-/// ADR-0032's hook deadline, also used by the protocol-1 bridge.
-const HOOK: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Default)]
 pub struct Report(Arc<Mutex<Vec<ItemBody>>>);
@@ -33,7 +29,13 @@ impl Report {
         self.push(ItemBody::Notice {
             level: Level::Warn,
             code: "INTERCEPTOR_SKIPPED".into(),
-            text: format!("{name} ({point:?}): {reason}"),
+            text: format!(
+                "{name} ({}): {reason}",
+                serde_json::to_value(point)
+                    .ok()
+                    .and_then(|value| value.as_str().map(str::to_string))
+                    .unwrap_or_default()
+            ),
         });
     }
     fn receipt(&self, link: &Link, call: Option<&str>) {
@@ -74,12 +76,31 @@ pub(crate) trait Point: Send + Sync + 'static {
             None => admits(tier, Self::POINT, Act::Answer),
         }
     }
+    fn pinned(_before: &Self::Input, _after: &Self::Input) -> bool {
+        true
+    }
     fn needs_baseline(_: Tier, _: &Self::Output) -> bool {
         false
     }
 }
 
 type Pending<'a, O> = Shared<BoxFuture<'a, Result<O, KernelError>>>;
+struct Continued<'a, O: Clone> {
+    pending: Option<Pending<'a, O>>,
+    invalid: bool,
+    rewritten: bool,
+}
+impl<O: Clone> Default for Continued<'_, O> {
+    fn default() -> Self {
+        Self {
+            pending: None,
+            invalid: false,
+            rewritten: false,
+        }
+    }
+}
+type Continuation<'a, O> = Arc<Mutex<Continued<'a, O>>>;
+
 type Kernel<'a, I, O> = Arc<Mutex<Option<Next<'a, I, O>>>>;
 
 pub(crate) async fn run<'a, P: Point>(
@@ -89,6 +110,9 @@ pub(crate) async fn run<'a, P: Point>(
     input: P::Input,
     report: Report,
 ) -> Result<P::Output, KernelError> {
+    if links.is_empty() {
+        return kernel.run(input).await;
+    }
     run_at::<P>(links, Arc::new(Mutex::new(Some(kernel))), cx, input, report).await
 }
 
@@ -136,7 +160,7 @@ async fn invoke<'a, P: Point>(
     input: P::Input,
     report: Report,
 ) -> Result<P::Output, KernelError> {
-    let pending: Arc<Mutex<Option<Pending<'a, P::Output>>>> = Arc::new(Mutex::new(None));
+    let pending: Continuation<'a, P::Output> = Arc::new(Mutex::new(Continued::default()));
     let next = continuation::<P>(
         link,
         rest,
@@ -148,7 +172,7 @@ async fn invoke<'a, P: Point>(
     );
     let future = P::dispatch(link.interceptor.as_ref(), cx, input.clone(), next);
     let answer = if link.external.is_some() {
-        tokio::time::timeout(HOOK, future)
+        tokio::time::timeout(HOOK_DEADLINE, future)
             .await
             .unwrap_or_else(|_| {
                 Err(KernelError::new(
@@ -159,7 +183,11 @@ async fn invoke<'a, P: Point>(
     } else {
         future.await
     };
-    let called = pending.lock().unwrap_or_else(|e| e.into_inner()).take();
+    let Continued {
+        pending: called,
+        invalid,
+        rewritten,
+    } = std::mem::take(&mut *pending.lock().unwrap_or_else(|e| e.into_inner()));
     let baseline = match called {
         Some(future) => Some(future.await),
         None if answer
@@ -170,10 +198,19 @@ async fn invoke<'a, P: Point>(
         }
         None => None,
     };
+    if rewritten && P::POINT == LinkPoint::ToolCall {
+        report.receipt(link, P::tool(&input));
+    }
+    if invalid {
+        return match baseline {
+            Some(result) => result,
+            None => run_at::<P>(rest, kernel, cx, input, report).await,
+        };
+    }
     if let Ok(output) = &answer {
         let before = baseline.as_ref().and_then(|result| result.as_ref().ok());
         if P::accepts(link.tier, before, output) {
-            if P::POINT == LinkPoint::ToolCall && before != Some(output) {
+            if !rewritten && P::POINT == LinkPoint::ToolCall && before != Some(output) {
                 report.receipt(link, P::tool(&input));
             }
             return answer;
@@ -195,15 +232,22 @@ fn continuation<'a, P: Point>(
     cx: &'a HookContext,
     original: P::Input,
     report: Report,
-    pending: Arc<Mutex<Option<Pending<'a, P::Output>>>>,
+    pending: Continuation<'a, P::Output>,
 ) -> Next<'a, P::Input, P::Output> {
     Next::new(move |mut input| {
-        if input != original && !admits(link.tier, P::POINT, Act::Rewrite) {
-            report.notice(link, P::POINT, "input rewrite exceeds its trust tier");
+        let changed = input != original;
+        let invalid = !P::pinned(&original, &input)
+            || (changed && !admits(link.tier, P::POINT, Act::Rewrite));
+        if invalid {
+            report.notice(link, P::POINT, "input rewrite exceeds its authority");
             input = original;
         }
         let future = run_at::<P>(rest, kernel, cx, input, report).shared();
-        *pending.lock().unwrap_or_else(|e| e.into_inner()) = Some(future.clone());
+        *pending.lock().unwrap_or_else(|e| e.into_inner()) = Continued {
+            pending: Some(future.clone()),
+            invalid,
+            rewritten: changed && !invalid,
+        };
         Box::pin(future)
     })
 }

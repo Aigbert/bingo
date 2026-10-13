@@ -313,3 +313,37 @@ async fn a_turn_ending_during_submit_does_not_let_prose_overtake_a_command() {
     mailbox.close(CloseReason::Client);
     bounded(mailbox.wait_closed()).await;
 }
+
+struct HungLink(Arc<Hung>);
+#[async_trait::async_trait]
+impl Interceptor for HungLink {
+    fn id(&self) -> &str {
+        "hung-link"
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher {
+            points: vec![LinkPoint::ToolCheck],
+            tool: None,
+        }
+    }
+    async fn tool_check(
+        &self,
+        _: &HookContext,
+        _: ToolCall,
+        _: Next<'_, ToolCall, CheckResult>,
+    ) -> Result<CheckResult, KernelError> {
+        self.0.entered.notify_one();
+        std::future::pending().await
+    }
+}
+#[tokio::test(start_paused = true)]
+async fn interrupt_drops_a_hung_tool_check_link() {
+    let hung = Hung::at(HookPoint::BeforeTool);
+    let mut cfg = tool_config();
+    cfg.hooks.links.push(crate::chain::Link {
+        external: None,
+        tier: Tier::Full,
+        interceptor: Arc::new(HungLink(hung.clone())),
+    });
+    stopped_turn(cfg, hung, "go").await;
+}

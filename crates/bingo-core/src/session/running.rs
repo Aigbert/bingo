@@ -38,6 +38,7 @@ pub(super) async fn supervised<T>(
 pub(super) struct Running {
     pub(super) turn: TurnId,
     pub(super) cancel: CancellationToken,
+    pub(super) stopped: Arc<std::sync::atomic::AtomicBool>,
     task: JoinHandle<()>,
     /// The config this turn started under; the session's may have been
     /// rebuilt since, and a call is judged by the turn's own.
@@ -60,7 +61,9 @@ impl Running {
         let run = TurnRun::new(turn.clone(), &actor.state.transcript, cancel.clone(), kind);
         let cfg = Arc::clone(&actor.config);
         let mailbox = actor.mailbox.clone();
+        let stopped = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let host = TurnMail {
+            stopped: stopped.clone(),
             mailbox: mailbox.clone(),
             turn: turn.clone(),
         };
@@ -79,6 +82,7 @@ impl Running {
             });
         });
         Self {
+            stopped,
             turn,
             cancel,
             task,

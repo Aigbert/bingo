@@ -25,7 +25,7 @@ pub const CONTRIBUTE: Duration = Duration::from_secs(3);
 /// the host goes on with a notice naming it (ADR-0032 §5). Longer than a
 /// contributor's, because a hook that consults something is answering one
 /// event rather than filling one round.
-pub const HOOK: Duration = Duration::from_secs(5);
+pub const HOOK: Duration = bingo_sdk::intercept::HOOK_DEADLINE;
 
 /// How long a compaction has. A strategy that asks a model of its own is
 /// paying for a whole response — the provider crates wait

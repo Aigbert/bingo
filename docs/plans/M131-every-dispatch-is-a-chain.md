@@ -68,6 +68,7 @@ existing hook tests pass unedited. Audit §3, Mods gap 1.
 - `crates/bingo/tests/` (headless tier listing)
 - `crates/bingo-core/src/settings/merge.rs` (`pluginTrust`, user layer)
 - `crates/bingo/src/plugins.rs` (the tier column)
+- `crates/bingo-plugin-rpc/src/deadline.rs` (alias the existing HOOK bound to sdk)
 - `crates/bingo-hooks-shell/src/guide.md` (the order rules, in a person's words)
 - `docs/adr/0032-hooks-cross-the-bridge.md` (dated note)
 

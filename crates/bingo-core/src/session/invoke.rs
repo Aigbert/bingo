@@ -31,6 +31,7 @@ pub(super) type Reply = oneshot::Sender<Result<ToolOutcome, KernelError>>;
 pub(super) struct Serving {
     pub(super) turn: TurnId,
     pub(super) cancel: CancellationToken,
+    pub(super) stopped: Arc<std::sync::atomic::AtomicBool>,
     pub(super) config: Arc<TurnConfig>,
     pub(super) tool: Arc<dyn Tool>,
 }
@@ -45,6 +46,7 @@ pub(super) struct Bridged {
     /// A child of the turn's: one `esc` ends the turn and drops this call
     /// where it stands.
     pub(super) cancel: CancellationToken,
+    pub(super) stopped: Arc<std::sync::atomic::AtomicBool>,
     pub(super) tool: Arc<dyn Tool>,
     pub(super) item: ItemId,
     pub(super) call: ToolCall,
@@ -84,7 +86,10 @@ impl Bridged {
             let _ = self.mailbox.record(notice).await;
         }
         let hooks = self.config.hooks.gather().await;
-        let _ = crate::chain::tool::after(&call, &outcome.output, &hooks, &cx).await;
+        if crate::chain::tool::after(&call, &outcome.output, &hooks, &cx).await {
+            self.stopped
+                .store(true, std::sync::atomic::Ordering::Release);
+        }
         outcome
     }
 

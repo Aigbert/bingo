@@ -297,6 +297,7 @@ impl Actor {
             mailbox: self.mailbox.clone(),
             turn: serving.turn,
             cancel: serving.cancel,
+            stopped: serving.stopped,
             tool: serving.tool,
             item,
             call,
@@ -330,6 +331,7 @@ impl Actor {
         Ok(invoke::Serving {
             turn: running.turn.clone(),
             cancel: running.cancel.child_token(),
+            stopped: running.stopped.clone(),
             config: Arc::clone(&running.config),
             tool,
         })

@@ -965,3 +965,6 @@ fn turn_start_shares_ten_thousand_bodies_without_a_journal() {
 
 #[path = "../chain/hook_contract_turn.rs"]
 mod hook_contract;
+
+#[path = "../chain/turn_tests.rs"]
+mod chain;

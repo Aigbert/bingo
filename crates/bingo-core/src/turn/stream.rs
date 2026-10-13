@@ -7,7 +7,7 @@ use std::time::Duration;
 use bingo_sdk::*;
 use futures::StreamExt;
 
-use super::{Step, Turn, emit_and_fold};
+use super::{INTERRUPTED_MARKER, Step, Turn, TurnHost, TurnOutcome, emit_and_fold, mint};
 use crate::accumulator::{Accumulator, Emit, Finished};
 use crate::models::window_from_overflow;
 
@@ -237,4 +237,27 @@ pub fn backoff(attempt: u32, retry_after_ms: Option<u64>) -> Duration {
     }
     let exp = attempt.saturating_sub(1).min(6);
     Duration::from_millis(500 * (1u64 << exp)).min(MAX_RETRY_DELAY)
+}
+
+pub(super) fn stopped_early(
+    host: &dyn TurnHost,
+    turn: &TurnId,
+    mut transcript: Transcript,
+) -> TurnOutcome {
+    let item = mint(
+        turn,
+        0,
+        ItemBody::Interruption {
+            marker: INTERRUPTED_MARKER.into(),
+        },
+        ItemStatus::Completed,
+    );
+    emit_and_fold(&mut transcript, host, Event::ItemCompleted { item });
+    TurnOutcome {
+        status: TurnStatus::Interrupted {
+            reason: InterruptReason::UserCancel,
+        },
+        usage: Usage::default(),
+        items: transcript.model_items().cloned().collect(),
+    }
 }

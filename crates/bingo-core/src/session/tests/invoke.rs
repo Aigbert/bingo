@@ -346,3 +346,85 @@ async fn a_full_link_answers_a_call_without_running_the_tool() {
         Some("answered by the link")
     );
 }
+
+struct HeldStep(Arc<tokio::sync::Notify>);
+#[async_trait::async_trait]
+impl Interceptor for HeldStep {
+    fn id(&self) -> &str {
+        "held-step"
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher {
+            points: vec![LinkPoint::TurnStep],
+            tool: None,
+        }
+    }
+    async fn turn_step(
+        &self,
+        _: &HookContext,
+        _: ModelRequest,
+        _: Next<'_, ModelRequest, Result<StepStream, ProviderError>>,
+    ) -> Result<Result<StepStream, ProviderError>, KernelError> {
+        let release = self.0.clone();
+        let head = futures::stream::iter([
+            Ok(ModelEvent::TextStart { id: "held".into() }),
+            Ok(ModelEvent::TextDelta {
+                id: "held".into(),
+                delta: "waiting".into(),
+            }),
+        ]);
+        let tail = futures::stream::once(async move {
+            release.notified().await;
+            Ok(ModelEvent::Finish {
+                usage: Usage::default(),
+                finish_reason: FinishReason::unified(UnifiedFinish::Stop),
+            })
+        });
+        Ok(Ok(StepStream::new(Box::pin(head.chain(tail)))))
+    }
+}
+struct BlockAfter;
+#[async_trait::async_trait]
+impl Hook for BlockAfter {
+    fn id(&self) -> &str {
+        "block-after"
+    }
+    fn matcher(&self) -> HookMatcher {
+        HookMatcher::default()
+    }
+    async fn after_tool(&self, _: &ToolCall, _: &ToolOutput, _: &HookContext) -> HookOutcome {
+        HookOutcome::Block {
+            reason: "done".into(),
+        }
+    }
+    async fn on_stop(&self, _: &HookContext) -> HookOutcome {
+        panic!("a blocked round must not start another round")
+    }
+}
+#[tokio::test]
+async fn a_bridged_after_tool_block_completes_at_the_round_boundary() {
+    let release = Arc::new(tokio::sync::Notify::new());
+    let link = Arc::new(HeldStep(release.clone()));
+    let mailbox = start_with(
+        streaming(),
+        vec![Arc::new(EchoTool { read_only: true })],
+        move |cfg| {
+            cfg.hooks = crate::turn::HookSet::fixed(vec![Arc::new(BlockAfter)]);
+            cfg.hooks.links.push(crate::chain::Link {
+                interceptor: link.clone(),
+                external: None,
+                tier: Tier::Full,
+            });
+        },
+    );
+    let (mut state, mut events) = mid_turn(&mailbox).await;
+    mailbox.invoke(call("Echo", 9)).await.expect("served");
+    release.notify_one();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        drive(&mut events, &mut state, turn_completed),
+    )
+    .await
+    .expect("completed");
+    assert_eq!(state.last_status(), Some(&TurnStatus::Completed));
+}

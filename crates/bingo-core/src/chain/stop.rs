@@ -29,3 +29,19 @@ pub(crate) async fn kernel(
     }
     Ok(StopResult::Complete)
 }
+
+pub(crate) async fn dispatch(
+    hooks: &crate::turn::HookSet,
+    cx: &HookContext,
+    report: Report,
+) -> Result<StopResult, KernelError> {
+    let matched = hooks.at(HookPoint::Stop, None).await;
+    run::<Stop>(
+        &hooks.links,
+        Next::new(|()| Box::pin(kernel(&matched, cx))),
+        cx,
+        (),
+        report,
+    )
+    .await
+}

@@ -444,12 +444,17 @@ impl SessionPort for Port {
 
 /// The turn loop's view of the actor: publish, ask, absorb — all by mail.
 pub(super) struct TurnMail {
+    pub(super) stopped: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub(super) mailbox: Mailbox,
     pub(super) turn: TurnId,
 }
 
 #[async_trait]
 impl TurnHost for TurnMail {
+    fn stopped(&self) -> bool {
+        self.stopped.load(std::sync::atomic::Ordering::Acquire)
+    }
+
     fn offered(&self, tools: Vec<Arc<dyn Tool>>) {
         self.mailbox.send(Msg::Offered {
             turn: self.turn.clone(),

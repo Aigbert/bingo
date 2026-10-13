@@ -24,10 +24,11 @@ pub use config::{Breaker, ModelChoice, TurnBudget, TurnConfig, runs_on};
 use late::Late;
 pub use late::{CompactorSet, ContributorSet, HookSet, ProviderSet, ToolSet};
 use ruler::Ruler;
-use stream::Streamed;
 pub use stream::{MAX_RETRY_DELAY, MAX_SERVER_RETRY_DELAY, backoff};
+use stream::{Streamed, stopped_early};
 
 use crate::accumulator::Finished;
+use crate::chain::tool::AskVia;
 use crate::context::{ContextView, KERNEL_SURFACE, budget, elide, estimate_tokens};
 use crate::executor::{self, Gate, PendingCall};
 use crate::gate::{GateInput, gate_call};
@@ -41,6 +42,10 @@ const MAX_THRESHOLD_COMPACTIONS: u32 = 2;
 /// The session actor as the turn sees it: a place to publish, a way to ask, a queue to absorb.
 #[async_trait]
 pub trait TurnHost: Send + Sync {
+    /// A bridged after-tool observer requested completion at this round's boundary.
+    fn stopped(&self) -> bool {
+        false
+    }
     fn emit(&self, event: Event);
     /// The tools this turn resolved when it started (ADR-0009 §1): the offer
     /// every one of its requests carries. The session keeps them so that a
@@ -169,25 +174,6 @@ fn mint(turn: &TurnId, round: u32, body: ItemBody, status: ItemStatus) -> Item {
 /// A turn stopped before it had gathered enough to be one. The marker still
 /// reaches the transcript and the clients: what a person sees when they press
 /// esc does not depend on how far the turn had got.
-fn stopped_early(host: &dyn TurnHost, turn: &TurnId, mut transcript: Transcript) -> TurnOutcome {
-    let item = mint(
-        turn,
-        0,
-        ItemBody::Interruption {
-            marker: INTERRUPTED_MARKER.into(),
-        },
-        ItemStatus::Completed,
-    );
-    emit_and_fold(&mut transcript, host, Event::ItemCompleted { item });
-    TurnOutcome {
-        status: TurnStatus::Interrupted {
-            reason: InterruptReason::UserCancel,
-        },
-        usage: Usage::default(),
-        items: transcript.model_items().cloned().collect(),
-    }
-}
-
 /// The actor opens no turn on a session nothing answers (ADR-0011 §1); this
 /// is the guard, not a path.
 fn unanswered(items: Vec<Item>) -> TurnOutcome {
@@ -662,6 +648,9 @@ impl Turn<'_> {
     /// What the response means when it asks for no tool: `None` means it does,
     /// and the round goes on to act.
     async fn decide(&mut self, finished: &Finished) -> Option<Step> {
+        if self.host.stopped() && finished.tool_calls.is_empty() {
+            return Some(Step::Closing(TurnStatus::Completed));
+        }
         if finished.items.is_empty() {
             // One empty response is a provider hiccup; two is an answer.
             if !self.empty_retry_used {
@@ -689,17 +678,11 @@ impl Turn<'_> {
 
     /// A `Stop` hook may push the turn into another round instead of ending it.
     async fn stop_hooks(&mut self) -> Step {
-        let Some(hooks) = self.racing(self.hooks(HookPoint::Stop)).await else {
-            return self.interrupted();
-        };
         let report = crate::chain::Report::default();
-        let cx = self.hook_cx.clone();
         let result = self
-            .racing(crate::chain::run::<crate::chain::stop::Stop>(
-                &self.cfg.hooks.links,
-                Next::new(|()| Box::pin(crate::chain::stop::kernel(&hooks, &cx))),
-                &cx,
-                (),
+            .racing(crate::chain::stop::dispatch(
+                &self.cfg.hooks,
+                &self.hook_cx,
                 report.clone(),
             ))
             .await;
@@ -725,7 +708,7 @@ impl Turn<'_> {
         if self.cancel.is_cancelled() {
             return self.interrupted();
         }
-        if stop_after {
+        if stop_after || self.host.stopped() {
             return Step::Closing(TurnStatus::Completed);
         }
         if self.barrier().await.is_none() {
@@ -805,34 +788,17 @@ impl Turn<'_> {
             failures: self.cfg.compaction.failures(),
             keep_budget: self.ruler.lines.keep,
         };
-        let provider = self.model.provider.clone();
-        let capabilities = &self.model.capabilities;
-        let cancel = self.cancel.child_token();
-        let kernel = Next::new(|input: CompactInput| {
-            Box::pin(async move {
-                let cx = CompactContext {
-                    items: &input.items,
-                    usage: input.usage,
-                    capabilities,
-                    provider,
-                    request: &input.request,
-                    cancel,
-                    failures: input.failures,
-                    keep_budget: input.keep_budget,
-                };
-                Ok(compactor.compact(cx, input.reason).await)
-            })
-        });
         let report = crate::chain::Report::default();
-        let outcome = crate::chain::run::<crate::chain::compact::Compact>(
+        let outcome = crate::chain::compact::dispatch(
             &self.cfg.hooks.links,
-            kernel,
             &self.hook_cx,
             input,
+            compactor,
+            &self.model,
+            self.cancel.child_token(),
             report.clone(),
         )
-        .await
-        .unwrap_or_else(|error| Err(error.into()));
+        .await;
         for notice in report.take() {
             self.record(notice);
         }
@@ -1012,61 +978,16 @@ impl Turn<'_> {
         outcomes
     }
 
-    /// Let the `AfterTool` hooks see each result; one of them may stop the turn.
+    /// Let the adapters observe the whole round before honoring a block.
     async fn after_tool_hooks(&self, outcomes: &[ToolOutcome]) -> bool {
-        let mut stop_after = false;
-        let Some(hooks) = self.racing(self.cfg.hooks.gather()).await else {
-            return stop_after;
-        };
-        for o in outcomes {
-            let Some(item) = self.transcript.get(&o.item) else {
-                continue;
-            };
-            let ItemBody::ToolCall {
-                call_id,
-                name,
-                input,
-                ..
-            } = &item.body
-            else {
-                continue;
-            };
-            let call = ToolCall {
-                call_id: call_id.clone(),
-                name: name.clone(),
-                input: input.clone(),
-            };
-            let Some(blocked) = self
-                .racing(crate::chain::tool::after(
-                    &call,
-                    &o.output,
-                    &hooks,
-                    &self.hook_cx,
-                ))
-                .await
-            else {
-                return stop_after;
-            };
-            stop_after |= blocked;
-        }
-        stop_after
-    }
-}
-
-/// The permission prompter a gate uses: it opens the interaction on the turn host.
-struct AskVia<'a> {
-    host: &'a dyn TurnHost,
-    item: ItemId,
-}
-
-#[async_trait]
-impl Prompter for AskVia<'_> {
-    async fn ask(
-        &self,
-        kind: InteractionKind,
-        answers: Vec<AnswerSpec>,
-    ) -> Result<Answer, KernelError> {
-        self.host.ask(Some(self.item.clone()), kind, answers).await
+        self.racing(crate::chain::tool::after_outcomes(
+            outcomes,
+            &self.transcript,
+            &self.cfg.hooks,
+            &self.hook_cx,
+        ))
+        .await
+        .unwrap_or(false)
     }
 }
 

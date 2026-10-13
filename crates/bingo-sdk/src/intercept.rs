@@ -6,6 +6,9 @@ use futures::future::BoxFuture;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// Wall bound for an external dispatch link (ADR-0032, ADR-0074).
+pub const HOOK_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
+
 mod stream;
 pub use stream::StepStream;
 
@@ -55,6 +58,14 @@ pub struct PluginTrust {
 }
 
 /// The continuation cannot be cloned or called twice.
+///
+/// ```compile_fail
+/// use bingo_sdk::Next;
+/// async fn twice(next: Next<'_, (), ()>) {
+///     let _ = next.run(()).await;
+///     let _ = next.run(()).await;
+/// }
+/// ```
 pub struct Next<'a, I, O>(Box<dyn FnOnce(I) -> BoxFuture<'a, Result<O, KernelError>> + Send + 'a>);
 
 impl<'a, I, O> Next<'a, I, O> {
@@ -109,6 +120,7 @@ pub trait Interceptor: Send + Sync {
     ) -> Result<SubmitResult, KernelError> {
         next.run(input).await
     }
+    /// Tool identity and call id are pinned; links may rewrite `input`.
     async fn tool_check(
         &self,
         _cx: &HookContext,
