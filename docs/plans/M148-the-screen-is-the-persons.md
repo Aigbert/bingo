@@ -35,9 +35,10 @@ become data. No new dependency.
    lanes' drawing and the under-the-running-rows lane. Every caller of
    what goes is listed; nothing is kept "for later".
 4. **The producers move.** demo-ui (`board.rs`, `command.rs`,
-   `progress.rs`, `lib.rs` module header): the board as a `Row`, the
+   `journal.rs`, `progress.rs`, `lib.rs` module header): the board as a `Row`, the
    progress as an `Activity`, placed through ADR-0070's `slot::with`.
-   rooms (`owed.rs`, the `members` writer in `roster.rs`/`bingo-collab`)
+   rooms (`owed.rs`, delegating to `bingo-collab/src/owed.rs`; the
+   `members` payload writer in `bingo-collab/src/room.rs`)
    and schedule (`wake.rs`): `slots: []`.
 5. **Records.** ADR-0081 accepted; dated notes on ADR-0013 §2 §4,
    ADR-0070 §1 and ADR-0079 §3; tui.md §3 (*Rail* removed), §8's lane
@@ -49,8 +50,10 @@ become data. No new dependency.
 - `crates/bingo-sdk/src/state.rs` and its fixtures
 - `crates/bingo-surface-tui/src/{frame,rail,panel,layout,pointer,status,keys,view}.rs`
   (`rail.rs` and `panel.rs` deleted; `layout.rs` is M124's)
-- `crates/bingo-demo-ui/src/{board,command,progress,lib,tests}.rs`
-- `crates/bingo-rooms/src/{owed,roster}.rs`, `crates/bingo-collab/src/room.rs`
+- TUI removal callers: `src/{lib,ui,focus,input,layers,test_lanes,window}.rs`,
+  `src/layout/tests.rs`, `src/screens{,/teams,/windows}.rs`, and their snapshots
+- `crates/bingo-demo-ui/src/{board,command,journal,progress,lib,tests}.rs`
+- `crates/bingo-rooms/src/{owed,roster}.rs`, `crates/bingo-collab/src/{room,owed}.rs`
 - `crates/bingo-schedule/src/wake.rs`
 - `scripts/tui-smoke.sh`, the guide pages naming `ctrl+p` or the rail
 - `docs/adr/{0013,0070,0079,0081}-*.md`, `docs/design/tui.md`,
@@ -59,8 +62,9 @@ become data. No new dependency.
 ## Exit criteria
 
 - [ ] Each brick-1 test failed first (output pasted) and passes now.
-- [ ] `rg 'RAIL_AT|RAIL_WIDTH|mod rail|mod panel|ctrl\+p' crates/bingo-surface-tui/src`
-      finds nothing.
+- [ ] `rg 'RAIL_AT|RAIL_WIDTH|ctrl\+p' crates/bingo-surface-tui/src` and
+      `rg '^mod (rail|panel);' crates/bingo-surface-tui/src/lib.rs` find nothing.
+      `views/panel.rs` remains: it draws `View::Panel`, not the removed sheet.
 - [ ] A tmux drive at 80×24, 120×40 and 200×50 with a room open and
       `--demo-ui`: no column beside the transcript at any width; `/board`
       shows the board row and its Tick button changes the table; the
@@ -88,7 +92,55 @@ become data. No new dependency.
   itself, and its data stays in the fold.
 - `Null` removing an extension changes a journaled fold. Old journals
   fold to fewer entries, never more; the fixture pins it.
-- Re-verify at start: M124's layout targets for the rail and the sheet,
-  M123's readers for `owed`/`members`, how M121 carries `slots` on a
-  payload that is itself a `View`, and whether a `Row` holds a table body
-  and two actions as the board needs.
+- **Stopped at re-verification (2026-10-14), protocol step 6.** Outside
+  Files, `crates/bingo-context/src/baseline/lifecycle.rs:121`, test
+  `session_start_invalidates_both_keys_without_opening_the_session`, asserts
+  `fixture.journal.state().extensions[PLUGIN][id].is_null()`.
+  `BaselineHook::on_session` invalidates these keys with `extend(..., Null)`.
+  ADR-0081 §5 removes the keys, so the indexed assertion would panic.
+  This is an assertion change, not the mechanical constructor/fixture
+  exception allowed by step 6; no implementation or test was changed.
+- Recommended resolution: authorize adding that lifecycle test to Files and
+  assert key absence with `extensions.get(PLUGIN).is_none_or(|kinds|
+  !kinds.contains_key(id))`. Keep its refresh, stable-recapture and sequence
+  assertions. The production `baseline::retained` reader already accepts
+  a missing key, so no context production change is indicated.
+  Alternative: defer §5 to a separately approved milestone, requiring an
+  explicit revision of this plan/ADR's implementation scope.
+
+## Re-verified (2026-10-14, `23810b23`)
+
+- Branch `m148-the-screen-is-the-persons`; clean tree at the supplied base.
+  M108–M136 and M147 are the supplied landed set; M137 files are untouched.
+- M124/M125 geometry is in `frame.rs` and `layout.rs`; `view::compose`
+  renders rail cards and the inline fallback. `Ui::pinned`, `Focus::Card`,
+  `Open::Panel`, key/pointer dispatch and layout targets are removal callers.
+- `slot::with` adds `slots` to a View object without losing its other fields;
+  `Slot::Row` holds a body and actions, but requires an existing `ItemId`.
+  `/board` currently returns `Applied` and journals only an extension.
+  Its anchor mechanism remains to be resolved before implementation;
+  `CommandOutcome::Record` plus an event observer is an existing-door option.
+- The shared owed/member writers are in `bingo-collab`, not `roster.rs`.
+  TUI `seats.rs` uses the collab readers. Schedule `wake::payload` currently
+  places a `Status` countdown; M148 intentionally changes it to empty slots.
+- The extension-reader search found the context assertion above. Other
+  inspected readers use optional lookup/deserialization: tasks, demo-ui,
+  collab room/ear/cursor/readers, context memory rows and agents report-back.
+- `scripts/tui-smoke.sh` currently uses fixed tmux socket `bingo` and kills
+  that server in cleanup. Before running it, use a unique owned socket;
+  migrate the progress and pinned-board steps to Activity and `/board`.
+
+## Verified (2026-10-14)
+
+Re-verification only; stopped under protocol step 6 before code. Exit
+criteria remain unticked, ADR-0081 remains proposed, and no gate, live test,
+credential test or tmux drive was run. No schema or fixture was regenerated.
+
+```text
+$ git branch --show-current
+m148-the-screen-is-the-persons
+$ git rev-parse --short HEAD
+23810b23
+$ git status --porcelain=v1
+(no output before the plan edit)
+```
