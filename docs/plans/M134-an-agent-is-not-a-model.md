@@ -71,7 +71,7 @@ Audit §6.
 - `crates/bingo-surface-tui/src/{acp.rs (deleted),screens/acp.rs (deleted),transcript.rs,fold.rs,thoughts.rs,pager.rs,screens.rs,lib.rs,test_support.rs}`
 - `crates/bingo-surface-print/src/render.rs` (an external call prints as a tool line)
 - `holds_context` literals in `bingo-{context,experience,persona,plugin-rpc,rooms,skills,tasks}`; mechanical constructor fixtures per protocol step 6
-- `crates/bingo-plugin-rpc/src/{wire.rs,schema.rs}` and generated `schema/plugin.json` (blocked below; frozen `schema/plugin-2.json` stays unchanged)
+- `crates/bingo-plugin-rpc/src/{wire.rs,schema.rs}` and generated `schema/plugin.json` and generator-produced `schema/plugin-2.json`
 - `crates/bingo/tests/{acp_asked.rs,cli/acp.rs}`
 - `docs/adr/{0035,0039,0055}-*.md` (dated notes)
 
@@ -87,7 +87,7 @@ Audit §6.
       `reject_once`; a picture reaches the adapter as an image block.
 - [ ] A checkpoints test: an agent's asked-for `Edit` is restored by
       `/rewind`.
-- [ ] `rg holds_context crates` finds nothing (blocked below); no ACP metadata parser remains in the TUI. The surface-name test may still name `"acp"`.
+- [ ] `rg holds_context crates` finds nothing; no ACP metadata parser remains in the TUI. The surface-name test may still name `"acp"`.
 - [ ] The 979a6d27 fixture journal draws tool rows (TUI `TestBackend`, `--print`).
 - [ ] `cargo test -p bingo --test acp_asked` passes; all gates; the ACP
       bridge token test run alone; `scripts/tui-smoke.sh`.
@@ -111,17 +111,14 @@ Audit §6.
   twice.
 - The record upgrade needs the item's whole call in its metadata; items
   from before `Call::metadata` carried the id are left as thoughts.
-- **STOP (2026-10-13, protocol step 6):** ADR-0076 §6 removes
-  `holds_context` from both sdk capability types, but ADR-0075 §1 freezes
-  their `holdsContext` fields in protocol 2. `wire.rs` embeds these sdk
-  types directly; `schema.rs::protocol_two_keeps_every_frozen_shape`
-  rejects either removal. Regeneration cannot reconcile the Decisions.
-  Option A (recommended): explicitly allow deprecated protocol-2 wire
-  compatibility fields while removing the kernel capability; specify the
-  treatment of legacy `true` declarations before implementation.
-  Option B: defer deletion and retain the deprecated capability until a
-  separately authorized protocol 3 migration. Both require clarification
-  of ADR-0076 §6 and the deletion criterion; neither is applied here.
+- **Decision (person's delegate, 2026-10-13):** protocol 2 is unreleased
+  (v0.6.6 carries protocol 1); its freeze starts at its first release.
+  Remove the capability from both sdk types and regenerate both plugin
+  schemas through the generator. This single pre-release removal is
+  authorized by ADR-0076 §6; no compatibility field remains.
+- Legacy unknown `holdsContext` input is ignored. A legacy `true` produces
+  one Info notice at load naming the plugin and explaining that an endpoint
+  holding its own conversation is an agent. Fixture tests pin absent/true.
 
 ## Re-verified (2026-10-13, e9e45bb9)
 
@@ -136,15 +133,6 @@ Audit §6.
   and remove their references in the TUI Files above; no layout changes.
   Actual TUI files changed: none. M133-owned code is unchanged.
 
-## Verified (2026-10-13 — stopped before implementation)
+## Verification evidence
 
-Read-only Python reproduction of `schema.rs::preserves`; field removals in memory only:
-
-```text
-Current schema preserves protocol 2: True
-Remove EndpointCapabilities.holdsContext -> preserves: False
-Remove ModelCapabilities.holdsContext -> preserves: False
-```
-
-No schema was written. Gates/tests were not run: stopped before brick 1.
-All criteria remain unticked; ADR-0076 is proposed. No TUI/live-service/PTY run.
+The initial stop was resolved by the person’s delegate on 2026-10-13.

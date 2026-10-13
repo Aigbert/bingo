@@ -103,3 +103,9 @@ plugin spawning agents (it delivers to a session, whose model may).
 Revised 2026-10-13 for ADR-0078: the embedded JS engine this record
 refused is ADR-0078's; the TypeScript SDK speaks ADR-0078 §2's
 `register(on)` so one module runs in either transport.
+
+*2026-10-13, M134, person's delegate: the protocol-2 freeze starts with
+the first release carrying protocol 2 (v0.6.6 carries protocol 1). Before
+that release, ADR-0076 §6 removes `holdsContext` from both capability
+types and the generator regenerates `plugin.json` and `plugin-2.json`.
+This authorizes that one removal, not other changes to the frozen wire.*
