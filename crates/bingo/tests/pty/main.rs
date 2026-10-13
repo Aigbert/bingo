@@ -395,6 +395,24 @@ impl Terminal {
         );
     }
 
+    /// Wait for one whole `a=T` transmission and answer with everything
+    /// written by then. Its start reaches the pty before its terminator does,
+    /// and on a loaded machine a read can land between the two.
+    fn wait_transmission(&self) -> Vec<u8> {
+        let deadline = Instant::now() + LIMIT;
+        while Instant::now() < deadline {
+            let written = self.written();
+            if transmission_ended(&written) {
+                return written;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        panic!(
+            "timed out waiting for a whole transmission\n--- screen ---\n{}",
+            self.screen()
+        );
+    }
+
     /// Wait for `needle` to appear, or say what was there instead.
     fn wait_for(&self, needle: &str) {
         let deadline = Instant::now() + LIMIT;
@@ -619,6 +637,16 @@ fn counted(haystack: &[u8], needle: &[u8]) -> usize {
         .count()
 }
 
+/// Whether an `a=T,f=100` transmission has started and its terminator
+/// (`ESC \`) has arrived after it.
+fn transmission_ended(written: &[u8]) -> bool {
+    let start = b"\x1b_Ga=T,f=100";
+    written
+        .windows(start.len())
+        .position(|w| w == start)
+        .is_some_and(|at| contains(&written[at..], b"\x1b\\"))
+}
+
 fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     count(haystack, needle) > 0
 }
@@ -643,8 +671,7 @@ fn a_terminal_that_answers_the_graphics_probe_is_sent_the_picture() {
     terminal.wait_for("That is the picture.");
     // The cells are on the screen a frame before the pixels are: fitting a
     // picture to them is a decode, and the run does it off the loop (M61).
-    terminal.wait_written(b"\x1b_Ga=T,f=100");
-    let written = terminal.written();
+    let written = terminal.wait_transmission();
     assert_eq!(
         count(&written, b"\x1b_Ga=T,f=100"),
         1,
@@ -692,8 +719,7 @@ fn a_picture_an_answer_named_in_markdown_is_read_in_and_sent() {
     terminal.send(b"show me the shot\r");
     terminal.wait_for("[image: the shot]");
     // The read happens between frames, so the bytes come after the chip.
-    terminal.wait_written(b"\x1b_Ga=T,f=100");
-    let written = terminal.written();
+    let written = terminal.wait_transmission();
     assert_eq!(
         count(&written, b"\x1b_Ga=T,f=100"),
         1,
