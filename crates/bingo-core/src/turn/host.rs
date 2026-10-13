@@ -1,0 +1,27 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use bingo_sdk::*;
+
+/// The session actor as the turn sees it: a place to publish, a way to ask, a queue to absorb.
+#[async_trait]
+pub trait TurnHost: Send + Sync {
+    /// A bridged after-tool observer requested completion at this round's boundary.
+    fn stopped(&self) -> bool {
+        false
+    }
+    fn emit(&self, event: Event);
+    /// The tools this turn resolved when it started (ADR-0009 §1): the offer
+    /// every one of its requests carries. The session keeps them so that a
+    /// call handed in from outside the turn is served by the very set the
+    /// model was given (ADR-0036 §2).
+    fn offered(&self, tools: Vec<Arc<dyn Tool>>);
+    async fn ask(
+        &self,
+        item: Option<ItemId>,
+        kind: InteractionKind,
+        answers: Vec<AnswerSpec>,
+    ) -> Result<Answer, KernelError>;
+    /// Queued inputs eligible for steering, removed from the queue.
+    async fn absorb(&self) -> Vec<(IntentId, Input)>;
+}

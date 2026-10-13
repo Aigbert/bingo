@@ -29,14 +29,14 @@ Audit §6.
 
 ## Files
 - `crates/bingo-sdk/src/{agent.rs (new),plugin.rs,model.rs,lib.rs,store/checkpoint.rs}`
-- `crates/bingo-core/src/{judge.rs (new),turn/agent.rs (new),turn/endpoint.rs (new),turn.rs,turn/stream.rs,session.rs,session/{complete,invoke}.rs,spec.rs,host.rs,commands/model.rs,models/{resolve,learned}.rs,test_support.rs}`
+- `crates/bingo-core/src/{judge.rs (new),turn/agent.rs (new),turn/endpoint.rs (new),turn/host.rs (new),turn.rs,turn/stream.rs,session.rs,session/{complete,invoke}.rs,spec.rs,host.rs,commands/model.rs,models/{resolve,learned}.rs,test_support.rs}`
 - `crates/bingo-store-jsonl/src/journal/{migrate.rs,versions.rs}` and
   journal.rs, fixtures and checkpoint tests (journal/checkpoint versions 2 → 3)
 - `crates/bingo-provider-acp/src/{lib.rs,provider.rs→agent.rs,events.rs,events_tests.rs,question.rs→permission.rs,render.rs,fixtures.rs,guide.md,windows.rs (deleted),transcript.rs}`
 - `crates/bingo-core/src/{accumulator.rs,chain/tool.rs,turn/config.rs,turn/late.rs,host/{registry,choose,catalog,refresh}.rs}`
 - `crates/bingo-provider-acp/src/{inbox.rs,refusal.rs,session.rs}` and `tests/{pictures.rs,fake_agent.rs,deadlines.rs,harness/mod.rs}`
 - `crates/bingo-checkpoints/src/hook.rs`
-- `crates/bingo-surface-tui/src/{acp.rs (deleted),screens/acp.rs (deleted),transcript.rs,fold.rs,thoughts.rs,pager.rs,screens.rs,lib.rs,test_support.rs}`
+- `crates/bingo-surface-tui/src/{acp.rs (deleted),screens/acp.rs (deleted),transcript.rs,fold.rs,thoughts.rs,pager.rs,screens.rs,lib.rs,test_support.rs,test_support/external.rs (new)}`
 - `crates/bingo-surface-print/src/render.rs` (an external call prints as a tool line)
 - `holds_context` literals in `bingo-{context,experience,persona,plugin-rpc,rooms,skills,tasks}`; mechanical constructor fixtures per protocol step 6
 - `crates/bingo-plugin-rpc/src/{wire.rs,schema.rs,bridge.rs,legacy.rs (new),lib.rs}, legacy fixtures` and generated `schema/plugin.json` and generator-produced `schema/plugin-2.json`
@@ -94,7 +94,7 @@ Audit §6.
   M111 supplies sdk test hosts; M115 hydrates live pictures in store `record.rs`.
 - Parallel M124: intended TUI changes only delete the ACP parser/screens
   and remove their references in the TUI Files above; no layout changes.
-  Actual TUI files changed: the nine TUI paths listed in Files, plus the four
+  Actual TUI files changed: the TUI paths listed in Files, plus the four
   deleted `screens__acp_*` snapshots. No layout code or M133-owned code.
 
 ## Decisions and verification status (2026-10-13)
@@ -103,7 +103,7 @@ The delegate chose no open retry for an agent (ADR-0009 §6, ADR-0076).
 Mid-answer loss fails with a reason, retains speech/work, buries the child
 with one `ACP_RESPAWN`, and serves the next prompt on a new child.
 `cli/acp/life.rs` is authorized; its silent-death test is unchanged.
-Dev moved `TurnHost` to `turn/host.rs`; M134 has not changed that trait.
+`TurnHost` moves verbatim to `turn/host.rs`, matching dev’s module boundary.
 
 ## Verified (2026-10-13, incomplete — protocol stop)
 
@@ -128,9 +128,7 @@ discipline FAILED
 The full suite includes every PTY test; none flaked. The three token tests
 were explicitly excluded there and then run alone as above. Focused ACP CLI:
 `40 passed; 0 failed`; permission interactions: `2 passed; 0 failed`.
-**STOP:** sdk `event.rs` is unchanged, already 1004 lines at `e9e45bb9`,
-and outside Files. Protocol step 6 forbids fixing it without scope approval.
-Proposed extension: extract `ToolOutput` and its impl into `event/output.rs`,
-re-exporting it unchanged. Fix the two M134-owned overages alongside it.
-Budget, deny, Windows checks and tmux smoke remain pending; no milestone
-completion is claimed. Contract-red evidence will be included when verified.
+**Decision (delegate, 2026-10-13):** leave sdk `event.rs` unchanged. Its
+1004 lines are baseline, fixed on dev by `98d7355d` (interactions extracted).
+It is the sole allowed discipline failure. Split M134's TurnHost contract
+and external TUI fixture into their own modules; finish all remaining gates.
