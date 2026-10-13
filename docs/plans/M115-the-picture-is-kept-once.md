@@ -30,7 +30,7 @@ This is the first use of M113's version line.
    dimensions it decoded or produced; `sniffed`, `accepted`, `load`, the
    `Read` tool and the MCP bridge pass them into `Image`.
 4. **The estimate.** `bingo-sdk/src/tokens.rs`: `ceil(w·h/750)` when both
-   are known, else `IMAGE_TOKENS`.
+   are known, else `IMAGE_TOKENS`; aggregate estimates and their anchor saturate.
 5. **The request budget.** In `bingo-core/src/context/budget.rs` (where
    `IMAGE_ROUNDS_KEPT` lives), `REQUEST_PICTURE_BYTES = 4 * 1024 * 1024`;
    the projection that applies ADR-0061's age rule then keeps pictures
@@ -71,7 +71,8 @@ This is the first use of M113's version line.
 - Mechanical Image/schema fixtures in provider, core, print, TUI, MCP and RPC tests
 - `crates/bingo/tests/cli/images.rs`: resolve stored pictures through journal replay
   in its fixture reader; keep the existing CLI assertions unchanged
-- Dimension-only expected Image fixtures in pictures, MCP, print and Read tests
+- Dimension-only expected Image fixtures in pictures, MCP, print, Read and
+  `bingo-tool-web/src/{body,fetch}.rs` tests
 - `docs/adr/{0067,0005,0040,0061,0062}*.md`
 
 ## Exit criteria

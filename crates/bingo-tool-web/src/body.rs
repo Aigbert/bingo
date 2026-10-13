@@ -134,7 +134,11 @@ mod tests {
                 assert_eq!(image.media_type, "image/png");
                 assert_eq!(
                     image,
-                    Image::from_bytes("image/png", &bytes).expect("within the cap")
+                    Image {
+                        width: Some(3),
+                        height: Some(2),
+                        ..Image::from_bytes("image/png", &bytes).expect("within the cap")
+                    }
                 );
             }
             other => panic!("expected a picture, got {other:?}"),
