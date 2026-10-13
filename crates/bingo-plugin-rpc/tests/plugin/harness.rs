@@ -43,6 +43,7 @@ pub fn installed(plugins: &[(&str, &[&str])]) -> tempfile::TempDir {
         let manifest = json!({
             "name": name,
             "version": "0.1.0",
+            "uses": ["kv", "model", "state", "store", "ui", "session"],
             "entry": {
                 "command": stub_plugin().display().to_string(),
                 "args": args,
@@ -124,6 +125,7 @@ pub async fn started_with_timeout(plugins: &[(&str, &[&str])], seconds: Option<u
     let listener = Arc::new(Listening::new());
     let host = listener.host.handle();
     manager.start(project.path(), host.clone()).await;
+    publish(&manager, &listener).await;
     Started {
         manager,
         host,
@@ -131,6 +133,64 @@ pub async fn started_with_timeout(plugins: &[(&str, &[&str])], seconds: Option<u
         home,
         project,
     }
+}
+
+/// Model user trust for the fixtures' declared model and service calls.
+pub async fn register(manager: &Manager) {
+    let trust = manager
+        .plugins()
+        .await
+        .into_iter()
+        .map(|status| {
+            (
+                status.id,
+                bingo_sdk::PluginTrust {
+                    tier: bingo_sdk::Tier::Rewrite,
+                    uses: vec!["model".into(), "kv".into()],
+                },
+            )
+        })
+        .collect();
+    for proposal in manager.registrations(&trust).await {
+        manager
+            .registered(&proposal.name, Ok(proposal.execution.grant))
+            .await;
+    }
+}
+
+/// Read grants from the manager so a reload cannot leave a stale catalogue.
+pub async fn publish(manager: &Arc<Manager>, listener: &Listening) {
+    register(manager).await;
+    let manager = Arc::downgrade(manager);
+    listener.host.on_catalog(move |kind| {
+        let manager = manager.clone();
+        async move {
+            let mut entries = Vec::new();
+            if kind == bingo_sdk::CatalogKind::Plugins
+                && let Some(manager) = manager.upgrade()
+            {
+                register(&manager).await;
+                for status in manager.plugins().await {
+                    let mut meta = json!({"enabled":status.enabled, "reason":status.reason});
+                    if let Some(execution) = status.execution {
+                        meta.as_object_mut().unwrap().extend(
+                            serde_json::to_value(execution)
+                                .unwrap()
+                                .as_object()
+                                .unwrap()
+                                .clone(),
+                        );
+                    }
+                    entries.push(bingo_sdk::CatalogEntry {
+                        id: status.id.clone(),
+                        label: status.id,
+                        meta,
+                    });
+                }
+            }
+            Ok(bingo_sdk::Catalog { kind, entries })
+        }
+    });
 }
 
 /// The one stub, started, with a project beside it.

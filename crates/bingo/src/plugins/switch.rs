@@ -11,7 +11,7 @@
 // is a diagnostic on stderr, as every diagnostic is.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use bingo_core::plugins::{ignored, needed, state};
 use bingo_core::settings::{self, Claim, Layer};
@@ -55,7 +55,27 @@ pub fn run(
     for (_, text) in &settings.notices {
         eprintln!("{text}");
     }
-    let listed = listing(&composed, env, cwd, &switched_off);
+    let runtime: bingo_plugin_rpc::Settings = serde_json::from_value(
+        settings
+            .plugins
+            .get(bingo_plugin_rpc::PluginRpcPlugin::default().manifest().id)
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({})),
+    )
+    .map_err(|error| invalid(error.to_string()))?;
+    let mut listed = listing(&composed, env, cwd, &switched_off, &runtime.plugin_dirs);
+    for status in &mut listed {
+        if let Some(execution) = &mut status.execution
+            && let Some(trust) = settings.kernel.plugin_trust.get(&status.id)
+        {
+            execution.grant = bingo_plugin_host::grant::grant(
+                execution.runtime,
+                execution.origin,
+                Some(trust),
+                &execution.grant.uses.iter().cloned().collect::<Vec<_>>(),
+            );
+        }
+    }
     let said = match action {
         Action::Validate { .. } | Action::Test { .. } => {
             return Err(invalid(
@@ -91,9 +111,10 @@ fn listing(
     env: &Env,
     cwd: &Path,
     switched_off: &BTreeSet<String>,
+    explicit: &[PathBuf],
 ) -> Vec<PluginStatus> {
     let mut listed = built_in(composed, switched_off);
-    listed.extend(external(env, cwd, switched_off));
+    listed.extend(external(env, cwd, switched_off, explicit));
     listed
 }
 
@@ -113,9 +134,14 @@ fn built_in(composed: &[Box<dyn Plugin>], switched_off: &BTreeSet<String>) -> Ve
 /// The plugin directories this machine holds. Nothing is spawned, so nothing
 /// here knows whether a process would answer: what it says is what the switch
 /// says, which is what the next start will act on.
-fn external(env: &Env, cwd: &Path, switched_off: &BTreeSet<String>) -> Vec<PluginStatus> {
+fn external(
+    env: &Env,
+    cwd: &Path,
+    switched_off: &BTreeSet<String>,
+    explicit: &[PathBuf],
+) -> Vec<PluginStatus> {
     let notices = Notices::default();
-    let found = discovery::discover(&discovery::dirs(env, cwd), &notices);
+    let found = discovery::with_explicit(&discovery::dirs(env, cwd), explicit, &notices);
     let human = std::io::IsTerminal::is_terminal(&std::io::stderr());
     for notice in notices.drain() {
         eprintln!("{}", notice_report(&notice.code, &notice.text, human));
@@ -127,13 +153,35 @@ fn external(env: &Env, cwd: &Path, switched_off: &BTreeSet<String>) -> Vec<Plugi
 }
 
 fn installed(found: Found, switched_off: &BTreeSet<String>) -> PluginStatus {
-    let off = switched_off.contains(&found.name);
+    let runtime = match found.manifest.launch {
+        bingo_plugin_host::manifest::Launch::Entry(_) => bingo_sdk::PluginRuntime::Process,
+        bingo_plugin_host::manifest::Launch::Module(_) => bingo_sdk::PluginRuntime::Module,
+    };
+    let reason = if switched_off.contains(&found.name) {
+        Some(SWITCHED_OFF.to_string())
+    } else {
+        bingo_plugin_host::runtime::runtime_of(
+            &found.manifest,
+            !switched_off.contains("bingo.mods"),
+        )
+        .err()
+    };
+    let grant = bingo_plugin_host::grant::grant(runtime, found.origin, None, &found.manifest.uses);
     PluginStatus {
         id: found.name,
         version: found.manifest.version,
-        enabled: !off,
-        reason: off.then(|| SWITCHED_OFF.to_string()),
-        from: bingo_plugin_rpc::ID.to_string(),
+        enabled: reason.is_none(),
+        reason,
+        execution: Some(bingo_sdk::PluginExecution {
+            origin: found.origin,
+            runtime,
+            grant,
+        }),
+        from: match runtime {
+            bingo_sdk::PluginRuntime::Process => bingo_plugin_rpc::ID,
+            bingo_sdk::PluginRuntime::Module => "bingo.mods",
+        }
+        .into(),
     }
 }
 
@@ -168,6 +216,8 @@ fn list_with_uses(
             }
             let tier = if status.from == bingo_sdk::BUILT_IN {
                 bingo_sdk::Tier::Full
+            } else if let Some(execution) = &status.execution {
+                execution.grant.tier
             } else {
                 trust
                     .get(&status.id)
@@ -181,6 +231,15 @@ fn list_with_uses(
                     bingo_sdk::Tier::Full => "full",
                 }
             ));
+            let runtime =
+                status
+                    .execution
+                    .as_ref()
+                    .map_or("native", |execution| match execution.runtime {
+                        bingo_sdk::PluginRuntime::Process => "process",
+                        bingo_sdk::PluginRuntime::Module => "module",
+                    });
+            line.push_str(&format!("\t{runtime}"));
             line
         })
         .collect::<Vec<_>>()
@@ -264,6 +323,7 @@ mod tests {
             version: "0.1.0".into(),
             enabled,
             reason: reason.map(str::to_string),
+            execution: None,
             from: bingo_sdk::BUILT_IN.into(),
         }
     }
@@ -283,7 +343,7 @@ mod tests {
         assert_eq!(
             said,
             format!(
-                "bingo.tools.web\t0.1.0\ton\t\tfull\nwordcount\t0.1.0\toff\t{SWITCHED_OFF}\tfull"
+                "bingo.tools.web\t0.1.0\ton\t\tfull\tnative\nwordcount\t0.1.0\toff\t{SWITCHED_OFF}\tfull\tnative"
             )
         );
     }

@@ -204,6 +204,7 @@ impl Host {
             }
         });
         host.start_plugins().await?;
+        interception::register_pending(&host).await;
         refresh::in_background(&host);
         Ok(host)
     }
@@ -692,13 +693,7 @@ impl HostApi for Host {
         turn: Option<&TurnId>,
         request: Completion,
     ) -> Result<Vec<ModelEvent>, KernelError> {
-        let granted = self
-            .settings
-            .kernel
-            .plugin_trust
-            .get(&request.plugin)
-            .is_some_and(|grant| grant.uses.iter().any(|noun| noun == "model"));
-        if !granted {
+        if !catalog::model_granted(self, &request.plugin).await {
             return Err(KernelError::new(
                 ErrorCode::PermissionDenied,
                 format!("{} needs the model grant", request.plugin),

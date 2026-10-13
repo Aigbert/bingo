@@ -89,6 +89,12 @@ fn typescript_acceptance_runs_outside_the_workspace() {
     }
     let root = tempfile::tempdir().unwrap();
     let plugin = fixture(root.path(), "ts-status");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(plugin.join("plugin.json")).unwrap())
+            .unwrap();
+    manifest.as_object_mut().unwrap().remove("module");
+    manifest["entry"] = serde_json::json!({"command":"node","args":["${PLUGIN_ROOT}/main.ts"]});
+    std::fs::write(plugin.join("plugin.json"), manifest.to_string()).unwrap();
     let validated = success(&run(root.path(), "validate", &plugin));
     assert!(validated.contains("protocol 2") && validated.contains("tool.check"));
     let tested = success(&run(root.path(), "test", &plugin));
@@ -170,4 +176,129 @@ fn scenario_refuses_a_plugin_that_did_not_start() {
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("missing-program"));
+}
+
+#[test]
+fn module_acceptance_runs_outside_the_workspace() {
+    let root = tempfile::tempdir().unwrap();
+    let plugin = fixture(root.path(), "ts-status");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(plugin.join("plugin.json")).unwrap())
+            .unwrap();
+    manifest.as_object_mut().unwrap().remove("entry");
+    manifest["module"] = serde_json::json!("hooks/register.ts");
+    manifest["uses"] = serde_json::json!(["store", "ui"]);
+    std::fs::write(plugin.join("plugin.json"), manifest.to_string()).unwrap();
+    let tested = success(&run(root.path(), "test", &plugin));
+    assert!(tested.starts_with("PASS ") && tested.contains("acceptance.json"));
+    assert!(!plugin.join("must-not-run").exists());
+}
+
+#[test]
+fn module_listing_names_the_runtime_and_its_disabled_reason() {
+    let root = tempfile::tempdir().unwrap();
+    let plugin = root.path().join(".bingo/plugins/hello");
+    std::fs::create_dir_all(&plugin).unwrap();
+    std::fs::write(
+        plugin.join("plugin.json"),
+        r#"{"name":"hello","version":"1","module":"main.ts"}"#,
+    )
+    .unwrap();
+    std::fs::write(plugin.join("main.ts"), "export function register(on) {}").unwrap();
+    let list = || {
+        Command::new(env!("CARGO_BIN_EXE_bingo"))
+            .args(["plugins", "list"])
+            .current_dir(root.path())
+            .envs(home::home_env(root.path()))
+            .env_remove("BINGO_FAKE_SCRIPT")
+            .output()
+            .unwrap()
+    };
+    let first = success(&list());
+    let row = first
+        .lines()
+        .find(|line| line.starts_with("hello\t"))
+        .unwrap();
+    assert!(row.ends_with("\tmodule"), "{row}");
+    std::fs::write(
+        root.path().join(".bingo/settings.toml"),
+        "[enabledPlugins]\n\"bingo.mods\" = false\n",
+    )
+    .unwrap();
+    let disabled = success(&list());
+    let row = disabled
+        .lines()
+        .find(|line| line.starts_with("hello\t"))
+        .unwrap();
+    assert!(
+        row.contains("\toff\t") && row.contains("module runtime is switched off"),
+        "{row}"
+    );
+}
+
+#[test]
+fn the_cli_composes_the_module_runtime_for_an_explicit_directory() {
+    let root = tempfile::tempdir().unwrap();
+    let plugin = root.path().join("hello");
+    std::fs::create_dir(&plugin).unwrap();
+    std::fs::write(
+        plugin.join("plugin.json"),
+        r#"{"name":"hello","version":"1","module":"main.ts"}"#,
+    )
+    .unwrap();
+    std::fs::write(plugin.join("main.ts"), "export function register(on) { on('tool.call', () => ({parts:[{type:'text',text:'module result'}],isError:false})); }").unwrap();
+    let script = root.path().join("fake.json");
+    std::fs::write(&script, r#"{"responses":[{"steps":[{"toolCall":{"name":"Read","input":{"file_path":"missing.txt"}}}]},{"steps":[{"text":"offline"}]}]}"#).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+        .args([
+            "--print",
+            "--output-format",
+            "json",
+            "--provider",
+            "fake",
+            "--model",
+            "fake-1",
+            "--plugin-dir",
+        ])
+        .arg(&plugin)
+        .arg("hello")
+        .current_dir(root.path())
+        .envs(home::home_env(root.path()))
+        .env("BINGO_FAKE_SCRIPT", script)
+        .output()
+        .unwrap();
+    let output = success(&output);
+    let frames: Vec<bingo_sdk::Frame> = output
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("stdout is NDJSON frames"))
+        .collect();
+    assert!(frames.iter().any(|frame| matches!(&frame.event, bingo_sdk::Event::ItemCompleted {item}
+        if matches!(&item.body, bingo_sdk::ItemBody::ToolCall {output:Some(output), ..} if output.parts.iter().any(|part| part.as_text() == Some("module result"))))), "{output}");
+}
+
+#[test]
+fn listing_includes_explicit_modules_without_starting_them() {
+    let root = tempfile::tempdir().unwrap();
+    let plugin = root.path().join("hello");
+    std::fs::create_dir(&plugin).unwrap();
+    std::fs::write(
+        plugin.join("plugin.json"),
+        r#"{"name":"hello","version":"1","module":"missing.ts"}"#,
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+        .arg("--plugin-dir")
+        .arg(&plugin)
+        .args(["plugins", "list"])
+        .current_dir(root.path())
+        .envs(home::home_env(root.path()))
+        .env_remove("BINGO_FAKE_SCRIPT")
+        .output()
+        .unwrap();
+    let text = success(&output);
+    let row = text.lines().find(|line| line.starts_with("hello\t"));
+    assert!(
+        row.is_some_and(|row| row.contains("\trewrite") && row.ends_with("\tmodule")),
+        "{text}"
+    );
 }

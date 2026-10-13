@@ -1,4 +1,4 @@
-import type { Register } from '../../../../sdk/typescript/src/index.ts';
+import type { Register } from 'bingo';
 
 export const register: Register = on => {
   on('tool.call', async ($, e, next) => {

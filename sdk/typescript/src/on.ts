@@ -7,27 +7,22 @@ export type Next = ((event: any) => Promise<any>) & {
   readonly called: boolean;
   readonly signal: AbortSignal;
   readonly origin: unknown;
+  readonly error?: { kind: string; message: string };
+  readonly budget?: { ms: number; remainingMs: number };
 };
 export type Hook = ($: Dollar, event: any, next: Next) => any;
 export type EventNext<N extends keyof EventInputs> = ((event: EventInputs[N]) => Promise<EventResults[N]>) & Omit<Next, keyof Function>;
 export type EventHook<N extends keyof EventInputs> = ($: Dollar, event: EventInputs[N], next: EventNext<N>) => EventResults[N] | void | Promise<EventResults[N] | void>;
 export type On = {
-  <N extends keyof EventInputs>(pattern: N, hook: EventHook<N>): void;
-  <N extends keyof EventInputs>(pattern: N, matcher: Partial<EventInputs[N]>, hook: EventHook<N>): void;
-  (pattern: string, hook: Hook): void;
-  (pattern: string, matcher: Matcher, hook: Hook): void;
+  <N extends keyof EventInputs>(pattern: N, hook: EventHook<N>): Registration;
+  <N extends keyof EventInputs>(pattern: N, matcher: Partial<EventInputs[N]>, hook: EventHook<N>): Registration;
+  (pattern: string, hook: Hook): Registration;
+  (pattern: string, matcher: Matcher, hook: Hook): Registration;
 };
 export type Register = (on: On, options: unknown) => void | Promise<void>;
 
-type Entry = { pattern: string; matcher: Matcher; hook: Hook };
-type Before = { chain: string; input: any; site?: any; tier?: string };
-type Pending = {
-  controller: AbortController;
-  resume: (value: any) => void;
-  reject: (error: Error) => void;
-  result: Promise<any>;
-};
-
+export type Registration = { catch(hook: Hook): void };
+export type Entry = { pattern: string; matcher: Matcher; hook: Hook; recover?: Hook };
 export function patternMatches(pattern: string, name: string): boolean {
   if (pattern.startsWith('!')) return !patternMatches(pattern.slice(1), name);
   if (pattern === '*') return true;
@@ -47,7 +42,7 @@ export function matches(matcher: Matcher, event: unknown): boolean {
   return Object.is(matcher, event);
 }
 
-function frozen<T>(value: T): T {
+export function frozen<T>(value: T): T {
   if (value !== null && typeof value === 'object') {
     Object.values(value).forEach(frozen);
     Object.freeze(value);
@@ -55,100 +50,48 @@ function frozen<T>(value: T): T {
   return value;
 }
 
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason: Error) => void;
-  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
-  return { promise, resolve, reject };
-}
-
 export class Hooks {
   entries: Entry[] = [];
-  pending = new Map<string, Pending>();
   on: On = (pattern: string, matcher: Matcher | Hook, hook?: Hook) => {
-    this.entries.push({ pattern, matcher: hook ? matcher : undefined, hook: hook ?? matcher as Hook });
+    const entry: Entry = { pattern, matcher: hook ? matcher : undefined, hook: hook ?? matcher as Hook };
+    const key = JSON.stringify([pattern, entry.matcher], (_, value) => value instanceof RegExp ? { regex: value.source, flags: value.flags } : value);
+    if (this.entries.some(held => JSON.stringify([held.pattern, held.matcher], (_, value) => value instanceof RegExp ? { regex: value.source, flags: value.flags } : value) === key)) throw new Error('duplicate hook registration');
+    this.entries.push(entry);
+    return { catch: (recover: Hook) => {
+      if (entry.recover) throw new Error('catch may be registered only once');
+      entry.recover = recover;
+    } };
   };
 
   names(catalogue: readonly string[]): string[] {
     return catalogue.filter(name => this.entries.some(entry => patternMatches(entry.pattern, name)));
   }
 
-  async before(name: string, request: Before, dollar: unknown): Promise<unknown> {
-    if (this.pending.has(request.chain)) throw new Error('duplicate chain');
-    const first = deferred<unknown>();
-    const downstream = deferred<any>();
-    const controller = new AbortController();
-    const stopped = deferred<never>();
-    // Cancellation can arrive before any hook has called next.
-    void downstream.promise.catch(() => {});
-    let crossed = false;
-    const entries = this.entries.filter(entry => patternMatches(entry.pattern, name));
-    const terminal = (input: unknown) => {
-      crossed = true;
-      first.resolve({ next: input });
-      return downstream.promise;
-    };
-    const result = Promise.race([
-      Promise.resolve().then(() => this.dispatch(entries, 0, request.input, dollar, request.site, controller.signal, terminal)),
-      stopped.promise,
-    ]);
-    const reject = (error: Error) => {
-      first.reject(error);
-      downstream.reject(error);
-      stopped.reject(error);
-    };
-    this.pending.set(request.chain, { controller, resume: downstream.resolve, reject, result });
-    void result.then(answer => {
-      if (!crossed) first.resolve({ answer: answer ?? null });
-    }, error => { if (!crossed) first.reject(error); }).finally(() => {
-      if (!crossed) this.pending.delete(request.chain);
-    });
-    return first.promise;
-  }
-
-  private async dispatch(entries: Entry[], index: number, input: any, dollar: unknown,
-    origin: unknown, signal: AbortSignal, terminal: (input: any) => Promise<any>): Promise<any> {
+  async dispatch(entries: Entry[], index: number, input: any, dollar: unknown,
+    origin: unknown, signal: AbortSignal, terminal: (input: any) => Promise<any>, dollarFor?: (entry: Entry) => unknown): Promise<any> {
     if (signal.aborted) throw new Error('intercept cancelled');
     const entry = entries[index];
     if (!entry) return terminal(input);
-    if (entry.matcher !== undefined && !matches(entry.matcher, input)) return this.dispatch(entries, index + 1, input, dollar, origin, signal, terminal);
+    if (entry.matcher !== undefined && !matches(entry.matcher, input)) return this.dispatch(entries, index + 1, input, dollar, origin, signal, terminal, dollarFor);
     let called = false;
     let continuation: Promise<any> | undefined;
     const next = Object.assign(async (changed: unknown) => {
       if (called) throw new Error('next may be called only once');
       if (signal.aborted) throw new Error('intercept cancelled');
       called = true;
-      continuation = this.dispatch(entries, index + 1, changed, dollar, origin, signal, terminal);
+      continuation = this.dispatch(entries, index + 1, changed, dollar, origin, signal, terminal, dollarFor);
       return continuation;
     }, { signal, origin }) as Next;
     Object.defineProperty(next, 'called', { get: () => called });
-    const answer = await entry.hook(dollar as Dollar, frozen(input), next);
+    let answer;
+    try { answer = await entry.hook((dollarFor?.(entry) ?? dollar) as Dollar, frozen(input), next); }
+    catch (error) {
+      if (!entry.recover) throw error;
+      Object.defineProperty(next, 'error', { value: { kind: 'throw', message: String(error) } });
+      answer = await entry.recover((dollarFor?.(entry) ?? dollar) as Dollar, frozen(input), next);
+    }
     // A fire-and-forget next still owns the downstream result and its lifetime.
     return answer === undefined && continuation ? await continuation : answer;
   }
 
-  async observe(name: string, payload: unknown, dollar: unknown): Promise<void> {
-    const entries = this.entries.filter(entry => patternMatches(entry.pattern, name));
-    await this.dispatch(entries, 0, payload, dollar, undefined, new AbortController().signal, async () => null);
-  }
-
-  async after(request: { chain: string; result: unknown }): Promise<unknown> {
-    const pending = this.pending.get(request.chain);
-    if (!pending) throw new Error('unknown intercept chain');
-    pending.resume(request.result);
-    try { return { result: await pending.result }; }
-    finally { this.pending.delete(request.chain); }
-  }
-
-  cancel(chain: string): void {
-    const pending = this.pending.get(chain);
-    if (!pending) return;
-    this.pending.delete(chain);
-    pending.controller.abort();
-    pending.reject(new Error('intercept cancelled'));
-  }
-
-  close(): void {
-    for (const chain of this.pending.keys()) this.cancel(chain);
-  }
 }

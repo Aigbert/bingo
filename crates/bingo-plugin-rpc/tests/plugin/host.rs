@@ -70,14 +70,15 @@ async fn state_versions_refuse_stale_writes_and_survive_a_restart() {
     let conflict = reverse(&started, "host/state/set", stale).await;
     assert_eq!(conflict["error"]["data"]["version"], 1);
     started.manager.shutdown().await;
-    let manager = bingo_plugin_rpc::Manager::new(
+    let manager = std::sync::Arc::new(bingo_plugin_rpc::Manager::new(
         bingo_sdk::Env::rooted(started.home.path()),
         Default::default(),
         Default::default(),
-    );
+    ));
     manager
         .start(started.project.path(), started.host.clone())
         .await;
+    publish(&manager, &started.listener).await;
     let tool = only_tool(&manager).await;
     let (_, result) = call(
         &tool,

@@ -71,3 +71,5 @@ wire; per-service types in the sdk; a second service registry.
 Amended 2026-10-13 by ADR-0069 §1–4 (M119): §2 uses one `bingo-services` library with a module per contract; §5 adds optional `uses` beside disabling `requires`. Typed keys bind both registration and lookup; external wire routing is unchanged.
 
 Amended 2026-10-14 (M136, ADR-0078 §1): wire faces declare noun/method event names, input/result schemas and unsafe metadata. Registration rejects collisions with kernel names or another owner; wire routing raises the declared chain through the existing service door.
+
+Verified 2026-10-14 (M137, ADR-0078): module host operations use registered noun faces through the existing wire door; model/service admission consults the registered grant.

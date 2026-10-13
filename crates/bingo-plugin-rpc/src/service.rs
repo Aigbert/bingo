@@ -209,6 +209,17 @@ impl ServiceCalls for Hub {
         let params: ServiceCallParams = serde_json::from_value(params)
             .map_err(|error| RpcError::new(INVALID_PARAMS, error.to_string()))?;
         let wire = self.wire(&params.key)?;
+        if params.key != doors::KEY {
+            bingo_plugin_host::grant::admit_service(
+                &self.host,
+                &self.plugin,
+                &params.key,
+                &params.method,
+                wire.as_ref(),
+            )
+            .await
+            .map_err(|error| RpcError::new(INTERNAL_ERROR, error))?;
+        }
         let result = wire
             .call(&params.method, params.params)
             .await
@@ -358,7 +369,18 @@ mod tests {
             }
         }
 
-        let host = bingo_sdk::testing::ServiceHost::handle();
+        let fixture = bingo_sdk::testing::TestHost::default();
+        fixture.on_catalog(|kind| async move {
+            Ok(bingo_sdk::Catalog {
+                kind,
+                entries: vec![bingo_sdk::CatalogEntry {
+                    id: "caller".into(),
+                    label: "caller".into(),
+                    meta: json!({"enabled":true,"tier":"rewrite","uses":["kv"]}),
+                }],
+            })
+        });
+        let host = fixture.handle();
         host.open_service("kv", Arc::new(Kv)).expect("a free key");
         let answered = hub(host)
             .call(asked("kv", "get"))
@@ -375,6 +397,34 @@ mod tests {
             .await
             .expect_err("a call names its service");
         assert_eq!(error.code, INVALID_PARAMS);
+    }
+
+    #[tokio::test]
+    async fn an_undeclared_service_noun_is_refused_before_the_call() {
+        struct Hidden;
+        #[async_trait]
+        impl WireService for Hidden {
+            async fn call(&self, _: &str, _: Value) -> Result<Value, ServiceError> {
+                Ok(json!("must not run"))
+            }
+        }
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_catalog(|kind| async move {
+            Ok(bingo_sdk::Catalog {
+                kind,
+                entries: vec![bingo_sdk::CatalogEntry {
+                    id: "caller".into(),
+                    label: "caller".into(),
+                    meta: json!({"enabled":true,"tier":"rewrite","uses":[]}),
+                }],
+            })
+        });
+        host.handle()
+            .open_service("hidden", Arc::new(Hidden))
+            .unwrap();
+        let answer = hub(host.handle()).call(asked("hidden", "get")).await;
+        assert!(answer.is_err(), "undeclared service ran: {answer:?}");
+        assert!(answer.unwrap_err().message.contains("hidden grant"));
     }
 
     /// A declaration is a map, so what a bridge publishes is one service per

@@ -21,7 +21,10 @@ pub fn read(root: &Path) -> Result<Manifest, KernelError> {
             "name must be a safe plugin directory name and match its directory",
         ));
     }
-    if manifest.entry.command.trim().is_empty() {
+    if manifest
+        .entry()
+        .is_ok_and(|entry| entry.command.trim().is_empty())
+    {
         return Err(invalid("entry.command must not be empty"));
     }
     if let Some(schema) = &manifest.config {
@@ -126,7 +129,7 @@ pub async fn validate(root: &Path, env: &Env) -> Result<Vec<String>, KernelError
     let manifest = read(&root)?;
     let connection = Connection::spawn(
         &manifest.name,
-        &manifest.entry.rooted(&root),
+        &manifest.entry().map_err(invalid)?.rooted(&root),
         &root,
         &env.data_dir,
         None,

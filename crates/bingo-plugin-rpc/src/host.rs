@@ -1,74 +1,13 @@
-//! Reverse requests translate wire envelopes onto the host's own doors.
+//! Reverse requests negotiate capabilities before shared host operations.
 
-use bingo_sdk::slot::Slot;
-use bingo_sdk::{Input, ModelEvent, ModelRequest, SessionId, TurnId};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-pub struct Place {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub session: Option<SessionId>,
-    /// The plugin's placement key. Several independent slots can coexist.
-    pub slot: String,
-    pub view: Option<Slot>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-pub struct Extend {
-    pub session: SessionId,
-    pub key: String,
-    pub value: Value,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-pub struct Deliver {
-    pub session: SessionId,
-    pub input: Input,
-    pub wake: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct StateGet {
-    pub scope: String,
-    pub key: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct StateSet {
-    pub scope: String,
-    pub key: String,
-    pub value: Value,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub if_version: Option<u64>,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct StateValue {
-    pub version: u64,
-    pub value: Value,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-pub struct Complete {
-    pub session: SessionId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub turn: Option<TurnId>,
-    pub request: ModelRequest,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-pub struct Completed {
-    pub events: Vec<ModelEvent>,
-}
-
-use crate::codec::{INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, RpcError};
+use crate::codec::{INTERNAL_ERROR, METHOD_NOT_FOUND, RpcError};
 use crate::service::ServiceCalls;
 use crate::wire::{Cap, name};
-use bingo_sdk::{Delivery, HostHandle, IntentId, Origin, SessionFilter};
+pub use bingo_plugin_host::host::{
+    Complete, Completed, Deliver, Extend, Place, StateGet, StateSet, StateValue,
+};
+use bingo_sdk::HostHandle;
+use serde_json::Value;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -129,97 +68,19 @@ impl Server {
             .await
             .map_err(failed)?;
         self.permits(method)?;
-        match method {
-            name::SERVICE_CALL => self.service.call(params).await,
-            name::HOST_PLACE => self.place(parse(params)?).await,
-            name::HOST_EXTEND => self.extend(parse(params)?).await,
-            name::HOST_DELIVER => self.deliver(parse(params)?).await,
-            name::STATE_GET => self.get(parse(params)?).await,
-            name::STATE_SET => self.set(parse(params)?).await,
-            name::MODEL_COMPLETE => self.complete(parse(params)?).await,
-            _ => Err(unknown(method)),
+        if method == name::SERVICE_CALL {
+            return self.service.call(params).await;
         }
-    }
-
-    async fn complete(&self, params: Complete) -> Result<Value, RpcError> {
-        let events = self
-            .host
-            .complete(
-                &params.session,
-                params.turn.as_ref(),
-                bingo_sdk::Completion {
-                    plugin: self.plugin.clone(),
-                    request: params.request,
-                },
-            )
+        bingo_plugin_host::ops::admit(&self.host, &self.plugin, method, &params)
             .await
             .map_err(failed)?;
-        serde_json::to_value(Completed { events }).map_err(failed)
-    }
-
-    async fn get(&self, params: StateGet) -> Result<Value, RpcError> {
-        serde_json::to_value(self.state.get(params.scope, params.key).await?).map_err(failed)
-    }
-    async fn set(&self, params: StateSet) -> Result<Value, RpcError> {
-        serde_json::to_value(
-            self.state
-                .set(params.scope, params.key, params.value, params.if_version)
-                .await?,
-        )
-        .map_err(failed)
-    }
-
-    async fn place(&self, params: Place) -> Result<Value, RpcError> {
-        let payload = match params.view {
-            Some(view) => bingo_sdk::slot::with(serde_json::json!({}), [view]),
-            None => Value::Null,
-        };
-        let sessions = match params.session {
-            Some(session) => vec![session],
-            None => self
-                .host
-                .sessions(SessionFilter::default())
-                .await
-                .map_err(failed)?
-                .into_iter()
-                .map(|summary| summary.id)
-                .collect(),
-        };
-        for session in sessions {
-            self.host
-                .signal(&session, &self.plugin, &params.slot, payload.clone())
-                .await
-                .map_err(failed)?;
+        bingo_plugin_host::host::Operations {
+            plugin: &self.plugin,
+            host: &self.host,
+            state: &self.state,
         }
-        Ok(Value::Null)
-    }
-
-    async fn extend(&self, params: Extend) -> Result<Value, RpcError> {
-        self.host
-            .extend(&params.session, &self.plugin, &params.key, params.value)
-            .await
-            .map_err(failed)?;
-        Ok(Value::Null)
-    }
-
-    async fn deliver(&self, mut params: Deliver) -> Result<Value, RpcError> {
-        let Input::Text { origin, .. } = &mut params.input else {
-            return Err(RpcError::new(
-                INVALID_PARAMS,
-                "host/deliver requires text input",
-            ));
-        };
-        *origin = Origin::surface(format!("plugin:{}", self.plugin));
-        let delivery = if params.wake {
-            Delivery::Wake
-        } else {
-            Delivery::Hold
-        };
-        self.host
-            .deliver(&params.session, IntentId::mint(), params.input, delivery)
-            .await
-            .map_err(failed)?;
-        Ok(Value::Null)
+        .answer(method, params)
+        .await
     }
 }
 
@@ -228,9 +89,6 @@ pub(crate) fn unknown(method: &str) -> RpcError {
         METHOD_NOT_FOUND,
         format!("the host does not serve {method}"),
     )
-}
-fn parse<T: serde::de::DeserializeOwned>(params: Value) -> Result<T, RpcError> {
-    serde_json::from_value(params).map_err(|error| RpcError::new(INVALID_PARAMS, error.to_string()))
 }
 fn failed(error: impl std::fmt::Display) -> RpcError {
     RpcError::new(INTERNAL_ERROR, error.to_string())
@@ -246,4 +104,102 @@ fn catalogue_capability(method: &str) -> Option<&'static str> {
         && !event.contains(['*', '!'])
         && bingo_sdk::catalogue::Pattern::parse(event).is_ok())
     .then_some(capability)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bingo_sdk::{Catalog, CatalogEntry, CatalogKind};
+    use serde_json::json;
+
+    struct NoServices;
+    #[async_trait::async_trait]
+    impl ServiceCalls for NoServices {
+        async fn call(&self, _: Value) -> Result<Value, RpcError> {
+            Err(unknown("service/call"))
+        }
+    }
+
+    #[tokio::test]
+    async fn model_completion_requires_the_catalogues_granted_noun() {
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_catalog(|kind| async move {
+            assert_eq!(kind, CatalogKind::Plugins);
+            Ok(Catalog {
+                kind,
+                entries: vec![CatalogEntry {
+                    id: "stub".into(),
+                    label: "stub".into(),
+                    meta: json!({"enabled":true, "tier":"rewrite", "uses":[]}),
+                }],
+            })
+        });
+        let home = tempfile::tempdir().unwrap();
+        let server = Server::new(
+            "stub",
+            host.handle(),
+            Arc::new(NoServices),
+            crate::state::Store::new(home.path(), "stub"),
+        );
+        server.initialize(&crate::wire::capabilities());
+        let error = server
+            .answer(
+                name::MODEL_COMPLETE,
+                json!({"session":"ses_1", "request":{
+                    "model":"fake", "maxTokens":1, "system":[], "messages":[], "tools":[]
+                }}),
+            )
+            .await
+            .unwrap_err();
+        assert!(error.message.contains("model grant"), "{}", error.message);
+    }
+
+    #[tokio::test]
+    async fn host_operations_require_the_catalogues_granted_nouns() {
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_catalog(|kind| async move {
+            Ok(Catalog {
+                kind,
+                entries: vec![CatalogEntry {
+                    id: "stub".into(),
+                    label: "stub".into(),
+                    meta: json!({"enabled":true, "tier":"rewrite", "uses":[]}),
+                }],
+            })
+        });
+        let home = tempfile::tempdir().unwrap();
+        let server = Server::new(
+            "stub",
+            host.handle(),
+            Arc::new(NoServices),
+            crate::state::Store::new(home.path(), "stub"),
+        );
+        server.initialize(&crate::wire::capabilities());
+        for (method, params, noun) in [
+            (
+                "host/state/get",
+                json!({"scope":"ses_1", "key":"key"}),
+                "state",
+            ),
+            (
+                "host/state/set",
+                json!({"scope":"global", "key":"key", "value":1}),
+                "store",
+            ),
+            ("host/place", json!({"slot":"calls", "view":null}), "ui"),
+            (
+                "host/extend",
+                json!({"session":"ses_1", "key":"key", "value":1}),
+                "session",
+            ),
+            ("host/deliver", json!({}), "session"),
+        ] {
+            let error = server.answer(method, params).await.expect_err(method);
+            assert!(
+                error.message.contains(&format!("{noun} grant")),
+                "{method}: {}",
+                error.message
+            );
+        }
+    }
 }

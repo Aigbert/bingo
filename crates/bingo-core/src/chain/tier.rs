@@ -27,6 +27,7 @@ pub fn admits(tier: Tier, point: &bingo_sdk::catalogue::Entry, act: Act) -> bool
         (Tier::Tighten, Act::Rewrite | Act::Answer) => [
             bingo_sdk::catalogue::PROMPT_SUBMIT,
             bingo_sdk::catalogue::TOOL_CHECK,
+            bingo_sdk::catalogue::PLUGIN_REGISTER,
         ]
         .contains(&point),
         (Tier::Rewrite, Act::Rewrite) => point.acts.rewrite,

@@ -11,6 +11,18 @@ repository = "https://github.com/yexrob/bingo"
 publish = false
 
 [workspace.dependencies]
+bingo-mods = { path = "crates/bingo-mods" }
+# M137 / ADR-0078: sandbox memory/time caps and the TS/TSX compiler.
+rquickjs = { version = "=0.14.0", features = ["futures", "loader", "parallel"] }
+oxc_allocator = "=0.152.0"
+oxc_ast = "=0.152.0"
+oxc_parser = "=0.152.0"
+oxc_semantic = "=0.152.0"
+oxc_span = "=0.152.0"
+oxc_transformer = "=0.152.0"
+oxc_codegen = "=0.152.0"
+
+bingo-plugin-host = { path = "crates/bingo-plugin-host" }
 bingo-schema-ts = { path = "crates/bingo-schema-ts" }
 bingo-http = { path = "crates/bingo-http" }
 bingo-collab = { path = "crates/bingo-collab" }

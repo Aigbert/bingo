@@ -65,6 +65,9 @@ pub struct ExternalInterceptor {
 pub trait InterceptorSource: Send + Sync {
     fn id(&self) -> &str;
     async fn interceptors(&self) -> Vec<ExternalInterceptor>;
+    async fn tier(&self, _plugin: &str) -> Option<Tier> {
+        None
+    }
 }
 
 /// The continuation cannot be cloned or called twice.
@@ -171,6 +174,10 @@ pub enum StopResult {
 pub trait Interceptor: Send + Sync {
     fn id(&self) -> &str;
     fn matcher(&self) -> LinkMatcher;
+    /// Sandboxed runtimes account their own active time and interrupt execution.
+    fn owns_deadline(&self) -> bool {
+        false
+    }
 
     async fn chain(
         &self,

@@ -64,6 +64,64 @@ pub const BUILT_IN: &str = "built in";
 /// found for itself, so the sentence is written once.
 pub const SWITCHED_OFF: &str = "switched off in the settings";
 
+/// The directory that supplied an external plugin.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum PluginOrigin {
+    User,
+    Project,
+    Explicit,
+}
+
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum PluginRuntime {
+    Process,
+    Module,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+pub struct PluginGrant {
+    pub tier: crate::Tier,
+    pub uses: BTreeSet<String>,
+}
+
+/// The registration chain may reduce a grant or refuse the plugin in words.
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(untagged)]
+pub enum PluginDecision {
+    Granted(PluginGrant),
+    Denied { reason: String },
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+pub struct PluginExecution {
+    pub origin: PluginOrigin,
+    pub runtime: PluginRuntime,
+    #[serde(flatten)]
+    pub grant: PluginGrant,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+pub struct PluginRegistration {
+    pub name: String,
+    pub version: String,
+    #[serde(flatten)]
+    pub execution: PluginExecution,
+}
+
 /// What one plugin is, for a listing: what it is called, whether it will run,
 /// and why not. It covers a plugin the kernel registered and one only a
 /// [`PluginSource`] has ever seen, so the two draw as one table (ADR-0057 §5).
@@ -76,6 +134,7 @@ pub struct PluginStatus {
     pub reason: Option<String>,
     /// [`BUILT_IN`], or the id of the source that listed it.
     pub from: String,
+    pub execution: Option<PluginExecution>,
 }
 
 impl PluginStatus {
@@ -87,6 +146,7 @@ impl PluginStatus {
             enabled: true,
             reason: None,
             from: BUILT_IN.to_string(),
+            execution: None,
         }
     }
 
@@ -188,6 +248,14 @@ pub trait HookSource: Send + Sync {
 pub trait PluginSource: Send + Sync {
     fn id(&self) -> &str;
     async fn plugins(&self) -> Vec<PluginStatus>;
+    /// Claim pending generations once, before they may contribute links.
+    async fn registrations(
+        &self,
+        _trust: &std::collections::BTreeMap<String, crate::PluginTrust>,
+    ) -> Vec<PluginRegistration> {
+        Vec::new()
+    }
+    async fn registered(&self, _name: &str, _grant: Result<PluginGrant, String>) {}
 }
 
 /// What a plugin hands the host. One enum so the in-process path and a future

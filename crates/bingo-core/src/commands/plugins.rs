@@ -147,6 +147,7 @@ mod tests {
             version: "1.2.3".into(),
             enabled,
             reason: reason.map(str::to_string),
+            execution: None,
             from: BUILT_IN.into(),
         }
     }

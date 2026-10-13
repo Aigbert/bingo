@@ -41,13 +41,16 @@ async fn a_manifest_change_reloads_once_and_keeps_global_state() {
             Ok(())
         }
     });
-    let manager = Manager::new(
-        Env::rooted(home.path()),
-        Default::default(),
-        Default::default(),
-    )
-    .with_dirs(vec![root.clone()]);
+    let manager = Arc::new(
+        Manager::new(
+            Env::rooted(home.path()),
+            Default::default(),
+            Default::default(),
+        )
+        .with_dirs(vec![root.clone()]),
+    );
     manager.start(project.path(), listener.host.handle()).await;
+    publish(&manager, &listener).await;
     let saved = reverse(
         &manager,
         project.path(),
@@ -71,6 +74,7 @@ async fn a_manifest_change_reloads_once_and_keeps_global_state() {
     tokio::time::timeout(Duration::from_secs(10), reloaded.notified())
         .await
         .unwrap();
+    register(&manager).await;
     assert_eq!(manager.commands().await.len(), 1);
     let read = reverse(
         &manager,
@@ -104,7 +108,7 @@ async fn reload_fails_a_held_link_and_reports_changed_services() {
     let bridge = Arc::new(bingo_plugin_rpc::Bridge::new(
         "reload",
         root.clone(),
-        manifest.entry.rooted(&root),
+        manifest.entry().unwrap().rooted(&root),
         Value::Null,
         None,
         bingo_plugin_rpc::Setting {
@@ -132,7 +136,10 @@ async fn reload_fails_a_held_link_and_reports_changed_services() {
     let mut held = Box::pin(link.link.turn_stop(&cx, (), next));
     assert!(futures::poll!(&mut held).is_pending());
     let mut changed = manifest;
-    changed.entry.args.push("--no-service".into());
+    let bingo_plugin_rpc::manifest::Launch::Entry(entry) = &mut changed.launch else {
+        panic!("process fixture")
+    };
+    entry.args.push("--no-service".into());
     bridge.reload(changed).await;
     let error = held.await.unwrap_err();
     assert!(!error.to_string().is_empty());

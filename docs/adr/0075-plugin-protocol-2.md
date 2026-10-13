@@ -123,3 +123,7 @@ This authorizes that one removal, not other changes to the frozen wire.*
 Verified 2026-10-14 (M136): catalogue subscriptions and dynamic service-face
 chains cross protocol 2; generated schema and TypeScript drift tests pass,
 as does the additive-only test against the amended pre-release baseline.
+
+2026-10-14, person's delegate: pre-release, M137: entry becomes optional when module is present (exactly one of the two); the freeze still starts at the first release carrying protocol 2.
+
+Verified 2026-10-14 (M137): shared manifest/discovery/state serve process and module runtimes; both read adjudicated noun grants. Module reload registers a fresh runtime and replays open sessions while retaining host state. Generated schema freeze tests pass.

@@ -1,5 +1,5 @@
 import { stdout } from 'node:process';
-import { Hooks } from './on.ts';
+import { Hooks } from './cross.ts';
 import type { Register } from './on.ts';
 import { dollar } from './dollar.ts';
 import { Peer, stdio } from './rpc.ts';

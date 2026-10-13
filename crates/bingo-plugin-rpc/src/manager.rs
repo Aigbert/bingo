@@ -23,13 +23,13 @@ use crate::doors::{self, Caller, Doors};
 use crate::notice::{self, Notices};
 use crate::source::ID;
 use crate::wire::HostEnv;
+use bingo_plugin_host::registration::Registration;
 
 /// One plugin this machine has installed: what it is called, what its
 /// manifest says it is, and the bridge that runs it — or nothing, where the
 /// settings switched it off (ADR-0057 §4).
 struct Installed {
-    name: String,
-    version: String,
+    registration: Arc<Registration>,
     bridge: Option<Arc<Bridge>>,
 }
 
@@ -37,17 +37,15 @@ impl Installed {
     /// What a listing shows about it, without spawning anything: a switched-off
     /// plugin has no process to ask, and a dead one answers with why.
     async fn status(&self) -> PluginStatus {
-        let (enabled, reason) = match &self.bridge {
-            Some(bridge) => bridge.standing().await,
-            None => (false, Some(SWITCHED_OFF.to_string())),
-        };
-        PluginStatus {
-            id: self.name.clone(),
-            version: self.version.clone(),
-            enabled,
-            reason,
-            from: ID.to_string(),
+        let mut status = self.registration.status(ID);
+        if status.enabled
+            && let Some(bridge) = &self.bridge
+        {
+            let (enabled, reason) = bridge.standing().await;
+            status.enabled = enabled;
+            status.reason = reason;
         }
+        status
     }
 }
 
@@ -114,7 +112,7 @@ impl Manager {
     pub fn names(&self) -> Vec<&str> {
         self.discovered()
             .iter()
-            .map(|installed| installed.name.as_str())
+            .map(|installed| installed.registration.name.as_str())
             .collect()
     }
 
@@ -141,6 +139,12 @@ impl Manager {
         );
         let installed: Vec<Installed> = found
             .into_iter()
+            .filter(|found| {
+                matches!(
+                    found.manifest.launch,
+                    bingo_plugin_host::manifest::Launch::Entry(_)
+                )
+            })
             .map(|f| self.install(f, host.clone()))
             .collect();
         if self.installed.set(installed).is_err() {
@@ -159,7 +163,7 @@ impl Manager {
 
     pub async fn interceptors(&self) -> Vec<bingo_sdk::ExternalInterceptor> {
         let mut links = Vec::new();
-        for bridge in self.bridges() {
+        for bridge in self.active_bridges() {
             links.extend(bridge.interceptors().await);
         }
         links
@@ -167,7 +171,7 @@ impl Manager {
 
     pub async fn tools(&self) -> Vec<Arc<dyn Tool>> {
         let mut tools = Vec::new();
-        for bridge in self.bridges() {
+        for bridge in self.active_bridges() {
             tools.extend(bridge.tools().await);
         }
         tools
@@ -175,7 +179,7 @@ impl Manager {
 
     pub async fn commands(&self) -> Vec<Arc<dyn Command>> {
         let mut commands = Vec::new();
-        for bridge in self.bridges() {
+        for bridge in self.active_bridges() {
             commands.extend(bridge.commands().await);
         }
         commands
@@ -183,7 +187,7 @@ impl Manager {
 
     pub async fn contributors(&self) -> Vec<Arc<dyn ContextContributor>> {
         let mut contributors = Vec::new();
-        for bridge in self.bridges() {
+        for bridge in self.active_bridges() {
             contributors.extend(bridge.contributors().await);
         }
         contributors
@@ -191,7 +195,7 @@ impl Manager {
 
     pub async fn compactors(&self) -> Vec<Arc<dyn Compactor>> {
         let mut compactors = Vec::new();
-        for bridge in self.bridges() {
+        for bridge in self.active_bridges() {
             compactors.extend(bridge.compactors().await);
         }
         compactors
@@ -199,7 +203,7 @@ impl Manager {
 
     pub async fn providers(&self) -> Vec<Arc<dyn Provider>> {
         let mut providers = Vec::new();
-        for bridge in self.bridges() {
+        for bridge in self.active_bridges() {
             providers.extend(bridge.providers().await);
         }
         providers
@@ -207,7 +211,7 @@ impl Manager {
 
     pub async fn hooks(&self) -> Vec<Arc<dyn Hook>> {
         let mut hooks = Vec::new();
-        for bridge in self.bridges() {
+        for bridge in self.active_bridges() {
             hooks.extend(bridge.hooks().await);
         }
         hooks
@@ -323,34 +327,80 @@ impl Manager {
     /// switched off, it is a directory that is read and a process that is
     /// never started (ADR-0057 §4).
     fn install(&self, found: Found, host: HostHandle) -> Installed {
-        let name = found.name.clone();
-        let version = found.manifest.version.clone();
-        let on = !self.switched_off.contains(&name);
+        let registration = Arc::new(Registration::new(&found, bingo_sdk::PluginRuntime::Process));
+        let on = !self.switched_off.contains(&found.name);
+        if !on {
+            registration.admission.refuse(SWITCHED_OFF.into());
+        }
+        let bridge = on
+            .then(|| self.bridge(found, host, registration.clone()))
+            .flatten();
         Installed {
-            name,
-            version,
-            bridge: on.then(|| self.bridge(found, host)),
+            registration,
+            bridge,
         }
     }
 
-    fn bridge(&self, found: Found, host: HostHandle) -> Arc<Bridge> {
+    fn active_bridges(&self) -> impl Iterator<Item = &Arc<Bridge>> {
+        self.discovered()
+            .iter()
+            .filter(|installed| installed.registration.admission.allowed())
+            .filter_map(|installed| installed.bridge.as_ref())
+    }
+    pub async fn registrations(
+        &self,
+        trust: &BTreeMap<String, bingo_sdk::PluginTrust>,
+    ) -> Vec<bingo_sdk::PluginRegistration> {
+        self.discovered()
+            .iter()
+            .filter_map(|installed| {
+                installed
+                    .registration
+                    .claim(trust.get(&installed.registration.name))
+            })
+            .collect()
+    }
+    pub async fn registered(&self, name: &str, result: Result<bingo_sdk::PluginGrant, String>) {
+        if let Some(installed) = self
+            .discovered()
+            .iter()
+            .find(|installed| installed.registration.name == name)
+        {
+            let denied = result.is_err();
+            installed.registration.admission.finish(result);
+            if denied && let Some(bridge) = &installed.bridge {
+                bridge.stop().await;
+            }
+        }
+    }
+
+    fn bridge(
+        &self,
+        found: Found,
+        host: HostHandle,
+        registration: Arc<Registration>,
+    ) -> Option<Arc<Bridge>> {
+        let entry = found.manifest.entry().ok()?.rooted(&found.root);
         let config = self.settings.get(&found.name).cloned().unwrap_or_default();
         let watched = self.directories.contains(&found.root);
         let root = found.root.clone();
-        let bridge = Arc::new(Bridge::new(
-            found.name,
-            found.root.clone(),
-            found.manifest.entry.rooted(&found.root),
-            config,
-            found.manifest.call_timeout,
-            Setting {
-                env: HostEnv::from(&self.env),
-                data_dir: self.env.data_dir.clone(),
-                notices: Arc::clone(&self.notices),
-                doors: Arc::clone(&self.doors),
-                host,
-            },
-        ));
+        let bridge = Arc::new(
+            Bridge::new(
+                found.name,
+                found.root.clone(),
+                entry,
+                config,
+                found.manifest.call_timeout,
+                Setting {
+                    env: HostEnv::from(&self.env),
+                    data_dir: self.env.data_dir.clone(),
+                    notices: Arc::clone(&self.notices),
+                    doors: Arc::clone(&self.doors),
+                    host,
+                },
+            )
+            .with_registration(registration),
+        );
         if watched {
             match crate::reload::Watch::new(root, bridge.clone(), self.notices.clone()) {
                 Ok(watch) => self
@@ -363,7 +413,7 @@ impl Manager {
                     .push(notice::Notice::warn("PLUGIN_UNREADABLE", error.to_string())),
             }
         }
-        bridge
+        Some(bridge)
     }
 }
 

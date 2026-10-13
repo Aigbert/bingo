@@ -48,11 +48,19 @@ pub async fn run(root: &Path) -> Result<(), KernelError> {
 async fn execute(root: &Path, scenario: Scenario) -> Result<(), KernelError> {
     let home = tempfile::tempdir().map_err(invalid)?;
     let plugin = PluginRpcPlugin::default().with_project(home.path().into());
+    let modules = bingo_mods::ModsPlugin::default()
+        .with_dirs(vec![root.into()])
+        .with_project(home.path().into());
+    let runtime = Runtime {
+        process: plugin.clone(),
+        modules: modules.clone(),
+    };
     let plugins: Vec<Box<dyn Plugin>> = vec![
         Box::new(FakePlugin::new(Arc::new(FakeProvider::new(scenario.model)))),
         Box::new(bingo_tool_fs::FsPlugin),
         Box::new(bingo_tool_bash::BashPlugin::default()),
         Box::new(plugin.clone()),
+        Box::new(modules),
     ];
     let config = HostConfig::new(Env::rooted(home.path())).with_layer(
         "scenario",
@@ -61,14 +69,28 @@ async fn execute(root: &Path, scenario: Scenario) -> Result<(), KernelError> {
         }),
     );
     let host = Host::build(plugins, config).await.map_err(invalid)?;
-    let result = drive(&host, &plugin, root, scenario.steps).await;
+    let result = drive(&host, &runtime, root, scenario.steps).await;
     host.shutdown().await;
     result
 }
 
+struct Runtime {
+    process: PluginRpcPlugin,
+    modules: bingo_mods::ModsPlugin,
+}
+impl Runtime {
+    async fn reload(&self, root: &Path) -> Result<(), KernelError> {
+        let manifest = bingo_plugin_rpc::validate::read(root)?;
+        match bingo_plugin_host::runtime::runtime_of(&manifest, true).map_err(invalid)? {
+            bingo_sdk::PluginRuntime::Process => self.process.reload(root).await,
+            bingo_sdk::PluginRuntime::Module => self.modules.reload(root).await,
+        }
+    }
+}
+
 async fn drive(
     host: &Arc<Host>,
-    plugin: &PluginRpcPlugin,
+    plugin: &Runtime,
     root: &Path,
     steps: Vec<Step>,
 ) -> Result<(), KernelError> {
@@ -116,7 +138,7 @@ async fn step_run(
     step: Step,
     session: &mut Attachment,
     notices: &mut Vec<String>,
-    plugin: &PluginRpcPlugin,
+    plugin: &Runtime,
     root: &Path,
 ) -> Result<(), KernelError> {
     match step {

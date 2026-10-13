@@ -1,4 +1,18 @@
 // Generated from schema/events.json. Do not edit.
+export namespace PluginRegisterInput {
+// Generated from JSON Schema. Do not edit.
+export type PluginOrigin = ("user" | "project" | "explicit");
+export type PluginRuntime = ("process" | "module");
+export type Tier = ("tighten" | "rewrite" | "full");
+export type Payload = { "name": string; "origin": PluginOrigin; "runtime": PluginRuntime; "tier": Tier; "uses": Array<string>; "version": string; [key: string]: unknown; };
+}
+export namespace PluginRegisterResult {
+// Generated from JSON Schema. Do not edit.
+export type PluginGrant = { "tier": Tier; "uses": Array<string>; [key: string]: unknown; };
+export type Tier = ("tighten" | "rewrite" | "full");
+export type Payload = (PluginGrant | { "reason": string; [key: string]: unknown; });
+}
+export type PluginRegister = PluginRegisterInput.Payload;
 export namespace PromptSubmitInput {
 // Generated from JSON Schema. Do not edit.
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
@@ -353,6 +367,7 @@ export type Payload = null;
 export type SessionDetach = SessionDetachInput.Payload;
 export type Turn = TurnComplete;
 export interface EventInputs {
+  "plugin.register": PluginRegisterInput.Payload;
   "prompt.submit": PromptSubmitInput.Payload;
   "tool.check": ToolCheckInput.Payload;
   "tool.call": ToolCallInput.Payload;
@@ -378,6 +393,7 @@ export interface EventInputs {
   "session.detach": SessionDetachInput.Payload;
 }
 export interface EventResults {
+  "plugin.register": PluginRegisterResult.Payload;
   "prompt.submit": PromptSubmitResult.Payload;
   "tool.check": ToolCheckResult.Payload;
   "tool.call": ToolCallResult.Payload;
