@@ -2,6 +2,7 @@ use bingo_sdk::{Event, ItemBody};
 
 fn fixture_name(value: &Event) -> (&'static str, &'static str) {
     match value {
+        Event::Unknown { .. } => panic!("known fixture became opaque"),
         Event::SessionUpdated { .. } => (
             "sessionUpdated",
             include_str!("../fixtures/record/event/sessionUpdated.json"),
@@ -117,6 +118,7 @@ fn every_event_variant_has_a_golden_fixture() {
 
 fn item_fixture_name(value: &ItemBody) -> (&'static str, &'static str) {
     match value {
+        ItemBody::Unknown { .. } => panic!("known fixture became opaque"),
         ItemBody::User { .. } => ("user", include_str!("../fixtures/record/item/user.json")),
         ItemBody::Assistant { .. } => (
             "assistant",

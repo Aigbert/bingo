@@ -3,6 +3,11 @@
 //! `Item` is one unit in transcript order. Deltas, notices and lag markers are
 //! ephemeral (never journaled); everything else is durable.
 
+mod raw;
+mod record;
+
+pub use record::UnknownRecord;
+
 use std::collections::BTreeMap;
 
 use jiff::Timestamp;
@@ -50,6 +55,7 @@ pub struct Frame {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(
+    remote = "Self",
     tag = "type",
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
@@ -170,6 +176,13 @@ pub enum Event {
     Lagged {
         from: Seq,
         to: Seq,
+    },
+    /// A payload this build cannot read, carried without interpretation.
+    #[serde(skip)]
+    #[schemars(!skip, untagged)]
+    Unknown {
+        #[schemars(flatten)]
+        raw: UnknownRecord,
     },
 }
 
@@ -374,6 +387,7 @@ impl ItemStatus {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(
+    remote = "Self",
     tag = "kind",
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
@@ -456,6 +470,13 @@ pub enum ItemBody {
         asset: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         label: Option<String>,
+    },
+    /// A payload this build cannot read, carried without interpretation.
+    #[serde(skip)]
+    #[schemars(!skip, untagged)]
+    Unknown {
+        #[schemars(flatten)]
+        raw: UnknownRecord,
     },
 }
 

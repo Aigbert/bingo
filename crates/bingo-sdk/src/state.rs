@@ -195,7 +195,7 @@ impl SessionState {
             Event::IntentAck { intent, .. } => Applied::Intent(intent.clone()),
             Event::Compacted { .. } | Event::Rewound { .. } => applied,
             Event::ConfigChanged { config } => self.config_changed(config),
-            Event::CatalogChanged { .. } => Applied::Nothing,
+            Event::CatalogChanged { .. } | Event::Unknown { .. } => Applied::Nothing,
             Event::Notice { .. } => Applied::Notice,
             Event::Extension {
                 plugin,
