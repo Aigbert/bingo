@@ -213,10 +213,19 @@ impl SessionState {
     }
 
     fn extended(&mut self, plugin: &str, kind: &str, payload: &Value) -> Applied {
-        self.extensions
-            .entry(plugin.to_string())
-            .or_default()
-            .insert(kind.to_string(), payload.clone());
+        if payload.is_null() {
+            if let Some(kinds) = self.extensions.get_mut(plugin) {
+                kinds.remove(kind);
+                if kinds.is_empty() {
+                    self.extensions.remove(plugin);
+                }
+            }
+        } else {
+            self.extensions
+                .entry(plugin.to_string())
+                .or_default()
+                .insert(kind.to_string(), payload.clone());
+        }
         Applied::Extension
     }
 
