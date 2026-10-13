@@ -12,7 +12,7 @@ these holds only where a `select!` was remembered.
 1. **Failing tests first.** All on the paused clock (`#[tokio::test(
    start_paused = true)]`; bingo-core's dev tokio has `test-util`), in
    `crates/bingo-core/src/session/tests/owned.rs`, using
-   `bingo-provider-fake` and fakes in `test_support/`. Each sends
+   the existing `ScriptedProvider` and fakes in `test_support/`. Each sends
    `Interrupt`, advances the clock by `INTERRUPT_GRACE` plus 1 ms, and
    asserts `TurnCompleted { Interrupted }`. Every item the turn opened
    must read `Interrupted` in `SessionState`. The fakes:
@@ -28,9 +28,9 @@ these holds only where a `select!` was remembered.
      `Query`/state request is answered and a second session on the same
      runtime still streams. Interrupt rejects the gated input
      `INTERRUPTED`;
-   - a store fake whose `append` blocks its thread on a
-     `std::sync::Barrier`: a second session on a `current_thread`
-     runtime still completes a turn (passes once brick 6's rule holds).
+   - a blocking-pool contract test in the JSONL store: its I/O closure
+     runs off a `current_thread` runtime, and a barrier-held write
+     leaves that runtime responsive. A fake alone cannot test JSONL I/O.
 2. **`ErrorCode::Interrupted`.** Additive (`INTERRUPTED`), with a doc
    line ("the person stopped it; not a failure"). Pin it in `error.rs`'s
    wire test and `schema/rpc.json`; M113's fixtures are not in this tree.
