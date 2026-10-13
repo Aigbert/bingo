@@ -33,7 +33,7 @@ these holds only where a `select!` was remembered.
      leaves that runtime responsive. A fake alone cannot test JSONL I/O.
 2. **`ErrorCode::Interrupted`.** Additive (`INTERRUPTED`), with a doc
    line ("the person stopped it; not a failure"). Pin it in `error.rs`'s
-   wire test and `schema/rpc.json`; M113's fixtures are not in this tree.
+   wire test and RPC/plugin schemas; M113's fixtures are not in this tree.
 3. **The supervised turn.** `session/running.rs`:
    - `INTERRUPT_GRACE: Duration = 2 s`, beside `AFTER_TURN_DEADLINE`.
    - The task races `run_turn` against
@@ -107,7 +107,8 @@ these holds only where a `select!` was remembered.
   mailbox,spawn,tests}.rs`, `session/gate.rs` (new),
   `session/tests/{owned,storage}.rs`, `test_support/**`
 - `crates/bingo-sdk/src/{error.rs,command.rs,tool.rs,store.rs,
-  transcript.rs}`, `transcript/tests.rs`, `schema/rpc.json`
+  transcript.rs}`, `transcript/tests.rs`, `schema/{rpc,plugin}.json`
+- `crates/bingo-surface-rpc/tests/wire/main.rs` (INTERRUPTED NDJSON contract)
 - `crates/bingo-store-jsonl/{src/lib.rs,Cargo.toml}`, `Cargo.lock`
 - every `CommandContext {` constructor outside the kernel (production and tests):
   `rg -n 'CommandContext \{' crates`
@@ -117,7 +118,7 @@ these holds only where a `select!` was remembered.
 
 - [ ] The six tests in brick 1 fail on the tree before this milestone
       and pass after (both runs pasted).
-- [ ] `rg -n 'tokio::spawn' crates/bingo-core/src/session` lists only
+- [ ] Production `rg -n 'tokio::spawn' crates/bingo-core/src/session` lists only
       the actor's own (`spawn.rs`) and `Running::spawn` (pasted).
 - [ ] `rg -n '\.await' crates/bingo-core/src/session/inputs.rs` shows no
       call into `commands.find`, a hook, or `host.deliver` (pasted).
@@ -141,8 +142,7 @@ these holds only where a `select!` was remembered.
 - Update all `CommandContext` literals; the team command literal is inside `cfg(test)`.
 - Record a 1 000-frame append benchmark before and after the blocking-pool change (not a budget).
 - Re-verification at `01789d66` (2026-10-13): M112's `Transcript` and the named session methods
-  exist; M113's fixtures do not. The actor already has a `TaskTracker`; commands still use an
-  untracked `tokio::spawn`.
+  exist; M113's fixtures do not. Commands use an untracked spawn at that baseline.
 - Decided by the user, 2026-10-13: ADR-0068 §2 now matches the plan.
   Commands use the actor's `TaskTracker`, child tokens and an intent-to-token map;
   close cancels the root and joins under `AFTER_TURN_DEADLINE`.
