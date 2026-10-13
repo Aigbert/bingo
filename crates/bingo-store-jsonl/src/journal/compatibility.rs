@@ -26,7 +26,7 @@ fn historical_shapes_stay_known() {
 fn an_unknown_event_journal_replays() {
     let frames = replay_fixture("unknown-event.jsonl");
     assert_eq!(frames.len(), 4);
-    assert!(format!("{:?}", frames[1].event).starts_with("Unknown"));
+    assert!(matches!(frames[1].event, Event::Unknown { .. }));
 }
 
 #[test]
@@ -36,5 +36,30 @@ fn an_unknown_item_journal_replays() {
     let Event::ItemCompleted { item } = &frames[1].event else {
         panic!("known envelope")
     };
-    assert!(format!("{:?}", item.body).starts_with("Unknown"));
+    assert!(matches!(item.body, ItemBody::Unknown { .. }));
+}
+
+#[test]
+fn replay_and_append_preserve_unknown_payload_bytes() {
+    let dir = tempfile::tempdir().unwrap();
+    create(dir.path(), &crate::tests::session()).unwrap();
+    for (index, raw) in [
+        include_str!("../../../bingo-sdk/fixtures/record/unknown/event.json"),
+        include_str!("../../../bingo-sdk/fixtures/record/unknown/malformed-event.json"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let event: Event = serde_json::from_str(raw).unwrap();
+        append(dir.path(), &crate::tests::frame(index as u64 + 1, event)).unwrap();
+    }
+    append_version(dir.path()).unwrap();
+    let frames = replay(dir.path(), Seq::ZERO).unwrap();
+    let raw = include_str!("../../../bingo-sdk/fixtures/record/unknown/event.json").trim_end();
+    assert_eq!(serde_json::to_string(&frames[0].event).unwrap(), raw);
+    assert!(
+        std::fs::read_to_string(layout::journal(dir.path()))
+            .unwrap()
+            .contains(raw)
+    );
 }
