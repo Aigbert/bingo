@@ -2,18 +2,10 @@
 
 ## Goal
 
-ADR-0072 §5–6. M109 created `bingo-claim` and moved the scheduler and
-the channels onto it. This milestone moves the last two lock styles:
-
-- **The gateway.** Its pid file is the exclusion today, so a pid reused
-  after a kill wedges every later start (`run.rs` `replace` never steps
-  on a live pid "whatever it turns out to be running").
-- **The store's sidecar.** It is already an OS lock; only the code
-  moves.
-
-After this, `try_lock` appears in one crate. The schedule and
-experience stores, their `id.rs`, and the three `diff.rs` copies become
-`bingo-shelf`. No format on disk changes.
+ADR-0072 §5–6: finish M109's shared claim by moving the gateway and
+store sidecar onto it. Move schedule/experience file stores and ids, and
+the three unified-diff copies, into `bingo-shelf`. Keep shelf bytes intact;
+modern gateway records add `claimed: true`, with legacy records defaulting false.
 
 ## Bricks, in build order
 
@@ -86,38 +78,36 @@ experience stores, their `id.rs`, and the three `diff.rs` copies become
 
 ## Exit criteria
 
-- [ ] Brick 3's three gateway tests pass (paste before and after).
-- [ ] `rg -n 'try_lock' crates --type rust` finds OS-lock implementation
+- [x] Brick 3's three gateway tests pass (paste before and after).
+- [x] `rg -n 'try_lock' crates --type rust` finds OS-lock implementation
       only in `bingo-claim` (existing test witnesses and the plugin-rpc
       async mutex are not implementations), and `rg -n 'create_new' crates/bingo-gateway/src`
       finds no exclusion.
-- [ ] `ls crates/bingo-{schedule,experience}/src/{id,diff}.rs
+- [x] `ls crates/bingo-{schedule,experience}/src/{id,diff}.rs
       crates/bingo-tool-fs/src/diff.rs` finds no file.
-- [ ] `cargo test -p bingo-claim -p bingo-shelf -p bingo-store-jsonl
+- [x] `cargo test -p bingo-claim -p bingo-shelf -p bingo-store-jsonl
       -p bingo-gateway -p bingo-schedule -p bingo-experience -p bingo-tool-fs`
       passes, including the schedule golden bytes.
-- [ ] `scripts/budget.sh` (+1, `bingo-shelf`), `cargo deny check` and
+- [x] `scripts/budget.sh` (+1, `bingo-shelf`), `cargo deny check` and
       `scripts/check_discipline.sh` pass.
-- [ ] Windows `cargo check` passes for claim, shelf, gateway and
-      store-jsonl; all gates pass.
+- [x] All local gates pass; Windows cross-checks pass for claim, shelf,
+      store-jsonl, schedule and experience.
+- [ ] Windows CI checks gateway and tool-fs: their `aws-lc-sys` graphs need
+      a Windows SDK; deferred by the execution instruction, not attempted here.
 
 ## Non-goals
 
-- Core's atomic writers (ADR-0072 §7). The writers in pictures,
-  auth-oauth, update and the gateway log adopt the shelf later, one at a
-  time if at all. tool-bash's `jobs::mint` (the same slug with a prefix)
-  likewise.
-- Any on-disk format change. In particular, no version envelope: a newer
-  file an older binary cannot parse is already listed as unreadable.
-- The gateway's detached start; the channels' claim (M109).
+Core's atomic writers (ADR-0072 §7); picture/auth-oauth/update/gateway-log
+writers; tool-bash `jobs::mint`; version envelopes or shelf format changes;
+gateway detached start; channels' claim (M109).
 
 ## Risks
 
 - A pre-M129 gateway holds no `gateway.lock`. The legacy rule covers it,
   and an old binary still refuses a live pid. Name both directions in the
   commit body.
-- On Windows an open file cannot be deleted, so `gateway.lock` is
-  permanent like the scheduler's; `stop` keeps its Windows kill.
+- `gateway.lock` is permanent like the scheduler's; platform termination
+  remains the existing probe's responsibility.
 - If M122 or M126 moved experience or the gateway's composition, follow
   the tree.
 - Re-verified at `fa042aa6`: paths and callers remain; claim has `take`,
@@ -126,3 +116,32 @@ experience stores, their `id.rs`, and the three `diff.rs` copies become
   under `data_dir`; the existing pid record stays under `gateway/`.
 - Per execution instruction, Windows graphs containing `aws-lc-sys` are
   left to Windows CI; check every other touched crate locally.
+
+## Verified (2026-10-13)
+
+Evidence: `target/m129-logs/`. Contract commits precede implementations.
+
+| Command / contract | Before | After |
+|---|---|---|
+| `cargo test -p bingo-claim --test bare` | `error[E0432]: unresolved import bingo_claim::lock` | `test result: ok. 1 passed; 0 failed` |
+| `cargo test -p bingo-gateway --test claim`: claimed record naming live non-gateway | `M129:refused [INVALID_INPUT] a gateway already holds this data dir` | `a_claimed_record_naming_a_live_non_gateway_does_not_block_run ... ok` |
+| Same command: killed gateway restart | `a_killed_gateway_can_restart_without_removing_files ... ok` | Same: `ok` |
+| Same command: legacy live record | `a_legacy_record_naming_a_live_child_still_refuses ... ok` | Same: `ok` |
+| Same command: complete new contract suite | `FAILED. 4 passed; 3 failed` | `test result: ok. 8 passed; 0 failed` |
+| `cargo test -p bingo-shelf` | `error[E0432]: unresolved imports bingo_shelf::Codec, bingo_shelf::CodecError, bingo_shelf::Shelf` | store `5 passed`; id `3 passed`; diff `3 passed`; all `0 failed` |
+| `cargo test -p bingo-schedule --test shelf` | `pre_m129_schedule_bytes_survive_loading_and_saving ... ok` | Same: `ok` |
+| `cargo test -p bingo-experience --test shelf` | `reading_hand_edited_experience_never_rewrites_it ... ok` | Same: `ok` |
+
+- Focused exit-criterion command (`cargo test -p bingo-claim -p bingo-shelf -p bingo-store-jsonl -p bingo-gateway -p bingo-schedule -p bingo-experience -p bingo-tool-fs`): summed output `392 passed; 0 failed`.
+- `rg -n 'try_lock' crates --type rust`: implementation at `bingo-claim/src/lib.rs:101`; other matches are existing test witnesses and plugin-rpc's async mutex. `rg -n 'create_new' crates/bingo-gateway/src`: no matches (exit 1). The exit criterion's `ls` command reports `No such file or directory` for all five removed paths (`removed-files.log`).
+- `cargo fmt --all -- --check`: exit 0, no output.
+- `cargo check --workspace --all-targets --locked`: `Finished dev profile [unoptimized + debuginfo] target(s) in 3.30s`.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile [unoptimized + debuginfo] target(s) in 48.50s`. Initial helper-only unwrap lint fixed with the existing integration-test allowance.
+- `cargo test --workspace --locked -- --test-threads=1 --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing`: exit 0; summed output `4986 passed; 0 failed; 3 ignored` (existing stress/manual tests). Gateway CLI tests all `ok`; no flaky reruns needed.
+- `cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1`: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out`.
+- `scripts/check_discipline.sh`: `discipline ok` (historical size warnings).
+- `scripts/budget.sh`: `dependencies (unique, normal): 345 (max 345)`; `warm cargo check -p bingo-core: 0s (max 20s)`; `relink isolation: touching the TUI recompiled 0 crates for core`; `target/debug: 4 GB (soft max 5)`; `budget ok`.
+- `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok` (existing duplicate-version warnings).
+- `cargo tree -p <crate> -i aws-lc-sys --target x86_64-pc-windows-msvc --locked`: no matching package for claim/shelf/store-jsonl/schedule/experience; gateway/tool-fs show `aws-lc-sys v0.44.0` and remain for Windows CI.
+- `cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc`, sequentially: claim `Finished dev profile ... in 0.52s`; shelf `1.70s`; store-jsonl `1.77s`; schedule `1.08s`; experience `4.28s`; each exit 0.
+- Token build briefly overlapped the first discipline run; both were rerun sequentially and passed. No terminal-byte changes, so no separate TUI smoke was needed. No push, merge, PR, live configuration change or toolchain install.
