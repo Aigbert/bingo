@@ -7,42 +7,14 @@ via Input::Action as ui.press/input/select. TUI draws elements, panes and toasts
 After M121, M123–M125, M137, M138.
 ## Bricks, in build order
 
-1. **Elements, tests first.** Split sdk `view.rs` into `view/{mod,read,fold,table,tests}.rs`.
-   Add nine nodes and golden JSON/folds (Engine folds empty). Text/Button have children
-   (strings or nested styled Text); legacy Text.text and Code.text/lang still read;
-   Code writes source/language. Canonical JSX names reach serde unmapped.
-2. **Drawn props, one table.** Box: key, flexDirection(row|column), flexGrow, flexWrap,
-   alignItems, justifyContent, gap, width, height, margin[X|Y], padding[X|Y], borderStyle,
-   borderColor, display. Text: color, dimColor, bold, italic, underline, strikethrough,
-   inverse, wrap. Button: key, label, hotkey, dimColor, variant, onPress.
-   Input: key, label, placeholder, value, onInput, onSubmit. Select: key, label,
-   options, value, onSelect. Link: href, label. Image: source, alt, columns, rows.
-   Raster: columns, rows, cells. Svg: source, alt, width, height. Code: source,
-   language. Markdown: text, dimColor. Props outside the table are ignored.
-3. **Legacy containers.** Stack reads as column Box; Columns as wrapping row Box,
-   children with flexGrow 1 and widths sharing NARROW=60 including two-cell gutters.
-   Delete Stack/Columns variants; schema kinds plus READ_ONLY pin KNOWN. Writers:
-   experience/command, schedule/render and tools/list, demo-ui/board, tasks/journal.
-4. **Tables/validation.** TERMINAL, DESKTOP, TEXT and pure outside(table, view) paths.
-   answer_ok checks only structure: Engine matches requested component, handlers name
-   the answering mod's `<plugin>:ui`, at most 4096 nodes. published_ok refuses Engine.
-5. **Places.** Shown::View or Pull{request}; old JSON reads View. Pane{id,title,focus,
-   close_on_escape,hold_toasts,asked,rows,view}; Toast{text,until,alert}; Activity can pull.
-   Golden fixtures and published_ok cover each.
-6. **Render pair.** sdk Component (ADR-0079's fifteen, no permission), Viewport,
-   SurfaceName, RenderRequest{component,requestId,surface,props,viewport}.
-   HostApi::render defaults Engine; invalidate defaults no-op. Core raises ui.render
-   through M131's runner off the mailbox, four in flight/session; latest queued ask
-   replaces the same (component,requestId). Bad tree/hook: Engine plus one plugin notice.
-   Pure throttle limits invalidations to 30/s/request; ephemeral Invalidated folds
-   a generation per request. ui/render is additive to surface RPC PROTOCOL 1.
-7. **Subscriptions.** plugin-host/subscribed: subscribe(requestId,reads), changed(scope,key),
-   forget. Both runtimes invalidate on writes to reads or $.ui.invalidate. Bind render
-   scope to M138's state face: state.set while rendering is refused in words.
-   Node ui.ts mints handlers; plugin schema adds host/ui/invalidate.
-8. **Handlers.** CommandSpec.hidden defaults false, excluded from listing/completion.
-   Each runtime contributes instant hidden `<plugin>:ui`. Per-request generations mint
-   Action args {handler:"<generation>:<n>",event}; surface adds value via Input::Action.
+1. **Elements, tests first.** Split sdk `view.rs` into `view/{mod,read,fold,table,tests}.rs`. Add nine nodes and golden JSON/folds (Engine folds empty). Text/Button have children (strings or nested styled Text); legacy Text.text and Code.text/lang still read; Code writes source/language. Canonical JSX names reach serde unmapped.
+2. **Drawn props, one table.** Box: key, flexDirection(row|column), flexGrow, flexWrap, alignItems, justifyContent, gap, width, height, margin[X|Y], padding[X|Y], borderStyle, borderColor, display. Text: color, dimColor, bold, italic, underline, strikethrough, inverse, wrap. Button: key, label, hotkey, dimColor, variant, onPress. Input: key, label, placeholder, value, onInput, onSubmit. Select: key, label, options, value, onSelect. Link: href, label. Image: source, alt, columns, rows. Raster: columns, rows, cells. Svg: source, alt, width, height. Code: source, language. Markdown: text, dimColor. Props outside the table are ignored.
+3. **Legacy containers.** Stack reads as column Box; Columns as wrapping row Box, children with flexGrow 1 and widths sharing NARROW=60 including two-cell gutters. Delete Stack/Columns variants; schema kinds plus READ_ONLY pin KNOWN. Writers: experience/command, schedule/render and tools/list, demo-ui/board, tasks/journal.
+4. **Tables/validation.** TERMINAL, DESKTOP, TEXT and pure outside(table, view) paths. answer_ok checks only structure: Engine matches requested component, handlers name the answering mod's `<plugin>:ui`, at most 4096 nodes. published_ok refuses Engine.
+5. **Places.** Shown::View or Pull{request}; old JSON reads View. Pane{id,title,focus, close_on_escape,hold_toasts,asked,rows,view}; Toast{text,until,alert}; Activity can pull. Golden fixtures and published_ok cover each.
+6. **Render pair.** sdk Component (ADR-0079's fifteen, no permission), Viewport, SurfaceName, RenderRequest{component,requestId,surface,props,viewport}. HostApi::render defaults Engine; invalidate defaults no-op. Core raises ui.render through M131's runner off the mailbox, four in flight/session; latest queued ask replaces the same (component,requestId). Bad tree/hook: Engine plus one plugin notice. Pure throttle limits invalidations to 30/s/request; ephemeral Invalidated folds a generation per request. ui/render is additive to surface RPC PROTOCOL 1.
+7. **Subscriptions.** plugin-host/subscribed: subscribe(requestId,reads), changed(scope,key), forget. Both runtimes invalidate on writes to reads or $.ui.invalidate. Bind render scope to M138's state face: state.set while rendering is refused in words. Node ui.ts mints handlers; plugin schema adds host/ui/invalidate.
+8. **Handlers.** CommandSpec.hidden defaults false, excluded from listing/completion. Each runtime contributes instant hidden `<plugin>:ui`. Per-request generations mint Action args {handler:"<generation>:<n>",event}; surface adds value via Input::Action.
    Raise ui.press/input/select in that mod alone; stale generation notices; Escape
    fires event close for a close_on_escape pane.
 9. **$.ui.** All methods raise op events: status, toast(default 4000ms), notify(alert),
@@ -99,6 +71,7 @@ After M121, M123–M125, M137, M138.
   `globals.js` still emits `{type,props,children}`. Direct Text writers need migration.
 - 2026-10-14, person's delegate: authorize the scoped pre-release View/Shown/place/ui-render baseline amendment; protocol 2 freezes at its first release (ADR-0075).
 - 2026-10-14, person's delegate: authorize print Invalidated ignore arms and all mechanical Event/Shown/element sibling mappings; record files below, stop only for new out-of-scope behaviour.
+- Stopped (2026-10-14): TUI `theme::tests::every_token_is_spent_where_the_design_says` pins token-use files and rejects the new element/toast renderers. `theme.rs` is outside Files; protocol step 6 excludes changing an out-of-scope fixture assertion. Proposed: authorize only updating that test's file allowlists, leaving theme values/runtime behavior unchanged; then continue M140. No final gates or tmux drive completed yet.
 ## Verified (2026-10-14)
 
 Mechanical match updates: `bingo-surface-print/src/{render,stream_json}.rs` (ignore Invalidated).
@@ -143,4 +116,25 @@ cargo check --workspace --all-targets --locked
 error[E0004]: non-exhaustive patterns: `&bingo_sdk::Event::Invalidated { .. }` not covered
 error: could not compile `bingo-surface-print` (lib) due to 2 previous errors
 error: could not compile `bingo-surface-tui` (lib) due to 3 previous errors
+cargo test -p bingo-surface-tui views::tests --locked
+test result: FAILED. 9 passed; 3 failed; 0 ignored; 0 measured; 1090 filtered out
+cargo test -p bingo-surface-tui views::tests --locked
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1090 filtered out
+cargo test -p bingo-surface-tui pulled:: --locked
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1102 filtered out
+cargo test -p bingo-surface-tui pane:: --locked
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1104 filtered out
+cargo test -p bingo-surface-tui toast:: --locked
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1104 filtered out
+cargo test -p bingo-surface-tui pane:: --locked
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1104 filtered out
+cargo test -p bingo-surface-tui toast:: --locked
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1104 filtered out
+node --test sdk/typescript/src/ui.test.ts
+fail 1: Escape raises close in the mod and removes only its current closable pane
+node --test sdk/typescript/src/ui.test.ts
+pass 3; fail 0
+cargo test -p bingo-surface-tui --lib --locked
+theme::tests::every_token_is_spent_where_the_design_says: assertion failed: where `text` is spent
+test result: FAILED. 1104 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out
 ```
