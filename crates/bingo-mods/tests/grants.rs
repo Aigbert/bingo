@@ -19,7 +19,7 @@ fn fixture(root: &std::path::Path, name: &str, source: &str, uses: &[&str]) {
 #[tokio::test]
 async fn registration_can_deny_a_module_with_a_named_reason() {
     let home = tempfile::tempdir().unwrap();
-    let policy = home.path().join("policy");
+    let policy = home.path().join("a-policy");
     let target = home.path().join("target");
     fixture(
         &policy,

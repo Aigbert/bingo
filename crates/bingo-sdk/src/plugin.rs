@@ -92,6 +92,16 @@ pub struct PluginGrant {
     pub uses: BTreeSet<String>,
 }
 
+/// The registration chain may reduce a grant or refuse the plugin in words.
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(untagged)]
+pub enum PluginDecision {
+    Granted(PluginGrant),
+    Denied { reason: String },
+}
+
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]

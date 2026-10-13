@@ -123,7 +123,7 @@ const WATCH: Acts = Acts {
 };
 
 catalogue! {
-    PLUGIN_REGISTER: "plugin.register", Chain, crate::PluginRegistration => crate::PluginGrant, &["name", "origin", "runtime"], &["/name", "/version", "/origin", "/runtime"], WRAP;
+    PLUGIN_REGISTER: "plugin.register", Chain, crate::PluginRegistration => crate::PluginDecision, &["name", "origin", "runtime"], &["/name", "/version", "/origin", "/runtime"], WRAP;
     PROMPT_SUBMIT: "prompt.submit", Chain, crate::Input => crate::SubmitResult, &[], &[], PASS;
     TOOL_CHECK: "tool.check", Chain, ToolCall => crate::CheckResult, &["tool"], &["/tool", "/tool_use_id"], PASS;
     TOOL_CALL: "tool.call", Chain, ToolCall => crate::ToolOutput, &["tool"], &["/tool", "/tool_use_id"], WRAP;

@@ -67,25 +67,44 @@
       },
       "result": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "PluginGrant",
-        "type": "object",
-        "properties": {
-          "tier": {
-            "$ref": "#/$defs/Tier"
+        "title": "PluginDecision",
+        "description": "The registration chain may reduce a grant or refuse the plugin in words.",
+        "anyOf": [
+          {
+            "$ref": "#/$defs/PluginGrant"
           },
-          "uses": {
-            "type": "array",
-            "uniqueItems": true,
-            "items": {
-              "type": "string"
-            }
+          {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
           }
-        },
-        "required": [
-          "tier",
-          "uses"
         ],
         "$defs": {
+          "PluginGrant": {
+            "type": "object",
+            "properties": {
+              "tier": {
+                "$ref": "#/$defs/Tier"
+              },
+              "uses": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "tier",
+              "uses"
+            ]
+          },
           "Tier": {
             "type": "string",
             "enum": [

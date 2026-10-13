@@ -16,9 +16,10 @@ fn rank(tier: Tier) -> u8 {
 pub(crate) fn values(before: &serde_json::Value, after: &serde_json::Value) -> bool {
     match (
         serde_json::from_value::<PluginGrant>(before.clone()),
-        serde_json::from_value::<PluginGrant>(after.clone()),
+        serde_json::from_value::<PluginDecision>(after.clone()),
     ) {
-        (Ok(before), Ok(after)) => reduced(&before, &after),
+        (Ok(before), Ok(PluginDecision::Granted(after))) => reduced(&before, &after),
+        (Ok(_), Ok(PluginDecision::Denied { reason })) => !reason.trim().is_empty(),
         _ => false,
     }
 }
@@ -28,13 +29,16 @@ pub(crate) async fn register(
     links: &[super::Link],
     cx: &HookContext,
 ) -> Result<PluginGrant, String> {
+    let name = input.name.clone();
     let report = super::Report::default();
     let result = super::json::dispatch(
         catalogue::PLUGIN_REGISTER,
         links,
         cx,
         input,
-        Next::new(|input: PluginRegistration| Box::pin(async move { Ok(input.execution.grant) })),
+        Next::new(|input: PluginRegistration| {
+            Box::pin(async move { Ok(PluginDecision::Granted(input.execution.grant)) })
+        }),
         report.clone(),
     )
     .await;
@@ -43,7 +47,11 @@ pub(crate) async fn register(
             let _ = cx.host.notice(level, &code, &text).await;
         }
     }
-    result.map_err(|error| error.message)
+    match result {
+        Ok(PluginDecision::Granted(grant)) => Ok(grant),
+        Ok(PluginDecision::Denied { reason }) => Err(format!("{name}: {reason}")),
+        Err(error) => Err(format!("{name}: {}", error.message)),
+    }
 }
 
 #[cfg(test)]

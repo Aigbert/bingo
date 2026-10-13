@@ -8,8 +8,9 @@ export type Payload = { "name": string; "origin": PluginOrigin; "runtime": Plugi
 }
 export namespace PluginRegisterResult {
 // Generated from JSON Schema. Do not edit.
+export type PluginGrant = { "tier": Tier; "uses": Array<string>; [key: string]: unknown; };
 export type Tier = ("tighten" | "rewrite" | "full");
-export type Payload = { "tier": Tier; "uses": Array<string>; [key: string]: unknown; };
+export type Payload = (PluginGrant | { "reason": string; [key: string]: unknown; });
 }
 export type PluginRegister = PluginRegisterInput.Payload;
 export namespace PromptSubmitInput {
