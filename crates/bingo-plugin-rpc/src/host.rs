@@ -1,11 +1,13 @@
 //! Reverse requests negotiate capabilities before shared host operations.
 
-pub use bingo_plugin_host::host::{Place, Extend, Deliver, StateGet, StateSet, StateValue, Complete, Completed};
-use serde_json::Value;
 use crate::codec::{INTERNAL_ERROR, METHOD_NOT_FOUND, RpcError};
 use crate::service::ServiceCalls;
 use crate::wire::{Cap, name};
+pub use bingo_plugin_host::host::{
+    Complete, Completed, Deliver, Extend, Place, StateGet, StateSet, StateValue,
+};
 use bingo_sdk::HostHandle;
+use serde_json::Value;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -66,8 +68,16 @@ impl Server {
             .await
             .map_err(failed)?;
         self.permits(method)?;
-        if method == name::SERVICE_CALL { return self.service.call(params).await; }
-        bingo_plugin_host::host::Operations { plugin: &self.plugin, host: &self.host, state: &self.state }.answer(method, params).await
+        if method == name::SERVICE_CALL {
+            return self.service.call(params).await;
+        }
+        bingo_plugin_host::host::Operations {
+            plugin: &self.plugin,
+            host: &self.host,
+            state: &self.state,
+        }
+        .answer(method, params)
+        .await
     }
 }
 

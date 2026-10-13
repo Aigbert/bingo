@@ -1,9 +1,9 @@
-//! A channel carries JavaScript effects; the host owns every continuation.
-use crate::module::Module;
+//! A mod is one interceptor; its registered hooks compose within that link.
+use crate::{chain::Chain, module::Module};
 use async_trait::async_trait;
 use bingo_sdk::*;
-use serde_json::{Value, json};
-use std::sync::Arc;
+use serde_json::Value;
+use std::sync::{Arc, Mutex};
 
 tokio::task_local! { static CALLING: Vec<(String, usize)>; }
 
@@ -20,11 +20,14 @@ impl Interceptor for Link {
                 .engine
                 .as_ref()
                 .into_iter()
-                .flat_map(|engine| engine.patterns())
-                .filter_map(|pattern| catalogue::Pattern::parse(pattern).ok())
+                .flat_map(|engine| engine.hooks())
+                .filter_map(|hook| catalogue::Pattern::parse(&hook.pattern).ok())
                 .collect(),
             prefilter: Value::Null,
         }
+    }
+    fn owns_deadline(&self) -> bool {
+        true
     }
     async fn chain(
         &self,
@@ -36,30 +39,34 @@ impl Interceptor for Link {
         let Some(engine) = &self.0.engine else {
             return next.run(input).await;
         };
-        let skip = CALLING
-            .try_with(|calling| {
-                calling
-                    .iter()
-                    .filter(|(name, _)| name == self.id())
-                    .map(|(_, hook)| *hook)
-                    .collect::<Vec<_>>()
+        let hooks = engine
+            .hooks()
+            .iter()
+            .enumerate()
+            .filter_map(|(index, hook)| {
+                let skipped = CALLING
+                    .try_with(|calling| {
+                        calling
+                            .iter()
+                            .any(|(name, hook)| name == self.id() && *hook == index)
+                    })
+                    .unwrap_or(false);
+                (!skipped
+                    && catalogue::Pattern::parse(&hook.pattern)
+                        .is_ok_and(|pattern| pattern.matches(&entry.name)))
+                .then_some(index)
             })
-            .unwrap_or_default();
-        let site = json!({"session": cx.session, "turn": cx.turn, "item": cx.item, "cwd": cx.cwd,
-            "skip": skip, "origin": {"plugin": self.id(), "tier": next.tier()}});
-        let mut call = engine.call(&entry.name, input, site).map_err(failed)?;
-        let mut next = Some(next);
-        loop {
-            tokio::select! {
-                result = &mut call.result => return result.map_err(failed)?.map_err(failed),
-                Some(operation) = call.operations.recv() => {
-                    let result = if operation.method == "next" {
-                        match next.take() { Some(next) => next.run(operation.params).await.map_err(|error| error.message), None => Err("next may be called only once".into()) }
-                    } else { self.operation(cx, operation.hook, &operation.method, operation.params).await };
-                    let _ = operation.reply.send(result);
-                }
-            }
-        }
+            .collect();
+        let chain = Chain {
+            module: self.0.clone(),
+            engine: engine.clone(),
+            entry: entry.clone(),
+            cx: cx.clone(),
+            tier: next.tier(),
+            hooks,
+            kernel: Arc::new(Mutex::new(Some(next))),
+        };
+        chain.at(0, input).await
     }
     async fn observe(&self, entry: &catalogue::Entry, cx: &HookContext, input: &Value) {
         if let Err(error) = self
@@ -82,34 +89,32 @@ impl Interceptor for Link {
         }
     }
 }
-impl Link {
-    async fn operation(
-        &self,
-        cx: &HookContext,
-        hook: usize,
-        method: &str,
-        params: Value,
-    ) -> Result<Value, String> {
-        let mut calling = CALLING.try_with(Clone::clone).unwrap_or_default();
-        calling.push((self.id().into(), hook));
-        CALLING
-            .scope(calling, async {
-                tokio::time::timeout(
-                    HOOK_DEADLINE,
-                    bingo_plugin_host::ops::call(
-                        &cx.host,
-                        self.id(),
-                        &self.0.store,
-                        method,
-                        params,
-                    ),
-                )
-                .await
-                .map_err(|_| format!("{method}: host operation deadline exceeded"))?
-            })
+pub(crate) async fn operation(
+    module: &Module,
+    cx: &HookContext,
+    hook: usize,
+    method: &str,
+    params: Value,
+) -> Result<Value, String> {
+    let mut calling = CALLING.try_with(Clone::clone).unwrap_or_default();
+    calling.push((module.found.name.clone(), hook));
+    CALLING
+        .scope(calling, async {
+            tokio::time::timeout(
+                HOOK_DEADLINE,
+                bingo_plugin_host::ops::call(
+                    &cx.host,
+                    &module.found.name,
+                    &module.store,
+                    method,
+                    params,
+                ),
+            )
             .await
-    }
+            .map_err(|_| format!("{method}: host operation deadline exceeded"))?
+        })
+        .await
 }
-fn failed(error: impl std::fmt::Display) -> KernelError {
+pub(crate) fn failed(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::Internal, error.to_string())
 }

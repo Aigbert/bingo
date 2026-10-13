@@ -555,3 +555,48 @@ error: could not compile `bingo-plugin-host` (lib test) due to 1 previous error
 ```text
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.13s
 ```
+
+`cargo test -p bingo-mods --test plugin a_timed_out_inner --locked`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.69s
+test a_timed_out_inner_hook_gets_a_fresh_catch_budget ... FAILED
+thread 'a_timed_out_inner_hook_gets_a_fresh_catch_budget' (7958989) panicked at crates/bingo-mods/tests/plugin.rs:206:5:
+assertion `left == right` failed
+  left: Object {"test": Number(1)}
+ right: Object {"kind": String("timeout"), "called": Bool(false), "budget": Number(1000), "outer": Bool(true)}
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.10s
+```
+
+`cargo test -p bingo-mods --test plugin a_timed_out_inner --locked`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.79s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.07s
+```
+
+`cargo test -p bingo-mods -p bingo-plugin-host --locked`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.83s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+`cargo clippy -p bingo-mods -p bingo-plugin-host -p bingo-core --all-targets --locked -- -D warnings`:
+```text
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.90s
+```
+
+`node --test --test-reporter=tap sdk/typescript/src/*.test.ts`:
+```text
+# tests 13
+# pass 13
+# fail 0
+# skipped 0
+```

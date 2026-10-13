@@ -110,4 +110,3 @@ mod tests {
         assert!(admits(&trusted, "undeclared", "read", false).is_err());
     }
 }
-

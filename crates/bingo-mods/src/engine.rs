@@ -39,6 +39,12 @@ impl Fault {
     }
 }
 
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct RegisteredHook {
+    pub pattern: String,
+    pub recover: bool,
+}
+
 pub struct Operation {
     pub hook: usize,
     pub method: String,
@@ -68,7 +74,7 @@ pub struct Engine {
     requests: mpsc::UnboundedSender<Request>,
     stop: CancellationToken,
     thread: Mutex<Option<std::thread::JoinHandle<()>>>,
-    patterns: Vec<String>,
+    hooks: Vec<RegisteredHook>,
     limits: Limits,
 }
 impl Engine {
@@ -103,11 +109,11 @@ impl Engine {
         let started = started.await.map_err(Fault::load)?;
         starting.0.take();
         match started {
-            Ok(patterns) => Ok(Arc::new(Self {
+            Ok(hooks) => Ok(Arc::new(Self {
                 requests,
                 stop,
                 thread: Mutex::new(Some(thread)),
-                patterns,
+                hooks,
                 limits,
             })),
             Err(error) => {
@@ -116,13 +122,24 @@ impl Engine {
             }
         }
     }
-    pub fn patterns(&self) -> &[String] {
-        &self.patterns
+    pub fn hooks(&self) -> &[RegisteredHook] {
+        &self.hooks
+    }
+    pub fn patterns(&self) -> Vec<&str> {
+        self.hooks
+            .iter()
+            .map(|hook| hook.pattern.as_str())
+            .collect()
     }
     pub fn call(&self, event: &str, input: Value, site: Value) -> Result<Call, Fault> {
         let (operations, incoming) = mpsc::unbounded_channel();
         let (result, answer) = oneshot::channel();
         let cancel = self.stop.child_token();
+        let hook_time = if site.get("recover").and_then(Value::as_bool) == Some(true) {
+            Duration::from_secs(1)
+        } else {
+            self.limits.hook_time
+        };
         self.requests
             .send(Request {
                 event: event.into(),
@@ -130,7 +147,7 @@ impl Engine {
                 site,
                 operations,
                 result,
-                meter: Meter::new(self.limits.hook_time, cancel.clone()),
+                meter: Meter::new(hook_time, cancel.clone()),
             })
             .map_err(Fault::load)?;
         Ok(Call {
@@ -138,6 +155,9 @@ impl Engine {
             result: answer,
             cancel,
         })
+    }
+    pub fn hook_time(&self) -> Duration {
+        self.limits.hook_time
     }
     pub async fn close(&self) {
         self.stop.cancel();

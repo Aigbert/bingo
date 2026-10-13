@@ -187,7 +187,7 @@ async fn invoke<'a, P: Point>(
         pending.clone(),
     );
     let future = P::dispatch(link.interceptor.as_ref(), cx, input.clone(), next);
-    let answer = if link.external.is_some() {
+    let answer = if link.external.is_some() && !link.interceptor.owns_deadline() {
         phase_deadline(future, phase).await
     } else {
         future.await

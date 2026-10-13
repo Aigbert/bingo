@@ -190,19 +190,42 @@ async fn a_timed_out_inner_hook_gets_a_fresh_catch_budget() {
     let home = tempfile::tempdir().unwrap();
     let root = home.path().join("fixture");
     std::fs::create_dir(&root).unwrap();
-    std::fs::write(root.join("plugin.json"), json!({"name":"fixture", "version":"1", "module":"main.ts"}).to_string()).unwrap();
-    std::fs::write(root.join("main.ts"), r#"
+    std::fs::write(
+        root.join("plugin.json"),
+        json!({"name":"fixture", "version":"1", "module":"main.ts"}).to_string(),
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("main.ts"),
+        r#"
       export function register(on) {
         on('fixture.echo', async ($, e, next) => ({...await next(e), outer:true}));
         on('fixture.echo', {test:1}, () => { while(true) {} }).catch(($, e, next) => ({
           kind:next.error.kind, called:next.called, budget:next.budget.ms
         }));
       }
-    "#).unwrap();
-    let config = HostConfig::new(Env::rooted(home.path())).with_layer("test", json!({"mods":{"hookMs":50}}));
-    let host = Host::build(vec![Box::new(ModsPlugin::default().with_dirs(vec![root]))], config).await.unwrap();
-    host.open_service("fixture", std::sync::Arc::new(Echo)).unwrap();
-    let result = host.service_wire("fixture").unwrap().call("echo", json!({"test":1})).await.unwrap();
-    assert_eq!(result, json!({"kind":"timeout", "called":false, "budget":1000, "outer":true}));
+    "#,
+    )
+    .unwrap();
+    let config =
+        HostConfig::new(Env::rooted(home.path())).with_layer("test", json!({"mods":{"hookMs":50}}));
+    let host = Host::build(
+        vec![Box::new(ModsPlugin::default().with_dirs(vec![root]))],
+        config,
+    )
+    .await
+    .unwrap();
+    host.open_service("fixture", std::sync::Arc::new(Echo))
+        .unwrap();
+    let result = host
+        .service_wire("fixture")
+        .unwrap()
+        .call("echo", json!({"test":1}))
+        .await
+        .unwrap();
+    assert_eq!(
+        result,
+        json!({"kind":"timeout", "called":false, "budget":1000, "outer":true})
+    );
     host.shutdown().await;
 }

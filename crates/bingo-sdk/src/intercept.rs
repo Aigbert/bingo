@@ -174,6 +174,10 @@ pub enum StopResult {
 pub trait Interceptor: Send + Sync {
     fn id(&self) -> &str;
     fn matcher(&self) -> LinkMatcher;
+    /// Sandboxed runtimes account their own active time and interrupt execution.
+    fn owns_deadline(&self) -> bool {
+        false
+    }
 
     async fn chain(
         &self,

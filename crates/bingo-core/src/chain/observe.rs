@@ -59,7 +59,7 @@ pub(crate) async fn work(work: Work, hooks: &crate::turn::HookSet) {
         }
         let future = std::panic::AssertUnwindSafe(link.interceptor.observe(entry, &cx, &value))
             .catch_unwind();
-        let failed = if link.external.is_some() {
+        let failed = if link.external.is_some() && !link.interceptor.owns_deadline() {
             !matches!(
                 tokio::time::timeout(HOOK_DEADLINE, future).await,
                 Ok(Ok(()))

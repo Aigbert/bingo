@@ -42,7 +42,7 @@ export function matches(matcher: Matcher, event: unknown): boolean {
   return Object.is(matcher, event);
 }
 
-function frozen<T>(value: T): T {
+export function frozen<T>(value: T): T {
   if (value !== null && typeof value === 'object') {
     Object.values(value).forEach(frozen);
     Object.freeze(value);

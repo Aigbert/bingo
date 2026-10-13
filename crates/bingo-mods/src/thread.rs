@@ -1,6 +1,6 @@
 //! One current-thread executor owns one mod's runtime and all of its jobs.
 use crate::{
-    engine::{Fault, Limits, Operation, Request},
+    engine::{Fault, Limits, Operation, RegisteredHook, Request},
     load::Root,
     meter::Meter,
 };
@@ -22,7 +22,7 @@ pub(crate) fn run(
     limits: Limits,
     stop: CancellationToken,
     requests: mpsc::UnboundedReceiver<Request>,
-    ready: oneshot::Sender<Result<Vec<String>, Fault>>,
+    ready: oneshot::Sender<Result<Vec<RegisteredHook>, Fault>>,
 ) {
     match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -42,7 +42,7 @@ async fn serve(
     limits: Limits,
     stop: CancellationToken,
     mut requests: mpsc::UnboundedReceiver<Request>,
-    ready: oneshot::Sender<Result<Vec<String>, Fault>>,
+    ready: oneshot::Sender<Result<Vec<RegisteredHook>, Fault>>,
 ) {
     let active = Active::default();
     let loaded = initialize(root, &module, &config, &limits, &stop, &active).await;
@@ -81,7 +81,7 @@ async fn initialize(
     limits: &Limits,
     stop: &CancellationToken,
     active: &Active,
-) -> Result<(AsyncRuntime, AsyncContext, Vec<String>), Fault> {
+) -> Result<(AsyncRuntime, AsyncContext, Vec<RegisteredHook>), Fault> {
     let root = Root::new(&root, limits.memory_bytes as u64).map_err(Fault::load)?;
     let runtime = AsyncRuntime::new().map_err(Fault::load)?;
     runtime.set_memory_limit(limits.memory_bytes).await;
@@ -106,7 +106,7 @@ async fn initialize(
         .await
         .map_err(Fault::load)?;
     let bootstrap = format!(
-        "import {{ Hooks, dollar, patternMatches }} from 'bingo';\nimport {{ register }} from {};\nconst hooks = new Hooks();\nawait register(hooks.on, {});\n{}",
+        "import {{ Hooks, dollar, patternMatches, matches, frozen }} from 'bingo';\nimport {{ register }} from {};\nconst hooks = new Hooks();\nawait register(hooks.on, {});\n{}",
         json!(format!("./{module}")),
         config,
         include_str!("thread.js")
@@ -125,7 +125,7 @@ async fn initialize(
         ctx.globals()
             .set("__bingo_dispatch", run)
             .map_err(Fault::load)?;
-        serde_json::from_str::<Vec<String>>(&patterns).map_err(Fault::load)
+        serde_json::from_str::<Vec<RegisteredHook>>(&patterns).map_err(Fault::load)
     });
     let patterns = tokio::select! {
         result = loaded => result?,
@@ -164,12 +164,24 @@ async fn execute(context: AsyncContext, active: Active, request: Request) {
             }),
         )
         .map_err(Fault::load)?;
+        let remaining = meter.clone();
+        let remaining = Function::new(ctx.clone(), move || {
+            remaining.remaining().as_millis() as f64
+        })
+        .map_err(Fault::load)?;
         let flag = meter.cancel.clone();
         let cancelled =
             Function::new(ctx.clone(), move || flag.is_cancelled()).map_err(Fault::load)?;
         let function: Function = ctx.globals().get("__bingo_dispatch").map_err(Fault::load)?;
         let promise: Promise = function
-            .call((event, input.to_string(), site.to_string(), ask, cancelled))
+            .call((
+                event,
+                input.to_string(),
+                site.to_string(),
+                ask,
+                cancelled,
+                remaining,
+            ))
             .map_err(|e| fault(&ctx, e, &meter))?;
         let answer = promise
             .into_future::<String>()

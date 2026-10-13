@@ -9,6 +9,7 @@ pub mod sandbox;
 pub mod strip;
 mod thread;
 pub use plugin::ModsPlugin;
+mod chain;
 mod config;
 mod link;
 mod manager;
