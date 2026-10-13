@@ -270,7 +270,7 @@ fn an_external_plugins_tier_is_listed_from_user_settings_only() {
 #[test]
 fn the_demo_is_opt_in_and_legacy_settings_report_the_new_switch() {
     let home = tempfile::tempdir().unwrap();
-    let absent = run(&mut plugins(home.path()));
+    let absent = run(plugins(home.path()).arg("list"));
     assert_eq!(absent.status.code(), Some(0), "{}", stderr(&absent));
     assert!(!stdout(&absent).contains("bingo.demo.ui"));
     std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
@@ -287,7 +287,7 @@ fn the_demo_is_opt_in_and_legacy_settings_report_the_new_switch() {
         "[enabledPlugins]\n\"bingo.demo.ui\" = true\n",
     )
     .unwrap();
-    let switched = run(&mut plugins(home.path()));
+    let switched = run(plugins(home.path()).arg("list"));
     assert_eq!(switched.status.code(), Some(0), "{}", stderr(&switched));
     assert_eq!(row(&stdout(&switched), "bingo.demo.ui")[2], "on");
 }
