@@ -62,9 +62,8 @@ pub async fn add(env: &Env, adapter: &str, platforms: &Platforms) -> Result<Stri
     .join("\n"))
 }
 
-/// The app id into the user settings layer, through the same round trip
-/// `provider add` uses; the spelling of the key is the plugin's
-/// (`from_flags`), so this file never learns how a channel is written down.
+/// Public settings into the user layer through the same round trip as
+/// `provider add`; the platform's prompts own the keys inside its slice.
 fn configured(env: &Env, adapter: &str, slice: Value) -> Result<std::path::PathBuf, KernelError> {
     let path = bingo_core::settings::user_path(env);
     let mut document = crate::provider::read(&path)?;

@@ -738,14 +738,16 @@ fn demo_ui(cli: &Cli, layers: &[settings::Layer]) -> bool {
         .is_some_and(|layer| bingo_demo_ui::wanted(&Value::Object(layer.value.clone())))
 }
 
-/// Every plugin this build ships, in registration order.
-fn platforms(_env: &Env) -> Platforms {
-    vec![
-        Arc::new(bingo_channel_feishu::Platform),
-        Arc::new(bingo_channel_adapter::loopback::Platform),
-    ]
+/// The platforms shared by every channel configuration reader.
+fn platforms(env: &Env) -> Platforms {
+    let mut platforms: Platforms = vec![Arc::new(bingo_channel_feishu::Platform)];
+    if bingo_channel_adapter::loopback::enabled(env) {
+        platforms.push(Arc::new(bingo_channel_adapter::loopback::Platform));
+    }
+    platforms
 }
 
+/// Every plugin this build ships, in registration order.
 fn plugins(demo_ui: bool, platforms: &Platforms) -> Result<Vec<Box<dyn Plugin>>, KernelError> {
     // The fake provider exists for the scripted harness alone: without
     // `BINGO_FAKE_SCRIPT` it is not registered, so a packaged binary never
