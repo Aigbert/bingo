@@ -364,6 +364,16 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_missing_used_service_leaves_the_plugin_standing() {
+        static USES: PluginManifest = PluginManifest {
+            uses: &["test.optional"],
+            ..GIVES
+        };
+        let plugins: Vec<Box<dyn Plugin>> = vec![Box::new(Paper(&USES))];
+        assert_eq!(standing(&plugins, &BTreeSet::new()), [None]);
+    }
+
     static NEEDS: PluginManifest = PluginManifest {
         id: "test.needs",
         version: "0.0.0",

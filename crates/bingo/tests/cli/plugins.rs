@@ -219,3 +219,17 @@ fn an_external_plugin_is_listed_switched_and_never_spawned() {
         "the bridge's own plugins are in the kernel's table, named for it: {drawn}"
     );
 }
+
+#[test]
+fn a_missing_used_service_is_named_without_disabling_its_consumer() {
+    let home = tempfile::tempdir().unwrap();
+    let off = run(plugins(home.path()).args(["disable", "bingo.mcp"]));
+    assert_eq!(off.status.code(), Some(0), "{}", stderr(&off));
+    let listed = run(plugins(home.path()).arg("list"));
+    assert_eq!(listed.status.code(), Some(0), "{}", stderr(&listed));
+    assert_eq!(stderr(&listed), "");
+    let said = stdout(&listed);
+    let consumer = row(&said, "bingo.provider.acp");
+    assert_eq!(consumer[2], "on");
+    assert!(consumer[3].contains("mcp.servers"), "{said}");
+}
