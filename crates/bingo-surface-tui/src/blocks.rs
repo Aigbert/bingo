@@ -86,7 +86,7 @@ fn revision(
 
 /// How much of the body is on the screen. Anything that grows a block grows
 /// this: the text of an answer, a tail, an output — and a thought's text, which
-/// M34-B left out because the row said `✻ Thinking…` whatever the deltas
+/// M34-B left out because the row said `▏ Thinking…` whatever the deltas
 /// carried and nothing under it was drawn from them. A thought now streams its
 /// tail under that row (§6), so a delta does change the rows and the block has
 /// to be drawn again for it.
@@ -232,7 +232,7 @@ impl Blocks {
     /// the whole transcript, in wrapped lines.
     pub fn sync(&mut self, state: &SessionState, agents: &Agents<'_>, rows: &Rows<'_>) -> usize {
         self.relaid(rows);
-        let boxed = welcome::lines(state, rows.width, rows.update);
+        let boxed = welcome::draw(state, rows.width, rows.entrance, rows.update, rows.now.wall);
         // The opening plays in the welcome box's place and lands on it, so while
         // it runs the box *is* the frame (M70, M72; design §11).
         self.head = match rows.opening {
@@ -747,7 +747,7 @@ mod tests {
         let under_the_welcome = usize::from(head(&state, 60) > 0);
         assert_eq!(
             lines.iter().filter(|l| l.trim().is_empty()).count(),
-            1 + under_the_welcome
+            1 + 2 * under_the_welcome
         );
     }
 
@@ -795,7 +795,7 @@ mod tests {
         assert_eq!(
             &lines[top..],
             [
-                "✻ Thought for 5s",
+                "▏ Thought for 5s",
                 "  ⎿  The manifest first.",
                 "     Then the crate map.",
             ],

@@ -1,6 +1,6 @@
 //! M149's visible contracts, before their implementation.
-use crate::{activity, opening, theme, welcome};
 use crate::test_support::*;
+use crate::{activity, opening, theme, welcome};
 use bingo_sdk::{Event, ItemStatus};
 use ratatui::style::Color;
 
@@ -14,8 +14,8 @@ fn ember_palette() {
 
 #[test]
 fn caret_glyphs() {
-    assert_eq!(theme::spark(), "▍");
-    theme::with(crate::painted::ascii(), || assert_eq!(theme::spark(), "|"));
+    assert_eq!(theme::mark(), "▍");
+    theme::with(crate::painted::ascii(), || assert_eq!(theme::mark(), "|"));
 }
 
 #[test]
@@ -29,9 +29,12 @@ fn caret_phase_styles() {
         let on = mark(&state, &ui, now);
         let off = mark(&state, &ui, later(now, 530));
         assert_ne!(on.style, off.style, "waiting blinks at 530 ms");
-        state.apply(&frame(2, Event::ItemStarted {
-            item: assistant("itm_1", "words", ItemStatus::Running),
-        }));
+        state.apply(&frame(
+            2,
+            Event::ItemStarted {
+                item: assistant("itm_1", "words", ItemStatus::Running),
+            },
+        ));
         assert_eq!(mark(&state, &ui, now).style, theme::glow());
         assert_eq!(mark(&state, &ui, later(now, 530)).style, theme::glow());
         ui.stop_asked = state.turn.as_ref().map(|turn| turn.id.clone());
@@ -50,8 +53,14 @@ fn opening_wordmark_and_frames() {
     for t in [0.0, 0.5, 1.2, 2.0, 2.4] {
         let frame = opening::frame(t, &rows);
         assert_eq!(frame.len(), rows.len());
-        insta::assert_snapshot!(format!("wordmark_{t:.1}"),
-            frame.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n"));
+        insta::assert_snapshot!(
+            format!("wordmark_{t:.1}"),
+            frame
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
     }
 }
 
@@ -63,4 +72,35 @@ fn code_language_shares_the_raised_band() {
         assert!(rows[0].to_string().ends_with("rust"));
         assert_eq!(rows[0].style.bg, Some(theme::DARK.raised));
     });
+}
+
+#[test]
+fn embers_hold_the_band_and_yield_to_motion_off_and_the_foot() {
+    let (mut ui, now) = mid_turn();
+    let mut state = folded(vec![frame(1, started("trn_1"))]);
+    state.turn.as_mut().unwrap().usage.output_tokens = 256;
+    ui.embers.observe(0, &state, now.instant);
+    let tree = solo(&state);
+    let with = activity::lines(&tree, &ui, 80, now);
+    assert_eq!(with[0].to_string(), " · · · ·");
+    assert_eq!(
+        with.len(),
+        activity::lines(&tree, &ui, 80, still(now)).len()
+    );
+    assert!(
+        activity::lines(&tree, &ui, 80, still(now))[0]
+            .to_string()
+            .is_empty()
+    );
+    assert!(ui.embers.row(&state, now, 80, true).to_string().is_empty());
+    let drawn = draw_tree(80, 24, &tree, &mut ui, now);
+    assert!(drawn.contains(" · · · ·"));
+    assert!(
+        activity::lines(&tree, &ui, 80, later(now, 600))[0]
+            .to_string()
+            .is_empty()
+    );
+    state.turn = None;
+    ui.embers.observe(256, &state, now.instant);
+    assert!(ui.embers.row(&state, now, 80, false).to_string().is_empty());
 }

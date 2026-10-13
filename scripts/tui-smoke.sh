@@ -345,7 +345,7 @@ finish
 step 'BINGO_ASCII=1 and NO_COLOR leave a terminal nothing it cannot draw'
 start '{"responses":[{"steps":[{"text":"Hello in ascii."}]}]}' 'BINGO_ASCII=1 NO_COLOR=1'
 keys 'say hello' Enter
-await '* Hello in ascii.'
+await '| Hello in ascii.'
 if pane | grep -q '⏺'; then
   echo 'tui-smoke: a glyph outside the ascii table survived BINGO_ASCII=1' >&2
   pane >&2

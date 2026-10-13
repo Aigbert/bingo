@@ -2,8 +2,7 @@
 source: crates/bingo-surface-tui/src/views/tests.rs
 expression: at_80(&view)
 ---
-"    rust                                                                        "
-"   1  let line_1 = 1;                                                           "
+"   1  let line_1 = 1;    rust                                                   "
 "   2  let line_2 = 2;                                                           "
 "   3  let line_3 = 3;                                                           "
 "   4  let line_4 = 4;                                                           "

@@ -57,6 +57,6 @@ fn the_piece_moves_nothing_but_the_boxs_own_cells() {
     };
     assert_eq!(rows(0.0), rows(2.4), "the furniture never moved");
     let landed = in_look(truecolor(), || playing(80, 24, 2.4));
-    assert!(landed.contains("✻ Welcome to bingo!"), "{landed}");
+    assert!(landed.contains("█▀▀▀▀█"), "{landed}");
     assert!(landed.contains("? for shortcuts"), "{landed}");
 }

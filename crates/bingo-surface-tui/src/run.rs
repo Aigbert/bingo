@@ -75,6 +75,7 @@ enum Reply {
     /// attachment's own stream is dropped: the tree's carries the child.
     Handle(SessionId, SessionHandle),
     Sessions(Vec<SessionSummary>),
+    Resume(Option<SessionSummary>),
     /// What the store holds, for the switcher's stored rows.
     Stored(Vec<SessionSummary>),
     Commands(Vec<CommandSpec>),
@@ -284,6 +285,7 @@ async fn standing(
     notices::raise(&mut run.ui, run.detection.notice(), Instant::now());
     let now = run.detection.now();
     opening::begin(&mut run, screen, asked, now);
+    opening::find_resume(&mut run);
     Ok((run, events, Some(host.gateway_events())))
 }
 
@@ -514,6 +516,12 @@ impl Run {
     }
 
     fn fold(&mut self, frame: &bingo_sdk::Frame) -> bool {
+        let tokens = self
+            .session
+            .tree
+            .state(&frame.session)
+            .and_then(|state| state.turn.as_ref())
+            .map_or(0, |turn| turn.usage.output_tokens);
         let before: Vec<_> = if matches!(
             frame.event,
             Event::SessionClosed {
@@ -530,6 +538,9 @@ impl Run {
         };
         if self.session.tree.fold.apply(frame) == bingo_sdk::Applied::Stale {
             return false;
+        }
+        if let Some(state) = self.session.tree.state(&frame.session) {
+            self.ui.embers.observe(tokens, state, Instant::now());
         }
         let removed: Vec<_> = before
             .into_iter()
@@ -581,6 +592,7 @@ impl Run {
         self.session.tree.forget(removed);
         for id in removed {
             self.session.handles.remove(id);
+            self.ui.embers.forget(id);
         }
         if let Some(Open::Switcher(open)) = self.ui.focus.open_mut() {
             open.stored.retain(|stored| !removed.contains(&stored.id));
@@ -909,7 +921,7 @@ impl Run {
             let said = format!("↑ v{version} is out · bingo update");
             self.ui.notify(Level::Info, said, Instant::now());
         }
-        self.ui.update = Some(version);
+        self.ui.welcome.update = Some(version);
     }
 
     fn spawn(&self, call: impl Future<Output = Result<Reply, KernelError>> + Send + 'static) {
@@ -933,6 +945,7 @@ impl Run {
                 }),
                 Instant::now(),
             ),
+            Reply::Resume(previous) => self.ui.welcome.resume = previous,
             Reply::Stored(sessions) => self.fill_switcher(sessions),
             Reply::Commands(specs) => self.ui.catalogs.commands = specs,
             Reply::Catalogue(source, ids) => {
@@ -979,7 +992,7 @@ impl Run {
 fn title(tree: &Tree) -> String {
     let cwd = tree::directory(&tree.root().summary.cwd);
     let mark = match tree.attention() {
-        true => format!("{} ", crate::theme::spark()),
+        true => format!("{} ", crate::theme::mark()),
         false => String::new(),
     };
     let child = match tree.viewing() {
@@ -1162,7 +1175,7 @@ mod tests {
                 .recorder
                 .titles
                 .iter()
-                .any(|t| t == "✻ bingo — project"),
+                .any(|t| t == "▍ bingo — project"),
             "{:?}",
             harness.recorder.titles
         );
@@ -1782,7 +1795,7 @@ mod tests {
         );
         assert_eq!(
             ended.screen.last().map(String::as_str),
-            Some("⏺ answer 30"),
+            Some("▍ answer 30"),
             "{:?}",
             ended.screen
         );
@@ -1954,7 +1967,7 @@ mod tests {
     #[test]
     fn a_newer_release_reaches_the_welcome_box() {
         let run = told_of_update(0);
-        assert_eq!(run.ui.update.as_deref(), Some("0.5.0"));
+        assert_eq!(run.ui.welcome.update.as_deref(), Some("0.5.0"));
         assert!(
             run.ui.notices.is_empty(),
             "the box is on screen, so nothing else says it"
@@ -1967,7 +1980,7 @@ mod tests {
     #[test]
     fn a_welcome_box_that_has_scrolled_away_is_said_in_the_status_line() {
         let run = told_of_update(12);
-        assert_eq!(run.ui.update.as_deref(), Some("0.5.0"));
+        assert_eq!(run.ui.welcome.update.as_deref(), Some("0.5.0"));
         let said = run.ui.notice().expect("a notice");
         assert_eq!(said.level, Level::Info);
         assert_eq!(said.text, "↑ v0.5.0 is out · bingo update");

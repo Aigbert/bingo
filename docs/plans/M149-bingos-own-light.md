@@ -82,10 +82,11 @@ ADRs checked: 0001, 0002, 0070 and 0081; no acceptance change is due here.
   welcome,opening,run,markdown,motion}.rs`, `opening/*`,
   `transcript/thinking.rs`, `views/code.rs`, `render.rs`
 - TUI wiring: `lib.rs`, `ui.rs`, `view.rs`, `blocks.rs`, `layout.rs`,
-  `layout/deadline.rs`, `run/opening.rs`; `focus.rs` only if opening
+  `layout/deadline.rs`, `run/opening.rs`, `paths.rs` (reuse middle elision); `focus.rs` only if opening
   deadlines need adjustment. Resume data must be read on the host-call lane.
 - TUI tests: `screens/*.rs`, `painted.rs`, `motion/*`, `layout/tests.rs`;
-  mechanical removed-glyph expectations in `select.rs` and `search.rs`
+  `identity.rs`, `embers.rs` contract tests; `transcript/pictured.rs`
+  mechanical assistant-mark expectations; mechanical removed-glyph expectations in `select.rs` and `search.rs`
 - `crates/bingo-surface-tui/src/{screens,snapshots,…}/**` (snapshots)
 - `crates/bingo/tests/pty/**` only where a needle names a removed glyph
 - `scripts/tui-smoke.sh` (`* Hello in ascii.` becomes `| Hello in ascii.`)

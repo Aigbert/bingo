@@ -26,30 +26,47 @@ pub fn lines(lang: Option<&str>, text: &str, width: usize) -> Vec<Line<'static>>
         return preview::diff(text);
     }
     let rows = highlight::lines(lang, text);
-    let mut out: Vec<Line<'static>> = fence(lang, width).into_iter().collect();
-    let gutter = gutter(rows.len());
-    out.extend(
-        rows.into_iter()
-            .enumerate()
-            .map(|(n, row)| line(gutter.then_some(n + 1), row, width)),
-    );
-    out
+    let numbered = gutter(rows.len());
+    let lead = if numbered { GUTTER + 2 } else { GUTTER };
+    let longest = rows.iter().map(Line::width).max().unwrap_or(0);
+    let band = (lead + longest + if lang.is_empty() { 0 } else { lang.width() + 2 }).min(width);
+    rows.into_iter()
+        .enumerate()
+        .map(|(n, row)| {
+            let label = if n == 0 { lang } else { "" };
+            band_line(numbered.then_some(n + 1), row, band, label)
+        })
+        .collect()
+}
+
+fn band_line(
+    number: Option<usize>,
+    row: Line<'static>,
+    width: usize,
+    label: &str,
+) -> Line<'static> {
+    let label = clip(label, width.saturating_sub(GUTTER + 2));
+    let room = width.saturating_sub(if label.is_empty() {
+        0
+    } else {
+        label.width() + 2
+    });
+    let mut row = line(number, row, room);
+    let padding = width.saturating_sub(row.width() + label.width());
+    row.spans.push(Span::raw(" ".repeat(padding)));
+    if !label.is_empty() {
+        row.spans.push(Span::styled(label, theme::dim()));
+    }
+    for span in &mut row.spans {
+        span.style = theme::raised().patch(span.style);
+    }
+    row.style = theme::raised();
+    row
 }
 
 /// The two words that mean a block is a patch rather than a program.
 fn is_diff(lang: &str) -> bool {
     matches!(lang, "diff" | "patch")
-}
-
-/// The language, dim, above the block; nothing when the plugin named none.
-fn fence(lang: &str, width: usize) -> Option<Line<'static>> {
-    if lang.is_empty() {
-        return None;
-    }
-    Some(Line::from(Span::styled(
-        clip(&format!("{}{lang}", " ".repeat(GUTTER)), width),
-        theme::dim(),
-    )))
 }
 
 /// Whether the block is long enough to number.
@@ -62,6 +79,7 @@ fn line(number: Option<usize>, row: Line<'static>, width: usize) -> Line<'static
         Some(n) => format!("{n:>GUTTER$}  "),
         None => " ".repeat(GUTTER),
     };
+    let lead = clip(&lead, width);
     let room = width.saturating_sub(lead.width());
     let mut spans = vec![Span::styled(lead, theme::dim())];
     spans.extend(cut(row, room));

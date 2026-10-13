@@ -120,6 +120,7 @@ pub struct Rows<'a> {
     /// *inside* the welcome box and lands on it, so the box is derived from the
     /// second rather than drawn twice. Nothing at all once it is over.
     pub opening: Option<f32>,
+    pub entrance: crate::welcome::Entrance<'a>,
 }
 
 impl<'a> Rows<'a> {
@@ -148,6 +149,7 @@ impl<'a> Rows<'a> {
             update: None,
             measure: None,
             opening: None,
+            entrance: crate::welcome::Entrance::default(),
         }
     }
 
@@ -159,6 +161,13 @@ impl<'a> Rows<'a> {
     /// Which second of the opening this frame is, while it plays.
     pub fn opening(self, opening: Option<f32>) -> Self {
         Self { opening, ..self }
+    }
+
+    pub fn entrance(self, height: u16, resume: Option<&'a bingo_sdk::SessionSummary>) -> Self {
+        Self {
+            entrance: crate::welcome::Entrance { height, resume },
+            ..self
+        }
     }
 
     /// The measure a person set for prose, as this run was told it.
@@ -563,7 +572,16 @@ fn assistant(text: &str, status: ItemStatus, fold: Fold, rows: &Rows<'_>, cue: C
     };
     let body = pictured::in_the_words(lit, &written.images, fold, rows);
     Block {
-        lines: speaks(theme::text().patch(theme::bold()), body.lines, rows),
+        lines: marked(
+            theme::mark(),
+            if status == ItemStatus::Running {
+                theme::presence()
+            } else {
+                theme::text().patch(theme::bold())
+            },
+            body.lines,
+            rows,
+        ),
         ..body
     }
 }
@@ -873,7 +891,7 @@ fn calls(item: &Item, tool: &str) -> bool {
 }
 
 /// What stands under the last turn once it is over and nothing runs: why it
-/// failed, then what it cost (`✻ Worked for 15m 11s · done 13:48`). Both are
+/// failed, then what it cost (`▍ Worked for 15m 11s · done 13:48`). Both are
 /// derived from `last_turn` rather than kept as lines of the surface's own,
 /// and neither belongs to an item, so this is the transcript's last block
 /// rather than one of them: it scrolls with the answer it closes (M84,
@@ -903,7 +921,7 @@ fn failure(state: &SessionState, rows: &Rows<'_>) -> Vec<Line<'static>> {
     )
 }
 
-/// `✻ Worked for 15m 11s · done 13:48`, dim: the verb the verdict earns, how
+/// `▍ Worked for 15m 11s · done 13:48`, dim: the verb the verdict earns, how
 /// long the turn ran, and the hour it ended on. A turn that answered at once
 /// says nothing, as it drew no row while it ran.
 fn worked(state: &SessionState, rows: &Rows<'_>) -> Vec<Line<'static>> {
@@ -915,7 +933,7 @@ fn worked(state: &SessionState, rows: &Rows<'_>) -> Vec<Line<'static>> {
     }
     let (what, when) = worked::words(turn, rows.now.wall, &jiff::tz::TimeZone::system());
     vec![Line::from(vec![
-        Span::styled(format!("{} ", theme::spark()), theme::presence()),
+        Span::styled(format!("{} ", theme::mark()), theme::dim()),
         Span::styled(what, theme::dim()),
         Span::styled(when, theme::dim()),
     ])]
@@ -1556,7 +1574,7 @@ mod tests {
                 ItemStatus::Completed,
             )]),
             vec![
-                "⏺ alpha bravo charlie delta echo foxtrot golf hotel india".to_string(),
+                "▍ alpha bravo charlie delta echo foxtrot golf hotel india".to_string(),
                 "  juliet".to_string(),
             ],
             "a wrapped answer hangs under its own bullet"
@@ -1665,7 +1683,7 @@ mod tests {
                 thought_at("itm_2", "Then the crate map.", 3),
             ]),
             vec![
-                "✻ Thought for 5s".to_string(),
+                "▏ Thought for 5s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
                 "     Then the crate map.".to_string(),
             ],
@@ -1685,7 +1703,7 @@ mod tests {
                 thinking_at("itm_3", "The plan after that."),
             ]),
             vec![
-                "✻ Thinking…".to_string(),
+                "▏ Thinking…".to_string(),
                 "  ⎿  Then the crate map.".to_string(),
                 "     The plan after that.".to_string(),
             ],
@@ -1709,13 +1727,13 @@ mod tests {
                 thought_at("itm_3", "Then the crate map.", 3),
             ]),
             vec![
-                "✻ Thought for 2s".to_string(),
+                "▏ Thought for 2s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
                 String::new(),
                 "⏺ Read(Cargo.toml)".to_string(),
                 "  ⎿  Read 3 lines".to_string(),
                 String::new(),
-                "✻ Thought for 3s".to_string(),
+                "▏ Thought for 3s".to_string(),
                 "  ⎿  Then the crate map.".to_string(),
             ],
         );
@@ -1732,7 +1750,7 @@ mod tests {
         ]);
         assert_eq!(
             drawn.first().map(String::as_str),
-            Some("✻ Thought for 3m 21s"),
+            Some("▏ Thought for 3m 21s"),
             "{drawn:?}"
         );
     }
@@ -1741,13 +1759,13 @@ mod tests {
     fn thinking_streams_and_then_holds_the_rows_it_streamed() {
         assert_eq!(
             drawn(vec![thinking_item("the manifest")]),
-            vec!["✻ Thinking…".to_string(), "  ⎿  the manifest".to_string()],
+            vec!["▏ Thinking…".to_string(), "  ⎿  the manifest".to_string()],
             "a thought being had is read as it is thought"
         );
         assert_eq!(
             drawn(vec![thought_item("The manifest first.", 2)]),
             vec![
-                "✻ Thought for 2s".to_string(),
+                "▏ Thought for 2s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
             ],
             "and once it is over it holds: the heading's words are the whole of the change"
@@ -1791,7 +1809,7 @@ mod tests {
         assert_eq!(
             drawn(vec![thinking_item("first\nsecond\nthird\nfourth")]),
             vec![
-                "✻ Thinking…".to_string(),
+                "▏ Thinking…".to_string(),
                 "  ⎿  third".to_string(),
                 "     fourth".to_string(),
             ],
@@ -1886,7 +1904,7 @@ mod tests {
         assert_eq!(
             at(Fold::Peek),
             vec![
-                "✻ Thought for 3s".to_string(),
+                "▏ Thought for 3s".to_string(),
                 "  ⎿  step 8".to_string(),
                 "     step 9".to_string(),
             ],
@@ -1897,7 +1915,7 @@ mod tests {
         assert_eq!(open.last().map(String::as_str), Some("     step 9"));
         assert_eq!(
             at(Fold::Shut),
-            vec!["✻ Thought for 3s".to_string()],
+            vec!["▏ Thought for 3s".to_string()],
             "and one more click puts the thought away"
         );
     }
@@ -1908,7 +1926,7 @@ mod tests {
     fn a_thought_with_nothing_in_it_yet_is_the_row_alone() {
         assert_eq!(
             drawn(vec![thinking_item("")]),
-            vec!["✻ Thinking…".to_string()],
+            vec!["▏ Thinking…".to_string()],
         );
     }
 
@@ -1946,13 +1964,13 @@ mod tests {
 
     /// A call still being made carries no metadata — the provider writes it
     /// when the block closes — so it reads exactly as it did before the row
-    /// existed: the heading, under `✻ Thinking…`.
+    /// existed: the heading, under `▏ Thinking…`.
     #[test]
     fn an_agents_call_still_running_reads_as_the_text_it_is() {
         assert_eq!(
             drawn(vec![thinking_item("read Read src/lib.rs (1 - 50)")]),
             vec![
-                "✻ Thinking…".to_string(),
+                "▏ Thinking…".to_string(),
                 "  ⎿  read Read src/lib.rs (1 - 50)".to_string(),
             ],
         );
@@ -1965,7 +1983,7 @@ mod tests {
         assert_eq!(
             drawn(vec![thought_item("The manifest first.", 2)]),
             vec![
-                "✻ Thought for 2s".to_string(),
+                "▏ Thought for 2s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
             ],
         );
@@ -1976,7 +1994,7 @@ mod tests {
                 serde_json::json!({ "title": "not a call" }),
             )]),
             vec![
-                "✻ Thought for 1s".to_string(),
+                "▏ Thought for 1s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
             ],
             "a namespace without the flag is somebody's private note, not a call"
@@ -2035,7 +2053,7 @@ mod tests {
         assert_eq!(
             drawn(vec![thought_item(&text, 3)]),
             vec![
-                "✻ Thought for 3s".to_string(),
+                "▏ Thought for 3s".to_string(),
                 "  ⎿  step 98".to_string(),
                 "     step 99".to_string(),
             ],
@@ -2048,7 +2066,7 @@ mod tests {
     fn an_empty_thought_is_the_row_and_nothing_else() {
         assert_eq!(
             drawn(vec![thought_item("", 1)]),
-            vec!["✻ Thought for 1s".to_string()],
+            vec!["▏ Thought for 1s".to_string()],
         );
         assert_eq!(thought(&thought_item("   \n", 1)), None);
         assert_eq!(thought(&thought_item("why", 1)), Some("why"));

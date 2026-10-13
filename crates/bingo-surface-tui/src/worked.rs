@@ -1,4 +1,4 @@
-//! What the turn cost, said once it is over (M84): `✻ Worked for 15m 11s ·
+//! What the turn cost, said once it is over (M84): `▍ Worked for 15m 11s ·
 //! done 13:48`, Claude Code's own shape. Everything here is words over the
 //! last turn the fold kept ([`bingo_sdk::LastTurn`]) and the clock; nothing
 //! is stored, so a session read back from its journal says it too.

@@ -257,8 +257,8 @@ mod tests {
         for c in "warm".chars() {
             search.typed(c);
         }
-        // `✻ ` is two cells and each of `你好` is two more.
-        search.find(&["✻ 你好 warm".to_string()]);
+        // `▍ ` is two cells and each of `你好` is two more.
+        search.find(&["▍ 你好 warm".to_string()]);
         assert_eq!(search.current().map(|h| h.column), Some(7));
     }
 }

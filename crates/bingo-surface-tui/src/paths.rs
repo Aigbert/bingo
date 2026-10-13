@@ -92,7 +92,7 @@ fn under(path: &str, root: &str) -> Option<String> {
 
 /// Drop whole directories from the middle before cutting a name in half: the
 /// first segment says where it started, the last says what it is.
-fn elide(path: &str, max: usize) -> String {
+pub(crate) fn elide(path: &str, max: usize) -> String {
     if path.width() <= max {
         return path.to_string();
     }

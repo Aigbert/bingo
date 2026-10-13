@@ -51,8 +51,8 @@ pub struct Palette {
 /// The accents over a terminal's own dark ground.
 pub const DARK: Palette = Palette {
     raised: Color::Rgb(0x21, 0x1d, 0x17),
-    presence: Color::Rgb(0xd9, 0x77, 0x57),
-    glow: Color::Rgb(0xf2, 0xa0, 0x7c),
+    presence: Color::Rgb(0xf0, 0x88, 0x3e),
+    glow: Color::Rgb(0xff, 0xc2, 0x78),
     good: Color::Rgb(0x8f, 0xcf, 0x8a),
     bad: Color::Rgb(0xe0, 0x65, 0x5a),
     mode: Color::Rgb(0x8f, 0xb4, 0xde),
@@ -66,8 +66,8 @@ pub const DARK: Palette = Palette {
 /// the tint is what gives the frame depth either way (design §4).
 pub const LIGHT: Palette = Palette {
     raised: Color::Rgb(0xee, 0xe8, 0xdd),
-    presence: Color::Rgb(0xb2, 0x4f, 0x2c),
-    glow: Color::Rgb(0xd9, 0x77, 0x57),
+    presence: Color::Rgb(0xa8, 0x4d, 0x12),
+    glow: Color::Rgb(0xe0, 0x7a, 0x2a),
     good: Color::Rgb(0x35, 0x72, 0x30),
     bad: Color::Rgb(0xb0, 0x2f, 0x24),
     mode: Color::Rgb(0x2f, 0x5f, 0x99),
@@ -102,10 +102,10 @@ pub struct Glyphs {
     /// Where typing lands, in a row the terminal's own cursor is not parked
     /// on — a query line.
     pub caret: &'static str,
-    /// bingo at work, one frame every [`SPARKLE_MS`].
-    pub sparkles: [&'static str; 4],
+    /// bingo speaking and thinking, respectively.
+    pub mark: [&'static str; 2],
     /// A box a person ticks: `[0]` open, `[1]` done. One field because it is
-    /// one fact in two states, as the sparkles are one in four.
+    /// one fact in two states, as the marks are one voice in two states.
     pub todo: [&'static str; 2],
     /// A task on the session's list, by where it stands: `[0]` still to do,
     /// `[1]` being done, `[2]` done — Claude Code's own three (M74), which
@@ -132,7 +132,7 @@ pub const UNICODE: Glyphs = Glyphs {
     user: ">",
     cursor: "❯",
     caret: "▌",
-    sparkles: ["✻", "✢", "✶", "✽"],
+    mark: ["▍", "▏"],
     todo: ["☐", "☒"],
     task: ["◻", "◼", "✔"],
     tick: "✔",
@@ -156,7 +156,7 @@ pub const ASCII: Glyphs = Glyphs {
     user: ">",
     cursor: ">",
     caret: "|",
-    sparkles: ["+", "+", "+", "+"],
+    mark: ["|", "|"],
     todo: ["-", "x"],
     // Still to do, being done — the bullet, because it is the one the model
     // is on — and done.
@@ -177,9 +177,6 @@ pub const ASCII: Glyphs = Glyphs {
         horizontal_bottom: "-",
     },
 };
-
-/// One frame of the sparkle, per `docs/design/tui.md` §6.
-pub const SPARKLE_MS: u128 = 150;
 
 /// Terminal bell, written out of band between frames.
 pub const BELL: &[u8] = b"\x07";
@@ -516,32 +513,6 @@ pub fn comet(age: f32) -> Style {
             Style::new().fg(mix(palette.glow, palette.presence, age / SETTLES))
         }
         Colors::True(_) => text(),
-    }
-}
-
-/// A border with light on it: the hairline it rests as below `SETTLES`,
-/// bingo's own colour there, and its glow at 1.
-///
-/// The opening's own ramp (§11), the same shape as [`comet`]: the warm half
-/// is a gradient between the two accents, and the cold half is what the
-/// border rests as. A hairline is a weight and not a hue (§4), so there is
-/// nothing to mix towards — the light hands back to it, as streaming words
-/// hand back to `text`.
-pub fn hairline(warmth: f32) -> Style {
-    match current().colors {
-        Colors::True(palette) if settled(warmth) >= SETTLES => Style::new().fg(mix(
-            palette.presence,
-            palette.glow,
-            (settled(warmth) - SETTLES) / (1.0 - SETTLES),
-        )),
-        Colors::True(_) => dim(),
-        // Three stops and eight colours: the two ends and the one in the
-        // middle, which is the only warm colour either of them has.
-        _ => match settled(warmth) {
-            warm if warm >= 0.75 => glow(),
-            warm if warm >= 0.25 => presence(),
-            _ => dim(),
-        },
     }
 }
 
@@ -887,17 +858,14 @@ pub fn border() -> border::Set<'static> {
     glyphs().border
 }
 
-/// bingo, standing still: the sparkle's first frame, which is what a finished
-/// thought and the welcome box wear.
-pub fn spark() -> &'static str {
-    glyphs().sparkles[0]
+/// bingo's voice, at work or at rest.
+pub fn mark() -> &'static str {
+    glyphs().mark[0]
 }
 
-/// The sparkle's frame for an elapsed duration, so the animation is a pure
-/// function of the clock rather than a counter someone has to advance.
-pub fn sparkle(elapsed: std::time::Duration) -> &'static str {
-    let sparkles = glyphs().sparkles;
-    sparkles[(elapsed.as_millis() / SPARKLE_MS) as usize % sparkles.len()]
+/// The narrower caret while a thought is being had.
+pub fn thinking() -> &'static str {
+    glyphs().mark[1]
 }
 
 #[cfg(test)]
@@ -946,6 +914,7 @@ mod tests {
                         // and into an escape, so it reads colours off the
                         // tokens rather than naming any (M69).
                         | "opening/storyboard.rs"
+                        | "identity.rs"
                         | "motion.rs"
                         | "motion/landing.rs"
                         | "painted.rs"
@@ -998,6 +967,7 @@ mod tests {
                     // cursor: the same weight the dialog's rows wear.
                     "form.rs",
                     "markdown.rs",
+                    "opening/frame.rs",
                     "pager.rs",
                     "preview.rs",
                     "rewind.rs",
@@ -1060,7 +1030,7 @@ mod tests {
                     "transcript/ran.rs",
                     "transcript/said.rs",
                     "transcript/slots.rs",
-                    // The `✻` of a thinking row and everything under it: a
+                    // The `▍` of a thinking row and everything under it: a
                     // thought is working, and working is read past (§4).
                     "transcript/thinking.rs",
                     "tree.rs",
@@ -1089,6 +1059,7 @@ mod tests {
                     "select.rs",
                     // The bar a person's own line is a band on.
                     "transcript/said.rs",
+                    "views/code.rs",
                 ],
             ),
             (
@@ -1108,7 +1079,7 @@ mod tests {
                     "welcome.rs",
                 ],
             ),
-            ("glow", &[]),
+            ("glow", &["activity.rs", "opening/frame.rs"]),
             // A task that is done wears the mark a finished call does.
             (
                 "good",
@@ -1140,7 +1111,6 @@ mod tests {
                 &[
                     // The mark igniting, which is the head's own light spent
                     // on it (§11).
-                    "opening/frame.rs",
                     "transcript.rs",
                     "view.rs",
                     "views/progress.rs",
@@ -1148,7 +1118,12 @@ mod tests {
             ),
             (
                 "comet",
-                &["activity.rs", "opening/frame.rs", "transcript.rs"],
+                &[
+                    "activity.rs",
+                    "embers.rs",
+                    "opening/frame.rs",
+                    "transcript.rs",
+                ],
             ),
             ("landing", &["transcript.rs"]),
             ("cooling", &["transcript.rs"]),
@@ -1162,7 +1137,6 @@ mod tests {
             ),
             // The one border the light draws, and the one breath it takes
             // when the drawing is done (§11).
-            ("hairline", &["opening/frame.rs"]),
             // Highlighted code reaches the table through one door, so no view
             // has to know that a keyword and the mode badge share a colour.
             ("ink", &["highlight.rs"]),
@@ -1419,7 +1393,8 @@ mod tests {
             assert_eq!(cursor(), ">");
             assert_eq!(todo(false), "-");
             assert_eq!(todo(true), "x");
-            assert_eq!(sparkle(std::time::Duration::ZERO), "+");
+            assert_eq!(mark(), "|");
+            assert_eq!(thinking(), "|");
             assert_eq!(border().top_left, "+");
             assert_eq!(ellipsis(), "...");
             assert_eq!(row_mark('❖'), "*", "and a skill says so in words instead");
@@ -1445,12 +1420,9 @@ mod tests {
     }
 
     #[test]
-    fn the_sparkle_walks_its_four_frames_on_the_clock() {
-        let at = |ms| sparkle(std::time::Duration::from_millis(ms));
-        assert_eq!(at(0), "✻");
-        assert_eq!(at(SPARKLE_MS as u64), "✢");
-        assert_eq!(at(SPARKLE_MS as u64 * 3), "✽");
-        assert_eq!(at(SPARKLE_MS as u64 * 4), "✻", "it comes back round");
+    fn the_voice_has_a_speaking_and_a_thinking_caret() {
+        assert_eq!(mark(), "▍");
+        assert_eq!(thinking(), "▏");
     }
 
     fn dark() -> Theme {
@@ -1520,30 +1492,6 @@ mod tests {
         });
     }
 
-    /// The opening's own ramp: the comet's shape, and both ends of it are
-    /// somewhere the border already rests — the hairline at one end and the
-    /// glow the light's head wears at the other (§11).
-    #[test]
-    fn a_border_with_light_on_it_runs_from_its_own_hairline_to_the_glow() {
-        for look in [dark(), light()] {
-            with(look, || {
-                assert_eq!(hairline(0.0), dim(), "at rest it is the hairline");
-                assert_eq!(hairline(0.5), presence(), "halfway, bingo's colour");
-                assert_eq!(hairline(1.0), glow(), "and under the head, its glow");
-                assert_eq!(hairline(-1.0), dim(), "clamped");
-                assert_eq!(hairline(2.0), glow());
-                assert_eq!(hairline(f32::NAN), dim(), "and never a colour of NaN");
-                assert_eq!(hairline(0.25), dim(), "the cold half is the hairline");
-                let warming = hairline(0.75).fg.expect("a colour between the two");
-                assert_ne!(warming, glow().fg.expect("the glow"));
-                assert_ne!(warming, presence().fg.expect("bingo's own"));
-            });
-        }
-        assert_eq!(hairline(0.0), dim(), "and the eight take the three stops");
-        assert_eq!(hairline(0.5), presence());
-        assert_eq!(hairline(1.0), glow());
-    }
-
     fn light() -> Theme {
         Theme {
             colors: Colors::True(LIGHT),
@@ -1588,13 +1536,7 @@ mod tests {
     #[test]
     fn nothing_that_moves_spends_a_colour_under_no_colour() {
         with(no_colour(), || {
-            for style in [
-                breath(1.0),
-                pulse(1.0),
-                comet(0.0),
-                warming(1.0),
-                hairline(1.0),
-            ] {
+            for style in [breath(1.0), pulse(1.0), comet(0.0), warming(1.0)] {
                 assert_eq!(style, Style::new());
             }
             assert_eq!(fading(bingo_sdk::Level::Error, 1.0), Style::new());

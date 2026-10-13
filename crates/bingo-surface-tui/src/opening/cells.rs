@@ -72,12 +72,12 @@ mod tests {
     #[test]
     fn a_row_comes_apart_into_cells_and_back_into_the_runs_it_was() {
         let row = Line::from(vec![
-            Span::styled("✻ ", theme::presence()),
+            Span::styled("▍ ", theme::presence()),
             Span::styled("hello", theme::text()),
         ]);
         let cells = of(&row);
         assert_eq!(cells.len(), 7, "one cell a glyph");
-        assert_eq!(cells[0].glyph, "✻");
+        assert_eq!(cells[0].glyph, "▍");
         assert_eq!(cells[1].style, theme::presence(), "the space is the mark's");
         assert_eq!(line(cells), row, "and the runs come back as they were");
     }

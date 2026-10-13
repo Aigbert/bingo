@@ -408,7 +408,8 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
             &ui.linked,
             now,
         )
-        .saying(ui.update.as_deref())
+        .saying(ui.welcome.update.as_deref())
+        .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
         .opening(ui.focus.intro().map(|intro| intro.seconds(now)))
         .measuring(ui.measure),
     );

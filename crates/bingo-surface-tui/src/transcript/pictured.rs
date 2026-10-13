@@ -755,7 +755,7 @@ mod tests {
             Fold::Peek,
             &linked,
         );
-        assert_eq!(text(&block), vec!["⏺ [image: shot]"]);
+        assert_eq!(text(&block), vec!["▍ [image: shot]"]);
         assert!(block.pictures.is_empty());
     }
 
@@ -769,7 +769,7 @@ mod tests {
             Fold::Peek,
             &Linked::default(),
         );
-        assert_eq!(text(&block), vec!["⏺ [image: shot]"]);
+        assert_eq!(text(&block), vec!["▍ [image: shot]"]);
         assert!(block.pictures.is_empty(), "nothing to send yet");
         assert_eq!(block.wanted, vec!["docs/x.png".to_string()]);
     }
@@ -784,7 +784,7 @@ mod tests {
             Fold::Peek,
             &linked,
         );
-        assert_eq!(text(&block), vec!["⏺ [image: shot] (not found)"]);
+        assert_eq!(text(&block), vec!["▍ [image: shot] (not found)"]);
         let spans = &block.lines[0].spans;
         assert_eq!(
             spans.last().map(|s| s.style),

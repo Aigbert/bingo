@@ -23,7 +23,7 @@ use crate::theme::Theme;
 
 /// The seconds the storyboard is read at: the light running, the light home,
 /// the first row arriving, the mark settled, the last row home, and the box.
-const AT: [f32; 6] = [0.3, 0.9, 1.1, 1.5, 2.0, 2.4];
+const AT: [f32; 5] = [0.0, 0.5, 1.2, 2.0, 2.4];
 
 /// The two widths every layout rule is written for.
 const WIDTHS: [u16; 2] = [80, 120];

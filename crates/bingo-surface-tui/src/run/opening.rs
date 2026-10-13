@@ -35,6 +35,34 @@ pub(super) fn begin(run: &mut Run, screen: (u16, u16), asked: bool, now: Now) {
     }
 }
 
+/// Read the same cwd's most recent earlier root once, on the host-call lane.
+pub(super) fn find_resume(run: &mut Run) {
+    let host = run.host.clone();
+    let state = run.session.tree.root();
+    let id = state.summary.id.clone();
+    let created = state.summary.created_at;
+    let filter = bingo_sdk::SessionFilter {
+        cwd: Some(std::path::PathBuf::from(&state.summary.cwd)),
+        parent: None,
+        limit: None,
+    };
+    run.spawn(async move {
+        host.sessions(filter).await.map(|sessions| {
+            super::Reply::Resume(
+                sessions
+                    .into_iter()
+                    .filter(|session| {
+                        session.id != id
+                            && session.parent.is_none()
+                            && session.driver == bingo_sdk::Driver::Model
+                            && session.created_at < created
+                    })
+                    .max_by_key(|session| session.updated_at),
+            )
+        })
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -62,7 +90,7 @@ mod tests {
                 "a run given work on the command line goes and does it"
             );
             assert!(
-                !plays(&run, (79, 24), false, now),
+                !plays(&run, (39, 24), false, now),
                 "and a narrow terminal has no room for the box to play in"
             );
             assert!(!plays(&run, (80, 15), false, now), "nor a short one");
@@ -114,7 +142,7 @@ mod tests {
         let mut recorder = Recorder::default();
         run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
         assert!(
-            !recorder.last().contains("Welcome to bingo!"),
+            !recorder.last().contains("█▀▀▀▀█"),
             "the first second of the piece has said nothing yet:\n{}",
             recorder.last()
         );
@@ -127,7 +155,7 @@ mod tests {
         run.painted = crate::run::older_than_a_frame();
         run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
         assert!(
-            recorder.last().contains("Welcome to bingo!"),
+            recorder.last().contains("█▀▀▀▀█"),
             "and by the last beat the box is whole:\n{}",
             recorder.last()
         );

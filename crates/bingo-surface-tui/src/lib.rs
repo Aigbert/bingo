@@ -323,6 +323,6 @@ mod test_lanes;
 #[cfg(test)]
 mod test_support;
 
+mod embers;
 #[cfg(test)]
 mod identity;
-mod embers;
