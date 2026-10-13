@@ -312,10 +312,7 @@ impl Interceptor for Answering {
         "answering"
     }
     fn matcher(&self) -> LinkMatcher {
-        LinkMatcher {
-            points: vec![LinkPoint::ToolCall],
-            tool: None,
-        }
+        LinkMatcher::at(bingo_sdk::catalogue::TOOL_CALL)
     }
     async fn tool_call(
         &self,
@@ -355,10 +352,7 @@ impl Interceptor for HeldStep {
         "held-step"
     }
     fn matcher(&self) -> LinkMatcher {
-        LinkMatcher {
-            points: vec![LinkPoint::TurnStep],
-            tool: None,
-        }
+        LinkMatcher::at(bingo_sdk::catalogue::TURN_STEP)
     }
     async fn turn_step(
         &self,

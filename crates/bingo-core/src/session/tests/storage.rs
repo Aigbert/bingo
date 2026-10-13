@@ -147,7 +147,10 @@ async fn storage_failure_never_publishes_or_observes_the_failed_frame() {
             .iter()
             .any(|f| matches!(f.event, Event::Extension { .. }))
     );
-    while let Ok((frame, _)) = observations.try_recv() {
+    while let Ok(work) = observations.try_recv() {
+        let crate::chain::observe::Work::Frame(frame, _) = work else {
+            continue;
+        };
         assert!(!matches!(frame.event, Event::Extension { .. }));
     }
 }

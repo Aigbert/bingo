@@ -204,7 +204,11 @@ async fn evaluate(
 ) -> Verdict {
     let Waiting { input, kind, .. } = waiting;
     if let Kind::Deliver(delivery) = kind {
-        return Verdict::Delivered { input, delivery };
+        return match crate::chain::deliver::receive(input, &hooks.links().await, &cx, report).await
+        {
+            Ok(input) => Verdict::Delivered { input, delivery },
+            Err(error) => Verdict::Rejected(error),
+        };
     }
     if !matches!(kind, Kind::Prose)
         && let Some(parsed) = commands::parse(&input)

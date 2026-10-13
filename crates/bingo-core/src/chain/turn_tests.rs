@@ -83,10 +83,7 @@ impl Interceptor for Grow {
         "grow"
     }
     fn matcher(&self) -> LinkMatcher {
-        LinkMatcher {
-            points: vec![LinkPoint::PromptCompose],
-            tool: None,
-        }
+        LinkMatcher::at(bingo_sdk::catalogue::PROMPT_COMPOSE)
     }
     async fn prompt_compose(
         &self,

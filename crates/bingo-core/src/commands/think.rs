@@ -57,6 +57,9 @@ async fn set(
             format!("unknown thinking level: {wanted}"),
         )
     })?;
+    let value = crate::config::set(host, &cx.session, "thinking", serde_json::json!(level)).await?;
+    let level: Option<Effort> = serde_json::from_value(value)
+        .map_err(|error| KernelError::new(ErrorCode::InvalidInput, error.to_string()))?;
     host.reconfigure(&cx.session, SessionChange::Thinking(level))
         .await?;
     let mut message = said(level);

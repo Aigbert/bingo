@@ -4,7 +4,7 @@ pub(crate) struct Check;
 impl Point for Check {
     type Input = ToolCall;
     type Output = CheckResult;
-    const POINT: LinkPoint = LinkPoint::ToolCheck;
+    const POINT: LinkPoint = bingo_sdk::catalogue::TOOL_CHECK;
     fn dispatch<'a>(
         link: &'a dyn Interceptor,
         cx: &'a HookContext,
@@ -22,7 +22,12 @@ impl Point for Check {
     fn needs_baseline(tier: Tier, output: &CheckResult) -> bool {
         tier != Tier::Full && !matches!(output.decision, Decision::Deny { .. })
     }
-    fn accepts(tier: Tier, before: Option<&CheckResult>, after: &CheckResult) -> bool {
+    fn accepts(
+        _entry: &bingo_sdk::catalogue::Entry,
+        tier: Tier,
+        before: Option<&CheckResult>,
+        after: &CheckResult,
+    ) -> bool {
         tier == Tier::Full
             || (before.is_none() && matches!(after.decision, Decision::Deny { .. }))
             || before.is_some_and(|before| {
@@ -35,7 +40,7 @@ pub(crate) struct Call;
 impl Point for Call {
     type Input = ToolCall;
     type Output = ToolOutput;
-    const POINT: LinkPoint = LinkPoint::ToolCall;
+    const POINT: LinkPoint = bingo_sdk::catalogue::TOOL_CALL;
     fn dispatch<'a>(
         link: &'a dyn Interceptor,
         cx: &'a HookContext,

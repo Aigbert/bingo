@@ -4,7 +4,7 @@ pub(crate) struct Stop;
 impl Point for Stop {
     type Input = ();
     type Output = StopResult;
-    const POINT: LinkPoint = LinkPoint::TurnStop;
+    const POINT: LinkPoint = bingo_sdk::catalogue::TURN_STOP;
     fn dispatch<'a>(
         link: &'a dyn Interceptor,
         cx: &'a HookContext,

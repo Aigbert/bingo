@@ -466,7 +466,7 @@ impl Turn<'_> {
     /// Let the contributors speak, then measure. A first round that is already
     /// over the compaction threshold compacts before it sends anything.
     async fn assemble_request(&mut self) -> Option<(ModelRequest, ContextUsage)> {
-        let request = ModelRequest {
+        let mut request = ModelRequest {
             model: self.model.id.clone(),
             max_tokens: self.model.max_tokens,
             system: self.cfg.system.clone(),
@@ -479,6 +479,9 @@ impl Turn<'_> {
         let links = self.cfg.hooks.links().await;
         let cx = self.hook_cx.clone();
         let report = crate::chain::Report::default();
+        request.tools = crate::chain::describe::tools(request.tools, &links, &cx, report.clone())
+            .await
+            .ok()?;
         let result = crate::chain::run::<crate::chain::compose::Compose>(
             &links,
             Next::new(|request| Box::pin(self.compose_request(request))),

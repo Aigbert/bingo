@@ -83,6 +83,28 @@ pub fn switch(env: &Env, name: &str, enabled: bool) -> Result<(), SettingsError>
     settings::remember(&path, &[(KEY, Value::Object(switches))])
 }
 
+pub(crate) async fn switch_in(
+    host: &crate::host::Host,
+    session: &bingo_sdk::SessionId,
+    name: &str,
+    enabled: bool,
+) -> Result<(), bingo_sdk::KernelError> {
+    let path = settings::user_path(host.env());
+    let failed = |error: SettingsError| {
+        bingo_sdk::KernelError::new(bingo_sdk::ErrorCode::Internal, error.to_string())
+    };
+    let mut switches = written(&path).map_err(failed)?;
+    switches.insert(name.into(), Value::Bool(enabled));
+    let value = crate::config::set(host, session, KEY, Value::Object(switches)).await?;
+    if !value.is_object() {
+        return Err(bingo_sdk::KernelError::new(
+            bingo_sdk::ErrorCode::InvalidInput,
+            "enabledPlugins must be an object",
+        ));
+    }
+    settings::remember(&path, &[(KEY, value)]).map_err(failed)
+}
+
 /// What the user layer already says about the plugins, read to be written
 /// back. Only that layer, because only that layer is ever written.
 fn written(path: &Path) -> Result<Map<String, Value>, SettingsError> {

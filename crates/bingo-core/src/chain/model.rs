@@ -4,7 +4,7 @@ pub(crate) struct Model;
 impl Point for Model {
     type Input = ModelRequest;
     type Output = Result<StepStream, ProviderError>;
-    const POINT: LinkPoint = LinkPoint::TurnStep;
+    const POINT: LinkPoint = bingo_sdk::catalogue::TURN_STEP;
     fn dispatch<'a>(
         link: &'a dyn Interceptor,
         cx: &'a HookContext,

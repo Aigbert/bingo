@@ -255,7 +255,12 @@ impl Commands {
     }
 
     /// Run on a task that reports back by mail.
-    pub(super) fn spawn(&mut self, run: Run) -> Result<(), KernelError> {
+    pub(super) fn spawn(
+        &mut self,
+        run: Run,
+        hooks: crate::turn::HookSet,
+        hook_cx: HookContext,
+    ) -> Result<(), KernelError> {
         let host = self
             .host
             .upgrade()
@@ -286,7 +291,10 @@ impl Commands {
         }
         let mailbox = self.mailbox.clone();
         self.tracker.spawn(async move {
-            let future = AssertUnwindSafe(command.run(&args, &cx)).catch_unwind();
+            let report = crate::chain::Report::default();
+            let work =
+                crate::chain::command::run(command, args, &cx, &hooks, &hook_cx, report.clone());
+            let future = AssertUnwindSafe(work).catch_unwind();
             let returned = super::running::supervised(future, &cancel).await;
             let outcome = match returned {
                 _ if cancel.is_cancelled() => Err(interrupted()),
@@ -297,6 +305,9 @@ impl Commands {
                 )),
                 None => Err(interrupted()),
             };
+            for notice in report.take() {
+                let _ = mailbox.record(notice).await;
+            }
             mailbox.send(Msg::CommandFinished { intent, outcome });
         });
         Ok(())

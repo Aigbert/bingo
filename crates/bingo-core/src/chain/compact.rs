@@ -4,7 +4,7 @@ pub(crate) struct Compact;
 impl Point for Compact {
     type Input = CompactInput;
     type Output = Result<Compaction, CompactError>;
-    const POINT: LinkPoint = LinkPoint::SessionCompact;
+    const POINT: LinkPoint = bingo_sdk::catalogue::SESSION_COMPACT;
     fn dispatch<'a>(
         link: &'a dyn Interceptor,
         cx: &'a HookContext,
