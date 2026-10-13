@@ -297,5 +297,8 @@ fn listing_includes_explicit_modules_without_starting_them() {
         .unwrap();
     let text = success(&output);
     let row = text.lines().find(|line| line.starts_with("hello\t"));
-    assert!(row.is_some_and(|row| row.contains("\trewrite") && row.ends_with("\tmodule")), "{text}");
+    assert!(
+        row.is_some_and(|row| row.contains("\trewrite") && row.ends_with("\tmodule")),
+        "{text}"
+    );
 }

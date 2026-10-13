@@ -517,8 +517,9 @@ async fn switched_plugins(
     if let Some(result) = plugins::author(action).await {
         return result;
     }
-    let layers = settings::load(env, cwd, cli.settings.as_deref())
+    let mut layers = settings::load(env, cwd, cli.settings.as_deref())
         .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e.to_string()))?;
+    layers.push(settings::Layer::new("cli", cli_layer(cli)));
     let merged = composition::merged(&layers, platforms)?;
     let composed = plugins(Composition::for_cli(cli, &merged), platforms)?;
     plugins::run(action, env, cwd, &layers, composed)

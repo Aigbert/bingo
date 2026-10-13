@@ -11,7 +11,7 @@
 // is a diagnostic on stderr, as every diagnostic is.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use bingo_core::plugins::{ignored, needed, state};
 use bingo_core::settings::{self, Claim, Layer};
@@ -55,7 +55,15 @@ pub fn run(
     for (_, text) in &settings.notices {
         eprintln!("{text}");
     }
-    let mut listed = listing(&composed, env, cwd, &switched_off);
+    let runtime: bingo_plugin_rpc::Settings = serde_json::from_value(
+        settings
+            .plugins
+            .get(bingo_plugin_rpc::PluginRpcPlugin::default().manifest().id)
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({})),
+    )
+    .map_err(|error| invalid(error.to_string()))?;
+    let mut listed = listing(&composed, env, cwd, &switched_off, &runtime.plugin_dirs);
     for status in &mut listed {
         if let Some(execution) = &mut status.execution
             && let Some(trust) = settings.kernel.plugin_trust.get(&status.id)
@@ -102,9 +110,10 @@ fn listing(
     env: &Env,
     cwd: &Path,
     switched_off: &BTreeSet<String>,
+    explicit: &[PathBuf],
 ) -> Vec<PluginStatus> {
     let mut listed = built_in(composed, switched_off);
-    listed.extend(external(env, cwd, switched_off));
+    listed.extend(external(env, cwd, switched_off, explicit));
     listed
 }
 
@@ -124,9 +133,14 @@ fn built_in(composed: &[Box<dyn Plugin>], switched_off: &BTreeSet<String>) -> Ve
 /// The plugin directories this machine holds. Nothing is spawned, so nothing
 /// here knows whether a process would answer: what it says is what the switch
 /// says, which is what the next start will act on.
-fn external(env: &Env, cwd: &Path, switched_off: &BTreeSet<String>) -> Vec<PluginStatus> {
+fn external(
+    env: &Env,
+    cwd: &Path,
+    switched_off: &BTreeSet<String>,
+    explicit: &[PathBuf],
+) -> Vec<PluginStatus> {
     let notices = Notices::default();
-    let found = discovery::discover(&discovery::dirs(env, cwd), &notices);
+    let found = discovery::with_explicit(&discovery::dirs(env, cwd), explicit, &notices);
     let human = std::io::IsTerminal::is_terminal(&std::io::stderr());
     for notice in notices.drain() {
         eprintln!("{}", notice_report(&notice.code, &notice.text, human));
