@@ -221,6 +221,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_missing_shell_is_a_hook_error_with_the_remedy() {
+        const CHILD: &str = "BINGO_TEST_MISSING_SHELL";
+        if std::env::var_os(CHILD).is_none() {
+            let output =
+                std::process::Command::new(std::env::current_exe().expect("test executable"))
+                    .args([
+                        "--exact",
+                        "run::tests::a_missing_shell_is_a_hook_error_with_the_remedy",
+                        "--nocapture",
+                    ])
+                    .env(CHILD, "1")
+                    .env("BINGO_SHELL", "/nonexistent")
+                    .output()
+                    .expect("child test");
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+        let error = hook("true", &json!({})).await.expect_err("no shell");
+        assert!(error.to_string().contains("/nonexistent"));
+        assert!(
+            error
+                .to_string()
+                .contains("Install Git for Windows or set BINGO_SHELL")
+        );
+    }
+
+    #[tokio::test]
     async fn the_hook_reads_its_event_on_stdin() {
         let out = ok(hook("cat", &json!({"hook_event_name": "Stop"})).await);
         assert_eq!(out.code, 0);

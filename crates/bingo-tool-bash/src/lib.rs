@@ -452,6 +452,71 @@ pub(crate) mod tests {
         Prompter, SessionId, ToolHost, TurnId,
     };
 
+    #[tokio::test]
+    async fn a_missing_shell_withholds_tools_and_warns_the_session() {
+        const CHILD: &str = "BINGO_TEST_MISSING_SHELL";
+        if std::env::var_os(CHILD).is_none() {
+            let output =
+                std::process::Command::new(std::env::current_exe().expect("test executable"))
+                    .args([
+                        "--exact",
+                        "tests::a_missing_shell_withholds_tools_and_warns_the_session",
+                        "--nocapture",
+                    ])
+                    .env(CHILD, "1")
+                    .env("BINGO_SHELL", "/nonexistent")
+                    .output()
+                    .expect("child test");
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+        let plugin = BashPlugin::default();
+        let mut registrar = Registrar::new(
+            "bingo.tools.bash",
+            Value::Null,
+            Env::rooted("/tmp"),
+            Default::default(),
+        );
+        plugin.register(&mut registrar).expect("register");
+        let contributions = registrar.into_contributions();
+        assert!(
+            !contributions
+                .iter()
+                .any(|c| matches!(c, Contribution::Tool(_) | Contribution::Command(_))),
+            "missing shell was offered"
+        );
+        let kernel = Arc::new(Kernel::default());
+        let cx = bingo_sdk::HookContext {
+            session: SessionId::from_raw("session"),
+            turn: None,
+            cwd: std::env::temp_dir(),
+            provider: None,
+            model: None,
+            host: kernel.handle(),
+        };
+        for contribution in contributions {
+            if let Contribution::Hook(hook) = contribution {
+                hook.on_session(bingo_sdk::Phase::Start, &cx).await;
+                hook.on_session(bingo_sdk::Phase::End, &cx).await;
+            }
+        }
+        let notices = kernel.notices.lock().expect("notices");
+        assert_eq!(notices.len(), 1);
+        assert_eq!(notices[0].0, bingo_sdk::Level::Warn);
+        assert_eq!(notices[0].1, "SHELL_MISSING");
+        assert!(notices[0].2.contains("/nonexistent"));
+        assert!(
+            notices[0]
+                .2
+                .contains("Install Git for Windows or set BINGO_SHELL")
+        );
+    }
+
     /// A tool host that keeps every progress tail it is handed, which is all a
     /// shell command ever reaches for.
     #[derive(Debug, Default)]
@@ -494,6 +559,7 @@ pub(crate) mod tests {
     pub(crate) struct Kernel {
         delivered: Mutex<Vec<(SessionId, String, Delivery)>>,
         signals: Mutex<Vec<(SessionId, String, Value)>>,
+        notices: Mutex<Vec<(bingo_sdk::Level, String, String)>>,
         /// Every delivery fails, as it does when the session has gone.
         pub(crate) closed: bool,
     }
@@ -514,6 +580,19 @@ pub(crate) mod tests {
 
     #[async_trait]
     impl HostApi for Kernel {
+        async fn notice(
+            &self,
+            level: bingo_sdk::Level,
+            code: &str,
+            text: &str,
+        ) -> Result<(), KernelError> {
+            self.notices
+                .lock()
+                .expect("notices")
+                .push((level, code.into(), text.into()));
+            Ok(())
+        }
+
         async fn sessions(
             &self,
             filter: bingo_sdk::SessionFilter,
