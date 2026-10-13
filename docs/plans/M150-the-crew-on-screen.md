@@ -2,116 +2,140 @@
 
 ## Goal
 
-[tui-identity-2026-10.md](../design/tui-identity-2026-10.md) §4, C1–C4,
-the person's direction of 2026-10-13 (crew). What only bingo does —
-agents, rooms, teams — gets a face on the screen: every agent a sigil
-and a hue derived from its name, the status line's middle a strip of the
-crew at work, a room read as a chat. The hue says who; the words and the
-motion keep saying what, so `NO_COLOR` loses nothing. No new dependency,
-no sdk change.
+Implement [tui-identity §4 C1–C4](../design/tui-identity-2026-10.md):
+name-derived agent faces, the active crew in the status middle, and rooms
+read as chats. Identity uses hue; lifecycle keeps its words and pulse.
+No new dependency, SDK type, wire shape or schema change.
 
 ## Bricks, in build order
 
-1. **Contract first: the face.** `crates/bingo-surface-tui/fixtures/
-   faces.json` — twenty names and the face each gets — and the rule that
-   produces it: FNV-1a 32-bit over the name's UTF-8; sigil `h % 6` over
-   `◆ ● ▲ ■ ◗ ✦`, hue `(h >> 8) % 5` over lime, teal, violet, orchid,
-   pink. The fixture is the contract a wire client (the GUI, in its own
-   repository) can test against; it is written before the function.
-2. **Failing tests first** (TUI):
-   - `face(name)` matches the fixture; ASCII sigils `@ # % & + =` by the
-     same index.
-   - the hues: each ≥ 4.5:1 on both grounds and ≥ 36° of hue from
-     `presence`, `good`, `bad` and `mode` (theme's own readable test,
-     extended).
-   - child row: `◆ reviewer(review the manifest)`, sigil and name in the
-     hue, the sigil pulsing while live, `⎿  working · 3 tools · ↓ 1.2k`
-     in M135's vocabulary; `asking` and `idle · completed` keep their words.
-   - the list (`ctrl+g`): the dot column is the sigil; `~` still marks a
-     live ear; a room keeps `#`.
-   - crew strip: the status line's middle with two agents running reads
-     `◆ reviewer  ● scout`, one that owes adds `owes #design`, one that
-     needs you pulses; under 100 columns sigils only; a notice takes the
-     slot for its 4 s and gives it back; with no agent alive the slot is
-     what it is today; `N running` is never drawn.
-   - room chat: two consecutive posts by one author draw the name once; a
-     post addressed to the reader ends `→ you`; `@reviewer` in prose
-     wears reviewer's hue, `#design` wears `mode`; the members row under
-     the room's first message.
-3. **`face.rs`** (new): the rule of brick 1, pure, and the five hues in
-   `theme.rs` for dark and light (ANSI: none; the sigil is `text`).
-4. **Rows** (`transcript.rs` `child_row`, `tree.rs` `bullet_style`,
-   `roster.rs` `dot`, `transcript/said.rs` `post`): the face where the
-   bullet or the dot was; state keeps its words and its pulse.
-5. **The crew strip** (`status.rs` middle): agents under the viewed
-   session whose lifecycle is `Working` or `Asking`, in tree order, then
-   `+N` for what the width cuts; `owes` read from the `owed` data
-   M148 kept (by name, through M123's readers); a click opens `ctrl+g`.
-6. **Mentions in prose** (`markdown.rs` inline pass, the room view):
-   `@name` of a known agent takes its hue, `#name` of a known room takes
-   `mode`; an unknown one is plain text. Known means in the tree the
-   surface already folds; nothing is asked of a plugin.
-7. **The room as a chat** (`transcript/said.rs`, the room view): the
-   grouping, `→ you`, the members row (from the `members` data).
-8. **Records.** tui.md §3 *Teams* and *Sessions*, §4 *child row*, *the
-   list*, *status line*, a dated §10 entry; tui-identity §4 ticked.
+1. **Contract first:** `fixtures/faces.json`, twenty names including UTF-8,
+   empty and case-distinct names. FNV-1a 32-bit over exact UTF-8 bytes;
+   `h % 6` selects `◆ ● ▲ ■ ◗ ✦` (ASCII `@ # % & + =`),
+   `(h >> 8) % 5` selects lime, teal, violet, orchid, pink.
+2. **Failing screen contracts:** fixture/ASCII equality; all five hues
+   ≥4.5:1 against their palette's raised ground and ≥36° from the four
+   state accents; child faces and lifecycle words; roster faces with `~`;
+   wide/narrow crew, debt, notice handover; grouped room authors, reader
+   marker, members, known mentions. Seven tests fail before implementation.
+3. **Faces and rows:** a pure hash in `face.rs`, hues in `theme.rs`;
+   `child_row`, roster `dot` and room `post` derive the face. Remove the
+   superseded tree `bullet_style`. ANSI/plain use text; live sigils pulse
+   in weight. Keep M135's `working`, `asking`, `idle · completed` words.
+4. **Crew:** working/asking descendants of the viewed session, in tree
+   order; names at ≥100 columns, sigils below; `+N` for omitted entries.
+   Read `owes` through `seats::seat`; clicking opens `ctrl+g`.
+   Priority: armed exit, notice, placed Status, crew, existing idle hint.
+5. **Mentions:** known `@agent` and `#room` take identity and mode colours;
+   unknown names stay plain. Markdown code and links keep their treatment.
+   Names come from the folded tree, never a plugin query.
+6. **Chat:** consecutive authors share one heading; calls on the holder
+   (`parent`, including `@all`) end `→ you` (`-> you` in ASCII). Members
+   take one clipped dim row below the first post. Cache revisions include
+   known names, room sequence and the child's pulse; layout owns hit areas.
+7. **Records:** update tui.md §§3, 4, 10 and tick identity C1–C4.
 
 ## Files
 
-- `crates/bingo-surface-tui/src/{face,theme,transcript,tree,roster,
-  status,markdown}.rs`, `transcript/said.rs`, the room view, `fixtures/
-  faces.json`
+- TUI `src/{face,theme,transcript,tree,roster,status,markdown,crew}.rs`,
+  `transcript/said.rs`, `markdown/mentions.rs`, `fixtures/faces.json`.
 - TUI wiring: `src/{lib,blocks,seats,pointer,layout,view}.rs`,
-  `src/layout/deadline.rs`, new `src/crew.rs`,
-  `src/markdown/mentions.rs`, and TUI test modules/fixtures as needed.
-  The room view is `transcript/said.rs`; cache revisions must include its
-  render inputs and the known names used by prose.
-- `crates/bingo-surface-tui/src/**/snapshots` (teams, roster, room,
-  child-row families)
-- `scripts/tui-smoke.sh` (`❯ ⏺ ask me` becomes the session's sigil)
-- `docs/design/tui.md`, `docs/design/tui-identity-2026-10.md`
+  `layout/deadline.rs`; TUI test modules/fixtures and their snapshots.
+- `scripts/tui-smoke.sh`; `docs/design/{tui,tui-identity-2026-10}.md`.
+- Changed snapshots: 28, in child-row, room, roster/switcher and status
+  families. Composer/status geometry stays fixed; chat membership is content.
 
 ## Exit criteria
 
-- [ ] The fixture and each brick-2 test failed first (pasted) and pass.
-- [ ] `rg 'running' crates/bingo-surface-tui/src/status.rs` finds no
-      `N running` drawing.
-- [ ] A tmux drive at 120×40 and 80×24 with a parent, two spawned agents
-      and a room (fake provider): child rows, the strip while both run
-      and after one ends, a needs-you pulse, `ctrl+g`, the room view with
-      grouped posts and a mention; dark, light, `NO_COLOR`,
-      `BINGO_ASCII=1`; concise capture assertions recorded, no capture files.
-- [ ] Changed snapshots listed by family; no row moved.
-- [ ] `scripts/tui-smoke.sh` passes.
-- [ ] All gates of the upgrade protocol, plus the Windows cross-check
-      for the TUI.
+- [x] All seven original contracts fail first and pass after implementation.
+- [x] No `N running` drawing remains in status.rs.
+- [ ] Fake-provider tmux drive: parent, two agents and a room; both sizes
+      (120×40, 80×24), dark/light/NO_COLOR/ASCII; strip, one agent ending,
+      asking pulse, list, grouped posts, mentions and members.
+- [x] Snapshot families reviewed; layout tests pin unchanged furniture rows.
+- [x] `scripts/tui-smoke.sh` passes.
+- [x] Native protocol gates pass; Windows cross-check attempted under step 7.
 
 ## Non-goals
 
-- Faces chosen by a person or a persona; a face in `--print` or in a
-  channel; the GUI's drawing of faces (it can read the fixture).
-- Any change to what rooms record or deliver (ADR-0034).
-- A per-agent colour for anything but the sigil and the name.
+Chosen faces/personas, print/channel faces, GUI implementation, changed room
+records or delivery (ADR-0034), or identity colour outside sigils/names.
+M137's plugin-host, plugin-rpc, plugin manifests and schemas are untouched.
 
 ## Risks
 
-- Two agents can share a face (30 faces). The name always stands beside
-  it, so a collision costs a glance, never a fact.
-- The strip competes with notices and placed statuses for one slot.
-  Order: a notice, then a placed `Status`, then the strip; each test
-  pins one handover.
-- Re-verified at `9150697a` (2026-10-14), after M108–M136 and M147–M149.
-  ADR-0034, ADR-0070/0071, ADR-0077 and ADR-0081 §§1–6 still hold.
-  `Lifecycle::of_state` owns the words; `Tree::sessions` is root then id
-  order, and `Scope::Under` walks descendants. `seats::seat` reads debts
-  through `bingo_collab::room::debts` on the room's parent; `members` reads
-  the room itself. Both payloads retain data with empty slots.
-- There is no separate room-view module. `Place::previous` supplies chat
-  grouping; `Rows` supplies folded context, and `blocks::Revision` must
-  invalidate when that context changes. The status click belongs in pointer
-  handling against the layout's status region; no mirror session state.
-- C1's proposed dark pink is only 35.53° from `bad` in RGB hue; adjust
-  crew colours minimally to satisfy 36° and 4.5:1 on their own palette's
-  ground and raised tint. Existing state accents stay unchanged.
-- No new dependency or wire/schema change is planned. M137's plugin-host,
-  plugin-rpc, plugin manifests and schemas are outside this work.
+- Re-verified at `9150697a` on 2026-10-14, after M108–M136 and M147–M149,
+  in commit `4d802d67`. ADR-0034, 0070/0071, 0077 and 0081 §§1–6 hold.
+  `Lifecycle::of_state` owns the words. `Tree::sessions` is root/id order;
+  `Scope::Under` resolves descendants. Collab readers own owed/members data.
+- The room view is `transcript/said.rs`; `Place::previous` supplies grouping.
+  Names and membership must invalidate cached drawings even without new text.
+- Faces can collide; names remain available in the list at narrow widths.
+- Dark pink becomes `#f08cc0` (proposed pink was only 35.53° from bad);
+  light teal becomes `#1d7566` (proposed teal was 4.25:1 on raised).
+  State accents are unchanged. All five hues satisfy both palette checks.
+- Notice priority preserves its four-second hold and two 66 ms fades.
+- Windows: `aws-lc-sys` lacks `stdlib.h`/`windows.h` on this Mac. Per protocol
+  step 7, the TUI cross-check is left to Windows CI; no toolchain installed.
+
+- **Stopped under protocol step 6:** two owned-socket crew drives both timed
+  out waiting for `First review post` and ended on the reviewer's transcript.
+  The second waited for the selected `#design` row and `in #design` before
+  waiting for posts; that strengthened synchronization did not resolve it.
+  No complete drive case passed. Native gates and the general PTY smoke pass.
+- Next-run options: isolate the permission-to-room focus transition with a
+  deterministic TUI regression and fix any unintended view switch; or first
+  make the drive wait for the child's permission/turn transition to settle
+  before navigating. The evidence does not yet distinguish harness timing
+  from a TUI navigation defect. Do not call M150 complete before the matrix.
+
+## Verified (2026-10-14)
+
+```text
+$ cargo test -p bingo-surface-tui --lib crew_contract --locked (before implementation)
+test crew_contract::crew_hues_are_readable_and_apart_from_state ... FAILED
+test crew_contract::faces_match_the_cross_surface_fixture ... FAILED
+test crew_contract::strip_names_the_work_and_yields_to_notices ... FAILED
+test crew_contract::roster_keeps_a_face_beside_the_live_ear ... FAILED
+test crew_contract::child_row_has_a_face_and_keeps_lifecycle_words ... FAILED
+test crew_contract::room_groups_authors_marks_the_reader_and_lists_members ... FAILED
+test crew_contract::room_mentions_wear_the_known_names_hues ... FAILED
+test result: FAILED. 0 passed; 7 failed; 0 ignored
+$ cargo fmt --all -- --check
+exit=0
+$ cargo check --workspace --all-targets --locked
+exit=0
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+exit=0
+$ cargo test --workspace --locked
+exit=0; 5169 passed; 0 failed; 4 ignored
+$ scripts/check_discipline.sh
+discipline ok
+$ scripts/budget.sh
+dependencies (unique, normal): 355 (max 355)
+warm cargo check -p bingo-core: 1s (max 20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 4 GB (soft max 5)
+test binaries: 97
+budget ok
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+$ cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+fatal error: 'stdlib.h' file not found; fatal error: 'windows.h' file not found
+$ cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1
+test result: ok. 1 passed; 0 failed; 0 ignored
+$ cargo test -p bingo-provider-acp --test bridge --locked token -- --test-threads=1
+test result: ok. 3 passed; 0 failed; 0 ignored
+$ cargo build -p bingo --locked
+exit=0
+$ scripts/tui-smoke.sh
+tui-smoke ok
+$ rg 'running' crates/bingo-surface-tui/src/status.rs
+611:        assert!(!drawn.contains("running"), "{drawn}");
+681:        // Nothing published, nothing running, nothing to say, and something
+$ python3 /tmp/m150-drive.py (first attempt)
+AssertionError: missing First review post:
+$ python3 /tmp/m150-drive.py (second attempt, waits for room selection/status)
+AssertionError: missing First review post:
+```
