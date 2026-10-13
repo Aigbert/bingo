@@ -228,6 +228,29 @@ mod tests {
     }
 
     #[test]
+    fn subscriptions_accept_every_catalogue_entry_and_dynamic_patterns() {
+        for entry in bingo_sdk::catalogue::ALL {
+            let result = serde_json::from_value(json!({
+                "protocol": PROTOCOL, "name": "catalogue", "version": "1",
+                "subscriptions": [{"patterns": [entry.name], "prefilter": null}]
+            })).unwrap();
+            let lines = findings(&result).unwrap();
+            assert!(lines.iter().any(|line| line.contains(entry.name.as_ref())),
+                "missing catalogue subscription {}: {lines:?}", entry.name);
+        }
+        let result = serde_json::from_value(json!({
+            "protocol": PROTOCOL, "name": "catalogue", "version": "1",
+            "subscriptions": [{"patterns": ["*", "mcp.*"], "prefilter": null}]
+        })).unwrap();
+        let lines = findings(&result).unwrap();
+        for entry in bingo_sdk::catalogue::ALL {
+            assert!(lines.iter().any(|line| line.contains(entry.name.as_ref())),
+                "wildcard missed {}", entry.name);
+        }
+        assert!(lines.iter().any(|line| line.contains("mcp.*")));
+    }
+
+    #[test]
     fn protocol_one_names_both_numbers() {
         let result =
             serde_json::from_value(json!({"protocol":1,"name":"old","version":"1"})).unwrap();
