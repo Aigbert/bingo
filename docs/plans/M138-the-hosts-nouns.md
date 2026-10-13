@@ -30,7 +30,7 @@ it: natives in process, and M133's `dollar.ts` under node.
 - `crates/bingo-mods/src/dollar/*.rs` (new), `src/{lib,link,chain,engine,thread,module,manager,plugin,load,config}.rs`, `src/{thread.js,manager/reload.rs}`, `tests/{contracts,plugin}.rs`, `tests/mods/nouns/*` (new), `guide.md`, `Cargo.toml`
 - `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs,invocation.rs,lib.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/completion.rs,host/tests/complete.rs,host/tests/catalogue.rs,session.rs,session/mailbox.rs,session/catalogue.rs,session/gate.rs,session/inputs.rs,session/commands.rs,chain/observe.rs}`
 - `crates/bingo-plugin-host/src/{state,ops,host,invocation,callback,lib}.rs`
-- `crates/bingo-plugin-rpc/src/{host,service,bridge,schema,wire,wire_ts,context,connection,intercept,callback,lib}.rs`
+- `crates/bingo-plugin-rpc/src/{host,service,bridge,schema,wire,wire_ts,context,connection,intercept,callback,reload,lib}.rs`
 - `schema/{dollar,plugin,events}.json`, `sdk/typescript/src/{cross,rpc,dollar,dollar-types,callbacks,plugin,wire,events}.ts`, SDK noun tests
 - `crates/bingo/tests/{plugin_kit.rs,support/reentry.rs}`, noun fixture modules and mechanical schema/fixture consumers
 - Existing workspace dependencies only: `jiff` for the specified timestamp, and `bingo-schema-ts` as a dev dependency for the generated dollar types; measure with `scripts/budget.sh`.
@@ -133,4 +133,8 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; 
 cargo test -p bingo-mods --test plugin --locked a_registered_tool
 left: Null; right: "plugin__fixture__hello"
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.06s
+node --test sdk/typescript/src/nouns.test.ts
+Error: unknown method callback/start
+ℹ pass 0
+ℹ fail 1
 ```

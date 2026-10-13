@@ -592,6 +592,7 @@ pub struct CallbackParams {
 }
 
 pub static METHODS: &[Method] = &[
+    ("callback/start", schema_of::<HookSite>, schema_of::<()>),
     (
         "callback/run",
         schema_of::<CallbackParams>,

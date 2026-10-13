@@ -4,6 +4,7 @@
   "protocol": 2,
   "capabilities": [
     "callback/run",
+    "callback/start",
     "command/run",
     "commands/changed",
     "compactor/compact",
@@ -8012,6 +8013,14 @@
       },
       "result": {
         "$ref": "#/$defs/Completed"
+      }
+    },
+    "callback/start": {
+      "params": {
+        "$ref": "#/$defs/HookSite"
+      },
+      "result": {
+        "type": "null"
       }
     },
     "callback/run": {
