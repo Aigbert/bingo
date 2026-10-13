@@ -33,14 +33,20 @@ mod tests {
 
     #[test]
     fn committed_scenario_schema_is_generated() {
-        let rendered = format!("{}\n", serde_json::to_string_pretty(&schemars::schema_for!(Scenario)).unwrap());
+        let rendered = format!(
+            "{}\n",
+            serde_json::to_string_pretty(&schemars::schema_for!(Scenario)).unwrap()
+        );
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../schema/plugin-scenario.json");
         if std::env::var_os("BINGO_UPDATE_SCHEMA").is_some() {
             std::fs::write(path, rendered).unwrap();
         } else {
-            assert_eq!(std::fs::read_to_string(path).unwrap_or_default(), rendered,
-                "scenario schema drift: run BINGO_UPDATE_SCHEMA=1 cargo test -p bingo committed_scenario_schema");
+            assert_eq!(
+                std::fs::read_to_string(path).unwrap_or_default(),
+                rendered,
+                "scenario schema drift: run BINGO_UPDATE_SCHEMA=1 cargo test -p bingo committed_scenario_schema"
+            );
         }
     }
 
