@@ -51,3 +51,10 @@ registered for every session; the manifest gains `tool:OpenRoom`.
 
 Refs: ADR-0011 §1 (a room is a Log session), the collaboration survey.
 Non-goals: invite/kick verbs, membership ACLs, cross-tree rooms.
+
+## Amendment — 2026-10-13 (M122)
+
+[ADR-0071](0071-collaboration-is-one-library.md) amends this record:
+Room names, records and pure folds are shared through `bingo-collab`.
+`OpenRoom` keeps its existing door; agents post through the `rooms.post`
+service, whose writer and serial rule are owned by rooms.

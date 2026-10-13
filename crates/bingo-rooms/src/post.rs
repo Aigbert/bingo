@@ -606,3 +606,34 @@ mod tests {
         assert_eq!(waiting, [PARENT], "the holder was not");
     }
 }
+
+/// The tool name on historical bounced calls.
+pub(crate) const SEND_MESSAGE: &str = "SendMessage";
+#[derive(serde::Deserialize)]
+pub(crate) struct MessageArgs {
+    pub to: String,
+    pub text: Option<String>,
+}
+
+/// Land a post after the room's serial checkpoint accepted it.
+pub(crate) async fn write(
+    host: &HostHandle,
+    room: &SessionId,
+    author: &str,
+    text: String,
+) -> Result<(), bingo_sdk::KernelError> {
+    host.deliver(
+        room,
+        bingo_sdk::IntentId::mint(),
+        bingo_sdk::Input::text(
+            text,
+            bingo_sdk::Origin {
+                surface: "agent".into(),
+                principal: Some(author.into()),
+                conversation: None,
+            },
+        ),
+        bingo_sdk::Delivery::Wake,
+    )
+    .await
+}

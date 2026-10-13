@@ -71,7 +71,7 @@ pub async fn seat(
     seats: &[Seat],
 ) -> Result<SessionId, KernelError> {
     let opening = Opening {
-        name: name::check(opening.name)?,
+        name: name::check_room(opening.name)?,
         ..opening
     };
     let title = name::title(opening.name);
@@ -96,7 +96,7 @@ pub async fn open(
     seats: &[Seat],
 ) -> Result<SessionId, KernelError> {
     let opening = Opening {
-        name: name::check(opening.name)?,
+        name: name::check_room(opening.name)?,
         ..opening
     };
     let title = name::title(opening.name);

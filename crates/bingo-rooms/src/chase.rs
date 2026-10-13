@@ -12,12 +12,13 @@
 //! finds already overdue **once** — the schedule plugin's rule for an
 //! occurrence missed while nobody was running.
 
-use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
-use bingo_sdk::{CancellationToken, HostHandle, ItemId, SessionId};
+use bingo_alarm::{Alarm, Alarms};
+use bingo_sdk::{HostHandle, ItemId, SessionId};
 use jiff::Timestamp;
+use tokio::time::Instant;
 
 use crate::mentions::Mention;
 use crate::post;
@@ -26,7 +27,7 @@ use crate::room::Room;
 /// How long a member has to answer before the first nudge, and between them —
 /// and, with no second constant for it, how long a patient seat may hold a
 /// room's posts before the deadline wakes it (ADR-0029 §2).
-pub(crate) const PATIENCE: Duration = Duration::from_secs(300);
+pub(crate) use bingo_collab::ear::PATIENCE;
 
 /// How many nudges a debt is worth in the process that heard it asked.
 const NUDGES: u8 = 3;
@@ -48,7 +49,7 @@ struct Debt {
 /// The debts this process has taken up, each with the timer chasing it.
 #[derive(Debug, Default)]
 pub struct Chaser {
-    taken: Mutex<BTreeMap<Debt, CancellationToken>>,
+    taken: Mutex<Alarms<Debt>>,
 }
 
 impl Chaser {
@@ -68,25 +69,23 @@ impl Chaser {
         // This fold speaks for one room, so only that room's debts are its to
         // close; another room's are still standing until its own fold says
         // otherwise.
-        taken.retain(|debt, timer| {
-            let stands = &debt.room != id || standing.contains(debt);
-            if !stands {
-                timer.cancel();
-            }
-            stands
-        });
+        taken.retain(|debt| &debt.room != id || standing.contains(debt));
         for mention in open {
             let Some(debt) = debt(id, mention) else {
                 continue;
             };
-            if taken.contains_key(&debt) {
+            if taken.contains(&debt) {
                 continue;
             }
-            taken.insert(debt, arm(host, room, mention, now));
+            taken.arm(debt, arm(host, room, id, mention, now));
         }
     }
 
-    fn taken(&self) -> MutexGuard<'_, BTreeMap<Debt, CancellationToken>> {
+    pub fn clear(&self) {
+        self.taken().clear();
+    }
+
+    fn taken(&self) -> MutexGuard<'_, Alarms<Debt>> {
         self.taken.lock().unwrap_or_else(|held| held.into_inner())
     }
 }
@@ -102,18 +101,18 @@ fn debt(room: &SessionId, mention: &Mention) -> Option<Debt> {
 }
 
 /// One timer for one debt.
-fn arm(host: &HostHandle, room: &Room, mention: &Mention, now: Timestamp) -> CancellationToken {
-    let cancel = CancellationToken::new();
+fn arm(host: &HostHandle, room: &Room, id: &SessionId, mention: &Mention, now: Timestamp) -> Alarm {
     let (first, nudges) = budget(mention.at, now);
-    tokio::spawn(chase(
-        host.clone(),
-        room.clone(),
-        mention.clone(),
-        first,
-        nudges,
-        cancel.clone(),
-    ));
-    cancel
+    Alarm::new(
+        Instant::now() + first,
+        chase(
+            host.clone(),
+            room.clone(),
+            id.clone(),
+            mention.clone(),
+            nudges,
+        ),
+    )
 }
 
 /// How long until the first nudge, and how many there are: a question this
@@ -135,22 +134,21 @@ pub(crate) fn waited(at: Timestamp, now: Timestamp) -> Duration {
 
 /// The timer itself. It sleeps, nudges, and sleeps again until its nudges are
 /// spent — or until the debt closes, which cancels it mid-sleep.
-async fn chase(
-    host: HostHandle,
-    room: Room,
-    mention: Mention,
-    first: Duration,
-    nudges: u8,
-    cancel: CancellationToken,
-) {
-    let mut delay = first;
-    for _ in 0..nudges {
-        tokio::select! {
-            () = cancel.cancelled() => return,
-            () = tokio::time::sleep(delay) => {}
+async fn chase(host: HostHandle, room: Room, id: SessionId, mention: Mention, nudges: u8) {
+    for n in 0..nudges {
+        if n > 0 {
+            // A delivery may itself close the debt. Ask the journal again
+            // before taking another patience, even if no hook saw its answer.
+            let open = crate::mentions::of_room(&host, &id).await;
+            if !open
+                .iter()
+                .any(|owed| owed.post == mention.post && owed.owed_by == mention.owed_by)
+            {
+                return;
+            }
+            tokio::time::sleep(PATIENCE).await;
         }
         nudge(&host, &room, &mention).await;
-        delay = PATIENCE;
     }
 }
 
@@ -201,7 +199,20 @@ mod tests {
             purpose: None,
             closed: false,
         };
-        (fleet, id, room, mention(Owed::Member("scout".into())))
+        let event = fleet.post(&id, "@scout look at the build", None, fresh());
+        let bingo_sdk::Event::ItemCompleted { item } = event else {
+            panic!("post")
+        };
+        let mut owed = mention(Owed::Member("scout".into()));
+        owed.post = item.id;
+        fleet.remember(
+            &id,
+            crate::tests::extended(
+                crate::room::MEMBERS,
+                crate::room::payload(&[crate::ear::Seat::named("scout")]),
+            ),
+        );
+        (fleet, id, room, owed)
     }
 
     fn mention(owed_by: Owed) -> Mention {
@@ -268,7 +279,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_nudge_says_where_who_and_what_and_is_not_a_post() {
         let (fleet, id, room, mention) = asked(&["scout"]);
-        Chaser::default().reconcile(&fleet.handle(), &room, &id, &[mention], fresh());
+        let chaser = Chaser::default();
+        chaser.reconcile(&fleet.handle(), &room, &id, &[mention], fresh());
         wait(1).await;
 
         let delivered = fleet.delivered();
@@ -347,7 +359,8 @@ mod tests {
     async fn a_debt_found_overdue_is_nudged_once_and_at_once() {
         let (fleet, id, room, mention) = asked(&["scout"]);
         let later = Timestamp::UNIX_EPOCH + jiff::SignedDuration::from_secs(3600);
-        Chaser::default().reconcile(&fleet.handle(), &room, &id, &[mention], later);
+        let chaser = Chaser::default();
+        chaser.reconcile(&fleet.handle(), &room, &id, &[mention], later);
 
         wait(1).await;
         assert_eq!(nudges(&fleet).len(), 1, "a restart's chase is once");
@@ -358,7 +371,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn the_room_s_own_debt_is_never_chased() {
         let (fleet, id, room, _) = asked(&["scout"]);
-        Chaser::default().reconcile(&fleet.handle(), &room, &id, &[mention(Owed::Room)], fresh());
+        let chaser = Chaser::default();
+        chaser.reconcile(&fleet.handle(), &room, &id, &[mention(Owed::Room)], fresh());
         wait(4).await;
         assert!(
             fleet.delivered().is_empty(),
@@ -372,7 +386,8 @@ mod tests {
     async fn a_debt_the_holder_owes_is_nudged_at_the_session_the_room_hangs_under() {
         let (fleet, id, room, _) = asked(&["scout"]);
         let owed = mention(Owed::Member(crate::name::PARENT.into()));
-        Chaser::default().reconcile(&fleet.handle(), &room, &id, &[owed], fresh());
+        let chaser = Chaser::default();
+        chaser.reconcile(&fleet.handle(), &room, &id, &[owed], fresh());
         wait(1).await;
 
         let delivered = fleet.delivered();
@@ -384,7 +399,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_member_whose_seat_is_gone_is_skipped_and_nothing_wedges() {
         let (fleet, id, room, mention) = asked(&[]);
-        Chaser::default().reconcile(&fleet.handle(), &room, &id, &[mention], fresh());
+        let chaser = Chaser::default();
+        chaser.reconcile(&fleet.handle(), &room, &id, &[mention], fresh());
         wait(4).await;
         assert!(fleet.delivered().is_empty(), "nobody answers to that name");
     }

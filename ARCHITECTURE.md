@@ -31,7 +31,9 @@ bingo (bin)                     composes Vec<Box<dyn Plugin>>, picks a Surface
 │                               verbs, the pidfile, the log sink, the unit file, the doctor.
 │                               The bin keeps only the host that `gateway run` holds (ADR-0020)
 ├── libraries (`tier = "library"`: register nothing, depend on bingo-sdk and each other, ADR-0042 §2)
-│   bingo-services              typed service keys and team/MCP wire adapters (ADR-0069)
+│   bingo-services              typed team/MCP/room-post services and wire adapters (ADR-0069, ADR-0071)
+│   bingo-collab                shared names, room records and pure collaboration folds (ADR-0071)
+│   bingo-alarm                 keyed, owned timers armed from their owners' records (ADR-0071)
 │   bingo-auth-oauth            PKCE redirect · device code · auth.json · single-flight refresh (ADR-0012)
 │                               · the resource-server side: a `401`'s challenge, RFC 9728/8414 discovery,
 │                                 RFC 7591 registration, and one MCP server's sign-in (ADR-0050)

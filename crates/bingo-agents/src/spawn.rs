@@ -286,10 +286,16 @@ fn pick<'a>(
 
 /// Starting a session and posting a prompt into it: this session's transcript
 /// is untouched, and every call the child then makes is gated in the child.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct SpawnAgentTool;
+#[derive(Debug, Default, Clone)]
+pub struct SpawnAgentTool {
+    reports: std::sync::Arc<crate::report::Reports>,
+}
 
 impl SpawnAgentTool {
+    pub(crate) fn new(reports: std::sync::Arc<crate::report::Reports>) -> Self {
+        Self { reports }
+    }
+
     /// The child, running, with the prompt already on its way.
     async fn open(
         &self,
@@ -399,7 +405,9 @@ impl Tool for SpawnAgentTool {
         }
         let host = cx.host.clone();
         let parent = cx.session.clone();
-        tokio::spawn(watch::report(attachment, host, parent, name.clone()));
+        self.reports
+            .promise(attachment, host, parent, &cx.cancel)
+            .await?;
         Ok(ToolOutput::text(named(&name, &session)))
     }
 }
@@ -428,7 +436,7 @@ mod tests {
         fleet.script([assistant("hi from the child"), turn_completed()]);
         let root = fleet.root();
         let host = Recorder::new(&fleet);
-        let tool = SpawnAgentTool;
+        let tool = SpawnAgentTool::default();
         let out = tool
             .call(input, &tool_context(&root, host.clone()))
             .await
@@ -454,7 +462,7 @@ mod tests {
         fleet.script([turn_failed("no key")]);
         let root = fleet.root();
         let host = Recorder::new(&fleet);
-        let out = SpawnAgentTool
+        let out = SpawnAgentTool::default()
             .call(
                 json!({ "prompt": "go", "background": false }),
                 &tool_context(&root, host),
@@ -487,7 +495,7 @@ mod tests {
         let root = fleet.root();
         let host = Recorder::new(&fleet);
         let cx = tool_context(&root, host.clone());
-        SpawnAgentTool
+        SpawnAgentTool::default()
             .call(json!({ "prompt": "go", "name": "reviewer" }), &cx)
             .await
             .expect("a spawn");
@@ -512,7 +520,7 @@ mod tests {
         fleet.script([turn_completed()]);
         let root = fleet.root();
         let host = Recorder::new(&fleet);
-        SpawnAgentTool
+        SpawnAgentTool::default()
             .call(
                 json!({ "prompt": "go" }),
                 &tool_context(&root, host.clone()),
@@ -533,7 +541,7 @@ mod tests {
         let root = fleet.root();
         fleet.child(&root, "reviewer");
         let host = Recorder::new(&fleet);
-        let out = SpawnAgentTool
+        let out = SpawnAgentTool::default()
             .call(
                 json!({ "prompt": "go", "name": "reviewer" }),
                 &tool_context(&root, host.clone()),
@@ -552,7 +560,7 @@ mod tests {
         let root = fleet.root();
         let scout = fleet.child(&root, "scout");
         let host = Recorder::new(&fleet);
-        let out = SpawnAgentTool
+        let out = SpawnAgentTool::default()
             .call(
                 json!({ "prompt": "look again", "name": "scout", "reopen": true, "background": false }),
                 &tool_context(&root, host.clone()),
@@ -582,7 +590,7 @@ mod tests {
         let root = fleet.root();
         fleet.room(&root, "scout");
         let host = Recorder::new(&fleet);
-        let out = SpawnAgentTool
+        let out = SpawnAgentTool::default()
             .call(
                 json!({ "prompt": "look", "name": "scout", "reopen": true }),
                 &tool_context(&root, host.clone()),
@@ -601,7 +609,7 @@ mod tests {
         let root = fleet.root();
         let host = Recorder::new(&fleet);
         host.lock(&format!("agent/{root}/reviewer"));
-        SpawnAgentTool
+        SpawnAgentTool::default()
             .call(
                 json!({ "prompt": "go", "name": "reviewer" }),
                 &tool_context(&root, host.clone()),
@@ -622,7 +630,14 @@ mod tests {
     }
 
     async fn everything_delivered(input: Value) -> Vec<(SessionId, Input, Delivery)> {
-        let (_, host) = spawned(input).await;
+        let fleet = Fleet::default();
+        fleet.script([assistant("hi from the child"), turn_completed()]);
+        let root = fleet.root();
+        let host = Recorder::new(&fleet);
+        let tool = SpawnAgentTool::default();
+        tool.call(input, &tool_context(&root, host.clone()))
+            .await
+            .unwrap();
         settled().await;
         host.delivered()
     }
@@ -873,7 +888,7 @@ mod tests {
 
     #[test]
     fn it_reads_and_a_rule_may_name_the_agent_it_starts() {
-        let tool = SpawnAgentTool;
+        let tool = SpawnAgentTool::default();
         let spec = tool.spec();
         assert_eq!(spec.name, "SpawnAgent");
         assert!(spec.input_schema.get("$schema").is_none());

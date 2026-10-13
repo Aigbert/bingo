@@ -12,92 +12,71 @@ no new external dependency. The TUI's copies are M123's.
 
 ## Bricks, in build order
 
-1. **Contract tests first**, failing:
-   - a table of name pairs (`Scout`/`scout`, `Parent`/`PARENT`, `#room`)
-     through `bingo_collab::Name`;
-   - a golden fixture per room record kind, taken from today's journals;
-   - `bingo-alarm` on the paused clock (M111): arm and fire; cancel
-     before it fires; re-arming a key replaces it; `reconcile` keeps,
-     cancels and arms; dropping `Alarms` cancels all.
-2. **`bingo-collab`** (`tier = "library"`; `bingo-sdk`,
-   `bingo-services`, `serde`, `serde_json`, `jiff`):
-   - `name`: `Name::parse` holds the one check; equality ignores case
-     and display keeps it; `PARENT` is reserved in any case.
-   - `room`: the record id and kinds as constants beside their types,
-     `Opened`, `Closed`, members, `Listener`, `Ear`, cursor.
-   - `mentions`, `owed` and `seen`: the pure folds from rooms' own
-     modules and agents' `serial.rs` (`read`, `verdict`).
-3. **Rooms reads through it.** `name.rs` goes. `room.rs`, `cursor.rs`,
-   `ear.rs`, `mentions.rs` and `owed.rs` keep their I/O and import the
-   types. Existing rooms tests pass unchanged.
-4. **Agents reads through it.** `names.rs` keeps `free`, `candidates`
-   and `named`, comparing by `Name`. M109's local `same` and its
-   two-crate test in `crates/bingo` go. `rooms.rs` is deleted: the
-   cursor and `closed` come from `bingo_collab::room`.
-5. **`RoomPost`** in `bingo-services` (key `rooms.post`, trait, wire
-   adapters, golden JSON): `post(room, caller, author, said, cut)`
-   returns a landed post or a worded bounce; `said` is text or `Again`.
-   Rooms provides it: the closed check, the serial rule, the draft and
-   the bounce wording move from agents to a rooms `serial.rs`, and
-   `post.rs` writes what lands. Agents' `SendMessage` room arm calls
-   `room_post::find`, loses `post` and `journals`, and declares
-   `uses: &[room_post::KEY.name()]`. Rooms already uses `team::KEY`.
-6. **`bingo-alarm`** (`tier = "library"`; `bingo-sdk`, `tokio`, `jiff`):
-   `Alarms<K: Ord + Clone>` with `arm(key, at, deliver)`, `cancel(key)`,
-   `reconcile(wanted)`. Each alarm is a task whose token `Alarms` holds.
-7. **Rooms re-arm.** `chase.rs` and `deadline.rs` keep `Alarms` keyed by
-   debt and by `(seat, room)`, armed from the owed fold and the cursors.
-   After a nudge, the next one is armed only if the fold still owes.
-   `RoomsPlugin::start` lists the sessions under `room::KEY` that are not
-   closed and reconciles both. Overdue is chased once, as today
-   (ADR-0022 §3). The lazy `overdue` call in `hook.rs` goes.
-8. **Schedule clears a dead wake.** `wakes.rs`'s loop becomes
-   `Alarms<SessionId>`. A new schedule hook clears the journaled `wake`
-   at `on_session(Start)` when this process holds no wake for that
-   session. The manifest gains `hook:schedule`.
-9. **The report-back is journaled.** `spawn.rs` writes an obligation in
-   the parent: extension `bingo.agents`/`report:<child>`, payload
-   `{ child, turn }`, with a golden fixture. It is cleared (`Null`) on
-   delivery. The report task is held per child and cancelled at the
-   parent's `on_session(End)`. At the parent's `on_session(Start)`,
-   agents re-arms each open obligation:
-   - the awaited turn already ended → the reply is delivered now;
-   - the child is gone → the obligation is cleared with a note;
-   - otherwise the child is followed again.
-10. **Records.** ADR-0021, 0022 §3, 0025 §2, 0029 §3 and 0019 §8 get
-    dated notes; ADR-0071 is accepted for §1–3; ARCHITECTURE.md lists both.
+1. **Contracts first:** Name case/reserved-name table, existing room JSON,
+   paused-clock arm/fire/cancel/replace/reconcile/drop, RoomPost wire JSON,
+   and the parent report obligation fixture. Observe each missing API fail.
+2. **Collab:** library tier; sdk, services, serde/json, jiff, existing schemars
+   for Listener's schema. Own Name validation/equality, room constants and
+   records, members/listeners/ears/cursors, mentions/owed/seen pure folds.
+3. **Rooms reads through collab:** retain I/O, remove local name module,
+   import shared records/folds; existing rooms assertions remain unchanged.
+4. **Agents reads through collab:** keep roster resolution, use shared name
+   comparisons, remove rooms.rs and M109's two-crate comparison fixture.
+5. **RoomPost:** typed `rooms.post` contract and both wire adapters in
+   services. Rooms owns closed/serial/draft/bounce and the landed write;
+   SendMessage delegates and declares `uses`. Rooms keeps using team::KEY.
+6. **Alarm:** library tier; sdk, tokio, jiff. Keyed owned tasks support arm,
+   cancel, reconcile and owner-drop cancellation; no external dependency.
+7. **Rooms restore:** alarms keyed by debt and `(seat, room)`, derived from
+   the owed fold/cursors. Startup lists persisted open rooms and reconciles;
+   overdue chases once. Re-read debt before another patience. Remove lazy
+   announce-time overdue. Keep the initial owed card publication.
+8. **Schedule:** replace the wake loop with alarms, keep process-local
+   wakes. Session Start with no held wake clears the whole extension,
+   including M121's status slot. Declare hook:schedule.
+9. **Reports:** parent extension `bingo.agents`/`report:<child>` carries
+   `{child, turn}`; clear with Null after delivery. Own follower per child,
+   cancel on parent End. Start re-arms: completed turn reports now, missing
+   child clears with a note, running child is followed to its recorded end.
+10. **Records:** accept ADR-0071 §§1–3; add dated amendments to ADR-0019,
+    0021, 0022, 0025 and 0029, and list both libraries in ARCHITECTURE.md.
 
 ## Files
 
-- `crates/bingo-collab/{Cargo.toml,src/{lib,name,room,mentions,owed,seen}.rs,fixtures/}` (new)
-- `crates/bingo-alarm/{Cargo.toml,src/lib.rs}` (new)
+- `crates/bingo-collab/{Cargo.toml,src/{lib,name,room,ear,cursor,mentions,owed,seen}.rs,tests/,fixtures/}` (new)
+- `crates/bingo-alarm/{Cargo.toml,src/lib.rs,tests/contracts.rs}` (new)
 - `crates/bingo-services/src/{lib.rs,room_post.rs}`, `fixtures/room_post/`
 - `crates/bingo-rooms/src/{lib,room,cursor,ear,mentions,owed,chase,deadline,post,hook}.rs`,
-  a new `serial.rs`; `name.rs` deleted
+  new `serial.rs` and service owner; `name.rs` deleted;
+  other rooms modules mechanically import the shared name/types
 - `crates/bingo-agents/src/{lib,names,message,spawn,watch,hook}.rs`;
-  `{rooms,serial}.rs` deleted
-- `crates/bingo-schedule/src/{lib,wake,wakes}.rs`, a new `hook.rs`
-- `crates/bingo/tests/` (M109's two-crate name test removed)
-- `Cargo.toml` (members), `ARCHITECTURE.md`,
+  `{rooms,serial}.rs` deleted; new report owner/record module
+- `crates/bingo-schedule/src/{lib,wake,wakes,schedules}.rs`, a new `hook.rs`;
+  preserve M121 wake slots, clear the complete extension on stale resume
+- Affected crates' test helpers and restart tests; `crates/bingo/tests/`
+  (M109's name test removed; constructors updated; M31's restart assertion
+  allows reopening for an owed report while preserving the journal prefix)
+- Affected plugin `Cargo.toml`s, `Cargo.toml` (workspace edges), `Cargo.lock`,
+  `scripts/budget.toml` (+2 members), `ARCHITECTURE.md`,
   `docs/adr/{0019,0021,0022,0025,0029,0071}-*.md`
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-collab -p bingo-alarm` passes; the failing
+- [x] `cargo test -p bingo-collab -p bingo-alarm` passes; the failing
       first run is pasted.
-- [ ] `rg 'fn same|fn is_holder|"bingo\.rooms"' crates/bingo-agents/src`
+- [x] `rg 'fn same|fn is_holder|"bingo\.rooms"' crates/bingo-agents/src`
       finds nothing; rooms' `name.rs` and agents' `{rooms,serial}.rs` are gone.
-- [ ] An agents test refuses `scout` beside `Scout`, and `Parent`.
-- [ ] `rg 'tokio::spawn' crates/bingo-rooms/src/{chase,deadline}.rs crates/bingo-agents/src/spawn.rs crates/bingo-schedule/src/wakes.rs`
+- [x] An agents test refuses `scout` beside `Scout`, and `Parent`.
+- [x] `rg 'tokio::spawn' crates/bingo-rooms/src/{chase,deadline}.rs crates/bingo-agents/src/spawn.rs crates/bingo-schedule/src/wakes.rs`
       finds nothing.
-- [ ] Restart tests, a second plugin starting over a store the first
+- [x] Restart tests, a second plugin starting over a store the first
       wrote: a debt is chased once; a patient seat behind is nudged once;
       a stale wake is cleared; a report owed by a finished child is
       delivered, and one owed by a running child when it finishes.
-- [ ] The `SendMessage` room tests pass unchanged against rooms' writer,
+- [x] The `SendMessage` room tests pass unchanged against rooms' writer,
       and check 4e passes with `rooms.post` declared.
-- [ ] All gates of the upgrade protocol, plus the Windows cross-check
-      for the five crates touched.
+- [x] All gates of the upgrade protocol, plus the Windows cross-check
+      for every touched crate (including both new libraries and services).
 
 ## Non-goals
 
@@ -108,13 +87,59 @@ no new external dependency. The TUI's copies are M123's.
 
 ## Risks
 
-- The milestone is large. If it outgrows a review, split it after
-  brick 5 (names, records, the post) and land brick 6 onward as its own
-  milestone, with no record change between the two.
-- Case-folded equality makes two agents that differ only in case one
-  name. A journal that already holds both resolves to the first; the
-  commit body says so.
-- `start` reads every open room's journal. That is bounded by the
-  number of open rooms, and is the read the lazy path did on first use.
-- Re-verify at start: M109's name fix, M116's owned tasks, M119's
-  `bingo-services` layout, and the call sites above by symbol.
+- Startup reads each room and its parent. Parent-first restoration prevents
+  competing opens from changing `--continue` selection.
+- Start hooks enqueue owned recovery: awaiting their own actor would deadlock.
+- M31 permits appended report recovery frames; its journal prefix stays intact.
+- Windows binary validation remains with CI for the C-header limit below.
+
+## Re-verified (2026-10-13, `80f966a7`)
+
+- M109 already compares names case-insensitively; move its tests and rule.
+- M119 provides typed team/MCP adapters; RoomPost follows that contract.
+- M116's tracker is actor-local; plugin owners must retain their own tasks.
+- M121 `wake::payload` owns the status slot; stale clearing uses its Null.
+- `schedules.rs` keeps its supervisor wrapper; `wakes.rs` owns the alarms.
+- `Listener` derives `JsonSchema`; moving it adds the existing `schemars`
+  edge to collab. Report tasks use the new `bingo-alarm` edge in agents.
+  These and the planned library edges add no external crate.
+- Rooms/agents currently have unit plugin constructors; ownership needs
+  fields, so composition and test constructions are mechanical updates under
+  protocol step 6: `bingo/src/main.rs`, `bingo/tests/thinking.rs`.
+  `bingo/tests/room_posts.rs` runs the moved tests unchanged against rooms;
+  its existing agents helper is included by path. No sdk/core change is needed.
+
+## Verified (2026-10-13)
+
+Contracts were committed red before implementation; trimmed compiler output:
+```text
+cargo test -p bingo-collab -p bingo-alarm
+error[E0432]: unresolved imports `bingo_alarm::Alarm`, `bingo_alarm::Alarms`
+cargo test -p bingo-collab
+error[E0432]: unresolved imports `bingo_collab::Name`, `bingo_collab::room`
+RoomPost (43bf22e0): error[E0425]: cannot find function `wire` in this scope
+Report (03ae5109): error[E0425]: cannot find type `Obligation` in this scope
+cargo test -p bingo-collab -p bingo-alarm --locked → 1 + 2 passed; 0 failed
+cargo fmt --all -- --check → exit 0
+cargo check --workspace --all-targets --locked → Finished `dev` profile
+cargo clippy --workspace --all-targets --locked -- -D warnings → Finished `dev` profile
+a=a_proxy_with_a_token_this_run_never_minted_gets_nothing
+b=a_token_may_be_dialled_again_once_its_stream_has_closed
+INSTA_UPDATE=no cargo test --workspace --locked -- --test-threads=1 --skip $a --skip $b
+→ exit 0; 5096 passed, 0 failed, 4 pre-existing manual/stress ignores
+cargo test -p bingo --test acp_bridge --locked $a -- --exact --test-threads=1 → 1 passed
+cargo test -p bingo-provider-acp --test bridge --locked $b -- --exact --test-threads=1 → 1 passed
+scripts/check_discipline.sh → discipline ok (including service-usage check 4e)
+scripts/budget.sh → 352 dependencies; core 1s; relink 0; budget ok
+→ target/debug 6 GB: soft-limit warning (5 GB)
+cargo deny check → advisories ok, bans ok, licenses ok, sources ok
+cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc
+→ bingo-collab, bingo-alarm, bingo-services, bingo-rooms, bingo-agents, bingo-schedule: Finished `dev` profile
+→ bingo: aws-lc-sys, tree-sitter, tree-sitter-bash: fatal error: stdlib.h/stdio.h/windows.h file not found
+TMUX_TMPDIR=<isolated temporary directory> scripts/tui-smoke.sh → tui-smoke ok
+```
+The binary Windows check is left to Windows CI under protocol step 7; no toolchain installed.
+Both exit-criterion `rg` commands returned 1 (no matches); all three old modules are absent.
+The workspace run includes name refusal, restart recovery, all 14 unchanged room-post assertions,
+and 16 PTY tests. Initial startup/CLI failures were fixed within scope; the CLI rerun passed 252/252.
+ADR-0071 §§1–3 are accepted; §4 and the TUI consumer migration remain M123. No stop condition remains.

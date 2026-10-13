@@ -27,6 +27,7 @@ mod command;
 use bingo_shelf::diff;
 pub mod entry;
 pub mod guide;
+mod hook;
 pub mod lock;
 mod render;
 pub mod runner;
@@ -68,6 +69,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "tool:Wake",
         "command:schedule",
         "command:wake",
+        "hook:schedule",
         "service:bingo.schedule.pages",
     ],
     requires: &[],
@@ -150,6 +152,9 @@ impl Plugin for SchedulePlugin {
         registrar.add(Contribution::Command(
             Arc::new(WakeCommand::new(schedules.clone())) as Arc<dyn Command>,
         ));
+        registrar.add(Contribution::Hook(Arc::new(hook::ScheduleHook(
+            schedules.wakes().clone(),
+        ))));
         registrar.add(guide::contribution(registrar));
         self.schedules
             .set(schedules)
@@ -223,7 +228,7 @@ mod plugin_tests {
         );
         assert!(matches!(contributions[4], Contribution::Command(_)));
         assert!(matches!(contributions[5], Contribution::Command(_)));
-        match &contributions[6] {
+        match &contributions[7] {
             Contribution::Service { key, wire, .. } => {
                 assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");

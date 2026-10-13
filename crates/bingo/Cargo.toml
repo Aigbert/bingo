@@ -65,6 +65,9 @@ async-trait.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+# M122: composition tests exercise the shared room-post service.
+bingo-collab.workspace = true
+bingo-services.workspace = true
 bingo-process.workspace = true
 bingo-sdk = { workspace = true, features = ["testing"] }
 tempfile.workspace = true

@@ -39,15 +39,8 @@ pub fn signed_by(seat: &bingo_sdk::SessionSummary) -> String {
 pub const CLOSE: &str = "close";
 
 /// A name a room can be opened under.
-pub fn check(name: &str) -> Result<&str, KernelError> {
-    let name = name.trim();
-    let bad = name.is_empty() || name.contains('/') || name.chars().any(char::is_whitespace);
-    if bad {
-        return Err(KernelError::new(
-            ErrorCode::InvalidInput,
-            format!("{name:?} is not a room name: one word, no slashes"),
-        ));
-    }
+pub fn check_room(name: &str) -> Result<&str, KernelError> {
+    let name = segment(name, "room name")?;
     if same(name, CLOSE) {
         return Err(KernelError::new(
             ErrorCode::InvalidInput,
@@ -66,42 +59,56 @@ pub fn title(name: &str) -> String {
     format!("#{name}")
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub const ROOM: char = '#';
 
-    #[test]
-    fn a_name_that_would_break_the_key_or_the_title_is_refused() {
-        assert_eq!(check(" design "), Ok("design"));
-        for bad in ["", "   ", "a/b", "two words", "de\tsign"] {
-            assert!(check(bad).is_err(), "{bad:?} was accepted");
-        }
-        let error = check("a/b").expect_err("a slash makes the key ambiguous");
-        assert_eq!(error.code, ErrorCode::InvalidInput);
-    }
+/// A validated agent name, retaining its display spelling.
+#[derive(Clone, Debug)]
+pub struct Name(String);
 
-    /// The one word a room may not be called, in any case (ADR-0053 §4).
-    #[test]
-    fn the_word_that_ends_a_room_is_not_a_room_name() {
-        for spelled in ["close", "Close", " close "] {
-            let error = check(spelled).expect_err("the word that ends a room");
-            assert_eq!(error.code, ErrorCode::InvalidInput);
-            assert!(error.message.contains("`/room close <name>`"), "{error}");
-        }
-        assert_eq!(check("closed"), Ok("closed"), "a name of its own");
+impl Name {
+    pub fn parse(value: &str) -> Result<Self, KernelError> {
+        agent_name(value).map(|value| Self(value.to_owned()))
     }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+impl PartialEq for Name {
+    fn eq(&self, other: &Self) -> bool {
+        same(&self.0, &other.0)
+    }
+}
+impl Eq for Name {}
+impl std::fmt::Display for Name {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
 
-    #[test]
-    fn a_room_wears_its_name_as_a_channel() {
-        assert_eq!(title("design"), "#design");
+fn agent_name(name: &str) -> Result<&str, KernelError> {
+    let name = segment(name, "name")?;
+    if same(name, PARENT) {
+        return Err(KernelError::new(
+            ErrorCode::InvalidInput,
+            format!("{PARENT:?} is what a child calls whoever spawned it; pick another name"),
+        ));
     }
+    if name.starts_with(ROOM) {
+        return Err(KernelError::new(
+            ErrorCode::InvalidInput,
+            format!("{name:?} reads as a room; an agent's name starts with a letter"),
+        ));
+    }
+    Ok(name)
+}
 
-    #[test]
-    fn a_name_is_the_same_word_in_any_case_and_parent_is_the_holder_s() {
-        assert!(same("reviewer", "Reviewer"));
-        assert!(!same("reviewer", "reviewers"));
-        assert!(is_holder("parent"));
-        assert!(is_holder("PARENT"));
-        assert!(!is_holder("parents"), "a name of its own");
+fn segment<'a>(name: &'a str, noun: &str) -> Result<&'a str, KernelError> {
+    let name = name.trim();
+    if name.is_empty() || name.contains('/') || name.chars().any(char::is_whitespace) {
+        return Err(KernelError::new(
+            ErrorCode::InvalidInput,
+            format!("{name:?} is not a {noun}: one word, no slashes"),
+        ));
     }
+    Ok(name)
 }

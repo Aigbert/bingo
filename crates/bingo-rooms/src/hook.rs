@@ -73,6 +73,46 @@ impl Hook for RoomsHook {
 }
 
 impl RoomsHook {
+    pub(crate) async fn start(&self, host: &HostHandle) -> Result<(), KernelError> {
+        let mut parents = std::collections::BTreeSet::new();
+        for summary in host.sessions(SessionFilter::default()).await? {
+            let Some(room) = Room::of(&summary) else {
+                continue;
+            };
+            // Room observers may publish to the parent while its journal opens.
+            // Open it first so those writes share its live mailbox.
+            self.rooms.register(&summary);
+            if room::read(host, &room.parent).await.is_none() {
+                continue;
+            }
+            let Some(state) = room::read(host, &summary.id).await else {
+                continue;
+            };
+            if let Some(kinds) = state.extensions.get(PLUGIN) {
+                for (kind, payload) in kinds {
+                    self.rooms.extended(&summary.id, kind, payload);
+                }
+            }
+            let room = room.seated(&state);
+            parents.insert(room.parent.clone());
+            let open = mentions::of_state(&state);
+            self.chaser
+                .reconcile(host, &room, &summary.id, &open, Timestamp::now());
+            self.deadline
+                .reconcile(host, &summary.id, &room, Timestamp::now())
+                .await;
+        }
+        for parent in parents {
+            self.show(&parent, host).await;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn stop(&self) {
+        self.chaser.clear();
+        self.deadline.clear();
+    }
+
     /// The rooms `.bingo/team.json` declares, opened under the session that
     /// just started, exactly as `/room <name> [member…]` would open them.
     async fn seat_declared(&self, cx: &HookContext) {
@@ -151,7 +191,7 @@ impl RoomsHook {
         };
         self.chaser
             .reconcile(&cx.host, room, session, &open, Timestamp::now());
-        self.show(&room.parent, cx).await;
+        self.show(&room.parent, &cx.host).await;
     }
 
     /// A room this process had not seen before, read for the first time: what
@@ -165,9 +205,6 @@ impl RoomsHook {
         };
         let room = room.seated(&state);
         self.reckon(session, &room, cx).await;
-        if !room.closed {
-            self.deadline.overdue(&cx.host, session, &room).await;
-        }
     }
 
     /// One of this plugin's frames in a room's journal. A closing is the one
@@ -176,22 +213,22 @@ impl RoomsHook {
     /// chasing them cancelled, and the card redrawn without them.
     async fn extended(&self, session: &SessionId, kind: &str, payload: &Value, cx: &HookContext) {
         self.rooms.extended(session, kind, payload);
-        if kind != room::CLOSED {
-            return;
-        }
         if let Some(room) = self.rooms.get(session) {
             self.reckon(session, &room, cx).await;
+            self.deadline
+                .reconcile(&cx.host, session, &room, Timestamp::now())
+                .await;
         }
     }
 
     /// The card on a session: every debt in every room under it, or nothing at
     /// all once the last one closes.
-    async fn show(&self, parent: &SessionId, cx: &HookContext) {
+    async fn show(&self, parent: &SessionId, host: &HostHandle) {
         let mut debts = Vec::new();
         for (id, room) in self.rooms.under(parent) {
-            debts.extend(stands(&cx.host, &id, &room).await);
+            debts.extend(stands(host, &id, &room).await);
         }
-        owed::publish(&cx.host, parent, owed::view(debts)).await;
+        owed::publish(host, parent, owed::view(debts)).await;
     }
 }
 
@@ -271,6 +308,7 @@ mod tests {
     }
 
     async fn post_into(fleet: &Fleet, hook: &RoomsHook, room: &SessionId, who: Option<&str>) {
+        hook.start(&fleet.handle()).await.expect("restore rooms");
         let cx = hook_context(room, fleet, Path::new("/work/project"));
         hook.on_event(&stamped(3, posted("hello team", who), room), &cx)
             .await;
@@ -507,6 +545,7 @@ mod tests {
 
     /// The room announcing itself, which is where this process first reads it.
     async fn announce(fleet: &Fleet, hook: &RoomsHook, room: &SessionId) {
+        hook.start(&fleet.handle()).await.expect("restore rooms");
         let cx = hook_context(room, fleet, Path::new("/work/project"));
         hook.on_event(&stamped(1, updated(&fleet.summary(room)), room), &cx)
             .await;

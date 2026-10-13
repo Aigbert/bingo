@@ -1,104 +1,132 @@
-//! The wakes this process holds, and the loop that delivers them.
-//!
-//! A wake is the session's own (ADR-0019 §8, amended 2026-09-04): a turn of
-//! that session sets it, in the process running the session, and the same
-//! process delivers it. It is never written to the store. The store's runner
-//! is one per store and a session is one per process, so a wake fired from
-//! another process would find the session locked — and a file left in the
-//! store is read by whichever binary holds the claim, however old that
-//! binary is. Held here, in memory, a wake lives exactly as long as the
-//! process that is running the session it wakes, which is what the ADR
-//! says a wake may live.
-
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
-
+//! Process-local wakes delivered by owned, keyed alarms.
+use crate::wake::{self, Wake};
+use bingo_alarm::{Alarm, Alarms};
 use bingo_sdk::{CancellationToken, Delivery, HostHandle, Input, IntentId, SessionId};
-use jiff::{SignedDuration, Timestamp};
-use tokio::sync::Notify;
+use jiff::Timestamp;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, Weak};
 
-use crate::wake::{self, WAKE_MOST, Wake};
+#[derive(Debug, Default)]
+struct State {
+    pending: HashMap<SessionId, Wake>,
+    alarms: Alarms<SessionId>,
+}
 
-/// One wake per session, and the bell rung when the set of them changes.
 #[derive(Debug, Default)]
 pub struct Wakes {
-    pending: Mutex<HashMap<SessionId, Wake>>,
-    changed: Notify,
+    state: Arc<Mutex<State>>,
+    host: OnceLock<HostHandle>,
 }
 
 impl Wakes {
-    /// Set the wake standing on `session`, in place of the one that stood.
     pub fn set(&self, session: &SessionId, wake: Wake) -> Option<Wake> {
-        let had = self.held().insert(session.clone(), wake);
-        self.changed.notify_one();
-        had
+        let mut state = self.held();
+        let previous = state.pending.insert(session.clone(), wake.clone());
+        if let Some(host) = self.host.get() {
+            state
+                .alarms
+                .arm(session.clone(), self.alarm(host, session, &wake));
+        }
+        previous
     }
 
-    /// End the wake standing on `session`, if one does.
     pub fn take(&self, session: &SessionId) -> Option<Wake> {
-        let had = self.held().remove(session);
-        self.changed.notify_one();
-        had
+        let mut state = self.held();
+        state.alarms.cancel(session);
+        state.pending.remove(session)
     }
 
-    /// The wake standing on `session`, if one does.
+    /// Session-start hooks must return before their actor accepts writes.
+    pub fn clear_stale(&self, host: HostHandle, session: SessionId) {
+        let mut state = self.held();
+        if state.pending.contains_key(&session) {
+            return;
+        }
+        state.alarms.arm(
+            session.clone(),
+            Alarm::new(tokio::time::Instant::now(), async move {
+                wake::publish(&host, &session, None).await;
+            }),
+        );
+    }
+
     pub fn pending(&self, session: &SessionId) -> Option<Wake> {
-        self.held().get(session).cloned()
+        self.held().pending.get(session).cloned()
     }
 
-    /// Every wake whose moment has come, soonest first, taken out as it
-    /// goes: a wake is spent by being forgotten.
-    pub fn due(&self, now: Timestamp) -> Vec<(SessionId, Wake)> {
+    pub fn start(&self, host: HostHandle) {
+        if self.host.set(host.clone()).is_err() {
+            return;
+        }
+        let mut state = self.held();
+        let wanted = state
+            .pending
+            .iter()
+            .map(|(session, wake)| (session.clone(), self.alarm(&host, session, wake)))
+            .collect::<Vec<_>>();
+        state.alarms.reconcile(wanted);
+    }
+
+    pub fn stop(&self) {
+        let mut state = self.held();
+        state.alarms.clear();
+        state.pending.clear();
+    }
+
+    fn alarm(&self, host: &HostHandle, session: &SessionId, wake: &Wake) -> Alarm {
+        let state = Arc::downgrade(&self.state);
+        let (host, session) = (host.clone(), session.clone());
+        Alarm::new(
+            bingo_alarm::deadline(wake.at, Timestamp::now()),
+            async move {
+                if let Some(wake) = spend(&state, &session) {
+                    deliver(&host, &session, wake).await;
+                }
+            },
+        )
+    }
+
+    fn held(&self) -> MutexGuard<'_, State> {
+        self.state.lock().unwrap_or_else(|held| held.into_inner())
+    }
+
+    #[cfg(test)]
+    fn due(&self, now: Timestamp) -> Vec<(SessionId, Wake)> {
         let mut held = self.held();
-        let mut due: Vec<(SessionId, Wake)> = held
+        let mut due: Vec<_> = held
+            .pending
             .iter()
             .filter(|(_, wake)| wake.at <= now)
             .map(|(session, wake)| (session.clone(), wake.clone()))
             .collect();
         for (session, _) in &due {
-            held.remove(session);
+            held.pending.remove(session);
+            held.alarms.cancel(session);
         }
         due.sort_by_key(|(_, wake)| wake.at);
         due
     }
-
-    /// The soonest moment still ahead, if any wake stands.
-    pub fn next(&self) -> Option<Timestamp> {
-        self.held().values().map(|wake| wake.at).min()
-    }
-
-    fn held(&self) -> MutexGuard<'_, HashMap<SessionId, Wake>> {
-        self.pending.lock().unwrap_or_else(|held| held.into_inner())
+    #[cfg(test)]
+    fn next(&self) -> Option<Timestamp> {
+        self.held().pending.values().map(|wake| wake.at).min()
     }
 }
 
-/// How long to sleep for a wake at `next`: never into the past, and never
-/// longer than the longest wake there is, so a clock that jumped is not
-/// slept through.
-pub fn until(next: Option<Timestamp>, now: Timestamp) -> Duration {
-    let ahead = next.map_or(WAKE_MOST, |at| at.duration_since(now));
-    ahead.clamp(SignedDuration::ZERO, WAKE_MOST).unsigned_abs()
+fn spend(state: &Weak<Mutex<State>>, session: &SessionId) -> Option<Wake> {
+    state
+        .upgrade()?
+        .lock()
+        .unwrap_or_else(|held| held.into_inner())
+        .pending
+        .remove(session)
 }
 
-/// Deliver each wake as its moment comes, sleep to the next, and start
-/// again — until the plugin stops.
 pub async fn run(wakes: Arc<Wakes>, host: HostHandle, cancel: CancellationToken) {
-    while !cancel.is_cancelled() {
-        for (session, wake) in wakes.due(Timestamp::now()) {
-            if cancel.is_cancelled() {
-                return;
-            }
-            deliver(&host, &session, wake).await;
-        }
-        let waited = until(wakes.next(), Timestamp::now());
-        tokio::select! {
-            biased;
-            _ = cancel.cancelled() => return,
-            _ = tokio::time::sleep(waited) => {}
-            _ = wakes.changed.notified() => {}
-        }
+    if !cancel.is_cancelled() {
+        wakes.start(host);
     }
+    cancel.cancelled().await;
+    wakes.stop();
 }
 
 /// The note, on the conversation that asked for it: a delivery like any
@@ -115,6 +143,21 @@ async fn deliver(host: &HostHandle, session: &SessionId, wake: Wake) {
     {
         tracing::warn!(%session, "a wake reached no turn: {}", error.message);
     }
+}
+
+#[cfg(test)]
+use crate::wake::WAKE_MOST;
+#[cfg(test)]
+use jiff::SignedDuration;
+#[cfg(test)]
+use std::time::Duration;
+#[cfg(test)]
+/// How long to sleep for a wake at `next`: never into the past, and never
+/// longer than the longest wake there is, so a clock that jumped is not
+/// slept through.
+pub fn until(next: Option<Timestamp>, now: Timestamp) -> Duration {
+    let ahead = next.map_or(WAKE_MOST, |at| at.duration_since(now));
+    ahead.clamp(SignedDuration::ZERO, WAKE_MOST).unsigned_abs()
 }
 
 #[cfg(test)]
@@ -226,7 +269,7 @@ mod tests {
         let fixture = Fixture::new();
         let wakes = Arc::new(Wakes::default());
         let cancel = CancellationToken::new();
-        let loop_ = tokio::spawn(run(Arc::clone(&wakes), fixture.handle(), cancel.clone()));
+        wakes.start(fixture.handle());
         wakes.set(&session("ses_now"), wake(0));
         tokio::time::timeout(Duration::from_secs(10), async {
             while fixture.host.delivered().is_empty() {
@@ -236,7 +279,7 @@ mod tests {
         .await
         .expect("the loop delivers the due wake");
         cancel.cancel();
-        loop_.await.expect("the loop ends when told");
+        wakes.stop();
         assert_eq!(fixture.host.delivered().len(), 1, "delivered once");
     }
 }

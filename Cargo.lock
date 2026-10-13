@@ -234,6 +234,7 @@ dependencies = [
  "bingo-channel-feishu",
  "bingo-channels",
  "bingo-checkpoints",
+ "bingo-collab",
  "bingo-context",
  "bingo-core",
  "bingo-demo-ui",
@@ -253,6 +254,7 @@ dependencies = [
  "bingo-rooms",
  "bingo-schedule",
  "bingo-sdk",
+ "bingo-services",
  "bingo-skills",
  "bingo-store-jsonl",
  "bingo-surface-print",
@@ -283,6 +285,8 @@ name = "bingo-agents"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-alarm",
+ "bingo-collab",
  "bingo-sdk",
  "bingo-services",
  "futures",
@@ -294,6 +298,15 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "bingo-alarm"
+version = "0.6.6"
+dependencies = [
+ "bingo-sdk",
+ "jiff",
+ "tokio",
 ]
 
 [[package]]
@@ -393,6 +406,18 @@ version = "0.6.6"
 dependencies = [
  "tempfile",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "bingo-collab"
+version = "0.6.6"
+dependencies = [
+ "bingo-sdk",
+ "bingo-services",
+ "jiff",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -719,6 +744,8 @@ name = "bingo-rooms"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-alarm",
+ "bingo-collab",
  "bingo-sdk",
  "bingo-services",
  "futures",
@@ -736,6 +763,7 @@ name = "bingo-schedule"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-alarm",
  "bingo-claim",
  "bingo-sdk",
  "bingo-shelf",

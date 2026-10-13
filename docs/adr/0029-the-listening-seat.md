@@ -92,3 +92,10 @@ turn boundary already coalesces and a queue already holds.
 Refs: ADR-0021, ADR-0022, ADR-0025, ADR-0027, ADR-0028.
 Non-goals: join/leave verbs, sliding quiet windows, stored inboxes or
 digests, per-room notification config beyond the seat's own number.
+
+## Amendment — 2026-10-13 (M122)
+
+[ADR-0071](0071-collaboration-is-one-library.md) amends this record:
+§3 derives owned patience alarms from the shared room records and cursors
+at startup. One alarm per seat and room checks that the seat is still behind
+before waking it. Delivery voice remains the separate M123 decision.

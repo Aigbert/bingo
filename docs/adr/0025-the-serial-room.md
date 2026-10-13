@@ -77,3 +77,10 @@ before landing.
   holder still posts blind.)
 - Restart-safe by construction: both ledgers are re-derived from journals;
   process death loses timers, never the discipline.
+
+## Amendment — 2026-10-13 (M122)
+
+[ADR-0071](0071-collaboration-is-one-library.md) amends this record:
+§2 is room law: the `rooms.post` service owns the checkpoint, draft,
+bounce and landed write. `SendMessage` calls the typed service through
+`bingo-services`; both plugins declare service usage without mutual requires.

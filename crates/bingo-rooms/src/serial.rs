@@ -22,25 +22,12 @@
 
 use bingo_sdk::{ContentPart, Item, ItemBody, ItemId, SessionState, ToolOutput};
 
-use crate::message::MessageArgs;
-use crate::{message, names, rooms};
-
-/// One post, as a room's journal has it.
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Post {
-    author: String,
-    text: String,
-}
-
-/// What the room says about a post about to be written.
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum Verdict {
-    /// Everything the caller could have read, it has read.
-    Land,
-    /// These landed since, in order, and the post was not written against
-    /// them.
-    Behind { seen: usize, missed: Vec<Post> },
-}
+use crate::post::MessageArgs;
+#[cfg(test)]
+use bingo_collab::name as names;
+use bingo_collab::room as rooms;
+use bingo_collab::seen::Post;
+use bingo_collab::seen::{Verdict, awaited, read, verdict};
 
 /// The bounce a stale post gets, or nothing when it may land. Both journals
 /// are read once, by the caller, and folded here: the discipline is only ever
@@ -86,59 +73,15 @@ fn bounced(item: &Item, room: &str) -> Option<String> {
     else {
         return None;
     };
-    if name != message::SEND_MESSAGE {
+    if name != crate::post::SEND_MESSAGE {
         return None;
     }
     head_of(room, &text_of(output))?;
     let args: MessageArgs = serde_json::from_value(input.clone()).ok()?;
-    if names::addressed(&args.to) != room {
+    if args.to.trim().trim_start_matches('@') != room {
         return None;
     }
     args.text
-}
-
-/// The posts of a room the caller was there to hear, each with where the room
-/// holds it: everyone else's, from the moment its own session opened.
-fn awaited(room: &SessionState, caller: &SessionState, speaker: &str) -> Vec<(usize, Post)> {
-    room.transcript
-        .items()
-        .iter()
-        .enumerate()
-        .filter(|(_, item)| {
-            item.completed_at.unwrap_or(item.started_at) >= caller.summary.created_at
-        })
-        .filter_map(|(at, item)| Some((at, post_of(item)?)))
-        .filter(|(_, post)| post.author != speaker)
-        .collect()
-}
-
-/// What a room holds is what was said into it: a user item, and nothing else.
-fn post_of(item: &Item) -> Option<Post> {
-    let ItemBody::User { parts, origin } = &item.body else {
-        return None;
-    };
-    Some(Post {
-        author: origin
-            .principal
-            .clone()
-            .unwrap_or_else(|| names::PARENT.to_string()),
-        text: parts.iter().filter_map(ContentPart::as_text).collect(),
-    })
-}
-
-/// How far the caller's cursor stands: the posts it awaited that the room
-/// holds at or before the one the cursor names (ADR-0034 §5). A seat with no
-/// cursor, or one the room does not hold, has read nothing.
-fn read(room: &SessionState, awaited: &[(usize, Post)], cursor: Option<ItemId>) -> usize {
-    let Some(head) = cursor.and_then(|id| {
-        room.transcript
-            .items()
-            .iter()
-            .position(|item| item.id == id)
-    }) else {
-        return 0;
-    };
-    awaited.iter().filter(|(at, _)| *at <= head).count()
 }
 
 /// The caller's journal as the model that made this call saw it. What a
@@ -181,19 +124,6 @@ fn text_of(output: &ToolOutput) -> String {
         .collect()
 }
 
-fn verdict(awaited: Vec<(usize, Post)>, seen: usize) -> Verdict {
-    if seen >= awaited.len() {
-        return Verdict::Land;
-    }
-    Verdict::Behind {
-        seen,
-        missed: awaited[seen..]
-            .iter()
-            .map(|(_, post)| post.clone())
-            .collect(),
-    }
-}
-
 /// The first line of a bounce, which is also the ledger a later call reads
 /// back out of it: one shape, written and parsed in one place.
 fn ledger(room: &str, seen: usize, head: usize) -> String {
@@ -226,8 +156,8 @@ fn said(room: &str, seen: usize, missed: &[Post]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::{Fleet, Recorder, summary, tool_context};
-    use bingo_sdk::{ItemStatus, Origin, Tool, TurnId};
+    use crate::tests::summary;
+    use bingo_sdk::{ItemStatus, Origin, TurnId};
     use jiff::Timestamp;
     use serde_json::{Value, json};
 
@@ -290,7 +220,7 @@ mod tests {
     fn call(input: Value, output: ToolOutput) -> Item {
         item(ItemBody::ToolCall {
             call_id: "c1".into(),
-            name: message::SEND_MESSAGE.into(),
+            name: crate::post::SEND_MESSAGE.into(),
             input,
             output: Some(output),
             progress: None,
@@ -483,38 +413,5 @@ mod tests {
             None,
             "another room's bounce, a landed post, and the call being made"
         );
-    }
-
-    /// End to end through the tool, on a fleet whose room holds a post the
-    /// caller never heard: the author is never behind on its own post, and
-    /// the one that was not there is.
-    #[tokio::test]
-    async fn a_stale_post_bounces_and_lands_nothing() {
-        let fleet = Fleet::default();
-        let root = fleet.root();
-        let room = fleet.room(&root, "#design");
-        let scout = fleet.child(&root, "scout");
-        fleet.post(&room, "the build is green", Some("scout"));
-        let host = Recorder::new(&fleet);
-
-        let out = posted(&scout, host.clone()).await;
-        assert!(!out.is_error, "the author is not behind on its own post");
-        assert_eq!(host.delivered().len(), 1);
-
-        let out = posted(&root, host.clone()).await;
-        assert!(out.is_error, "the root never heard the scout's post");
-        let text = out.parts[0].as_text().unwrap_or_default();
-        assert!(text.contains("scout: the build is green"), "{text}");
-        assert_eq!(host.delivered().len(), 1, "a bounced post never landed");
-    }
-
-    async fn posted(caller: &bingo_sdk::SessionId, host: std::sync::Arc<Recorder>) -> ToolOutput {
-        crate::MessageTool
-            .call(
-                json!({ "to": "#design", "text": "stand-up in five" }),
-                &tool_context(caller, host),
-            )
-            .await
-            .expect("a post this crate can judge")
     }
 }

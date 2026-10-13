@@ -93,8 +93,10 @@ async fn a_child_spawned_at_a_level_asks_for_it_from_its_first_turn() {
 /// A kernel with the fake provider and the sub-agents plugin. The model is
 /// absent from the catalogue; no declaration is needed to send its level.
 async fn host_on(home: &std::path::Path, provider: Arc<FakeProvider>) -> Arc<Host> {
-    let plugins: Vec<Box<dyn Plugin>> =
-        vec![Box::new(FakePlugin::new(provider)), Box::new(AgentsPlugin)];
+    let plugins: Vec<Box<dyn Plugin>> = vec![
+        Box::new(FakePlugin::new(provider)),
+        Box::new(AgentsPlugin::default()),
+    ];
     let config = HostConfig::new(Env::rooted(home)).with_layer(
         "cli",
         serde_json::json!({

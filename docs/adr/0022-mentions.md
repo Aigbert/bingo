@@ -59,3 +59,10 @@ a mention store beside the log it was derivable from.
   `owed` and that is the escalation.
 
 Refs: ADR-0011 §1, ADR-0013 §2, the collaboration surveys.
+
+## Amendment — 2026-10-13 (M122)
+
+[ADR-0071](0071-collaboration-is-one-library.md) amends this record:
+§3 now derives owned `bingo-alarm` chases from each open room at plugin
+startup. An overdue debt is chased once; further patience re-reads the owed
+fold, and closed debts cancel their alarms. The journal remains authoritative.

@@ -3,9 +3,9 @@
 //! derived from its journal at the moment it is asked for (ADR-0002).
 
 use bingo_sdk::{
-    Attachment, CancellationToken, ClientIdentity, Delivery, Event, HostHandle, Input, IntentId,
-    InterruptReason, ItemBody, KernelError, OpenOptions, SessionId, SessionSelector, SessionState,
-    ToolError, ToolOutput, TurnId, TurnStatus,
+    Attachment, CancellationToken, ClientIdentity, Event, HostHandle, InterruptReason, ItemBody,
+    KernelError, OpenOptions, SessionId, SessionSelector, SessionState, ToolError, ToolOutput,
+    TurnId, TurnStatus,
 };
 use futures::StreamExt;
 
@@ -139,26 +139,6 @@ fn last_reply(state: &SessionState) -> Option<Reply> {
     Some(Reply { status, text })
 }
 
-/// The background watcher: when the turn this spawn started ends, the child's
-/// reply wakes the parent as a peer message. The kernel's fold puts `[from
-/// <name>]` above it, so the text says only what happened.
-pub async fn report(mut attachment: Attachment, host: HostHandle, parent: SessionId, name: String) {
-    let text = match next_reply(&host, &mut attachment, &CancellationToken::new()).await {
-        Ok(reply) => finished(&reply),
-        Err(error) => {
-            tracing::debug!(agent = %name, %error, "an agent's turn was not followed to its end");
-            return;
-        }
-    };
-    let input = Input::text(text, message::origin(Some(name.clone())));
-    let sent = host
-        .deliver(&parent, IntentId::mint(), input, Delivery::Wake)
-        .await;
-    if let Err(error) = sent {
-        tracing::warn!(agent = %name, %error, "an agent finished and its parent was gone");
-    }
-}
-
 /// What a caller gets back from a call that waited for the agent itself: an
 /// error result when the turn was not completed, so the model does not read a
 /// crash as an answer.
@@ -184,7 +164,7 @@ fn replied(name: &str, session: &SessionId, reply: &Reply) -> String {
 }
 
 /// The message a background agent's end sends its parent.
-fn finished(reply: &Reply) -> String {
+pub(crate) fn finished(reply: &Reply) -> String {
     if let Some(cut) = cut_short(reply) {
         return cut;
     }
@@ -217,11 +197,141 @@ fn interrupted(reason: InterruptReason) -> &'static str {
     }
 }
 
+/// Identify the turn accepted by the child before promising its report.
+pub(crate) async fn started(
+    host: &HostHandle,
+    attachment: &mut Attachment,
+    cancel: &CancellationToken,
+) -> Result<TurnId, ToolError> {
+    if let Some(turn) = &attachment.snapshot.turn {
+        return Ok(turn.id.clone());
+    }
+    loop {
+        let frame = tokio::select! {
+            () = cancel.cancelled() => return Err(ToolError::Cancelled),
+            frame = attachment.events.next() => frame.ok_or_else(|| ToolError::Failed("the child ended before its turn started".into()))?,
+        };
+        if matches!(frame.event, Event::Lagged { .. }) {
+            *attachment = follow(host, &attachment.session)
+                .await
+                .map_err(|error| ToolError::Failed(error.message))?;
+            if let Some(turn) = &attachment.snapshot.turn {
+                return Ok(turn.id.clone());
+            }
+            if let Some(turn) = &attachment.snapshot.last_turn {
+                return Ok(turn.id.clone());
+            }
+            continue;
+        }
+        let turn = match &frame.event {
+            Event::TurnStarted { turn, .. } | Event::TurnCompleted { turn, .. } => {
+                Some(turn.clone())
+            }
+            Event::ItemCompleted { item } => item.turn.clone(),
+            _ => None,
+        };
+        attachment.snapshot.apply(&frame);
+        if let Some(turn) = turn {
+            return Ok(turn);
+        }
+    }
+}
+
+pub(crate) async fn awaited_reply(
+    host: &HostHandle,
+    attachment: &mut Attachment,
+    turn: &TurnId,
+) -> Result<Reply, ToolError> {
+    loop {
+        if let Some(last) = &attachment.snapshot.last_turn {
+            if &last.id == turn {
+                return Ok(Reply {
+                    status: last.status.clone(),
+                    text: reply_to(&attachment.snapshot, turn),
+                });
+            }
+            if attachment
+                .snapshot
+                .turn
+                .as_ref()
+                .is_none_or(|live| &live.id != turn)
+            {
+                return historical_reply(attachment, turn).await;
+            }
+        }
+        let frame = attachment
+            .events
+            .next()
+            .await
+            .ok_or_else(|| ToolError::Failed("the child ended before reporting".into()))?;
+        if matches!(frame.event, Event::Lagged { .. }) {
+            *attachment = follow(host, &attachment.session)
+                .await
+                .map_err(|error| ToolError::Failed(error.message))?;
+            continue;
+        }
+        attachment.snapshot.apply(&frame);
+        if let Event::TurnCompleted {
+            turn: ended,
+            status,
+            ..
+        } = &frame.event
+            && ended == turn
+        {
+            return Ok(Reply {
+                status: status.clone(),
+                text: reply_to(&attachment.snapshot, turn),
+            });
+        }
+    }
+}
+
+async fn historical_reply(attachment: &mut Attachment, turn: &TurnId) -> Result<Reply, ToolError> {
+    let mut events = attachment
+        .handle
+        .events_since(bingo_sdk::Seq::ZERO)
+        .await
+        .map_err(|error| ToolError::Failed(error.message))?;
+    let mut state = SessionState::new(attachment.snapshot.summary.clone());
+    while let Some(frame) = events.next().await {
+        state.apply(&frame);
+        if let Event::TurnCompleted {
+            turn: ended,
+            status,
+            ..
+        } = &frame.event
+            && ended == turn
+        {
+            return Ok(Reply {
+                status: status.clone(),
+                text: reply_to(&state, turn),
+            });
+        }
+        if frame.seq >= attachment.snapshot.seq {
+            break;
+        }
+    }
+    Err(ToolError::Failed(
+        "the awaited turn is missing from the child's journal".into(),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::tests::{Fleet, Recorder, assistant, turn_completed, turn_failed};
+    use bingo_sdk::{Delivery, Input};
     use bingo_sdk::{ErrorCode, KernelError};
+
+    async fn report(attachment: Attachment, host: HostHandle, parent: SessionId, _name: String) {
+        let reports = crate::report::Reports::default();
+        let _ = reports
+            .promise(attachment, host, parent, &CancellationToken::new())
+            .await;
+        for _ in 0..32 {
+            tokio::task::yield_now().await;
+        }
+    }
 
     fn completed(text: &str) -> Reply {
         Reply {
