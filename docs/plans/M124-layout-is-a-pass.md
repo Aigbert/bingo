@@ -4,9 +4,9 @@
 
 Audit-2026-10 §4. The TUI lays a frame out as a side effect of drawing
 it. `view::draw` fills `ui.painted: RefCell<Painted>` (`ui.rs`) from
-behind a shared borrow in 17 places, and keys, clicks and drags answer
-against what the last draw left there (59 `painted.borrow` sites:
-input 21, view 17, pointer 9, run 4, pager 2, `run/showing` 2,
+behind a shared borrow through 10 mutable borrow sites, and keys, clicks and drags answer
+against what the last draw left there (61 `painted.borrow` sites:
+input 21, view 19, pointer 9, run 4, pager 2, `run/showing` 2,
 `transcript/pictured` 2, ui 2). `demand()` measures the composer, strip
 and activity bands by rendering them, and the draw renders them again.
 `Run::animating` (`run.rs`) ORs a dozen conditions to decide whether to
@@ -28,12 +28,12 @@ No visible change, no new dependency, no sdk change.
      most once, counted by a test-only counter;
    - hit-testing without a terminal: a rail card, a picture's cells and
      the foot are found in a layout no `TestBackend` drew;
-   - `next_frame`: idle is `None`; a running turn is the next glyph
-     tick; a moving scroll or layer is its next sample; a notice is its
+   - `next_frame`: idle is `None`; a running turn is the next motion
+     sample (33 ms breath, including each 150 ms glyph tick); a moving scroll or layer is its next sample; a notice is its
      expiry; an armed exit is its deadline; a placed `Status.until`
      (M121) is the next second its text changes.
 2. **`Layout`** (`layout.rs`): the `Regions` from `frame::regions`, the
-   lines each region shows, and the targets `Painted` holds today:
+   visible lines composed into a screen-sized cell buffer, cursor, and targets `Painted` holds today:
    `blocks`, `height`, `top`, `card`, `list`, `rail`, `strip`, `cells`,
    `foot`. `cells` is still read out of the laid-out lines
    (`graphics::placed::cells`), so a picture cannot be targeted where
@@ -69,7 +69,8 @@ No visible change, no new dependency, no sdk change.
 - `crates/bingo-surface-tui/src/{run/showing,transcript/pictured,graphics/placed,graphics/decoded}.rs`
 - `crates/bingo-surface-tui/src/{activity,rail,status,composer,foot,scroll}.rs`
   (each band's `next_change`)
-- `crates/bingo-surface-tui/src/{test_support,screens,motion}.rs`
+- `crates/bingo-surface-tui/src/{test_support,screens,motion,painted,doubles,terminal,lib}.rs`
+- `crates/bingo-surface-tui/src/{layers,search,clock,views}.rs`; new `layout/` helpers/tests
 - `docs/design/tui.md`, `docs/adr/0002-*.md`
 
 ## Exit criteria
@@ -108,6 +109,18 @@ No visible change, no new dependency, no sdk change.
   any instant before it, the cue is the same; drawn at it, it differs.
 - A selection drag reads the lines and cells of the frame on screen.
   `Ui.shown` is that frame, as `Painted` was; the drag tests pin it.
-- Re-verify at start: the `painted.borrow` count by file, `Painted`'s
+- Re-verified at `abe1755f` (M108–M123 landed): the `painted.borrow` count by file, `Painted`'s
   fields and `animating`'s conditions after M121, the `Revision` keys
   after M123, and each band's motion by symbol.
+
+  `Painted` has the ten fields in brick 2 plus `regions`; `animating`
+  has 13 conditions including `behind`, intro and placed countdowns.
+  `Revision` has nine keys: status, size, agent, fold, linked, slots,
+  run, last, look. M123 captions and `LEGACY_VOICES`/check 4f stay intact.
+  `Screen::draw`, its recorder and test helpers must consume the layout;
+  layer/search/selection helpers compose cells without a terminal `Frame`.
+  The foot is patched into the reserved activity air after transcript
+  measurement; this avoids measuring that band by rendering it twice.
+  Rail geometry remains `frame::RAIL_AT` and `frame::RAIL_WIDTH` for M148.
+  Motion includes breath samples as well as glyph ticks; M149 can add its
+  caret and embers through the same `next_change` contract.
