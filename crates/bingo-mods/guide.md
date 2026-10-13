@@ -36,18 +36,49 @@ for every directory; declared safe nouns need no tier lift. Registration can red
 plugin with `{reason: "..."}`. Calls consult the granted catalogue; declaring
 a noun does not bypass an unsafe method's authority check.
 
-`$` currently offers state/store get and CAS set, UI status, model completion,
-session extend/deliver, and registered service faces. State belongs to the host
-and survives reload. Explicit directories are polled once a second. An edit is
-marked stale until `turn.complete`; reload joins the old thread, registers a
-fresh runtime, adjudicates its grants and repeats `session.start` for open
-sessions. The scenario harness can request a reload explicitly.
+`$` exposes the host's `session`, `turn`, `prompt`, `tool`, `command`,
+`config`, `model`, `state`, `store` and `clock` nouns. The generated
+`sdk/typescript/src/dollar-types.ts` lists every method's input and result.
+Each method raises its named chain once; other hooks can rewrite, deny or
+answer it. `$.plugin` is the frozen `{name, root}` identity and raises no chain.
+Calls default to the hook's session and turn where applicable. Reads fold the
+same ordered frames as other clients, including configuration, usage, prompt
+queue and attached surfaces. `session.messages` pages the persisted history.
+`session.extend` and `session.deliver` remain compatibility aliases for
+`session.append` and `session.send`.
+
+`$.state.get(key)` / `set(key, value, ifVersion?)` use the current session;
+`$.store` uses global scope and also has `keys()` and `delete(key)`. A read
+returns `{version, value}` or null. CAS conflicts report the held version.
+Only the owning plugin writes its shelf, with a 4 MiB total quota across scopes.
+State survives reload; each hook records the keys and versions it reads.
+
+Register a tool with `$.tool.register(spec, async ($, input) => output)`;
+its name is `plugin__<name>__<tool>`. Undeclared tool traits fail closed.
+`$.command.register(spec, async ($, args) => outcome)` registers an unprefixed
+command. Callbacks receive a fresh dollar for their invocation. Before a
+registered tool or command runs, a stale module reloads and repeats
+`session.start`, so callbacks resolve in the new generation under both runtimes.
+Explicit directories are polled once a second; normal hook reload waits for
+`turn.complete`. Reload joins the old thread and adjudicates grants again.
+
+`$.clock.now()` returns a timestamp; `sleep(ms)` waits, `after(ms, callback)`
+runs once, and `every(ms, callback)` repeats with a floor set by `mods.everyMs`
+(default 1000). Timers belong to their session and module generation and stop
+at session end or reload. Timer callbacks have no active turn.
+
+`$.model.complete(request)`, `classify({text, labels})` and `fork({prompt})`
+require the model grant and use the session's configured model. They charge
+the hook's turn, or session usage from a timer. Classification accepts an exact
+label and refuses an unmatched answer in words. Fork builds context from the
+persisted history (including compaction), without contributor pieces or tools;
+it does not reproduce the parent turn's assembled prompt.
 
 `plugins.<name>` supplies options (an empty object when absent). Manifest config
 schemas validate types, object properties/required/additionalProperties, arrays,
 choices, local references, composition and size/numeric bounds. Unsupported
 validation keywords are refused with a named reason instead of being ignored.
-Full author-kit analysis and module-owned tools/commands belong to later plans.
+Full author-kit analysis belongs to a later plan.
 
 For a repeatable local memory measurement, run:
 
