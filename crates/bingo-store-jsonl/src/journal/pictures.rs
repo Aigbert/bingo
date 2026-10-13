@@ -62,15 +62,34 @@ fn a_missing_blob_becomes_a_text_part() {
     );
 }
 
-#[test]
-fn the_planned_v2_picture_line_is_under_300_bytes() {
+fn realistic_picture_record() -> serde_json::Value {
     let line = include_str!("../../fixtures/picture-v2.jsonl")
         .lines()
         .nth(1)
         .unwrap();
-    assert!(
-        line.len() < 300,
-        "v2 picture frame is {} bytes, before newline",
-        line.len()
-    );
+    let mut record: serde_json::Value = serde_json::from_str(line).unwrap();
+    record["session"] = SessionId::mint().to_string().into();
+    record["event"]["item"]["id"] = bingo_sdk::ItemId::mint().to_string().into();
+    record
+}
+
+fn picture_record_line(mut record: serde_json::Value, bytes: &[u8]) -> String {
+    let image = &mut record["event"]["item"]["body"]["parts"][0];
+    image["blob"] = bingo_digest::hex(&bingo_digest::digest(bytes)).into();
+    image["bytes"] = bytes.len().into();
+    serde_json::to_string(&record).unwrap()
+}
+
+#[test]
+fn the_planned_v2_picture_line_is_under_one_kib() {
+    let line = picture_record_line(realistic_picture_record(), &vec![0; 3_000_000]);
+    assert!(line.len() < 1024, "{} bytes before newline", line.len());
+}
+
+#[test]
+fn the_planned_v2_picture_line_length_is_independent_of_picture_size() {
+    let record = realistic_picture_record();
+    let small = picture_record_line(record.clone(), b"x");
+    let large = picture_record_line(record, &vec![0; 3_000_000]);
+    assert_eq!(small.len(), large.len(), "1-byte and 3 MB picture frames");
 }
