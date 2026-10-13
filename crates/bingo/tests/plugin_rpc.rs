@@ -17,9 +17,7 @@ use std::process::{Command, Output, Stdio};
 
 use bingo_sdk::{Event, Frame, InteractionKind, ItemBody};
 
-#[path = "support/home.rs"]
-mod home;
-use home::home_env;
+use support::home::home_env;
 
 #[path = "support/python.rs"]
 mod python;
