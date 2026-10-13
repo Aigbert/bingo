@@ -15,6 +15,7 @@ use std::{
 
 mod reload;
 pub(crate) struct Manager {
+    pub(crate) callbacks: Arc<bingo_plugin_host::callback::Registry>,
     env: Env,
     directories: Vec<PathBuf>,
     settings: BTreeMap<String, Value>,
@@ -40,6 +41,7 @@ impl Manager {
         limits: Limits,
     ) -> Self {
         Self {
+            callbacks: Arc::default(),
             env,
             directories,
             settings,
@@ -100,7 +102,19 @@ impl Manager {
             .modules
             .write()
             .unwrap_or_else(|error| error.into_inner()) = modules;
+        for module in self.modules() {
+            self.publish_callbacks(module);
+        }
         self.watch();
+    }
+    pub(crate) fn publish_callbacks(&self, module: Arc<Module>) {
+        self.callbacks.insert(
+            module.found.name.clone(),
+            Arc::new(crate::dollar::callback::Native {
+                module,
+                manager: self.this.get().cloned().unwrap_or_default(),
+            }),
+        );
     }
     fn modules(&self) -> Vec<Arc<Module>> {
         self.modules
@@ -189,5 +203,30 @@ impl InterceptorSource for Manager {
                 }),
         );
         links
+    }
+}
+
+#[async_trait]
+impl ToolSource for Manager {
+    fn id(&self) -> &str {
+        "bingo.mods"
+    }
+    async fn tools(&self) -> Vec<Arc<dyn Tool>> {
+        self.dollar
+            .get()
+            .map(|dollar| dollar.tools())
+            .unwrap_or_default()
+    }
+}
+#[async_trait]
+impl CommandSource for Manager {
+    fn id(&self) -> &str {
+        "bingo.mods"
+    }
+    async fn commands(&self, _: &Path) -> Vec<Arc<dyn Command>> {
+        self.dollar
+            .get()
+            .map(|dollar| dollar.commands())
+            .unwrap_or_default()
     }
 }

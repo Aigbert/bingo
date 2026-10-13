@@ -329,7 +329,7 @@ async fn a_registered_tool_is_prefixed_and_offered_by_the_catalogue() {
       export function register(on) {
         on('fixture.echo', async ($, e) => ({name:await $.tool.register({
           name:'hello',description:'Say hello',inputSchema:{type:'object'}
-        }, async ($, input) => ({content:[{type:'text',text:'hello'}],isError:false}))}));
+        }, async ($, input) => ({parts:[{type:'text',text:'hello'}],isError:false}))}));
       }
     "#,
         &["tool"],
@@ -356,4 +356,219 @@ async fn a_registered_tool_is_prefixed_and_offered_by_the_catalogue() {
             .any(|tool| tool.id == "plugin__fixture__hello")
     );
     fixture.host.shutdown().await;
+}
+
+mod registered {
+    use super::*;
+    use bingo_sdk::*;
+    use futures::StreamExt;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    struct Model(AtomicUsize);
+    static MANIFEST: PluginManifest = PluginManifest {
+        id: "fixture.model",
+        version: "1",
+        uses: &[],
+        provides: &[],
+        requires: &[],
+        config: None,
+    };
+    #[async_trait::async_trait]
+    impl Plugin for Model {
+        fn manifest(&self) -> &'static PluginManifest {
+            &MANIFEST
+        }
+        fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+            registrar.provider(Arc::new(Model(AtomicUsize::new(0))));
+            Ok(())
+        }
+    }
+    #[async_trait::async_trait]
+    impl Provider for Model {
+        fn id(&self) -> &str {
+            "fixture.model"
+        }
+        fn endpoint(&self, _: &str) -> EndpointCapabilities {
+            EndpointCapabilities::default()
+        }
+        async fn stream(
+            &self,
+            request: ModelRequest,
+            _: CancellationToken,
+        ) -> Result<ModelStream, ProviderError> {
+            assert!(
+                request
+                    .tools
+                    .iter()
+                    .any(|tool| tool.name == "plugin__fixture__hello")
+            );
+            let mut events = Vec::new();
+            let reason = if self.0.fetch_add(1, Ordering::SeqCst).is_multiple_of(2) {
+                events.push(Ok(ModelEvent::ToolCall {
+                    id: "call".into(),
+                    name: "plugin__fixture__hello".into(),
+                    input: "{}".into(),
+                }));
+                UnifiedFinish::ToolCalls
+            } else {
+                events.extend([
+                    Ok(ModelEvent::TextStart { id: "a".into() }),
+                    Ok(ModelEvent::TextDelta {
+                        id: "a".into(),
+                        delta: "done".into(),
+                    }),
+                    Ok(ModelEvent::TextEnd { id: "a".into() }),
+                ]);
+                UnifiedFinish::Stop
+            };
+            events.push(Ok(ModelEvent::Finish {
+                usage: Usage::default(),
+                finish_reason: FinishReason::unified(reason),
+            }));
+            Ok(Box::pin(futures::stream::iter(events)))
+        }
+    }
+    const SOURCE: &str = r#"
+      export function register(on) {
+        on('session.start', async ($) => {
+          await $.tool.register({name:'hello',description:'fixture',inputSchema:{type:'object'}},
+            async ($) => { await $.session.append({key:'ran',value:'first'}); return {parts:[{type:'text',text:'first'}],isError:false}; });
+          await $.command.register({name:'hello',hint:'fixture',args:{kind:'none'},family:'fixture'},
+            async ($) => ({kind:'applied',message:'first'}));
+          await $.session.append({key:'ready',value:true});
+        });
+      }
+    "#;
+    async fn extension(session: &mut Attachment, key: &str) -> serde_json::Value {
+        loop {
+            let frame =
+                tokio::time::timeout(std::time::Duration::from_secs(15), session.events.next())
+                    .await
+                    .expect("expected extension")
+                    .unwrap();
+            if let Event::InteractionOpened { ref interaction } = frame.event {
+                assert!(matches!(
+                    interaction.kind,
+                    InteractionKind::Permission { .. }
+                ));
+                session.handle.answer(
+                    IntentId::mint(),
+                    interaction.id.clone(),
+                    Answer::AllowOnce,
+                    Activation::Programmatic,
+                );
+            }
+            assert!(
+                !matches!(frame.event, Event::TurnCompleted { .. }),
+                "turn ended before {key}"
+            );
+            if let Event::Extension { kind, payload, .. } = frame.event
+                && kind == key
+            {
+                return payload;
+            }
+        }
+    }
+    #[tokio::test]
+    async fn registered_callbacks_run_and_reload_before_the_next_call() {
+        let home = tempfile::tempdir().unwrap();
+        let root = home.path().join("fixture");
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(root.join("plugin.json"), json!({"name":"fixture","version":"1","module":"main.ts","uses":["tool","command","session"]}).to_string()).unwrap();
+        std::fs::write(root.join("main.ts"), SOURCE).unwrap();
+        let host = Host::build(
+            vec![
+                Box::new(ModsPlugin::default().with_dirs(vec![root.clone()])),
+                Box::new(Model(AtomicUsize::new(0))),
+            ],
+            HostConfig::new(Env::rooted(home.path())).with_layer(
+                "offline",
+                json!({"provider":"fixture.model","model":"offline"}),
+            ),
+        )
+        .await
+        .unwrap();
+        let mut session = host
+            .open(
+                SessionSelector::Create {
+                    spec: SessionSpec {
+                        cwd: home.path().into(),
+                        ..Default::default()
+                    },
+                },
+                ClientIdentity {
+                    name: "fixture".into(),
+                    surface: "test".into(),
+                },
+                OpenOptions::default(),
+            )
+            .await
+            .unwrap();
+        extension(&mut session, "ready").await;
+        session.handle.submit(
+            IntentId::mint(),
+            Input::text("run", Origin::surface("test")),
+        );
+        assert_eq!(extension(&mut session, "ran").await, "first");
+        loop {
+            let frame =
+                tokio::time::timeout(std::time::Duration::from_secs(15), session.events.next())
+                    .await
+                    .expect("turn completion")
+                    .unwrap();
+            if matches!(frame.event, Event::TurnCompleted { .. }) {
+                break;
+            }
+        }
+        std::fs::write(root.join("main.ts"), SOURCE.replace("first", "second")).unwrap();
+        session.handle.submit(
+            IntentId::mint(),
+            Input::text("run again", Origin::surface("test")),
+        );
+        assert_eq!(extension(&mut session, "ran").await, "second");
+        loop {
+            let frame =
+                tokio::time::timeout(std::time::Duration::from_secs(15), session.events.next())
+                    .await
+                    .expect("turn completion")
+                    .unwrap();
+            if matches!(frame.event, Event::TurnCompleted { .. }) {
+                break;
+            }
+        }
+        let intent = IntentId::mint();
+        session.handle.submit(
+            intent.clone(),
+            Input::Action {
+                action: Action {
+                    name: "hello".into(),
+                    args: serde_json::Value::Null,
+                },
+            },
+        );
+        loop {
+            let frame =
+                tokio::time::timeout(std::time::Duration::from_secs(15), session.events.next())
+                    .await
+                    .expect("command ack")
+                    .unwrap();
+            if let Event::IntentAck {
+                intent: ack,
+                outcome: verdict,
+            } = frame.event
+                && ack == intent
+            {
+                assert!(
+                    serde_json::to_value(verdict)
+                        .unwrap()
+                        .to_string()
+                        .contains("second")
+                );
+                break;
+            }
+        }
+        host.shutdown().await;
+    }
 }

@@ -106,7 +106,7 @@ async fn initialize(
         .await
         .map_err(Fault::load)?;
     let bootstrap = format!(
-        "import {{ Hooks, dollar, patternMatches, matches, frozen }} from 'bingo';\nimport {{ register }} from {};\nconst hooks = new Hooks();\nawait register(hooks.on, {});\n{}",
+        "import {{ Hooks, dollar, Callbacks, patternMatches, matches, frozen }} from 'bingo';\nimport {{ register }} from {};\nconst hooks = new Hooks();\nconst callbacks = new Callbacks();\nawait register(hooks.on, {});\n{}",
         json!(format!("./{module}")),
         config,
         include_str!("thread.js")

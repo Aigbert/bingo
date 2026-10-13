@@ -9,6 +9,10 @@ pub(super) struct Watch {
     stale: bool,
 }
 impl Manager {
+    pub(crate) async fn prepare(&self) {
+        self.poll().await;
+        self.reload_stale().await;
+    }
     pub(super) fn watch(self: &Arc<Self>) {
         let watches = self
             .modules()
@@ -129,6 +133,7 @@ impl Manager {
         )
         .await;
         self.replace(&old, module.clone());
+        self.publish_callbacks(module.clone());
         let host = self
             .host
             .get()

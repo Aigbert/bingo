@@ -1,6 +1,7 @@
 import { stdout } from 'node:process';
 import { Hooks } from './cross.ts';
 import type { Register, Entry } from './on.ts';
+import { Callbacks } from './callbacks.ts';
 import { dollar } from './dollar.ts';
 import { dollarRoutes } from './dollar-types.ts';
 import { Peer, stdio } from './rpc.ts';
@@ -14,6 +15,7 @@ function points(capabilities: readonly string[]): string[] {
 
 export function runtime(peer: Peer, register: Register) {
   const hooks = new Hooks();
+  const callbacks = new Callbacks();
   let negotiated = new Set<string>();
   let pluginName = "";
   let identity = Object.freeze({ name: "", root: "" });
@@ -35,7 +37,7 @@ export function runtime(peer: Peer, register: Register) {
         const hook = hooks.entries.indexOf(entry);
         const context = { parent: request.chain, hook, callers: [...callers, { plugin: pluginName, hook }] };
         return dollar({ ...rpc, request: <T>(method: string, params: unknown) =>
-          peer.withContext(context, () => rpc.request<T>(method, params)) }, request.site, identity);
+          peer.withContext(context, () => rpc.request<T>(method, params)) }, request.site, identity, callbacks);
       },
     };
   };
@@ -52,7 +54,7 @@ export function runtime(peer: Peer, register: Register) {
     const hooked = hooks.names(points(params.capabilities));
     const catalogue = params.capabilities.includes('intercept/*');
     const capabilities = [
-      ...Object.entries(dollarRoutes).filter(([, route]) => 'kernel' in route).map(([name]) => `host/${name.replace('.', '/')}`),'intercept/*', 'intercept/*/after', 'host/place', 'host/extend', 'host/deliver', 'host/state/get',
+      ...Object.entries(dollarRoutes).filter(([, route]) => 'kernel' in route).map(([name]) => `host/${name.replace('.', '/')}`),'callback/run', 'callback/start', 'intercept/*', 'intercept/*/after', 'host/place', 'host/extend', 'host/deliver', 'host/state/get',
       'host/state/set', 'host/model/complete', 'service/call', 'tools/changed', 'intercept/cancel', 'hook/observe',
       ...observed.map(name => `observe/${name}`),
       ...hooked.flatMap(name => [`intercept/${name}`, `intercept/${name}/after`])]
@@ -75,6 +77,17 @@ export function runtime(peer: Peer, register: Register) {
   peer.handlers.set('hook/observe', request => {
     const { dollarFor, skip } = invocation(request);
     return hooks.observe(request.event, request.payload, undefined, dollarFor, skip);
+  });
+  peer.handlers.set('callback/start', async site => {
+    const { dollarFor, skip } = invocation({site});
+    await hooks.observe('session.start', {session:site.session}, undefined, dollarFor, skip);
+    return null;
+  });
+  peer.handlers.set('callback/run', request => {
+    const context = {parent:request.chain, callers:peer.context()?.callers ?? []};
+    const api = dollar({...rpc, request:<T>(method:string, params:unknown) =>
+      peer.withContext(context, () => rpc.request<T>(method, params))}, request.site, identity, callbacks);
+    return callbacks.run(request.callback, api, request.input);
   });
   peer.handlers.set('intercept/cancel', params => hooks.cancel(params.chain));
   return {

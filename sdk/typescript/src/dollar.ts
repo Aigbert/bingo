@@ -1,8 +1,9 @@
+import type { Callbacks, Callback } from './callbacks.ts';
 import { dollarRoutes } from './dollar-types.ts';
 import type { Rpc } from './rpc.ts';
 import type { HookSite, StateValue, ModelRequest, Completed, Input, Tone } from './wire.ts';
 
-export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root: string } = { name: '', root: '' }) {
+export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root: string } = { name: '', root: '' }, callbacks?: Callbacks) {
   const store = (scope: string) => ({
     get: (key: string) => rpc.request<StateValue | null>('host/state/get', { scope, key }),
     set: (key: string, value: unknown, ifVersion?: number) =>
@@ -36,6 +37,13 @@ export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root:
       for (const field of route.site) params[field] ??= site[field];
       if ('kernel' in route) return rpc.request(`host/${name.replace('.', '/')}`, params);
       return rpc.request<{ result: unknown }>('service/call', { key: route.face, method, params }).then(reply => reply.result);
+    };
+  }
+  for (const noun of ['tool', 'command']) {
+    const register = hostApi[noun].register;
+    hostApi[noun].register = (spec: { name: string }, handler: Callback) => {
+      if (!callbacks) throw new Error('callback runtime is unavailable');
+      return register({ spec, callback: callbacks.put(noun, handler, spec.name) });
     };
   }
   Object.defineProperty(hostApi, 'plugin', { value: Object.freeze({ ...identity }), enumerable: true });

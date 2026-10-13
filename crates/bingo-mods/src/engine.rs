@@ -122,6 +122,9 @@ impl Engine {
             }
         }
     }
+    pub(crate) fn stopped(&self) -> CancellationToken {
+        self.stop.clone()
+    }
     pub fn hooks(&self) -> &[RegisteredHook] {
         &self.hooks
     }

@@ -104,6 +104,8 @@ pub struct Setting {
 
 /// Everything about one plugin that does not change, and the one thing that does.
 pub struct Bridge {
+    watched: std::sync::Mutex<Option<crate::reload::Stamps>>,
+    refreshing: Mutex<()>,
     registration: Option<Arc<bingo_plugin_host::registration::Registration>>,
     name: String,
     root: PathBuf,
@@ -147,6 +149,8 @@ impl Bridge {
         Self {
             registration: None,
             store: crate::state::Store::new(&setting.data_dir, &name),
+            watched: std::sync::Mutex::new(None),
+            refreshing: Mutex::new(()),
             name,
             root,
             launch: std::sync::RwLock::new((entry, call_timeout)),
@@ -167,6 +171,42 @@ impl Bridge {
     ) -> Self {
         self.registration = Some(registration);
         self
+    }
+    pub(crate) fn watch(&self, before: crate::reload::Stamps) {
+        *self
+            .watched
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some(before);
+    }
+    pub(crate) async fn refresh(self: &Arc<Self>) {
+        let _guard = self.refreshing.lock().await;
+        if self
+            .watched
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .is_none()
+        {
+            return;
+        }
+        let root = self.root.clone();
+        let Ok(Ok(after)) = tokio::task::spawn_blocking(move || crate::reload::stamps(&root)).await
+        else {
+            return;
+        };
+        let changed = {
+            let mut before = self
+                .watched
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            let changed = before
+                .as_ref()
+                .is_some_and(|before| crate::reload::changed(before, &after));
+            *before = Some(after);
+            changed
+        };
+        if changed && let Some(found) = crate::discovery::read(&self.root, &self.notices) {
+            self.reload(found.manifest).await;
+        }
     }
     pub fn name(&self) -> &str {
         &self.name
@@ -431,6 +471,12 @@ impl Bridge {
         let succeeded = outcome.is_ok();
         self.file(outcome).await;
         if succeeded {
+            let live = self.state.lock().await.live.clone();
+            if let Some(live) = live
+                && let Err(error) = crate::callback::restart(&live.connection, &self.host).await
+            {
+                self.notices.push(Notice::warn("PLUGIN_RELOAD", error));
+            }
             let suffix = if restart {
                 "; provider or service declarations changed; restart required"
             } else {
@@ -499,11 +545,20 @@ impl Bridge {
         true
     }
 
-    async fn file(&self, outcome: Result<Live, String>) {
+    async fn file(self: &Arc<Self>, outcome: Result<Live, String>) {
         let mut state = self.state.lock().await;
         state.starting = false;
         match outcome {
             Ok(live) => {
+                if let Some(callbacks) = self.host.service(&bingo_plugin_host::callback::KEY) {
+                    callbacks.insert(
+                        self.name.clone(),
+                        Arc::new(crate::callback::Remote {
+                            connection: live.connection.clone(),
+                            bridge: Arc::downgrade(self),
+                        }),
+                    );
+                }
                 state.live = Some(Arc::new(live));
                 state.failures = 0;
                 state.next_attempt = None;

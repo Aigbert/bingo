@@ -40,7 +40,7 @@ static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.mods",
     version: env!("CARGO_PKG_VERSION"),
     uses: &[],
-    provides: &[],
+    provides: &["service:bingo.plugin-host.callbacks"],
     requires: &[],
     config: Some(ConfigClaim {
         keys: &[("mods", Merge::ByName)],
@@ -67,6 +67,13 @@ impl Plugin for ModsPlugin {
             .set(manager.clone())
             .map_err(|_| PluginError::Failed("module runtime already registered".into()))?;
         registrar.add(Contribution::Plugins(manager.clone()));
+        registrar.add(Contribution::service(
+            &bingo_plugin_host::callback::KEY,
+            manager.callbacks.clone(),
+            None,
+        ));
+        registrar.add(Contribution::Tools(manager.clone()));
+        registrar.add(Contribution::Commands(manager.clone()));
         registrar.add(Contribution::Interceptors(manager));
         Ok(())
     }

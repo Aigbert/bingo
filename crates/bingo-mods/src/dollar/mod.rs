@@ -7,3 +7,6 @@ pub mod table;
 #[cfg(test)]
 mod tests;
 pub use runtime::Runtime;
+
+pub(crate) mod callback;
+mod register;

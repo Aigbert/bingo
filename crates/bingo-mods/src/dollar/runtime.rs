@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 use std::{path::PathBuf, sync::Arc};
 
 pub struct Runtime {
+    pub(super) registered: super::register::Registrations,
     sessions: Sessions,
     root: PathBuf,
 }
@@ -24,6 +25,7 @@ struct Noun {
 impl Runtime {
     pub fn install(host: &HostHandle, root: PathBuf) -> Result<Arc<Self>, KernelError> {
         let runtime = Arc::new(Self {
+            registered: Default::default(),
             sessions: Sessions::default(),
             root,
         });
@@ -38,6 +40,12 @@ impl Runtime {
             )?;
         }
         Ok(runtime)
+    }
+    pub(crate) fn tools(&self) -> Vec<Arc<dyn Tool>> {
+        self.registered.tools()
+    }
+    pub(crate) fn commands(&self) -> Vec<Arc<dyn Command>> {
+        self.registered.commands()
     }
     pub async fn stop(&self) {
         self.sessions.stop().await;
@@ -111,6 +119,8 @@ impl Runtime {
             "state.set" | "store.set" => operation(caller, "host/state/set", params).await,
             "session.send" => send(caller, parse(params)?).await,
             "session.authorize" => authorize(caller, parse(params)?).await,
+            "tool.register" => Ok(json!(self.registered.tool(caller, parse(params)?)?)),
+            "command.register" => Ok(json!(self.registered.command(caller, parse(params)?)?)),
             "tool.list" => Ok(json!(
                 caller
                     .host
