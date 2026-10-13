@@ -20,7 +20,7 @@ no new external dependency. The TUI's copies are M123's.
      before it fires; re-arming a key replaces it; `reconcile` keeps,
      cancels and arms; dropping `Alarms` cancels all.
 2. **`bingo-collab`** (`tier = "library"`; `bingo-sdk`,
-   `bingo-services`, `serde`, `serde_json`, `jiff`):
+   `bingo-services`, `serde`, `serde_json`, `jiff`, `schemars`):
    - `name`: `Name::parse` holds the one check; equality ignores case
      and display keeps it; `PARENT` is reserved in any case.
    - `room`: the record id and kinds as constants beside their types,
@@ -73,12 +73,16 @@ no new external dependency. The TUI's copies are M123's.
 - `crates/bingo-alarm/{Cargo.toml,src/lib.rs}` (new)
 - `crates/bingo-services/src/{lib.rs,room_post.rs}`, `fixtures/room_post/`
 - `crates/bingo-rooms/src/{lib,room,cursor,ear,mentions,owed,chase,deadline,post,hook}.rs`,
-  a new `serial.rs`; `name.rs` deleted
+  new `serial.rs` and service owner; `name.rs` deleted;
+  other rooms modules mechanically import the shared name/types
 - `crates/bingo-agents/src/{lib,names,message,spawn,watch,hook}.rs`;
-  `{rooms,serial}.rs` deleted
-- `crates/bingo-schedule/src/{lib,wake,wakes}.rs`, a new `hook.rs`
-- `crates/bingo/tests/` (M109's two-crate name test removed)
-- `Cargo.toml` (members), `ARCHITECTURE.md`,
+  `{rooms,serial}.rs` deleted; new report owner/record module
+- `crates/bingo-schedule/src/{lib,wake,wakes,schedules}.rs`, a new `hook.rs`;
+  preserve M121 wake slots, clear the complete extension on stale resume
+- Affected crates' test helpers and restart tests; `crates/bingo/tests/`
+  (M109's two-crate name test removed; unit plugin constructors updated)
+- Affected plugin `Cargo.toml`s, `Cargo.toml` (workspace edges), `Cargo.lock`,
+  `scripts/budget.toml` (+2 members), `ARCHITECTURE.md`,
   `docs/adr/{0019,0021,0022,0025,0029,0071}-*.md`
 
 ## Exit criteria
@@ -97,7 +101,7 @@ no new external dependency. The TUI's copies are M123's.
 - [ ] The `SendMessage` room tests pass unchanged against rooms' writer,
       and check 4e passes with `rooms.post` declared.
 - [ ] All gates of the upgrade protocol, plus the Windows cross-check
-      for the five crates touched.
+      for every touched crate (including both new libraries and services).
 
 ## Non-goals
 
@@ -118,3 +122,17 @@ no new external dependency. The TUI's copies are M123's.
   number of open rooms, and is the read the lazy path did on first use.
 - Re-verify at start: M109's name fix, M116's owned tasks, M119's
   `bingo-services` layout, and the call sites above by symbol.
+
+## Re-verified (2026-10-13, `80f966a7`)
+
+- M109 already compares names case-insensitively; move its tests and rule.
+- M119 provides typed team/MCP adapters; RoomPost follows that contract.
+- M116's tracker is actor-local; plugin owners must retain their own tasks.
+- M121 `wake::payload` owns the status slot; stale clearing uses its Null.
+- `schedules.rs` owns the wake loop and must change with `wakes.rs`.
+- `Listener` derives `JsonSchema`; moving it adds the existing `schemars`
+  edge to collab. Owned report tasks may use existing `tokio-util`'s tracker.
+  These and the planned library edges add no external crate.
+- Rooms/agents currently have unit plugin constructors; ownership needs
+  fields, so composition and test constructions are mechanical updates under
+  protocol step 6, listed here as discovered. No sdk/core change is needed.
