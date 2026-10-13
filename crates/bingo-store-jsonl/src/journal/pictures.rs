@@ -74,10 +74,17 @@ fn realistic_picture_record() -> serde_json::Value {
 }
 
 fn picture_record_line(mut record: serde_json::Value, bytes: &[u8]) -> String {
-    let image = &mut record["event"]["item"]["body"]["parts"][0];
-    image["blob"] = bingo_digest::hex(&bingo_digest::digest(bytes)).into();
-    image["bytes"] = bytes.len().into();
-    serde_json::to_string(&record).unwrap()
+    let mut image = bingo_sdk::Image::from_bytes("image/png", bytes).unwrap();
+    image.width = Some(2);
+    image.height = Some(3);
+    record["event"]["item"]["body"]["parts"][0] =
+        serde_json::to_value(ContentPart::Image(image)).unwrap();
+    let frame: Frame = serde_json::from_value(record).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    create(dir.path(), &frame.session).unwrap();
+    append(dir.path(), &frame).unwrap();
+    let journal = std::fs::read_to_string(layout::journal(dir.path())).unwrap();
+    journal.lines().last().unwrap().to_owned()
 }
 
 #[test]
