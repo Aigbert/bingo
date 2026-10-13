@@ -97,6 +97,23 @@ mod tests {
     }
 
     #[test]
+    fn legacy_files_are_refused_with_a_remedy_and_never_changed() {
+        for bytes in [b"4242".as_slice(), b""] {
+            let home = tempfile::tempdir().unwrap();
+            let dir = home.path().join(DIRECTORY);
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("feishu-cli_a1.lock");
+            std::fs::write(&path, bytes).unwrap();
+            let error = Claim::take(home.path(), "feishu", "cli_a1").unwrap_err();
+            let text = error.to_string();
+            assert!(text.contains("legacy"), "{text}");
+            assert!(text.contains("stop every bingo"), "{text}");
+            assert!(text.contains(&path.display().to_string()), "{text}");
+            assert_eq!(std::fs::read(path).unwrap(), bytes);
+        }
+    }
+
+    #[test]
     fn a_different_credential_is_a_different_claim() {
         let home = tempfile::tempdir().expect("a temporary directory");
         let _a = Claim::take(home.path(), "feishu", "cli_a1").expect("a");
@@ -111,7 +128,7 @@ mod tests {
             let claim = Claim::take(home.path(), "feishu", "cli_a1").expect("a claim");
             claim.path().to_path_buf()
         };
-        assert!(!path.exists());
+        assert!(path.exists(), "release keeps the permanent claim inode");
         Claim::take(home.path(), "feishu", "cli_a1").expect("the next process may have it");
     }
 
