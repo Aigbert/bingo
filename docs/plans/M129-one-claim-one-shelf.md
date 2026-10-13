@@ -20,7 +20,8 @@ experience stores, their `id.rs`, and the three `diff.rs` copies become
 1. **The bare lock.** Unless M109 added it, `bingo-claim` gains
    `lock(path) -> io::Result<Option<File>>`: open with create and no
    truncate, then `try_lock`; `None` means another holder has it.
-   `Claim::take` sits on top of it. Tests: a second handle gets `None`,
+   `Claim::take` shares its lock primitive after M109's atomic marker
+   publication; never publish a blank claim file. Tests: a second handle gets `None`,
    dropping the first frees it, and the file stays.
 2. **The store's sidecar.** `bingo-store-jsonl/src/lock.rs` `take` calls
    `bingo_claim::lock` and keeps its `KernelError` mapping. It writes no
@@ -75,17 +76,20 @@ experience stores, their `id.rs`, and the three `diff.rs` copies become
 ## Files
 
 - `crates/bingo-claim/src/**`, `crates/bingo-shelf/**` (new),
-  `Cargo.toml`, `scripts/budget.toml`
+  `Cargo.toml`, `Cargo.lock`, `scripts/budget.toml`
 - `crates/bingo-store-jsonl/{Cargo.toml,src/lock.rs}`
-- `crates/bingo-gateway/src/{pidfile,run,state,stop,status,doctor}.rs`, tests
-- `crates/bingo-{schedule,experience}/src/{store,id,diff}.rs` and callers
-- `crates/bingo-tool-fs/{Cargo.toml,src/diff.rs}`
+- `crates/bingo-gateway/src/{pidfile,run,state,stop,status,doctor}.rs`,
+  new integration tests in `crates/bingo-gateway/tests/`
+- `crates/bingo-{schedule,experience}/{Cargo.toml,src/**}`: stores,
+  codecs, id/diff callers and focused contract tests; leave test-host modules alone
+- `crates/bingo-tool-fs/{Cargo.toml,src/{lib,diff,edit,write}.rs}`
 
 ## Exit criteria
 
 - [ ] Brick 3's three gateway tests pass (paste before and after).
-- [ ] `rg -n 'try_lock' crates --type rust` matches only
-      `crates/bingo-claim`, and `rg -n 'create_new' crates/bingo-gateway/src`
+- [ ] `rg -n 'try_lock' crates --type rust` finds OS-lock implementation
+      only in `bingo-claim` (existing test witnesses and the plugin-rpc
+      async mutex are not implementations), and `rg -n 'create_new' crates/bingo-gateway/src`
       finds no exclusion.
 - [ ] `ls crates/bingo-{schedule,experience}/src/{id,diff}.rs
       crates/bingo-tool-fs/src/diff.rs` finds no file.
@@ -116,5 +120,9 @@ experience stores, their `id.rs`, and the three `diff.rs` copies become
   permanent like the scheduler's; `stop` keeps its Windows kill.
 - If M122 or M126 moved experience or the gateway's composition, follow
   the tree.
-- Re-verify at start: M109's `bingo-claim` API (is `lock` there?), how
-  doctor recognises a claim, and every line named here.
+- Re-verified at `fa042aa6`: paths and callers remain; claim has `take`,
+  `probe`, `holder`, atomic `publish::open`, but no bare `lock`. Doctor
+  already probes schedule/channel claims. `gateway.lock` belongs directly
+  under `data_dir`; the existing pid record stays under `gateway/`.
+- Per execution instruction, Windows graphs containing `aws-lc-sys` are
+  left to Windows CI; check every other touched crate locally.
