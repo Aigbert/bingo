@@ -18,17 +18,11 @@
 //! process tree down on its way out. Nothing is waited for and the output is
 //! forfeit — a background job is not a call and is never ended this way.
 //!
-//! The Windows port of this module was two things. The process group in
-//! [`spawn`] is done: it is `process-wrap`'s job object there, and the crate
-//! compiles and links for `x86_64-pc-windows-msvc`. [`shell`] is not — it
-//! still resolves `/bin/bash` or `/bin/sh` and hands the command to `-c`, so
-//! on Windows every command fails to spawn. Which dialect a Windows bingo
-//! writes, and what the model is told it is writing, is the M6 question the
-//! plan's non-goals hold; nothing here decides it.
+//! Shell resolution is shared with shell hooks through `bingo-process`.
 
 use std::path::Path;
 use std::process::{ExitStatus, Stdio};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 use bingo_sdk::{CancellationToken, ToolContext, ToolError};
@@ -57,20 +51,6 @@ const DRAIN: Duration = Duration::from_secs(2);
 /// object is ended rather than asked (see `supervise::end_it`).
 #[cfg(unix)]
 pub const TERM: i32 = 15;
-
-/// The shell every command runs under. `bash` is what the tool is named after
-/// and what the model writes for; `sh` is the fallback where there is no bash.
-/// Settled once: the shell does not change while the process lives.
-pub fn shell() -> &'static str {
-    static SHELL: OnceLock<&'static str> = OnceLock::new();
-    SHELL.get_or_init(|| {
-        if Path::new("/bin/bash").exists() {
-            "/bin/bash"
-        } else {
-            "/bin/sh"
-        }
-    })
-}
 
 /// What a command left behind: everything it wrote, within the cap, and the way
 /// it ended.
@@ -190,7 +170,9 @@ pub fn start(command: &str, cwd: &Path, sink: Sink) -> Result<Running, ToolError
 }
 
 fn spawn(command: &str, cwd: &Path) -> Result<Box<dyn ChildWrapper>, ToolError> {
-    let mut shell_command = Command::new(shell());
+    let shell =
+        bingo_process::shell::resolve().map_err(|error| ToolError::Failed(error.to_string()))?;
+    let mut shell_command = Command::new(shell.path());
     shell_command
         .arg("-c")
         .arg(command)
@@ -209,7 +191,7 @@ fn spawn(command: &str, cwd: &Path) -> Result<Box<dyn ChildWrapper>, ToolError> 
     wrapped.wrap(KillOnDrop);
     wrapped
         .spawn()
-        .map_err(|e| ToolError::Failed(format!("could not run {}: {e}", shell())))
+        .map_err(|e| ToolError::Failed(format!("could not run {}: {e}", shell.path().display())))
 }
 
 /// How the wait ended.
@@ -583,12 +565,6 @@ mod tests {
             .await
             .expect("concluded");
         assert_eq!(out.output, "started\n");
-    }
-
-    #[test]
-    fn the_shell_is_a_real_one() {
-        assert!(Path::new(shell()).exists(), "{}", shell());
-        assert!(shell().ends_with("bash") || shell().ends_with("sh"));
     }
 
     #[test]

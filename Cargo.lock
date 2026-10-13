@@ -446,6 +446,7 @@ name = "bingo-hooks-shell"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-process",
  "bingo-sdk",
  "insta",
  "jiff",
@@ -552,6 +553,13 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "bingo-process"
+version = "0.6.6"
+dependencies = [
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -807,6 +815,7 @@ name = "bingo-tool-bash"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-process",
  "bingo-sdk",
  "jiff",
  "process-wrap 10.0.0",

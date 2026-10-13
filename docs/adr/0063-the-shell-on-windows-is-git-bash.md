@@ -1,6 +1,6 @@
 # ADR-0063 — The shell on Windows is Git Bash
 
-Status: proposed · 2026-10-13 · Plan: M110
+Status: accepted · 2026-10-13 · Plan: M110
 
 ## Context
 
@@ -56,6 +56,8 @@ same launcher's store alias.
 
 ## Consequences
 
+- Dependency budget: 342 → 343 for the library member; `thiserror`
+  already exists in the workspace. No external crate is added.
 - One function to change when a fourth location matters; the two
   copies cannot drift. `bingo-tool-bash` and `bingo-hooks-shell` gain
   one library edge each, which ADR-0012 §1 allows.

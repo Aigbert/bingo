@@ -12,6 +12,7 @@ description = "Shell hooks plugin for bingo: Claude Code's hook contract over a 
 workspace = true
 
 [dependencies]
+bingo-process.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
 # M7: a hook is its own process group, killed whole at its deadline.

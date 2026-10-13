@@ -12,6 +12,7 @@ description = "Bash tool plugin for bingo"
 workspace = true
 
 [dependencies]
+bingo-process.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
 # M16: a job's card says when it started, and the sdk re-exports no clock.
