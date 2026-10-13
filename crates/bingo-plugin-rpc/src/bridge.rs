@@ -559,6 +559,12 @@ mod tests {
     }
 
     #[test]
+    fn protocol_one_is_refused_with_both_numbers() {
+        let why = check_protocol(&result(1)).expect_err("protocol 1 is retired");
+        assert!(why.contains("protocol 1") && why.contains("speaks 2"), "{why}");
+    }
+
+    #[test]
     fn the_first_attempt_after_a_death_waits_for_nothing() {
         assert_eq!(backoff(0), Duration::ZERO);
     }

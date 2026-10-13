@@ -425,6 +425,24 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[tokio::test(start_paused = true)]
+    async fn an_unserved_request_gets_method_not_found() {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        let (host, plugin) = tokio::io::duplex(4096);
+        let (reader, writer) = tokio::io::split(host);
+        let _peer = Peer::spawn(reader, writer, Arc::new(Inbound {
+            plugin: "stub".into(), router: Arc::new(Router::default()),
+        }));
+        let (reader, mut writer) = tokio::io::split(plugin);
+        writer.write_all(b"{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"future/verb\"}\n").await.unwrap();
+        let mut lines = BufReader::new(reader).lines();
+        let line = tokio::time::timeout(std::time::Duration::from_secs(1), lines.next_line())
+            .await.expect("every request must receive an answer").unwrap().unwrap();
+        let reply: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(reply["id"], 7);
+        assert_eq!(reply["error"]["code"], crate::codec::METHOD_NOT_FOUND);
+    }
+
     fn entry(command: &str, args: &[&str]) -> Entry {
         Entry {
             command: command.to_string(),

@@ -91,6 +91,21 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn protocol_two_names_the_new_doors() {
+        let schema = document();
+        assert_eq!(schema["protocol"], 2);
+        for method in ["host/place", "host/extend", "host/deliver", "host/state/get",
+            "host/state/set", "host/model/complete", "intercept/tool.call",
+            "intercept/tool.call/after"] {
+            assert!(schema["methods"].get(method).is_some(), "missing {method}");
+        }
+        assert!(schema["methods"].get("hook/decide").is_none());
+        for field in ["pluginName", "pluginRoot", "capabilities"] {
+            assert!(schema["$defs"]["InitializeParams"]["properties"].get(field).is_some(), "missing {field}");
+        }
+    }
+
     fn committed() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schema/plugin.json")
     }
