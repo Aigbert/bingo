@@ -7,8 +7,6 @@
 
 use std::time::{Duration, Instant};
 
-use std::collections::BTreeSet;
-
 use bingo_sdk::{Action, CommandSpec, Level, Seq, SessionId, SessionState, SessionSummary, View};
 
 use crate::clock::{Anim, FRAME, Now};
@@ -19,7 +17,6 @@ use crate::graphics::{Decoded, Linked};
 use crate::layers::{self, Reveal};
 use crate::layout::Layout;
 use crate::pager::Pager;
-use crate::rail::Pin;
 use crate::rewind::Rewind;
 use crate::roster;
 use crate::scroll::Scroll;
@@ -221,8 +218,6 @@ pub enum Open {
     Nothing,
     /// The binding table and the commands, as a sheet.
     Help,
-    /// What the plugins wrote into the session in view, as a sheet.
-    Panel,
     /// The `/resume` list, as a sheet.
     Picker(Picker),
     /// One block, whole, as a sheet.
@@ -248,7 +243,7 @@ impl Open {
     pub fn captures(&self) -> bool {
         matches!(
             self,
-            Open::Picker(_) | Open::Pager(_) | Open::Switcher(_) | Open::Rewind(_) | Open::Panel
+            Open::Picker(_) | Open::Pager(_) | Open::Switcher(_) | Open::Rewind(_)
         )
     }
 
@@ -335,9 +330,6 @@ pub struct Ui {
     pub notices: Vec<Notice>,
     /// A command's `View`, shown until the next key.
     pub block: Option<View>,
-    /// The panels a person pinned into the rail, per session (ADR-0013 §4:
-    /// where a panel sits is the surface's answer, not the plugin's).
-    pub pinned: BTreeSet<Pin>,
     /// `ctrl+t` took the task list off the band (M74). The verb row keeps
     /// the task being done either way: hiding the list is about rows, not
     /// about what the turn is doing.
@@ -392,7 +384,6 @@ impl Ui {
             scroll: Scroll::default(),
             notices: Vec::new(),
             block: None,
-            pinned: BTreeSet::new(),
             activity_hidden: false,
             folds: Folds::new(),
             focused: true,

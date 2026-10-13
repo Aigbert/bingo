@@ -594,7 +594,7 @@ mod tests {
         let rows = Rows::of(&state, 60, &folds, &[], &pictures, &linked, scene().1);
         let tail = graphics::with(graphics::drawing(), || {
             let mut blocks = Blocks::default();
-            let height = blocks.sync(&state, &Agents::new(), &rows, Vec::new());
+            let height = blocks.sync(&state, &Agents::new(), &rows);
             assert!(height > 1, "the picture was drawn in the first place");
             blocks.tail(height)
         });
@@ -620,9 +620,9 @@ mod tests {
         let rows = Rows::of(&state, 60, &folds, &[], &pictures, &linked, scene().1);
         graphics::with(graphics::drawing(), || {
             let mut blocks = Blocks::default();
-            blocks.sync(&state, &Agents::new(), &rows, Vec::new());
+            blocks.sync(&state, &Agents::new(), &rows);
             let first = blocks.renders();
-            blocks.sync(&state, &Agents::new(), &rows, Vec::new());
+            blocks.sync(&state, &Agents::new(), &rows);
             assert_eq!(blocks.renders(), first, "nothing was drawn again");
             assert_eq!(blocks.pictures().len(), 1, "and the picture is still named");
         });

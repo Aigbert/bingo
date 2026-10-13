@@ -2,7 +2,7 @@
 //!
 //! [`render`] walks the tree and hands each node to the module that owns it,
 //! so a `Table` looks the same under a tool row, in the `ctrl+p` sheet and in
-//! a rail card — the TUI draws every node exactly once, and it is tested once.
+//! a placed view — the TUI draws every node exactly once, and it is tested once.
 //! Nothing here knows which lane the view came from or where it will be put:
 //! a renderer is a pure function of a node and a width.
 
@@ -159,7 +159,7 @@ pub fn indent(line: Line<'static>, by: usize) -> Line<'static> {
 }
 
 /// One line cut and padded to exactly `width` cells: what a column of
-/// [`columns`] and a rail card are laid out on.
+/// [`columns`] and a placed view are laid out on.
 pub fn fit(line: Line<'static>, width: usize) -> Line<'static> {
     let mut spans: Vec<Span<'static>> = Vec::new();
     let mut used = 0usize;

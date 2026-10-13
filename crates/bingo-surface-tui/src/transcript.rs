@@ -1188,7 +1188,7 @@ mod tests {
         let pictures = Decoded::default();
         let linked = Linked::default();
         let rows = Rows::of(state, 60, folds, commands, &pictures, &linked, scene().1);
-        let height = blocks.sync(state, &Agents::new(), &rows, Vec::new());
+        let height = blocks.sync(state, &Agents::new(), &rows);
         let mut rows: Vec<String> = blocks
             .window(0, height)
             .iter()
@@ -2120,7 +2120,7 @@ mod tests {
         let linked = Linked::default();
         let rows =
             Rows::of(state, width, &folds, &[], &pictures, &linked, scene().1).measuring(measure);
-        let height = blocks.sync(state, &Agents::new(), &rows, Vec::new());
+        let height = blocks.sync(state, &Agents::new(), &rows);
         blocks
             .window(0, height)
             .iter()

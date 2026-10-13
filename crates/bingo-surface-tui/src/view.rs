@@ -20,8 +20,8 @@ use crate::frame::{self, Demand, Regions};
 use crate::tree::{self, Tree};
 use crate::ui::{Card, Listed, Open, Picker, Switcher, Ui};
 use crate::{
-    activity, composer as prompt, dialog, foot, graphics, keys, layers, mentions, pager, panel,
-    rail, rewind, roster, search, select, status, theme, transcript, views, window, wrap,
+    activity, composer as prompt, dialog, foot, graphics, keys, layers, mentions, pager, rewind,
+    roster, search, select, status, theme, transcript, views, window, wrap,
 };
 
 /// How tall the composer box may grow before it scrolls internally.
@@ -38,24 +38,9 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let draft = ui.composer.layout(inner_width(state, area.width as usize));
     let strip = strip(state, ui, &frame.measurements, area.width);
     let activity = activity::lines(tree, ui, area.width as usize, now);
-    let cards = rail::cards(tree.viewed(), tree.view(), &ui.pinned);
-    frame.next_frame = rail::next_change(&cards, now);
-    let regions = frame::regions(area, demand(&draft, &strip, &activity, !cards.is_empty()));
+    let regions = frame::regions(area, demand(&draft, &strip, &activity));
     frame.regions = regions;
-    let drawn = rail::render(
-        &cards,
-        rail::width(regions.rail, regions.transcript),
-        ui.focus.card(),
-        &ui.marks(tree.viewed(), now),
-    );
-    // A card is in the rail, or — where there is no rail — under the running
-    // rows; never in both (design §3).
-    let live = match regions.rail {
-        Some(_) => Vec::new(),
-        None => rail::inline(&drawn),
-    };
-    render_transcript(tree, ui, frame, regions.transcript, now, live);
-    render_rail(frame, regions.rail, &drawn);
+    render_transcript(tree, ui, frame, regions.transcript, now);
     render_activity(ui, frame, regions.activity, activity);
     render_strip(frame, regions.strip, strip);
     render_composer(tree.viewed(), ui, frame, regions.composer, now, draft);
@@ -64,30 +49,12 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
 }
 
 /// What the frame must make room for before the transcript is given the rest.
-fn demand(
-    draft: &prompt::Layout,
-    strip: &graphics::Band,
-    activity: &[Line<'_>],
-    rail: bool,
-) -> Demand {
+fn demand(draft: &prompt::Layout, strip: &graphics::Band, activity: &[Line<'_>]) -> Demand {
     Demand {
         composer: u16::try_from(draft.lines.len().clamp(1, COMPOSER_ROWS)).unwrap_or(u16::MAX),
         strip: strip.height(),
         activity: u16::try_from(activity.len()).unwrap_or(u16::MAX).max(2),
-        rail,
     }
-}
-
-/// The rail: the cards on their raised tint, from the top row down. Where
-/// each landed is left in [`crate::layout::Layout`] for a click to read.
-fn render_rail(frame: &mut Layout, area: Option<Rect>, drawn: &[rail::Drawn]) {
-    let Some(area) = area.filter(|area| area.height > 0) else {
-        frame.rail.clear();
-        return;
-    };
-    let (lines, where_) = rail::painted(drawn, area.width as usize);
-    frame.rail = where_;
-    frame.render_widget(Paragraph::new(lines), area);
 }
 
 /// The draft's thumbnails, measured and rendered once for this frame.
@@ -204,20 +171,6 @@ fn layer(
             over(frame, above, lines)
         }
         Open::Help => sheet(frame, above, help(width), reveal),
-        Open::Panel => sheet(
-            frame,
-            above,
-            panel::lines(
-                tree.viewed(),
-                tree.view(),
-                ui.panel,
-                &ui.pinned,
-                width,
-                rows,
-                now,
-            ),
-            reveal,
-        ),
         Open::Picker(picker) => sheet(frame, above, picker_lines(picker, now, rows), reveal),
         Open::Pager(open) => paged(tree, frame, above, open, reveal),
         // A dropdown above the input box, like the switcher's.
@@ -437,14 +390,7 @@ fn over(frame: &mut Layout, region: Rect, lines: Vec<Line<'static>>) {
 
 /// The tail of the transcript, or the window the scroll keys parked on. What
 /// it drew is left in [`crate::layout::Layout`] for the next key to read.
-fn render_transcript(
-    tree: &Tree,
-    ui: &Ui,
-    frame: &mut Layout,
-    area: Rect,
-    now: Now,
-    live: Vec<Line<'static>>,
-) {
+fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
     if area.height == 0 {
         return;
     }
@@ -465,10 +411,10 @@ fn render_transcript(
         .saying(ui.update.as_deref())
         .opening(ui.focus.intro().map(|intro| intro.seconds(now)))
         .measuring(ui.measure),
-        live,
     );
     frame.top = ui.scroll.top(frame.height, rows, now.instant);
     let mut shown = frame.blocks.window(frame.top, rows);
+    mark_row(ui, frame, &mut shown);
     // A short transcript hangs from the composer, not from the top of the screen.
     let padding = frame.padding();
     shown.splice(..0, std::iter::repeat_n(Line::default(), padding));
@@ -486,6 +432,26 @@ fn render_transcript(
     }
     if ui.crossfading(now) {
         layers::hush(frame, area);
+    }
+}
+
+/// Mark focus in the drawn copy, leaving the cached transcript unchanged.
+fn mark_row(ui: &Ui, frame: &Layout, shown: &mut [Line<'static>]) {
+    let Some(item) = ui.focus.row() else {
+        return;
+    };
+    let Some((start, _)) = frame.blocks.span(item) else {
+        return;
+    };
+    let Some(row) = start
+        .checked_sub(frame.top)
+        .and_then(|at| shown.get_mut(at))
+    else {
+        return;
+    };
+    if let Some(bullet) = row.spans.first_mut() {
+        bullet.content = "❯ ".into();
+        bullet.style = theme::presence();
     }
 }
 
@@ -1771,56 +1737,6 @@ mod tests {
         )
     }
 
-    /// The roster a room publishes, spelled as `bingo-rooms` publishes it: the
-    /// names a reader parses and the tree a surface draws, in one payload. A
-    /// node per seat, badged only where the ear is not the default one a bare
-    /// name asks for (ADR-0034 §6).
-    fn members() -> Event {
-        extended(
-            "bingo.rooms",
-            "members",
-            json!({
-                "members": ["reviewer", "scout"],
-                "kind": "tree",
-                "nodes": [
-                    {"label": "reviewer", "tone": "neutral"},
-                    {"label": "scout", "badge": "live", "tone": "neutral"},
-                ],
-            }),
-        )
-    }
-
-    /// The sheet lists what the plugins wrote — but the task list, which has
-    /// its own place under the activity row (M74) and is not listed twice.
-    #[test]
-    fn ctrl_p_shows_what_the_plugins_wrote_into_the_session() {
-        let tree = room(vec![
-            posted(2, "itm_1", "reviewer", "what is left?"),
-            log_frame(3, tasks()),
-            log_frame(4, members()),
-        ]);
-        let (mut ui, now) = scene();
-        shown(&mut ui, Open::Panel, now);
-        let screen = render_tree(&tree, &mut ui, now);
-        assert!(screen.contains("bingo.rooms · members"), "{screen}");
-        assert!(!screen.contains("bingo.tasks"), "{screen}");
-        insta::assert_snapshot!(screen);
-    }
-
-    #[test]
-    fn the_panel_shows_the_session_in_view_and_says_when_it_is_empty() {
-        let mut tree = room(vec![log_frame(2, members())]);
-        let (mut ui, now) = scene();
-        shown(&mut ui, Open::Panel, now);
-        assert!(render_tree(&tree, &mut ui, now).contains("scout"));
-
-        let root = tree.root_id().clone();
-        tree.show(&root);
-        let screen = render_tree(&tree, &mut ui, now);
-        assert!(screen.contains(crate::panel::NOTHING), "{screen}");
-        assert!(!screen.contains("scout"), "{screen}");
-    }
-
     /// A room's board is the room's own list, drawn where any list is: under
     /// the activity row of the room's own view, and nowhere in a member's.
     #[test]
@@ -1840,50 +1756,6 @@ mod tests {
     }
 
     // ---- the three lanes (ADR-0013) -------------------------------------
-
-    /// A person who pinned the board into the rail and put the focus on it.
-    fn watching() -> (Ui, Now) {
-        let (mut ui, now) = scene();
-        pin_board(&mut ui);
-        ui.focus = crate::focus::Focus::Card(demo_card("board"));
-        (ui, now)
-    }
-
-    #[test]
-    fn the_rail_holds_the_pinned_board_and_the_live_progress_card() {
-        let (mut ui, now) = watching();
-        let screen = draw_sized(120, 40, &boarded(), &mut ui, now);
-        assert!(screen.contains("❯ Board"), "{screen}");
-        assert!(screen.contains("[ 1 Tick ]"), "{screen}");
-        assert!(screen.contains("████████░░ 80 %"), "{screen}");
-        insta::assert_snapshot!(screen);
-    }
-
-    #[test]
-    fn a_rail_is_not_drawn_for_a_session_no_plugin_has_written_to() {
-        let (mut ui, now) = scene();
-        draw_sized(120, 40, &state(), &mut ui, now);
-        let quiet = ui.shown.regions;
-        assert!(quiet.rail.is_none(), "an empty rail is not drawn");
-        assert_eq!(quiet.transcript.width, 120, "the transcript keeps it all");
-
-        let (mut ui, now) = watching();
-        draw_sized(120, 40, &boarded(), &mut ui, now);
-        let busy = ui.shown.regions;
-        assert!(busy.rail.is_some(), "a card asks for the column");
-        assert_eq!(busy.transcript.width, 120 - crate::frame::RAIL_WIDTH);
-    }
-
-    /// Below the rail's width the same cards draw under the running rows, so
-    /// a signal is never lost to a narrow terminal (design §3).
-    #[test]
-    fn without_a_rail_the_same_cards_draw_under_the_running_rows() {
-        let (mut ui, now) = watching();
-        let screen = render(&boarded(), &mut ui, now);
-        assert!(screen.contains("████████░░ 80 %"), "{screen}");
-        assert!(screen.contains("❯ Board"), "{screen}");
-        insta::assert_snapshot!(screen);
-    }
 
     /// The block lane: what a tool drew for a person, under its own row and
     /// folded like any other output.

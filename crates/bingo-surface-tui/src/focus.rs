@@ -1,10 +1,10 @@
 //! The single surface owner shared by keys and pointer events.
 
 use crate::opening::Playing;
-use crate::rail::CardId;
 use crate::search::Search;
 use crate::select::Run;
 use crate::ui::Layer;
+use bingo_sdk::ItemId;
 
 #[derive(Debug, Default)]
 pub enum Focus {
@@ -14,7 +14,7 @@ pub enum Focus {
     Select(Run),
     Search(Search),
     Layer(Layer),
-    Card(CardId),
+    Row(ItemId),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,7 +24,7 @@ pub enum Owner {
     Select,
     Search,
     Layer,
-    Card,
+    Row,
     Interaction,
     Menu,
 }
@@ -44,7 +44,7 @@ fn resolve(focus: &Focus, interaction: bool, menu: bool) -> Owner {
         Focus::Select(_) => Owner::Select,
         Focus::Search(_) => Owner::Search,
         Focus::Layer(layer) if layer.showing() => Owner::Layer,
-        Focus::Card(_) => Owner::Card,
+        Focus::Row(_) => Owner::Row,
         _ if interaction => Owner::Interaction,
         _ if menu => Owner::Menu,
         _ => Owner::Composer,
@@ -87,8 +87,8 @@ impl Focus {
             None
         }
     }
-    pub fn card(&self) -> Option<&CardId> {
-        if let Self::Card(value) = self {
+    pub fn row(&self) -> Option<&ItemId> {
+        if let Self::Row(value) = self {
             Some(value)
         } else {
             None
@@ -176,7 +176,7 @@ mod tests {
     fn focus_has_one_owner_for_every_key_class_and_left_press() {
         let (_, now) = scene();
         let mut layer = Layer::shut(now.instant);
-        layer.show(Open::Panel, now.instant);
+        layer.show(Open::Help, now.instant);
         let cases = [
             (Focus::Composer, Owner::Composer),
             (Focus::Intro(Playing::from(now.instant)), Owner::Intro),
@@ -189,14 +189,7 @@ mod tests {
             ),
             (Focus::Search(Search::open()), Owner::Search),
             (Focus::Layer(layer), Owner::Layer),
-            (
-                Focus::Card(CardId {
-                    plugin: "fixture".into(),
-                    kind: "card".into(),
-                    slot: None,
-                }),
-                Owner::Card,
-            ),
+            (Focus::Row(ItemId::from_raw("itm_focus")), Owner::Row),
         ];
         for (focus, expected) in cases {
             for event in [
@@ -278,7 +271,7 @@ mod dispatch_tests {
             assert!(crate::pointer::on_mouse(&mut ui, &tree, mouse, now).is_empty());
             assert!(ui.focus.selection().is_none());
         }
-        for open in [crate::ui::Open::Panel, crate::ui::Open::Help] {
+        for open in [crate::ui::Open::Help] {
             ui.focus.show(open, now.instant);
             assert_eq!(owner(&ui, &tree), Owner::Layer);
             assert!(crate::pointer::on_mouse(&mut ui, &tree, mouse, now).is_empty());

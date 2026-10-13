@@ -61,20 +61,6 @@ fn layout_renders_each_band_once_and_reuses_unchanged_blocks() {
 }
 
 #[test]
-fn layout_finds_a_rail_card_without_a_terminal() {
-    let (mut ui, now) = scene();
-    pin_board(&mut ui);
-    let frame = layout(Layout::default(), &solo(&boarded()), &ui, SIZE, now);
-    assert!(frame.regions.rail.is_some());
-    assert!(
-        frame
-            .rail
-            .iter()
-            .any(|(id, rows)| *id == demo_card("board") && !rows.is_empty())
-    );
-}
-
-#[test]
 fn layout_schedules_exit_at_its_deadline() {
     let (mut ui, now) = scene();
     ui.armed = Some(now.instant);
@@ -95,7 +81,7 @@ fn layout_schedules_a_scroll_sample() {
 }
 
 #[test]
-fn layout_answers_picture_and_rail_clicks_without_painting() {
+fn layout_answers_picture_clicks_without_painting() {
     use crate::effect::Effect;
     use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
     let click = |x, y| MouseEvent {
@@ -105,21 +91,6 @@ fn layout_answers_picture_and_rail_clicks_without_painting() {
         modifiers: KeyModifiers::NONE,
     };
     let (mut ui, now) = scene();
-    pin_board(&mut ui);
-    let tree = solo(&boarded());
-    ui.shown = layout(Layout::default(), &tree, &ui, SIZE, now);
-    let rail = ui.shown.regions.rail.expect("rail");
-    let row = ui
-        .shown
-        .rail
-        .iter()
-        .find(|(id, _)| *id == demo_card("board"))
-        .expect("board")
-        .1
-        .start;
-    crate::pointer::on_mouse(&mut ui, &tree, click(rail.x + 1, rail.y + row as u16), now);
-    assert_eq!(ui.focus.card().cloned(), Some(demo_card("board")));
-
     let mut state = state();
     let mut picture = user("itm_picture", "A picture.");
     if let bingo_sdk::ItemBody::User { parts, .. } = &mut picture.body {
@@ -241,37 +212,6 @@ fn layout_running_turn_schedules_each_motion_sample() {
         next.next_frame,
         Some(later_sample.instant + crate::clock::FRAME)
     );
-}
-
-#[test]
-fn layout_unbounded_rail_schedules_its_next_step() {
-    let (ui, now) = scene();
-    let state = folded(vec![frame(
-        1,
-        signalled(
-            "fixture",
-            "progress",
-            bingo_sdk::slot::with(
-                serde_json::json!({}),
-                vec![bingo_sdk::slot::Slot::Rail {
-                    title: "progress".into(),
-                    view: bingo_sdk::View::Progress {
-                        value: 1,
-                        total: None,
-                        label: None,
-                    },
-                }],
-            ),
-        ),
-    )]);
-    let tree = solo(&state);
-    let first = layout(Layout::default(), &tree, &ui, SIZE, now);
-    let due = first.next_frame.expect("moving rail");
-    assert_eq!(due, now.instant + std::time::Duration::from_millis(250));
-    let same = layout(Layout::default(), &tree, &ui, SIZE, later(now, 249));
-    assert_eq!(same.canvas, first.canvas);
-    let next = layout(first, &tree, &ui, SIZE, later(now, 250));
-    assert_ne!(next.canvas, same.canvas);
 }
 
 #[test]

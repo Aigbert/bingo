@@ -158,30 +158,6 @@ fn the_rewind_card_scrolls_under_the_row_the_keyboard_is_on() {
     assert_eq!(cuts(&screen), 2);
 }
 
-/// Four plugins with a board each: more rows than the sheet can hold.
-fn crowded_panel(cursor: usize) -> (bingo_sdk::SessionState, Ui, Now) {
-    let frames = (1..=4)
-        .map(|i| {
-            frame(
-                i,
-                extended(
-                    &format!("bingo.plugin-{i}"),
-                    "board",
-                    json!([
-                        {"id": 1, "status": "pending", "subject": "write the plan"},
-                        {"id": 2, "status": "in_progress", "subject": "ship it"},
-                        {"id": 3, "status": "done", "subject": "read the diff"},
-                    ]),
-                ),
-            )
-        })
-        .collect();
-    let (mut ui, now) = scene();
-    ui.panel = cursor;
-    shown(&mut ui, Open::Panel, now);
-    (folded(frames), ui, now)
-}
-
 /// A question with a dozen options, each with a description: a card with more
 /// answers in it than the box has rows to walk them in.
 fn crowded_question(focus: usize) -> (Tree, Ui, Now) {
@@ -272,19 +248,4 @@ fn a_card_walks_its_answers_without_losing_the_one_it_is_on() {
     let screen = shot("question_end", &tree, &mut ui, now);
     assert!(marked(&screen).contains("option 12"), "{screen}");
     assert_eq!(cuts(&screen), 1);
-}
-
-/// The panel's cursor walks headings, and each heading carries its view under
-/// it — so the sheet starts at the one it is on rather than around it.
-#[test]
-fn the_panel_sheet_starts_at_the_row_the_keyboard_is_on() {
-    let (state, mut ui, now) = crowded_panel(3);
-    let screen = shot("panel_end", &solo(&state), &mut ui, now);
-    assert!(marked(&screen).contains("bingo.plugin-4"), "{screen}");
-    assert_eq!(cuts(&screen), 1);
-
-    let (state, mut ui, now) = crowded_panel(1);
-    let screen = shot("panel_middle", &solo(&state), &mut ui, now);
-    assert!(marked(&screen).contains("bingo.plugin-2"), "{screen}");
-    assert_eq!(cuts(&screen), 2);
 }

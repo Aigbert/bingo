@@ -20,12 +20,11 @@ use crate::fold;
 use crate::keys;
 use crate::mentions;
 use crate::pager;
-use crate::rail::{self, CardId, Pin};
 use crate::rewind::{self, Rewind};
 use crate::search::Search;
 use crate::tree::Tree;
 use crate::ui::{Menu, Open, Pending, Ui};
-use crate::{panel, views};
+use crate::views;
 
 mod switcher;
 
@@ -100,7 +99,7 @@ fn tabbed(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         dropdown: !suggestions(ui, tree).is_empty(),
         busy: tree.viewed().busy(),
         typing: !ui.composer.text().trim().is_empty(),
-        focusable: !rail::cards(tree.viewed(), tree.view(), &ui.pinned).is_empty(),
+        focusable: !row_actions(tree.viewed()).is_empty(),
     };
     match keys::tab(at) {
         Some(keys::Tab::Complete) => accept(ui, tree),
@@ -108,7 +107,7 @@ fn tabbed(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         // waits for the running turn rather than steering it.
         Some(keys::Tab::Queue) => submit(ui, tree, now, Delivery::Hold),
         Some(keys::Tab::Focus) => {
-            cycle_focus(ui, tree);
+            cycle_focus(ui, tree, now);
             Vec::new()
         }
         None => Vec::new(),
@@ -142,7 +141,6 @@ fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effe
         match chord {
             'f' => ui.focus = crate::focus::Focus::Search(Search::open()),
             switcher::CHORD => return Some(switcher::toggle(ui, tree, now)),
-            'p' => ui.focus.toggle(Open::Panel, now.instant),
             'o' => deepen(ui, tree, now),
             'b' => return Some(background(ui, tree, now)),
             // No other chord reaches here: `LAYERS` is what `chorded` answers.
@@ -153,17 +151,14 @@ fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effe
     if !ui.focus.captures() {
         return None;
     }
-    Some(match *ui.focus.open() {
-        Open::Panel => panel_keys(ui, tree, key, now),
-        _ => switcher::keys(ui, tree, key, now),
-    })
+    Some(switcher::keys(ui, tree, key, now))
 }
 
 /// The control chords that open a layer of their own — the one table there is
 /// of them. Every other control chord is the line's ([`control`]): `ctrl+w`
 /// deletes a word wherever a person is typing, the list's own query included,
 /// so it must not be mistaken for a layer's key.
-const LAYERS: [char; 5] = ['f', switcher::CHORD, 'p', 'o', 'b'];
+const LAYERS: [char; 4] = ['f', switcher::CHORD, 'o', 'b'];
 
 /// The letter of a layer's control chord, if that is what this key is.
 fn chorded(key: KeyEvent) -> Option<char> {
@@ -203,7 +198,7 @@ fn deepen(ui: &mut Ui, tree: &Tree, now: Now) {
 /// `ctrl+b` hands the shell command that is running to the background: the
 /// plugin's own command, fired by name with the call it is to act on
 /// (ADR-0018 §6). The plugin does the rest — the call returns early with a job
-/// id, and the rail draws the job from the signal it already publishes.
+/// id, and its row follows the signal it already publishes.
 fn background(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     let Some(action) = placed_action(tree.viewed(), 'b') else {
         ui.notify(Level::Info, NOTHING_RUNNING, now.instant);
@@ -281,62 +276,55 @@ fn folds(item: &bingo_sdk::Item) -> bool {
     }
 }
 
-/// The panel sheet answers its own keys: the cursor walks the kinds the
-/// plugins published, and `⏎` pins one into the rail or takes it back.
-fn panel_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
-    let rows = panel::rows(tree.viewed());
-    match key.code {
-        KeyCode::Up => ui.panel = ui.panel.saturating_sub(1),
-        KeyCode::Down => ui.panel = (ui.panel + 1).min(rows.len().saturating_sub(1)),
-        KeyCode::Esc => ui.focus.close(now.instant),
-        KeyCode::Enter => pin(ui, tree.view(), rows.get(ui.panel)),
-        _ => {}
-    }
-    Vec::new()
+/// Rows with actions, in transcript order, using the last placement as drawing does.
+fn row_actions(state: &SessionState) -> Vec<(bingo_sdk::ItemId, Vec<bingo_sdk::ActionItem>)> {
+    let placed = bingo_sdk::slot::placed(state);
+    state
+        .transcript
+        .items()
+        .iter()
+        .filter_map(|item| {
+            let actions = placed.iter().rev().find_map(|placed| match &placed.slot {
+                bingo_sdk::slot::Slot::Row {
+                    item: id, actions, ..
+                } if id == &item.id => Some(actions),
+                _ => None,
+            })?;
+            (!actions.is_empty()).then(|| (item.id.clone(), actions.clone()))
+        })
+        .collect()
 }
 
-fn pin(ui: &mut Ui, session: &SessionId, card: Option<&CardId>) {
-    let Some(card) = card else {
+/// Tab walks the placed rows, then returns the keyboard to the composer.
+fn cycle_focus(ui: &mut Ui, tree: &Tree, now: Now) {
+    let rows = row_actions(tree.viewed());
+    let next = ui
+        .focus
+        .row()
+        .and_then(|id| rows.iter().position(|(item, _)| item == id))
+        .map_or(0, |at| at + 1);
+    let Some((item, _)) = rows.get(next) else {
+        ui.focus = crate::focus::Focus::Composer;
         return;
     };
-    let pin = Pin {
-        session: session.clone(),
-        card: card.clone(),
-    };
-    if !ui.pinned.remove(&pin) {
-        ui.pinned.insert(pin);
+    ui.focus = crate::focus::Focus::Row(item.clone());
+    if let Some((line, _)) = ui.shown.blocks.span(item) {
+        ui.scroll.reveal(
+            line,
+            ui.shown.height,
+            usize::from(ui.shown.regions.transcript.height),
+            now.instant,
+        );
     }
 }
 
-/// `tab` walks the rail's cards and then comes back round to none, so the
-/// digits belong to what a person is typing again (design §7: focus moves by
-/// opening and closing, never by an ambient event). A rail with no cards in
-/// it leaves the key to whoever wanted it.
-fn cycle_focus(ui: &mut Ui, tree: &Tree) -> bool {
-    let cards = rail::cards(tree.viewed(), tree.view(), &ui.pinned);
-    if cards.is_empty() {
-        return false;
-    }
-    let at = ui
-        .focus
-        .card()
-        .and_then(|id| cards.iter().position(|card| &card.id == id));
-    ui.focus = match at {
-        Some(at) if at + 1 == cards.len() => crate::focus::Focus::Composer,
-        Some(at) => crate::focus::Focus::Card(cards[at + 1].id.clone()),
-        None => crate::focus::Focus::Card(cards[0].id.clone()),
-    };
-    true
-}
-
-/// A key on the focused card fires the action it names (ADR-0013 §3). The
-/// button wears the mark until the session's stream moves, which is the ack.
+/// A focused row owns only the keys its actions offer.
 fn fire(ui: &mut Ui, tree: &Tree, key: char) -> Option<Vec<Effect>> {
     let state = tree.viewed();
-    let focus = ui.focus.card()?.clone();
-    let cards = rail::cards(state, tree.view(), &ui.pinned);
-    let card = cards.iter().find(|card| card.id == focus)?;
-    let action = views::actions::fired(&views::actions_of(&card.body), key)?
+    let focus = ui.focus.row()?;
+    let rows = row_actions(state);
+    let (_, actions) = rows.iter().find(|(item, _)| item == focus)?;
+    let action = views::actions::fired(&actions.iter().collect::<Vec<_>>(), key)?
         .action
         .clone();
     ui.pending = Some(Pending {
@@ -402,6 +390,9 @@ fn interrupt_or_exit(ui: &mut Ui, state: &SessionState, now: Now) -> Vec<Effect>
 /// order of [`keys::ESCAPES`]. Leaving a card is the card's own answer, so
 /// that rung goes back to the dialog.
 fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+    if ui.focus.row().is_some() {
+        ui.focus = crate::focus::Focus::Composer;
+    }
     let open = keys::Open {
         // One layer is open at a time, whichever form it takes.
         sheet: ui.focus.showing(),
@@ -739,7 +730,7 @@ fn plain(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         KeyCode::Char('v') if reading(ui) => start_selection(ui),
         // A key belongs to the focused card's buttons while one is focused and
         // nothing is being typed; the rest of the time it is a letter.
-        KeyCode::Char(c) if ui.composer.is_empty() && ui.focus.card().is_some() => {
+        KeyCode::Char(c) if ui.composer.is_empty() && ui.focus.row().is_some() => {
             if let Some(effects) = fire(ui, tree, c) {
                 return effects;
             }
@@ -2034,9 +2025,9 @@ mod tests {
         write(&mut ui, tree.viewed(), "half a thought", now);
         press_tree(&mut ui, &tree, ctrl('g'), now);
         typing(&mut ui, &tree, "sco", now);
-        press_tree(&mut ui, &tree, ctrl('p'), now);
+        press_tree(&mut ui, &tree, ctrl('f'), now);
         assert!(
-            ui.focus.is(&Open::Panel),
+            ui.focus.search().is_some(),
             "the chord's own layer is what is up"
         );
         assert_eq!(ui.composer.text(), "half a thought");
@@ -3404,19 +3395,6 @@ mod tests {
 
     // ---- the plugin-state panel -----------------------------------------
 
-    #[test]
-    fn ctrl_p_toggles_the_plugin_state_panel_and_esc_closes_it() {
-        let (mut ui, now) = scene();
-        assert!(press(&mut ui, &state(), ctrl('p'), now).is_empty());
-        assert!(ui.focus.is(&Open::Panel));
-        press(&mut ui, &state(), ctrl('p'), now);
-        assert!(!ui.focus.is(&Open::Panel), "the same chord closes it");
-
-        press(&mut ui, &state(), ctrl('p'), now);
-        assert!(press(&mut ui, &state(), key(KeyCode::Esc), now).is_empty());
-        assert!(!ui.focus.showing(), "and so does esc");
-    }
-
     /// Claude Code's key for its own list (M74): the rows go off the band and
     /// come back, and no layer opens over anything.
     #[test]
@@ -3435,8 +3413,8 @@ mod tests {
         let (mut ui, now) = scene();
         press(&mut ui, &state(), typed('?'), now);
         assert!(ui.focus.is(&Open::Help));
-        press(&mut ui, &state(), ctrl('p'), now);
-        assert!(ui.focus.is(&Open::Panel), "focus moves, never sideways");
+        press(&mut ui, &state(), ctrl('f'), now);
+        assert!(ui.focus.search().is_some(), "focus moves, never sideways");
     }
 
     #[test]
@@ -3577,97 +3555,11 @@ mod tests {
     }
 
     #[test]
-    fn tab_walks_the_rail_cards_and_comes_back_round_to_none() {
-        let state = boarded();
-        let (mut ui, now) = scene();
-        pin_board(&mut ui);
-        assert_eq!(ui.focus.card(), None);
-        press(&mut ui, &state, key(KeyCode::Tab), now);
-        assert_eq!(ui.focus.card().cloned(), Some(demo_card("board")));
-        press(&mut ui, &state, key(KeyCode::Tab), now);
-        assert_eq!(ui.focus.card().cloned(), Some(demo_card("progress")));
-        press(&mut ui, &state, key(KeyCode::Tab), now);
-        assert_eq!(
-            ui.focus.card(),
-            None,
-            "and the keys are the composer's again"
-        );
-    }
-
-    #[test]
-    fn tab_is_left_alone_when_the_rail_has_no_cards_to_walk() {
-        let (mut ui, now) = scene();
-        press(&mut ui, &state(), key(KeyCode::Tab), now);
-        assert_eq!(ui.focus.card(), None);
-    }
-
-    #[test]
-    fn a_key_on_the_focused_card_fires_the_action_it_names() {
-        let state = boarded();
-        let (mut ui, now) = scene();
-        pin_board(&mut ui);
-        ui.focus = crate::focus::Focus::Card(demo_card("board"));
-        let fired = press(&mut ui, &state, typed('1'), now);
-        assert_eq!(
-            action_of(&fired).map(|action| action.name.as_str()),
-            Some("board.tick")
-        );
-        assert_eq!(ui.composer.text(), "", "the key was not typed as well");
-        assert_eq!(
-            ui.pending.as_ref().map(|pending| pending.seq),
-            Some(state.seq),
-            "the mark waits for the stream to move"
-        );
-    }
-
-    #[test]
-    fn a_key_the_focused_card_does_not_offer_is_a_letter_like_any_other() {
-        let state = boarded();
-        let (mut ui, now) = scene();
-        pin_board(&mut ui);
-        ui.focus = crate::focus::Focus::Card(demo_card("board"));
-        assert!(press(&mut ui, &state, typed('9'), now).is_empty());
-        assert_eq!(ui.composer.text(), "9");
-    }
-
-    #[test]
     fn a_digit_with_no_card_focused_is_typed() {
         let state = boarded();
         let (mut ui, now) = scene();
-        pin_board(&mut ui);
         assert!(press(&mut ui, &state, typed('1'), now).is_empty());
         assert_eq!(ui.composer.text(), "1");
-    }
-
-    #[test]
-    fn a_click_on_the_rail_focuses_the_card_it_landed_on() {
-        let state = boarded();
-        let (mut ui, now) = scene();
-        pin_board(&mut ui);
-        // The rail exists only once it has been drawn: a click is answered
-        // against the frame the last draw left behind.
-        draw_sized(120, 40, &state, &mut ui, now);
-        let rail = ui.shown.regions.rail.expect("a rail at 120 columns");
-        let effects = on_mouse(&mut ui, &solo(&state), click(rail.x + 2, rail.y), now);
-        assert!(effects.is_empty());
-        assert_eq!(ui.focus.card().cloned(), Some(demo_card("board")));
-    }
-
-    #[test]
-    fn enter_in_the_panel_sheet_pins_a_panel_and_again_takes_it_back() {
-        let state = boarded();
-        let (mut ui, now) = scene();
-        press(&mut ui, &state, ctrl('p'), now);
-        assert!(ui.focus.captures(), "the sheet answers its own keys");
-        press(&mut ui, &state, key(KeyCode::Enter), now);
-        assert!(ui.pinned.contains(&crate::rail::Pin {
-            session: bingo_sdk::SessionId::from_raw("ses_1"),
-            card: demo_card("board"),
-        }));
-        press(&mut ui, &state, key(KeyCode::Enter), now);
-        assert!(ui.pinned.is_empty(), "the same key takes it back");
-        press(&mut ui, &state, ctrl('p'), now);
-        assert!(!ui.focus.showing(), "ctrl+p still closes it");
     }
 
     // ---- the line that waits (M68) --------------------------------------
