@@ -516,7 +516,7 @@ mod tests {
         assert_eq!(tree.spawned_by(&spawned), Some(&child_id()));
         assert_eq!(
             agents.get(&spawned).and_then(|child| activity(child)),
-            Some("Starting…".to_string())
+            Some("idle".to_string())
         );
 
         tree.show(&child_id());
@@ -574,7 +574,7 @@ mod tests {
         let running = tree.fold.sessions().nth(1).expect("the child");
         assert_eq!(
             activity(running).as_deref(),
-            Some("Running… 3 tools · 1.2k tokens")
+            Some("working · 3 tools · 1.2k tokens")
         );
 
         tree.fold.apply(&child_frame(
@@ -584,12 +584,12 @@ mod tests {
         let done = tree.fold.sessions().nth(1).expect("the child");
         assert_eq!(
             activity(done).as_deref(),
-            Some("Done (3 tools · 1.2k tokens · 0s)")
+            Some("idle · completed · 3 tools · 1.2k tokens · 0s")
         );
 
         tree.fold.apply(&child_frame(7, opened(child_permission())));
         let asking = tree.fold.sessions().nth(1).expect("the child");
-        assert_eq!(activity(asking).as_deref(), Some("Needs you"));
+        assert_eq!(activity(asking).as_deref(), Some("asking"));
     }
 
     /// What a row says of a session that has not run yet: the thing it was
@@ -748,7 +748,10 @@ mod tests {
             },
         ));
         assert_eq!(tree.rows()[1].status, Some(Lifecycle::Stored));
-        assert_eq!(activity(tree.state(&child_id()).unwrap()), None);
+        assert_eq!(
+            activity(tree.state(&child_id()).unwrap()).as_deref(),
+            Some("stored")
+        );
         tree.fold.apply(&child_frame(4, announced("reviewer")));
         let child = tree.state(&child_id()).expect("still in the tree");
         assert_eq!(Lifecycle::of_state(child), Some(Lifecycle::Idle));

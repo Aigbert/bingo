@@ -724,9 +724,9 @@ fn a_waiting_childs_row_and_its_switcher_line_pulse_with_it() {
         child_frame(2, opened(child_permission())),
     ]);
     let (_, now) = scene();
-    assert_eq!(transcript_style(&tree, now, "Needs"), theme::presence());
+    assert_eq!(transcript_style(&tree, now, "asking"), theme::presence());
     assert_eq!(
-        transcript_style(&tree, later(now, 1_000), "Needs"),
+        transcript_style(&tree, later(now, 1_000), "asking"),
         theme::text(),
         "the child's row is on the same beat"
     );

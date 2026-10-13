@@ -546,8 +546,8 @@ mod tests {
             drawn,
             vec![
                 "Agents",
-                "❯ ⏺ project   what is in this workspace?",
-                "  ~ reviewer  running · in #design · live · owes an answer · 22m · 3 tools · 1.…",
+                "❯ ⏺ project   idle · what is in this workspace?",
+                "  ~ reviewer  working · in #design · live · owes an answer · 22m · 3 tools · 1.…",
                 "  ⏺ watcher   idle · in #design · listening · 600s",
                 "Rooms",
                 "  #design  2 seats · 1 owed",
@@ -571,6 +571,7 @@ mod tests {
         let glyph = dot(
             reviewer,
             seats::seat(&tree, tree.state(reviewer.session).expect("it")).as_ref(),
+            None,
         );
         assert!(glyph.content.starts_with('~'), "{glyph:?}");
         assert_eq!(
@@ -615,12 +616,12 @@ mod tests {
     fn a_session_that_has_not_run_says_what_it_was_asked() {
         let drawn = drawn_at(&team(), Cursor::default(), 120, 8);
         assert!(
-            drawn[1].contains("project   what is in this workspace?"),
+            drawn[1].contains("project   idle · what is in this workspace?"),
             "{drawn:#?}"
         );
         assert!(
             drawn[2].contains(
-                "reviewer  running · in #design · live · owes an answer · 22m · 3 tools · 1.2k tokens"
+                "reviewer  working · in #design · live · owes an answer · 22m · 3 tools · 1.2k tokens"
             ),
             "one that has run says what it is doing, then where it sits and what \
              it owes, and only then what it has spent: {drawn:#?}"
@@ -651,7 +652,7 @@ mod tests {
         ]);
         let drawn = drawn_at(&tree, Cursor::default(), 80, 8);
         assert!(
-            drawn[1].contains("reviewer  idle · needs you"),
+            drawn[1].contains("reviewer  asking · needs you"),
             "{drawn:#?}"
         );
     }
@@ -690,7 +691,7 @@ mod tests {
         assert_eq!(
             drawn,
             vec![
-                "❯ ~ reviewer  running · in #design · live · owes an answer · 22m · 3 tools · 1.…",
+                "❯ ~ reviewer  working · in #design · live · owes an answer · 22m · 3 tools · 1.…",
             ],
             "one row, no label over the only run left, and no line of its own: {drawn:#?}"
         );
@@ -705,7 +706,7 @@ mod tests {
             drawn,
             vec![
                 "Agents",
-                "❯ ~ reviewer  running · in #design · live · owes an answer · 22m · 3 tools · 1.2k tokens",
+                "❯ ~ reviewer  working · in #design · live · owes an answer · 22m · 3 tools · 1.2k tokens",
                 "  ⏺ watcher   idle · in #design · listening · 600s",
                 "Rooms",
                 "  #design  2 seats · 1 owed",
