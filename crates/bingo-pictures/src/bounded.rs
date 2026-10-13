@@ -230,6 +230,7 @@ mod tests {
             assert_eq!(image.media_type, media_type, "{format:?}");
             assert_eq!(decoded(&image), bytes, "{format:?} the very bytes");
             assert_eq!(image.path, None, "the caller says where it is");
+            assert_eq!((image.width, image.height), (Some(40), Some(30)));
         }
     }
 
@@ -242,6 +243,7 @@ mod tests {
             bounded_within("image/png", &bytes, (200, 200), MODEL_BUDGET).expect("a picture");
         assert_eq!(image.media_type, "image/png", "flat colour stays PNG");
         assert_eq!(png_size(&decoded(&image)), Some((200, 150)));
+        assert_eq!((image.width, image.height), (Some(200), Some(150)));
     }
 
     /// Pixels no PNG can squeeze under the budget: the ladder goes lossy
