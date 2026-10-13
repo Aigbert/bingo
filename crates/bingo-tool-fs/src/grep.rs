@@ -348,6 +348,36 @@ impl Tool for GrepTool {
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn rough_edges_grep_display_preserves_content_and_shortens_only_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let content = format!("needle {}", dir.path().display());
+        write(dir.path(), "a.rs", &content);
+        for (mode, suffix) in [
+            ("files_with_matches", String::new()),
+            ("count", ":1".into()),
+            ("content", format!(":1:{content}")),
+        ] {
+            let out = GrepTool
+                .call(
+                    serde_json::json!({"pattern":"needle", "output_mode":mode,"-n":true}),
+                    &context(dir.path()),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                out.parts[0].as_text(),
+                Some(format!("{}{suffix}", dir.path().join("a.rs").display()).as_str())
+            );
+            assert_eq!(
+                out.display,
+                Some(bingo_sdk::View::Text {
+                    text: format!("a.rs{suffix}")
+                })
+            );
+        }
+    }
+
     use super::*;
     use crate::tests::{context, write};
 

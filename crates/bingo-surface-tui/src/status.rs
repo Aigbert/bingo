@@ -368,6 +368,18 @@ pub fn styles(line: &Line<'static>) -> Vec<(String, ratatui::style::Style)> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_counts_have_one_precision() {
+        for (n, expected) in [
+            (812, "812"),
+            (1_200, "1.2k"),
+            (13_812, "13k"),
+            (1_200_000, "1.2M"),
+        ] {
+            assert_eq!(thousands(n), expected);
+        }
+    }
+
     use super::*;
     use crate::test_support::*;
     use bingo_sdk::{ContextUsage, Event, ItemBody, ItemStatus, TurnId};

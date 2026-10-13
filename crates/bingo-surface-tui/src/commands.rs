@@ -245,6 +245,21 @@ fn offered(head: &str, partial: &str, args: &ArgSpec, catalogues: &Catalogues) -
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_quit_is_an_alias_not_a_second_row() {
+        let specs = local_specs();
+        assert!(!specs.iter().any(|s| s.name == "quit"));
+        assert!(
+            specs
+                .iter()
+                .find(|s| s.name == "exit")
+                .unwrap()
+                .aliases
+                .contains(&"quit".into())
+        );
+        assert_eq!(local("/quit"), Some(Local::Exit));
+    }
+
     use super::*;
     use bingo_sdk::{CatalogEntry, CatalogKind};
 

@@ -334,6 +334,20 @@ fn cell(binding: &Binding, key_column: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_help_groups_keys_without_clipping_at_100() {
+        let lines = help_lines(96);
+        let text = lines
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        for group in ["write", "move", "turn", "sessions"] {
+            assert!(text.contains(group), "{text}");
+        }
+        assert!(!text.contains('…'), "{text}");
+    }
+
     use super::*;
 
     #[test]

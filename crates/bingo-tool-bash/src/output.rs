@@ -151,6 +151,32 @@ fn seconds(ms: u64) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_display_reports_only_output_and_an_abnormal_end() {
+        for (end, expected) in [
+            (Ended::Exited(0), "hi"),
+            (Ended::Exited(7), "hi\nexit 7"),
+            (
+                Ended::Timeout { after_ms: 200 },
+                "hi\n[timed out after 0.2s]",
+            ),
+            (Ended::Interrupted, "hi\n[interrupted]"),
+        ] {
+            assert_eq!(
+                shape("echo hi", "hi\n", end).display,
+                Some(bingo_sdk::View::Text {
+                    text: expected.into()
+                })
+            );
+        }
+        assert_eq!(
+            shape("true", "", Ended::Exited(0)).display,
+            Some(bingo_sdk::View::Text {
+                text: String::new()
+            })
+        );
+    }
+
     use super::*;
 
     fn collect(max: usize, text: &str) -> Bounded {

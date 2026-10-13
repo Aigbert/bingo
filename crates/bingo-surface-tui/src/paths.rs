@@ -142,6 +142,11 @@ fn clip(chars: impl Iterator<Item = char>, cells: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_an_absolute_path_keeps_its_first_segment() {
+        assert_eq!(elide("/var/folders/x/T/tmp.a/cwd", 16), "/var/…/tmp.a/cwd");
+    }
+
     use super::*;
 
     const CWD: &str = "/tmp/project";

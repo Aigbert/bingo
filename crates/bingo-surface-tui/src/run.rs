@@ -997,6 +997,13 @@ pub(crate) fn terminal_keys() -> Keys {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_debug_draws_are_quiet() {
+        if cfg!(debug_assertions) {
+            assert_eq!(slow_draw(Duration::from_secs(1), false), None);
+        }
+    }
+
     use super::*;
     use crate::test_support::*;
     use bingo_sdk::{CloseReason, ItemStatus, TurnStatus};

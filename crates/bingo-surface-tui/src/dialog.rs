@@ -551,3 +551,20 @@ fn indent(line: Line<'static>) -> Line<'static> {
     spans.extend(line.spans);
     Line::from(spans)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rough_edges_questions_are_sentences_for_the_preview() {
+        for (preview, expected) in [
+            (Some(serde_json::from_value(serde_json::json!({"kind":"command","command":"echo hi","cwd":"/work","description":"Print a greeting"})).unwrap()), "Do you want to run this command?"),
+            (Some(Preview::Url { url: "https://example.test".into() }), "Do you want to fetch this page?"),
+            (None, "Do you want to allow Edit src/lib.rs?"),
+        ] {
+            let interaction = crate::test_support::permission(None, preview);
+            assert_eq!(question(&interaction, "/work").unwrap().to_string(), expected);
+        }
+    }
+}

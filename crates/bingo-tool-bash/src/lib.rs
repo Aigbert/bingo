@@ -487,6 +487,16 @@ impl bingo_sdk::Hook for MissingShell {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    #[test]
+    fn rough_edges_command_preview_carries_the_description() {
+        let tool = BashTool::new(Arc::new(Jobs::default()));
+        let input = serde_json::json!({"command":"echo hi", "description":"Print a greeting"});
+        assert_eq!(
+            serde_json::to_value(tool.preview(&input, Path::new("/work"))).unwrap(),
+            serde_json::json!({"kind":"command","command":"echo hi","cwd":"/work","description":"Print a greeting"})
+        );
+    }
+
     use super::*;
 
     use std::path::PathBuf;

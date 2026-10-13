@@ -422,6 +422,15 @@ pub fn bullet_style(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_a_child_counts_only_what_it_wrote() {
+        let mut state = state();
+        state.summary.usage.input_tokens = 40_000;
+        state.summary.usage.cache_read_tokens = 80_000;
+        state.summary.usage.output_tokens = 8_100;
+        assert_eq!(spent(&state), "0 tools · ↓ 8.1k");
+    }
+
     use super::*;
     use crate::test_support::*;
     use bingo_sdk::{Applied, Event};

@@ -133,3 +133,770 @@ because after M123 the TUI names no tool and no plugin.
   (demo-ui, jobs). That is tui.md's rule already; list the snapshots.
 - Re-verify at start: the M123 rule 4f, the `Row`/`caption` shape after
   M123, `spent`'s callers, and the specs whose hint is a synopsis.
+
+## Verified (2026-10-14)
+
+### Regression tests before implementation
+
+`cargo test -p bingo-sdk -p bingo-tool-fs -p bingo-tool-bash -p bingo-core -p bingo-surface-tui rough_edges --no-fail-fast` (exit 101).
+
+```text
+      ┌─────────┐  mr boxington
+     ╱ ═══════ ╱│
+    ╱─────────╱ │
+    │ •    (◉)│≡│
+    │  ◟▄▄▄◞  │ ╱
+    │   ◀◆▶   │╱
+    └─────────┘
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+   Compiling libc v0.2.189
+   Compiling cfg-if v1.0.4
+   Compiling memchr v2.8.3
+   Compiling log v0.4.34
+   Compiling allocator-api2 v0.2.21
+   Compiling equivalent v1.0.2
+   Compiling foldhash v0.2.0
+   Compiling bitflags v2.13.1
+   Compiling serde_core v1.0.229
+   Compiling hashbrown v0.17.1
+   Compiling pin-project-lite v0.2.17
+   Compiling itoa v1.0.18
+   Compiling futures-core v0.3.34
+   Compiling bytes v1.12.1
+   Compiling once_cell v1.21.4
+   Compiling indexmap v2.14.0
+   Compiling futures-sink v0.3.34
+   Compiling serde v1.0.229
+   Compiling futures-io v0.3.34
+   Compiling futures-channel v0.3.34
+   Compiling slab v0.4.12
+   Compiling futures-task v0.3.34
+   Compiling errno v0.3.14
+   Compiling mio v1.2.2
+   Compiling syn v3.0.4
+   Compiling syn v2.0.119
+   Compiling socket2 v0.6.5
+   Compiling signal-hook-registry v1.4.8
+   Compiling tokio-macros v2.7.2
+   Compiling futures-macro v0.3.34
+   Compiling serde_derive v1.0.229
+   Compiling thiserror v2.0.20
+   Compiling thiserror-impl v2.0.20
+   Compiling tokio v1.53.1
+   Compiling futures-util v0.3.34
+   Compiling zmij v1.0.23
+   Compiling getrandom v0.4.3
+   Compiling rand_core v0.10.1
+   Compiling serde_json v1.0.151
+   Compiling synstructure v0.13.2
+   Compiling regex-syntax v0.8.11
+   Compiling tokio-util v0.7.19
+   Compiling fnv v1.0.7
+   Compiling zerofrom-derive v0.1.7
+   Compiling yoke-derive v0.8.2
+   Compiling stable_deref_trait v1.2.1
+   Compiling futures-executor v0.3.34
+   Compiling zerofrom v0.1.8
+   Compiling rustix v1.1.4
+   Compiling smallvec v1.15.2
+   Compiling ref-cast v1.0.27
+   Compiling yoke v0.8.3
+   Compiling shlex v2.0.1
+   Compiling jobserver v0.1.35
+   Compiling futures v0.3.34
+   Compiling chacha20 v0.10.2
+   Compiling zerovec-derive v0.11.6
+   Compiling ref-cast-impl v1.0.27
+   Compiling serde_derive_internals v0.30.0
+   Compiling zerocopy v0.8.56
+   Compiling find-msvc-tools v0.1.11
+   Compiling zerovec v0.11.8
+   Compiling schemars_derive v1.2.2
+   Compiling cc v1.4.4
+   Compiling rand v0.10.2
+   Compiling zerocopy-derive v0.8.56
+   Compiling displaydoc v0.2.7
+   Compiling dyn-clone v1.0.20
+   Compiling jiff-core v0.1.0
+   Compiling cmake v0.1.58
+   Compiling tracing-attributes v0.1.31
+   Compiling tracing-core v0.1.36
+   Compiling dunce v1.0.5
+   Compiling fs_extra v1.3.0
+   Compiling autocfg v1.5.1
+   Compiling pkg-config v0.3.34
+   Compiling base64 v0.23.1
+   Compiling tracing v0.1.44
+   Compiling num-traits v0.2.19
+   Compiling async-trait v0.1.92
+   Compiling aws-lc-sys v0.44.0
+   Compiling core-foundation-sys v0.8.7
+   Compiling tinystr v0.8.4
+   Compiling aho-corasick v1.1.5
+   Compiling writeable v0.6.4
+   Compiling fastrand v2.5.0
+   Compiling getrandom v0.3.4
+   Compiling litemap v0.8.3
+   Compiling tempfile v3.27.0
+   Compiling regex-automata v0.4.18
+   Compiling icu_locale_core v2.3.0
+   Compiling zerotrie v0.2.5
+   Compiling potential_utf v0.1.6
+   Compiling http v1.5.0
+   Compiling icu_properties_data v2.3.0
+   Compiling icu_normalizer_data v2.3.0
+   Compiling aws-lc-rs v1.18.0
+   Compiling bit-vec v0.8.0
+   Compiling utf8_iter v1.0.4
+   Compiling bit-set v0.8.0
+   Compiling icu_collections v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling zeroize v1.9.0
+   Compiling simd-adler32 v0.3.10
+   Compiling rand_core v0.9.5
+   Compiling http-body v1.1.0
+   Compiling adler2 v2.0.1
+   Compiling unicode-segmentation v1.13.3
+   Compiling httparse v1.10.1
+   Compiling crc32fast v1.5.1
+   Compiling system-configuration-sys v0.6.0
+   Compiling percent-encoding v2.3.2
+mbx[warning]: cc cache bypassed: compiler invocation names no output file
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling rustls-pki-types v1.15.1
+   Compiling try-lock v0.2.5
+   Compiling tower-service v0.3.3
+   Compiling untrusted v0.9.0
+   Compiling rustls v0.23.45
+   Compiling atomic-waker v1.1.2
+   Compiling idna_adapter v1.2.2
+   Compiling want v0.3.1
+   Compiling h2 v0.4.19
+   Compiling miniz_oxide v0.9.1
+   Compiling core-foundation v0.9.4
+   Compiling ppv-lite86 v0.2.21
+   Compiling wait-timeout v0.2.1
+   Compiling console v0.16.4
+   Compiling subtle v2.6.1
+   Compiling similar v2.7.0
+   Compiling rustversion v1.0.23
+   Compiling httpdate v1.0.3
+   Compiling quick-error v1.2.3
+   Compiling system-configuration v0.7.0
+   Compiling hyper v1.11.1
+   Compiling rusty-fork v0.3.1
+   Compiling rand_chacha v0.9.0
+   Compiling flate2 v1.1.10
+   Compiling idna v1.1.0
+   Compiling form_urlencoded v1.2.2
+   Compiling rand_xorshift v0.4.0
+   Compiling rand v0.9.5
+   Compiling strsim v0.11.1
+   Compiling ident_case v1.0.1
+   Compiling unarray v0.1.4
+   Compiling base64 v0.22.1
+   Compiling ipnet v2.12.1
+   Compiling darling_core v0.24.1
+   Compiling proptest v1.11.0
+   Compiling hyper-util v0.1.20
+   Compiling url v2.5.8
+   Compiling core-foundation v0.10.1
+   Compiling security-framework-sys v2.17.0
+   Compiling sync_wrapper v1.0.2
+   Compiling encoding_rs v0.8.35
+   Compiling either v1.18.0
+   Compiling heck v0.5.0
+   Compiling crossbeam-utils v0.8.22
+   Compiling signal-hook v0.3.18
+   Compiling tower-layer v0.3.3
+   Compiling parking_lot_core v0.9.12
+   Compiling tower v0.5.3
+   Compiling strum_macros v0.28.0
+   Compiling itertools v0.14.0
+   Compiling security-framework v3.7.0
+   Compiling darling_macro v0.24.1
+   Compiling convert_case v0.10.0
+   Compiling http-body-util v0.1.5
+   Compiling bstr v1.13.1
+   Compiling jiff v0.2.35
+   Compiling hashbrown v0.16.1
+   Compiling same-file v1.0.6
+   Compiling crossbeam-epoch v0.9.20
+   Compiling unicode-width v0.2.2
+   Compiling quick-error v2.0.1
+   Compiling cfg_aliases v0.2.2
+   Compiling instability v0.3.13
+   Compiling scopeguard v1.2.0
+   Compiling zune-core v0.5.3
+   Compiling weezl v0.1.12
+   Compiling ryu v1.0.23
+   Compiling static_assertions v1.1.0
+   Compiling zune-jpeg v0.5.15
+   Compiling lock_api v0.4.14
+   Compiling castaway v0.2.4
+   Compiling nix v0.31.3
+   Compiling unicode-truncate v2.0.1
+   Compiling compact_str v0.9.1
+   Compiling walkdir v2.5.0
+   Compiling kasuari v0.4.12
+   Compiling derive_more-impl v2.1.1
+   Compiling darling v0.24.1
+   Compiling strum v0.28.0
+   Compiling tower-http v0.6.11
+   Compiling miniz_oxide v0.8.9
+   Compiling fdeflate v0.3.7
+   Compiling half v2.7.1
+   Compiling lru v0.18.3
+   Compiling indoc v2.0.7
+   Compiling litrs v1.0.0
+   Compiling byteorder-lite v0.1.0
+   Compiling color_quant v1.1.0
+   Compiling crossbeam-deque v0.8.7
+   Compiling mime v0.3.17
+   Compiling pxfm v0.1.30
+   Compiling fax v0.2.7
+   Compiling critical-section v1.2.0
+   Compiling bytemuck v1.25.2
+   Compiling tiff v0.11.3
+   Compiling ulid v3.0.0
+   Compiling schemars v1.2.2
+   Compiling insta v1.48.0
+   Compiling moxcms v0.8.1
+   Compiling qoi v0.4.1
+   Compiling ratatui-core v0.1.2
+   Compiling bingo-sdk v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-sdk)
+   Compiling gif v0.14.2
+   Compiling image-webp v0.2.4
+   Compiling document-features v0.2.12
+   Compiling png v0.18.1
+   Compiling signal-hook-mio v0.2.5
+   Compiling parking_lot v0.12.5
+   Compiling derive_more v2.1.1
+   Compiling image v0.25.10
+   Compiling crossterm v0.29.0
+   Compiling bincode v1.3.3
+   Compiling globset v0.4.20
+   Compiling fancy-regex v0.16.2
+   Compiling regex v1.13.1
+   Compiling num_cpus v1.17.0
+   Compiling line-clipping v0.3.8
+   Compiling grep-matcher v0.1.9
+   Compiling winnow v1.0.4
+   Compiling deadpool-runtime v0.1.4
+   Compiling lazy_static v1.5.0
+   Compiling pulldown-cmark v0.13.4
+   Compiling similar v3.2.0
+   Compiling toml_parser v1.1.3+spec-1.1.0
+   Compiling deadpool v0.12.3
+   Compiling ratatui-widgets v0.3.2
+   Compiling ignore v0.4.33
+   Compiling syntect v5.3.0
+   Compiling process-wrap v10.0.0
+   Compiling ratatui-crossterm v0.1.2
+   Compiling assert-json-diff v2.0.2
+   Compiling serde_spanned v1.1.1
+   Compiling toml_datetime v0.7.5+spec-1.1.0
+   Compiling encoding_rs_io v0.1.8
+   Compiling memmap2 v0.9.11
+   Compiling terminal-trx v0.2.6
+   Compiling bingo-digest v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-digest)
+   Compiling unicase v2.9.0
+   Compiling toml_writer v1.1.2+spec-1.1.0
+   Compiling winnow v0.7.15
+   Compiling xterm-color v1.0.2
+   Compiling bingo-update v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-update)
+   Compiling toml_edit v0.23.10+spec-1.0.0
+   Compiling terminal-colorsaurus v1.0.3
+   Compiling grep-searcher v0.1.17
+   Compiling wiremock v0.6.5
+   Compiling ratatui v0.30.2
+   Compiling two-face v0.5.2+bat-0.26.1
+   Compiling bingo-process v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-process)
+   Compiling bingo-shelf v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-shelf)
+   Compiling grep-regex v0.1.14
+   Compiling jsonc-parser v0.33.1
+   Compiling bingo-loopback v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-loopback)
+   Compiling nucleo-matcher v0.3.1
+   Compiling bingo-services v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-services)
+   Compiling bingo-collab v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-collab)
+   Compiling bingo-tool-bash v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-tool-bash)
+   Compiling bingo-core v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-core)
+mbx[progress]: 15s elapsed; 485 hits, 122 misses, 10 bypassed, 8 not looked up; ~282.8s compiler work saved
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.4
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.13.4
+   Compiling bingo-http v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-http)
+   Compiling bingo-pictures v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-pictures)
+   Compiling bingo-surface-tui v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-surface-tui)
+   Compiling bingo-tool-fs v0.6.6 (/Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m147/crates/bingo-tool-fs)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 27.27s
+     Running unittests src/lib.rs (target/debug/deps/bingo_core-d494ebde3f1602cf)
+
+running 1 test
+test commands::status::tests::rough_edges_status_groups_digits ... FAILED
+
+failures:
+
+---- commands::status::tests::rough_edges_status_groups_digits stdout ----
+
+thread 'commands::status::tests::rough_edges_status_groups_digits' (6262226) panicked at crates/bingo-core/src/commands/status.rs:85:9:
+assertion `left == right` failed
+  left: "13812 of 191808 tokens (7 %) · compacts at 172627"
+ right: "13,812 of 191,808 tokens (7 %) · compacts at 172,627"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed
+   4: bingo_core::commands::status::tests::rough_edges_status_groups_digits
+   5: bingo_core::commands::status::tests::rough_edges_status_groups_digits::{{closure}}
+   6: core::ops::function::FnOnce::call_once
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    commands::status::tests::rough_edges_status_groups_digits
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 488 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p bingo-core --lib`
+     Running unittests src/lib.rs (target/debug/deps/bingo_sdk-6bab0d1da0d082ef)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out; finished in 0.00s
+
+     Running tests/intercept.rs (target/debug/deps/intercept-b7079ad538640efe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/preview.rs (target/debug/deps/preview-2e6144162a681d33)
+
+running 2 tests
+test rough_edges_a_command_preview_without_description_keeps_its_wire_shape ... ok
+test rough_edges_a_command_preview_round_trips_its_description ... FAILED
+
+failures:
+
+---- rough_edges_a_command_preview_round_trips_its_description stdout ----
+
+thread 'rough_edges_a_command_preview_round_trips_its_description' (6262230) panicked at crates/bingo-sdk/tests/preview.rs:15:5:
+assertion `left == right` failed
+  left: Object {"kind": String("command"), "command": String("echo hi"), "cwd": String("/work")}
+ right: Object {"kind": String("command"), "command": String("echo hi"), "cwd": String("/work"), "description": String("Print a greeting")}
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed
+   4: preview::rough_edges_a_command_preview_round_trips_its_description
+   5: preview::rough_edges_a_command_preview_round_trips_its_description::{{closure}}
+   6: core::ops::function::FnOnce::call_once
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    rough_edges_a_command_preview_round_trips_its_description
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p bingo-sdk --test preview`
+     Running tests/record.rs (target/debug/deps/record-d1cc0e4dd0066c28)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/unknown_record.rs (target/debug/deps/unknown_record-64a75922eb6e8508)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/voice.rs (target/debug/deps/voice-8d1346110a681481)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/bingo_surface_tui-8ca2baf148756e0f)
+
+running 8 tests
+test status::tests::rough_edges_counts_have_one_precision ... FAILED
+test run::tests::rough_edges_debug_draws_are_quiet ... FAILED
+test commands::tests::rough_edges_quit_is_an_alias_not_a_second_row ... FAILED
+test paths::tests::rough_edges_an_absolute_path_keeps_its_first_segment ... FAILED
+test tree::tests::rough_edges_a_child_counts_only_what_it_wrote ... FAILED
+test dialog::tests::rough_edges_questions_are_sentences_for_the_preview ... FAILED
+test keys::tests::rough_edges_help_groups_keys_without_clipping_at_100 ... FAILED
+test transcript::tests::rough_edges_a_plain_allow_has_no_receipt_row ... FAILED
+
+failures:
+
+---- status::tests::rough_edges_counts_have_one_precision stdout ----
+
+thread 'status::tests::rough_edges_counts_have_one_precision' (6262241) panicked at crates/bingo-surface-tui/src/status.rs:374:13:
+assertion `left == right` failed
+  left: "1k"
+ right: "1.2k"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed
+   4: bingo_surface_tui::status::tests::rough_edges_counts_have_one_precision
+   5: bingo_surface_tui::status::tests::rough_edges_counts_have_one_precision::{{closure}}
+   6: core::ops::function::FnOnce::call_once
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- run::tests::rough_edges_debug_draws_are_quiet stdout ----
+
+thread 'run::tests::rough_edges_debug_draws_are_quiet' (6262240) panicked at crates/bingo-surface-tui/src/run.rs:1003:13:
+assertion `left == right` failed
+  left: Some("drawing took 1000ms; a debug build or a slow terminal does this")
+ right: None
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed
+   4: bingo_surface_tui::run::tests::rough_edges_debug_draws_are_quiet
+   5: bingo_surface_tui::run::tests::rough_edges_debug_draws_are_quiet::{{closure}}
+   6: core::ops::function::FnOnce::call_once
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- commands::tests::rough_edges_quit_is_an_alias_not_a_second_row stdout ----
+
+thread 'commands::tests::rough_edges_quit_is_an_alias_not_a_second_row' (6262236) panicked at crates/bingo-surface-tui/src/commands.rs:251:9:
+assertion failed: !specs.iter().any(|s| s.name == "quit")
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:150:5
+   3: bingo_surface_tui::commands::tests::rough_edges_quit_is_an_alias_not_a_second_row
+   4: bingo_surface_tui::commands::tests::rough_edges_quit_is_an_alias_not_a_second_row::{{closure}}
+   5: core::ops::function::FnOnce::call_once
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- paths::tests::rough_edges_an_absolute_path_keeps_its_first_segment stdout ----
+
+thread 'paths::tests::rough_edges_an_absolute_path_keeps_its_first_segment' (6262239) panicked at crates/bingo-surface-tui/src/paths.rs:147:9:
+assertion `left == right` failed
+  left: "/…/x/T/tmp.a/cwd"
+ right: "/var/…/tmp.a/cwd"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed
+   4: bingo_surface_tui::paths::tests::rough_edges_an_absolute_path_keeps_its_first_segment
+   5: bingo_surface_tui::paths::tests::rough_edges_an_absolute_path_keeps_its_first_segment::{{closure}}
+   6: core::ops::function::FnOnce::call_once
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- tree::tests::rough_edges_a_child_counts_only_what_it_wrote stdout ----
+
+thread 'tree::tests::rough_edges_a_child_counts_only_what_it_wrote' (6262243) panicked at crates/bingo-surface-tui/src/tree.rs:431:9:
+assertion `left == right` failed
+  left: "0 tools · 128.1k tokens"
+ right: "0 tools · ↓ 8.1k"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed
+   4: bingo_surface_tui::tree::tests::rough_edges_a_child_counts_only_what_it_wrote
+   5: bingo_surface_tui::tree::tests::rough_edges_a_child_counts_only_what_it_wrote::{{closure}}
+   6: core::ops::function::FnOnce::call_once
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- dialog::tests::rough_edges_questions_are_sentences_for_the_preview stdout ----
+
+thread 'dialog::tests::rough_edges_questions_are_sentences_for_the_preview' (6262237) panicked at crates/bingo-surface-tui/src/dialog.rs:567:13:
+assertion `left == right` failed
+  left: "Do you want to edit src/lib.rs?"
+ right: "Do you want to run this command?"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed
+   4: bingo_surface_tui::dialog::tests::rough_edges_questions_are_sentences_for_the_preview
+   5: bingo_surface_tui::dialog::tests::rough_edges_questions_are_sentences_for_the_preview::{{closure}}
+   6: core::ops::function::FnOnce::call_once
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- keys::tests::rough_edges_help_groups_keys_without_clipping_at_100 stdout ----
+
+thread 'keys::tests::rough_edges_help_groups_keys_without_clipping_at_100' (6262238) panicked at crates/bingo-surface-tui/src/keys.rs:342:13:
+enter        send the message · open the focused block
+shift+enter  newline (ctrl+j · alt+enter · \ enter)
+esc          sheet → card → dropdown → interrupt
+esc esc      rewind to an earlier turn
+ctrl+c       interrupt · clear input · twice to exit
+ctrl+d       exit on an empty input
+up/down      prompt history at the first and last line
+down         walk the sessions (empty box)
+ctrl+a/e     start / end of the line (home · end)
+alt+b/f      move one word
+ctrl+w/u/k   delete word · to line start · to line end
+pgup/pgdn    scroll the transcript
+v · drag     select · ↑↓←→ or a drag extend · y, ctrl+c or release copy
+ctrl+g       the same list · ↑↓ to walk it
+ctrl+t       show / hide the task list
+ctrl+p       plugin state (rooms, panels to pin)
+tab          complete → queue → next card
+shift+tab    cycle permission mode
+1-9 · y/a/n  answer the open dialog
+ctrl+e       expand the dialog's preview
+ctrl+o       expand the latest result · again for all of it
+ctrl+b       background the running command
+/ · !        run a command · run a shell line
+click        a picture · open it
+?            toggle this panel
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: bingo_surface_tui::keys::tests::rough_edges_help_groups_keys_without_clipping_at_100
+   3: bingo_surface_tui::keys::tests::rough_edges_help_groups_keys_without_clipping_at_100::{{closure}}
+   4: core::ops::function::FnOnce::call_once
+   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- transcript::tests::rough_edges_a_plain_allow_has_no_receipt_row stdout ----
+
+thread 'transcript::tests::rough_edges_a_plain_allow_has_no_receipt_row' (6262242) panicked at crates/bingo-surface-tui/src/transcript.rs:935:9:
+assertion failed: drawn(vec![receipt_item("itm_1", "Bash", DecisionKind::Allow,
+            None)]).is_empty()
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:150:5
+   3: bingo_surface_tui::transcript::tests::rough_edges_a_plain_allow_has_no_receipt_row
+   4: bingo_surface_tui::transcript::tests::rough_edges_a_plain_allow_has_no_receipt_row::{{closure}}
+   5: core::ops::function::FnOnce::call_once
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    commands::tests::rough_edges_quit_is_an_alias_not_a_second_row
+    dialog::tests::rough_edges_questions_are_sentences_for_the_preview
+    keys::tests::rough_edges_help_groups_keys_without_clipping_at_100
+    paths::tests::rough_edges_an_absolute_path_keeps_its_first_segment
+    run::tests::rough_edges_debug_draws_are_quiet
+    status::tests::rough_edges_counts_have_one_precision
+    transcript::tests::rough_edges_a_plain_allow_has_no_receipt_row
+    tree::tests::rough_edges_a_child_counts_only_what_it_wrote
+
+test result: FAILED. 0 passed; 8 failed; 0 ignored; 0 measured; 1126 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `-p bingo-surface-tui --lib`
+     Running unittests src/lib.rs (target/debug/deps/bingo_tool_bash-d3bc77a4cc93eeb1)
+
+running 2 tests
+test output::tests::rough_edges_display_reports_only_output_and_an_abnormal_end ... FAILED
+test tests::rough_edges_command_preview_carries_the_description ... FAILED
+
+failures:
+
+---- output::tests::rough_edges_display_reports_only_output_and_an_abnormal_end stdout ----
+
+thread 'output::tests::rough_edges_display_reports_only_output_and_an_abnormal_end' (6262245) panicked at crates/bingo-tool-bash/src/output.rs:162:13:
+assertion `left == right` failed
+  left: None
+ right: Some(Text { text: "hi" })
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed
+   4: bingo_tool_bash::output::tests::rough_edges_display_reports_only_output_and_an_abnormal_end
+   5: bingo_tool_bash::output::tests::rough_edges_display_reports_only_output_and_an_abnormal_end::{{closure}}
+   6: core::ops::function::FnOnce::call_once
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- tests::rough_edges_command_preview_carries_the_description stdout ----
+
+thread 'tests::rough_edges_command_preview_carries_the_description' (6262246) panicked at crates/bingo-tool-bash/src/lib.rs:494:9:
+assertion `left == right` failed
+  left: Null
+ right: Object {"kind": String("command"), "command": String("echo hi"), "cwd": String("/work"), "description": String("Print a greeting")}
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed
+   4: bingo_tool_bash::tests::rough_edges_command_preview_carries_the_description
+   5: bingo_tool_bash::tests::rough_edges_command_preview_carries_the_description::{{closure}}
+   6: core::ops::function::FnOnce::call_once
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    output::tests::rough_edges_display_reports_only_output_and_an_abnormal_end
+    tests::rough_edges_command_preview_carries_the_description
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 147 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p bingo-tool-bash --lib`
+     Running unittests src/lib.rs (target/debug/deps/bingo_tool_fs-1dac5d87c8305c9b)
+
+running 2 tests
+test glob::tests::rough_edges_glob_display_is_relative ... FAILED
+test grep::tests::rough_edges_grep_display_preserves_content_and_shortens_only_paths ... FAILED
+
+failures:
+
+---- glob::tests::rough_edges_glob_display_is_relative stdout ----
+
+thread 'glob::tests::rough_edges_glob_display_is_relative' (6262248) panicked at crates/bingo-tool-fs/src/glob.rs:146:9:
+assertion `left == right` failed
+  left: None
+ right: Some(Text { text: "a.rs" })
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed
+   4: bingo_tool_fs::glob::tests::rough_edges_glob_display_is_relative::{{closure}}
+   5: <core::pin::Pin<P> as core::future::future::Future>::poll
+   6: <core::pin::Pin<P> as core::future::future::Future>::poll
+   7: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}::{{closure}}
+   8: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}
+   9: tokio::runtime::scheduler::current_thread::Context::enter
+  10: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}
+  11: tokio::runtime::scheduler::current_thread::CoreGuard::enter::{{closure}}
+  12: tokio::runtime::context::scoped::Scoped<T>::set
+  13: tokio::runtime::context::set_scheduler::{{closure}}
+  14: std::thread::local::LocalKey<T>::try_with
+  15: std::thread::local::LocalKey<T>::with
+  16: tokio::runtime::context::set_scheduler
+  17: tokio::runtime::scheduler::current_thread::CoreGuard::enter
+  18: tokio::runtime::scheduler::current_thread::CoreGuard::block_on
+  19: tokio::runtime::scheduler::current_thread::CurrentThread::block_on::{{closure}}
+  20: tokio::runtime::context::runtime::enter_runtime
+  21: tokio::runtime::scheduler::current_thread::CurrentThread::block_on
+  22: tokio::runtime::runtime::Runtime::block_on_inner
+  23: tokio::runtime::runtime::Runtime::block_on
+  24: bingo_tool_fs::glob::tests::rough_edges_glob_display_is_relative
+  25: bingo_tool_fs::glob::tests::rough_edges_glob_display_is_relative::{{closure}}
+  26: core::ops::function::FnOnce::call_once
+  27: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- grep::tests::rough_edges_grep_display_preserves_content_and_shortens_only_paths stdout ----
+
+thread 'grep::tests::rough_edges_grep_display_preserves_content_and_shortens_only_paths' (6262249) panicked at crates/bingo-tool-fs/src/grep.rs:359:13:
+assertion `left == right` failed
+  left: None
+ right: Some(Text { text: "a.rs" })
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed
+   4: bingo_tool_fs::grep::tests::rough_edges_grep_display_preserves_content_and_shortens_only_paths::{{closure}}
+   5: <core::pin::Pin<P> as core::future::future::Future>::poll
+   6: <core::pin::Pin<P> as core::future::future::Future>::poll
+   7: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}::{{closure}}
+   8: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}
+   9: tokio::runtime::scheduler::current_thread::Context::enter
+  10: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}
+  11: tokio::runtime::scheduler::current_thread::CoreGuard::enter::{{closure}}
+  12: tokio::runtime::context::scoped::Scoped<T>::set
+  13: tokio::runtime::context::set_scheduler::{{closure}}
+  14: std::thread::local::LocalKey<T>::try_with
+  15: std::thread::local::LocalKey<T>::with
+  16: tokio::runtime::context::set_scheduler
+  17: tokio::runtime::scheduler::current_thread::CoreGuard::enter
+  18: tokio::runtime::scheduler::current_thread::CoreGuard::block_on
+  19: tokio::runtime::scheduler::current_thread::CurrentThread::block_on::{{closure}}
+  20: tokio::runtime::context::runtime::enter_runtime
+  21: tokio::runtime::scheduler::current_thread::CurrentThread::block_on
+  22: tokio::runtime::runtime::Runtime::block_on_inner
+  23: tokio::runtime::runtime::Runtime::block_on
+  24: bingo_tool_fs::grep::tests::rough_edges_grep_display_preserves_content_and_shortens_only_paths
+  25: bingo_tool_fs::grep::tests::rough_edges_grep_display_preserves_content_and_shortens_only_paths::{{closure}}
+  26: core::ops::function::FnOnce::call_once
+  27: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    glob::tests::rough_edges_glob_display_is_relative
+    grep::tests::rough_edges_grep_display_preserves_content_and_shortens_only_paths
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 80 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p bingo-tool-fs --lib`
+error: 5 targets failed:
+    `-p bingo-core --lib`
+    `-p bingo-sdk --test preview`
+    `-p bingo-surface-tui --lib`
+    `-p bingo-tool-bash --lib`
+    `-p bingo-tool-fs --lib`
+mbx[cache]: 557 hits, 163 misses, 10 not looked up, 11 bypassed; 0 B downloaded, 0 B uploaded, 219.0 MiB stored locally
+mbx[savings]: quietly substituted 557 cached compilations. nobody noticed. that is the job. (4m 50s saved)
+```

@@ -80,6 +80,22 @@ fn context(context: Option<ContextUsage>) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_status_groups_digits() {
+        assert_eq!(
+            context(Some(ContextUsage {
+                used: 13_812,
+                window: 191_808,
+                trigger: 172_627
+            })),
+            "13,812 of 191,808 tokens (7 %) · compacts at 172,627"
+        );
+        let mut state = SessionState::new(crate::test_support::summary("ses_status"));
+        state.summary.usage.input_tokens = 54_811;
+        state.summary.usage.output_tokens = 139;
+        assert!(rows(&state).contains(&("tokens".into(), "54,811 in · 139 out".into())));
+    }
+
     use super::*;
 
     #[test]
