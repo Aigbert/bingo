@@ -9,4 +9,5 @@ mod tests;
 pub use runtime::Runtime;
 
 pub(crate) mod callback;
+mod clock;
 mod register;

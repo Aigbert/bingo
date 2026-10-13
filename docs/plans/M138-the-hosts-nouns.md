@@ -141,4 +141,7 @@ cargo test -p bingo-plugin-host --lib --locked the_four_mib_limit
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.12s
 cargo test -p bingo-plugin-host --lib --locked a_hook_read_log
 left: []; right: [Read { plugin: "owner", scope: "global", key: "key", version: Some(1) }]
+cargo test -p bingo-mods --lib --locked dollar::clock
+timer did not fire: Elapsed(())
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s
 ```
