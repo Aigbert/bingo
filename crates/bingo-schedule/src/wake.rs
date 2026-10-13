@@ -216,3 +216,18 @@ mod voice_tests {
         assert_eq!(super::origin().voice, Some(bingo_sdk::Voice::Note));
     }
 }
+
+#[cfg(test)]
+mod m148 {
+    use super::*;
+    #[test]
+    fn m148_wake_is_unplaced_data() {
+        assert_eq!(
+            payload(Some(&Wake {
+                at: Timestamp::UNIX_EPOCH,
+                note: "check".into()
+            }))["slots"],
+            json!([])
+        );
+    }
+}

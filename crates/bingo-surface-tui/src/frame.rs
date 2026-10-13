@@ -346,3 +346,82 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod m148 {
+    use crate::test_support::*;
+    use bingo_sdk::{
+        View,
+        slot::{self, Slot},
+    };
+    use serde_json::json;
+
+    #[test]
+    fn m148_unplaced_payloads_leave_the_screen_unchanged_at_every_width() {
+        for width in [80, 120, 200] {
+            for payload in [
+                as_payload(board_view()),
+                progress_view(4, 10),
+                slot::with(
+                    json!({}),
+                    [Slot::Rail {
+                        title: "legacy".into(),
+                        view: View::text("unplaced"),
+                    }],
+                ),
+                slot::with(
+                    json!({}),
+                    [Slot::Panel {
+                        title: "legacy".into(),
+                        view: View::text("unplaced"),
+                    }],
+                ),
+            ] {
+                let (mut ui, now) = scene();
+                let before = draw_sized(width, 40, &state(), &mut ui, now);
+                let state = folded(vec![
+                    frame(1, extended("stranger", "legacy", payload.clone())),
+                    frame(2, signalled("stranger", "legacy", payload)),
+                ]);
+                let after = draw_sized(width, 40, &state, &mut ui, now);
+                assert_eq!(ui.shown.regions.transcript.width, width);
+                assert_eq!(after, before);
+            }
+        }
+    }
+
+    #[test]
+    fn m148_room_and_wake_data_draw_nothing_at_every_width() {
+        for width in [80, 120, 200] {
+            let (mut ui, now) = scene();
+            let before = draw_sized(width, 40, &state(), &mut ui, now);
+            let state = folded(vec![
+                frame(
+                    1,
+                    signalled(
+                        "bingo.rooms",
+                        "owed",
+                        json!({"kind":"table", "headers":["room","owed"], "rows":[["#design","scout"]]}),
+                    ),
+                ),
+                frame(
+                    2,
+                    extended(
+                        "bingo.rooms",
+                        "members",
+                        json!({"kind":"text", "text":"scout"}),
+                    ),
+                ),
+                frame(
+                    3,
+                    extended(
+                        "bingo.schedule",
+                        "wake",
+                        json!({"at":"2030-01-01T00:00:00Z"}),
+                    ),
+                ),
+            ]);
+            assert_eq!(draw_sized(width, 40, &state, &mut ui, now), before);
+        }
+    }
+}

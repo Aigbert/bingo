@@ -102,3 +102,18 @@ pub fn age(at: Timestamp, now: Timestamp) -> String {
         _ => format!("{}h", seconds / 3600),
     }
 }
+
+#[cfg(test)]
+mod m148 {
+    use super::*;
+    #[test]
+    fn m148_owed_is_unplaced_data() {
+        let value = view(vec![Debt {
+            room: "#design".into(),
+            who: "scout".into(),
+            at: Timestamp::UNIX_EPOCH,
+        }]);
+        assert_eq!(value["slots"], json!([]));
+        assert_eq!(value["debts"][0]["who"], "scout");
+    }
+}

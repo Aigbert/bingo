@@ -291,3 +291,14 @@ pub struct Retuned {
 mod readers;
 pub use crate::name::PARENT as HOLDER;
 pub use readers::{Hearing, Owes, debts, hearing, unread_count};
+
+#[cfg(test)]
+mod m148 {
+    use super::*;
+    #[test]
+    fn m148_members_are_unplaced_and_readable() {
+        let value = payload(&[Seat::live("scout")]);
+        assert_eq!(value["slots"], serde_json::json!([]));
+        assert_eq!(members_from(&value), ["scout"]);
+    }
+}

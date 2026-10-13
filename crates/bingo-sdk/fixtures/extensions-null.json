@@ -1,0 +1,24 @@
+[
+  {
+    "type": "extension",
+    "plugin": "fixture",
+    "kind": "board",
+    "payload": {
+      "n": 1
+    }
+  },
+  {
+    "type": "extension",
+    "plugin": "fixture",
+    "kind": "kept",
+    "payload": {
+      "n": 2
+    }
+  },
+  {
+    "type": "extension",
+    "plugin": "fixture",
+    "kind": "board",
+    "payload": null
+  }
+]

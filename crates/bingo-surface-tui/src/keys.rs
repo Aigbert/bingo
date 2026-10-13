@@ -575,3 +575,21 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod m148 {
+    use crate::test_support::*;
+    #[test]
+    fn m148_control_p_is_unbound_and_absent_from_help() {
+        let (mut ui, now) = scene();
+        let state = state();
+        assert!(crate::input::on_key(&mut ui, &solo(&state), ctrl('p'), now).is_empty());
+        assert!(!ui.focus.showing());
+        let help = super::help_lines(200)
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(!help.contains(concat!("ctrl", "+p")));
+    }
+}

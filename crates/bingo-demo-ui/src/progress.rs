@@ -175,3 +175,19 @@ mod tests {
         assert!(!traits.concurrency_safe);
     }
 }
+
+#[cfg(test)]
+mod m148 {
+    use super::*;
+    #[tokio::test]
+    async fn m148_progress_places_an_activity() {
+        let journals = crate::tests::Journals::new();
+        let session = journals.session();
+        publish(&crate::tests::tool_context(&session, &journals), 3, "check")
+            .await
+            .unwrap();
+        let payload = &journals.signals()[0].1;
+        assert_eq!(payload["slots"][0]["kind"], "activity");
+        assert_eq!(payload["slots"][0]["view"]["value"], 3);
+    }
+}

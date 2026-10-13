@@ -290,3 +290,70 @@ fn summary(id: &SessionId) -> SessionSummary {
         messages: None,
     }
 }
+
+#[tokio::test]
+async fn m148_board_places_its_table_and_buttons_on_its_recorded_row() {
+    use bingo_sdk::{Command, Item, ItemStatus, Level};
+    let journals = Journals::new();
+    let session = journals.session();
+    let id = ItemId::from_raw("itm_board");
+    journals
+        .fold(
+            &session,
+            Event::ItemCompleted {
+                item: Item {
+                    id: id.clone(),
+                    turn: None,
+                    round: 0,
+                    status: ItemStatus::Completed,
+                    started_at: Timestamp::UNIX_EPOCH,
+                    completed_at: Some(Timestamp::UNIX_EPOCH),
+                    intent: None,
+                    meta: Default::default(),
+                    body: ItemBody::Notice {
+                        level: Level::Info,
+                        code: "DEMO_BOARD".into(),
+                        text: "Board".into(),
+                    },
+                },
+            },
+        )
+        .unwrap();
+    crate::command::SHOW
+        .run("", &command_context(&session, &journals))
+        .await
+        .unwrap();
+    let states = journals.states();
+    let slots = bingo_sdk::slot::placed(&states[0]);
+    let bingo_sdk::slot::Slot::Row {
+        item,
+        body: Some(bingo_sdk::View::Table { .. }),
+        actions,
+        ..
+    } = &slots.first().expect("board row").slot
+    else {
+        panic!("table row")
+    };
+    assert_eq!(item, &id);
+    assert_eq!(
+        actions
+            .iter()
+            .map(|action| action.label.as_str())
+            .collect::<Vec<_>>(),
+        ["Tick", "Reset"]
+    );
+}
+
+#[tokio::test]
+async fn m148_a_fresh_board_records_a_transcript_anchor() {
+    use bingo_sdk::{Command, CommandOutcome};
+    let journals = Journals::new();
+    let session = journals.session();
+    let outcome = crate::command::SHOW
+        .run("", &command_context(&session, &journals))
+        .await
+        .unwrap();
+    assert!(
+        matches!(outcome, CommandOutcome::Record { body: ItemBody::Notice { ref code, .. } } if code == "DEMO_BOARD")
+    );
+}
