@@ -211,7 +211,7 @@ async fn counted(counts: &Counts, name: &str, expected: usize) {
     assert_eq!(counts.get(name), expected, "{name} was raised twice");
 }
 #[tokio::test]
-async fn every_row_raises_exactly_one_chain_on_the_real_host() {
+async fn host_rows_raise_exactly_one_chain_on_the_real_host() {
     let home = tempfile::tempdir().unwrap();
     let root = home.path().join("fixture");
     std::fs::create_dir(&root).unwrap();
@@ -236,7 +236,10 @@ async fn every_row_raises_exactly_one_chain_on_the_real_host() {
     let mut held = open(&host, home.path()).await;
     turn(&mut session, "seed", true).await;
     turn(&mut held, "hold-model", false).await;
-    for row in ROWS.iter().filter(|row| row.method != "abort") {
+    for row in ROWS
+        .iter()
+        .filter(|row| !row.world() && row.method != "abort")
+    {
         let name = format!("{}.{}", row.noun, row.method);
         let target = if name == "tool.call" {
             &mut held

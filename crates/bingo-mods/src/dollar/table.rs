@@ -1,5 +1,5 @@
 //! One row owns a noun method's schemas, grant and dispatch door.
-use super::params::*;
+use super::{params::*, world::*};
 use bingo_plugin_host::host::*;
 use bingo_sdk::{
     catalogue::{self, Entry},
@@ -13,6 +13,7 @@ type Shape = fn(&mut SchemaGenerator) -> Schema;
 pub enum Door {
     Kernel(&'static Entry),
     Face,
+    Service(&'static str),
 }
 pub struct Row {
     pub noun: &'static str,
@@ -32,8 +33,27 @@ macro_rules! rows {
             input:shape::<$input>, result:shape::<$result>, accepts:|value| serde_json::from_value::<$result>(value.clone()).is_ok()}),*];
     };
 }
-use Door::{Face, Kernel};
+use Door::{Face, Kernel, Service};
 rows! {
+    "mcp", "call", Service("mcp"), false, Value => ToolOutput;
+    "mcp", "connect", Service("mcp"), true, Value => ();
+    "agent", "spawn", Service("agent"), true, Value => ToolOutput;
+    "agent", "list", Service("agent"), false, catalogue::Session => Vec<SessionSummary>;
+    "agent", "register", Service("agent"), false, Value => ();
+    "http", "fetch", Face, true, Fetch => Fetched;
+    "env", "get", Face, true, EnvGet => Option<String>;
+    "env", "set", Face, true, EnvSet => ();
+    "process", "run", Face, true, ProcessInput => ProcessOutput;
+    "process", "spawn", Face, true, ProcessInput => String;
+    "process", "read", Face, true, ProcessId => ProcessOutput;
+    "process", "write", Face, true, ProcessWrite => ();
+    "process", "kill", Face, true, ProcessId => ();
+    "fs", "read", Face, false, FileRead => String;
+    "fs", "write", Face, false, FileWrite => ();
+    "fs", "list", Face, false, FileList => Vec<String>;
+    "fs", "exists", Face, false, FilePath => bool;
+    "fs", "stat", Face, false, FilePath => FileStat;
+    "fs", "ancestors", Face, false, Ancestors => Vec<std::path::PathBuf>;
     "session", "messages", Face, false, Messages => HistoryChunk;
     "session", "cwd", Face, false, catalogue::Session => String;
     "session", "root", Face, false, catalogue::Session => String;
@@ -74,6 +94,15 @@ rows! {
     "clock", "every", Face, false, Timer => String;
 }
 
+impl Row {
+    pub fn world(&self) -> bool {
+        matches!(
+            self.noun,
+            "fs" | "http" | "process" | "env" | "mcp" | "agent"
+        )
+    }
+}
+
 pub fn document() -> Value {
     let mut generator = SchemaGenerator::default();
     let methods: serde_json::Map<String, Value> = ROWS.iter().map(|row| {
@@ -81,6 +110,7 @@ pub fn document() -> Value {
         let door = match row.door {
             Door::Kernel(entry) => json!({"kernel":entry.name}),
             Door::Face => json!({"face":format!("bingo.plugin.{}",row.noun)}),
+            Door::Service(key) => json!({"face":key,"owner":true}),
         };
         (name, json!({"noun":row.noun, "method":row.method, "door":door,
             "unsafe":row.unsafe_call, "input":(row.input)(&mut generator), "result":(row.result)(&mut generator)}))

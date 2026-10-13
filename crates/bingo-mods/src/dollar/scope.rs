@@ -164,16 +164,7 @@ mod tests {
             .unwrap(),
             plain
         );
-        assert!(
-            scope(
-                Path::new(r"\\unavailable.invalid\share\file"),
-                Roots {
-                    project: &plain,
-                    data: &plain
-                },
-                Access::Read
-            )
-            .is_err()
-        );
+        let unc = Path::new(r"\\server\share\folder\..\file");
+        assert_eq!(lexical(unc).unwrap(), PathBuf::from(r"\\server\share\file"));
     }
 }

@@ -308,3 +308,149 @@ mod reentry;
 
 #[path = "support/nouns.rs"]
 mod nouns;
+
+fn world_output(root: &Path, plugin: &Path, url: Option<&str>) -> Vec<bingo_sdk::Frame> {
+    let script = root.join("world-script.json");
+    std::fs::write(&script,r#"{"responses":[{"steps":[{"toolCall":{"name":"Read","input":{"file_path":"world.txt"}}}]},{"steps":[{"text":"offline"}]}]}"#).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+        .args([
+            "--print",
+            "--output-format",
+            "json",
+            "--provider",
+            "fake",
+            "--model",
+            "fake-1",
+            "--plugin-dir",
+        ])
+        .arg(plugin)
+        .arg("world")
+        .current_dir(root)
+        .envs(home::home_env(root.join("user-home")))
+        .env("BINGO_FAKE_SCRIPT", script)
+        .env("BINGO_WORLD_PARITY", "environment")
+        .env("BINGO_WORLD_URL", url.unwrap_or_default())
+        .output()
+        .unwrap();
+    success(&output)
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("NDJSON frames"))
+        .collect()
+}
+#[test]
+fn world_nouns_give_the_same_answer_in_process_and_under_node() {
+    if !node_available() {
+        return;
+    }
+    use std::io::{Read, Write};
+    let root = tempfile::tempdir().unwrap();
+    let plugin = fixture(root.path(), "ts-status");
+    std::fs::write(
+        plugin.join("hooks/register.ts"),
+        include_str!("../../bingo-mods/tests/mods/world/parity.ts"),
+    )
+    .unwrap();
+    std::fs::write(root.path().join("world.txt"), "filesystem").unwrap();
+    std::fs::create_dir_all(root.path().join("user-home/.bingo")).unwrap();
+    std::fs::write(root.path().join("user-home/.bingo/settings.toml"),"[pluginTrust.ts-status]\ntier = \"rewrite\"\nuses = [\"fs\", \"http\", \"process\", \"env\", \"mcp\", \"agent\"]\n").unwrap();
+    let mut answers = Vec::new();
+    for node in [false, true] {
+        let mut manifest = serde_json::json!({"name":"ts-status","version":"1","uses":["fs","http","process","env","mcp","agent"]});
+        if node {
+            manifest["entry"] =
+                serde_json::json!({"command":"node","args":["${PLUGIN_ROOT}/main.ts"]});
+        } else {
+            manifest["module"] = serde_json::json!("hooks/register.ts");
+        }
+        std::fs::write(plugin.join("plugin.json"), manifest.to_string()).unwrap();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        // Nonblocking accept bounds a failed CLI without leaving a server thread behind.
+        listener.set_nonblocking(true).unwrap();
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let stopped = stop.clone();
+        let server = std::thread::spawn(move || {
+            while !stopped.load(std::sync::atomic::Ordering::Relaxed) {
+                match listener.accept() {
+                    Ok((mut socket, _)) => {
+                        socket
+                            .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+                            .unwrap();
+                        let mut head = [0; 4096];
+                        let _ = socket.read(&mut head);
+                        let _ = socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\nhttp");
+                        return;
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(std::time::Duration::from_millis(1))
+                    }
+                    Err(error) => panic!("{error}"),
+                }
+            }
+        });
+        let frames = world_output(root.path(), &plugin, Some(&url));
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        server.join().unwrap();
+        let text = frames
+            .iter()
+            .find_map(|frame| match &frame.event {
+                bingo_sdk::Event::ItemCompleted { item } => match &item.body {
+                    bingo_sdk::ItemBody::ToolCall {
+                        output: Some(output),
+                        ..
+                    } => output.parts.iter().find_map(|part| {
+                        part.as_text()
+                            .filter(|text| text.starts_with('{'))
+                            .map(str::to_owned)
+                    }),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .expect("world result");
+        answers.push(serde_json::from_str::<serde_json::Value>(&text).unwrap());
+    }
+    assert_eq!(
+        answers[0],
+        serde_json::json!({"fs":"filesystem","env":"environment","process":"child","http":"http","agent":0,"mcp":true})
+    );
+    assert_eq!(answers[0], answers[1]);
+}
+
+#[test]
+fn the_models_spawn_agent_call_crosses_the_agent_noun_chain() {
+    let root = tempfile::tempdir().unwrap();
+    let plugin = root.path().join("agent-link");
+    std::fs::create_dir(&plugin).unwrap();
+    std::fs::write(
+        plugin.join("plugin.json"),
+        r#"{"name":"agent-link","version":"1","module":"main.ts"}"#,
+    )
+    .unwrap();
+    std::fs::write(plugin.join("main.ts"),"export function register(on) { on('agent.spawn', () => ({parts:[{type:'text',text:'agent noun intercepted'}],isError:false})); }").unwrap();
+    let script = root.path().join("script.json");
+    std::fs::write(&script,r#"{"responses":[{"steps":[{"toolCall":{"name":"SpawnAgent","input":{"prompt":"must be intercepted"}}}]},{"steps":[{"text":"offline"}]}]}"#).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+        .args([
+            "--print",
+            "--output-format",
+            "json",
+            "--provider",
+            "fake",
+            "--model",
+            "fake-1",
+            "--plugin-dir",
+        ])
+        .arg(&plugin)
+        .arg("world")
+        .current_dir(root.path())
+        .envs(home::home_env(root.path()))
+        .env("BINGO_FAKE_SCRIPT", script)
+        .output()
+        .unwrap();
+    let frames: Vec<bingo_sdk::Frame> = success(&output)
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("NDJSON frames"))
+        .collect();
+    assert!(frames.iter().any(|frame| matches!(&frame.event,bingo_sdk::Event::ItemCompleted {item} if matches!(&item.body,bingo_sdk::ItemBody::ToolCall {output:Some(output),..} if output.parts.iter().any(|part|part.as_text()==Some("agent noun intercepted"))))));
+}

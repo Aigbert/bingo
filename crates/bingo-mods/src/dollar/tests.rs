@@ -9,7 +9,7 @@ fn each_method_has_one_door_in_the_catalogue_namespace() {
         assert!(names.insert(name.clone()), "duplicate row: {name}");
         match row.door {
             Door::Kernel(entry) => assert_eq!(entry.name, name),
-            Door::Face => assert!(
+            Door::Face | Door::Service(_) => assert!(
                 bingo_sdk::catalogue::find(&name).is_none(),
                 "face duplicates {name}"
             ),
@@ -63,7 +63,8 @@ fn schema_and_types_are_generated_from_the_same_rows() {
             route["site"] = serde_json::json!(
                 ["session", "turn"]
                     .into_iter()
-                    .filter(|field| input["properties"].get(*field).is_some())
+                    .filter(|field| input["properties"].get(*field).is_some()
+                        || (*field == "session" && method["door"]["owner"] == true))
                     .collect::<Vec<_>>()
             );
             (name.clone(), route)

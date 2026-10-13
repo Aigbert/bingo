@@ -1,6 +1,6 @@
 import type { Callbacks, Callback } from './callbacks.ts';
 import { dollarRoutes } from './dollar-types.ts';
-import type { DollarInputs, DollarResults } from './dollar-types.ts';
+import type { ProcessOutput, DollarInputs, DollarResults } from './dollar-types.ts';
 import type { Rpc } from './rpc.ts';
 import type { HookSite, StateValue, ModelRequest, Completed, Input, Tone, ToolSpec, CommandSpec } from './wire.ts';
 
@@ -58,6 +58,17 @@ export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root:
       return register({ spec, callback: callbacks.put(noun, handler, spec.name) });
     };
   }
+  const spawn = hostApi.process.spawn;
+  hostApi.process.spawn = async (input: any) => {
+    const id = await spawn(input);
+    const session = input?.session ?? site.session;
+    return Object.freeze({
+      id,
+      read: () => hostApi.process.read({session,id}),
+      write: (body: string | null) => hostApi.process.write({session,id,body}),
+      kill: () => hostApi.process.kill({session,id}),
+    });
+  };
   Object.defineProperty(hostApi, 'plugin', { value: Object.freeze({ ...identity }), enumerable: true });
   return new Proxy(hostApi, {
     get(target, noun: string) {
@@ -83,7 +94,14 @@ type State = {
   get(key: string): Promise<StateValue | null>;
   set(key: string, value: unknown, ifVersion?: number): Promise<StateValue>;
 };
+export type ProcessHandle = {
+  readonly id: string;
+  read(): Promise<ProcessOutput>;
+  write(body: string | null): Promise<null>;
+  kill(): Promise<null>;
+};
 export type Dollar = Replace<HostNouns, {
+  process: Replace<HostNouns['process'], {spawn(input: AtSite<DollarInputs['process.spawn']>): Promise<ProcessHandle>}>;
   readonly plugin: Readonly<{name: string; root: string}>;
   state: State;
   store: State & {keys(): Promise<string[]>; delete(key: string): Promise<boolean>};

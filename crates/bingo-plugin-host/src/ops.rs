@@ -1,9 +1,5 @@
 //! Existing host doors exposed as noun faces, with the caller held out of band.
-use crate::{
-    grant::{admits, granted},
-    host::*,
-    state::Store,
-};
+use crate::{host::*, state::Store};
 use async_trait::async_trait;
 use bingo_sdk::*;
 use serde_json::{Value, json};
@@ -103,8 +99,7 @@ pub async fn admit<'a>(
 ) -> Result<(&'a str, &'a str), String> {
     let (noun, verb) =
         route(method, params).ok_or_else(|| format!("the host does not serve {method}"))?;
-    let grant = granted(host, plugin).await?;
-    admits(&grant, noun, verb, false).map_err(|error| format!("{plugin}: {error}"))?;
+    crate::grant::check(host, plugin, noun, verb, false, params).await?;
     Ok((noun, verb))
 }
 
@@ -120,7 +115,8 @@ async fn service(host: &HostHandle, plugin: &str, params: Value) -> Result<Value
     let wire = host
         .service_wire(key)
         .ok_or_else(|| format!("service {key} is unavailable"))?;
-    crate::grant::admit_service(host, plugin, key, method, wire.as_ref()).await?;
+    crate::grant::admit_service(host, plugin, key, method, wire.as_ref(), &params["params"])
+        .await?;
     let input = bind(
         plugin,
         key,

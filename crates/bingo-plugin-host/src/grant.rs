@@ -90,6 +90,7 @@ pub async fn admit_service(
     key: &str,
     method: &str,
     wire: &dyn bingo_sdk::WireService,
+    input: &serde_json::Value,
 ) -> Result<(), String> {
     let face = wire.face();
     let noun = face.as_ref().map(|face| face.noun.as_str()).unwrap_or(key);
@@ -97,8 +98,7 @@ pub async fn admit_service(
         .as_ref()
         .and_then(|face| face.find(method))
         .is_none_or(|method| method.unsafe_call);
-    admits(&granted(host, plugin).await?, noun, method, unsafe_call)
-        .map_err(|error| format!("{plugin}: {error}"))
+    check(host, plugin, noun, method, unsafe_call, input).await
 }
 
 #[cfg(test)]
@@ -182,5 +182,207 @@ mod tests {
         );
         assert!(admits(&trusted, "agents", "spawn", true).is_ok());
         assert!(admits(&trusted, "undeclared", "read", false).is_err());
+    }
+}
+
+/// The exact words are shared by both transports and dynamic filesystem grants.
+pub fn refusal(
+    plugin: &str,
+    noun: &str,
+    method: &str,
+    reason: &str,
+    settings: &std::path::Path,
+) -> String {
+    format!(
+        "{plugin} may not {noun}.{method}: {reason}. Grant it under pluginTrust in {}.",
+        settings.display()
+    )
+}
+
+pub async fn check(
+    host: &bingo_sdk::HostHandle,
+    plugin: &str,
+    noun: &str,
+    method: &str,
+    unsafe_call: bool,
+    input: &serde_json::Value,
+) -> Result<(), String> {
+    let result = admits(&granted(host, plugin).await?, noun, method, unsafe_call);
+    let audit = host.service_wire(AUDIT);
+    if let Err(error) = result {
+        let settings = match &audit {
+            Some(audit) => audit
+                .call("settings", serde_json::Value::Null)
+                .await
+                .ok()
+                .and_then(|v| v.as_str().map(std::path::PathBuf::from)),
+            None => None,
+        }
+        .unwrap_or_else(|| "<user settings path>".into());
+        return Err(refusal(plugin, noun, method, &error.to_string(), &settings));
+    }
+    if unsafe_call || UNSAFE.contains(&noun) {
+        tracing::info!(plugin, noun, method, session = ?input.get("session"), "granted unsafe plugin operation");
+        if let Some(audit) = audit {
+            let first = audit
+                .call(
+                    "record",
+                    serde_json::json!({"plugin":plugin,"noun":noun,"session":input.get("session")}),
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            if first == true {
+                host.notice(
+                    bingo_sdk::Level::Info,
+                    "PLUGIN_UNSAFE",
+                    &format!("{plugin} uses the granted {noun} noun"),
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    Ok(())
+}
+const AUDIT: &str = "bingo.plugin-host.grants";
+
+pub struct Audit {
+    settings: std::path::PathBuf,
+    seen: std::sync::Mutex<BTreeSet<(String, String, Option<String>)>>,
+}
+impl Audit {
+    pub fn install(
+        host: &bingo_sdk::HostHandle,
+        env: &bingo_sdk::Env,
+    ) -> Result<std::sync::Arc<Self>, bingo_sdk::KernelError> {
+        let audit = std::sync::Arc::new(Self {
+            settings: env.user_settings(),
+            seen: Default::default(),
+        });
+        host.open_service(AUDIT, audit.clone())?;
+        Ok(audit)
+    }
+    pub fn end(&self, session: &bingo_sdk::SessionId) {
+        self.seen
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .retain(|(_, _, id)| id.as_deref() != Some(session.as_str()));
+    }
+}
+#[async_trait::async_trait]
+impl bingo_sdk::WireService for Audit {
+    async fn call(
+        &self,
+        method: &str,
+        input: serde_json::Value,
+    ) -> Result<serde_json::Value, bingo_sdk::ServiceError> {
+        match method {
+            "settings" => Ok(serde_json::json!(self.settings)),
+            "record" => {
+                let plugin = input["plugin"]
+                    .as_str()
+                    .ok_or_else(|| bingo_sdk::ServiceError("plugin is required".into()))?;
+                let noun = input["noun"]
+                    .as_str()
+                    .ok_or_else(|| bingo_sdk::ServiceError("noun is required".into()))?;
+                let session = input["session"].as_str().map(str::to_owned);
+                Ok(serde_json::json!(
+                    self.seen.lock().unwrap_or_else(|e| e.into_inner()).insert((
+                        plugin.into(),
+                        noun.into(),
+                        session
+                    ))
+                ))
+            }
+            _ => Err(bingo_sdk::ServiceError(
+                "unknown grant audit operation".into(),
+            )),
+        }
+    }
+}
+
+#[cfg(test)]
+mod world_tests {
+    use super::*;
+    use bingo_sdk::{Env, SessionId, WireService};
+    use serde_json::json;
+    #[test]
+    fn refusal_words_name_the_operation_and_actual_settings() {
+        assert_eq!(
+            refusal(
+                "sample",
+                "fs",
+                "write",
+                "outside data",
+                std::path::Path::new("settings.toml")
+            ),
+            "sample may not fs.write: outside data. Grant it under pluginTrust in settings.toml."
+        );
+    }
+    #[test]
+    fn every_unsafe_world_method_requires_a_user_grant_for_project_modules() {
+        let uses = ["fs", "http", "process", "env", "mcp", "agent"]
+            .map(str::to_owned)
+            .to_vec();
+        let project = grant(PluginRuntime::Module, Origin::Project, None, &uses);
+        let trusted = grant(
+            PluginRuntime::Module,
+            Origin::Project,
+            Some(&PluginTrust {
+                tier: Tier::Rewrite,
+                uses: uses.clone(),
+            }),
+            &uses,
+        );
+        for (noun, methods) in [
+            ("fs", &["write"][..]),
+            ("http", &["fetch"][..]),
+            ("process", &["run", "spawn", "read", "write", "kill"][..]),
+            ("env", &["get", "set"][..]),
+            ("mcp", &["connect"][..]),
+            ("agent", &["spawn"][..]),
+        ] {
+            for method in methods {
+                assert!(
+                    admits(&project, noun, method, true).is_err(),
+                    "{noun}.{method}"
+                );
+                assert!(
+                    admits(&trusted, noun, method, true).is_ok(),
+                    "{noun}.{method}"
+                );
+            }
+        }
+    }
+    #[tokio::test]
+    async fn unsafe_nouns_are_recorded_once_per_plugin_and_session() {
+        let host = bingo_sdk::testing::TestHost::default();
+        let audit = Audit::install(&host.handle(), &Env::rooted("fixture")).unwrap();
+        let session = SessionId::mint();
+        let input = json!({"plugin":"one","noun":"process","session":session});
+        assert_eq!(audit.call("record", input.clone()).await.unwrap(), true);
+        assert_eq!(audit.call("record", input.clone()).await.unwrap(), false);
+        assert_eq!(
+            audit
+                .call(
+                    "record",
+                    json!({"plugin":"two","noun":"process","session":session})
+                )
+                .await
+                .unwrap(),
+            true
+        );
+        assert_eq!(
+            audit
+                .call(
+                    "record",
+                    json!({"plugin":"one","noun":"http","session":session})
+                )
+                .await
+                .unwrap(),
+            true
+        );
+        audit.end(&session);
+        assert_eq!(audit.call("record", input).await.unwrap(), true);
     }
 }
