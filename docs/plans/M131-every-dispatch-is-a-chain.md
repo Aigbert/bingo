@@ -42,7 +42,7 @@ existing hook tests pass unedited. Audit §3, Mods gap 1.
    `tool.call` kernel link; `after_tool_hooks` becomes the `AfterTool`
    adapter. The turn's `gate`, `run_tools` and the bridged door
    (`Bridged::gated`, `serve`) all call the two chains (§5).
-6. **`prompt.submit` and `turn.stop`.** `submit_prose`'s hook loop and `stop_hooks`
+6. **`prompt.submit` and `turn.stop`.** `session/gate.rs::submit_hooks`'s loop and `stop_hooks`
    become adapters over their chains; the actor's dispositions (reject,
    redirect, queue, start) are the `prompt.submit` kernel link.
 7. **`turn.step`, `prompt.compose`, `session.compact`.** The provider stream
@@ -60,7 +60,11 @@ existing hook tests pass unedited. Audit §3, Mods gap 1.
 - `crates/bingo-core/src/chain/{mod.rs,submit.rs,tool.rs,model.rs,compose.rs,compact.rs,stop.rs}` (new; one point each)
 - `crates/bingo-core/src/{gate.rs,executor.rs,turn.rs,plugins.rs}`
 - `crates/bingo-core/src/turn/{late.rs,stream.rs}` (`HookSet` gathers links too)
-- `crates/bingo-core/src/session/{inputs.rs,invoke.rs}`
+- `crates/bingo-core/src/session/{gate.rs,inputs.rs,invoke.rs,mailbox.rs}`
+- `crates/bingo-core/src/{lib.rs,host.rs,settings.rs}` and `host/registry.rs`
+- `crates/bingo-core/src/{chain,session/tests}/` (new contract tests)
+- `crates/bingo-sdk/tests/` (chain shape and receipt fixtures)
+- `crates/bingo/tests/` (headless tier listing)
 - `crates/bingo-core/src/settings/merge.rs` (`pluginTrust`, user layer)
 - `crates/bingo/src/plugins.rs` (the tier column)
 - `crates/bingo-hooks-shell/src/guide.md` (the order rules, in a person's words)
@@ -92,6 +96,19 @@ existing hook tests pass unedited. Audit §3, Mods gap 1.
 - Moving any first-party hook onto a link (checkpoints, rooms, agents keep
   their hooks; each moves when it wants a `next`).
 - An `Allow` in `HookOutcome`.
+
+## Re-verification (2026-10-13, `3a0f80d2`)
+
+- M116 moved submit hooks into the owned `session/gate.rs` future; keep
+  `validate` and `may_run_shell` there, and retain `INTERRUPTED`/TaskTracker.
+- `HookSet` remains in `turn/late.rs`; `TurnConfig` is in `turn/config.rs`.
+  Registry/host wiring and settings types are required alongside merge.
+- M121 stamps quiet on opened calls; preserve it and permission actions.
+- Receipts can use existing durable notice items; no new Event is needed.
+- Settings layers currently carry only a source label; mark the user layer
+  at load time, never infer trust from a project path or its position.
+- Mechanical HookSet/Layer construction updates outside Files, if needed,
+  follow protocol step 6; existing hook assertions remain unchanged.
 
 ## Risks
 
