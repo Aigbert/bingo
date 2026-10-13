@@ -79,10 +79,15 @@ impl RoomsHook {
             let Some(room) = Room::of(&summary) else {
                 continue;
             };
+            // Room observers may publish to the parent while its journal opens.
+            // Open it first so those writes share its live mailbox.
+            self.rooms.register(&summary);
+            if room::read(host, &room.parent).await.is_none() {
+                continue;
+            }
             let Some(state) = room::read(host, &summary.id).await else {
                 continue;
             };
-            self.rooms.register(&summary);
             if let Some(kinds) = state.extensions.get(PLUGIN) {
                 for (kind, payload) in kinds {
                     self.rooms.extended(&summary.id, kind, payload);

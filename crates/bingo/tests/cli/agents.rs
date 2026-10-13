@@ -513,9 +513,9 @@ const LEFT_AT_WORK: &str = r#"{"responses":[
 
 /// M31: the process ends while a background child is inside a turn — killed,
 /// so nothing is closed and its journal ends where the last flush left it.
-/// `--continue` brings the root back with one line about that child, the
-/// child's journal is byte for byte what it was, and the child itself is not
-/// reopened: `recover` still owns the turn it left open.
+/// `--continue` brings the root back with one line about that child. M122
+/// reopens the child to recover its owed report; its existing journal prefix
+/// remains byte for byte what it was, and `recover` owns the turn it left open.
 #[test]
 fn a_resumed_root_is_told_which_child_was_mid_turn_when_the_process_ended() {
     let home = tempfile::tempdir().unwrap();
@@ -565,10 +565,9 @@ fn a_resumed_root_is_told_which_child_was_mid_turn_when_the_process_ended() {
         "it names the child: {}",
         lines[0]
     );
-    assert_eq!(
-        agent_journal(home.path(), &key),
-        before,
-        "and the child's own journal is untouched"
+    assert!(
+        agent_journal(home.path(), &key).starts_with(&before),
+        "report recovery appends without rewriting the child's history"
     );
 }
 
