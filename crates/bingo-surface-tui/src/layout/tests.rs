@@ -290,6 +290,7 @@ fn layout_layer_send_and_drag_report_their_own_deadlines() {
         Some(arrived.instant + crate::clock::FRAME)
     );
     ui.sent = None;
+    ui.start_selection(crate::select::Cell::default());
     ui.select.dragging = Some(crate::select::Dragging {
         edge: crate::select::Edge::Above(0),
         stepped: arrived.instant,
@@ -299,4 +300,8 @@ fn layout_layer_send_and_drag_report_their_own_deadlines() {
         first.next_frame,
         Some(arrived.instant + crate::select::EDGE_PACE)
     );
+    ui.focus = crate::focus::Focus::Search(crate::search::Search::open());
+    assert_eq!(layout(first, &tree, &ui, SIZE, arrived).next_frame, None);
+    ui.drag_step(arrived);
+    assert!(ui.select.dragging.is_none());
 }
