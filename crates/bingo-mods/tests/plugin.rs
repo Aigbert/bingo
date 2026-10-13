@@ -281,3 +281,43 @@ async fn dollar_reads_the_session_fold_and_freezes_its_plugin_identity() {
     assert_eq!(answer["frozen"], true);
     fixture.host.shutdown().await;
 }
+
+#[tokio::test]
+async fn an_append_keeps_its_calling_hook_across_the_mailbox() {
+    use bingo_sdk::*;
+    use futures::StreamExt;
+    let mut fixture = support::Fixture::new(
+        r#"
+      export function register(on) {
+        let calls = 0;
+        on('session.append', {kind:'probe'}, async ($, e, next) => {
+          calls++;
+          if (calls === 1) await $.session.append({key:'probe',value:1});
+          return next(e);
+        });
+        on('fixture.echo', () => ({calls}));
+      }
+    "#,
+        &["session"],
+        json!({}),
+    )
+    .await;
+    fixture
+        .host
+        .extend(&fixture.attachment.session, "test", "probe", json!(0))
+        .await
+        .unwrap();
+    let mut appended = 0;
+    while appended < 2 {
+        let frame = fixture.attachment.events.next().await.unwrap();
+        if matches!(frame.event, Event::Extension { ref kind, .. } if kind == "probe") {
+            appended += 1;
+        }
+    }
+    let answer = fixture.call("fixture", "echo", json!({})).await;
+    assert_eq!(
+        answer["calls"], 1,
+        "the calling hook re-entered across the actor mailbox"
+    );
+    fixture.host.shutdown().await;
+}

@@ -28,7 +28,7 @@ it: natives in process, and M133's `dollar.ts` under node.
 ## Files
 
 - `crates/bingo-mods/src/dollar/*.rs` (new), `src/{lib,link,chain,engine,thread,module,manager,plugin,load,config}.rs`, `src/{thread.js,manager/reload.rs}`, `tests/{contracts,plugin}.rs`, `tests/mods/nouns/*` (new), `guide.md`, `Cargo.toml`
-- `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/completion.rs,host/tests/complete.rs,host/tests/catalogue.rs}`
+- `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs,invocation.rs,lib.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/completion.rs,host/tests/complete.rs,host/tests/catalogue.rs,session.rs,session/mailbox.rs,session/catalogue.rs,session/gate.rs,session/inputs.rs,session/commands.rs,chain/observe.rs}`
 - `crates/bingo-plugin-host/src/{state,ops,host,invocation,lib}.rs`
 - `crates/bingo-plugin-rpc/src/{host,service,bridge,schema,wire,wire_ts,context,connection,intercept,lib}.rs`
 - `schema/{dollar,plugin,events}.json`, `sdk/typescript/src/{cross,rpc,dollar,dollar-types,plugin,wire,events}.ts`, SDK noun tests
@@ -64,6 +64,7 @@ it: natives in process, and M133's `dollar.ts` under node.
 - `core/src/chain/service.rs` wraps faces; SDK `service.rs` checks unique names. `HostApi::complete` only grants and mails. Move the model/think command's `config::set` calls into `reconfigure` to avoid duplicate chains.
 - The fold has config, queue, transcript and usage. Attach/detach are observations, not frames; project surfaces through the existing plugin signal door.
 - Use M111's `TestHost` for door answers, and the real offline kernel for chain counts: the test host does not dispatch interception chains.
+- Actor mail and spawned chain work must carry the SDK invocation context; re-export it from plugin-host so both runtimes still share one representation.
 - The Node re-entry prerequisite was repaired here as the authorized first brick; ADR-0078 §4 remains unchanged.
 
 - Prerequisite Windows checks: plugin-host and core pass; mods (rquickjs-sys), plugin-rpc and bingo (aws-lc-sys) await Windows CI because this Mac lacks Windows SDK C headers.
@@ -126,4 +127,7 @@ unknown folded read: session.id
 cargo test -p bingo-mods --locked
 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+cargo test -p bingo-mods --test plugin --locked an_append_keeps
+the calling hook re-entered across the actor mailbox; left: Number(2); right: 1
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.06s
 ```
