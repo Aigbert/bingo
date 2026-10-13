@@ -87,3 +87,58 @@ to go (a version line and a raw-JSON step). Sessions written before
   only; known lines parse once from the `Value`.
 - Re-verify at start: M112 has landed; variant counts; where `ItemBody`
   is defined.
+
+
+## Re-verification stopped (2026-10-13, `eddd0ebc`)
+
+Protocol steps 2 and 6: the historical compatibility requirement in brick 6
+and the third exit criterion contradict the current reader. No production
+code was changed; ADR-0065 remains proposed and every exit stays unticked.
+M112's `Transcript` exists; `Event` has 23 variants and `ItemBody` has 13,
+both in `bingo-sdk/src/event.rs`. Both `schema/rpc.json` and
+`schema/plugin.json` consume these types.
+
+### Risks: compatibility decision needs resolution
+
+The cited changes do not produce the promised pre-M113 `STORAGE` failure:
+
+- `git show 379bd04c -- crates/bingo-sdk/src/event.rs`: removes the optional
+  `ToolCall.child_session` field, not an event variant. Today's serde reader
+  ignores `childSession` and returns a known `ToolCall`.
+- `git show 4afd43d3 -- crates/bingo-sdk/src/event.rs`: replaces `Display`
+  with `View`. The old `summary` display now reads through the existing
+  `View::Custom` fallback (`bingo-sdk/src/view.rs`); its item stays known.
+- `git show 6471cde6 -- crates/bingo-sdk/src/event.rs`: extracts `Question`
+  with its wire shape explicitly preserved. The existing sdk test
+  `a_bare_question_on_the_wire_is_the_shape_it_always_was` pins that fact.
+  This old JSON cannot become `Unknown` while identical current JSON stays
+  known. ADR-0065's context describes this extraction as breaking, and its
+  historical-unknown decision (§7), as instantiated by brick 6, needs
+  clarification before implementation.
+
+Options (not applied): (1) retain these already-readable shapes as known,
+correct the historical premise in ADR-0065 and brick 6, and use genuinely
+unreadable historical records or explicitly synthetic unknown records for
+the pre-change failure; (2) require legacy shapes to become unknown, which
+needs a new compatibility decision about existing `View` behavior and the
+indistinguishable Question wire shape. Do not silently change either.
+
+### Re-verification evidence (not milestone verification)
+
+A temporary journal unit test used minimal frames recovered from each
+`git show <sha>^:crates/bingo-sdk/src/event.rs`, surrounded by the clean
+fixture's header/session head and a final valid close frame. Thus no old
+frame could disappear under the torn-tail rule. It asserted the known
+variants and all five replayed frames. The temporary probe was removed.
+Its first run had an incorrectly encoded `AnswerSpec`; after correcting
+that probe-only typo to the historical strings, the result was:
+
+```text
+$ cargo test -p bingo-store-jsonl cited_historical_shapes_already_replay --locked -- --nocapture
+379bd04c: known ToolCall; 4afd43d3: known ToolCall with View::Custom; 6471cde6: known Question; replay: Ok(5 frames), no STORAGE
+test journal::m113_reverification::cited_historical_shapes_already_replay ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 39 filtered out
+```
+
+The milestone gates, Windows checks, fixtures and implementation were not
+run/completed after this protocol stop. No ADR was accepted.
