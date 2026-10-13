@@ -94,15 +94,15 @@ decision taken early (its status line says so).
 
 ## Exit criteria
 
-- [ ] Schedule's claim tests pass unchanged against `bingo-claim`.
-- [ ] A killed channel host leaves a claim the next start takes; a
+- [x] Schedule's claim tests pass unchanged against `bingo-claim`.
+- [x] A killed channel host leaves a claim the next start takes; a
       second live host is refused (pasted test output, before and after).
-- [ ] Doctor never offers to remove a modern channel claim.
-- [ ] `Reviewer` is refused when `reviewer` exists; `Parent` is refused.
-- [ ] An image-capable ACP agent receives the picture; another receives
+- [x] Doctor never offers to remove a modern channel claim.
+- [x] `Reviewer` is refused when `reviewer` exists; `Parent` is refused.
+- [x] An image-capable ACP agent receives the picture; another receives
       the note.
-- [ ] A 3 MB PNG from a plugin tool reaches the model ≤ 1 MB.
-- [ ] `scripts/budget.sh` passes with the new crate; all gates.
+- [x] A 3 MB PNG from a plugin tool reaches the model ≤ 1 MB.
+- [ ] `scripts/budget.sh` passes with the new crate; all gates (Windows blocked; see Risks).
 
 ## Non-goals
 
@@ -114,8 +114,37 @@ decision taken early (its status line says so).
 - Existing `channels/*.lock` files on users' machines are legacy after
   this lands: the first start refuses with the remedy. Say so in the
   commit body and the channels guide.
-- `bingo-claim` must build on Windows (`File::try_lock` is std);
-  cross-check it and the channels crate.
+- **Stopped, protocol step 6:** Windows plugin-rpc checking fails in transitive `aws-lc-sys`: `fatal error: 'windows.h' file not found`. Fixing the toolchain or the pictures dependency boundary is outside Files; no workaround or other-worktree edit was attempted.
+  Options: provide a Windows SDK/C toolchain and rerun the remaining checks, or authorize a separate change to the picture library dependency boundary. M109 is not fully verified; ADR-0072 remains proposed.
 - Re-verified at `82e78d22`: all named bug sites remain; workspace members
   already use `crates/*`, both name modules are private, and the guide is
   `crates/bingo-channels/src/guide.md`. No Decision changes are needed.
+
+## Verified (2026-10-13)
+
+Contract commits preceded implementation; trimmed output (before → after):
+
+| Command | Before | After |
+| --- | --- | --- |
+| `cargo test -p bingo-claim` | `test result: FAILED. 0 passed; 8 failed;` | `test result: ok. 8 passed; 0 failed;` |
+| `cargo test -p bingo-claim -p bingo-schedule --lib` | — | `test result: ok. 116 passed; 0 failed;` (schedule; original claim bodies moved unchanged) |
+| `cargo test -p bingo --test channel_claim` | `successor exited instead of taking the claim: Ok(ExitStatus(unix_wait_status(256)))` | `test a_live_channel_host_excludes_another_and_a_killed_one_releases ... ok` |
+| `cargo test -p bingo-gateway --lib modern_channel` | `test result: FAILED. 0 passed; 1 failed;` | `test doctor::tests::modern_channel_claims_are_probed_and_never_removed ... ok` |
+| `cargo test -p bingo-agents --lib case_variants` | `test result: FAILED. 0 passed; 2 failed;` | `test names::tests::case_variants_cannot_claim_an_existing_or_reserved_name ... ok` |
+| `cargo test -p bingo --test name_rules` | — | `test agents_and_rooms_compare_one_table_of_names_the_same_way ... ok` |
+| `cargo test -p bingo-provider-acp --test pictures` | `test result: FAILED. 0 passed; 2 failed;` | `test result: ok. 2 passed; 0 failed;` (test adjusted to retain the existing opening preamble) |
+| `cargo test -p bingo-plugin-rpc --lib plugin_picture` | `assertion failed: seen.decoded_len() <= bingo_pictures::MODEL_BUDGET` | `test tool::tests::a_three_megabyte_plugin_picture_is_bounded_before_the_model_sees_it ... ok` |
+| `cargo test -p bingo-provider-openai --lib a_name_that_is_taken` | `test result: FAILED. 0 passed; 1 failed;` | `test instances::tests::a_name_that_is_taken_is_refused_by_name ... ok` |
+| `cargo test -p bingo --test cli a_colliding_instance_name` | — | `test instances::a_colliding_instance_name_stops_the_boot_and_is_named ... ok` |
+
+Gates run sequentially; logs are in `target/m109-logs/`:
+- Initial workspace failures: the gateway test expected deleted channel files, then raced channel startup; both assertions were corrected. ACP interrupt timed out under parallel tests, then passed alone (`test result: ok. 1 passed; 0 failed;`); the final suite runs serially.
+- `cargo fmt --all -- --check`: exit 0, no output.
+- `cargo check --workspace --all-targets --locked`: ``Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.50s``
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: ``Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.97s``
+- `cargo test --workspace --locked -- --test-threads=1`: exit 0; summed output: 4,960 passed, 0 failed, 3 existing ignored (stress/manual storyboard tests); final group: `test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s`.
+- `cargo test -p bingo-provider-acp --test bridge --locked token -- --test-threads=1`: `test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s` (also included in the final serial workspace run).
+- `scripts/check_discipline.sh`: `discipline ok` (historical size warnings).
+- `scripts/budget.sh`: `dependencies (unique, normal): 343 (max  343)`; `warm cargo check -p bingo-core: 0s (max  20s)`; `budget ok`.
+- `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok` (duplicate-version warnings).
+- `cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc`: claim/schedule/agents/rooms/provider-acp exit 0; plugin-rpc exit 101: `fatal error: 'windows.h' file not found`. Stopped immediately; channels/provider-openai/gateway/bingo Windows checks remain unrun.
