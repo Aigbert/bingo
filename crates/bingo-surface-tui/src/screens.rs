@@ -872,8 +872,9 @@ fn the_at_completion_dropdown_with_agents_to_reach() {
     let mut root = long_transcript(24);
     root.summary.cwd = dir.path().to_string_lossy().into_owned();
     let mut tree = Tree::new(root);
-    tree.apply(&child_frame(1, announced("reviewer")));
-    tree.apply(&agent_frame(3, 2, agent_announced(3, "researcher")));
+    tree.fold.apply(&child_frame(1, announced("reviewer")));
+    tree.fold
+        .apply(&agent_frame(3, 2, agent_announced(3, "researcher")));
     let (mut ui, now) = scene();
     for c in "@re".chars() {
         crate::input::on_key(&mut ui, &tree, typed(c), now);

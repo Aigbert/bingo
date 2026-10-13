@@ -799,7 +799,7 @@ pub fn solo(state: &SessionState) -> Tree {
 pub fn folded_tree(frames: Vec<Frame>) -> Tree {
     let mut tree = Tree::new(state());
     for frame in &frames {
-        tree.apply(frame);
+        tree.fold.apply(frame);
     }
     tree
 }
@@ -899,8 +899,8 @@ pub fn waited_on(agents: u64) -> Tree {
     let mut tree = Tree::new(state());
     for agent in 2..2 + agents {
         let announced = agent_announced(agent, &format!("agent-{agent}"));
-        tree.apply(&agent_frame(agent, 1, announced));
-        tree.apply(&agent_frame(agent, 2, started("trn_9")));
+        tree.fold.apply(&agent_frame(agent, 1, announced));
+        tree.fold.apply(&agent_frame(agent, 2, started("trn_9")));
     }
     tree
 }

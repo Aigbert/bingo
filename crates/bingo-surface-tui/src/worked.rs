@@ -202,18 +202,18 @@ mod tests {
     fn a_new_turn_takes_the_closing_away_and_a_wait_stands_beside_it() {
         let (ui, now) = scene();
         let mut again = ended(42, bingo_sdk::TurnStatus::Completed);
-        again.apply(&frame(3, started("trn_2")));
+        again.fold.apply(&frame(3, started("trn_2")));
         let at = later(now, 1_600);
         assert_eq!(after(&again, at, "Worked for"), "");
         assert!(draw_tree(80, 24, &again, &ui, at).contains("esc to interrupt"));
 
         let mut waited = waited_on(1);
-        waited.apply(&frame(8, started("trn_1")));
+        waited.fold.apply(&frame(8, started("trn_1")));
         let closed = bingo_sdk::Frame {
             ts: ts() + jiff::SignedDuration::from_secs(42),
             ..frame(9, completed("trn_1", bingo_sdk::TurnStatus::Completed))
         };
-        waited.apply(&closed);
+        waited.fold.apply(&closed);
         assert!(after(&waited, at, "Worked for").contains("Worked for 42s"));
         assert!(draw_tree(80, 24, &waited, &ui, at).contains("Waiting for"));
     }

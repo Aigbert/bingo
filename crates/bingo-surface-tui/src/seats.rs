@@ -429,7 +429,7 @@ mod tests {
     #[test]
     fn a_seat_that_retuned_its_own_ear_is_heard_over_the_roster() {
         let mut tree = seated();
-        tree.apply(&log_frame(
+        tree.fold.apply(&log_frame(
             9,
             extended(
                 "bingo.rooms",
@@ -444,7 +444,7 @@ mod tests {
             })
         );
 
-        tree.apply(&log_frame(
+        tree.fold.apply(&log_frame(
             10,
             extended(
                 "bingo.rooms",
@@ -494,14 +494,16 @@ mod tests {
     #[test]
     fn a_seat_behind_the_rooms_head_counts_what_it_has_not_read() {
         let mut tree = seated();
-        tree.apply(&log_frame(9, room_cursor("reviewer", "itm_p1")));
+        tree.fold
+            .apply(&log_frame(9, room_cursor("reviewer", "itm_p1")));
         assert_eq!(
             of(&tree, "reviewer").and_then(|seat| seat.unread),
             Some(3),
             "the room holds four posts and the mark stopped at the first"
         );
 
-        tree.apply(&log_frame(10, room_cursor("reviewer", "itm_p4")));
+        tree.fold
+            .apply(&log_frame(10, room_cursor("reviewer", "itm_p4")));
         assert_eq!(of(&tree, "reviewer").and_then(|seat| seat.unread), None);
     }
 
@@ -512,7 +514,8 @@ mod tests {
     #[test]
     fn a_mark_of_another_seat_or_another_shape_counts_nothing() {
         let mut tree = seated();
-        tree.apply(&log_frame(9, room_cursor("watcher", "itm_p1")));
+        tree.fold
+            .apply(&log_frame(9, room_cursor("watcher", "itm_p1")));
         assert_eq!(of(&tree, "reviewer").and_then(|seat| seat.unread), None);
         assert_eq!(
             of(&tree, "watcher").and_then(|seat| seat.unread),
@@ -520,7 +523,7 @@ mod tests {
             "it counts for the seat it was filed under"
         );
 
-        tree.apply(&log_frame(
+        tree.fold.apply(&log_frame(
             10,
             extended(
                 "bingo.rooms",
@@ -530,7 +533,7 @@ mod tests {
         ));
         assert_eq!(of(&tree, "reviewer").and_then(|seat| seat.unread), None);
 
-        tree.apply(&log_frame(
+        tree.fold.apply(&log_frame(
             11,
             extended(
                 "bingo.rooms",
@@ -556,7 +559,7 @@ mod tests {
     #[test]
     fn a_member_that_owes_twice_is_one_debtor_and_says_the_older() {
         let mut tree = seated();
-        tree.apply(&frame(
+        tree.fold.apply(&frame(
             6,
             signalled(
                 "bingo.rooms",
@@ -580,7 +583,7 @@ mod tests {
     #[test]
     fn a_debt_in_another_room_is_not_this_rooms() {
         let mut tree = seated();
-        tree.apply(&frame(
+        tree.fold.apply(&frame(
             6,
             signalled(
                 "bingo.rooms",
@@ -598,7 +601,7 @@ mod tests {
     #[test]
     fn a_card_from_before_the_debts_says_the_clock_time_it_carries() {
         let mut tree = seated();
-        tree.apply(&frame(
+        tree.fold.apply(&frame(
             6,
             signalled(
                 "bingo.rooms",
@@ -617,13 +620,13 @@ mod tests {
     #[test]
     fn a_payload_of_another_shape_says_nothing_rather_than_guessing() {
         let mut tree = seated();
-        tree.apply(&frame(
+        tree.fold.apply(&frame(
             6,
             signalled("bingo.rooms", "owed", serde_json::json!({"kind": "text"})),
         ));
         assert_eq!(of(&tree, "reviewer").and_then(|seat| seat.owes), None);
 
-        tree.apply(&log_frame(
+        tree.fold.apply(&log_frame(
             9,
             extended("bingo.rooms", "members", serde_json::json!(7)),
         ));

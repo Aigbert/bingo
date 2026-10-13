@@ -385,7 +385,7 @@ mod tests {
         let (_, now) = scene();
         assert_eq!(row(&waited_on(0), now), "");
         let mut done = waited_on(1);
-        done.apply(&agent_frame(
+        done.fold.apply(&agent_frame(
             2,
             3,
             completed("trn_9", bingo_sdk::TurnStatus::Completed),
@@ -416,7 +416,7 @@ mod tests {
     fn a_turn_on_the_viewed_session_takes_the_row_back_from_the_wait() {
         let (ui, now) = scene();
         let mut woken = waited_on(1);
-        woken.apply(&frame(2, started("trn_1")));
+        woken.fold.apply(&frame(2, started("trn_1")));
         let at = later(now, 1_600);
         assert_eq!(row(&woken, at), "");
         let drawn = draw_tree(80, 24, &woken, &ui, at);

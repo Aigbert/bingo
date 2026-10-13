@@ -73,7 +73,7 @@ No kernel door, no wire change.
   (accepted for §5–6, with the M112 half already accepted)
 - `docs/adr/0002-event-stream.md` (dated amendment note)
 - Mechanical TUI fixture updates in `view.rs`, `roster.rs`, `seats.rs`
-  and `screens.rs`; existing assertions remain unchanged.
+  `activity.rs`, `worked.rs`, and `screens.rs`; existing assertions remain unchanged.
 
 ## Exit criteria
 
