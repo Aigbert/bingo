@@ -1,6 +1,6 @@
 # ADR-0078 — A mod is a module the host runs
 
-Status: accepted for §1 catalogue/noun faces and §5 face metadata · 2026-10-14 · M136; all other decisions remain proposed.
+Status: accepted for §1–5 and §7 · 2026-10-14 · M136/M137; §6 and §8 remain proposed.
 Plans: M137 (runtime), M138, M139 (`$`), M142 (kit).
 Amends: ADR-0074 §1 §3 and Non-goals, ADR-0075 §2 and Non-goals, ADR-0069 §3, ADR-0031 §6
 
