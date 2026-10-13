@@ -3854,6 +3854,11 @@
           "description": "A turn is running. A summary travels without the turn it describes —\na host listing carries no `SessionState` — so the kernel stamps this\non every summary it publishes and nothing else writes it. A client\nthat holds the state derives the same fact with `SessionState::busy`.",
           "default": false
         },
+        "asking": {
+          "type": "boolean",
+          "description": "An interaction is open; stamped only by the session actor.",
+          "default": false
+        },
         "messages": {
           "type": [
             "integer",

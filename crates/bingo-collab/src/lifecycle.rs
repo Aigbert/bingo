@@ -72,6 +72,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn readers_use_their_own_source_of_truth() {
+        let event: bingo_sdk::Event = serde_json::from_str(include_str!(
+            "../../bingo-sdk/fixtures/record/compat/summary-before-asking.json"
+        ))
+        .unwrap();
+        let bingo_sdk::Event::SessionUpdated { mut summary } = event else {
+            panic!("a summary fixture");
+        };
+        summary.asking = true;
+        summary.busy = true;
+        assert_eq!(Lifecycle::of_summary(&summary), Some(Lifecycle::Asking));
+        let mut state = SessionState::new(summary);
+        assert_eq!(
+            Lifecycle::of_state(&state),
+            Some(Lifecycle::Idle),
+            "state reads its interactions and turn, not inherited stamps"
+        );
+        state.closed = true;
+        assert_eq!(Lifecycle::of_state(&state), Some(Lifecycle::Stored));
+        state.summary.driver = Driver::Log;
+        assert_eq!(Lifecycle::of_state(&state), None);
+        assert_eq!(Lifecycle::of_summary(&state.summary), None);
+    }
+
+    #[test]
     fn words_and_order() {
         use Lifecycle::*;
         assert_eq!(

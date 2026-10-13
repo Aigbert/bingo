@@ -26,6 +26,14 @@ fn checkpoint_fixture_preserves_model_and_client_orders() {
     let restored: Checkpoint =
         serde_json::from_slice(&serde_json::to_vec(&checkpoint).unwrap()).unwrap();
     assert_eq!(restored, checkpoint);
+    if std::env::var_os("BINGO_UPDATE_SCHEMA").is_some() {
+        std::fs::write(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/checkpoint-v1.json"),
+            format!("{}\n", serde_json::to_string_pretty(&checkpoint).unwrap()),
+        )
+        .unwrap();
+        return;
+    }
     assert_eq!(
         serde_json::to_value(&checkpoint).unwrap(),
         serde_json::from_str::<serde_json::Value>(bytes).unwrap()

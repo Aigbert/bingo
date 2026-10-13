@@ -29,8 +29,8 @@ and `Needs you` leave every surface and every model-facing text.
    actor's `pending` table, and `session/interactions.rs` republishes
    the summary after `InteractionOpened` and after every path that closes
    one (answered, cancelled, expired). Nothing else writes the field;
-   the `SessionSummary { … }` literals gain it through
-   `..Default::default()` where they do not already.
+   complete `SessionSummary { … }` constructors initialize it false;
+   update expressions retain the source summary.
 4. **The agents plugin.** `list.rs` `state()` → `of_summary(…).word()`;
    the list's tone follows the state; `team/command.rs` `NOT_SEATED` →
    `Lifecycle::Unseated`; `guide.md` and the `ListAgents` description say
@@ -51,7 +51,7 @@ and `Needs you` leave every surface and every model-facing text.
 
 ## Files
 
-- `crates/bingo-sdk/src/event.rs` (`SessionSummary.asking`), its fixture
+- `crates/bingo-sdk/src/event.rs` (`SessionSummary.asking`), its fixture and snapshots
 - `crates/bingo-core/src/{session.rs,session/interactions.rs}`
 - `crates/bingo-collab/src/lifecycle.rs` (new), `crates/bingo-collab/src/lib.rs`
 - `crates/bingo-agents/src/{list.rs,stop.rs,dismiss.rs,guide.md,team/command.rs}`
@@ -61,8 +61,11 @@ and `Needs you` leave every surface and every model-facing text.
 - `docs/adr/{0027,0029,0060,0077}-*.md` (dated notes and acceptance)
 - Core `session/tests/{asking.rs,../tests.rs}`; SDK `event.rs` compatibility test
 - TUI `src/lifecycle.rs` (pure verdict), `src/lib.rs`, affected screen tests/snapshots
-- Generated `schema/{rpc,plugin}.json` and SDK record fixtures; mechanical
-  summary constructors and vocabulary fixtures elsewhere (protocol step 6).
+- Generated `schema/{rpc,plugin}.json`, `sdk/typescript/src/wire.ts`, SDK
+  record/checkpoint fixtures and their regeneration tests; mechanical
+  summary constructors and vocabulary fixtures elsewhere (protocol step 6):
+  agents `command.rs`; TUI `motion.rs`, `view.rs`, `screens/teams.rs`; SDK
+  `state.rs` wire bytes.
 
 ## Exit criteria
 
