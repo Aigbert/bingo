@@ -10,6 +10,19 @@ ember amber, the words are bingo's own. The grammar of the hands —
 cards, keys, the esc stack, `⏺` tool rows, `⎿` results — is unchanged.
 No new dependency, no sdk change.
 
+## Re-verification (2026-10-14, `ed98a22f`)
+
+M108–M136, M147 and M148 are present; M125 and M148 satisfy the hard
+dependencies. The worktree started clean on `m149-bingos-own-light`.
+`render::Render` scopes the look; `Focus::Intro(Playing)` owns the opening.
+`layout/deadline.rs::next` collects `activity::next_change`; `view.rs`
+draws the foot on the air row. `blocks.rs::welcome` composes the opening.
+The named palette, glyph, motion, transcript and code functions still exist;
+Markdown fences already share `views/code.rs`. No separate fence renderer.
+M121/M123 replaced private task reads with `Slot::Activity { verb, view }`:
+brick 1's earned Bingo row needs a boundary decision (see Risks).
+ADRs checked: 0001, 0002, 0070 and 0081; no acceptance change is due here.
+
 ## Bricks, in build order
 
 1. **Failing tests first** (TUI):
@@ -70,11 +83,17 @@ No new dependency, no sdk change.
 
 - `crates/bingo-surface-tui/src/{theme,activity,embers,transcript,worked,
   welcome,opening,run,markdown,motion}.rs`, `opening/*`,
-  `transcript/thinking.rs`, `views/code.rs`, M125's render context
+  `transcript/thinking.rs`, `views/code.rs`, `render.rs`
+- TUI wiring: `lib.rs`, `ui.rs`, `view.rs`, `blocks.rs`, `layout.rs`,
+  `layout/deadline.rs`, `run/opening.rs`; `focus.rs` only if opening
+  deadlines need adjustment. Resume data must be read on the host-call lane.
+- TUI tests: `screens/*.rs`, `painted.rs`, `motion/*`, `layout/tests.rs`;
+  mechanical removed-glyph expectations in `select.rs` and `search.rs`
 - `crates/bingo-surface-tui/src/{screens,snapshots,…}/**` (snapshots)
 - `crates/bingo/tests/pty/**` only where a needle names a removed glyph
 - `scripts/tui-smoke.sh` (`* Hello in ascii.` becomes `| Hello in ascii.`)
 - `docs/design/tui.md`, `docs/design/tui-identity-2026-10.md`
+- M137's plugin host/runtime, plugin-rpc, manifests and schemas are excluded.
 
 ## Exit criteria
 
@@ -105,6 +124,7 @@ No new dependency, no sdk change.
   opening and the embers, and the band tests pin heights.
 - `▍`, `▏` and the half-blocks are ambiguous width, like the borders the
   frame already draws; `BINGO_ASCII` has none of them.
-- Re-verify at start: M125's render context (where `Theme` and the
-  glyph table now live), M124's `next_frame` (the caret and embers each
-  answer their next change), the opening's beats after M124.
+- Re-verified: the opening still uses `beat`, `cells`, `frame`, `lap` and
+  `storyboard`; replacing the box removes the perimeter lap. Keep `Playing`
+  and the 2.4 s deadline. The compact mark needs viewport height passed
+  through the layout/rows path; welcome currently receives width only.
