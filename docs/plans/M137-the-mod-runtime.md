@@ -455,3 +455,43 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 ```text
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.91s
 ```
+
+`BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.47s
+test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.29s
+```
+
+`cargo test -p bingo-plugin-rpc --locked`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.90s
+test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.31s
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+`cargo test -p bingo-mods --test plugin`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.59s
+test an_explicit_module_is_listed_with_its_granted_runtime ... FAILED
+thread 'an_explicit_module_is_listed_with_its_granted_runtime' (7767828) panicked at crates/bingo-mods/tests/plugin.rs:15:78:
+module is discovered
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+```
+
+`cargo test -p bingo-mods --test plugin --locked`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.08s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+`cargo test -p bingo-mods --test plugin a_module_wraps`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.66s
+test a_module_wraps_a_service_on_the_real_host_chain ... FAILED
+thread 'a_module_wraps_a_service_on_the_real_host_chain' (7772798) panicked at crates/bingo-mods/tests/plugin.rs:40:5:
+assertion `left == right` failed
+  left: Object {"value": Number(1)}
+ right: Object {"value": Number(1), "wrapped": Bool(true)}
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.04s
+```

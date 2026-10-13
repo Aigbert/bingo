@@ -28,6 +28,7 @@ pub struct Found {
     /// The directory's name, which is the plugin's name.
     pub name: String,
     pub root: PathBuf,
+    pub origin: bingo_sdk::PluginOrigin,
     pub manifest: Manifest,
 }
 
@@ -46,8 +47,13 @@ pub fn dirs(env: &Env, cwd: &Path) -> Vec<PathBuf> {
 /// not there is not an error: most people have no plugins.
 pub fn discover(dirs: &[PathBuf], notices: &Notices) -> Vec<Found> {
     let mut found: BTreeMap<String, Found> = BTreeMap::new();
-    for dir in dirs {
-        for plugin in layer(dir, notices) {
+    for (index, dir) in dirs.iter().enumerate() {
+        for mut plugin in layer(dir, notices) {
+            plugin.origin = if index == 0 {
+                bingo_sdk::PluginOrigin::User
+            } else {
+                bingo_sdk::PluginOrigin::Project
+            };
             found.insert(plugin.name.clone(), plugin);
         }
     }
@@ -91,6 +97,7 @@ pub fn read(root: &Path, notices: &Notices) -> Option<Found> {
         Ok(manifest) if manifest.name == name => Some(Found {
             name,
             root: root.to_path_buf(),
+            origin: bingo_sdk::PluginOrigin::Explicit,
             manifest,
         }),
         Ok(manifest) => {

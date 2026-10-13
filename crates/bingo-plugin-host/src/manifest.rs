@@ -27,6 +27,8 @@ pub struct Manifest {
     /// spellings of the name would be two answers to "which plugin is this".
     pub name: String,
     pub version: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub uses: Vec<String>,
     #[serde(flatten)]
     pub launch: Launch,
     /// A JSON Schema for this plugin's own settings — the slice a person
@@ -116,6 +118,12 @@ fn parse(value: &Value) -> Result<Manifest, String> {
         name: field(value, "name")?,
         version: field(value, "version")?,
         launch,
+        uses: value
+            .get("uses")
+            .map(|uses| serde_json::from_value(uses.clone()))
+            .transpose()
+            .map_err(|error| format!("uses: {error}"))?
+            .unwrap_or_default(),
         config: field(value, "config")?,
         call_timeout: field(value, "callTimeout")?,
     })
