@@ -339,15 +339,18 @@ impl Jobs {
             tone: bingo_sdk::Tone::Neutral,
             until: None,
         };
-        let slots =
-            std::iter::once(status).filter(|_| !running.is_empty()).chain(running.iter().map(|job| bingo_sdk::slot::Slot::Row {
+        let slots = std::iter::once(status)
+            .filter(|_| !running.is_empty())
+            .chain(running.iter().map(|job| bingo_sdk::slot::Slot::Row {
+                caption: None,
                 item: job.item.clone(),
                 mark: None,
                 title: None,
                 badge: None,
                 body: Some(View::text("Running in the background")),
                 actions: vec![],
-            })).chain(foreground);
+            }))
+            .chain(foreground);
         bingo_sdk::slot::with(serde_json::to_value(view).unwrap_or(Value::Null), slots)
     }
 

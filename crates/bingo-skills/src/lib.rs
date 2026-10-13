@@ -123,7 +123,9 @@ impl Plugin for SkillsPlugin {
         // This plugin's own page reaches the gathering the way every other
         // plugin's does, through the catalogue and the key (ADR-0054 §2).
         registrar.add(guide::contribution(registrar));
-        registrar.add(Contribution::Hook(Arc::new(hook::SkillRows(library.clone()))));
+        registrar.add(Contribution::Hook(Arc::new(hook::SkillRows(
+            library.clone(),
+        ))));
         self.library
             .set(library)
             .map_err(|_| PluginError::Failed("the skills plugin registered twice".into()))

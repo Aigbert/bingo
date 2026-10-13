@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use bingo_sdk::SessionState;
 use serde_json::Value;
 
+use super::DIRECTORIES as KIND;
 /// The namespace and the kind the directories are published under.
 use crate::baseline::PLUGIN;
-use super::DIRECTORIES as KIND;
 /// The two scopes, each a directory.
 const SCOPES: [&str; 2] = ["user", "project"];
 /// The index every scope keeps, which draws under its own name: it is not a
@@ -88,13 +88,22 @@ pub(crate) struct MemoryRows;
 
 #[async_trait::async_trait]
 impl bingo_sdk::Hook for MemoryRows {
-    fn id(&self) -> &str { "context:memory-rows" }
-
-    fn matcher(&self) -> bingo_sdk::HookMatcher {
-        bingo_sdk::HookMatcher { points: vec![bingo_sdk::HookPoint::BeforeTool], tool: None }
+    fn id(&self) -> &str {
+        "context:memory-rows"
     }
 
-    async fn before_tool(&self, call: &mut bingo_sdk::ToolCall, cx: &bingo_sdk::HookContext) -> bingo_sdk::HookOutcome {
+    fn matcher(&self) -> bingo_sdk::HookMatcher {
+        bingo_sdk::HookMatcher {
+            points: vec![bingo_sdk::HookPoint::BeforeTool],
+            tool: None,
+        }
+    }
+
+    async fn before_tool(
+        &self,
+        call: &mut bingo_sdk::ToolCall,
+        cx: &bingo_sdk::HookContext,
+    ) -> bingo_sdk::HookOutcome {
         if VERBS.iter().any(|(name, _)| *name == call.name) {
             place(call, cx).await;
         }
@@ -104,23 +113,48 @@ impl bingo_sdk::Hook for MemoryRows {
 
 async fn place(call: &bingo_sdk::ToolCall, cx: &bingo_sdk::HookContext) {
     let Some(item) = &cx.item else { return };
-    let Ok(opened) = cx.host.open(
-        bingo_sdk::SessionSelector::ById { id: cx.session.clone() },
-        bingo_sdk::ClientIdentity { name: "memory rows".into(), surface: PLUGIN.into() },
-        Default::default(),
-    ).await else { return };
+    let Ok(opened) = cx
+        .host
+        .open(
+            bingo_sdk::SessionSelector::ById {
+                id: cx.session.clone(),
+            },
+            bingo_sdk::ClientIdentity {
+                name: "memory rows".into(),
+                surface: PLUGIN.into(),
+            },
+            Default::default(),
+        )
+        .await
+    else {
+        return;
+    };
     let dirs = of(&opened.snapshot);
-    let Some((title, badge)) = self::call(&call.name, &call.input, &cx.cwd.to_string_lossy(), &dirs) else { return };
+    let Some((title, badge)) =
+        self::call(&call.name, &call.input, &cx.cwd.to_string_lossy(), &dirs)
+    else {
+        return;
+    };
     let row = row(item, title, badge);
     let payload = bingo_sdk::slot::with(serde_json::json!({}), [row]);
-    if let Err(error) = cx.host.extend(&cx.session, PLUGIN, &format!("row:{item}"), payload).await {
+    if let Err(error) = cx
+        .host
+        .extend(&cx.session, PLUGIN, &format!("row:{item}"), payload)
+        .await
+    {
         tracing::debug!(%error, "the memory row was not placed");
     }
 }
 
 fn row(item: &bingo_sdk::ItemId, title: &str, badge: String) -> bingo_sdk::slot::Slot {
     bingo_sdk::slot::Slot::Row {
-        item: item.clone(), mark: None, title: Some(title.into()), badge: Some(badge), body: None, actions: vec![],
+        caption: None,
+        item: item.clone(),
+        mark: None,
+        title: Some(title.into()),
+        badge: Some(badge),
+        body: None,
+        actions: vec![],
     }
 }
 
@@ -129,16 +163,100 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[tokio::test]
+    async fn the_hook_places_only_memory_calls_on_the_gated_item() {
+        use bingo_sdk::{
+            Event, Hook, HookContext, ToolCall,
+            testing::{HostCall, TestHost},
+        };
+        let Event::SessionUpdated { summary } = serde_json::from_str(include_str!(
+            "../../../bingo-sdk/fixtures/record/event/sessionUpdated.json"
+        ))
+        .unwrap() else {
+            panic!("summary")
+        };
+        let base = TestHost::with_sessions(vec![summary.clone()]);
+        let host = TestHost::default();
+        host.on_open(move |selector, who, options| {
+            let base = base.handle();
+            async move {
+                let mut opened = base.open(selector, who, options).await?;
+                opened
+                    .snapshot
+                    .extensions
+                    .entry(PLUGIN.into())
+                    .or_default()
+                    .insert(KIND.into(), json!({"user":"/data/memory/user"}));
+                Ok(opened)
+            }
+        });
+        host.on_extend(|_, _, _, _| async { Ok(()) });
+        let item = bingo_sdk::ItemId::from_raw("itm_memory");
+        let mut cx = HookContext {
+            item: Some(item.clone()),
+            session: summary.id,
+            turn: None,
+            cwd: "/data".into(),
+            provider: None,
+            model: None,
+            host: host.handle(),
+        };
+        let mut call = ToolCall {
+            call_id: "memory".into(),
+            name: "Read".into(),
+            input: json!({"file_path":"memory/user/the-build.md"}),
+        };
+        MemoryRows.before_tool(&mut call, &cx).await;
+        call.input = json!({"file_path":"src/lib.rs"});
+        MemoryRows.before_tool(&mut call, &cx).await;
+        cx.item = None;
+        call.input = json!({"file_path":"memory/user/the-build.md"});
+        MemoryRows.before_tool(&mut call, &cx).await;
+        let writes: Vec<_> = host
+            .calls()
+            .into_iter()
+            .filter_map(|call| match call {
+                HostCall::Extend {
+                    plugin,
+                    kind,
+                    payload,
+                    ..
+                } => Some((plugin, kind, payload)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(writes.len(), 1);
+        assert_eq!((&*writes[0].0, &*writes[0].1), (PLUGIN, "row:itm_memory"));
+        let slots: Vec<bingo_sdk::slot::Slot> =
+            serde_json::from_value(writes[0].2["slots"].clone()).unwrap();
+        assert_eq!(
+            slots,
+            [row(&item, "Recall from memory", "the-build".into())]
+        );
+    }
+
     fn published() -> Directories {
-        Directories(vec!["/data/memory/user".into(), "/data/memory/web-2bf6c26a7362cd1f".into()])
+        Directories(vec![
+            "/data/memory/user".into(),
+            "/data/memory/web-2bf6c26a7362cd1f".into(),
+        ])
     }
 
     #[test]
     fn a_file_tool_on_a_memory_is_the_memory_verb_and_the_slug() {
         let item = bingo_sdk::ItemId::from_raw("itm_memory");
-        assert_eq!(row(&item, "Recall from memory", "the-build".into()), bingo_sdk::slot::Slot::Row {
-            item, mark: None, title: Some("Recall from memory".into()), badge: Some("the-build".into()), body: None, actions: vec![],
-        });
+        assert_eq!(
+            row(&item, "Recall from memory", "the-build".into()),
+            bingo_sdk::slot::Slot::Row {
+                caption: None,
+                item,
+                mark: None,
+                title: Some("Recall from memory".into()),
+                badge: Some("the-build".into()),
+                body: None,
+                actions: vec![],
+            }
+        );
         let dirs = published();
         let read = json!({"file_path": "/data/memory/web-2bf6c26a7362cd1f/the-build.md"});
         assert_eq!(

@@ -152,6 +152,7 @@ fn stranger_payload() -> Value {
                     .to_vec(),
             },
             Slot::Row {
+                caption: None,
                 item: ItemId::from_raw("itm_slot"),
                 mark: Some('!'),
                 title: Some("stranger row".into()),
@@ -312,6 +313,7 @@ pub fn shell_payload(table: Value, item: &str) -> Value {
                 until: None,
             },
             Slot::Row {
+                caption: None,
                 item: ItemId::from_raw(item),
                 mark: None,
                 title: None,
@@ -414,6 +416,7 @@ fn a_row_with_no_body_keeps_the_item_and_a_wide_mark_keeps_the_bullet() {
                 slot::with(
                     serde_json::json!({}),
                     [Slot::Row {
+                        caption: None,
                         item: ItemId::from_raw("itm_row"),
                         mark: Some('界'),
                         title: None,

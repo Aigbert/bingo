@@ -3,9 +3,9 @@
 //! one (ADR-0044). The model is the one writer (ADR-0049).
 
 mod command;
-pub(crate) mod row;
 pub(crate) mod dir;
 pub(crate) mod file;
+pub(crate) mod row;
 pub(crate) mod store;
 mod teach;
 

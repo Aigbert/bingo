@@ -152,7 +152,10 @@ impl BashTool {
         conditions: Conditions,
         cx: &ToolContext,
     ) -> Result<ToolOutput, ToolError> {
-        let listening = self.jobs.promotions.listen(&cx.call_id, &cx.session, &cx.item);
+        let listening = self
+            .jobs
+            .promotions
+            .listen(&cx.call_id, &cx.session, &cx.item);
         let timeout = deadline(args.timeout);
         let mut running = run::start(&args.command, &cx.cwd, Sink::buffer(MAX_OUTPUT_CHARS))?;
         let context = run::Context::of_call(cx, listening.token());
@@ -432,8 +435,7 @@ impl Plugin for BashPlugin {
             return Ok(());
         }
         let promotions = self.jobs.promotions.clone();
-        registrar
-            .tool(Arc::new(BashTool::new(self.jobs.clone())) as Arc<dyn Tool>);
+        registrar.tool(Arc::new(BashTool::new(self.jobs.clone())) as Arc<dyn Tool>);
         registrar.tool(Arc::new(BashOutputTool::new(self.jobs.clone())) as Arc<dyn Tool>);
         registrar.tool(Arc::new(KillShellTool::new(self.jobs.clone())) as Arc<dyn Tool>);
         registrar.add(Contribution::Command(
