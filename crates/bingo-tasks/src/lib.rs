@@ -156,7 +156,7 @@ mod plugin_tests {
                 "tool:TaskList",
                 "command:tasks",
                 "context:tasks",
-                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id)),
+                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
             ]
         );
         assert!(MANIFEST.requires.is_empty());
@@ -186,7 +186,7 @@ mod plugin_tests {
         assert!(matches!(contributions[5], Contribution::Context(_)));
         match &contributions[6] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &bingo_sdk::Pages::key(MANIFEST.id));
+                assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

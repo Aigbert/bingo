@@ -228,6 +228,16 @@ pub enum Contribution {
     },
 }
 
+impl Contribution {
+    pub fn service<T: ?Sized + Any + Send + Sync>(
+        key: &crate::ServiceKey<T>,
+        value: Arc<T>,
+        wire: Option<Arc<dyn WireService>>,
+    ) -> Self {
+        Self::Service { key: key.name().to_string(), value: Arc::new(value), wire }
+    }
+}
+
 impl fmt::Debug for Contribution {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

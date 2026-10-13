@@ -210,7 +210,7 @@ async fn the_host_s_own_service_is_in_the_registry_under_its_key() {
     let started = started_with(&[("stub", &[])]).await;
     let doors = started
         .host
-        .service::<ServiceHandle>("bingo.host")
+        .service::<ServiceHandle>(&bingo_sdk::ServiceKey::new("bingo.host"))
         .expect("the bridge entered it through open_service");
     let why = doors
         .call(

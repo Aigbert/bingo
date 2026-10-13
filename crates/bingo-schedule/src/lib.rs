@@ -185,7 +185,7 @@ mod plugin_tests {
     #[test]
     fn the_manifest_says_what_it_provides_and_claims_no_settings() {
         assert_eq!(MANIFEST.id, "bingo.schedule");
-        let page = format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id));
+        let page = format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name());
         assert_eq!(MANIFEST.provides.last().copied(), Some(page.as_str()));
         assert!(MANIFEST.requires.is_empty());
         assert_eq!(
@@ -225,7 +225,7 @@ mod plugin_tests {
         assert!(matches!(contributions[5], Contribution::Command(_)));
         match &contributions[6] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &bingo_sdk::Pages::key(MANIFEST.id));
+                assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

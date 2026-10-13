@@ -658,8 +658,10 @@ impl std::fmt::Debug for HostHandle {
 }
 
 impl HostHandle {
-    pub fn service<T: Any + Send + Sync>(&self, key: &str) -> Option<Arc<T>> {
-        self.0.service_any(key).and_then(|v| v.downcast::<T>().ok())
+    pub fn service<T: ?Sized + Any + Send + Sync>(&self, key: &crate::ServiceKey<T>) -> Option<Arc<T>> {
+        self.0.service_any(key.name())
+            .and_then(|value| value.downcast::<Arc<T>>().ok())
+            .map(|value| Arc::clone(value.as_ref()))
     }
 }
 

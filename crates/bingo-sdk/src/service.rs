@@ -13,11 +13,44 @@
 //! all (ADR-0031 §3).
 
 use std::any::Any;
+use std::borrow::Cow;
+use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use async_trait::async_trait;
 use serde_json::Value;
+
+/// A service name bound to the type its owner registers.
+///
+/// ```compile_fail
+/// use bingo_sdk::{HostHandle, ServiceKey};
+/// fn wrong(host: &HostHandle, key: &ServiceKey<String>) {
+///     let _: Option<std::sync::Arc<u32>> = host.service(key);
+/// }
+/// ```
+#[derive(Debug)]
+pub struct ServiceKey<T: ?Sized> {
+    name: Cow<'static, str>,
+    marker: PhantomData<fn() -> Arc<T>>,
+}
+
+impl<T: ?Sized> ServiceKey<T> {
+    pub const fn new(name: &'static str) -> Self {
+        Self { name: Cow::Borrowed(name), marker: PhantomData }
+    }
+
+    pub fn named(name: String) -> Self {
+        Self { name: Cow::Owned(name), marker: PhantomData }
+    }
+
+    pub const fn name(&self) -> &str {
+        match &self.name {
+            Cow::Borrowed(name) => name,
+            Cow::Owned(name) => name.as_str(),
+        }
+    }
+}
 
 /// Why a call did not answer, in words: the method a service does not speak,
 /// the process that is not running, the deadline that ran out. There is
@@ -66,7 +99,7 @@ impl std::fmt::Debug for ServiceHandle {
 
 /// One service, as whoever keeps them keeps it: two faces of one live object.
 pub struct Service {
-    /// What `host.service::<T>(key)` downcasts to `T`.
+    /// The registered `Arc<T>`, erased behind `Any`.
     pub value: Arc<dyn Any + Send + Sync>,
     /// What a process reaches by `service/call`, when the owner opened one.
     pub wire: Option<Arc<dyn WireService>>,
@@ -102,7 +135,7 @@ impl Services {
         self.add(
             key.to_string(),
             Service {
-                value,
+                value: Arc::new(value),
                 wire: Some(wire),
             },
         )
@@ -152,7 +185,7 @@ mod tests {
 
     #[test]
     fn a_service_key_carries_a_trait_object_type() {
-        const KEY: ServiceKey<dyn Counter> = ServiceKey::new("test.counter");
+        static KEY: ServiceKey<dyn Counter> = ServiceKey::new("test.counter");
         let value: Arc<dyn Counter> = Arc::new(7u32);
         let host = crate::testing::ServiceHost::holding(&KEY, value.clone());
         let found = host.service(&KEY).expect("the registered trait");
@@ -218,7 +251,7 @@ mod tests {
         services.open("kv", Arc::new(Kv)).expect("a free key");
         let handle = services
             .value("kv")
-            .and_then(|value| value.downcast::<ServiceHandle>().ok())
+            .and_then(|value| value.downcast::<Arc<ServiceHandle>>().ok())
             .expect("the one lookup finds the handle");
         assert_eq!(
             handle.call("get", Value::Null).await.expect("it answers"),

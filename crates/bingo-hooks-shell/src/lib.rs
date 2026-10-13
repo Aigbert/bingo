@@ -128,7 +128,7 @@ mod tests {
         assert!(matches!(contributions[0], Contribution::Hook(_)));
         match &contributions[1] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &bingo_sdk::Pages::key(MANIFEST.id));
+                assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

@@ -247,7 +247,7 @@ mod plugin_tests {
         assert!(
             MANIFEST
                 .provides
-                .contains(&format!("service:{}", Pages::key(MANIFEST.id)).as_str()),
+                .contains(&format!("service:{}", Pages::key(MANIFEST.id).name()).as_str()),
             "the page's key is spelled the one way (ADR-0054 §1)"
         );
         let claim = MANIFEST.config.expect("a config claim");
@@ -271,7 +271,7 @@ mod plugin_tests {
         }
         match &contributions[1] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &Pages::key(MANIFEST.id));
+                assert_eq!(key, &Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

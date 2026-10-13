@@ -136,7 +136,7 @@ mod tests {
             MANIFEST.provides,
             [
                 "context:persona:judgement",
-                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id)),
+                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
             ]
         );
         assert!(MANIFEST.requires.is_empty());
@@ -160,7 +160,7 @@ mod tests {
         assert_eq!(contributor.id(), judgement::ID);
         match &contributions[1] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &bingo_sdk::Pages::key(MANIFEST.id));
+                assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

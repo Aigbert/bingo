@@ -38,7 +38,7 @@ async fn hook_of(manager: &Manager, id: &str) -> Arc<dyn Hook> {
 async fn crossings(started: &Started) -> Value {
     let kv = started
         .host
-        .service::<ServiceHandle>("kv")
+        .service::<ServiceHandle>(&bingo_sdk::ServiceKey::new("kv"))
         .expect("the stub serves kv");
     kv.call("get", json!({ "key": "hooks" }))
         .await

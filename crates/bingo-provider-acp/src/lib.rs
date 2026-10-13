@@ -253,7 +253,7 @@ mod tests {
         assert!(
             MANIFEST
                 .provides
-                .contains(&format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id)).as_str()),
+                .contains(&format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()).as_str()),
             "the page's key is spelled the one way (ADR-0054 §1)"
         );
         assert!(MANIFEST.requires.is_empty());

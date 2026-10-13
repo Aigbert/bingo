@@ -202,7 +202,7 @@ mod plugin_tests {
                 "command:agents",
                 "command:team",
                 "service:agents.team",
-                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id)),
+                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
             ]
         );
         assert!(MANIFEST.requires.is_empty());
@@ -257,7 +257,7 @@ mod plugin_tests {
                 _ => None,
             })
             .collect();
-        let page = bingo_sdk::Pages::key(MANIFEST.id);
+        let page = bingo_sdk::Pages::key(MANIFEST.id).name();
         assert_eq!(
             services,
             [("agents.team", false), (page.as_str(), false)],

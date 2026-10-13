@@ -121,7 +121,7 @@ mod tests {
         assert!(
             MANIFEST
                 .provides
-                .contains(&format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id)).as_str()),
+                .contains(&format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()).as_str()),
             "the page's key is spelled the one way (ADR-0054 §1)"
         );
         assert!(MANIFEST.config.is_none(), "no switch turns memory off");
@@ -145,7 +145,7 @@ mod tests {
         assert_eq!(hook.matcher().points, [bingo_sdk::HookPoint::Session]);
         match &contributions[5] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &bingo_sdk::Pages::key(MANIFEST.id));
+                assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

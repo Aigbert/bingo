@@ -21,13 +21,7 @@ pub static PAGES: Pages = Pages(&[Page {
 /// only where the library is, because a project that keeps no playbooks is
 /// offered nothing at all — a page included.
 pub fn contribution(registrar: &Registrar) -> Contribution {
-    Contribution::Service {
-        key: Pages::key(registrar.plugin_id()),
-        value: Arc::new(PAGES),
-        // A page is data in this binary; the gathering that reads it is in
-        // process (ADR-0031 §3).
-        wire: None,
-    }
+    Contribution::service(&Pages::key(registrar.plugin_id()), Arc::new(PAGES), None)
 }
 
 #[cfg(test)]

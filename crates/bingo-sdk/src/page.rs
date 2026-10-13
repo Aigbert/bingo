@@ -27,8 +27,8 @@ impl Pages {
     /// registers a `Contribution::Service` under and lists in `provides` as
     /// `service:<key>`. One spelling, in one place, so neither side of the
     /// contract writes it out by hand.
-    pub fn key(plugin_id: &str) -> String {
-        format!("{plugin_id}.pages")
+    pub fn key(plugin_id: &str) -> crate::ServiceKey<Pages> {
+        crate::ServiceKey::named(format!("{plugin_id}.pages"))
     }
 }
 
@@ -38,8 +38,8 @@ mod tests {
 
     #[test]
     fn a_plugin_s_pages_are_found_under_its_own_id() {
-        assert_eq!(Pages::key("bingo.rooms"), "bingo.rooms.pages");
-        assert_eq!(Pages::key("bingo.mcp"), "bingo.mcp.pages");
+        assert_eq!(Pages::key("bingo.rooms").name(), "bingo.rooms.pages");
+        assert_eq!(Pages::key("bingo.mcp").name(), "bingo.mcp.pages");
     }
 
     #[test]

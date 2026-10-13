@@ -308,7 +308,7 @@ mod tests {
     /// says which of the two it is.
     #[tokio::test]
     async fn a_service_with_no_wire_face_does_not_exist_to_a_process() {
-        let host = bingo_sdk::testing::ServiceHost::holding("kv", Arc::new(7u32));
+        let host = bingo_sdk::testing::ServiceHost::holding(&bingo_sdk::ServiceKey::new("kv"), Arc::new(7u32));
         let error = hub(host)
             .call(asked("kv", "get"))
             .await

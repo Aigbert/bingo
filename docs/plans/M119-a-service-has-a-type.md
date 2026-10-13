@@ -85,7 +85,7 @@ no new external dependency.
 - The four owners/consumers' `Cargo.toml`, `Cargo.lock`, `scripts/budget.toml`
   (+1 member, 347 → 348); no new external dependencies.
 - Mechanical page-key assertions in owners' `lib.rs`, SDK page tests, and
-  `bingo-plugin-rpc/src/service.rs` test fixture (protocol §6).
+  `bingo-skills/src/tests.rs`, `bingo-plugin-rpc/src/service.rs` fixtures (protocol §6).
 - `Cargo.toml` (workspace member), `scripts/check_discipline.sh`,
   `ARCHITECTURE.md`, `docs/adr/{0001,0031,0054,0069}-*.md`
 
