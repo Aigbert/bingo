@@ -22,7 +22,13 @@ fn layout_renders_each_band_once_and_reuses_unchanged_blocks() {
     let (ui, now) = scene();
     let mut state = state();
     state.transcript = (0..10_000)
-        .map(|i| assistant(&format!("itm_{i}"), "A finished answer.", bingo_sdk::ItemStatus::Completed))
+        .map(|i| {
+            assistant(
+                &format!("itm_{i}"),
+                "A finished answer.",
+                bingo_sdk::ItemStatus::Completed,
+            )
+        })
         .collect();
     let tree = solo(&state);
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
@@ -40,7 +46,12 @@ fn layout_finds_a_rail_card_without_a_terminal() {
     pin_board(&mut ui);
     let frame = layout(Layout::default(), &solo(&boarded()), &ui, SIZE, now);
     assert!(frame.regions.rail.is_some());
-    assert!(frame.rail.iter().any(|(id, rows)| *id == demo_card("board") && !rows.is_empty()));
+    assert!(
+        frame
+            .rail
+            .iter()
+            .any(|(id, rows)| *id == demo_card("board") && !rows.is_empty())
+    );
 }
 
 #[test]
@@ -54,7 +65,191 @@ fn layout_schedules_exit_at_its_deadline() {
 #[test]
 fn layout_schedules_a_scroll_sample() {
     let (mut ui, now) = scene();
-    ui.scroll = crate::scroll::Scroll::Held { from: 30, to: 0, since: now.instant };
+    ui.scroll = crate::scroll::Scroll::Held {
+        from: 30,
+        to: 0,
+        since: now.instant,
+    };
     let frame = layout(Layout::default(), &solo(&state()), &ui, SIZE, now);
     assert_eq!(frame.next_frame, Some(now.instant + crate::clock::FRAME));
+}
+
+#[test]
+fn layout_answers_picture_and_rail_clicks_without_painting() {
+    use crate::effect::Effect;
+    use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    let click = |x, y| MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: x,
+        row: y,
+        modifiers: KeyModifiers::NONE,
+    };
+    let (mut ui, now) = scene();
+    pin_board(&mut ui);
+    let tree = solo(&boarded());
+    ui.shown = layout(Layout::default(), &tree, &ui, SIZE, now);
+    let rail = ui.shown.regions.rail.expect("rail");
+    let row = ui
+        .shown
+        .rail
+        .iter()
+        .find(|(id, _)| *id == demo_card("board"))
+        .expect("board")
+        .1
+        .start;
+    crate::pointer::on_mouse(&mut ui, &tree, click(rail.x + 1, rail.y + row as u16), now);
+    assert_eq!(ui.focus, Some(demo_card("board")));
+
+    let mut state = state();
+    let mut picture = user("itm_picture", "A picture.");
+    if let bingo_sdk::ItemBody::User { parts, .. } = &mut picture.body {
+        parts.push(bingo_sdk::ContentPart::Image(bingo_pictures::testing::png(
+            40, 40,
+        )));
+    }
+    state.transcript = vec![picture].into_iter().collect();
+    let tree = solo(&state);
+    crate::graphics::with(crate::graphics::drawing(), || {
+        ui.shown = layout(Layout::default(), &tree, &ui, SIZE, now);
+        let cell = ui.shown.cells[0];
+        let picture = ui
+            .shown
+            .picture_at(cell.area.as_position())
+            .expect("visible picture");
+        assert_eq!(
+            crate::pointer::on_mouse(&mut ui, &tree, click(cell.area.x, cell.area.y), now),
+            vec![Effect::OpenPicture(picture.source)]
+        );
+    });
+}
+
+#[test]
+fn layout_finds_the_foot_in_the_current_transcript() {
+    let (mut ui, now) = scene();
+    let mut state = state();
+    state.transcript = (0..100)
+        .map(|i| user(&format!("itm_{i}"), "hello"))
+        .collect();
+    ui.scroll = crate::scroll::Scroll::Held {
+        from: 0,
+        to: 0,
+        since: now.instant,
+    };
+    let frame = layout(Layout::default(), &solo(&state), &ui, SIZE, now);
+    let foot = frame.foot.expect("held transcript");
+    assert_eq!(foot.y, frame.regions.activity.y);
+    assert!(
+        frame.canvas.buffer[(foot.x + 1, foot.y)]
+            .symbol()
+            .contains('↓')
+    );
+    assert_eq!(frame.line_at(0), Some(0));
+}
+
+#[test]
+fn layout_countdown_changes_at_the_deadline_it_reports() {
+    let (ui, now) = scene();
+    let until = now.wall + jiff::SignedDuration::from_millis(5250);
+    let state = folded(vec![frame(
+        1,
+        signalled(
+            "fixture",
+            "timer",
+            bingo_sdk::slot::with(
+                serde_json::json!({}),
+                vec![bingo_sdk::slot::Slot::Status {
+                    text: "wake".into(),
+                    tone: bingo_sdk::Tone::Neutral,
+                    until: Some(until),
+                }],
+            ),
+        ),
+    )]);
+    let tree = solo(&state);
+    let first = layout(Layout::default(), &tree, &ui, SIZE, now);
+    let due = first.next_frame.expect("countdown");
+    assert_eq!(
+        due,
+        now.instant + std::time::Duration::from_millis(250) + std::time::Duration::from_nanos(1)
+    );
+    let before = later(now, 250);
+    let same = layout(Layout::default(), &tree, &ui, SIZE, before);
+    assert_eq!(same.canvas, first.canvas);
+    let changed = crate::clock::Now {
+        instant: due,
+        wall: before.wall + jiff::SignedDuration::from_nanos(1),
+        ..now
+    };
+    let next = layout(Layout::default(), &tree, &ui, SIZE, changed);
+    assert_ne!(next.canvas, first.canvas);
+}
+
+#[test]
+fn layout_notice_sleeps_through_its_hold_and_expires() {
+    let (mut ui, now) = scene();
+    ui.notify(bingo_sdk::Level::Info, "hello", now.instant);
+    let tree = solo(&state());
+    let first = layout(Layout::default(), &tree, &ui, SIZE, now);
+    assert_eq!(first.next_frame, Some(now.instant + crate::ui::NOTICE_FADE));
+    let held = later(now, 100);
+    let frame = layout(first, &tree, &ui, SIZE, held);
+    assert_eq!(
+        frame.next_frame,
+        Some(
+            now.instant
+                + crate::ui::NOTICE_FADE
+                + crate::ui::NOTICE
+                + std::time::Duration::from_nanos(1)
+        )
+    );
+    ui.expire(later(now, 5000));
+    assert_eq!(
+        layout(frame, &tree, &ui, SIZE, later(now, 5000)).next_frame,
+        None
+    );
+}
+
+#[test]
+fn layout_running_turn_schedules_motion_and_glyph_boundaries() {
+    let (ui, now) = mid_turn();
+    let tree = solo(&folded(vec![frame(1, started("trn_1"))]));
+    let first = layout(Layout::default(), &tree, &ui, SIZE, now);
+    assert_eq!(first.next_frame, Some(now.instant + crate::clock::FRAME));
+    let near_glyph = later(now, 140);
+    let next = layout(first, &tree, &ui, SIZE, near_glyph);
+    assert_eq!(
+        next.next_frame,
+        Some(now.instant + std::time::Duration::from_millis(150))
+    );
+}
+
+#[test]
+fn layout_unbounded_rail_schedules_its_next_step() {
+    let (ui, now) = scene();
+    let state = folded(vec![frame(
+        1,
+        signalled(
+            "fixture",
+            "progress",
+            bingo_sdk::slot::with(
+                serde_json::json!({}),
+                vec![bingo_sdk::slot::Slot::Rail {
+                    title: "progress".into(),
+                    view: bingo_sdk::View::Progress {
+                        value: 1,
+                        total: None,
+                        label: None,
+                    },
+                }],
+            ),
+        ),
+    )]);
+    let tree = solo(&state);
+    let first = layout(Layout::default(), &tree, &ui, SIZE, now);
+    let due = first.next_frame.expect("moving rail");
+    assert_eq!(due, now.instant + std::time::Duration::from_millis(250));
+    let same = layout(Layout::default(), &tree, &ui, SIZE, later(now, 249));
+    assert_eq!(same.canvas, first.canvas);
+    let next = layout(first, &tree, &ui, SIZE, later(now, 250));
+    assert_ne!(next.canvas, same.canvas);
 }
