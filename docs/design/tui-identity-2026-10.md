@@ -145,6 +145,8 @@ turn ends with every task on its list done, the worked row says so in the
 name's own word: `▍ Bingo · 5 tasks done in 4m 12s`. It is earned by a
 true state, said once, and never otherwise.
 
+2026-10-14: M149 defers the earned Bingo variant to a later milestone’s producer-owned completion contract; the worked row keeps `Worked for …` and takes the caret mark.
+
 **L8. A code block stands on the raised tint**, the bar a `>` line already
 stands on, the width of the block; the fence's language rides dim at the
 band's right end instead of on a row of its own. Line numbers past eight

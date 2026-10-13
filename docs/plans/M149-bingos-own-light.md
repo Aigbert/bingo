@@ -20,7 +20,7 @@ draws the foot on the air row. `blocks.rs::welcome` composes the opening.
 The named palette, glyph, motion, transcript and code functions still exist;
 Markdown fences already share `views/code.rs`. No separate fence renderer.
 M121/M123 replaced private task reads with `Slot::Activity { verb, view }`:
-brick 1's earned Bingo row needs a boundary decision (see Risks).
+the earned Bingo row is deferred by the user's 2026-10-14 decision.
 ADRs checked: 0001, 0002, 0070 and 0081; no acceptance change is due here.
 
 ## Bricks, in build order
@@ -41,9 +41,6 @@ ADRs checked: 0001, 0002, 0070 and 0081; no acceptance change is due here.
    - opening (L6): the wordmark rows are exactly the site's bitmap in
      half-blocks with the caret at the end; under 40 columns or 16 rows
      the mark is `bingo▍`; frames at 0.0, 0.5, 1.2, 2.0 and 2.4 s.
-   - worked row (L7): `▍ Bingo · 5 tasks done in 4m 12s` when the turn
-     ends with every task on the list done and one finished in it;
-     otherwise `▍ Worked for …` as today.
 2. **The accent** (`theme.rs` `DARK`, `LIGHT`). Ramps derive from the
    two tokens as before; nothing else in the palette moves.
 3. **The mark.** `theme.rs` glyph tables: `mark` replaces `sparkles`;
@@ -71,7 +68,7 @@ ADRs checked: 0001, 0002, 0070 and 0081; no acceptance change is due here.
    and the `/login codex` line go.
 8. **Words** (`activity.rs` verbs; `worked.rs`): Kindling, Stoking,
    Smouldering, Foraging, Tracking, Burrowing, Sniffing around,
-   Pouncing, Sifting, Tinkering; the Bingo row of brick 1.
+   Pouncing, Sifting, Tinkering. The worked row keeps its existing words.
 9. **The code band** (L8; `views/code.rs`, `markdown.rs` fences): the
    block on the `raised` tint its own width, the language dim at the
    band's right end; no lone language row.
@@ -105,13 +102,15 @@ ADRs checked: 0001, 0002, 0070 and 0081; no acceptance change is due here.
 - [ ] A tmux drive at 120×40, 80×24 and 38×14, dark and light (fake
       OSC 11 ground), `NO_COLOR`, `BINGO_ASCII=1`, `BINGO_MOTION=off`:
       the opening, a streaming answer with embers, a tool holding the
-      turn, a stop, the worked row and a Bingo row; captures pasted.
+      turn, a stop and the worked row; captures pasted.
 - [ ] `scripts/tui-smoke.sh` passes.
 - [ ] All gates of the upgrade protocol, plus the Windows cross-check
       for the TUI.
 
 ## Non-goals
 
+- L7’s earned `Bingo · N tasks done in …` variant: it needs a
+  producer-owned completion contract, which is a later milestone’s work.
 - Agents' sigils and hues, the crew strip, rooms as chat (M150).
 - The site's `tokens.ts` and hero (`../bingo-site`) and the GUI, each in
   its own repository: the person is told the two tokens to carry over.
@@ -128,22 +127,5 @@ ADRs checked: 0001, 0002, 0070 and 0081; no acceptance change is due here.
   `storyboard`; replacing the box removes the perimeter lap. Keep `Playing`
   and the 2.4 s deadline. The compact mark needs viewport height passed
   through the layout/rows path; welcome currently receives width only.
-- **Stopped at protocol step 6 (2026-10-14), before tests or code.** L7
-  cannot be implemented within the stated TUI-only/no-sdk-change boundary
-  without violating ADR-0070 §§2,5,7 or ADR-0001's dependency direction.
-  `bingo-tasks/src/journal.rs:58–106` publishes only an Activity view:
-  counts are prose in its Panel title, completed nodes may be omitted,
-  and no field identifies a completion in the last turn. `task.rs:15`
-  has no completion turn/time. `bingo-sdk/src/slot.rs:19` has only `verb`
-  and `view`; `state.rs:76`'s LastTurn has no plugin completion fact.
-  `transcript.rs:909` renders the worked row from LastTurn alone. No
-  task-completion contract exists in `bingo-services` or `bingo-collab`.
-  Reading private payloads/tool names or inferring completion from view
-  prose would restore the coupling M121/M123 removed; importing the
-  tasks plugin is forbidden. Retaining task state in Ui is not a remedy.
-  **Options:** (A, recommended) expand M149 with a producer-owned,
-  turn-scoped completion contract and its consumer, documented boundary,
-  contract-first tests and any schema/fixture generation; coordinate
-  shared schema work with M137. (B) explicitly defer the earned Bingo
-  row and retain the generic worked row. Neither option is applied.
-  All exit criteria remain unticked; no gates or live tests were run.
+- The L7 boundary stop was resolved by the user on 2026-10-14: defer
+  the earned variant; keep the generic worked row and change its mark.
