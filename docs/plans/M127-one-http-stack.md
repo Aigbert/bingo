@@ -23,7 +23,7 @@ bingo builds has a connect bound, and none falls back to
    Add the member and a `budget.toml` comment in M67's style (+1). The
    contract:
    - `Bounds { connect, call: Option<Duration> }`, with `STREAMED`
-     (20 s, none) and `CALL` (20 s, 30 s, Feishu's call bound today);
+     (20 s, none) and `CALL` (10 s, 30 s, Feishu/OAuth call bounds today);
    - `client(Bounds) -> Result<Client, HttpError>`, the one
      `#[allow(clippy::disallowed_methods)]`;
    - `trait Decode { fn decode(&mut self, event, data) ->
@@ -31,7 +31,7 @@ bingo builds has a connect bound, and none falls back to
    - `CONNECT_TIMEOUT`, `IDLE_TIMEOUT` and `FRAME`, with a test that
      pins ADR-0056's numbers.
 3. **`metered` and `sse` move.** `diff` the two copies and paste the
-   result, which should show comments only. Move anthropic's copy with
+   result: production differs only in comments; SSE test payloads differ. Move anthropic's copy with
    its tests and run `cargo test -p bingo-http`. Point both providers at
    the crate, then delete both copies.
 4. **`stream` moves, generic over `D: Decode`.** The library tests the
@@ -52,7 +52,7 @@ bingo builds has a connect bound, and none falls back to
      `a_peer_that_stops_reading_ends_the_request`,
      `a_server_that_accepts_and_says_nothing_times_out`.
 
-   They run on M111's test host.
+   Preserve the loopback socket harness; use paused time where I/O permits.
 6. **Every client goes through `client`.**
    - The provider constructors (`keyed`, `subscription`) take a client
      built in `register`, where a failed build can refuse the provider
@@ -69,8 +69,8 @@ bingo builds has a connect bound, and none falls back to
 
    Brick 1's clippy run is now clean.
 7. **`key.rs` moves to `bingo_auth_oauth::key`.** `ApiKey`, `Places` and
-   `Configured` move with their tests. The provider name becomes a
-   parameter, and both copies go.
+   `Configured` move with their tests. The provider name is already a
+   parameter; preserve it and delete both copies.
 8. **Records.** Add a dated note to ADR-0056 §5 pointing at ADR-0072.
 
 ## Files
@@ -78,10 +78,27 @@ bingo builds has a connect bound, and none falls back to
 - `crates/bingo-http/**` (new), `Cargo.toml`, `scripts/budget.toml`,
   `clippy.toml`
 - `crates/bingo-provider-{anthropic,openai}/{Cargo.toml,src/*.rs}`
-- `crates/bingo-auth-oauth/src/{lib,key}.rs` and its test clients
+- `crates/bingo-auth-oauth/src/{lib,key}.rs` and its test clients (`src/http.rs` keeps deadline tests)
 - `crates/bingo-mcp/src/{auth,dial}.rs`, `crates/bingo/src/{mcp,update,main}.rs`
-- `crates/bingo-channels/src/feishu/api.rs`, `bingo-pictures/src/load.rs`,
-  `bingo-tool-web/src/lib.rs`; `docs/adr/0056-*.md`
+- `crates/bingo-channel-feishu/src/feishu/{api,token,platform,tests}.rs`,
+  `crates/bingo-pictures/src/{load,lib}.rs`, `crates/bingo-tool-web/src/*.rs`
+- TUI `src/run/updates.rs` and its manifest: mechanical bounded-client migration
+- Consumer manifests, provider integration tests and constructor-only fixtures;
+  `docs/adr/{0056,0072}-*.md`
+
+## Re-verification (2026-10-13, `706a9b2d`)
+
+Audit §5 and ADR-0072 §2 still hold. M126 has not moved construction:
+`register` calls `instances::providers`; keyed/subscription callers are in
+those modules and provider tests. M130 moved Feishu into its platform crate.
+M117 OAuth and Feishu connect in 10 s, not the plan's stale 20 s; `CALL`
+preserves 10/30 s, while streamed providers preserve ADR-0056's 20/300 s.
+The missed TUI update client needs only a mechanical edit, coordinated by
+scope with M123. `metered` differs only in comments; SSE additionally uses
+different test strings. Key production is identical except comments and
+already parameterizes the provider. Workspace membership uses `crates/*`.
+Keep user agents on requests and reqwest's existing ten-redirect default.
+No provider fixture payload or assertion changes; no live-network tests run.
 
 ## Exit criteria
 
