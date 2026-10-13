@@ -18,15 +18,15 @@ enum Spec {
     Command(CommandSpec),
 }
 #[derive(Clone)]
-struct Named {
+struct Named<T> {
     plugin: String,
     callback: String,
-    spec: Spec,
+    spec: T,
     stopped: CancellationToken,
     registry: Arc<Registry>,
 }
 #[derive(Default)]
-pub struct Registrations(Mutex<BTreeMap<(String, String), Named>>);
+pub struct Registrations(Mutex<BTreeMap<(String, String), Named<Spec>>>);
 impl Registrations {
     pub fn tool(&self, caller: &Caller, input: RegisterTool) -> Result<String, String> {
         let name = tool_name(&caller.plugin, &input.spec.name);
@@ -63,8 +63,12 @@ impl Registrations {
             .lock()
             .unwrap_or_else(|error| error.into_inner())
             .values()
-            .filter(|entry| !entry.stopped.is_cancelled() && matches!(entry.spec, Spec::Tool(_)))
-            .map(|entry| Arc::new(RegisteredTool(entry.clone())) as Arc<dyn Tool>)
+            .filter_map(|entry| match &entry.spec {
+                Spec::Tool(spec) if !entry.stopped.is_cancelled() => {
+                    Some(Arc::new(RegisteredTool(entry.with_spec(spec.clone()))) as Arc<dyn Tool>)
+                }
+                _ => None,
+            })
             .collect()
     }
     pub fn commands(&self) -> Vec<Arc<dyn Command>> {
@@ -72,25 +76,36 @@ impl Registrations {
             .lock()
             .unwrap_or_else(|error| error.into_inner())
             .values()
-            .filter(|entry| !entry.stopped.is_cancelled() && matches!(entry.spec, Spec::Command(_)))
-            .map(|entry| Arc::new(RegisteredCommand(entry.clone())) as Arc<dyn Command>)
+            .filter_map(|entry| match &entry.spec {
+                Spec::Command(spec) if !entry.stopped.is_cancelled() => {
+                    Some(Arc::new(RegisteredCommand(entry.with_spec(spec.clone())))
+                        as Arc<dyn Command>)
+                }
+                _ => None,
+            })
             .collect()
     }
 }
-impl Named {
+impl<T> Named<T> {
+    fn with_spec<S>(&self, spec: S) -> Named<S> {
+        Named {
+            plugin: self.plugin.clone(),
+            callback: self.callback.clone(),
+            spec,
+            stopped: self.stopped.clone(),
+            registry: self.registry.clone(),
+        }
+    }
     async fn run(&self, input: Value, cx: &HookContext) -> Result<Value, String> {
         let executor = self.registry.prepared(&self.plugin).await?;
         executor.call(&self.callback, input, cx).await
     }
 }
-struct RegisteredTool(Named);
+struct RegisteredTool(Named<ToolSpec>);
 #[async_trait::async_trait]
 impl Tool for RegisteredTool {
     fn spec(&self) -> ToolSpec {
-        match &self.0.spec {
-            Spec::Tool(spec) => spec.clone(),
-            _ => unreachable!(),
-        }
+        self.0.spec.clone()
     }
     async fn call(&self, input: Value, cx: &ToolContext) -> Result<ToolOutput, ToolError> {
         let context = HookContext {
@@ -110,14 +125,11 @@ impl Tool for RegisteredTool {
         serde_json::from_value(answer).map_err(|error| ToolError::Failed(error.to_string()))
     }
 }
-struct RegisteredCommand(Named);
+struct RegisteredCommand(Named<CommandSpec>);
 #[async_trait::async_trait]
 impl Command for RegisteredCommand {
     fn spec(&self) -> CommandSpec {
-        match &self.0.spec {
-            Spec::Command(spec) => spec.clone(),
-            _ => unreachable!(),
-        }
+        self.0.spec.clone()
     }
     async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
         let context = HookContext {

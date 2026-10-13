@@ -17,9 +17,11 @@ type WireLookup = Immediate<(String,), Option<Arc<dyn WireService>>>;
 
 type ServiceOpening = Immediate<(String, Arc<dyn WireService>), Result<(), KernelError>>;
 
+type CompletionScript = Script<(SessionId, Option<TurnId>, Completion), Vec<ModelEvent>>;
+
 #[derive(Default)]
 pub(super) struct Scripts {
-    pub complete: Option<Script<(SessionId, Option<TurnId>, Completion), Vec<ModelEvent>>>,
+    pub complete: Option<CompletionScript>,
     pub sessions: Option<Script<(SessionFilter,), Vec<SessionSummary>>>,
     pub open: Option<Script<(SessionSelector, ClientIdentity, OpenOptions), Attachment>>,
     pub close: Option<Script<(SessionId, CloseReason), ()>>,

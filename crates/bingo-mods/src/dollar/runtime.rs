@@ -102,30 +102,15 @@ impl Runtime {
     }
 
     async fn call(&self, caller: &Caller, method: &str, params: Value) -> Result<Value, String> {
-        if method.starts_with("state.") || method.starts_with("store.") && method != "store.keys" {
+        if (method.starts_with("state.") || method.starts_with("store.")) && method != "store.keys"
+        {
             let global = params.get("scope").and_then(Value::as_str) == Some("global");
             if global != method.starts_with("store.") {
                 return Err("operation scope does not match its noun".into());
             }
         }
         match method {
-            "store.keys" => Ok(json!(
-                caller
-                    .state
-                    .keys("global".into())
-                    .await
-                    .map_err(bingo_plugin_host::host::error_message)?
-            )),
-            "store.delete" => {
-                let input: bingo_plugin_host::host::StateGet = parse(params)?;
-                Ok(json!(
-                    caller
-                        .state
-                        .delete(input.scope, input.key)
-                        .await
-                        .map_err(bingo_plugin_host::host::error_message)?
-                ))
-            }
+            "store.keys" | "store.delete" => store(caller, method, params).await,
             "clock.now" => Ok(json!(jiff::Timestamp::now().to_string())),
             "clock.sleep" => {
                 tokio::time::sleep(std::time::Duration::from_millis(
@@ -140,22 +125,10 @@ impl Runtime {
             }
             "session.version" => Ok(json!(env!("CARGO_PKG_VERSION"))),
             "session.root" => Ok(json!(self.root)),
-            "session.messages" => {
-                let input: Messages = parse(params)?;
-                let live = self.sessions.get(&caller.host, &input.session).await?;
-                Ok(json!(
-                    live.handle.history(input.page).await.map_err(failed)?
-                ))
-            }
+            "session.messages" => self.messages(caller, parse(params)?).await,
             "session.id" | "session.cwd" | "session.model" | "session.turns" | "session.usage"
             | "session.surfaces" | "config.list" | "config.read" | "prompt.read" => {
-                let input: catalogue::Session = parse(params.clone())?;
-                let live = self.sessions.get(&caller.host, &input.session).await?;
-                super::read::read(
-                    &live.snapshot(),
-                    method,
-                    params.get("key").and_then(Value::as_str),
-                )
+                self.read(caller, method, params).await
             }
             "session.append" | "session.extend" => operation(caller, "host/extend", params).await,
             "session.deliver" => operation(caller, "host/deliver", params).await,
@@ -168,20 +141,8 @@ impl Runtime {
             "session.authorize" => authorize(caller, parse(params)?).await,
             "tool.register" => Ok(json!(self.registered.tool(caller, parse(params)?)?)),
             "command.register" => Ok(json!(self.registered.command(caller, parse(params)?)?)),
-            "tool.list" => Ok(json!(
-                caller
-                    .host
-                    .catalog(CatalogKind::Tools)
-                    .await
-                    .map_err(failed)?
-            )),
-            "command.list" => Ok(json!(
-                caller
-                    .host
-                    .catalog(CatalogKind::Commands)
-                    .await
-                    .map_err(failed)?
-            )),
+            "tool.list" => catalog(caller, CatalogKind::Tools).await,
+            "command.list" => catalog(caller, CatalogKind::Commands).await,
             "tool.call" => invoke(caller, parse(params)?).await,
             "config.set" => setting(caller, parse(params)?).await,
             "prompt.submit" | "command.run" | "session.compact" | "turn.abort" => {
@@ -189,6 +150,21 @@ impl Runtime {
             }
             _ => Err(format!("{method}: runtime operation is unavailable")),
         }
+    }
+    async fn messages(&self, caller: &Caller, input: Messages) -> Result<Value, String> {
+        let live = self.sessions.get(&caller.host, &input.session).await?;
+        Ok(json!(
+            live.handle.history(input.page).await.map_err(failed)?
+        ))
+    }
+    async fn read(&self, caller: &Caller, method: &str, params: Value) -> Result<Value, String> {
+        let input: catalogue::Session = parse(params.clone())?;
+        let live = self.sessions.get(&caller.host, &input.session).await?;
+        super::read::read(
+            &live.snapshot(),
+            method,
+            params.get("key").and_then(Value::as_str),
+        )
     }
     async fn fork(&self, caller: &Caller, input: Fork) -> Result<Value, String> {
         let live = self.sessions.get(&caller.host, &input.session).await?;
@@ -235,7 +211,7 @@ impl Runtime {
             input.callback,
             period,
             every
-        )))
+        )?))
     }
 
     async fn input(&self, caller: &Caller, method: &str, params: Value) -> Result<Value, String> {
@@ -380,4 +356,27 @@ async fn setting(caller: &Caller, input: Setting) -> Result<Value, String> {
         .await
         .map_err(failed)?;
     Ok(Value::Null)
+}
+
+async fn catalog(caller: &Caller, kind: CatalogKind) -> Result<Value, String> {
+    Ok(json!(caller.host.catalog(kind).await.map_err(failed)?))
+}
+async fn store(caller: &Caller, method: &str, params: Value) -> Result<Value, String> {
+    if method == "store.keys" {
+        return Ok(json!(
+            caller
+                .state
+                .keys("global".into())
+                .await
+                .map_err(bingo_plugin_host::host::error_message)?
+        ));
+    }
+    let input: bingo_plugin_host::host::StateGet = parse(params)?;
+    Ok(json!(
+        caller
+            .state
+            .delete(input.scope, input.key)
+            .await
+            .map_err(bingo_plugin_host::host::error_message)?
+    ))
 }

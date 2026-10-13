@@ -74,39 +74,6 @@ fn request(messages: Vec<Message>) -> ModelRequest {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn classification_preserves_labels_and_refuses_an_unlisted_answer() {
-        let labels = vec!["yes".into(), "no".into()];
-        assert_eq!(pick(" yes\n", &labels), Some("yes"));
-        assert_eq!(pick("maybe", &labels), None);
-        let request = classify_request("a question", &labels);
-        let text = serde_json::to_string(&request.messages).unwrap();
-        for word in ["a question", "yes", "no"] {
-            assert!(text.contains(word));
-        }
-        assert!(request.tools.is_empty());
-        assert!(request.session.is_none());
-    }
-    #[test]
-    fn a_fork_uses_history_then_the_new_prompt_without_a_main_conversation() {
-        let item: Item = serde_json::from_value(serde_json::json!({"id":"i","status":"completed","startedAt":"2026-01-01T00:00:00Z",
-            "body":{"kind":"user","parts":[{"type":"text","text":"history"}],"origin":{"surface":"test"}}})).unwrap();
-        let request = fork_request(&[item], "side question");
-        assert_eq!(
-            request.messages,
-            vec![
-                Message::text(Role::User, "history"),
-                Message::text(Role::User, "side question")
-            ]
-        );
-        assert!(request.tools.is_empty());
-        assert!(request.session.is_none());
-    }
-}
-
 pub async fn classify(
     caller: &bingo_plugin_host::ops::Caller,
     input: super::params::Classify,
@@ -150,4 +117,37 @@ pub async fn complete(
         )
         .await
         .map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn classification_preserves_labels_and_refuses_an_unlisted_answer() {
+        let labels = vec!["yes".into(), "no".into()];
+        assert_eq!(pick(" yes\n", &labels), Some("yes"));
+        assert_eq!(pick("maybe", &labels), None);
+        let request = classify_request("a question", &labels);
+        let text = serde_json::to_string(&request.messages).unwrap();
+        for word in ["a question", "yes", "no"] {
+            assert!(text.contains(word));
+        }
+        assert!(request.tools.is_empty());
+        assert!(request.session.is_none());
+    }
+    #[test]
+    fn a_fork_uses_history_then_the_new_prompt_without_a_main_conversation() {
+        let item: Item = serde_json::from_value(serde_json::json!({"id":"i","status":"completed","startedAt":"2026-01-01T00:00:00Z",
+            "body":{"kind":"user","parts":[{"type":"text","text":"history"}],"origin":{"surface":"test"}}})).unwrap();
+        let request = fork_request(&[item], "side question");
+        assert_eq!(
+            request.messages,
+            vec![
+                Message::text(Role::User, "history"),
+                Message::text(Role::User, "side question")
+            ]
+        );
+        assert!(request.tools.is_empty());
+        assert!(request.session.is_none());
+    }
 }

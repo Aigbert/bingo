@@ -242,13 +242,11 @@ impl Interceptor for Boundary {
                 }
                 if [catalogue::SESSION_ATTACH, catalogue::SESSION_DETACH].contains(&entry)
                     && let Ok(input) = serde_json::from_value(input.clone())
-                {
-                    if let Err(reason) = dollar
+                    && let Err(reason) = dollar
                         .surface(&cx.host, input, entry == catalogue::SESSION_ATTACH)
                         .await
-                    {
-                        manager.notices.push(Notice::warn("MODS_SURFACE", reason));
-                    }
+                {
+                    manager.notices.push(Notice::warn("MODS_SURFACE", reason));
                 }
             }
             let mut subscriptions = manager

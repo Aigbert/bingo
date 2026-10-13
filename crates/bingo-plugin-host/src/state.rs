@@ -208,8 +208,7 @@ mod quota_contract {
         let error = store
             .set("session".into(), "small".into(), large, Some(1))
             .await
-            .err()
-            .expect("4 MiB budget was not enforced");
+            .expect_err("4 MiB budget was not enforced");
         assert!(error.message.contains("4 MiB"), "{}", error.message);
         assert_eq!(
             store.get("session".into(), "small".into()).await.unwrap(),

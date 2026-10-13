@@ -10,7 +10,7 @@ pub fn read(state: &SessionState, method: &str, key: Option<&str>) -> Result<Val
         "session.turns" => turns(state),
         "session.usage" => json!(super::params::UsageView {
             session: state.summary.usage,
-            context: state.context.clone(),
+            context: state.context,
             last_turn: state.last_turn.as_ref().map(|turn| turn.usage),
         }),
         "session.surfaces" => surfaces(state),

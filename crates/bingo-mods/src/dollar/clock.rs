@@ -17,11 +17,13 @@ impl Timers {
         callback: String,
         period: Duration,
         every: bool,
-    ) -> String {
+    ) -> Result<String, String> {
         let id = IntentId::mint().to_string();
         let session = cx.session.clone();
         let stopped = executor.stopped();
-        let start = tokio::time::Instant::now() + period;
+        let start = tokio::time::Instant::now()
+            .checked_add(period)
+            .ok_or("timer deadline is out of range")?;
         let task = tokio::spawn(async move {
             let mut clock = tokio::time::interval_at(start, period.max(Duration::from_millis(1)));
             clock.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -43,7 +45,7 @@ impl Timers {
         let mut owned = self.0.lock().unwrap_or_else(|error| error.into_inner());
         owned.retain(|timer| !timer.task.is_finished());
         owned.push(Owned { session, task });
-        id
+        Ok(id)
     }
     pub async fn end(&self, session: &SessionId) {
         self.stop_matching(|id| id == session).await;
@@ -126,13 +128,15 @@ mod tests {
             stop: stop.clone(),
             calls: tx,
         });
-        timers.start(
-            context("one"),
-            executor.clone(),
-            "tick".into(),
-            Duration::from_secs(1),
-            true,
-        );
+        timers
+            .start(
+                context("one"),
+                executor.clone(),
+                "tick".into(),
+                Duration::from_secs(1),
+                true,
+            )
+            .unwrap();
         tokio::task::yield_now().await;
         tokio::time::advance(Duration::from_millis(999)).await;
         assert!(calls.try_recv().is_err());
@@ -141,23 +145,27 @@ mod tests {
         tokio::time::advance(Duration::from_secs(1)).await;
         assert_eq!(fired(&mut calls).await, SessionId::from_raw("one"));
         timers.end(&SessionId::from_raw("one")).await;
-        timers.start(
-            context("two"),
-            executor.clone(),
-            "once".into(),
-            Duration::from_secs(1),
-            false,
-        );
+        timers
+            .start(
+                context("two"),
+                executor.clone(),
+                "once".into(),
+                Duration::from_secs(1),
+                false,
+            )
+            .unwrap();
         tokio::task::yield_now().await;
         tokio::time::advance(Duration::from_secs(1)).await;
         assert_eq!(fired(&mut calls).await, SessionId::from_raw("two"));
-        timers.start(
-            context("three"),
-            executor,
-            "tick".into(),
-            Duration::from_secs(1),
-            true,
-        );
+        timers
+            .start(
+                context("three"),
+                executor,
+                "tick".into(),
+                Duration::from_secs(1),
+                true,
+            )
+            .unwrap();
         tokio::task::yield_now().await;
         stop.cancel();
         tokio::time::advance(Duration::from_secs(10)).await;

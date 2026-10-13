@@ -109,29 +109,84 @@ async fn the_host_nouns_fixture_agrees_under_quickjs_and_node() {
 
 #[tokio::test]
 async fn node_registered_commands_refresh_callbacks_before_the_next_call() {
-    if !super::node_available() {return;}
+    if !super::node_available() {
+        return;
+    }
     let home = tempfile::tempdir().unwrap();
-    let root = install(home.path(),true);
+    let root = install(home.path(), true);
     let source = r#"export function register(on) {
       on('session.start', async ($) => {
         await $.command.register({name:'hello',hint:'fixture',args:{kind:'none'},family:'fixture'}, async () => ({kind:'applied',message:'first'}));
         await $.session.append({key:'ready',value:true});
       });
     }"#;
-    std::fs::write(root.join("register.ts"),source).unwrap();
-    let host = Host::build(vec![Box::new(ModsPlugin::default()),Box::new(PluginRpcPlugin::default().with_project(home.path().into()))],HostConfig::new(Env::rooted(home.path())).with_layer("fixture",json!({"pluginDirs":[root]}))).await.unwrap();
-    let mut session = host.open(SessionSelector::Create{spec:SessionSpec{cwd:home.path().into(),driver:Driver::Log,..Default::default()}},ClientIdentity{name:"fixture".into(),surface:"test".into()},OpenOptions::default()).await.unwrap();
+    std::fs::write(root.join("register.ts"), source).unwrap();
+    let host = Host::build(
+        vec![
+            Box::new(ModsPlugin::default()),
+            Box::new(PluginRpcPlugin::default().with_project(home.path().into())),
+        ],
+        HostConfig::new(Env::rooted(home.path()))
+            .with_layer("fixture", json!({"pluginDirs":[root]})),
+    )
+    .await
+    .unwrap();
+    let mut session = host
+        .open(
+            SessionSelector::Create {
+                spec: SessionSpec {
+                    cwd: home.path().into(),
+                    driver: Driver::Log,
+                    ..Default::default()
+                },
+            },
+            ClientIdentity {
+                name: "fixture".into(),
+                surface: "test".into(),
+            },
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap();
     async fn next(session: &mut Attachment) -> Event {
-        tokio::time::timeout(std::time::Duration::from_secs(15),session.events.next()).await.expect("callback event").unwrap().event
+        tokio::time::timeout(std::time::Duration::from_secs(15), session.events.next())
+            .await
+            .expect("callback event")
+            .unwrap()
+            .event
     }
-    loop {if matches!(next(&mut session).await,Event::Extension{ref kind,..} if kind == "ready") {break;}}
-    for expected in ["first","second"] {
-        if expected == "second" {std::fs::write(root.join("register.ts"),source.replace("first","second")).unwrap();}
+    loop {
+        if matches!(next(&mut session).await,Event::Extension{ref kind,..} if kind == "ready") {
+            break;
+        }
+    }
+    for expected in ["first", "second"] {
+        if expected == "second" {
+            std::fs::write(root.join("register.ts"), source.replace("first", "second")).unwrap();
+        }
         let intent = IntentId::mint();
-        session.handle.submit(intent.clone(),Input::Action{action:Action{name:"hello".into(),args:Value::Null}});
+        session.handle.submit(
+            intent.clone(),
+            Input::Action {
+                action: Action {
+                    name: "hello".into(),
+                    args: Value::Null,
+                },
+            },
+        );
         loop {
-            if let Event::IntentAck{intent:ack,outcome} = next(&mut session).await && ack == intent {
-                assert!(serde_json::to_value(outcome).unwrap().to_string().contains(expected));
+            if let Event::IntentAck {
+                intent: ack,
+                outcome,
+            } = next(&mut session).await
+                && ack == intent
+            {
+                assert!(
+                    serde_json::to_value(outcome)
+                        .unwrap()
+                        .to_string()
+                        .contains(expected)
+                );
                 break;
             }
         }
