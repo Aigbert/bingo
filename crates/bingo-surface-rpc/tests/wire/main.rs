@@ -218,6 +218,9 @@ fn params_for(method: &str) -> Value {
     let session = json!(session_id());
     let intent = json!(IntentId::from_raw("req_1"));
     match method {
+        name::UI_RENDER => {
+            json!({"session":session,"component":"Pane","requestId":"fixture","surface":"terminal","props":{},"viewport":{"columns":80,"rows":8}})
+        }
         name::SESSION_LIST => json!({ "filter": {} }),
         name::SESSION_LIST_HEADS => json!({ "filter": {}, "maxBytes": 4096 }),
         name::SESSION_CHILDREN => json!({ "parent": session, "maxBytes": 4096 }),

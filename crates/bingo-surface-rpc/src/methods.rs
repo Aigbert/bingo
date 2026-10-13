@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn the_wire_has_explicit_methods_and_notifications() {
-        assert_eq!(METHODS.len(), 21);
+        assert_eq!(METHODS.len(), 22);
         assert_eq!(NOTIFICATIONS.len(), 4);
     }
 
