@@ -131,6 +131,7 @@ mod tests {
         assert_eq!(schema["protocol"], 2);
         for method in [
             "host/place",
+            "host/ui/invalidate",
             "host/extend",
             "host/deliver",
             "host/state/get",
