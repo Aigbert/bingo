@@ -84,6 +84,7 @@ impl Plugin for ContextPlugin {
             data_dir,
         ))));
         registrar.add(guide::contribution(registrar));
+        registrar.add(Contribution::Hook(Arc::new(memory::row::MemoryRows)));
         Ok(())
     }
 }
@@ -113,11 +114,11 @@ mod tests {
 
     /// The baseline hook is the one hook: nothing here writes a memory.
     #[test]
-    fn the_plugin_registers_a_compactor_two_contributors_the_command_and_one_hook() {
+    fn the_plugin_registers_a_compactor_two_contributors_the_command_and_two_hooks() {
         let contributions = contributions(json!({}));
         // The hook is nobody's promise: it is the baseline's own, and the
         // manifest names the five things another plugin could ask for.
-        assert_eq!(contributions.len(), MANIFEST.provides.len() + 1);
+        assert_eq!(contributions.len(), MANIFEST.provides.len() + 2);
         assert!(matches!(contributions[0], Contribution::Compactor(_)));
         assert!(matches!(contributions[1], Contribution::Context(_)));
         assert!(matches!(contributions[2], Contribution::Context(_)));
