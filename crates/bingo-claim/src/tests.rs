@@ -3,7 +3,10 @@ use std::fs::TryLockError;
 
 const LOCK: &str = "runner.lock";
 const MARKER: &str = "bingo-schedule-runner-v1\n";
-const PROTOCOL: Protocol<'_> = Protocol { file: LOCK, marker: MARKER };
+const PROTOCOL: Protocol<'_> = Protocol {
+    file: LOCK,
+    marker: MARKER,
+};
 
 // Keep the scheduler's original contract tests unchanged below this adapter.
 struct Claim;

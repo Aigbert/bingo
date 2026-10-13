@@ -116,11 +116,16 @@ async fn output(plugin: &str, reply: Reply) -> Result<ToolOutput, ToolError> {
     for part in result.output.parts {
         parts.push(bounded_part(part).await);
     }
-    Ok(ToolOutput { parts, ..result.output })
+    Ok(ToolOutput {
+        parts,
+        ..result.output
+    })
 }
 
 async fn bounded_part(part: ContentPart) -> ContentPart {
-    let ContentPart::Image(image) = part else { return part };
+    let ContentPart::Image(image) = part else {
+        return part;
+    };
     let media_type = image.media_type.clone();
     match bingo_pictures::taken(image).await {
         Ok(image) => ContentPart::Image(image),
@@ -205,8 +210,16 @@ mod tests {
     use super::*;
 
     async fn received(parts: Vec<bingo_sdk::ContentPart>) -> ToolOutput {
-        let result = ToolCallResult { output: ToolOutput { parts, is_error: false, display: None } };
-        output("pictures", Ok(serde_json::to_value(result).unwrap())).await.unwrap()
+        let result = ToolCallResult {
+            output: ToolOutput {
+                parts,
+                is_error: false,
+                display: None,
+            },
+        };
+        output("pictures", Ok(serde_json::to_value(result).unwrap()))
+            .await
+            .unwrap()
     }
 
     #[tokio::test]
@@ -214,20 +227,34 @@ mod tests {
         use bingo_sdk::ContentPart;
         let image = bingo_pictures::testing::noisy(1024, 1024).at("original.png");
         assert!(image.decoded_len() >= 3 * 1024 * 1024);
-        let output = received(vec![ContentPart::text("before"), ContentPart::Image(image),
-            ContentPart::text("after")]).await;
+        let output = received(vec![
+            ContentPart::text("before"),
+            ContentPart::Image(image),
+            ContentPart::text("after"),
+        ])
+        .await;
         assert_eq!(output.parts[0].as_text(), Some("before"));
         assert_eq!(output.parts[2].as_text(), Some("after"));
-        let ContentPart::Image(seen) = &output.parts[1] else { panic!("a bounded picture") };
+        let ContentPart::Image(seen) = &output.parts[1] else {
+            panic!("a bounded picture")
+        };
         assert!(seen.decoded_len() <= bingo_pictures::MODEL_BUDGET);
         assert_eq!(seen.path.as_deref(), Some(Path::new("original.png")));
     }
 
     #[tokio::test]
     async fn an_unreadable_plugin_picture_becomes_a_reasoned_text_part() {
-        let output = received(vec![bingo_sdk::ContentPart::Image(bingo_pictures::testing::unreadable())]).await;
-        let text = output.parts[0].as_text().expect("a refusal instead of a corrupt image");
-        assert!(text.contains("image/png") && text.contains("not a picture"), "{text}");
+        let output = received(vec![bingo_sdk::ContentPart::Image(
+            bingo_pictures::testing::unreadable(),
+        )])
+        .await;
+        let text = output.parts[0]
+            .as_text()
+            .expect("a refusal instead of a corrupt image");
+        assert!(
+            text.contains("image/png") && text.contains("not a picture"),
+            "{text}"
+        );
     }
 
     #[test]

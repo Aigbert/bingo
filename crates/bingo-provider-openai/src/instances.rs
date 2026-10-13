@@ -234,7 +234,10 @@ mod tests {
         assert!(names(&["proxy1", "proxy2", "work"]).is_ok());
         assert!(refusal(&["codex"]).contains("`codex`"));
         assert!(refusal(&["openai"]).contains("built-in"));
-        assert!(names(&["fake", "anthropic"]).is_ok(), "the registry owns other plugins' names");
+        assert!(
+            names(&["fake", "anthropic"]).is_ok(),
+            "the registry owns other plugins' names"
+        );
         assert!(refusal(&["proxy1", "proxy1"]).contains("named twice"));
     }
 

@@ -291,7 +291,10 @@ mod tests {
 
     #[test]
     fn case_variants_cannot_claim_an_existing_or_reserved_name() {
-        assert_eq!(free("Reviewer", &["reviewer".into()]), Some("Reviewer-2".into()));
+        assert_eq!(
+            free("Reviewer", &["reviewer".into()]),
+            Some("Reviewer-2".into())
+        );
         for name in ["Parent", "PARENT", "parent"] {
             assert!(check(name).is_err(), "{name} is reserved");
         }
@@ -305,8 +308,14 @@ mod tests {
         let builder = fleet.child(&root, "builder");
         let room = fleet.room(&root, "#design");
         let host = fleet.handle();
-        assert_eq!(resolve(&host, &root, " @REVIEWER ").await.unwrap().id, reviewer);
-        assert_eq!(agent(&host, &builder, "Reviewer").await.unwrap().id, reviewer);
+        assert_eq!(
+            resolve(&host, &root, " @REVIEWER ").await.unwrap().id,
+            reviewer
+        );
+        assert_eq!(
+            agent(&host, &builder, "Reviewer").await.unwrap().id,
+            reviewer
+        );
         assert_eq!(child(&host, &root, "Reviewer").await.unwrap().id, reviewer);
         assert_eq!(mine(&host, &root, "@Reviewer").await.unwrap().id, reviewer);
         assert_eq!(resolve(&host, &reviewer, "@Parent").await.unwrap().id, root);

@@ -41,6 +41,9 @@ mod tests {
         assert_eq!(PROTOCOL.marker, "bingo-schedule-runner-v1\n");
         let home = tempfile::tempdir().unwrap();
         let claim = Claim::take(home.path()).unwrap();
-        assert_eq!(std::fs::read(claim.path()).unwrap(), PROTOCOL.marker.as_bytes());
+        assert_eq!(
+            std::fs::read(claim.path()).unwrap(),
+            PROTOCOL.marker.as_bytes()
+        );
     }
 }

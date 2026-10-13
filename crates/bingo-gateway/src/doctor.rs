@@ -248,8 +248,8 @@ fn lock_checks(patient: &Patient<'_>, probe: &dyn Probe) -> Vec<Row> {
 
 fn lock_check(root: &Path, path: PathBuf, probe: &dyn Probe) -> Option<Row> {
     let name = relative(&path, root);
-    if let Some(row) = schedule_lock(root, &path, &name)
-        .or_else(|| channel_lock(root, &path, &name))
+    if let Some(row) =
+        schedule_lock(root, &path, &name).or_else(|| channel_lock(root, &path, &name))
     {
         return Some(row);
     }
@@ -313,7 +313,10 @@ fn channel_lock(root: &Path, path: &Path, name: &str) -> Option<Row> {
         marker: bingo_channels::lock::MARKER,
     };
     let (verdict, say) = match bingo_claim::probe(&directory, protocol) {
-        Ok(true) => (Verdict::Ok, "channel OS lock is held; never remove this file".into()),
+        Ok(true) => (
+            Verdict::Ok,
+            "channel OS lock is held; never remove this file".into(),
+        ),
         Ok(false) => (
             Verdict::Ok,
             "channel OS lock is free; this permanent file is not a stale claim".into(),
@@ -539,7 +542,11 @@ mod tests {
         let path = case.lock("channels", "feishu-cli_a1.lock", 4242);
         let marker = b"bingo-channel-claim-v1\n";
         std::fs::write(&path, marker).unwrap();
-        let file = std::fs::File::options().read(true).write(true).open(&path).unwrap();
+        let file = std::fs::File::options()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
         file.try_lock().unwrap();
         let held = case.report(&Fake::empty(), true);
         assert!(held.contains("channel OS lock is held"), "{held}");

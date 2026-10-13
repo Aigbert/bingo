@@ -56,7 +56,8 @@ impl Claim {
     pub fn take(dir: &Path, protocol: Protocol<'_>) -> Result<Self, ClaimError> {
         std::fs::create_dir_all(dir).map_err(|e| ClaimError::io(dir, e))?;
         let path = dir.join(protocol.file);
-        let mut file = publish::open(&path, protocol.marker).map_err(|e| ClaimError::io(&path, e))?;
+        let mut file =
+            publish::open(&path, protocol.marker).map_err(|e| ClaimError::io(&path, e))?;
         acquire(&file, &path)?;
         recognize(&mut file, &path, protocol.marker)?;
         Ok(Self { path, _file: file })

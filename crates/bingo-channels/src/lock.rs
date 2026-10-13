@@ -25,7 +25,10 @@ impl Claim {
     pub fn take(data_dir: &Path, adapter: &str, credential: &str) -> Result<Self, ChannelError> {
         let directory = data_dir.join(DIRECTORY);
         let file = format!("{}.lock", slug(&format!("{adapter}-{credential}")));
-        let protocol = bingo_claim::Protocol { file: &file, marker: MARKER };
+        let protocol = bingo_claim::Protocol {
+            file: &file,
+            marker: MARKER,
+        };
         bingo_claim::Claim::take(&directory, protocol)
             .map(Self)
             .map_err(|error| refusal(adapter, error))

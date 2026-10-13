@@ -15,8 +15,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use agent_client_protocol_schema::v1::{
-    CancelNotification, ContentBlock, PromptRequest, PromptResponse, SessionId as AcpSessionId,
-    ImageContent, TextContent,
+    CancelNotification, ContentBlock, ImageContent, PromptRequest, PromptResponse,
+    SessionId as AcpSessionId, TextContent,
 };
 use async_trait::async_trait;
 use bingo_sdk::{
@@ -166,7 +166,9 @@ impl Asking {
         let mut prompt = said(&self.asked, link.capabilities.prompt_capabilities.image);
         if let Some(preamble) = link.take_preamble().await {
             match prompt.first_mut() {
-                Some(ContentBlock::Text(first)) => first.text = format!("{preamble}\n\n{}", first.text),
+                Some(ContentBlock::Text(first)) => {
+                    first.text = format!("{preamble}\n\n{}", first.text)
+                }
                 _ => prompt.insert(0, ContentBlock::Text(TextContent::new(preamble))),
             }
         }
@@ -264,7 +266,10 @@ fn nobody() -> ProviderError {
 fn split(mut messages: Vec<Message>) -> (Vec<Message>, Vec<ContentPart>) {
     match messages.last() {
         Some(last) if last.role == Role::User => {
-            let asked = messages.pop().map(|message| message.parts).unwrap_or_default();
+            let asked = messages
+                .pop()
+                .map(|message| message.parts)
+                .unwrap_or_default();
             (messages, asked)
         }
         // No trailing user turn — a continuation the kernel asked for, or a
@@ -276,17 +281,22 @@ fn split(mut messages: Vec<Message>) -> (Vec<Message>, Vec<ContentPart>) {
 
 /// Keep the user's order and decide from the link carrying this attempt.
 fn said(parts: &[ContentPart], images: bool) -> Vec<ContentBlock> {
-    let prompt: Vec<_> = parts.iter().filter_map(|part| match part {
-        ContentPart::Text { text } => Some(ContentBlock::Text(TextContent::new(text.clone()))),
-        ContentPart::Image(image) if images => Some(ContentBlock::Image(ImageContent::new(
-            image.data.clone(), image.media_type.clone(),
-        ))),
-        ContentPart::Image(image) => Some(ContentBlock::Text(TextContent::new(format!(
-            "[picture not sent: {} {}; this agent does not take pictures]",
-            image.media_type, bingo_sdk::bytes::words(image.decoded_len()),
-        )))),
-        _ => None,
-    }).collect();
+    let prompt: Vec<_> = parts
+        .iter()
+        .filter_map(|part| match part {
+            ContentPart::Text { text } => Some(ContentBlock::Text(TextContent::new(text.clone()))),
+            ContentPart::Image(image) if images => Some(ContentBlock::Image(ImageContent::new(
+                image.data.clone(),
+                image.media_type.clone(),
+            ))),
+            ContentPart::Image(image) => Some(ContentBlock::Text(TextContent::new(format!(
+                "[picture not sent: {} {}; this agent does not take pictures]",
+                image.media_type,
+                bingo_sdk::bytes::words(image.decoded_len()),
+            )))),
+            _ => None,
+        })
+        .collect();
     if prompt.is_empty() {
         vec![ContentBlock::Text(TextContent::new(""))]
     } else {

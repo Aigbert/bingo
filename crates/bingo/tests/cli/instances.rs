@@ -306,7 +306,10 @@ fn a_colliding_instance_name_stops_the_boot_and_is_named() {
         let file = settings(home.path(), value);
         let out = run(bingo_with(home.path(), &file).args(["--print", "--provider", "fake", "hi"]));
         assert_ne!(out.status.code(), Some(0), "stdout: {}", stdout(&out));
-        assert!(out.stdout.is_empty(), "a boot refusal prints no model output");
+        assert!(
+            out.stdout.is_empty(),
+            "a boot refusal prints no model output"
+        );
         stderr(&out)
     };
     let err = refused(serde_json::json!({ "openai": { "instances": { "codex": {} } } }));
@@ -316,7 +319,10 @@ fn a_colliding_instance_name_stops_the_boot_and_is_named() {
     );
 
     let err = refused(serde_json::json!({ "openai": { "instances": { "anthropic": {} } } }));
-    assert!(err.contains("provider anthropic is already registered"), "{err}");
+    assert!(
+        err.contains("provider anthropic is already registered"),
+        "{err}"
+    );
 
     let err = refused(serde_json::json!({
         "openai": { "instances": { "proxy1": {}, "shared": {} } },
