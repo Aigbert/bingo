@@ -7,6 +7,14 @@ cleanup and C-header-blocked builds remain for Windows CI (protocol step 7).
 M133 author-kit verification (2026-10-13) is recorded in its plan, including
 authorized baseline exceptions and pending Linux/Windows CI evidence.
 
+Pre-release amendment (2026-10-13, M136): protocol 2 has not shipped
+(v0.6.6 ships protocol 1). Its old `turn.complete` becomes `turn.stop`
+with unchanged shape and behaviour; `turn.complete` takes the catalogue's
+metadata-to-completion-text meaning. Amend the frozen baseline for these
+entries only. Any protocol-2 change after its first release that breaks
+its frozen contract still needs protocol 3. M134's `holds_context` note
+is on its parallel branch; both pre-release amendments apply.
+
 ## Context
 
 ADR-0015 kept `PROTOCOL` at 1 "until a plugin outside this repository

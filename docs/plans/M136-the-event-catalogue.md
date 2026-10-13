@@ -101,7 +101,7 @@ is M137's. With no link installed, a person sees no change.
 - `crates/bingo-core/src/{host,session,plugins,config (new),commands/mod,turn/late,session/inputs,session/commands}.rs`
 - `crates/bingo-services/src/{team,mcp}.rs` (M119 owns both wire adapters)
 - `crates/bingo-plugin-rpc/src/{intercept,wire,service,schema,lib,events_ts (new)}.rs`
-- `crates/bingo/tests/catalogue.rs` (new), `schema/events.json` (new), `schema/plugin.json`
+- `crates/bingo/tests/catalogue.rs` (new), `schema/events.json` (new), `schema/{plugin,plugin-2}.json`
 - `sdk/typescript/src/{events.ts (generated),on.ts,on.test.ts,index.ts}`,
   `sdk/typescript/test/cases.json`, `scripts/check_discipline.sh`
 
@@ -124,7 +124,7 @@ is M137's. With no link installed, a person sees no change.
 - [ ] `events_ts::` (plugin-rpc) fails on a hand edit of `events.ts`;
       `check_discipline.sh` on a stray `Entry {`. Each shown once.
 - [ ] Existing hook, chain, intercept and plugin tests pass unedited;
-      all gates; the MSVC `cargo check` for sdk, core and plugin-rpc.
+      except the authorized stop-name rename; all gates; the MSVC `cargo check` for sdk, core and plugin-rpc.
 
 ## Non-goals
 
@@ -138,15 +138,13 @@ is M137's. With no link installed, a person sees no change.
 
 ## Risks
 
-- **STOP, step 6, at `60deb2b9`:** `LinkPoint::TurnStop`, `point_name`,
-  `wire::METHODS` and frozen protocol 2 name the old stop hook `turn.complete`
-  (`null → StopResult`); `catalogue_tool_fields_and_completion_spelling`
-  asserts it. M136 needs that name for metadata → completion text and names
-  the old hook `turn.stop`. Retyping breaks ADR-0075 §1; keeping the schema
-  while changing dispatch breaks its behaviour. This is not a mechanical fixture update.
-- Options: (A) preserve protocol 2's legacy stop transport and negotiate a
-  distinct catalogue transport (recommended; record a compatibility exception),
-  or (B) protocol 3 with protocol 2 support (expands M136). Decision required.
+- Resolved by the user, 2026-10-13: protocol 2 has never shipped. Amend
+  it in place: old `turn.complete` becomes `turn.stop` without changing
+  its shape or behaviour; `turn.complete` takes the catalogue contract.
+  Regenerate current schemas with `BINGO_UPDATE_SCHEMA=1`; amend only
+  these entries and their referenced definitions in `plugin-2.json` in
+  one commit. Keep the additive-only test and record ADR-0075's dated
+  exception. A change after the first protocol-2 release needs protocol 3.
 - Gather links once per round; chain config before writes; never measure
   `UsageCharged`; keep actor plugin work on M116-owned tasks.
 
@@ -167,3 +165,5 @@ CURRENT intercept/turn.complete/after: result=#/$defs/StopResult
 
 Implementation and gates not run: steps 2/6 require stopping on this conflict.
 No schemas regenerated; no live or credential tests run.
+
+Resumed on the user's pre-release amendment decision; the earlier stop is resolved.
