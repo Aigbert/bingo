@@ -60,7 +60,11 @@ fn manager(servers: &[(&str, Server)], disabled: &[String]) -> (Arc<Manager>, te
         .iter()
         .map(|(name, server)| ((*name).to_string(), server.clone()))
         .collect();
+    let Ok(http) = bingo_http::client(bingo_http::Bounds::CALL) else {
+        panic!("a bounded HTTP client");
+    };
     let manager = Arc::new(Manager::new(
+        http,
         configured,
         disabled,
         data.path().to_path_buf(),
@@ -451,6 +455,7 @@ async fn a_child_is_spawned_in_the_directory_and_environment_it_was_given() {
         cwd: Some(work_path.clone()),
     };
     let manager = Arc::new(Manager::new(
+        bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
         BTreeMap::from([("test".to_string(), server)]),
         &[],
         data.path().to_path_buf(),

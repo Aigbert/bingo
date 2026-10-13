@@ -28,6 +28,7 @@ pub mod error;
 pub mod exchange;
 pub mod issuer;
 pub mod jwt;
+pub mod key;
 pub mod mcp;
 mod percent;
 pub mod pkce;
@@ -45,5 +46,5 @@ pub use source::{Status, TokenSource};
 pub use store::{CredentialStore, Entry, mcp_key};
 pub use tokens::Tokens;
 
+#[cfg(test)]
 mod http;
-pub use http::client;

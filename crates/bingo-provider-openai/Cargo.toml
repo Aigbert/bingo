@@ -12,6 +12,7 @@ description = "OpenAI Responses API provider plugin for bingo"
 workspace = true
 
 [dependencies]
+bingo-http.workspace = true
 bingo-sdk.workspace = true
 # The subscription's OAuth flows and the credential store (ADR-0012 §1).
 bingo-auth-oauth.workspace = true
@@ -20,10 +21,6 @@ bingo-loopback.workspace = true
 async-trait.workspace = true
 futures.workspace = true
 reqwest.workspace = true
-# The request body goes out metered, so a slow upload reads as movement and
-# not as silence (ADR-0056 §2). Both are already in the tree under `reqwest`.
-bytes.workspace = true
-http-body.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 schemars.workspace = true

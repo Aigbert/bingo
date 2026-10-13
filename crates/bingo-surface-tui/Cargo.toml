@@ -13,6 +13,7 @@ workspace = true
 
 [dependencies]
 bingo-collab.workspace = true
+bingo-http.workspace = true
 bingo-sdk.workspace = true
 tokio.workspace = true
 futures.workspace = true

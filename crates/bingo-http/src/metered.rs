@@ -10,8 +10,7 @@
 //! chunked, and the builder above is never handed the metered body — it keeps
 //! its own bytes for `RequestBuilder::try_clone` (ADR-0056 §3).
 //!
-//! The same module sits in `bingo-provider-openai`: a plugin may not import
-//! another plugin, so the bricks are duplicated as the guards already are.
+//! Shared by the HTTP providers through the library tier (ADR-0072).
 
 use std::convert::Infallible;
 use std::pin::Pin;
@@ -126,15 +125,16 @@ impl Body for Metered {
 pub fn meter(
     builder: reqwest::RequestBuilder,
     clock: &Clock,
-) -> Result<reqwest::Request, ProviderError> {
-    let mut request = builder.build().map_err(|e| ProviderError::Request {
+) -> Result<(reqwest::Client, reqwest::Request), ProviderError> {
+    let (client, request) = builder.build_split();
+    let mut request = request.map_err(|e| ProviderError::Request {
         message: format!("the request could not be built: {e}"),
     })?;
     let bytes = request
         .body()
         .map(|body| body.as_bytes().map(Bytes::copy_from_slice));
     match bytes {
-        None => Ok(request),
+        None => Ok((client, request)),
         // Nothing here builds a streaming body, and one that slipped through
         // would be a request no guard could watch.
         Some(None) => Err(ProviderError::Config {
@@ -142,7 +142,7 @@ pub fn meter(
         }),
         Some(Some(bytes)) => {
             *request.body_mut() = Some(reqwest::Body::wrap(Metered::new(bytes, clock.clone())));
-            Ok(request)
+            Ok((client, request))
         }
     }
 }

@@ -3,7 +3,7 @@
 Status: accepted · 2026-10-13 · Plan: M129 · Plans: M109 (claim), M110 (shell), M127, M128, M129 · Supersedes: ADR-0056 §5
 
 Implementation note (2026-10-13): M129 completes §5–6; M128 completes §3–4.
-§2 remains assigned to M127. Gateway/tool-fs Windows checks remain for CI,
+M127 completes §2 on 2026-10-13. Gateway/tool-fs Windows checks remain for CI,
 as do M128's plugin-rpc/MCP/bin checks blocked by Windows C headers.
 
 ## Context

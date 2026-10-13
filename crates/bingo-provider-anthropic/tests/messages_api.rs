@@ -41,7 +41,11 @@ fn request() -> ModelRequest {
 }
 
 fn provider(server: &MockServer) -> AnthropicProvider {
-    AnthropicProvider::with_endpoint(Some(KEY.into()), server.uri())
+    AnthropicProvider::with_endpoint(
+        bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+        Some(KEY.into()),
+        server.uri(),
+    )
 }
 
 /// A mock that answers `POST /v1/messages` only when the request carries the

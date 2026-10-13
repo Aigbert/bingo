@@ -213,7 +213,7 @@ mod tests {
         Arc::new(move |url: &str| {
             let (url, answer, seen) = (url.to_string(), answer.clone(), Arc::clone(&seen));
             tokio::spawn(async move {
-                let http = reqwest::Client::new();
+                let http = bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client");
                 if let Ok(response) = http.get(&url).send().await
                     && let Ok(html) = response.text().await
                 {

@@ -8,32 +8,22 @@
 //! which is how an interrupt reaches the wire. Neither retries — the turn
 //! loop owns the ladder.
 //!
-//! [`CONNECT_TIMEOUT`] bounds the phase before either of them: reaching the
+//! [`crate::CONNECT_TIMEOUT`] bounds the phase before either of them: reaching the
 //! server at all. Past it, size never ends a request; only silence does.
 //!
-//! The guards are the same two `bingo-provider-anthropic::stream` carries: a
-//! plugin may not import another plugin, so they are duplicated until they
-//! earn a place in the sdk.
+//! Provider decoders own the vocabulary; this module owns the transport.
 
 use std::collections::VecDeque;
 use std::pin::Pin;
-use std::time::Duration;
 
 use bingo_sdk::{CancellationToken, ModelEvent, ModelStream, ProviderError};
 use futures::{Stream, StreamExt};
 
-use crate::events::Decoder;
+use crate::Decode;
 use crate::metered::{Clock, quiet};
 use crate::sse::{SseFrame, SseParser};
 
-/// How long reaching the server may take, which is the one phase with nothing
-/// to meter yet (ADR-0056 §1).
-pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
-
-/// How long the wire may stay silent. The upload, the wait for the status
-/// line and the body that follows share this one bound — Codex's number for
-/// the same job (`codex-rs/model-provider-info`).
-pub const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
+use crate::IDLE_TIMEOUT;
 
 /// The response body as bytes, with transport failures already named. Erasing
 /// the chunk type here is what lets a fixture drive the decoding half without
@@ -50,11 +40,16 @@ pub fn chunks(response: reqwest::Response) -> Chunks {
     }))
 }
 
-pub fn model_stream(chunks: Chunks, clock: Clock, cancel: CancellationToken) -> ModelStream {
+pub fn model_stream<D: Decode>(
+    chunks: Chunks,
+    clock: Clock,
+    cancel: CancellationToken,
+    decoder: D,
+) -> ModelStream {
     let body = Body {
         chunks,
         parser: SseParser::new(),
-        decoder: Decoder::new(),
+        decoder,
         queue: VecDeque::new(),
         failure: None,
         done: false,
@@ -69,10 +64,10 @@ pub fn model_stream(chunks: Chunks, clock: Clock, cancel: CancellationToken) -> 
 /// One response being read. `queue` holds events already decoded but not yet
 /// handed out, so a chunk carrying several frames is delivered event by event
 /// and a failure still arrives *after* everything that preceded it.
-struct Body {
+struct Body<D> {
     chunks: Chunks,
     parser: SseParser,
-    decoder: Decoder,
+    decoder: D,
     queue: VecDeque<ModelEvent>,
     failure: Option<ProviderError>,
     done: bool,
@@ -88,7 +83,7 @@ enum Pulled {
     Silent,
 }
 
-impl Body {
+impl<D: Decode> Body<D> {
     async fn next(&mut self) -> Option<Result<ModelEvent, ProviderError>> {
         loop {
             if let Some(event) = self.queue.pop_front() {
@@ -170,118 +165,5 @@ impl Body {
 
     fn fail(&mut self, error: ProviderError) {
         self.failure = Some(error);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use bingo_sdk::{FinishReason, UnifiedFinish};
-    use futures::stream;
-
-    /// A fixture body, cut into small chunks so every frame straddles one.
-    fn fixture(name: &str, chunk: usize) -> Chunks {
-        let body = std::fs::read(crate::tests::fixture(name)).expect("read the fixture");
-        let parts: Vec<Result<Vec<u8>, ProviderError>> =
-            body.chunks(chunk).map(|c| Ok(c.to_vec())).collect();
-        Box::pin(stream::iter(parts))
-    }
-
-    async fn drain(chunks: Chunks) -> Vec<Result<ModelEvent, ProviderError>> {
-        model_stream(chunks, Clock::new(), CancellationToken::new())
-            .collect()
-            .await
-    }
-
-    #[tokio::test]
-    async fn a_chunked_body_decodes_to_the_same_events_as_one_piece() {
-        let whole = drain(fixture("text.sse", 4096)).await;
-        let split = drain(fixture("text.sse", 7)).await;
-        assert_eq!(whole, split, "framing must not depend on chunk size");
-        assert!(matches!(
-            whole.last(),
-            Some(Ok(ModelEvent::Finish {
-                finish_reason: FinishReason {
-                    unified: UnifiedFinish::Stop,
-                    ..
-                },
-                ..
-            }))
-        ));
-    }
-
-    #[tokio::test]
-    async fn a_mid_stream_failure_arrives_after_everything_that_preceded_it() {
-        let items = drain(fixture("failed.sse", 13)).await;
-        let (last, before) = items.split_last().expect("some events");
-        assert!(
-            matches!(last, Err(ProviderError::Server { status: 500, .. })),
-            "{last:?}"
-        );
-        assert!(before.iter().all(Result::is_ok));
-        assert!(matches!(
-            before.last(),
-            Some(Ok(ModelEvent::TextDelta { .. }))
-        ));
-    }
-
-    #[tokio::test]
-    async fn a_transport_failure_ends_the_stream() {
-        let chunks: Chunks = Box::pin(stream::iter(vec![
-            Ok(b"event: response.in_progress\ndata: {}\n\n".to_vec()),
-            Err(ProviderError::Transport {
-                message: "connection reset".into(),
-            }),
-        ]));
-        assert_eq!(
-            drain(chunks).await,
-            vec![Err(ProviderError::Transport {
-                message: "connection reset".into()
-            })]
-        );
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn a_body_that_goes_quiet_times_out() {
-        let chunks: Chunks = Box::pin(stream::pending());
-        let mut events = model_stream(chunks, Clock::new(), CancellationToken::new());
-        assert_eq!(events.next().await, Some(Err(ProviderError::Timeout)));
-        assert_eq!(events.next().await, None, "a timeout ends the stream");
-    }
-
-    #[tokio::test]
-    async fn a_cancelled_turn_stops_the_stream_before_it_finishes() {
-        let cancel = CancellationToken::new();
-        let mut events = model_stream(fixture("text.sse", 64), Clock::new(), cancel.clone());
-        assert!(events.next().await.is_some());
-        cancel.cancel();
-        let rest: Vec<_> = events.collect().await;
-        assert!(
-            !rest
-                .iter()
-                .any(|e| matches!(e, Ok(ModelEvent::Finish { .. }))),
-            "a cancelled stream never finishes"
-        );
-    }
-
-    #[tokio::test]
-    async fn a_token_cancelled_before_the_first_poll_yields_nothing() {
-        let cancel = CancellationToken::new();
-        cancel.cancel();
-        let events: Vec<_> = model_stream(fixture("text.sse", 64), Clock::new(), cancel)
-            .collect()
-            .await;
-        assert!(events.is_empty());
-    }
-
-    #[tokio::test]
-    async fn a_body_that_never_frames_is_a_stream_error() {
-        let flood: Vec<Result<Vec<u8>, ProviderError>> =
-            (0..9).map(|_| Ok(vec![b'x'; 1024 * 1024])).collect();
-        let items = drain(Box::pin(stream::iter(flood))).await;
-        assert!(matches!(
-            items.last(),
-            Some(Err(ProviderError::Stream { .. }))
-        ));
     }
 }

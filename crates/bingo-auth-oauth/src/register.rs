@@ -131,7 +131,7 @@ mod tests {
             .await;
         assert_eq!(
             register(
-                &reqwest::Client::new(),
+                &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
                 &format!("{}/register", server.uri()),
                 &uris()
             )
@@ -155,7 +155,7 @@ mod tests {
             .mount(&server)
             .await;
         let refused = register(
-            &reqwest::Client::new(),
+            &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
             &format!("{}/register", server.uri()),
             &uris(),
         )

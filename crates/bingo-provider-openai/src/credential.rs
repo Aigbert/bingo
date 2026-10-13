@@ -12,7 +12,7 @@ use std::sync::Arc;
 use bingo_auth_oauth::{AuthError, Status, TokenSource};
 use bingo_sdk::{AuthStatus, ProviderError};
 
-use crate::key::ApiKey;
+use bingo_auth_oauth::key::ApiKey;
 
 #[derive(Debug)]
 pub enum Credential {

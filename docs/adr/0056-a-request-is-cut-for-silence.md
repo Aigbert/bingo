@@ -1,7 +1,7 @@
 # 0056 — A request is cut for silence, not for size
 
 2026-10-13: §5 is superseded by [ADR-0072](0072-mechanism-lives-in-the-library-tier.md)
-(accepted in M129); the provider migration remains assigned to M127.
+(accepted in M129); M127 completes the shared provider transport on 2026-10-13.
 
 ## Context
 

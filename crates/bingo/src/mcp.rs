@@ -368,7 +368,13 @@ fn signs_in(
     server: &Server,
 ) -> Result<Arc<bingo_auth_oauth::McpAuth>, KernelError> {
     let store = Arc::new(CredentialStore::new(env.data_dir.clone()));
-    bingo_mcp::auth::handle(name, server, store, bingo_auth_oauth::client()).ok_or_else(|| {
+    bingo_mcp::auth::handle(
+        name,
+        server,
+        store,
+        bingo_http::client(bingo_http::Bounds::CALL).map_err(|e| internal(e.to_string()))?,
+    )
+    .ok_or_else(|| {
         invalid(format!(
             "`{name}` signs in to nothing: it is a child process, or its \
              Authorization header is already written in the settings"

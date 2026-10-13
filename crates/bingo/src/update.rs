@@ -111,11 +111,11 @@ async fn latest(client: &reqwest::Client) -> Result<Release, KernelError> {
 }
 
 fn client(timeout: std::time::Duration) -> Result<reqwest::Client, KernelError> {
-    reqwest::Client::builder()
-        .timeout(timeout)
-        .user_agent(api::user_agent(CURRENT))
-        .build()
-        .map_err(|e| internal(e.to_string()))
+    bingo_http::client(bingo_http::Bounds {
+        connect: bingo_http::CONNECT_TIMEOUT,
+        call: Some(timeout),
+    })
+    .map_err(|e| internal(e.to_string()))
 }
 
 async fn text(client: &reqwest::Client, url: &str) -> Result<String, KernelError> {
@@ -138,6 +138,7 @@ async fn bytes(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, KernelErr
 async fn answered(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, KernelError> {
     client
         .get(url)
+        .header(reqwest::header::USER_AGENT, api::user_agent(CURRENT))
         .send()
         .await
         .and_then(reqwest::Response::error_for_status)

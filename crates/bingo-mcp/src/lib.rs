@@ -83,6 +83,8 @@ impl Plugin for McpPlugin {
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
         let settings: Settings = registrar.config()?;
         let manager = Arc::new(Manager::new(
+            bingo_http::client(bingo_http::Bounds::CALL)
+                .map_err(|e| PluginError::Failed(e.to_string()))?,
             settings.mcp_servers,
             &settings.disabled_mcp_servers,
             registrar.env().data_dir.clone(),

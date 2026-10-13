@@ -99,6 +99,7 @@
 # M114 (ADR-0066): bingo-digest lifts SHA-256, one member, no external crate.
 # M128 (ADR-0072 §4): bingo-jsonrpc adds one member, no external crate.
 # M122 (ADR-0071): collab and alarm add two members, no external crate.
-max_dependencies = 352
+# M127 (ADR-0072 §2): bingo-http adds one member, no external crate.
+max_dependencies = 353
 max_core_check_seconds = 20
 max_target_gb = 5

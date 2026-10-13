@@ -11,6 +11,7 @@ repository = "https://github.com/yexrob/bingo"
 publish = false
 
 [workspace.dependencies]
+bingo-http = { path = "crates/bingo-http" }
 bingo-collab = { path = "crates/bingo-collab" }
 bingo-alarm = { path = "crates/bingo-alarm" }
 bingo-digest = { path = "crates/bingo-digest" }

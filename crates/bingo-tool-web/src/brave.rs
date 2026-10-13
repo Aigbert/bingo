@@ -33,6 +33,7 @@ impl Brave {
         let response = self
             .http
             .get(endpoint)
+            .header(header::USER_AGENT, crate::USER_AGENT)
             .header("X-Subscription-Token", &self.key)
             .header(header::ACCEPT, "application/json")
             .send()
@@ -154,7 +155,10 @@ mod tests {
 
     #[test]
     fn the_key_never_reaches_a_debug_line() {
-        let brave = Brave::new(Client::new(), "secret-key-value".into());
+        let brave = Brave::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
+            "secret-key-value".into(),
+        );
         assert!(!format!("{brave:?}").contains("secret-key-value"));
     }
 }

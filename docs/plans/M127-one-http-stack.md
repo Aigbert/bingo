@@ -2,120 +2,143 @@
 
 ## Goal
 
-ADR-0072 §2. The two providers' transport, about 1.4k lines kept twice,
-becomes one crate, `bingo-http`. After this, every `reqwest::Client`
-bingo builds has a connect bound, and none falls back to
-`Client::new()`, which panics where the builder failed. The twin
-`key.rs` moves to `bingo-auth-oauth`.
+Implement ADR-0072 §2 and audit-2026-10 §5: one bounded HTTP stack,
+provider-owned decoding/refusals, and API-key lookup in `bingo-auth-oauth`.
 
 ## Bricks, in build order
 
-1. **The rule first.** Add `disallowed-methods` to `clippy.toml` for
-   `reqwest::Client::new` and `reqwest::Client::builder`, with the
-   reason `ADR-0072: build a client with bingo_http::client`. Paste the
-   run: both `http()`, M117's `bingo_auth_oauth::client()` (which the
-   codex token source, MCP's `auth.rs` and the bin's `mcp.rs` call),
-   Feishu `Api::new`, pictures `load.rs`, the bin's `update.rs`,
-   tool-web, and auth-oauth's test clients. This is the failing test; it stays red until brick 6.
-2. **The crate and its contract.** Create `crates/bingo-http`,
-   `tier = "library"`. It depends on `bingo-sdk`, `reqwest`, `bytes`,
-   `http-body`, `futures`, `tokio` and `thiserror`, all already in tree.
-   Add the member and a `budget.toml` comment in M67's style (+1). The
-   contract:
-   - `Bounds { connect, call: Option<Duration> }`, with `STREAMED`
-     (20 s, none) and `CALL` (20 s, 30 s, Feishu's call bound today);
-   - `client(Bounds) -> Result<Client, HttpError>`, the one
-     `#[allow(clippy::disallowed_methods)]`;
-   - `trait Decode { fn decode(&mut self, event, data) ->
-     Result<Vec<ModelEvent>, ProviderError> }`;
-   - `CONNECT_TIMEOUT`, `IDLE_TIMEOUT` and `FRAME`, with a test that
-     pins ADR-0056's numbers.
-3. **`metered` and `sse` move.** `diff` the two copies and paste the
-   result, which should show comments only. Move anthropic's copy with
-   its tests and run `cargo test -p bingo-http`. Point both providers at
-   the crate, then delete both copies.
-4. **`stream` moves, generic over `D: Decode`.** The library tests the
-   five behaviours the providers test today with a trivial line decoder:
-   chunked equals whole, quiet times out, cancel stops, a transport
-   failure ends, a body that never frames is an error. Each
-   `events::Decoder` implements `Decode`. Fixture tests stay in each
-   provider and call `bingo_http::stream::model_stream`.
-5. **`round_trip` moves, and the transport harness lands once.**
-   `round_trip(builder, idle) -> Result<(Response, Clock),
-   ProviderError>` is the shared half of `send`. Each provider's
-   `refusal` keeps classifying a non-success status, because their
-   `error.rs` files differ. Move the harness and its tests into
-   `crates/bingo-http/tests/transport.rs` and delete both inline copies:
-   - helpers: `peer`, `head`, `declared_length`, `a_trickle`,
-     `a_deaf_peer`, `a_mute_peer`;
-   - tests: `a_slow_upload_is_not_a_silence`,
-     `a_peer_that_stops_reading_ends_the_request`,
-     `a_server_that_accepts_and_says_nothing_times_out`.
-
-   They run on M111's test host.
-6. **Every client goes through `client`.**
-   - The provider constructors (`keyed`, `subscription`) take a client
-     built in `register`, where a failed build can refuse the provider
-     with the builder's reason. `http()` goes.
-   - M117's `bingo_auth_oauth::client()` is deleted. Its three callers
-     (the codex token source, MCP's auth handles, the bin's MCP login)
-     take `bingo_http::client(Bounds::CALL)`; M117's numbers are
-     `CALL`'s.
-   - MCP's streamable-HTTP client (`dial.rs`) takes `Bounds::STREAMED`.
-     A silent server is caught by M117's tool-call deadline.
-   - Feishu, pictures, update and tool-web keep their numbers and lose
-     `unwrap_or_else(|_| Client::new())`.
-   - Tests in auth-oauth take a dev-dependency on `bingo-http`.
-
-   Brick 1's clippy run is now clean.
-7. **`key.rs` moves to `bingo_auth_oauth::key`.** `ApiKey`, `Places` and
-   `Configured` move with their tests. The provider name becomes a
-   parameter, and both copies go.
-8. **Records.** Add a dated note to ADR-0056 §5 pointing at ADR-0072.
+1. Ban direct/implicit reqwest clients in clippy; record the red run.
+2. Add library-tier `bingo-http`: `Bounds`, fallible `client`, `HttpError`,
+   `Decode`, and ADR-0056's 20 s connect / 300 s idle / 64 KiB frame.
+   `STREAMED` has no total timeout; `CALL` preserves OAuth/Feishu's 10/30 s.
+   Dependencies: sdk, reqwest, bytes, http-body, futures, tokio, thiserror,
+   already in the tree. The new member raises the dependency budget by one.
+3. Diff and move `metered`/`sse`, with tests; test before deleting copies.
+4. Move `stream`, generic over `Decode`; pin chunking, silence, cancellation,
+   transport failure and unframed overflow. Keep provider fixture tests.
+5. Move `round_trip(builder, idle)` and the loopback transport harness once;
+   preserve slow upload, deaf/mute peer, and Content-Length assertions.
+   Provider refusals and the subscription refresh retry stay provider-owned.
+6. Build provider clients in registration; pass them through constructors.
+   Route OAuth, MCP HTTP, Feishu, pictures, updates and web tools through
+   `client`; propagate construction errors, preserve existing call bounds.
+7. Move `ApiKey`, `Places`, `Configured` and tests into OAuth; delete twins.
+8. Record implementation in ADR-0072 and the dated ADR-0056 §5 note.
 
 ## Files
 
-- `crates/bingo-http/**` (new), `Cargo.toml`, `scripts/budget.toml`,
-  `clippy.toml`
-- `crates/bingo-provider-{anthropic,openai}/{Cargo.toml,src/*.rs}`
-- `crates/bingo-auth-oauth/src/{lib,key}.rs` and its test clients
-- `crates/bingo-mcp/src/{auth,dial}.rs`, `crates/bingo/src/{mcp,update,main}.rs`
-- `crates/bingo-channels/src/feishu/api.rs`, `bingo-pictures/src/load.rs`,
-  `bingo-tool-web/src/lib.rs`; `docs/adr/0056-*.md`
+- `crates/bingo-http/**`, workspace manifest/lock, clippy and budget config.
+- Provider manifests, `src/*.rs` and integration constructor fixtures.
+- OAuth manifest, `src/{lib,key,http}.rs` and existing test-client call sites.
+- MCP manifest, `src/{auth,dial,manager,lib}.rs`; constructor-only fixtures
+  in `src/{command,rows,manager,auth}.rs`, `tests/{server,signing_in}.rs`.
+- Feishu manifest and `src/feishu/**`; pictures manifest and `src/load.rs`;
+  web-tool manifest and `src/*.rs`; bin manifest and `src/{mcp,update}.rs`.
+- TUI manifest and `src/run/updates.rs`: mechanical client migration only.
+- ADR-0056/0072 and this plan.
+
+## Re-verification (2026-10-13, `706a9b2d`)
+
+Committed before code in `0a135995`. M130 moved Feishu into its platform
+crate. M126 has not moved provider construction. OAuth/Feishu connect in
+10 s, not the original plan's 20 s; `CALL` preserves their existing bounds.
+The missed TUI update client needs a mechanical migration. Keys already
+parameterize the provider. Workspace membership uses `crates/*`.
+MCP/Feishu constructors take built clients; their callers change mechanically.
+The duplicate scan matches definitions (`const IDLE_TIMEOUT`), not references.
+Metered production differs only in comments; SSE also differs in test strings.
+Request user agents stay unchanged; reqwest's default redirect limit is ten.
 
 ## Exit criteria
 
-- [ ] `cargo clippy --workspace --all-targets --locked -- -D warnings`
-      is clean with `disallowed-methods` in place (paste brick 1's run
-      beside it).
-- [ ] `rg -l 'fn find_block_end|struct Metered|IDLE_TIMEOUT|struct ApiKey'
-      crates/bingo-provider-*` finds nothing.
-- [ ] `cargo test -p bingo-http -p bingo-auth-oauth` passes, including
-      the moved transport tests.
-- [ ] `cargo test -p bingo-provider-anthropic -p bingo-provider-openai`
-      passes, with unchanged fixture streams.
-- [ ] `scripts/budget.sh` passes, with the count raised by exactly one.
-      `cargo deny check` and `scripts/check_discipline.sh` pass.
-- [ ] `cargo check -p bingo-http -p bingo-provider-anthropic
-      -p bingo-provider-openai --all-targets --target x86_64-pc-windows-msvc`
-      passes. All gates pass.
+- [x] Clippy passes with the ban; initial failing output is recorded.
+- [x] Duplicate transport/key definitions are absent from providers.
+- [x] HTTP/OAuth and both provider suites pass; fixture streams are unchanged.
+- [x] Budget is exactly +1; discipline, deny and all local gates pass.
+- [ ] MSVC check passes for every touched crate — blocked by C headers; Windows CI.
 
 ## Non-goals
 
-- Changing ADR-0056 §1–4's numbers; adding a retry.
-- Merging the providers' `error.rs` or `refusal`.
-- An MCP HTTP idle bound. M117's tool-call deadline covers a silent
-  server; other await deadlines are M117's too.
-- An HTTP server. `bingo-loopback` is that.
-- Changing the reqwest version, its features or its TLS backend.
+No retry, provider-error merge, MCP idle bound, HTTP server, reqwest version,
+feature or TLS-backend change. No M123/M132 work, live smoke, push, merge or PR.
 
 ## Risks
 
-- The transport tests use real sockets and wall-clock gaps (20 ms
-  gaps, a 500 ms idle). If M111's paused clock cannot drive real I/O,
-  they need M111's named exception. If M111 grants none, stop and ask.
-- A client built in `register` changes public constructors. Re-verify
-  every caller of `keyed` and `subscription` first.
-- Re-verify at start: that the copies are still identical; every symbol
-  named here; M117's `bingo_auth_oauth::client()`; whether M126 moved
-  provider construction.
+- Real loopback I/O keeps the existing transport harness's pacing and deadline
+  lower-bound assertions; owned stream/OAuth timers use paused time. If paused
+  time cannot drive an attempted socket migration, require M111's exception;
+  if M111 grants none, stop and ask.
+- A changed ADR Decision or an out-of-scope gate fix stops under protocol §6.
+- Constructor fixture changes are mechanical under protocol §6's M130 note.
+- Missing Windows SDK C headers are left to Windows CI under protocol §7;
+  any Rust compilation failure blocks.
+
+## Verified (2026-10-13)
+
+Logs: ignored `target/m127/`. Contracts `255a2dc9`, shared transport `492770c4`,
+migration `b107b781`, test-client/lint fixes `b17bb437`. Fixture payloads and
+assertions are unchanged. No live smoke ran. No terminal bytes changed.
+
+Initial evidence (before implementation):
+```text
+$ diff -u crates/bingo-provider-{anthropic,openai}/src/metered.rs
+-//! The same module sits in `bingo-provider-openai`: a plugin may not import
++//! The same module sits in `bingo-provider-anthropic`: a plugin may not import
+$ diff -u crates/bingo-provider-{anthropic,openai}/src/sse.rs
+-            frames(&[b"event: ping\ndata: {}\n\n"]),
++            frames(&[b"event: response.created\ndata: {}\n\n"]),
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+error: use of a disallowed method `reqwest::Client::builder`
+error: use of a disallowed method `reqwest::Client::new`
+    = note: ADR-0072: build a client with bingo_http::client
+$ cargo test -p bingo-http
+error[E0432]: unresolved imports `bingo_http::Bounds`, `bingo_http::CONNECT_TIMEOUT`, `bingo_http::FRAME`, `bingo_http::IDLE_TIMEOUT`, `bingo_http::client`
+```
+The first lint run reached OAuth/pictures before blocking dependents. The final
+scan leaves only the allowed library builder; `reqwest::get` is also banned.
+
+```text
+$ cargo fmt --all -- --check
+(exit 0; no output)
+$ cargo check --workspace --all-targets --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.18s
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.34s
+$ cargo test -p bingo-http -p bingo-auth-oauth -p bingo-provider-anthropic -p bingo-provider-openai --locked
+(exit 0; includes the four moved loopback transport tests)
+$ cargo test --workspace --locked --no-fail-fast -- --skip a_token_may_be_dialled_again_once_its_stream_has_closed
+(exit 0)
+$ cargo test -p bingo-provider-acp --test bridge --locked a_token_may_be_dialled_again_once_its_stream_has_closed -- --exact --test-threads=1
+(exit 0)
+$ python3 target/m127/results.py
+targeted: 304 passed; 0 failed; 0 ignored
+test: 5125 passed; 0 failed; 4 ignored
+test-acp-alone: 1 passed; 0 failed; 0 ignored
+test-pty-alone: 1 passed; 0 failed; 0 ignored
+$ rg -l 'fn find_block_end|struct Metered|const IDLE_TIMEOUT|struct ApiKey' crates/bingo-provider-*
+(no matches; exit 1)
+$ scripts/check_discipline.sh
+test host and wall-clock advisory checks complete
+discipline ok
+$ scripts/budget.sh
+dependencies (unique, normal): 353 (max  353)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 5 GB (soft max  5)
+test binaries: 109
+budget ok
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+$ cargo check -p bingo-http -p bingo-auth-oauth -p bingo-provider-anthropic -p bingo-provider-openai -p bingo-mcp -p bingo-channel-feishu -p bingo-pictures -p bingo-tool-web -p bingo-surface-tui -p bingo --all-targets --locked --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+error: failed to run custom build command for `tree-sitter v0.26.13`
+error: failed to run custom build command for `tree-sitter-bash v0.25.1`
+```
+Windows: missing `stdlib.h`, `windows.h`, `stdio.h`; no Rust compile error.
+All ten selected crates resolve `aws-lc-sys` (individual `cargo tree -p <crate>
+-i aws-lc-sys --target x86_64-pc-windows-msvc --locked --depth 0` prints
+`aws-lc-sys v0.44.0`); the bin also resolves both tree-sitter C crates.
+These cross-checks remain for Windows CI under protocol §7; no toolchain installed.
+The initial workspace run's rewind PTY timeout passed alone with
+`cargo test -p bingo --test pty --locked esc_twice_rewinds_the_turn_and_the_file_it_wrote -- --exact --test-threads=1`,
+and passed again in the final complete run. No out-of-scope fixes were needed.

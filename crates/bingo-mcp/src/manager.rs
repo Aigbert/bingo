@@ -87,7 +87,12 @@ impl std::fmt::Debug for Manager {
 }
 
 impl Manager {
-    pub fn new(servers: BTreeMap<String, Server>, disabled: &[String], data_dir: PathBuf) -> Self {
+    pub fn new(
+        http: reqwest::Client,
+        servers: BTreeMap<String, Server>,
+        disabled: &[String],
+        data_dir: PathBuf,
+    ) -> Self {
         let slots = servers
             .keys()
             .map(|name| {
@@ -99,7 +104,11 @@ impl Manager {
                 (name.clone(), Slot { epoch: 0, state })
             })
             .collect();
-        let auth = crate::auth::handles(&servers, Arc::new(CredentialStore::new(data_dir.clone())));
+        let auth = crate::auth::handles(
+            http,
+            &servers,
+            Arc::new(CredentialStore::new(data_dir.clone())),
+        );
         Self {
             servers,
             auth,
@@ -456,6 +465,7 @@ mod tests {
             ("web".to_string(), stdio("/bin/echo")),
         ]);
         Arc::new(Manager::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
             servers,
             disabled,
             std::env::temp_dir().join("bingo-mcp-manager-tests"),

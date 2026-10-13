@@ -24,7 +24,10 @@ impl Contract for Platform {
     fn build(&self, slice: &Value, env: &Env) -> Result<Arc<dyn ChannelAdapter>, String> {
         let settings: FeishuChannel =
             serde_json::from_value(slice.clone()).map_err(|e| e.to_string())?;
-        Ok(Arc::new(Feishu::new(settings.config(env))))
+        Ok(Arc::new(Feishu::new(
+            bingo_http::client(bingo_http::Bounds::CALL).map_err(|e| e.to_string())?,
+            settings.config(env),
+        )))
     }
     fn secret(&self) -> Option<Requirement> {
         Some(Requirement {

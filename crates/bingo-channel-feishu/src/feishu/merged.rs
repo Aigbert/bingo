@@ -80,7 +80,12 @@ mod tests {
             })))
             .mount(server)
             .await;
-        Api::new(server.uri(), "cli_1", "secret")
+        Api::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+            server.uri(),
+            "cli_1",
+            "secret",
+        )
     }
 
     async fn answering(server: &MockServer, response: ResponseTemplate) {

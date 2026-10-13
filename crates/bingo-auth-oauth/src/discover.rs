@@ -432,7 +432,7 @@ mod tests {
         )
         .await;
         let found = discover(
-            &reqwest::Client::new(),
+            &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
             &format!("{issuer}/mcp"),
             &Challenge::default(),
         )
@@ -480,7 +480,7 @@ mod tests {
             ..Challenge::default()
         };
         let found = discover(
-            &reqwest::Client::new(),
+            &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
             &format!("{issuer}/mcp"),
             &challenge,
         )
@@ -500,7 +500,7 @@ mod tests {
         )
         .await;
         let refused = discover(
-            &reqwest::Client::new(),
+            &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
             &format!("{issuer}/mcp"),
             &Challenge::default(),
         )
@@ -536,7 +536,7 @@ mod tests {
             )
             .await;
             let refused = discover(
-                &reqwest::Client::new(),
+                &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
                 &format!("{}/mcp", server.uri()),
                 &Challenge::default(),
             )
@@ -551,7 +551,7 @@ mod tests {
     async fn a_resource_with_no_metadata_anywhere_says_what_it_tried() {
         let server = MockServer::start().await;
         let refused = discover(
-            &reqwest::Client::new(),
+            &bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
             &format!("{}/mcp", server.uri()),
             &Challenge::default(),
         )

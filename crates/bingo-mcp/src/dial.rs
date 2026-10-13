@@ -229,7 +229,11 @@ async fn open_http(
     let config = StreamableHttpClientTransportConfig::with_uri(url).custom_headers(headers);
     serve_client(
         Client::new(asker),
-        StreamableHttpClientTransport::from_config(config),
+        StreamableHttpClientTransport::with_client(
+            bingo_http::client(bingo_http::Bounds::STREAMED)
+                .map_err(|e| Refused::Failed(e.to_string()))?,
+            config,
+        ),
     )
     .await
     .map(|inner| Service { inner, _tree: None })

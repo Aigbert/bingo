@@ -100,6 +100,7 @@ impl WebFetchTool {
         let response = self
             .http
             .get(url.as_str())
+            .header(header::USER_AGENT, crate::USER_AGENT)
             .header(header::ACCEPT, ACCEPT)
             .send()
             .await
@@ -205,7 +206,7 @@ mod tests {
         holds nothing worth reading.</p></article></body></html>";
 
     fn tool() -> WebFetchTool {
-        WebFetchTool::new(Client::new())
+        WebFetchTool::new(bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"))
     }
 
     fn args(url: &str) -> Value {

@@ -123,10 +123,11 @@ async fn fetch(url: &str) -> Result<Vec<u8>, PictureError> {
 }
 
 fn client() -> Result<reqwest::Client, PictureError> {
-    reqwest::Client::builder()
-        .timeout(TIMEOUT)
-        .build()
-        .map_err(shorn)
+    bingo_http::client(bingo_http::Bounds {
+        connect: bingo_http::CONNECT_TIMEOUT,
+        call: Some(TIMEOUT),
+    })
+    .map_err(|e| shorn(e.0))
 }
 
 /// The URL out of a transport error's own message: the caller is naming the

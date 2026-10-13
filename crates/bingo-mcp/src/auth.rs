@@ -25,10 +25,10 @@ use crate::config::Server;
 /// who it is — for either, a `401` is a settings problem, not a sign-in bingo
 /// can offer (ADR-0050 §3).
 pub fn handles(
+    http: reqwest::Client,
     servers: &BTreeMap<String, Server>,
     store: Arc<CredentialStore>,
 ) -> BTreeMap<String, Arc<McpAuth>> {
-    let http = bingo_auth_oauth::client();
     servers
         .iter()
         .filter_map(|(name, server)| {
@@ -143,7 +143,13 @@ mod tests {
 
     #[test]
     fn an_http_server_with_no_authorization_of_its_own_can_be_signed_in_to() {
-        let auth = handle("remote", &http(&[]), store(), reqwest::Client::new()).expect("a handle");
+        let auth = handle(
+            "remote",
+            &http(&[]),
+            store(),
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client"),
+        )
+        .expect("a handle");
         assert_eq!(auth.server(), "remote");
     }
 
@@ -157,7 +163,7 @@ mod tests {
                     "remote",
                     &http(&[(header, "Bearer mine")]),
                     store(),
-                    reqwest::Client::new()
+                    bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client")
                 )
                 .is_none(),
                 "{header}"
@@ -174,7 +180,15 @@ mod tests {
             env: BTreeMap::new(),
             cwd: None,
         };
-        assert!(handle("files", &stdio, store(), reqwest::Client::new()).is_none());
+        assert!(
+            handle(
+                "files",
+                &stdio,
+                store(),
+                bingo_http::client(bingo_http::Bounds::CALL).expect("a bounded client")
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -196,7 +210,11 @@ mod tests {
                 },
             ),
         ]);
-        let handles = handles(&servers, store());
+        let handles = handles(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+            &servers,
+            store(),
+        );
         assert_eq!(handles.keys().collect::<Vec<_>>(), ["open"]);
     }
 

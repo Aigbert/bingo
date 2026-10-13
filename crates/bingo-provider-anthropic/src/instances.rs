@@ -12,9 +12,9 @@ use std::sync::Arc;
 use bingo_auth_oauth::CredentialStore;
 use bingo_sdk::{Env, PluginError, Provider};
 
-use crate::key::{ApiKey, Configured, Places};
 use crate::settings::{AnthropicEndpoint, Settings};
 use crate::{API_KEY_ENV, AnthropicProvider, BASE_URL_ENV, DEFAULT_BASE_URL, PROVIDER_ID};
+use bingo_auth_oauth::key::{ApiKey, Configured, Places};
 
 /// The ids this build answers to before any instance is read. A plugin sees
 /// its own settings only, so a name that collides with *another* plugin's
@@ -23,18 +23,23 @@ use crate::{API_KEY_ENV, AnthropicProvider, BASE_URL_ENV, DEFAULT_BASE_URL, PROV
 const BUILT_IN: [&str; 4] = ["anthropic", "codex", "fake", "openai"];
 
 /// Every provider the `anthropic` key names, the default first.
-pub fn providers(settings: Settings, env: &Env) -> Result<Vec<Arc<dyn Provider>>, PluginError> {
+pub fn providers(
+    http: reqwest::Client,
+    settings: Settings,
+    env: &Env,
+) -> Result<Vec<Arc<dyn Provider>>, PluginError> {
     let store = Arc::new(CredentialStore::new(env.data_dir.clone()));
     let file = env.user_settings();
     let mut named = BTreeSet::new();
     let mut providers: Vec<Arc<dyn Provider>> = vec![Arc::new(default_anthropic(
+        http.clone(),
         settings.anthropic.endpoint,
         &file,
         &store,
     ))];
     for (name, endpoint) in settings.anthropic.instances {
         claim(&mut named, &name)?;
-        providers.push(Arc::new(keyed(name, endpoint, &file, &store)));
+        providers.push(Arc::new(keyed(http.clone(), name, endpoint, &file, &store)));
     }
     Ok(providers)
 }
@@ -51,6 +56,7 @@ pub(crate) fn default_places(file: Option<PathBuf>) -> Places {
 
 /// The environment feeds this one and no instance (ADR-0017 §3).
 fn default_anthropic(
+    http: reqwest::Client,
     endpoint: AnthropicEndpoint,
     file: &Path,
     store: &Arc<CredentialStore>,
@@ -63,6 +69,7 @@ fn default_anthropic(
         configured(&places, endpoint.api_key),
     );
     AnthropicProvider::keyed(
+        http,
         PROVIDER_ID,
         key,
         first([std::env::var(BASE_URL_ENV).ok(), endpoint.base_url])
@@ -74,6 +81,7 @@ fn default_anthropic(
 /// One more Anthropic-shaped endpoint under its own name. Its key is its own:
 /// the store entry under that name, else the instance's `apiKey`.
 fn keyed(
+    http: reqwest::Client,
     name: String,
     endpoint: AnthropicEndpoint,
     file: &Path,
@@ -92,6 +100,7 @@ fn keyed(
         configured(&places, endpoint.api_key),
     );
     AnthropicProvider::keyed(
+        http,
         name,
         key,
         blank(endpoint.base_url).unwrap_or_else(|| DEFAULT_BASE_URL.to_string()),
@@ -165,7 +174,15 @@ mod tests {
     fn an_instance_talks_to_its_own_base_url_or_the_public_one() {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let file = directory.path().join("settings.toml");
-        let built = |endpoint| keyed("proxy1".into(), endpoint, &file, &store(&directory));
+        let built = |endpoint| {
+            keyed(
+                bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+                "proxy1".into(),
+                endpoint,
+                &file,
+                &store(&directory),
+            )
+        };
         assert_eq!(
             built(AnthropicEndpoint {
                 base_url: Some("http://127.0.0.1:8080/".into()),

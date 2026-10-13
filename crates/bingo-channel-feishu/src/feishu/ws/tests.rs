@@ -138,7 +138,12 @@ async fn endpoint(address: SocketAddr) -> MockServer {
 }
 
 fn listening(server: &MockServer) -> (Api, mpsc::Receiver<Arrival>, Inbox) {
-    let api = Api::new(server.uri(), "cli_a", "secret");
+    let api = Api::new(
+        bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+        server.uri(),
+        "cli_a",
+        "secret",
+    );
     let (post, arrivals) = mpsc::channel(8);
     let inbox = Inbox::new("feishu", post);
     (api, arrivals, inbox)

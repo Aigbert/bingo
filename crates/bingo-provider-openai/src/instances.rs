@@ -12,10 +12,10 @@ use std::sync::Arc;
 use bingo_auth_oauth::CredentialStore;
 use bingo_sdk::{Env, PluginError, Provider};
 
-use crate::key::{ApiKey, Configured, Places};
 use crate::settings::{OpenAiEndpoint, Settings};
 use crate::variant::Variant;
 use crate::{API_KEY_ENV, BASE_URL_ENV, DEFAULT_BASE_URL, OpenAiProvider};
+use bingo_auth_oauth::key::{ApiKey, Configured, Places};
 
 /// The ids this plugin answers to before any instance is read. A plugin sees
 /// its own settings only, so a name that collides with *another* plugin's
@@ -24,13 +24,25 @@ use crate::{API_KEY_ENV, BASE_URL_ENV, DEFAULT_BASE_URL, OpenAiProvider};
 const BUILT_IN: [&str; 2] = ["codex", "openai"];
 
 /// Every provider the `openai` and `codex` keys name, defaults first.
-pub fn providers(settings: Settings, env: &Env) -> Result<Vec<Arc<dyn Provider>>, PluginError> {
+pub fn providers(
+    http: reqwest::Client,
+    oauth: reqwest::Client,
+    settings: Settings,
+    env: &Env,
+) -> Result<Vec<Arc<dyn Provider>>, PluginError> {
     let store = Arc::new(CredentialStore::new(env.data_dir.clone()));
     let file = env.user_settings();
     let mut named = BTreeSet::new();
     let mut providers = vec![
-        registered(default_openai(settings.openai.endpoint, &file, &store)),
+        registered(default_openai(
+            http.clone(),
+            settings.openai.endpoint,
+            &file,
+            &store,
+        )),
         registered(OpenAiProvider::subscription(
+            http.clone(),
+            oauth.clone(),
             Variant::Codex.provider_id(),
             settings.codex.endpoint,
             store.clone(),
@@ -38,11 +50,19 @@ pub fn providers(settings: Settings, env: &Env) -> Result<Vec<Arc<dyn Provider>>
     ];
     for (name, endpoint) in settings.openai.instances {
         claim(&mut named, &name)?;
-        providers.push(registered(keyed(name, endpoint, &file, &store)));
+        providers.push(registered(keyed(
+            http.clone(),
+            name,
+            endpoint,
+            &file,
+            &store,
+        )));
     }
     for (name, endpoint) in settings.codex.instances {
         claim(&mut named, &name)?;
         providers.push(registered(OpenAiProvider::subscription(
+            http.clone(),
+            oauth.clone(),
             name,
             endpoint,
             store.clone(),
@@ -67,6 +87,7 @@ pub(crate) fn default_places(file: Option<PathBuf>) -> Places {
 
 /// The environment feeds this one and no instance (ADR-0017 §3).
 fn default_openai(
+    http: reqwest::Client,
     endpoint: OpenAiEndpoint,
     file: &Path,
     store: &Arc<CredentialStore>,
@@ -79,6 +100,7 @@ fn default_openai(
         configured(&places, endpoint.api_key),
     );
     OpenAiProvider::keyed(
+        http,
         Variant::Default.provider_id(),
         key,
         first([std::env::var(BASE_URL_ENV).ok(), endpoint.base_url])
@@ -90,6 +112,7 @@ fn default_openai(
 /// One more OpenAI-shaped endpoint under its own name. Its key is its own:
 /// the store entry under that name, else the instance's `apiKey`.
 fn keyed(
+    http: reqwest::Client,
     name: String,
     endpoint: OpenAiEndpoint,
     file: &Path,
@@ -108,6 +131,7 @@ fn keyed(
         configured(&places, endpoint.api_key),
     );
     OpenAiProvider::keyed(
+        http,
         name,
         key,
         blank(endpoint.base_url).unwrap_or_else(|| DEFAULT_BASE_URL.to_string()),
@@ -182,7 +206,15 @@ mod tests {
     fn an_instance_talks_to_its_own_base_url_or_the_public_one() {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let file = directory.path().join("settings.toml");
-        let built = |endpoint| keyed("proxy1".into(), endpoint, &file, &store(&directory));
+        let built = |endpoint| {
+            keyed(
+                bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+                "proxy1".into(),
+                endpoint,
+                &file,
+                &store(&directory),
+            )
+        };
         assert_eq!(
             built(OpenAiEndpoint {
                 base_url: Some("http://127.0.0.1:8080/".into()),
@@ -206,6 +238,7 @@ mod tests {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let file = directory.path().join("settings.toml");
         let proxy = keyed(
+            bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
             "proxy1".into(),
             OpenAiEndpoint::default(),
             &file,
@@ -213,6 +246,8 @@ mod tests {
         );
         assert_eq!((proxy.id(), proxy.family()), ("proxy1", "openai"));
         let work = OpenAiProvider::subscription(
+            bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
+            bingo_http::client(bingo_http::Bounds::CALL).expect("an OAuth client"),
             "work",
             crate::settings::CodexEndpoint::default(),
             store(&directory),

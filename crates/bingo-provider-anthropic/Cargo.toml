@@ -12,6 +12,7 @@ description = "Anthropic Messages API provider plugin for bingo"
 workspace = true
 
 [dependencies]
+bingo-http.workspace = true
 bingo-sdk.workspace = true
 # The credential store a pasted key rests in (ADR-0012 §2, ADR-0017 §4): the
 # library tier, which any plugin may depend on. No new external crate.
@@ -19,10 +20,6 @@ bingo-auth-oauth.workspace = true
 async-trait.workspace = true
 futures.workspace = true
 reqwest.workspace = true
-# The request body goes out metered, so a slow upload reads as movement and
-# not as silence (ADR-0056 §2). Both are already in the tree under `reqwest`.
-bytes.workspace = true
-http-body.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 schemars.workspace = true
