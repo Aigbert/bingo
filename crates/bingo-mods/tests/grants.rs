@@ -125,3 +125,21 @@ async fn a_project_model_call_requires_the_users_grant() {
         host.shutdown().await;
     }
 }
+
+#[tokio::test]
+async fn module_options_are_validated_before_register_runs() {
+    let home = tempfile::tempdir().unwrap();
+    let root = home.path().join("target");
+    fixture(&root, "target", "export function register(on, options) {}", &[]);
+    let path = root.join("plugin.json");
+    let mut manifest: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    manifest["config"] = json!({"type":"object", "properties":{"label":{"type":"string"}}, "required":["label"], "additionalProperties":false});
+    std::fs::write(path, manifest.to_string()).unwrap();
+    let plugin = ModsPlugin::default().with_dirs(vec![root]).with_settings([("target".into(), json!({"label":42}))].into());
+    let host = Host::build(vec![Box::new(plugin)], HostConfig::new(Env::rooted(home.path()))).await.unwrap();
+    let catalog = host.catalog(CatalogKind::Plugins).await.unwrap();
+    let row = catalog.entries.iter().find(|row| row.id == "target").unwrap();
+    assert_eq!(row.meta["enabled"], false);
+    assert!(row.meta["reason"].as_str().unwrap().contains("label"), "{row:?}");
+    host.shutdown().await;
+}
