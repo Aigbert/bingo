@@ -53,10 +53,10 @@ fn layout_renders_each_band_once_and_reuses_unchanged_blocks() {
     let tree = solo(&state);
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
     assert_eq!(first.blocks.renders(), 10_000);
-    assert_eq!(first.renders, [1; 5]);
+    assert_eq!(first.renders, [1; 4]);
     let next = layout(first, &tree, &ui, SIZE, now);
     assert_eq!(next.blocks.renders(), 10_000);
-    assert_eq!(next.renders, [1; 5]);
+    assert_eq!(next.renders, [1; 4]);
     assert_eq!(next.canvas.buffer.content.len(), 120 * 40);
 }
 

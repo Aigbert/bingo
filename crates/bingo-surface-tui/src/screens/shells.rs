@@ -4,7 +4,7 @@
 //! Three things are being decided here and nowhere else: that the row which
 //! started a shell says where it went and, once it has gone, that it went;
 //! that the status line counts the shells still running; and that the running
-//! set is the one signal the rail never makes a card of.
+//! set stays data for the placed row.
 
 use super::*;
 
@@ -91,7 +91,7 @@ fn ran() -> bingo_sdk::SessionState {
 }
 
 /// `⎿  Running in the background` under the call, `1 shell` on the status
-/// line, and at 120 columns no card in the rail.
+/// line, without a second card.
 #[test]
 fn shell_running() {
     let (mut ui, now) = scene();

@@ -118,7 +118,7 @@ fn tabbed(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 ///
 /// A list and the pager own every key while they are up — the layer chords
 /// included, so `g` is the pager's and not the switcher's for as long as a
-/// block is open. The panel and the switcher leave those chords alone, because
+/// block is open. Help and the switcher leave those chords alone, because
 /// the chord that opened one is what closes it; a chord that edits a line
 /// ([`LAYERS`] does not name it) belongs to whoever is being typed into.
 fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effect>> {
@@ -3393,8 +3393,6 @@ mod tests {
         assert_eq!(row.description, "background running command");
     }
 
-    // ---- the plugin-state panel -----------------------------------------
-
     /// Claude Code's key for its own list (M74): the rows go off the band and
     /// come back, and no layer opens over anything.
     #[test]
@@ -3544,7 +3542,6 @@ mod tests {
         write(&mut ui, &state, "x", now);
         assert_eq!(ui.composer.text(), "x");
     }
-    // ---- the rail, its focus and its actions (ADR-0013 §3) --------------
 
     /// The action a press fired, when it fired one.
     fn action_of(effects: &[Effect]) -> Option<&bingo_sdk::Action> {
@@ -3680,5 +3677,76 @@ mod tests {
         ui.history = crate::history::PromptHistory::new(vec!["an older ask".into()]);
         assert!(press(&mut ui, &busy(), key(KeyCode::Up), now).is_empty());
         assert_eq!(ui.composer.text(), "an older ask");
+    }
+}
+
+#[cfg(test)]
+mod m148 {
+    use crate::test_support::*;
+    use bingo_sdk::{Action, ActionItem, Event, Input, ItemId, ItemStatus, slot::Slot};
+    use crossterm::event::KeyCode;
+
+    fn with_actions() -> bingo_sdk::SessionState {
+        crate::transcript::slots::fixtures::with_row(
+            folded(vec![frame(
+                1,
+                Event::ItemCompleted {
+                    item: assistant("itm_board", "old text", ItemStatus::Completed),
+                },
+            )]),
+            Slot::Row {
+                item: ItemId::from_raw("itm_board"),
+                mark: None,
+                title: Some("Board".into()),
+                badge: None,
+                caption: None,
+                body: Some(bingo_sdk::View::text("table")),
+                actions: vec![ActionItem {
+                    label: "Tick".into(),
+                    key: None,
+                    action: Action {
+                        name: "stranger.tick".into(),
+                        args: serde_json::Value::Null,
+                    },
+                }],
+            },
+        )
+    }
+
+    #[test]
+    fn m148_tab_focuses_a_placed_row_and_its_button_dispatches() {
+        let state = with_actions();
+        let (mut ui, now) = scene();
+        render(&state, &mut ui, now);
+        super::on_key(&mut ui, &solo(&state), key(KeyCode::Tab), now);
+        assert_eq!(ui.focus.row(), Some(&ItemId::from_raw("itm_board")));
+        assert!(render(&state, &mut ui, now).contains("❯ Board"));
+        let effects = super::on_key(&mut ui, &solo(&state), typed('1'), now);
+        assert!(
+            matches!(&effects[..], [crate::effect::Effect::Submit(Input::Action { action })] if action.name == "stranger.tick")
+        );
+        assert!(ui.composer.is_empty());
+        super::on_key(&mut ui, &solo(&state), key(KeyCode::Tab), now);
+        assert!(ui.focus.row().is_none());
+        super::on_key(&mut ui, &solo(&state), typed('1'), now);
+        assert_eq!(ui.composer.text(), "1");
+    }
+
+    #[test]
+    fn m148_row_focus_uses_the_ascii_cursor() {
+        crate::theme::with(
+            crate::theme::Theme {
+                glyphs: &crate::theme::ASCII,
+                ..crate::render::Render::default().look
+            },
+            || {
+                let state = with_actions();
+                let (mut ui, now) = scene();
+                super::on_key(&mut ui, &solo(&state), key(KeyCode::Tab), now);
+                let screen = render(&state, &mut ui, now);
+                assert!(screen.contains("> Board"), "{screen}");
+                assert!(!screen.contains('❯'));
+            },
+        );
     }
 }

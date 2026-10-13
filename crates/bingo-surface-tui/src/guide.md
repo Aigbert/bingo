@@ -25,7 +25,7 @@ where you are, the window used against the whole, and the model.
   with nothing to clear it says how to leave, and again within the moment
   leaves. `ctrl+d` — exit on an empty input.
 - `tab` — a second ordered stack: take the dropdown's row, else queue the line
-  for after the running turn, else move the ring to the next card that answers
+  for after the running turn, else move the ring to the next placed row that answers
   keys. `⏎` while a turn runs *steers* it — the turn absorbs the line at its
   next barrier — and `tab` *queues*; the box says so.
 - `up/down` — your own prompt history, at the first and last line of the box.
@@ -43,9 +43,9 @@ where you are, the window used against the whole, and the model.
   lets the run go; `esc` lets it go and copies nothing. What is copied is what
   was drawn: the cells as you saw them, trailing spaces trimmed. More than
   100 KiB is refused out loud rather than half-copied.
-- `ctrl+t` — show and hide the task list. `ctrl+p` — the plugin-state sheet:
-  what the plugins wrote about the session on screen, and where a panel is
-  pinned into the rail (`⏎` pins a row, `⏎` again takes it back).
+- `ctrl+t` — show and hide the task list and activity views.
+- Plugins draw where they place a view: a transcript row, the activity band,
+  or the status line. Legacy panel and live payloads remain data until placed.
 - `shift+tab` — cycle the permission mode.
 - `1-9 · y/a/n` — answer the open dialog. `ctrl+e` — expand its preview.
 - `ctrl+o` — open the newest fold one rung further, and again until it is

@@ -999,7 +999,6 @@ mod tests {
                     "form.rs",
                     "markdown.rs",
                     "pager.rs",
-                    "panel.rs",
                     "preview.rs",
                     "rewind.rs",
                     // The row a person is on in the one list of sessions:
@@ -1046,7 +1045,6 @@ mod tests {
                     "layers.rs",
                     "markdown.rs",
                     "pager.rs",
-                    "panel.rs",
                     "preview.rs",
                     "rewind.rs",
                     "roster.rs",
@@ -1101,7 +1099,6 @@ mod tests {
                     // Which session asked, named after a card's own title —
                     // every card's head is written in one place (ADR-0010 §3).
                     "form.rs",
-                    "panel.rs",
                     "search.rs",
                     "select.rs",
                     "transcript.rs",

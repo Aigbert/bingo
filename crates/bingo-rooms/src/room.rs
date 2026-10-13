@@ -219,6 +219,7 @@ mod tests {
         assert_eq!(
             payload(&[Seat::named("scout")]),
             json!({
+                "slots": [],
                 "members": ["scout"],
                 "kind": "tree",
                 "nodes": [{"label": "scout", "tone": "neutral"}],
@@ -235,6 +236,7 @@ mod tests {
         assert_eq!(
             payload(&asked),
             json!({
+                "slots": [],
                 "members": ["scout", "parent"],
                 "listeners": [
                     {"name": "scout", "patience_s": 0},

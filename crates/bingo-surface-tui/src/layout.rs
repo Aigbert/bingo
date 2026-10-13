@@ -22,7 +22,7 @@ pub struct Layout {
     pub canvas: Canvas,
     pub next_frame: Option<Instant>,
     #[cfg(test)]
-    pub renders: [usize; 5],
+    pub renders: [usize; 4],
     pub regions: Regions,
     /// The transcript's height in wrapped lines.
     pub height: usize,

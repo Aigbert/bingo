@@ -450,8 +450,7 @@ fn mark_row(ui: &Ui, frame: &Layout, shown: &mut [Line<'static>]) {
         return;
     };
     if let Some(bullet) = row.spans.first_mut() {
-        bullet.content = "❯ ".into();
-        bullet.style = theme::presence();
+        *bullet = theme::cursor_span(true);
     }
 }
 
