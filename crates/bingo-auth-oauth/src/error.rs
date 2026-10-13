@@ -54,7 +54,11 @@ impl From<bingo_loopback::LoopbackError> for AuthError {
 
 impl From<reqwest::Error> for AuthError {
     fn from(error: reqwest::Error) -> Self {
-        AuthError::Transport(error.to_string())
+        if error.is_timeout() {
+            AuthError::Timeout
+        } else {
+            AuthError::Transport(error.to_string())
+        }
     }
 }
 

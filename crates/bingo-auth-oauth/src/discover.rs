@@ -163,7 +163,7 @@ async fn protected_resource(
 ) -> Result<ProtectedResource, AuthError> {
     let urls = protected_resource_urls(server_url, challenge)?;
     for url in &urls {
-        if let Some(document) = fetch(http, url).await
+        if let Some(document) = fetch(http, url).await?
             && let Ok(resource) = serde_json::from_value::<ProtectedResource>(document)
             && !resource.authorization_servers.is_empty()
         {
@@ -182,7 +182,7 @@ async fn server_metadata(
 ) -> Result<Value, AuthError> {
     let urls = metadata_urls(authorization_server)?;
     for url in &urls {
-        if let Some(document) = fetch(http, url).await {
+        if let Some(document) = fetch(http, url).await? {
             return Ok(document);
         }
     }
@@ -194,12 +194,20 @@ async fn server_metadata(
 
 /// One rung of a ladder: a document, or nothing to say about it. A rung that
 /// 404s is the specification working, not a failure to report.
-async fn fetch(http: &reqwest::Client, url: &str) -> Option<Value> {
-    let response = http.get(url).send().await.ok()?;
+async fn fetch(http: &reqwest::Client, url: &str) -> Result<Option<Value>, AuthError> {
+    let response = match http.get(url).send().await {
+        Ok(response) => response,
+        Err(error) if error.is_timeout() => return Err(AuthError::Timeout),
+        Err(_) => return Ok(None),
+    };
     if !response.status().is_success() {
-        return None;
+        return Ok(None);
     }
-    response.json::<Value>().await.ok()
+    match response.json::<Value>().await {
+        Ok(document) => Ok(Some(document)),
+        Err(error) if error.is_timeout() => Err(AuthError::Timeout),
+        Err(_) => Ok(None),
+    }
 }
 
 /// Where a resource keeps its metadata: what the challenge named, then the

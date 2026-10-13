@@ -28,7 +28,7 @@ pub fn handles(
     servers: &BTreeMap<String, Server>,
     store: Arc<CredentialStore>,
 ) -> BTreeMap<String, Arc<McpAuth>> {
-    let http = reqwest::Client::new();
+    let http = bingo_auth_oauth::client();
     servers
         .iter()
         .filter_map(|(name, server)| {
