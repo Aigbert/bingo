@@ -2,9 +2,8 @@
 
 ## Goal
 
-Grow `bingo_sdk::testing` into one scriptable, recording test host, migrate
-plugin fakes, and remove machine-speed assertions. Keep `HostApi` defaults.
-This is the floor for M119's typed services and later milestone tests.
+Share one scriptable, recording `bingo_sdk::testing` host across plugin tests;
+remove machine-speed assertions. Preserve `HostApi` defaults as M119's foundation.
 
 ## Bricks, in build order
 
@@ -46,24 +45,23 @@ This is the floor for M119's typed services and later milestone tests.
 - [x] Host implementations are production, SDK utilities or reasoned exceptions.
 - [x] No remaining test assertion bounds machine speed.
 - [x] Workspace test count does not drop: 4,968 → 4,974; three ignored both times.
-- [ ] All gates: six touched crates' Windows check is blocked by missing SDK headers.
+- [x] All gates: local checks passed; six Windows checks left to CI by decision below.
 
 ## Non-goals
 
-Typed services (M119), changing HostApi verbs/defaults, rewriting kernel test
-support or PTY smoke. No TUI-visible behaviour changes; smoke is not required.
+Typed services (M119), HostApi changes, kernel test support or PTY smoke rewrites.
+No TUI-visible behaviour changes; smoke is not required.
 
 ## Risks
 
 - Preserve each fake's assertions; do not loosen behaviour while migrating.
 - Wide migration: separate crate commits, targeted tests, then full gates.
-- **Stop, 2026-10-13 (protocol step 6):** the Windows check for permissions,
-  print, TUI, MCP, channels and bin fails in `aws-lc-sys` because this Mac
-  lacks Windows SDK C headers (`stdlib.h`, `windows.h`). Installing a target
-  SDK or changing native dependencies is outside Files. No workaround applied.
-  Options: run the remaining gate on a provisioned Windows/cross-build runner,
-  or explicitly defer this local gate to Windows CI. M110's deferral does not
-  authorize one for M111. Await the user's decision; M111 is not fully verified.
+- **Decision, 2026-10-13:** Windows checks failing only because third-party
+  C build scripts cannot find Windows SDK headers are left to Windows CI;
+  no toolchain installed. Any Rust compile error still blocks.
+  `bingo-permissions`: `tree-sitter` and `tree-sitter-bash`;
+  `bingo-surface-print`, `bingo-surface-tui`, `bingo-mcp`, `bingo-channels`,
+  `bingo`: each has `aws-lc-sys`. Windows CI results remain pending.
 
 ## Re-verification (2026-10-13, `3d53863d`)
 
@@ -73,10 +71,9 @@ checkpoints' `OneSession`; include it in the checkpoints migration. Three TUI
 speed bounds and Bash/hooks/CLI/RPC liveness bounds remain. Chase/deadline and
 core retry already pause time; schedule wakes did not. No ADR is named.
 
-## Verified (2026-10-13; incomplete Windows gate)
+## Verified (2026-10-13)
 
-Commands ran sequentially. Full logs are in ignored `target/m111/`.
-Contracts were committed first (`726c6739`), then the implementation (`f9fc41a5`).
+Sequential command logs: ignored `target/m111/`. Contracts: `726c6739`; implementation: `f9fc41a5`.
 ```text
 $ cargo test -p bingo-sdk --features testing --locked
 error[E0432]: unresolved imports `super::HostCall`, `super::TestHost`
@@ -104,12 +101,10 @@ $ cargo test -p bingo-provider-acp --test bridge --locked a_token_may_be_dialled
 baseline: 4968 passed; 3 ignored; 1 initial failures
 final: 4974 passed; 3 ignored; 0 initial failures
 ```
-Totals sum Cargo result lines. Baseline PTY `look::a_terminal_whose_ground_turns_light_is_followed_within_one_focus`
-failed under load, then passed alone (`--exact --test-threads=1`): `1 passed; 0 failed`.
-Baseline resumed with `--workspace --exclude bingo` and the same ACP skip,
-then `-p bingo --test rooms --test rpc --test thinking --test views` (all locked).
-An earlier final run's rewind PTY failure also passed alone; the last complete
-run (`test-final.log` plus `test-token-final.log`) passed without failures.
+Totals sum Cargo result lines. Baseline's theme PTY and an earlier final run's
+rewind PTY each passed alone (`--exact --test-threads=1`). Baseline resumed with
+`--workspace --exclude bingo` (same ACP skip), then `-p bingo --test rooms --test rpc --test thinking --test views` (all locked).
+The last full run (`test-final.log` plus `test-token-final.log`) had no failures.
 The qualified checkpoints correction also passed all 42 crate tests.
 ```text
 $ cargo fmt --all -- --check
@@ -137,5 +132,19 @@ $ cargo check -p bingo-permissions -p bingo-surface-print -p bingo-surface-tui -
 fatal error: 'stdlib.h' file not found
 fatal error: 'windows.h' file not found
 error: failed to run custom build command for `aws-lc-sys v0.44.0`
-(exit 101; stopped under protocol step 6)
+(exit 101; Windows SDK C headers missing; left to Windows CI)
+$ cargo check -p bingo-permissions --all-targets --target x86_64-pc-windows-msvc --locked
+error: failed to run custom build command for `tree-sitter v0.26.13`
+fatal error: 'stdio.h' file not found
+error: failed to run custom build command for `tree-sitter-bash v0.25.1`
+fatal error: 'stdlib.h' file not found
+(exit 101; Windows SDK C headers missing; left to Windows CI)
+$ cargo tree -p <crate> -i aws-lc-sys --target x86_64-pc-windows-msvc --locked
+(first output line for each of six sequential invocations)
+bingo-permissions: error: package ID specification `aws-lc-sys` did not match any packages
+bingo-surface-print: aws-lc-sys v0.44.0
+bingo-surface-tui: aws-lc-sys v0.44.0
+bingo-mcp: aws-lc-sys v0.44.0
+bingo-channels: aws-lc-sys v0.44.0
+bingo: aws-lc-sys v0.44.0
 ```
