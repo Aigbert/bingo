@@ -66,10 +66,48 @@ pub struct Link {
     held: Mutex<Option<Reading>>,
     inbox: Arc<Inbox>,
     /// Dropping this ends the process group.
-    _adapter: child::Adapter,
+    adapter: std::sync::Mutex<Option<child::Adapter>>,
+    prompts: std::sync::Mutex<Vec<tokio::task::AbortHandle>>,
+}
+
+impl Drop for Link {
+    fn drop(&mut self) {
+        self.stop();
+    }
 }
 
 impl Link {
+    /// The link keeps the prompt alive after the turn drops its stream.
+    pub(crate) fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
+        let mut prompts = self
+            .prompts
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        prompts.retain(|prompt| !prompt.is_finished());
+        prompts.push(tokio::spawn(future).abort_handle());
+    }
+
+    /// Retire before killing so a new prompt takes the fresh-child path.
+    pub(crate) fn expire(&self) {
+        self.connection.mark_dead();
+        self.adapter
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .take();
+    }
+
+    fn stop(&self) {
+        for prompt in self
+            .prompts
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .drain(..)
+        {
+            prompt.abort();
+        }
+        self.expire();
+    }
+
     /// Take the stream of the turn that is starting. The previous turn's sink,
     /// if any, is dropped with it.
     pub async fn listen(&self) -> mpsc::UnboundedReceiver<SessionNotification> {
@@ -155,7 +193,12 @@ impl Sessions {
     /// link takes its process group, so letting go of them all is the whole
     /// of a shutdown — and dropping the bridge takes the socket.
     pub async fn close(&self) {
-        self.links.lock().await.clear();
+        let mut links = self.links.lock().await;
+        for link in links.values() {
+            link.stop();
+        }
+        links.clear();
+        drop(links);
         self.known.lock().await.clear();
         *self.bridge.lock().await = None;
     }
@@ -170,7 +213,14 @@ impl Sessions {
 
     /// The session ended: its children end with it.
     pub async fn forget(&self, session: &SessionId) {
-        self.links.lock().await.retain(|(_, id), _| id != session);
+        self.links.lock().await.retain(|(_, id), link| {
+            if id == session {
+                link.stop();
+                false
+            } else {
+                true
+            }
+        });
         self.known.lock().await.remove(session);
     }
 
@@ -220,10 +270,15 @@ impl Sessions {
     /// found it buries it, and [`Self::prepare`] afterwards finds nothing left
     /// to bury.
     pub(crate) async fn bury(&self, name: &str, session: &SessionId) {
-        self.links
+        if let Some(link) = self
+            .links
             .lock()
             .await
-            .remove(&(name.to_string(), session.clone()));
+            .remove(&(name.to_string(), session.clone()))
+        {
+            // A transport retry may be running on this link's prompt task.
+            link.expire();
+        }
         let Some(host) = self.host.lock().await.clone() else {
             return;
         };
@@ -301,7 +356,8 @@ impl Sessions {
             knobs: Knobs::new(entered.declared),
             held: Mutex::new(None),
             inbox,
-            _adapter: handle,
+            adapter: std::sync::Mutex::new(Some(handle)),
+            prompts: std::sync::Mutex::new(Vec::new()),
         });
         self.preset(name, adapter, &link).await;
         Ok(link)

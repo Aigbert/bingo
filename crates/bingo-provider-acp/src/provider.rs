@@ -304,11 +304,15 @@ fn said(parts: &[ContentPart], images: bool) -> Vec<ContentBlock> {
     }
 }
 
+/// An agent keeps its state when it answers cancel promptly. Ten seconds
+/// allows cleanup but bounds a wedged child after the kernel drops the turn.
+pub const CANCEL_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// The turn, as a stream. The asking runs on a task of its own so the stream
 /// is there to be read the moment it is handed over.
 fn hold(link: Arc<Link>, asking: Asking, cancel: CancellationToken) -> ModelStream {
     let (out, events) = mpsc::unbounded_channel();
-    tokio::spawn(round(link, asking, cancel, Telling::new(out)));
+    link.spawn(round(link.clone(), asking, cancel, Telling::new(out)));
     Box::pin(stream::unfold(events, |mut events| async move {
         events.recv().await.map(|event| (event, events))
     }))
@@ -410,23 +414,29 @@ async fn fold(
     let waiting = link.connection.call(prompt);
     tokio::pin!(waiting);
     let mut told = false;
+    let grace = tokio::time::sleep(CANCEL_GRACE);
+    tokio::pin!(grace);
     let answered = loop {
         tokio::select! {
             biased;
-            Some(note) = updates.recv() => {
-                if !out.tell(mapper.update(note.update)) {
-                    return Attempt::Done;
-                }
+            () = &mut grace, if told => {
+                link.expire();
+                out.failed(ProviderError::Timeout);
+                return Attempt::Done;
             }
             answer = &mut waiting => break answer,
-            () = cancel.cancelled(), if !told => {
+            () = stopped(cancel, &out.out), if !told => {
                 told = true;
-                // ADR-0035 §6: one notification, then wait for the agent to
-                // stop of its own accord. The child is not killed here — a
-                // cancelled turn leaves the session, and the agent, alive.
+                grace.as_mut().reset(tokio::time::Instant::now() + CANCEL_GRACE);
+                // The link owns this wait even after M116 drops the turn.
                 let _ = link
                     .connection
                     .notify(CancelNotification::new(AcpSessionId::new(link.acp.as_str())));
+            }
+            Some(note) = updates.recv() => {
+                // Keep draining until the cancel answer or grace, even when
+                // the turn has dropped its receiver.
+                out.tell(mapper.update(note.update));
             }
         }
     };
@@ -437,6 +447,13 @@ async fn fold(
         }
     }
     settle(answered, mapper, cancel, out)
+}
+
+async fn stopped(cancel: &CancellationToken, out: &mpsc::UnboundedSender<Yielded>) {
+    tokio::select! {
+        () = cancel.cancelled() => {},
+        () = out.closed() => {},
+    }
 }
 
 /// What the prompt answered with, and what it leaves the turn. A dead pipe

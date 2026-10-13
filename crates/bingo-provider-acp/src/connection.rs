@@ -102,6 +102,11 @@ impl Connection {
         self.alive.load(Ordering::Acquire)
     }
 
+    /// A cancelled prompt exhausted its grace; never reuse this child.
+    pub(crate) fn mark_dead(&self) {
+        self.alive.store(false, Ordering::Release);
+    }
+
     /// Send a request and wait for the answer that carries its id.
     pub async fn call<C: Call>(&self, params: C) -> Result<C::Response, AcpError> {
         self.call_seen(params).await.map(|(answer, _)| answer)
