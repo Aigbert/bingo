@@ -43,12 +43,12 @@ steps provide the seam for breaking changes. Readable historical shapes stay kno
 
 ## Exit criteria
 
-- [ ] Every known variant has a fixture; deleting one fails compilation.
-- [ ] Unknown/malformed payloads retain envelopes and serialize byte-equal.
-- [ ] Synthetic kinds fail with `STORAGE` before M113, then replay and resume;
+- [x] Every known variant has a fixture; deleting one fails compilation.
+- [x] Unknown/malformed payloads retain envelopes and serialize byte-equal.
+- [x] Synthetic kinds fail with `STORAGE` before M113, then replay and resume;
       historical shapes stay known; model and surfaces ignore opaque payloads.
-- [ ] Non-JSON middle-line corruption still returns `STORAGE` naming the line.
-- [ ] All gates.
+- [x] Non-JSON middle-line corruption still returns `STORAGE` naming the line.
+- [ ] All gates: final PTY rewind test failed twice; see Verified and Risks.
 
 ## Non-goals
 
@@ -60,6 +60,13 @@ changing the wire beyond opaque Unknown, or calling the version writer in produc
 Raw capture/serde buffering adds decoding work; the byte-preservation tests
 and warm-check budget cover it. `serde_json` gains its existing `raw_value`
 feature to retain bytes, with no new crate dependency. No second live enum.
+
+2026-10-13 stop (protocol §6): final workspace rerun failed the PTY rewind
+assertion at `bingo/tests/pty/main.rs:574`; its isolated rerun timed out at
+`:407` waiting for `Rewind to`. This timing/interaction test is outside Files;
+its repair is not a mechanical changed-type update. Options: wait for M111's
+wall-clock test work, then rerun; or authorize a scoped PTY synchronization
+repair here. No test change attempted. ADR-0065 remains proposed; brick 7 waits.
 
 ## Re-verification and scope decisions (2026-10-13)
 
@@ -98,3 +105,43 @@ version_lines_between_frames_do_not_take_a_sequence_number ... FAILED
 [STORAGE] ... line 3: missing field `seq`
 test result: FAILED. 1 passed; 2 failed
 ```
+
+## Verified (2026-10-13; incomplete at the gate)
+
+Contract failures above precede implementation. Passing commands/output:
+```text
+cargo test -p bingo-sdk --test record --locked: 2 passed; 0 failed
+cargo test -p bingo-sdk --test unknown_record --locked: 6 passed; 0 failed
+cargo test -p bingo-store-jsonl --locked: 49 passed; 0 failed
+cargo test -p bingo-core a_journal_with_unknown_records --locked: 1 passed
+cargo test -p bingo-surface-print -p bingo-surface-tui opaque --locked: 1 + 1 passed
+cargo test -p bingo --test versioned_record --locked: 1 passed; 0 failed
+cargo fmt --all -- --check: exit 0
+cargo check --workspace --all-targets --locked: Finished dev profile in 4.89s
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished in 30.85s
+scripts/check_discipline.sh: discipline ok
+scripts/budget.sh: dependencies 345/345; warm core 0s; relink 0; budget ok
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok
+bash target/m113-tui-smoke.sh: tui-smoke ok (only SOCKET changed to a unique name)
+```
+Windows: `cargo tree -p <crate> -i aws-lc-sys --target x86_64-pc-windows-msvc`
+was checked for every touched crate. `cargo check -p <crate> --all-targets
+--target x86_64-pc-windows-msvc --locked` passed for sdk, core, store-jsonl,
+surface-rpc. Surface-print, surface-tui, plugin-rpc and bingo have aws-lc-sys;
+left to Windows CI per the standing decision, with no toolchain installed.
+
+An earlier complete workspace run passed (5018 passed, 3 existing ignored,
+1 filtered); the filtered ACP token test passed alone (1 passed). After moving
+only the new resume test into a submodule to meet the discipline size limit:
+```text
+cargo test --workspace --locked -- --test-threads=1 --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing
+esc_twice_rewinds_the_turn_and_the_file_it_wrote ... FAILED
+and the turn is out of the transcript (pty/main.rs:574)
+test result: FAILED. 15 passed; 1 failed [PTY binary]
+cargo test -p bingo --test pty --locked esc_twice_rewinds_the_turn_and_the_file_it_wrote -- --exact --test-threads=1
+timed out waiting for "Rewind to" (pty/main.rs:407)
+test result: FAILED. 0 passed; 1 failed; 15 filtered out
+```
+The earlier inherited `RUST_TEST_THREADS=1` run broke gateway child readiness;
+removing that environment override and using `--test-threads=1` passed all 8
+claim tests and the earlier full run. Logs remain in `target/m113-*.log`.
