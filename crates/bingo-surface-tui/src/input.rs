@@ -37,9 +37,6 @@ pub const ARM_HINT: &str = "press ctrl+c again to exit";
 pub const UNKNOWN_MODE: &str = "permission mode unknown — /permission <mode>";
 /// What ctrl+b says when no shell command is running to background.
 pub const NOTHING_RUNNING: &str = "no shell command is running";
-/// The command the shell plugin registers for backgrounding a running one
-/// (ADR-0018 §6). A surface may not import a plugin (ADR-0001), so the name is
-/// the whole of the contract between them.
 
 pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     if key.kind == KeyEventKind::Release {
