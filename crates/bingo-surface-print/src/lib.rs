@@ -636,17 +636,15 @@ impl Plugin for PrintPlugin {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use std::any::Any;
     use std::collections::VecDeque;
     use std::sync::Mutex;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     use bingo_sdk::{
-        Catalog, CatalogEntry, ContentPart, Delivery, DeltaKind, Frame, FrameStream, GatewayStream,
-        HistoryChunk, HistoryPage, HostApi, InteractionId, InterruptReason, InterruptScope, Item,
-        ItemBody, ItemId, ItemStatus, QuestionOption, Seq, SessionFilter, SessionHandle, SessionId,
-        SessionPort, SessionSelector, SessionState, SessionSummary, ToolOutput, TurnId, TurnOrigin,
-        TurnStatus, Usage,
+        Catalog, CatalogEntry, ContentPart, DeltaKind, Frame, FrameStream, HistoryChunk,
+        HistoryPage, InteractionId, InterruptReason, InterruptScope, Item, ItemBody, ItemId,
+        ItemStatus, QuestionOption, Seq, SessionHandle, SessionId, SessionPort, SessionSelector,
+        SessionState, SessionSummary, ToolOutput, TurnId, TurnOrigin, TurnStatus, Usage,
     };
     use jiff::Timestamp;
     use serde_json::{Value, json};
@@ -995,94 +993,54 @@ pub(crate) mod tests {
             let host = TestHost {
                 session: Arc::clone(&session),
             };
-            (HostHandle(Arc::new(host)), session)
+            (Arc::new(host).scripted().handle(), session)
         }
     }
 
-    #[async_trait]
-    impl HostApi for TestHost {
-        async fn sessions(
-            &self,
-            _filter: SessionFilter,
-        ) -> Result<Vec<SessionSummary>, KernelError> {
-            Ok(vec![summary()])
+    impl TestHost {
+        fn scripted(self: &Arc<Self>) -> bingo_sdk::testing::TestHost {
+            let host = bingo_sdk::testing::TestHost::default();
+            host.on_sessions(|_filter| async move { Ok(vec![summary()]) });
+            self.script_open(&host);
+            host.on_close(|_session, _reason| async move { Ok(()) });
+            host.on_delete(|_session| async move { Ok(()) });
+            host.on_deliver(|_to, _intent, _input, _delivery| async move {
+                unreachable!("this double delivers nothing")
+            });
+            host.on_extend(|_session, _plugin, _kind, _payload| async move {
+                unreachable!("this double extends nothing")
+            });
+            host.on_signal(|_session, _plugin, _kind, _payload| async move {
+                unreachable!("this double signals nothing")
+            });
+            host.on_catalog(|kind| async move {
+                Ok(Catalog {
+                    kind,
+                    entries: vec![CatalogEntry {
+                        id: "Read".into(),
+                        label: "Read".into(),
+                        meta: Value::Null,
+                    }],
+                })
+            });
+            host
         }
 
-        async fn open(
-            &self,
-            _selector: SessionSelector,
-            _who: ClientIdentity,
-            options: OpenOptions,
-        ) -> Result<Attachment, KernelError> {
-            locked(&self.session.opened).push(options);
-            Ok(Attachment {
-                session: SessionId::from_raw("ses_1"),
-                snapshot: session_state(),
-                history: None,
-                events: self.session.stream(),
-                handle: SessionHandle(Arc::clone(&self.session) as Arc<dyn SessionPort>),
-            })
-        }
-
-        async fn close(
-            &self,
-            _session: &SessionId,
-            _reason: CloseReason,
-        ) -> Result<(), KernelError> {
-            Ok(())
-        }
-
-        async fn delete(&self, _session: &SessionId) -> Result<(), KernelError> {
-            Ok(())
-        }
-
-        async fn deliver(
-            &self,
-            _to: &SessionId,
-            _intent: IntentId,
-            _input: Input,
-            _delivery: Delivery,
-        ) -> Result<(), KernelError> {
-            unreachable!("this double delivers nothing")
-        }
-
-        async fn extend(
-            &self,
-            _session: &SessionId,
-            _plugin: &str,
-            _kind: &str,
-            _payload: serde_json::Value,
-        ) -> Result<(), KernelError> {
-            unreachable!("this double extends nothing")
-        }
-
-        async fn signal(
-            &self,
-            _session: &SessionId,
-            _plugin: &str,
-            _kind: &str,
-            _payload: serde_json::Value,
-        ) -> Result<(), KernelError> {
-            unreachable!("this double signals nothing")
-        }
-
-        async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
-            Ok(Catalog {
-                kind,
-                entries: vec![CatalogEntry {
-                    id: "Read".into(),
-                    label: "Read".into(),
-                    meta: Value::Null,
-                }],
-            })
-        }
-
-        fn gateway_events(&self) -> GatewayStream {
-            Box::pin(futures::stream::empty())
-        }
-
-        fn service_any(&self, _key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
-            None
+        fn script_open(self: &Arc<Self>, host: &bingo_sdk::testing::TestHost) {
+            let fixture = self.clone();
+            host.on_open(move |_selector, _who, options| {
+                let fixture = fixture.clone();
+                async move {
+                    locked(&fixture.session.opened).push(options);
+                    Ok(Attachment {
+                        session: SessionId::from_raw("ses_1"),
+                        snapshot: session_state(),
+                        history: None,
+                        events: fixture.session.stream(),
+                        handle: SessionHandle(Arc::clone(&fixture.session) as Arc<dyn SessionPort>),
+                    })
+                }
+            });
         }
     }
 
