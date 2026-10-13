@@ -74,12 +74,14 @@ M133's; this milestone makes every verb it needs answerable.
   (all under `crates/bingo-sdk`); `src/testing/{api.rs,calls.rs}` as needed.
 - `crates/bingo-core/src/{host.rs,plugins.rs,session.rs,turn.rs}`;
   `host/{registry.rs,complete.rs}`, `session/{mailbox.rs,running.rs,complete.rs}`,
-  `turn/late.rs`, `chain/*.rs`, `session/{inputs.rs,invoke.rs}` and their tests.
+  `turn/{late.rs,stream.rs}`, `chain/*.rs`, `session/{gate.rs,inputs.rs,invoke.rs}`
+  and their tests. `turn/tests` reads emitted usage after removing its duplicate tally.
 - `crates/bingo/src/main.rs` (`--plugin-dir`), `crates/bingo/src/plugins.rs` (who asks for `model`)
 - `examples/plugins/wordcount/main.py` (protocol 2), `crates/bingo/tests/plugin_rpc.rs`
 - `docs/adr/{0015,0030,0031}-*.md` (dated notes)
 - `crates/bingo-plugin-rpc/Cargo.toml`, `Cargo.lock`: existing workspace
   `bingo-shelf` dependency for state (ADR-0072); no external dependency.
+- `crates/bingo-sdk/src/lib.rs`: export the interceptor source contract.
 - Mechanical constructors, exhaustive Event/Contribution matches and generated
   schema fixtures outside these files follow execution protocol step 6.
 
