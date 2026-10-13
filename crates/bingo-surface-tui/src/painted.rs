@@ -7,10 +7,10 @@ use ratatui::backend::TestBackend;
 use ratatui::style::Style;
 
 use crate::clock::Now;
+use crate::layout;
 use crate::theme::{self, Colors, Theme};
 use crate::tree::Tree;
 use crate::ui::Ui;
-use crate::view;
 
 /// Draw the same frame in another look — `NO_COLOR`, or `BINGO_ASCII=1`.
 pub fn in_look(theme: Theme, draw: impl FnOnce() -> String) -> String {
@@ -52,11 +52,20 @@ pub fn daylight() -> Theme {
 pub struct Painted(ratatui::buffer::Buffer);
 
 /// Draw a tree and keep the buffer, so a test can ask what colour a row is.
-pub fn painted(width: u16, height: u16, tree: &Tree, ui: &Ui, now: Now) -> Painted {
+pub fn painted(width: u16, height: u16, tree: &Tree, ui: &mut Ui, now: Now) -> Painted {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("a test terminal");
+    ui.prepare(&tree.viewed().summary.cwd);
+    let shown = layout::layout(
+        std::mem::take(&mut ui.shown),
+        tree,
+        ui,
+        ratatui::layout::Rect::new(0, 0, width, height),
+        now,
+    );
     terminal
-        .draw(|frame| view::draw(tree, ui, frame, now))
+        .draw(|frame| layout::paint(&shown, frame))
         .expect("a drawn frame");
+    ui.shown = shown;
     Painted(terminal.backend().buffer().clone())
 }
 

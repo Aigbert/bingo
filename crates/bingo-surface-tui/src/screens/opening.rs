@@ -19,7 +19,7 @@ fn playing(width: u16, height: u16, t: f32) -> String {
             .checked_sub(std::time::Duration::from_secs_f32(t))
             .expect("a clock with the piece behind it"),
     ));
-    draw_tree(width, height, &tree, &ui, now)
+    draw_tree(width, height, &tree, &mut ui, now)
 }
 
 #[test]

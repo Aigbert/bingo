@@ -115,40 +115,40 @@ fn between_turns(records: serde_json::Value) -> bingo_sdk::SessionState {
 /// moved the list are nowhere in the transcript.
 #[test]
 fn tasks_at_work() {
-    let (ui, now) = mid_turn();
+    let (mut ui, now) = mid_turn();
     let state = at_work(three());
-    let screen = draw_tree(80, 24, &solo(&state), &ui, now);
+    let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(
         screen.contains("✻ Shipping it… (esc to interrupt"),
         "{screen}"
     );
     assert!(screen.contains("⎿  ✔ Write the plan"), "{screen}");
     assert!(!screen.contains("TaskCreate"), "{screen}");
-    both("tasks_at_work", &solo(&state), &ui, now);
+    both("tasks_at_work", &solo(&state), &mut ui, now);
 }
 
 /// `3 tasks (1 done, 1 in progress, 1 open)` where the verb row stood, the
 /// rows standing under it with no mark to hang from.
 #[test]
 fn tasks_between_turns() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let state = between_turns(three());
-    let screen = draw_tree(80, 24, &solo(&state), &ui, now);
+    let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(
         screen.contains("3 tasks (1 done, 1 in progress, 1 open)"),
         "{screen}"
     );
     assert!(screen.contains("  ◼ Ship it"), "{screen}");
-    both("tasks_between_turns", &solo(&state), &ui, now);
+    both("tasks_between_turns", &solo(&state), &mut ui, now);
 }
 
 /// Twelve tasks are five rows of what is open and a count of the rest —
 /// Claude Code's own cut, read off its screen.
 #[test]
 fn tasks_cut_to_five() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let state = between_turns(twelve());
-    let screen = draw_tree(80, 24, &solo(&state), &ui, now);
+    let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(
         screen.contains("12 tasks (1 done, 1 in progress, 10 open)"),
         "{screen}"
@@ -158,7 +158,7 @@ fn tasks_cut_to_five() {
         !screen.contains("Write the plan"),
         "the done one is counted, not drawn: {screen}"
     );
-    both("tasks_cut_to_five", &solo(&state), &ui, now);
+    both("tasks_cut_to_five", &solo(&state), &mut ui, now);
 }
 
 /// `ctrl+t` takes the rows and the summary off the band; the verb row keeps
@@ -168,7 +168,7 @@ fn activity_hidden() {
     let (mut ui, now) = mid_turn();
     ui.activity_hidden = true;
     let state = at_work(three());
-    let screen = draw_tree(80, 24, &solo(&state), &ui, now);
+    let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(screen.contains("✻ Shipping it…"), "{screen}");
     assert!(!screen.contains("Write the plan"), "{screen}");
     insta::assert_snapshot!("tasks_hidden_80x24", screen);
@@ -178,11 +178,11 @@ fn activity_hidden() {
 /// and a cross, out of the six characters the ASCII table has.
 #[test]
 fn tasks_in_ascii() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     without_glyphs(
         "tasks_between_turns_ascii",
         &solo(&between_turns(three())),
-        &ui,
+        &mut ui,
         now,
     );
 }

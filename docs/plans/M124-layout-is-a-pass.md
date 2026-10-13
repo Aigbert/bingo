@@ -70,7 +70,9 @@ No visible change, no new dependency, no sdk change.
 - `crates/bingo-surface-tui/src/{activity,rail,status,composer,foot,scroll}.rs`
   (each band's `next_change`)
 - `crates/bingo-surface-tui/src/{test_support,screens,motion,painted,doubles,terminal,lib}.rs`
-- `crates/bingo-surface-tui/src/{layers,search,clock,views}.rs`; new `layout/` helpers/tests
+- `composer/strip.rs`; mechanical fixtures in `screens/`, `motion/landing.rs`,
+  `test_lanes.rs`, `transcript{,/slots}.rs`, `worked.rs` (TUI src)
+- `crates/bingo-surface-tui/src/{layers,search,clock}.rs, `views/{mod,progress}.rs``; new `layout/` helpers/tests
 - `docs/design/tui.md`, `docs/adr/0002-*.md`
 
 ## Exit criteria
@@ -113,12 +115,14 @@ No visible change, no new dependency, no sdk change.
   fields and `animating`'s conditions after M121, the `Revision` keys
   after M123, and each band's motion by symbol.
 
-  `Painted` has the ten fields in brick 2 plus `regions`; `animating`
+  `Painted` has ten fields, including `regions`; `animating`
   has 13 conditions including `behind`, intro and placed countdowns.
   `Revision` has nine keys: status, size, agent, fold, linked, slots,
   run, last, look. M123 captions and `LEGACY_VOICES`/check 4f stay intact.
   `Screen::draw`, its recorder and test helpers must consume the layout;
   layer/search/selection helpers compose cells without a terminal `Frame`.
+  Directory names are prepared before layout; image header measurements
+  move with the consumed layout, so shared `Ui` reads do not fill a memo.
   The foot is patched into the reserved activity air after transcript
   measurement; this avoids measuring that band by rendering it twice.
   Rail geometry remains `frame::RAIL_AT` and `frame::RAIL_WIDTH` for M148.

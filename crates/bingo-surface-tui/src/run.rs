@@ -243,7 +243,7 @@ pub(crate) async fn drive(
                 }
                 Wake::Event
             },
-            () = tick(run.animating(Now::real()), run.painted + TICK) => Wake::Frame,
+            () = tick(run.next_draw()) => Wake::Frame,
             // Last, and slowest by a thousand: the terminal is asked what
             // ground it has now, while nothing else is going on.
             () = look::wait(look::asking(&run), run.look.due()) => {
@@ -354,10 +354,10 @@ async fn next_gateway(gateway: &mut Option<GatewayStream>) -> Option<GatewayEven
 /// moment, so a storm of events cannot keep pushing it back: a new `sleep` on
 /// every pass of the loop would be cancelled by the next delta and the screen
 /// would go still exactly when it has the most to say.
-async fn tick(animating: bool, next: Instant) {
-    match animating {
-        true => tokio::time::sleep_until(next.into()).await,
-        false => std::future::pending().await,
+async fn tick(next: Option<Instant>) {
+    match next {
+        Some(next) => tokio::time::sleep_until(next.into()).await,
+        None => std::future::pending().await,
     }
 }
 
@@ -373,40 +373,14 @@ fn slow_draw(took: Duration, already: bool) -> Option<String> {
 }
 
 impl Run {
-    /// Whether the next frame would differ from the one on the screen: a turn
-    /// breathes, a block is still settling, the transcript eases where a key
-    /// sent it, a layer is arriving or leaving, a notice is holding the status
-    /// line until its time is up, an armed exit is holding its hint — or
-    /// something happened faster than it can be drawn and what it did is not
-    /// on the screen yet. That last one is what holds the promise a person
-    /// feels: an event held at the gate leaves `behind` set, so the frame
-    /// boundary is armed and draws it within one tick.
-    ///
-    /// Every clock here is read at the instant that frame was drawn, not at
-    /// this one: a draw costs time, and an animation whose remaining frames
-    /// all fall due during a slow one is over before the loop looks again —
-    /// leaving a sheet halfway up the screen until the next keystroke.
-    fn animating(&self, now: Now) -> bool {
-        let screen = Now {
-            instant: self.painted,
-            ..now
-        };
-        self.behind
-            || self.ui.intro.is_some()
-            || self.session.tree.sessions().any(SessionState::busy)
-            || self.ui.scroll.moving(screen.instant)
-            || self.ui.layer_moving(screen)
-            || !self.ui.notices.is_empty()
-            || self.ui.crossfading(screen)
-            || self.ui.sending(screen).is_some()
-            || self.ui.painted.borrow().blocks.moving()
-            || self.ui.exit_armed(screen.instant)
-            || self.ui.select.dragging.is_some()
-            || self
-                .session
-                .tree
-                .sessions()
-                .any(|s| bingo_sdk::slot::placed(s).iter().any(|placed| matches!(placed.slot, bingo_sdk::slot::Slot::Status { until: Some(at), .. } if at > screen.wall)))
+    /// Events held at the draw gate still owe the next frame boundary.
+    fn next_draw(&self) -> Option<Instant> {
+        self.ui
+            .shown
+            .next_frame
+            .into_iter()
+            .chain(self.behind.then_some(self.painted + TICK))
+            .min()
     }
 
     /// The way out. Whatever arrived in the last tick is drawn first, so the
@@ -433,11 +407,11 @@ impl Run {
     /// away with it.
     fn farewell(&self, rows: u16) -> Vec<String> {
         let rows = usize::from(rows.saturating_sub(KEPT_BACK));
-        self.ui.painted.borrow().blocks.tail(rows)
+        self.ui.shown.blocks.tail(rows)
     }
 
     /// Draw, unless the frame on the screen is younger than one tick: what
-    /// happened is held until the frame boundary instead, which `animating`
+    /// happened is held until the frame boundary instead, which `next_draw`
     /// then owes and [`tick`] wakes for. Neither the kernel's pace nor a
     /// trackpad's is the screen's, and nothing waits longer than a frame.
     fn paint(&mut self, screen: &mut dyn Screen, wake: Wake, now: Now) -> Result<(), KernelError> {
@@ -451,9 +425,18 @@ impl Run {
         look::pay(self, screen).map_err(stdio)?;
         screen.title(&title(&self.session.tree)).map_err(stdio)?;
         let began = Instant::now();
-        screen
-            .draw(&self.session.tree, &self.ui, now)
-            .map_err(stdio)?;
+        let (width, height) = screen.size();
+        self.ui.prepare(&self.session.tree.viewed().summary.cwd);
+        let previous = std::mem::take(&mut self.ui.shown);
+        let layout = crate::layout::layout(
+            previous,
+            &self.session.tree,
+            &self.ui,
+            ratatui::layout::Rect::new(0, 0, width, height),
+            now,
+        );
+        screen.draw(&layout).map_err(stdio)?;
+        self.ui.shown = layout;
         self.grumble(began.elapsed());
         showing::hand(self, screen)?;
         showing::fit(self);
@@ -903,7 +886,7 @@ impl Run {
     /// The check came back. The box says it where the box is still on screen;
     /// where it has scrolled away, the status line says it once instead.
     fn told_of(&mut self, version: String) {
-        if self.ui.painted.borrow().top > 0 {
+        if self.ui.shown.top > 0 {
             let said = format!("↑ v{version} is out · bingo update");
             self.ui.notify(Level::Info, said, Instant::now());
         }
@@ -1483,13 +1466,13 @@ mod tests {
     async fn an_idle_surface_draws_nothing_at_all() {
         let mut harness = Harness::new();
         let (host, _) = TestHost::with(vec![]);
-        // Two seconds pass before each key, on the runtime's virtual clock.
+        // A minute passes before each key, on the runtime's virtual clock.
         let script = vec![key(KeyCode::Right), ctrl('d')];
         drive(
             &host,
             options(None, harness.home.path()),
             &mut harness.recorder,
-            keys_after(Duration::from_secs(2), script),
+            keys_after(Duration::from_secs(60), script),
         )
         .await
         .expect("the loop ran");
@@ -1499,7 +1482,7 @@ mod tests {
             "one frame for the first of the four things that happened at the \
              start and one at the frame boundary for the three that landed \
              inside it, one for the keystroke and one on the way out — and \
-             none at all for the four seconds of waiting between them"
+             none at all for the two minutes of waiting between them"
         );
     }
 
@@ -1925,7 +1908,7 @@ mod tests {
     /// What the start-up check found, folded in the way the loop folds it.
     fn told_of_update(top: usize) -> Run {
         let mut run = idle(Instant::now());
-        run.ui.painted.borrow_mut().top = top;
+        run.ui.shown.top = top;
         run.reply(Reply::Update("0.5.0".to_string()), &mut None);
         run
     }
@@ -2674,13 +2657,26 @@ mod tests {
         let mut run = idle(opened.instant);
         run.ui.layer.show(Open::Help, opened.instant);
         let after = later(opened, 200);
+        run.ui.shown = crate::layout::layout(
+            crate::layout::Layout::default(),
+            &run.session.tree,
+            &run.ui,
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+            opened,
+        );
         assert!(
-            run.animating(after),
+            run.next_draw().is_some_and(|due| due < after.instant),
             "the sheet on the screen is a quarter of the way up: the rest is owed"
         );
-        run.painted = after.instant;
+        run.ui.shown = crate::layout::layout(
+            std::mem::take(&mut run.ui.shown),
+            &run.session.tree,
+            &run.ui,
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+            after,
+        );
         assert!(
-            !run.animating(after),
+            run.next_draw().is_none(),
             "and once the whole of it has been painted, the loop may sleep"
         );
     }

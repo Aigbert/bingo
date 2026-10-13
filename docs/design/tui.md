@@ -18,6 +18,14 @@ The **grammar is Claude Code's**, taken whole because a person who knows it shou
 
 ## 3. Layout: the frame
 
+A frame is laid out before it is painted (M124, 2026-10-13).
+`layout(previous, tree, ui, size, now)` consumes the previous block and image
+measurement memos, renders each band once, cuts the regions and composes the
+visible cells, cursor and hit targets. `paint` copies that result to the
+terminal. The loop publishes it as `Ui.shown` after painting; keys, clicks,
+drags and graphics delivery read the same layout. Directory completion is
+prepared before the pass. No row or rail threshold changes with this split.
+
 The surface owns the alternate screen for the whole run. Regions, top to bottom — nothing above the transcript — with a rail past 120 columns:
 
 ```text
@@ -251,7 +259,15 @@ A terminal moves in three ways — a glyph changes, a row appears or leaves, bri
 | idle | no redraw at all | 0 Hz |
 | reduced motion | `BINGO_MOTION=off`: spinners freeze to `•`, no breath, no tail, no reveals, no pulse — and no light on a sent line, none across a landed name, no flare, the sheen parked at the head (2026-09-04); `NO_COLOR` strips colour, and every cue above it is pure colour, so nothing is lost (§4: colour never carries a fact alone) | — |
 
-Budget: an animation tick of 33 ms while anything animates, none otherwise; a full draw under 4 ms at 120×40; a keystroke echoes on the next frame. Every frame is written between the two halves of DEC mode 2026 (2026-09-04), so the terminal composites it whole instead of painting it as it arrives — not through a multiplexer, which consumes the mode rather than passing it on. Smoothness is the absence of flicker, tearing, jumps and dropped keys — the motion above sits on top of that, never instead of it.
+Each motion reports its next change (M124, 2026-10-13). The layout's
+`next_frame` is the earliest: 33 ms samples for continuous motion, the next
+step for a layer or unbounded progress, the next text boundary for a placed
+countdown, and the deadline for a notice or exit hint. The loop sleeps until
+that instant, an event or a key. An event held at the draw gate still owes the
+next frame boundary; an idle layout has no deadline. Carets and other later
+cues use this same contract.
+
+Budget: an animation tick of 33 ms while continuous motion runs, none otherwise; a full draw under 4 ms at 120×40; a keystroke echoes on the next frame. Every frame is written between the two halves of DEC mode 2026 (2026-09-04), so the terminal composites it whole instead of painting it as it arrives — not through a multiplexer, which consumes the mode rather than passing it on. Smoothness is the absence of flicker, tearing, jumps and dropped keys — the motion above sits on top of that, never instead of it.
 
 ## 7. Ergonomics
 

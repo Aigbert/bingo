@@ -72,7 +72,7 @@ fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect>
     let Some(cell) = transcript_cell(ui, mouse) else {
         return Vec::new();
     };
-    let block = ui.painted.borrow().blocks.at(cell.line);
+    let block = ui.shown.blocks.at(cell.line);
     // A row that spawned a session is that session's row: `⏎` steps in, and
     // so does a click.
     if let Some(session) = block.as_ref().and_then(|item| tree.spawned_by(item)) {
@@ -173,7 +173,7 @@ fn taken(lines: usize) -> String {
 /// drag that merely reached the top; a hand that stays there is what walks it
 /// (`Ui::drag_step`).
 fn edge_under(ui: &Ui, mouse: MouseEvent) -> Option<Edge> {
-    let region = ui.painted.borrow().regions.transcript;
+    let region = ui.shown.regions.transcript;
     match i32::from(mouse.row) - i32::from(region.y) {
         0 => Some(Edge::Above(0)),
         row => Edge::of(row, usize::from(region.height)),
@@ -182,7 +182,7 @@ fn edge_under(ui: &Ui, mouse: MouseEvent) -> Option<Edge> {
 
 /// The column of the transcript the pointer is over, whatever row it is on.
 fn column_under(ui: &Ui, mouse: MouseEvent) -> usize {
-    let region = ui.painted.borrow().regions.transcript;
+    let region = ui.shown.regions.transcript;
     usize::from(mouse.column.saturating_sub(region.x))
 }
 
@@ -194,7 +194,7 @@ fn picture(ui: &Ui, mouse: MouseEvent) -> Option<crate::graphics::Picture> {
     if ui.layer.showing() {
         return None;
     }
-    ui.painted.borrow().picture_at(Position {
+    ui.shown.picture_at(Position {
         x: mouse.column,
         y: mouse.row,
     })
@@ -207,7 +207,7 @@ fn on_foot(ui: &Ui, mouse: MouseEvent) -> bool {
     if ui.layer.showing() {
         return false;
     }
-    ui.painted.borrow().foot.is_some_and(|area| {
+    ui.shown.foot.is_some_and(|area| {
         area.contains(Position {
             x: mouse.column,
             y: mouse.row,
@@ -217,7 +217,7 @@ fn on_foot(ui: &Ui, mouse: MouseEvent) -> bool {
 
 /// Which option of the open card the pointer is on.
 fn card_option(ui: &Ui, mouse: MouseEvent) -> Option<usize> {
-    let painted = ui.painted.borrow();
+    let painted = &ui.shown;
     let card = painted.card.as_ref()?;
     let inside = card.area.contains(Position {
         x: mouse.column,
@@ -249,7 +249,7 @@ fn listed_row(ui: &Ui, mouse: MouseEvent) -> Option<roster::Cursor> {
     if !ui.layer.captures() {
         return None;
     }
-    let painted = ui.painted.borrow();
+    let painted = &ui.shown;
     painted.list.as_ref()?.at(mouse.row)
 }
 
@@ -264,7 +264,7 @@ fn under(ui: &Ui, tree: &Tree, cursor: roster::Cursor) -> Option<SessionId> {
 
 /// The rail card under the pointer, when it is over the rail.
 fn rail_card(ui: &Ui, mouse: MouseEvent) -> Option<CardId> {
-    let painted = ui.painted.borrow();
+    let painted = &ui.shown;
     let area = painted.regions.rail?;
     if !area.contains(Position {
         x: mouse.column,
@@ -282,7 +282,7 @@ fn rail_card(ui: &Ui, mouse: MouseEvent) -> Option<CardId> {
 
 /// The transcript cell under the pointer, when it is over the transcript.
 fn transcript_cell(ui: &Ui, mouse: MouseEvent) -> Option<Cell> {
-    let painted = ui.painted.borrow();
+    let painted = &ui.shown;
     let region = painted.regions.transcript;
     if !region.contains(Position {
         x: mouse.column,

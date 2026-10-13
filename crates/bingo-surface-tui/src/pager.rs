@@ -220,12 +220,12 @@ pub fn open_block(ui: &mut Ui, tree: &Tree, now: Now, focused: Option<&ItemId>) 
 
 /// The cells the sheet has, which is what its content is laid out for.
 fn width_of(ui: &Ui) -> usize {
-    ui.painted.borrow().regions.above().width as usize
+    ui.shown.regions.above().width as usize
 }
 
 /// How much the open pager has to show and how many rows it has.
 fn window_of(ui: &Ui, tree: &Tree) -> Window {
-    let rows = usize::from(ui.painted.borrow().regions.above().height).saturating_sub(HEAD);
+    let rows = usize::from(ui.shown.regions.above().height).saturating_sub(HEAD);
     Window {
         height: content_of(ui, tree).len(),
         rows,

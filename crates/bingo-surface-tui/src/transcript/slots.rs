@@ -243,8 +243,8 @@ pub(crate) mod fixtures {
                 ),
             ),
         ]);
-        let (ui, now) = scene();
-        let screen = draw_tree(80, 24, &solo(&state), &ui, now);
+        let (mut ui, now) = scene();
+        let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
         assert!(screen.contains("❖ Review(sample) details"), "{screen}");
         assert!(screen.contains("open"), "{screen}");
     }

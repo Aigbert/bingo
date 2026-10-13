@@ -88,7 +88,7 @@ fn body() -> &'static str {
 fn a_skill_command() {
     let (mut ui, now) = scene();
     ui.catalogs.commands = skills_in_the_catalogue();
-    both("skill_command", &solo(&typed()), &ui, now);
+    both("skill_command", &solo(&typed()), &mut ui, now);
 }
 
 /// The same skill, the model's own way in: the row is the one above to the
@@ -96,8 +96,8 @@ fn a_skill_command() {
 /// is.
 #[test]
 fn a_skill_the_model_called() {
-    let (ui, now) = scene();
-    both("skill_tool", &solo(&called()), &ui, now);
+    let (mut ui, now) = scene();
+    both("skill_tool", &solo(&called()), &mut ui, now);
 }
 
 /// A terminal with no glyphs (§7): the mark degrades to the bullet's own `*`
@@ -106,5 +106,5 @@ fn a_skill_the_model_called() {
 fn a_skill_without_the_glyphs() {
     let (mut ui, now) = scene();
     ui.catalogs.commands = skills_in_the_catalogue();
-    without_glyphs("ascii_skill", &solo(&typed()), &ui, now);
+    without_glyphs("ascii_skill", &solo(&typed()), &mut ui, now);
 }

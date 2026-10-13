@@ -94,24 +94,24 @@ fn ran() -> bingo_sdk::SessionState {
 /// line, and at 120 columns no card in the rail.
 #[test]
 fn shell_running() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let state = running();
-    let narrow = draw_tree(80, 24, &solo(&state), &ui, now);
+    let narrow = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(narrow.contains("⎿  Running in the background"), "{narrow}");
     assert!(narrow.contains("1 shell"), "{narrow}");
     assert!(!narrow.contains("job_ab12cd34"), "{narrow}");
-    let wide = draw_tree(120, 40, &solo(&state), &ui, now);
+    let wide = draw_tree(120, 40, &solo(&state), &mut ui, now);
     assert!(!wide.contains("since"), "no card: {wide}");
-    both("shell_running", &solo(&state), &ui, now);
+    both("shell_running", &solo(&state), &mut ui, now);
 }
 
 /// The same row reads the display fold once the set no longer lists
 /// the shell, the count is gone, and the completion is a turn of its own.
 #[test]
 fn shell_ran() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let state = ran();
-    let screen = draw_tree(80, 24, &solo(&state), &ui, now);
+    let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(
         screen.contains("⎿  Started in the background as job_ab12cd34"),
         "{screen}"
@@ -119,16 +119,16 @@ fn shell_ran() {
     assert!(!screen.contains("Running in the background"), "{screen}");
     assert!(!screen.contains("1 shell"), "{screen}");
     assert!(screen.contains("⏺ Background job job_ab12cd34"), "{screen}");
-    both("shell_ran", &solo(&state), &ui, now);
+    both("shell_ran", &solo(&state), &mut ui, now);
 }
 
 #[test]
 fn shell_and_wake_follow_plugin_order() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let mut state = running();
     let at = now.wall + jiff::SignedDuration::from_secs(240);
     state.apply(&frame(5, pending_wake(&at.to_string())));
-    let screen = draw_tree(120, 40, &solo(&state), &ui, now);
+    let screen = draw_tree(120, 40, &solo(&state), &mut ui, now);
     assert!(screen.find("wake in 4m").unwrap() < screen.find("1 shell").unwrap());
-    both("shell_and_wake", &solo(&state), &ui, now);
+    both("shell_and_wake", &solo(&state), &mut ui, now);
 }

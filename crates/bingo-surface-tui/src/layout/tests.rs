@@ -210,16 +210,16 @@ fn layout_notice_sleeps_through_its_hold_and_expires() {
 }
 
 #[test]
-fn layout_running_turn_schedules_motion_and_glyph_boundaries() {
+fn layout_running_turn_schedules_each_motion_sample() {
     let (ui, now) = mid_turn();
     let tree = solo(&folded(vec![frame(1, started("trn_1"))]));
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
     assert_eq!(first.next_frame, Some(now.instant + crate::clock::FRAME));
-    let near_glyph = later(now, 140);
-    let next = layout(first, &tree, &ui, SIZE, near_glyph);
+    let later_sample = later(now, 140);
+    let next = layout(first, &tree, &ui, SIZE, later_sample);
     assert_eq!(
         next.next_frame,
-        Some(now.instant + std::time::Duration::from_millis(150))
+        Some(later_sample.instant + crate::clock::FRAME)
     );
 }
 
@@ -252,4 +252,31 @@ fn layout_unbounded_rail_schedules_its_next_step() {
     assert_eq!(same.canvas, first.canvas);
     let next = layout(first, &tree, &ui, SIZE, later(now, 250));
     assert_ne!(next.canvas, same.canvas);
+}
+
+#[test]
+fn layout_layer_send_and_drag_report_their_own_deadlines() {
+    let (mut ui, now) = scene();
+    let tree = solo(&state());
+    ui.layer.show(crate::ui::Open::Help, now.instant);
+    let first = layout(Layout::default(), &tree, &ui, SIZE, now);
+    assert_eq!(first.next_frame, Some(now.instant + crate::clock::FRAME));
+    let arrived = later(now, 200);
+    assert_eq!(layout(first, &tree, &ui, SIZE, arrived).next_frame, None);
+    ui.sent = Some(arrived.instant);
+    let first = layout(Layout::default(), &tree, &ui, SIZE, arrived);
+    assert_eq!(
+        first.next_frame,
+        Some(arrived.instant + crate::clock::FRAME)
+    );
+    ui.sent = None;
+    ui.select.dragging = Some(crate::select::Dragging {
+        edge: crate::select::Edge::Above(0),
+        stepped: arrived.instant,
+    });
+    let first = layout(first, &tree, &ui, SIZE, arrived);
+    assert_eq!(
+        first.next_frame,
+        Some(arrived.instant + crate::select::EDGE_PACE)
+    );
 }

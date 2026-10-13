@@ -37,6 +37,7 @@ pub fn rows(
     decoded: &Decoded,
     width: u16,
 ) -> Band {
+    crate::layout::count::band(1);
     let Graphics::Kitty { cell, .. } = graphics else {
         return Band::default();
     };

@@ -20,9 +20,9 @@ pub use crate::test_lanes::*;
 pub use pressed::*;
 
 use crate::clock::Now;
+use crate::layout;
 use crate::tree::Tree;
 use crate::ui::Ui;
-use crate::view;
 
 /// The doubles the loop is driven against live next door; every test reaches
 /// them through this one import.
@@ -821,19 +821,19 @@ pub fn write(ui: &mut Ui, state: &SessionState, text: &str, now: Now) {
 }
 
 /// One frame, rendered into a fixed-size buffer, as text.
-pub fn render(state: &SessionState, ui: &Ui, now: Now) -> String {
+pub fn render(state: &SessionState, ui: &mut Ui, now: Now) -> String {
     draw_sized(80, 24, state, ui, now)
 }
 
-pub fn draw_sized(width: u16, height: u16, state: &SessionState, ui: &Ui, now: Now) -> String {
+pub fn draw_sized(width: u16, height: u16, state: &SessionState, ui: &mut Ui, now: Now) -> String {
     draw_tree(width, height, &solo(state), ui, now)
 }
 
-pub fn render_tree(tree: &Tree, ui: &Ui, now: Now) -> String {
+pub fn render_tree(tree: &Tree, ui: &mut Ui, now: Now) -> String {
     draw_tree(80, 24, tree, ui, now)
 }
 
-pub fn draw_tree(width: u16, height: u16, tree: &Tree, ui: &Ui, now: Now) -> String {
+pub fn draw_tree(width: u16, height: u16, tree: &Tree, ui: &mut Ui, now: Now) -> String {
     drawn(width, height, tree, ui, now).to_string()
 }
 
@@ -848,11 +848,20 @@ pub fn row_carrying(screen: &str, needle: &str) -> u16 {
 }
 
 /// The terminal one draw leaves, for a test that asks where a style landed.
-pub fn drawn(width: u16, height: u16, tree: &Tree, ui: &Ui, now: Now) -> TestBackend {
+pub fn drawn(width: u16, height: u16, tree: &Tree, ui: &mut Ui, now: Now) -> TestBackend {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("a test terminal");
+    ui.prepare(&tree.viewed().summary.cwd);
+    let shown = layout::layout(
+        std::mem::take(&mut ui.shown),
+        tree,
+        ui,
+        ratatui::layout::Rect::new(0, 0, width, height),
+        now,
+    );
     terminal
-        .draw(|frame| view::draw(tree, ui, frame, now))
+        .draw(|frame| layout::paint(&shown, frame))
         .expect("a drawn frame");
+    ui.shown = shown;
     terminal.backend().clone()
 }
 

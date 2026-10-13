@@ -50,14 +50,14 @@ pub(super) fn session() -> bingo_sdk::SessionState {
 
 #[test]
 fn shell_lines() {
-    let (ui, now) = scene();
-    both("shell_lines", &solo(&session()), &ui, now);
+    let (mut ui, now) = scene();
+    both("shell_lines", &solo(&session()), &mut ui, now);
 }
 
 /// The look a terminal that can draw no glyphs gets (§7): the prompt is a
 /// `$` either way, and the connector falls back with everything else.
 #[test]
 fn shell_lines_in_ascii() {
-    let (ui, now) = scene();
-    without_glyphs("shell_lines_ascii", &solo(&session()), &ui, now);
+    let (mut ui, now) = scene();
+    without_glyphs("shell_lines_ascii", &solo(&session()), &mut ui, now);
 }

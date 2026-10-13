@@ -46,8 +46,8 @@ fn a_thought_between_a_question_and_its_answer() {
             assistant("itm_3", "One package, demo 0.1.0.", ItemStatus::Completed),
         ),
     ]);
-    let (ui, now) = scene();
-    both("thinking", &solo(&state), &ui, now);
+    let (mut ui, now) = scene();
+    both("thinking", &solo(&state), &mut ui, now);
 }
 
 /// A thought streams as it is thought (2026-09-02, user-directed): `✻
@@ -67,8 +67,8 @@ fn a_thought_being_had_streams_under_its_own_row() {
             },
         ),
     ]);
-    let (ui, now) = mid_turn();
-    both("reasoning_streaming", &solo(&state), &ui, now);
+    let (mut ui, now) = mid_turn();
+    both("reasoning_streaming", &solo(&state), &mut ui, now);
 }
 
 /// A thought as the deltas have left it, cut off mid-sentence where the model
@@ -95,8 +95,8 @@ fn a_finished_thought_holds_the_rows_it_ended_on() {
         item(2, user("itm_1", "what is in this workspace?")),
         item(3, thought("itm_2", AS_FAR_AS_IT_GOT, 1)),
     ]);
-    let (ui, now) = mid_turn();
-    both("reasoning_held", &solo(&state), &ui, now);
+    let (mut ui, now) = mid_turn();
+    both("reasoning_held", &solo(&state), &mut ui, now);
 }
 
 /// The same thought written as models write them: one paragraph, no newline
@@ -120,8 +120,8 @@ fn a_thought_of_one_paragraph_is_still_two_rows() {
             },
         ),
     ]);
-    let (ui, now) = mid_turn();
-    both("reasoning_paragraph", &solo(&state), &ui, now);
+    let (mut ui, now) = mid_turn();
+    both("reasoning_paragraph", &solo(&state), &mut ui, now);
 }
 
 /// A run of thoughts, as the OpenAI Responses API hands one over (M79,
@@ -140,8 +140,8 @@ fn a_run_of_thoughts_draws_as_one_thought() {
         item(4, thought("itm_3", SECOND_OF_THE_RUN, 24)),
         item(5, thought("itm_4", THIRD_OF_THE_RUN, 26)),
     ]);
-    let (ui, now) = mid_turn();
-    both("reasoning_run", &solo(&state), &ui, now);
+    let (mut ui, now) = mid_turn();
+    both("reasoning_run", &solo(&state), &mut ui, now);
 }
 
 /// The same run one item earlier: the third thought is still being had, so the
@@ -162,8 +162,8 @@ fn a_run_whose_last_thought_is_still_being_had() {
             },
         ),
     ]);
-    let (ui, now) = mid_turn();
-    both("reasoning_run_streaming", &solo(&state), &ui, now);
+    let (mut ui, now) = mid_turn();
+    both("reasoning_run_streaming", &solo(&state), &mut ui, now);
 }
 
 /// The three items of the run, each the length the journal's were: a sentence
@@ -207,7 +207,7 @@ fn a_finished_thought_shuts_where_the_ring_comes_round() {
     both(
         "reasoning_shut",
         &solo(&a_thought_worth_reading()),
-        &ui,
+        &mut ui,
         now,
     );
 }
@@ -221,7 +221,7 @@ fn a_finished_thought_opens_whole_where_it_sits() {
     both(
         "reasoning_open",
         &solo(&a_thought_worth_reading()),
-        &ui,
+        &mut ui,
         now,
     );
 }
@@ -234,8 +234,8 @@ fn an_empty_thought_draws_the_row_alone() {
         item(1, user("itm_1", "what is in this workspace?")),
         item(2, thought("itm_2", "", 2)),
     ]);
-    let (ui, now) = scene();
-    both("reasoning_redacted", &solo(&state), &ui, now);
+    let (mut ui, now) = scene();
+    both("reasoning_redacted", &solo(&state), &mut ui, now);
 }
 
 /// `⏎` on a `✻ Thought for 2s` row: what was thought, whole.
@@ -260,5 +260,5 @@ fn a_thought_opens_in_a_sheet() {
         ))),
         now,
     );
-    both("reasoning_sheet", &solo(&state), &ui, now);
+    both("reasoning_sheet", &solo(&state), &mut ui, now);
 }

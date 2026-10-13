@@ -515,9 +515,9 @@ mod tests {
     #[test]
     fn the_frame_draws_the_band_above_the_persons_row() {
         let state = folded(vec![said(pasted(&png(100, 200)))]);
-        let (ui, now) = scene();
+        let (mut ui, now) = scene();
         let screen = graphics::with(graphics::drawing(), || {
-            crate::test_support::draw_tree(80, 24, &solo(&state), &ui, now)
+            crate::test_support::draw_tree(80, 24, &solo(&state), &mut ui, now)
         });
         let cells = crate::test_support::row_carrying(&screen, &PLACEHOLDER.to_string());
         let words = crate::test_support::row_carrying(&screen, "what is this?");
@@ -561,10 +561,10 @@ mod tests {
     #[test]
     fn the_frame_draws_the_cells_and_names_the_picture() {
         let state = folded(vec![said(read(&png(100, 200)))]);
-        let (ui, now) = scene();
+        let (mut ui, now) = scene();
         let screen = graphics::with(graphics::drawing(), || {
-            let drawn = crate::test_support::draw_tree(80, 24, &solo(&state), &ui, now);
-            let pictures = ui.painted.borrow().blocks.pictures();
+            let drawn = crate::test_support::draw_tree(80, 24, &solo(&state), &mut ui, now);
+            let pictures = ui.shown.blocks.pictures();
             (drawn, pictures)
         });
         assert!(
@@ -874,8 +874,8 @@ mod tests {
         let (mut ui, now) = scene();
         ui.linked = memo("docs/x.png", Ok(png(100, 200)));
         let screen = graphics::with(graphics::drawing(), || {
-            let drawn = crate::test_support::draw_tree(80, 24, &solo(&state), &ui, now);
-            let pictures = ui.painted.borrow().blocks.pictures();
+            let drawn = crate::test_support::draw_tree(80, 24, &solo(&state), &mut ui, now);
+            let pictures = ui.shown.blocks.pictures();
             (drawn, pictures)
         });
         assert!(

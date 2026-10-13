@@ -150,6 +150,7 @@ impl Composer {
 
     /// The wrapped rows and the caret cell, for a box `width` columns wide.
     pub fn layout(&self, width: usize) -> Layout {
+        crate::layout::count::band(0);
         let width = width.max(1);
         let mut lines = vec![String::new()];
         let mut column = 0usize;

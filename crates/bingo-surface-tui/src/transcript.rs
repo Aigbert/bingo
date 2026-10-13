@@ -1236,8 +1236,8 @@ mod tests {
             assert!(!text.contains("fact-"), "{text}");
             assert!(!text.contains("context:memory"), "{text}");
         }
-        let (ui, now) = scene();
-        let screen = crate::test_support::draw_sized(80, 24, &state, &ui, now);
+        let (mut ui, now) = scene();
+        let screen = crate::test_support::draw_sized(80, 24, &state, &mut ui, now);
         assert!(screen.contains("Show the current state"), "{screen}");
         assert!(screen.contains("Review completed"), "{screen}");
         assert!(!screen.contains("Memory index"), "{screen}");
@@ -2159,10 +2159,10 @@ mod tests {
             ),
             rendered(&before)
         );
-        let (ui, now) = scene();
+        let (mut ui, now) = scene();
         assert_eq!(
-            crate::test_support::render(&before, &ui, now),
-            crate::test_support::render(&after, &ui, now)
+            crate::test_support::render(&before, &mut ui, now),
+            crate::test_support::render(&after, &mut ui, now)
         );
         assert_eq!(after.transcript.items().len(), 2, "retained, but not drawn");
     }

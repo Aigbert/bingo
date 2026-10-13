@@ -16,11 +16,8 @@ use bingo_sdk::{
 use futures::StreamExt;
 use serde_json::Value;
 
-use crate::clock::Now;
 use crate::terminal::Screen;
-use crate::test_support::{child_id, child_summary, render_tree, state, summary};
-use crate::tree::Tree;
-use crate::ui::Ui;
+use crate::test_support::{child_id, child_summary, state, summary};
 
 /// A session that hands back a scripted frame list and remembers the writes.
 #[derive(Debug, Default)]
@@ -340,8 +337,15 @@ impl Recorder {
 }
 
 impl Screen for Recorder {
-    fn draw(&mut self, tree: &Tree, ui: &Ui, now: Now) -> std::io::Result<()> {
-        self.frames.push(render_tree(tree, ui, now));
+    fn draw(&mut self, layout: &crate::layout::Layout) -> std::io::Result<()> {
+        let area = layout.canvas.buffer.area;
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(area.width, area.height))
+                .expect("test terminal");
+        terminal
+            .draw(|frame| crate::layout::paint(layout, frame))
+            .expect("paint");
+        self.frames.push(terminal.backend().to_string());
         Ok(())
     }
 

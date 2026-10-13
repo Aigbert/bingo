@@ -6,7 +6,7 @@
 //! columns — because that is what a highlight is drawn over, and because a
 //! block's rendering is what a person is actually reading.
 
-use ratatui::Frame;
+use crate::layout::Canvas;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
@@ -140,7 +140,7 @@ pub fn row(search: &Search) -> Line<'static> {
 ///
 /// `area`'s first row is line `top`: it is the rows carrying lines, which is
 /// not the whole region when a short transcript hangs from the composer.
-pub fn mark(frame: &mut Frame, area: Rect, top: usize, search: &Search) {
+pub fn mark(frame: &mut Canvas, area: Rect, top: usize, search: &Search) {
     for row in 0..area.height {
         let line = top + row as usize;
         for (hit, current) in search.on(line) {
@@ -153,7 +153,7 @@ pub fn mark(frame: &mut Frame, area: Rect, top: usize, search: &Search) {
     }
 }
 
-fn paint(frame: &mut Frame, area: Rect, y: u16, hit: Hit, style: ratatui::style::Style) {
+fn paint(frame: &mut Canvas, area: Rect, y: u16, hit: Hit, style: ratatui::style::Style) {
     let buffer = frame.buffer_mut();
     let from = area
         .x

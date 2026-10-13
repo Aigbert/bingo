@@ -16,7 +16,7 @@ use ratatui::text::{Line, Span};
 use crate::clock::{self, Now};
 use crate::tree::{self, Scope, Tree, Wants};
 use crate::ui::Ui;
-use crate::{foot, theme, transcript, views};
+use crate::{theme, transcript, views};
 
 /// How long a turn must have run before it is worth a row of its own (§6).
 const ACTIVITY_AFTER: std::time::Duration = std::time::Duration::from_millis(300);
@@ -45,10 +45,29 @@ const VERBS: [&str; 8] = [
     "Percolating",
 ];
 
+pub fn next_change(tree: &Tree, ui: &Ui, now: Now) -> Option<std::time::Instant> {
+    let motion = tree.sessions().any(SessionState::busy).then(|| {
+        if now.motion {
+            now.instant + clock::FRAME
+        } else {
+            clock::next_tick(now, std::time::Duration::from_secs(1))
+        }
+    });
+    let slots = bingo_sdk::slot::placed(tree.viewed());
+    let views = slots.iter().filter_map(|placed| match &placed.slot {
+        bingo_sdk::slot::Slot::Activity { view, .. } if !ui.activity_hidden => {
+            views::next_change(view, now)
+        }
+        _ => None,
+    });
+    motion.into_iter().chain(views).min()
+}
+
 /// The rows between the transcript and the input box: what the turn is doing
 /// — or, between turns, what it is waiting on — the session's task list, and
 /// whatever the person has queued behind it.
 pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'static>> {
+    crate::layout::count::band(2);
     let state = tree.viewed();
     let slots = bingo_sdk::slot::placed(state);
     let mut out = band(tree, ui, &slots, width, now);
@@ -57,21 +76,6 @@ pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'s
     // (§3): they are not the tail of what was said, they are what is going on.
     if !out.is_empty() {
         out.insert(0, Line::default());
-    }
-    footed(out, ui, width, now)
-}
-
-/// The way back to the foot takes the band's first row while the transcript
-/// is held ([`crate::foot`]): the air when the band has rows, the band's one
-/// row when it has none. Either way the band is as tall as it was, so a
-/// scroll never moves the frame.
-fn footed(mut out: Vec<Line<'static>>, ui: &Ui, width: usize, now: Now) -> Vec<Line<'static>> {
-    let Some(pill) = foot::below(ui, now).and_then(|below| foot::pill(below, width)) else {
-        return out;
-    };
-    match out.first_mut() {
-        Some(air) => *air = pill.line,
-        None => out.push(pill.line),
     }
     out
 }
@@ -428,8 +432,8 @@ mod tests {
     /// The band's one row, as the terminal drew it, without the quotes a test
     /// backend prints around each row or the padding it is drawn into.
     fn row(tree: &Tree, now: Now) -> String {
-        let (ui, _) = scene();
-        draw_tree(80, 24, tree, &ui, now)
+        let (mut ui, _) = scene();
+        draw_tree(80, 24, tree, &mut ui, now)
             .lines()
             .find(|line| line.contains("Waiting for"))
             .map(|line| line.trim_matches('"').trim_end().to_string())
@@ -483,14 +487,14 @@ mod tests {
     /// of the same count and is unchanged — furniture counts, the row speaks.
     #[test]
     fn a_child_under_a_running_root_is_not_waiting_on_an_agent() {
-        let (ui, now) = scene();
+        let (mut ui, now) = scene();
         let mut tree = folded_tree(vec![
             frame(1, started("trn_1")),
             child_frame(1, announced("reviewer")),
         ]);
         tree.show(&child_id());
         assert_eq!(row(&tree, now), "");
-        let drawn = draw_tree(80, 24, &tree, &ui, now);
+        let drawn = draw_tree(80, 24, &tree, &mut ui, now);
         assert!(drawn.contains("1 running"), "{drawn}");
     }
 
@@ -498,12 +502,12 @@ mod tests {
     /// what the band then says: one row's slot either way (§3).
     #[test]
     fn a_turn_on_the_viewed_session_takes_the_row_back_from_the_wait() {
-        let (ui, now) = scene();
+        let (mut ui, now) = scene();
         let mut woken = waited_on(1);
         woken.fold.apply(&frame(2, started("trn_1")));
         let at = later(now, 1_600);
         assert_eq!(row(&woken, at), "");
-        let drawn = draw_tree(80, 24, &woken, &ui, at);
+        let drawn = draw_tree(80, 24, &woken, &mut ui, at);
         assert!(drawn.contains("esc to interrupt"), "{drawn}");
     }
 

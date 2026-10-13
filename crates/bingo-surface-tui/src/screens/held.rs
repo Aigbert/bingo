@@ -9,8 +9,8 @@ fn held_back_from_the_foot() {
     let state = long_transcript(60);
     let (mut ui, now) = scene();
     let tree = solo(&state);
-    draw_tree(80, 24, &tree, &ui, now);
+    draw_tree(80, 24, &tree, &mut ui, now);
     crate::input::on_key(&mut ui, &tree, key(KeyCode::PageUp), now);
     let settled = later(now, 100);
-    both("held_back", &tree, &ui, settled);
+    both("held_back", &tree, &mut ui, settled);
 }

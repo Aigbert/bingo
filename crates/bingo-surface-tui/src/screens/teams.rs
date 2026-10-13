@@ -32,14 +32,14 @@ fn a_room_transcript() {
             },
         ),
     ]);
-    let (ui, now) = scene();
-    let screen = draw_tree(80, 24, &tree, &ui, now);
+    let (mut ui, now) = scene();
+    let screen = draw_tree(80, 24, &tree, &mut ui, now);
     assert!(
         !screen.contains("⎿"),
         "no post is a folded result: {screen}"
     );
     assert!(screen.contains("⏺ parent: then let us ship it"), "{screen}");
-    both("room_transcript", &tree, &ui, now);
+    both("room_transcript", &tree, &mut ui, now);
 }
 
 /// What a member's own transcript shows of the room it sits in: nothing
@@ -76,8 +76,8 @@ fn a_room_post_in_a_member_s_own_transcript() {
         ),
     ]);
     let tree = solo(&state);
-    let (ui, now) = scene();
-    let screen = draw_tree(80, 24, &tree, &ui, now);
+    let (mut ui, now) = scene();
+    let screen = draw_tree(80, 24, &tree, &mut ui, now);
     assert!(
         !screen.contains("#design"),
         "not the nudge, not the reading, not the post: {screen}"
@@ -86,7 +86,7 @@ fn a_room_post_in_a_member_s_own_transcript() {
         screen.contains("⏺ scout: Two nits"),
         "a message from a peer is not a room's: {screen}"
     );
-    both("room_post", &tree, &ui, now);
+    both("room_post", &tree, &mut ui, now);
 }
 
 /// A tool that drew for a person as well as answering the model.
@@ -184,8 +184,8 @@ fn what_the_message_tools_answer() {
         item(3, listed_the_agents()),
     ]);
     let tree = solo(&state);
-    let (ui, now) = scene();
-    let wide = draw_tree(120, 40, &tree, &ui, now);
+    let (mut ui, now) = scene();
+    let wide = draw_tree(120, 40, &tree, &mut ui, now);
     assert!(wide.contains("├─ watcher [ 120s ]"), "{wide}");
     assert!(wide.contains("└─ parent [ live ]"), "{wide}");
     assert!(
@@ -193,7 +193,7 @@ fn what_the_message_tools_answer() {
         "{wide}"
     );
     assert!(wide.contains("├─ helper [ busy ]"), "{wide}");
-    both("message_tools", &tree, &ui, now);
+    both("message_tools", &tree, &mut ui, now);
 }
 
 /// What a room is owed, on the session it hangs under (ADR-0022 §4): a live
@@ -217,8 +217,8 @@ fn what_a_room_is_owed() {
         ),
     ]);
     let tree = solo(&state);
-    let (ui, now) = scene();
-    let wide = draw_tree(120, 40, &tree, &ui, now);
+    let (mut ui, now) = scene();
+    let wide = draw_tree(120, 40, &tree, &mut ui, now);
     assert!(
         wide.contains("owed"),
         "the card is titled by its kind: {wide}"
@@ -228,7 +228,7 @@ fn what_a_room_is_owed() {
         "two columns fit the rail whole, where three folded the clock \
          (2026-09-02): {wide}"
     );
-    both("owed", &tree, &ui, now);
+    both("owed", &tree, &mut ui, now);
 }
 
 // ---- the one list of sessions (M36) -------------------------------------
@@ -291,7 +291,7 @@ fn the_roster() {
     let tree = a_team();
     let (mut ui, now) = scene();
     shown(&mut ui, Open::Switcher(Switcher::default()), now);
-    let wide = draw_tree(120, 40, &tree, &ui, now);
+    let wide = draw_tree(120, 40, &tree, &mut ui, now);
     assert!(wide.contains("Agents"), "{wide}");
     assert!(wide.contains("Rooms"), "{wide}");
     assert!(
@@ -314,7 +314,7 @@ fn the_roster() {
         wide.contains("#design  2 seats · 1 owed"),
         "the room's own row is its size and its debts: {wide}"
     );
-    both("roster", &tree, &ui, now);
+    both("roster", &tree, &mut ui, now);
 }
 
 /// §4: the list spends a hue on the cursor, on the sessions at work, and on
@@ -325,7 +325,7 @@ fn the_roster_spends_colour_only_where_the_design_says() {
     let tree = a_team();
     let (mut ui, now) = scene();
     shown(&mut ui, Open::Switcher(Switcher::default()), now);
-    let painted = crate::painted::painted(120, 40, &tree, &ui, now);
+    let painted = crate::painted::painted(120, 40, &tree, &mut ui, now);
     assert_eq!(
         painted.coloured("Agents"),
         Vec::<String>::new(),
@@ -355,7 +355,7 @@ fn the_roster_with_the_cursor_on_a_room() {
         }),
         now,
     );
-    let screen = draw_tree(80, 24, &tree, &ui, now);
+    let screen = draw_tree(80, 24, &tree, &mut ui, now);
     assert!(screen.contains("❯ #design"), "{screen}");
     insta::assert_snapshot!("roster_in_the_rooms", screen);
 }
@@ -372,13 +372,13 @@ fn the_two_doors_open_byte_identical_lists() {
     crate::input::on_key(&mut chord, &tree, ctrl('g'), now);
     for (width, height) in [(80u16, 24u16), (120, 40)] {
         assert_eq!(
-            draw_tree(width, height, &tree, &down, now),
-            draw_tree(width, height, &tree, &chord, now),
+            draw_tree(width, height, &tree, &mut down, now),
+            draw_tree(width, height, &tree, &mut chord, now),
             "at {width}x{height}"
         );
     }
     assert!(
-        draw_tree(80, 24, &tree, &down, now).contains("❯ ⏺ project"),
+        draw_tree(80, 24, &tree, &mut down, now).contains("❯ ⏺ project"),
         "and it is the list that both of them opened"
     );
 }

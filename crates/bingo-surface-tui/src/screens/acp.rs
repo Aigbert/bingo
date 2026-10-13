@@ -121,8 +121,8 @@ fn thought(id: &str, text: &str) -> bingo_sdk::Item {
 /// reads as a thought.
 #[test]
 fn an_agents_own_calls_read_as_rows() {
-    let (ui, now) = scene();
-    both("acp_calls", &solo(&a_turn_of_its_own()), &ui, now);
+    let (mut ui, now) = scene();
+    both("acp_calls", &solo(&a_turn_of_its_own()), &mut ui, now);
 }
 
 /// The call as it is being made: the mark is written when the block closes, so
@@ -147,6 +147,6 @@ fn a_call_still_running_reads_as_the_text_it_is() {
             },
         ),
     ]);
-    let (ui, now) = mid_turn();
-    both("acp_call_running", &solo(&state), &ui, now);
+    let (mut ui, now) = mid_turn();
+    both("acp_call_running", &solo(&state), &mut ui, now);
 }

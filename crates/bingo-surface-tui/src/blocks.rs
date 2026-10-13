@@ -290,6 +290,10 @@ impl Blocks {
         self.moving
     }
 
+    pub fn next_change(&self, now: Now) -> Option<Instant> {
+        self.moving().then_some(now.instant + crate::clock::FRAME)
+    }
+
     /// Keep the block at `at` when it is still this item's, else draw it.
     /// Answers with how many blocks the item now occupies: one, or none when
     /// it has nothing to say.

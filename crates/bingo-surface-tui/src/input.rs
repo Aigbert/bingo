@@ -48,6 +48,7 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if ui.intro.take().is_some() {
         return Vec::new();
     }
+    ui.prepare(&tree.viewed().summary.cwd);
     ui.block = None;
     // `esc esc` needs no clock: any other key is what says the two were not
     // one gesture.
@@ -579,7 +580,7 @@ fn start_selection(ui: &mut Ui) {
 }
 
 fn focused_line(ui: &Ui) -> usize {
-    let painted = ui.painted.borrow();
+    let painted = &ui.shown;
     ui.select
         .block
         .as_ref()
@@ -2306,9 +2307,9 @@ mod tests {
     fn v_starts_a_run_the_arrows_extend_and_y_copies_it() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         press(&mut ui, &state, key(KeyCode::PageUp), now);
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         press(&mut ui, &state, typed('v'), now);
         assert!(ui.select.run.is_some(), "v starts one while reading back");
 
@@ -2330,10 +2331,10 @@ mod tests {
     /// transcript on either side of it.
     fn reading_back(state: &SessionState) -> (Ui, Now) {
         let (mut ui, now) = scene();
-        render(state, &ui, now);
+        render(state, &mut ui, now);
         press(&mut ui, state, key(KeyCode::PageUp), now);
         let now = settled_at(now);
-        render(state, &ui, now);
+        render(state, &mut ui, now);
         (ui, now)
     }
 
@@ -2351,7 +2352,7 @@ mod tests {
         let state = long_transcript(60);
         let (mut ui, now) = reading_back(&state);
         let (_, rows) = ui.transcript();
-        let top = ui.painted.borrow().top;
+        let top = ui.shown.top;
         press(&mut ui, &state, typed('v'), now);
         assert_eq!(
             ui.select.run.map(|run| run.head.line),
@@ -2362,8 +2363,8 @@ mod tests {
             press(&mut ui, &state, key(KeyCode::Down), now);
         }
         let now = settled_at(now);
-        render(&state, &ui, now);
-        let painted = ui.painted.borrow();
+        render(&state, &mut ui, now);
+        let painted = &ui.shown;
         assert_eq!(painted.top, top + 1, "one line, and only one");
         assert_eq!(
             painted.row_of(top + rows),
@@ -2376,13 +2377,13 @@ mod tests {
     fn walking_it_off_the_top_brings_the_view_back_up() {
         let state = long_transcript(60);
         let (mut ui, now) = reading_back(&state);
-        let top = ui.painted.borrow().top;
+        let top = ui.shown.top;
         assert!(top > 0, "there is transcript above the screen");
         press(&mut ui, &state, typed('v'), now);
         press(&mut ui, &state, key(KeyCode::Up), now);
         let now = settled_at(now);
-        render(&state, &ui, now);
-        let painted = ui.painted.borrow();
+        render(&state, &mut ui, now);
+        let painted = &ui.shown;
         assert_eq!(painted.top, top - 1);
         assert_eq!(
             painted.row_of(top - 1),
@@ -2397,21 +2398,21 @@ mod tests {
     fn walking_the_far_end_across_a_line_moves_nothing() {
         let state = long_transcript(60);
         let (mut ui, now) = reading_back(&state);
-        let top = ui.painted.borrow().top;
+        let top = ui.shown.top;
         press(&mut ui, &state, typed('v'), now);
         press(&mut ui, &state, key(KeyCode::Right), now);
         let now = settled_at(now);
-        render(&state, &ui, now);
-        assert_eq!(ui.painted.borrow().top, top);
+        render(&state, &mut ui, now);
+        assert_eq!(ui.shown.top, top);
     }
 
     #[test]
     fn a_letter_ends_a_run_and_is_typed() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         press(&mut ui, &state, key(KeyCode::PageUp), now);
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         press(&mut ui, &state, typed('v'), now);
         press(&mut ui, &state, typed('h'), now);
         assert!(ui.select.run.is_none());
@@ -2430,9 +2431,9 @@ mod tests {
     fn esc_lets_a_run_go() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         press(&mut ui, &state, key(KeyCode::PageUp), now);
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         press(&mut ui, &state, typed('v'), now);
         assert!(press(&mut ui, &state, key(KeyCode::Esc), now).is_empty());
         assert!(ui.select.run.is_none());
@@ -2460,7 +2461,7 @@ mod tests {
     fn the_wheel_scrolls_the_transcript_and_the_foot_takes_it_back() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         on_mouse(&mut ui, &solo(&state), wheel(true, 10, 5), now);
         let (total, rows) = ui.transcript();
         assert_eq!(
@@ -2480,19 +2481,12 @@ mod tests {
     fn a_click_on_the_foot_row_follows_the_tail_again() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
-        assert!(
-            ui.painted.borrow().foot.is_none(),
-            "following draws no pill"
-        );
+        render(&state, &mut ui, now);
+        assert!(ui.shown.foot.is_none(), "following draws no pill");
         press(&mut ui, &state, key(KeyCode::PageUp), now);
         let settled = later(now, 100);
-        render(&state, &ui, settled);
-        let pill = ui
-            .painted
-            .borrow()
-            .foot
-            .expect("a held transcript draws the pill");
+        render(&state, &mut ui, settled);
+        let pill = ui.shown.foot.expect("a held transcript draws the pill");
 
         on_mouse(&mut ui, &solo(&state), click(pill.x - 1, pill.y), settled);
         assert_ne!(
@@ -2503,18 +2497,15 @@ mod tests {
 
         on_mouse(&mut ui, &solo(&state), click(pill.x + 1, pill.y), settled);
         assert_eq!(ui.scroll, crate::scroll::Scroll::Tail);
-        render(&state, &ui, settled);
-        assert!(
-            ui.painted.borrow().foot.is_none(),
-            "at the foot the row is air again"
-        );
+        render(&state, &mut ui, settled);
+        assert!(ui.shown.foot.is_none(), "at the foot the row is air again");
     }
 
     #[test]
     fn a_click_in_the_transcript_focuses_the_block_it_landed_on() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         // Row 17 is the transcript's last: the reserved activity band holds
         // the two rows beneath it (view.rs's demand).
         on_mouse(&mut ui, &solo(&state), click(4, 17), now);
@@ -2546,7 +2537,7 @@ mod tests {
 
     /// The last row the transcript drew, which is the row a fold sits on.
     fn last_row(ui: &Ui) -> u16 {
-        ui.painted.borrow().regions.transcript.bottom() - 1
+        ui.shown.regions.transcript.bottom() - 1
     }
 
     /// A click on a fold is one gesture that opens it and folds it again — the
@@ -2556,11 +2547,11 @@ mod tests {
         let state = long_result();
         let tree = solo(&state);
         let (mut ui, now) = scene();
-        assert!(render(&state, &ui, now).contains("+4 lines (ctrl+o to expand)"));
+        assert!(render(&state, &mut ui, now).contains("+4 lines (ctrl+o to expand)"));
 
         let row = last_row(&ui);
         on_mouse(&mut ui, &tree, click(6, row), now);
-        let opened = render(&state, &ui, now);
+        let opened = render(&state, &mut ui, now);
         assert!(opened.contains("line 9"), "{opened}");
         assert!(!opened.contains("+4 lines"), "{opened}");
         assert_eq!(
@@ -2572,7 +2563,7 @@ mod tests {
         let row = last_row(&ui);
         on_mouse(&mut ui, &tree, click(6, row), now);
         assert!(
-            render(&state, &ui, now).contains("+4 lines (ctrl+o to expand)"),
+            render(&state, &mut ui, now).contains("+4 lines (ctrl+o to expand)"),
             "the same gesture on the same row takes it back"
         );
     }
@@ -2595,10 +2586,10 @@ mod tests {
         )]);
         let tree = solo(&state);
         let (mut ui, now) = scene();
-        assert!(render(&state, &ui, now).contains("+4 lines"));
+        assert!(render(&state, &mut ui, now).contains("+4 lines"));
         let row = last_row(&ui);
         on_mouse(&mut ui, &tree, click(6, row), now);
-        let opened = render(&state, &ui, now);
+        let opened = render(&state, &mut ui, now);
         assert!(opened.contains("line 9"), "{opened}");
         assert!(!opened.contains("+4 lines"), "{opened}");
     }
@@ -2630,7 +2621,7 @@ mod tests {
     fn ctrl_o_climbs_a_thought_from_its_hold_through_the_whole_to_the_sheet() {
         let state = thought(&steps());
         let (mut ui, now) = scene();
-        let held = render(&state, &ui, now);
+        let held = render(&state, &mut ui, now);
         assert!(held.contains("Thought for 2s"), "{held}");
         assert!(held.contains("step 9"), "it holds where it ended: {held}");
         assert!(!held.contains("step 7"), "two rows of it: {held}");
@@ -2640,12 +2631,12 @@ mod tests {
         );
 
         press(&mut ui, &state, ctrl('o'), now);
-        let opened = render(&state, &ui, now);
+        let opened = render(&state, &mut ui, now);
         assert!(opened.contains("step 1"), "{opened}");
 
         press(&mut ui, &state, ctrl('o'), now);
         assert!(
-            render(&state, &ui, later(now, 200)).contains("Thinking"),
+            render(&state, &mut ui, later(now, 200)).contains("Thinking"),
             "the sheet says what it is"
         );
 
@@ -2662,7 +2653,7 @@ mod tests {
         let state = thought(&steps());
         let tree = solo(&state);
         let (mut ui, now) = scene();
-        let held = render(&state, &ui, now);
+        let held = render(&state, &mut ui, now);
         assert!(
             held.contains("step 9") && !held.contains("step 7"),
             "{held}"
@@ -2670,19 +2661,19 @@ mod tests {
 
         let row = last_row(&ui);
         on_mouse(&mut ui, &tree, click(6, row), now);
-        let opened = render(&state, &ui, now);
+        let opened = render(&state, &mut ui, now);
         assert!(opened.contains("step 1"), "{opened}");
         assert!(!opened.contains("+7 lines"), "{opened}");
 
         let row = last_row(&ui);
         on_mouse(&mut ui, &tree, click(6, row), now);
-        let shut = render(&state, &ui, now);
+        let shut = render(&state, &mut ui, now);
         assert!(!shut.contains("step 9"), "the row alone: {shut}");
 
         let row = last_row(&ui);
         on_mouse(&mut ui, &tree, click(6, row), now);
         assert!(
-            render(&state, &ui, now).contains("step 9"),
+            render(&state, &mut ui, now).contains("step 9"),
             "and the fourth click is back where the first started"
         );
     }
@@ -2695,7 +2686,7 @@ mod tests {
         let state = a_run_of_thoughts();
         let tree = solo(&state);
         let (mut ui, now) = scene();
-        let held = render(&state, &ui, now);
+        let held = render(&state, &mut ui, now);
         assert!(
             held.contains("Thought for 6s"),
             "the run's own time: {held}"
@@ -2707,12 +2698,12 @@ mod tests {
 
         let row = last_row(&ui);
         on_mouse(&mut ui, &tree, click(6, row), now);
-        let opened = render(&state, &ui, now);
+        let opened = render(&state, &mut ui, now);
         assert!(opened.contains("The manifest first"), "{opened}");
         assert_eq!(ui.folds.len(), 1, "one fold for the whole run");
 
         press(&mut ui, &state, ctrl('o'), now);
-        let sheet = render(&state, &ui, later(now, 200));
+        let sheet = render(&state, &mut ui, later(now, 200));
         for thought in ["The manifest first", "Then the crate map", "The plan after"] {
             assert!(sheet.contains(thought), "{thought} is missing: {sheet}");
         }
@@ -2760,7 +2751,7 @@ mod tests {
     fn an_empty_thought_opens_nothing() {
         let state = thought("");
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         press(&mut ui, &state, ctrl('o'), now);
         assert!(ui.folds.is_empty(), "there is nothing to lift");
         ui.select.block = Some(bingo_sdk::ItemId::from_raw("itm_1"));
@@ -2791,7 +2782,7 @@ mod tests {
             },
         ));
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         press(&mut ui, &state, ctrl('o'), now);
         assert!(
             ui.folds.is_empty(),
@@ -2804,7 +2795,7 @@ mod tests {
             3,
             bingo_sdk::Event::ItemCompleted { item: being_had },
         ));
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         press(&mut ui, &state, ctrl('o'), now);
         assert_eq!(
             ui.folds.keys().map(ToString::to_string).collect::<Vec<_>>(),
@@ -2818,7 +2809,7 @@ mod tests {
     fn enter_on_a_focused_thought_opens_the_sheet() {
         let state = thought("the manifest first");
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         ui.select.block = Some(bingo_sdk::ItemId::from_raw("itm_1"));
         press(&mut ui, &state, key(KeyCode::Enter), now);
         assert!(matches!(ui.layer.open, Open::Pager(_)));
@@ -2828,7 +2819,7 @@ mod tests {
     fn a_drag_takes_the_far_end_of_the_run_with_it() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         on_mouse(&mut ui, &solo(&state), click(2, 15), now);
         on_mouse(&mut ui, &solo(&state), dragged(6, 17), now);
         let run = ui.select.run.expect("a run");
@@ -2853,7 +2844,7 @@ mod tests {
             )]);
             let tree = solo(&state);
             let (mut ui, now) = scene();
-            let row = row_carrying(&render(&state, &ui, now), text);
+            let row = row_carrying(&render(&state, &mut ui, now), text);
             on_mouse(&mut ui, &tree, click(from, row), now);
             on_mouse(&mut ui, &tree, dragged(to, row), now);
             assert_eq!(
@@ -2868,7 +2859,7 @@ mod tests {
 
     /// The rows of the transcript region as the last frame cut them.
     fn region(ui: &Ui) -> ratatui::layout::Rect {
-        ui.painted.borrow().regions.transcript
+        ui.shown.regions.transcript
     }
 
     /// A screen row `past` rows below the last one the transcript was drawn
@@ -2887,7 +2878,7 @@ mod tests {
         let (mut ui, now) = reading_back(&state);
         let tree = solo(&state);
         let (_, rows) = ui.transcript();
-        let top = ui.painted.borrow().top;
+        let top = ui.shown.top;
         on_mouse(&mut ui, &tree, click(4, 3), now);
         let foot = below_the_transcript(&ui, 3);
         on_mouse(&mut ui, &tree, dragged(4, foot), now);
@@ -2897,12 +2888,8 @@ mod tests {
             "the run reaches the line now drawn at the foot"
         );
         let now = settled_at(now);
-        render(&state, &ui, now);
-        assert_eq!(
-            ui.painted.borrow().top,
-            top + 3,
-            "three rows past, three lines"
-        );
+        render(&state, &mut ui, now);
+        assert_eq!(ui.shown.top, top + 3, "three rows past, three lines");
         assert!(ui.select.dragging.is_some(), "the hand is still out there");
     }
 
@@ -2919,9 +2906,9 @@ mod tests {
         assert!(ui.select.dragging.is_some());
         on_mouse(&mut ui, &tree, dragged(6, 5), now);
         assert!(ui.select.dragging.is_none(), "the hand came back");
-        let top = ui.painted.borrow().top;
+        let top = ui.shown.top;
         ui.drag_step(later(now, 500));
-        assert_eq!(ui.painted.borrow().top, top, "and nothing walks without it");
+        assert_eq!(ui.shown.top, top, "and nothing walks without it");
     }
 
     /// A hand that stays out there takes a line every [`crate::select::
@@ -2973,7 +2960,7 @@ mod tests {
         let state = long_transcript(60);
         let (mut ui, now) = reading_back(&state);
         let tree = solo(&state);
-        let top = ui.painted.borrow().top;
+        let top = ui.shown.top;
         assert!(top > 0, "there is transcript above the screen");
         let head_row = region(&ui).y;
         on_mouse(&mut ui, &tree, click(4, 3), now);
@@ -3000,7 +2987,7 @@ mod tests {
         let (mut ui, now) = reading_back(&state);
         let tree = solo(&state);
         let (_, rows) = ui.transcript();
-        let top = ui.painted.borrow().top;
+        let top = ui.shown.top;
         // Three rows past the foot, so three lines the screen was not showing
         // join the run; the first of them with anything on it is the proof.
         let hidden = ui
@@ -3061,11 +3048,11 @@ mod tests {
         on_mouse(&mut ui, &tree, click(2, 4), now);
         on_mouse(&mut ui, &tree, dragged(6, 6), now);
         let run = ui.select.run;
-        let top = ui.painted.borrow().top;
+        let top = ui.shown.top;
         on_mouse(&mut ui, &tree, wheel(true, 6, 6), now);
         let now = settled_at(now);
-        render(&state, &ui, now);
-        assert_eq!(ui.painted.borrow().top, top - WHEEL as usize);
+        render(&state, &mut ui, now);
+        assert_eq!(ui.shown.top, top - WHEEL as usize);
         assert_eq!(ui.select.run, run, "the run is the hand's, not the wheel's");
     }
 
@@ -3087,8 +3074,8 @@ mod tests {
             child_frame(1, announced("reviewer")),
         ]);
         let (mut ui, now) = scene();
-        render_tree(&tree, &ui, now);
-        let row = ui.painted.borrow().regions.transcript.bottom() - 1;
+        render_tree(&tree, &mut ui, now);
+        let row = ui.shown.regions.transcript.bottom() - 1;
         assert_eq!(
             on_mouse(&mut ui, &tree, click(4, row), now),
             vec![Effect::View(child_id())],
@@ -3146,7 +3133,7 @@ mod tests {
         let state = read_a_picture();
         let (mut ui, now) = scene();
         crate::graphics::with(crate::graphics::drawing(), || {
-            let screen = render(&state, &ui, now);
+            let screen = render(&state, &mut ui, now);
             let row = cells_row(&screen);
             let effects = on_mouse(&mut ui, &solo(&state), click(6, row), now);
             assert_eq!(effects, vec![Effect::OpenPicture(journal_picture())]);
@@ -3165,7 +3152,7 @@ mod tests {
         let state = read_a_picture();
         let (mut ui, now) = scene();
         crate::graphics::with(crate::graphics::drawing(), || {
-            let screen = render(&state, &ui, now);
+            let screen = render(&state, &mut ui, now);
             let row = row_carrying(&screen, "Read(shot.png)");
             assert!(
                 on_mouse(&mut ui, &solo(&state), click(4, row), now).is_empty(),
@@ -3187,7 +3174,7 @@ mod tests {
     fn a_chip_is_words_and_a_click_on_it_opens_nothing() {
         let state = read_a_picture();
         let (mut ui, now) = scene();
-        let screen = render(&state, &ui, now);
+        let screen = render(&state, &mut ui, now);
         let row = row_carrying(&screen, "[image: image/png]");
         assert!(on_mouse(&mut ui, &solo(&state), click(6, row), now).is_empty());
     }
@@ -3200,7 +3187,7 @@ mod tests {
         let (mut ui, now) = scene();
         let token = crate::test_support::drafted(&mut ui, bingo_pictures::testing::png(100, 100));
         crate::graphics::with(crate::graphics::drawing(), || {
-            let screen = render(&state, &ui, now);
+            let screen = render(&state, &mut ui, now);
             let row = cells_row(&screen);
             let effects = on_mouse(&mut ui, &solo(&state), click(3, row), now);
             assert_eq!(
@@ -3250,7 +3237,7 @@ mod tests {
         let state = sent_a_picture();
         let (mut ui, now) = scene();
         crate::graphics::with(crate::graphics::drawing(), || {
-            let screen = render(&state, &ui, now);
+            let screen = render(&state, &mut ui, now);
             let row = cells_row(&screen);
             let column = cells_column(&screen, row);
             assert!(
@@ -3276,7 +3263,7 @@ mod tests {
         let state = read_a_picture();
         let (mut ui, now) = scene();
         crate::graphics::with(crate::graphics::drawing(), || {
-            let screen = render(&state, &ui, now);
+            let screen = render(&state, &mut ui, now);
             let row = cells_row(&screen);
             ui.layer.show(crate::ui::Open::Help, now.instant);
             assert!(on_mouse(&mut ui, &solo(&state), click(6, row), now).is_empty());
@@ -3288,8 +3275,8 @@ mod tests {
         let state = folded(vec![frame(1, opened(permission(Some("Edit(src/)"), None)))]);
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
-        render(&state, &ui, now);
-        let card = ui.painted.borrow().card.clone().expect("a card on screen");
+        render(&state, &mut ui, now);
+        let card = ui.shown.card.clone().expect("a card on screen");
         let row = card
             .options
             .iter()
@@ -3473,7 +3460,7 @@ mod tests {
     fn the_page_keys_scroll_a_screenful_and_come_back_to_the_tail() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         let (total, rows) = ui.transcript();
         assert!(total > rows, "a transcript worth scrolling");
 
@@ -3505,7 +3492,7 @@ mod tests {
     fn home_and_end_walk_the_transcript_while_nothing_is_typed() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         let (total, rows) = ui.transcript();
         press(&mut ui, &state, key(KeyCode::Home), now);
         assert_eq!(
@@ -3632,13 +3619,8 @@ mod tests {
         pin_board(&mut ui);
         // The rail exists only once it has been drawn: a click is answered
         // against the frame the last draw left behind.
-        draw_sized(120, 40, &state, &ui, now);
-        let rail = ui
-            .painted
-            .borrow()
-            .regions
-            .rail
-            .expect("a rail at 120 columns");
+        draw_sized(120, 40, &state, &mut ui, now);
+        let rail = ui.shown.regions.rail.expect("a rail at 120 columns");
         let effects = on_mouse(&mut ui, &solo(&state), click(rail.x + 2, rail.y), now);
         assert!(effects.is_empty());
         assert_eq!(ui.focus, Some(demo_card("board")));

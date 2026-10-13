@@ -203,6 +203,11 @@ pub fn cycle(now: Now, period: Duration) -> Duration {
     Duration::from_nanos(u64::try_from(into).unwrap_or(u64::MAX))
 }
 
+/// The next boundary of a free-running cue, on the frame's wall clock.
+pub fn next_tick(now: Now, period: Duration) -> Instant {
+    now.instant + period.saturating_sub(cycle(now, period))
+}
+
 /// Where that turn is, between 0 and 1.
 pub fn phase(now: Now, period: Duration) -> f32 {
     let secs = period.as_secs_f32();

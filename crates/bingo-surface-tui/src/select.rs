@@ -9,10 +9,11 @@
 
 use std::time::{Duration, Instant};
 
+use crate::layout::Canvas;
 use base64::Engine;
 use bingo_sdk::ItemId;
 use ratatui::layout::Rect;
-use ratatui::{Frame, style::Style};
+use ratatui::style::Style;
 use unicode_width::UnicodeWidthChar;
 
 use crate::theme;
@@ -255,7 +256,7 @@ pub fn refused(bytes: usize) -> String {
 ///
 /// `area`'s first row is line `top`: it is the rows carrying lines, which is
 /// not the whole region when a short transcript hangs from the composer.
-pub fn mark(frame: &mut Frame, area: Rect, top: usize, run: &Run) {
+pub fn mark(frame: &mut Canvas, area: Rect, top: usize, run: &Run) {
     for row in 0..area.height {
         let line = top + row as usize;
         for column in 0..area.width {
@@ -271,7 +272,7 @@ pub fn mark(frame: &mut Frame, area: Rect, top: usize, run: &Run) {
     }
 }
 
-fn paint(frame: &mut Frame, x: u16, y: u16, style: Style) {
+fn paint(frame: &mut Canvas, x: u16, y: u16, style: Style) {
     frame.buffer_mut()[(x, y)].set_style(style);
 }
 

@@ -60,6 +60,13 @@ pub struct Card {
     pub body: View,
 }
 
+pub fn next_change(cards: &[Card], now: crate::clock::Now) -> Option<std::time::Instant> {
+    cards
+        .iter()
+        .filter_map(|card| crate::views::next_change(&card.body, now))
+        .min()
+}
+
 /// One card as it was drawn.
 pub struct Drawn {
     pub id: CardId,
@@ -162,6 +169,7 @@ pub fn width(rail: Option<Rect>, transcript: Rect) -> usize {
 /// The cards as rows: a title the focus cursor marks, then the view, with at
 /// most [`ROWS`] rows to a plugin and a fold saying what was left out.
 pub fn render(cards: &[Card], width: usize, focus: Option<&CardId>, marks: &Marks) -> Vec<Drawn> {
+    crate::layout::count::band(3);
     let mut spent: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
     cards
         .iter()

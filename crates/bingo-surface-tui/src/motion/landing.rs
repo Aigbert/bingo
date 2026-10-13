@@ -15,7 +15,7 @@ use crate::tree::Tree;
 /// A tool call that has just come back, with the cache warm on the frame
 /// before — which is what makes it a completion a person watched, rather than
 /// a row that was already there.
-fn just_landed(ok: bool, ui: &crate::ui::Ui, now: Now) -> Tree {
+fn just_landed(ok: bool, ui: &mut crate::ui::Ui, now: Now) -> Tree {
     let mut state = folded(running_bash());
     crate::painted::painted(80, 24, &solo(&state), ui, now);
     let output = match ok {
@@ -45,7 +45,7 @@ fn just_landed(ok: bool, ui: &crate::ui::Ui, now: Now) -> Tree {
 
 /// The runs of the row a call landed on, so the light crossing its name can
 /// be told from the one style it rests in.
-fn landed_runs(tree: &Tree, ui: &crate::ui::Ui, now: Now) -> Vec<(String, Style)> {
+fn landed_runs(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> Vec<(String, Style)> {
     crate::painted::painted(80, 24, tree, ui, now).row("Bash")
 }
 
@@ -55,10 +55,10 @@ fn landed_runs(tree: &Tree, ui: &crate::ui::Ui, now: Now) -> Vec<(String, Style)
 /// rest on the seventh — where "at rest" is exactly the row it always was.
 #[test]
 fn a_completion_sweeps_its_name_for_six_frames_and_rests_on_the_seventh() {
-    let (ui, now) = mid_turn();
-    let done = just_landed(true, &ui, now);
+    let (mut ui, now) = mid_turn();
+    let done = just_landed(true, &mut ui, now);
     crate::theme::with(crate::painted::truecolor(), || {
-        let sweeping = landed_runs(&done, &ui, now);
+        let sweeping = landed_runs(&done, &mut ui, now);
         assert!(
             sweeping.len() > 3,
             "the name is drawn cell by cell while the light is on it: {sweeping:#?}"
@@ -70,12 +70,12 @@ fn a_completion_sweeps_its_name_for_six_frames_and_rests_on_the_seventh() {
             "and the bullet only says it finished, with no frame of weight"
         );
         assert_ne!(
-            landed_runs(&done, &ui, later(now, 99)),
+            landed_runs(&done, &mut ui, later(now, 99)),
             sweeping,
             "the light has moved along halfway through"
         );
         assert_eq!(
-            landed_runs(&done, &ui, later(now, 198)),
+            landed_runs(&done, &mut ui, later(now, 198)),
             vec![
                 ("⏺ ".to_string(), theme::as_drawn(theme::good())),
                 ("Bash".to_string(), theme::as_drawn(theme::bold())),
@@ -85,8 +85,8 @@ fn a_completion_sweeps_its_name_for_six_frames_and_rests_on_the_seventh() {
         );
     });
     assert_eq!(
-        landed_runs(&done, &ui, still(now)),
-        landed_runs(&done, &ui, still(later(now, 198))),
+        landed_runs(&done, &mut ui, still(now)),
+        landed_runs(&done, &mut ui, still(later(now, 198))),
         "a still surface draws the settled row from the first frame"
     );
 }
@@ -96,11 +96,11 @@ fn a_completion_sweeps_its_name_for_six_frames_and_rests_on_the_seventh() {
 /// jumps" outranks it, and the rise was withdrawn on 2026-09-02 for it.
 #[test]
 fn a_failure_flares_and_cools_into_the_words_behind_it() {
-    let (ui, now) = mid_turn();
-    let failed = just_landed(false, &ui, now);
+    let (mut ui, now) = mid_turn();
+    let failed = just_landed(false, &mut ui, now);
     crate::theme::with(crate::painted::truecolor(), || {
-        let name = |ms| {
-            landed_runs(&failed, &ui, later(now, ms))
+        let mut name = |ms| {
+            landed_runs(&failed, &mut ui, later(now, ms))
                 .into_iter()
                 .find(|(text, _)| text.contains("Bash"))
                 .map(|(_, style)| style)
@@ -118,14 +118,14 @@ fn a_failure_flares_and_cools_into_the_words_behind_it() {
             "into the row's own words, twelve frames on"
         );
         assert_eq!(
-            style_of(&failed, &ui, later(now, 396), "⏺"),
+            style_of(&failed, &mut ui, later(now, 396), "⏺"),
             theme::as_drawn(theme::bad()),
             "the bullet stays `bad`: what cooled is how fresh it is"
         );
     });
     assert_eq!(
-        landed_runs(&failed, &ui, still(now)),
-        landed_runs(&failed, &ui, still(later(now, 396))),
+        landed_runs(&failed, &mut ui, still(now)),
+        landed_runs(&failed, &mut ui, still(later(now, 396))),
         "and a still surface draws the settled row from the first frame"
     );
 }
@@ -148,7 +148,7 @@ fn row_of(screen: &str, needle: &str) -> usize {
 /// per block.
 #[test]
 fn a_new_block_takes_its_own_room_and_walks_nowhere_after_it() {
-    let (ui, now) = mid_turn();
+    let (mut ui, now) = mid_turn();
     let mut state = folded(vec![frame(
         1,
         Event::ItemCompleted {
@@ -157,7 +157,7 @@ fn a_new_block_takes_its_own_room_and_walks_nowhere_after_it() {
     )]);
     // The cache is warm after this draw, so the next block is one a person
     // watches arrive.
-    let settled = screen(&solo(&state), &ui, now);
+    let settled = screen(&solo(&state), &mut ui, now);
     let was = row_of(&settled, "first");
 
     state.apply(&frame(
@@ -169,7 +169,7 @@ fn a_new_block_takes_its_own_room_and_walks_nowhere_after_it() {
     let arriving = solo(&state);
     let frames: Vec<String> = [0i64, 33, 66, 99]
         .iter()
-        .map(|ms| screen(&arriving, &ui, later(now, *ms)))
+        .map(|ms| screen(&arriving, &mut ui, later(now, *ms)))
         .collect();
     assert_eq!(
         row_of(&frames[0], "first"),

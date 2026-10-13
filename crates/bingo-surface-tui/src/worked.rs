@@ -132,8 +132,8 @@ mod tests {
     /// The closing row after a turn, found by its verb, wherever the screen
     /// draws it.
     fn after(tree: &Tree, now: Now, verb: &str) -> String {
-        let (ui, _) = scene();
-        draw_tree(80, 24, tree, &ui, now)
+        let (mut ui, _) = scene();
+        draw_tree(80, 24, tree, &mut ui, now)
             .lines()
             .find(|line| line.contains(verb))
             .map(|line| line.trim_matches('"').trim_end().to_string())
@@ -200,12 +200,12 @@ mod tests {
     /// the band's own row over the composer.
     #[test]
     fn a_new_turn_takes_the_closing_away_and_a_wait_stands_beside_it() {
-        let (ui, now) = scene();
+        let (mut ui, now) = scene();
         let mut again = ended(42, bingo_sdk::TurnStatus::Completed);
         again.fold.apply(&frame(3, started("trn_2")));
         let at = later(now, 1_600);
         assert_eq!(after(&again, at, "Worked for"), "");
-        assert!(draw_tree(80, 24, &again, &ui, at).contains("esc to interrupt"));
+        assert!(draw_tree(80, 24, &again, &mut ui, at).contains("esc to interrupt"));
 
         let mut waited = waited_on(1);
         waited.fold.apply(&frame(8, started("trn_1")));
@@ -215,20 +215,20 @@ mod tests {
         };
         waited.fold.apply(&closed);
         assert!(after(&waited, at, "Worked for").contains("Worked for 42s"));
-        assert!(draw_tree(80, 24, &waited, &ui, at).contains("Waiting for"));
+        assert!(draw_tree(80, 24, &waited, &mut ui, at).contains("Waiting for"));
     }
 
     /// The closing is the transcript's, not the band's: it stands under the
     /// answer and scrolls with it, above the composer's band and the box.
     #[test]
     fn the_closing_stands_under_the_answer_and_not_over_the_composer() {
-        let (ui, now) = scene();
+        let (mut ui, now) = scene();
         let now = later(now, 60_000);
         let drawn = draw_tree(
             80,
             24,
             &ended(42, bingo_sdk::TurnStatus::Completed),
-            &ui,
+            &mut ui,
             now,
         );
         let rows: Vec<&str> = drawn.lines().map(|l| l.trim_matches('"')).collect();
