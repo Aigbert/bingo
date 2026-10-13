@@ -35,6 +35,7 @@ pub mod manager;
 pub mod manifest;
 pub mod notice;
 pub mod provider;
+pub mod reload;
 pub mod schema;
 pub mod service;
 pub mod source;
