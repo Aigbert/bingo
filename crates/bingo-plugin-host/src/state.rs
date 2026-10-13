@@ -49,13 +49,36 @@ impl Codec for Json {
 pub struct Store {
     root: PathBuf,
     lock: Arc<tokio::sync::Mutex<()>>,
+    subscribed: Arc<std::sync::Mutex<crate::subscribed::Subscribed>>,
 }
 impl Store {
     pub fn new(data_dir: &std::path::Path, plugin: &str) -> Self {
         Self {
             root: data_dir.join("plugins").join(plugin).join("state"),
             lock: Arc::default(),
+            subscribed: Arc::default(),
         }
+    }
+
+    pub async fn subscribe(&self, host: &bingo_sdk::HostHandle, session: bingo_sdk::SessionId,
+        request: String, reads: Vec<Read>) -> Result<(), RpcError> {
+        self.subscribed.lock().unwrap_or_else(|e| e.into_inner())
+            .subscribe(session.clone(), request.clone(), reads.clone());
+        for read in reads {
+            if self.get(read.scope, read.key).await?.map(|entry| entry.version) != read.version {
+                host.invalidate(&session, vec![request]).await.map_err(failed)?;
+                break;
+            }
+        }
+        Ok(())
+    }
+    pub fn forget(&self, session: &bingo_sdk::SessionId, request: &str) {
+        self.subscribed.lock().unwrap_or_else(|e| e.into_inner()).forget(session, request);
+    }
+    pub async fn changed(&self, host: &bingo_sdk::HostHandle, scope: &str, key: &str) -> Result<(), RpcError> {
+        let requests = self.subscribed.lock().unwrap_or_else(|e| e.into_inner()).changed(scope, key);
+        for (session, requests) in requests { host.invalidate(&session, requests).await.map_err(failed)?; }
+        Ok(())
     }
 
     pub async fn get(&self, scope: String, key: String) -> Result<Option<StateValue>, RpcError> {
@@ -284,5 +307,22 @@ mod read_contract {
                 version: Some(1)
             }]
         );
+    }
+}
+
+tokio::task_local! { static RENDERING: bool; }
+pub async fn rendering<T>(active: bool, future: impl std::future::Future<Output = T>) -> T {
+    RENDERING.scope(active, future).await
+}
+#[cfg(test)]
+mod render_contract {
+    use super::*;
+    #[tokio::test]
+    async fn state_set_during_render_is_refused_in_words() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::new(root.path(), "counter");
+        let result = rendering(true, store.set("global".into(), "count".into(), json!(1), None)).await;
+        assert!(result.is_err_and(|error| error.message.contains("render")));
+        assert!(store.get("global".into(), "count".into()).await.unwrap().is_none());
     }
 }
