@@ -104,18 +104,15 @@ mod tests {
 
     #[test]
     fn the_page_names_every_adapter_this_crate_has() {
-        for id in [Loopback::ID] {
-            assert!(quoted(id), "the page never says the {id} adapter");
-        }
+        let id = Loopback::ID;
+        assert!(quoted(id), "the page never says the {id} adapter");
     }
 
-    /// The secret is the one thing that is never settings, so the page says
-    /// where it does come from, in the spelling the environment is read by.
+    /// The local platform stays off until the documented switch is set.
     #[test]
     fn the_page_names_the_local_platform_switch() {
-        for variable in [crate::loopback::ENABLE_ENV] {
-            assert!(quoted(variable), "the page never says {variable}");
-        }
+        let variable = crate::loopback::ENABLE_ENV;
+        assert!(quoted(variable), "the page never says {variable}");
     }
 
     #[test]
