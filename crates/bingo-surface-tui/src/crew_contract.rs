@@ -52,11 +52,11 @@ fn faces_match_the_cross_surface_fixture() {
     for row in rows.as_array().unwrap() {
         let name = row["name"].as_str().unwrap();
         let got = face::face(name);
-        assert_eq!(got.hash, row["hash"].as_u64().unwrap() as u32, "{name}");
-        assert_eq!(got.hue, row["hue"].as_u64().unwrap() as usize);
-        assert_eq!(got.sigil, row["sigil"].as_str().unwrap());
+        assert_eq!(got.0, row["hash"].as_u64().unwrap() as u32, "{name}");
+        assert_eq!(got.hue(), row["hue"].as_u64().unwrap() as usize);
+        assert_eq!(got.sigil(), row["sigil"].as_str().unwrap());
         theme::with(painted::ascii(), || {
-            assert_eq!(face::face(name).sigil, row["ascii"].as_str().unwrap())
+            assert_eq!(face::face(name).sigil(), row["ascii"].as_str().unwrap())
         });
     }
 }
@@ -102,7 +102,7 @@ fn crew_hues_are_readable_and_apart_from_state() {
                 unreachable!()
             };
             for name in [
-                "reviewer", "scout", "writer", "builder", "tester", "planner", "fox",
+                "reviewer", "scout", "writer", "builder", "tester", "planner", "fox", "Scout",
             ] {
                 let color = face::style(name).fg.unwrap();
                 let a = luminance(color);
@@ -125,7 +125,7 @@ fn child_row_has_a_face_and_keeps_lifecycle_words() {
     let (mut ui, now) = scene();
     let screen = draw_tree(120, 40, &crew(), &mut ui, now);
     assert!(
-        screen.contains(&format!("{} reviewer(", face::face("reviewer").sigil)),
+        screen.contains(&format!("{} reviewer(", face::face("reviewer").sigil())),
         "{screen}"
     );
     assert!(screen.contains("working · 3 tools"), "{screen}");
@@ -149,7 +149,7 @@ fn roster_keeps_a_face_beside_the_live_ear() {
         .find(|line| line.to_string().contains("reviewer"))
         .unwrap()
         .to_string();
-    assert!(row.contains(face::face("reviewer").sigil), "{row}");
+    assert!(row.contains(face::face("reviewer").sigil()), "{row}");
     assert!(row.contains('~'), "{row}");
 }
 
@@ -165,7 +165,7 @@ fn strip_names_the_work_and_yields_to_notices() {
     assert!(!wide.contains("running"));
     let narrow = status::line(&tree, &ui, 80, now).to_string();
     assert!(
-        !narrow.contains("reviewer") && narrow.contains(face::face("reviewer").sigil),
+        !narrow.contains("reviewer") && narrow.contains(face::face("reviewer").sigil()),
         "{narrow}"
     );
     ui.notify(Level::Info, "saved", now.instant);
@@ -174,8 +174,9 @@ fn strip_names_the_work_and_yields_to_notices() {
         notice.contains("saved") && !notice.contains("reviewer"),
         "{notice}"
     );
+    ui.expire(later(now, 4133));
     assert!(
-        status::line(&tree, &ui, 120, later(now, 4001))
+        status::line(&tree, &ui, 120, later(now, 4133))
             .to_string()
             .contains("reviewer")
     );
@@ -220,4 +221,164 @@ fn room_mentions_wear_the_known_names_hues() {
             "{row:?}"
         );
     });
+}
+
+#[test]
+fn live_faces_pulse_through_the_cache_and_stillness_preserves_words() {
+    for look in [
+        painted::truecolor(),
+        painted::daylight(),
+        painted::no_colour(),
+        painted::ascii(),
+    ] {
+        theme::with(look, || {
+            let tree = crew();
+            let (mut ui, now) = scene();
+            let before = painted::painted(120, 40, &tree, &mut ui, now).row("reviewer(");
+            let after =
+                painted::painted(120, 40, &tree, &mut ui, later(now, 1000)).row("reviewer(");
+            assert_ne!(before, after);
+            let stopped = painted::painted(120, 40, &tree, &mut ui, still(now)).row("reviewer(");
+            assert_eq!(
+                stopped,
+                painted::painted(120, 40, &tree, &mut ui, still(later(now, 1000))).row("reviewer(")
+            );
+        });
+    }
+}
+
+#[test]
+fn strip_scopes_overflows_finishes_and_clicks() {
+    let mut tree = crew();
+    let (mut ui, now) = scene();
+    let tiny = crate::crew::spans(&tree, 120, 14, now);
+    assert_eq!(
+        tiny.iter()
+            .map(|span| span.content.as_ref())
+            .collect::<String>(),
+        "◗ reviewer  +1"
+    );
+    draw_tree(120, 40, &tree, &mut ui, now);
+    let hit = ui.shown.crew.expect("the strip has a target");
+    let effects = crate::pointer::on_mouse(
+        &mut ui,
+        &tree,
+        crossterm::event::MouseEvent {
+            kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
+            column: hit.x,
+            row: hit.y,
+            modifiers: crossterm::event::KeyModifiers::NONE,
+        },
+        now,
+    );
+    assert!(
+        !effects.is_empty(),
+        "opening the list requests stored sessions"
+    );
+    assert!(ui.focus.captures());
+    tree.fold.apply(&child_frame(
+        20,
+        completed("trn_9", bingo_sdk::TurnStatus::Completed),
+    ));
+    assert!(
+        !status::line(&tree, &scene().0, 120, now)
+            .to_string()
+            .contains("reviewer")
+    );
+    tree.show(&child_id());
+    assert!(
+        crate::crew::active(&tree).is_empty(),
+        "neither parent nor siblings belong to this strip"
+    );
+}
+
+#[test]
+fn a_placed_status_outranks_crew_until_it_expires() {
+    let mut tree = crew();
+    let (mut ui, now) = scene();
+    tree.fold.apply(&frame(
+        40,
+        signalled(
+            "example.status",
+            "status",
+            bingo_sdk::slot::with(
+                serde_json::json!({}),
+                [bingo_sdk::slot::Slot::Status {
+                    text: "scheduled".into(),
+                    tone: bingo_sdk::Tone::Neutral,
+                    until: Some(now.wall + jiff::SignedDuration::from_secs(2)),
+                }],
+            ),
+        ),
+    ));
+    let placed = status::line(&tree, &ui, 120, now).to_string();
+    assert!(placed.contains("scheduled") && !placed.contains("reviewer"));
+    draw_tree(120, 40, &tree, &mut ui, now);
+    assert!(ui.shown.crew.is_none());
+    assert!(
+        status::line(&tree, &ui, 120, later(now, 2001))
+            .to_string()
+            .contains("reviewer")
+    );
+}
+
+#[test]
+fn prose_only_colours_known_mentions_and_refreshes_when_names_arrive() {
+    theme::with(painted::truecolor(), || {
+        let mut tree = crew();
+        let names = crate::markdown::mentions::known(&tree);
+        let lines =
+            crate::markdown::mentioned("@SCOUT #design @unknown mail@scout `@scout`", 120, &names)
+                .lines;
+        let spans = &lines[0].spans;
+        assert!(
+            spans
+                .iter()
+                .any(|span| span.content == "@SCOUT" && span.style.fg == face::style("scout").fg)
+        );
+        assert!(
+            spans
+                .iter()
+                .filter(|span| span.content.contains("unknown")
+                    || span.content.contains("mail@")
+                    || span.content.contains('`'))
+                .all(|span| span.style.fg != face::style("scout").fg)
+        );
+        tree.fold.apply(&frame(
+            40,
+            Event::ItemCompleted {
+                item: assistant("itm_a", "Hello @newcomer", bingo_sdk::ItemStatus::Completed),
+            },
+        ));
+        let (mut ui, now) = scene();
+        let before = painted::painted(120, 40, &tree, &mut ui, now).row("Hello @newcomer");
+        tree.fold
+            .apply(&agent_frame(5, 1, agent_announced(5, "newcomer")));
+        let after = painted::painted(120, 40, &tree, &mut ui, now).row("Hello @newcomer");
+        assert_ne!(
+            before, after,
+            "an unchanged item takes the newly known name's hue"
+        );
+    });
+}
+
+#[test]
+fn room_members_refresh_and_the_composer_stays_in_place() {
+    let mut tree = chat();
+    let (mut ui, now) = scene();
+    let before = draw_tree(120, 40, &tree, &mut ui, now);
+    let composer = ui.shown.regions.composer;
+    tree.fold.apply(&log_frame(
+        5,
+        extended(
+            "bingo.rooms",
+            "members",
+            roster_payload(&["parent", "reviewer"], &[]),
+        ),
+    ));
+    let after = draw_tree(120, 40, &tree, &mut ui, now);
+    assert_ne!(before, after);
+    assert!(after.contains("members: parent, reviewer"));
+    assert!(!after.contains("members: parent, reviewer, scout"));
+    assert_eq!(composer, ui.shown.regions.composer);
 }

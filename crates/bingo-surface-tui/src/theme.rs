@@ -405,12 +405,7 @@ pub fn with<R>(theme: Theme, f: impl FnOnce() -> R) -> R {
 
 // ---- the tokens ---------------------------------------------------------
 
-/// Answers, what you type, option labels — the terminal's own foreground, in
-/// every look (M73). No palette names it: a terminal that flips its scheme
-/// remaps every cell of prose itself, on the spot and in its scrollback, which
-/// is why Codex and Claude Code both draw their prose with no colour at all.
-/// It is spelled `Reset` rather than left unsaid so that it can be patched
-/// over a colour — the end of a ramp, a bold name a light has left.
+/// Identity colours belong only to agent sigils and names.
 pub fn crew(index: usize) -> Style {
     match current().colors {
         Colors::True(palette) => Style::new().fg(palette.crew[index % 5]),
@@ -418,6 +413,12 @@ pub fn crew(index: usize) -> Style {
     }
 }
 
+/// Answers, what you type, option labels — the terminal's own foreground, in
+/// every look (M73). No palette names it: a terminal that flips its scheme
+/// remaps every cell of prose itself, on the spot and in its scrollback, which
+/// is why Codex and Claude Code both draw their prose with no colour at all.
+/// It is spelled `Reset` rather than left unsaid so that it can be patched
+/// over a colour — the end of a ramp, a bold name a light has left.
 pub fn text() -> Style {
     Style::new().fg(Color::Reset)
 }
@@ -940,6 +941,7 @@ mod tests {
                         // tokens rather than naming any (M69).
                         | "opening/storyboard.rs"
                         | "identity.rs"
+                        | "crew_contract.rs"
                         | "motion.rs"
                         | "motion/landing.rs"
                         | "painted.rs"
@@ -983,30 +985,21 @@ mod tests {
             (
                 "text",
                 &[
-                    // The working word and neutral activity nodes.
                     "activity.rs",
                     "composer.rs",
                     "dialog.rs",
                     "foot.rs",
-                    // The question a form is on, and the option under its
-                    // cursor: the same weight the dialog's rows wear.
                     "form.rs",
                     "markdown.rs",
                     "opening/frame.rs",
                     "pager.rs",
                     "preview.rs",
                     "rewind.rs",
-                    // The row a person is on in the one list of sessions:
-                    // weight rather than hue, so `NO_COLOR` still says which
-                    // row the keyboard is talking to.
                     "roster.rs",
                     "search.rs",
                     "status.rs",
                     "transcript.rs",
-                    // The line of a shell command a person ran themselves.
                     "transcript/ran.rs",
-                    // What was said into a session, and who by: the name a
-                    // post carries and the words after it.
                     "transcript/said.rs",
                     "transcript/slots.rs",
                     "view.rs",
@@ -1024,17 +1017,12 @@ mod tests {
             (
                 "dim",
                 &[
-                    // The verb clock, queued lines, and activity titles, badges and completed nodes.
                     "activity.rs",
                     "composer.rs",
+                    "crew.rs",
                     "dialog.rs",
                     "foot.rs",
-                    // A form's tabs it is not on, the descriptions, and the
-                    // preview pane — a mockup is read past, so it is dim.
                     "form.rs",
-                    // The `+N` after the last thumbnail a band of them shows,
-                    // wherever one stands: the composer's strip, and a
-                    // person's own `>` block.
                     "graphics/band.rs",
                     "keys.rs",
                     "layers.rs",
@@ -1046,19 +1034,12 @@ mod tests {
                     "search.rs",
                     "status.rs",
                     "transcript.rs",
-                    // A folded result's own rows and its `+N lines` line.
                     "transcript/output.rs",
-                    // The chip that names a picture a terminal cannot draw
-                    // (§5's image row).
                     "transcript/pictured.rs",
-                    // The `$` a shell line the person ran is written under.
                     "transcript/ran.rs",
                     "transcript/said.rs",
                     "transcript/slots.rs",
-                    // The `▍` of a thinking row and everything under it: a
-                    // thought is working, and working is read past (§4).
                     "transcript/thinking.rs",
-                    "tree.rs",
                     "view.rs",
                     "views/actions.rs",
                     "views/badge.rs",
@@ -1069,20 +1050,16 @@ mod tests {
                     "views/table.rs",
                     "views/tree.rs",
                     "welcome.rs",
-                    // The `…` that says a list a cursor walks goes on past
-                    // the end of its window: a hint, as the strip's is.
                     "window.rs",
                 ],
             ),
             (
                 "raised",
                 &[
-                    // The bar the way back to the foot rides on (M95).
                     "foot.rs",
                     "layers.rs",
                     "search.rs",
                     "select.rs",
-                    // The bar a person's own line is a band on.
                     "transcript/said.rs",
                     "views/code.rs",
                 ],
@@ -1090,29 +1067,23 @@ mod tests {
             (
                 "presence",
                 &[
-                    // A retrying turn and an activity node in progress.
                     "activity.rs",
-                    // Which session asked, named after a card's own title —
-                    // every card's head is written in one place (ADR-0010 §3).
                     "form.rs",
                     "search.rs",
                     "select.rs",
                     "transcript.rs",
-                    "tree.rs",
                     "views/actions.rs",
                     "views/badge.rs",
                     "welcome.rs",
                 ],
             ),
             ("glow", &["activity.rs", "opening/frame.rs"]),
-            // A task that is done wears the mark a finished call does.
             (
                 "good",
                 &[
                     "activity.rs",
                     "status.rs",
                     "transcript.rs",
-                    "tree.rs",
                     "views/badge.rs",
                 ],
             ),
@@ -1126,21 +1097,9 @@ mod tests {
                     "views/badge.rs",
                 ],
             ),
-            ("mode", &["status.rs"]),
+            ("mode", &["markdown/mentions.rs", "status.rs"]),
             ("breath", &["activity.rs"]),
-            // The ramp `presence` → glow: a live bullet, the fill of a bar,
-            // and the light a sent line runs along the box's border — one
-            // gradient, wherever §4 sanctions one.
-            (
-                "pulse",
-                &[
-                    // The mark igniting, which is the head's own light spent
-                    // on it (§11).
-                    "transcript.rs",
-                    "view.rs",
-                    "views/progress.rs",
-                ],
-            ),
+            ("pulse", &["transcript.rs", "view.rs", "views/progress.rs"]),
             (
                 "comet",
                 &[
@@ -1154,17 +1113,8 @@ mod tests {
             ("cooling", &["transcript.rs"]),
             ("fading", &["status.rs"]),
             ("warming", &["status.rs"]),
-            (
-                "attention",
-                // The card's border is the fourth place one beat says a
-                // thing wants a person, and no longer the exception.
-                &["layers.rs", "roster.rs", "status.rs", "transcript.rs"],
-            ),
-            // The one border the light draws, and the one breath it takes
-            // when the drawing is done (§11).
-            // Highlighted code reaches the table through one door, so no view
-            // has to know that a keyword and the mode badge share a colour.
             ("ink", &["highlight.rs"]),
+            ("crew", &["face.rs"]),
         ];
         for (token, files) in allowed {
             let mut seen: Vec<String> = sources()

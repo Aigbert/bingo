@@ -6,8 +6,7 @@
 use std::time::{Duration, Instant};
 
 use bingo_sdk::{
-    CommandSpec, DecisionKind, Driver, Item, ItemBody, ItemStatus, SessionState, ToolOutput,
-    TurnStatus,
+    CommandSpec, DecisionKind, Item, ItemBody, ItemStatus, SessionState, ToolOutput, TurnStatus,
 };
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
@@ -83,7 +82,8 @@ const EXPAND: &str = "ctrl+o to expand";
 
 /// What every row of one transcript needs to know about where it is.
 pub struct Rows<'a> {
-    pub cwd: &'a str,
+    pub state: &'a SessionState,
+    pub names: Vec<markdown::mentions::Name>,
     pub width: usize,
     /// How much of each block a person opened or shut; everything else wears
     /// its kind's own start ([`crate::fold`]).
@@ -100,14 +100,6 @@ pub struct Rows<'a> {
     pub linked: &'a Linked,
     /// Plugin placements read from this frame's folded session.
     pub slots: Vec<bingo_sdk::slot::Placed>,
-    /// What the session in view is called. A post says which room it came
-    /// from, and the room's own transcript is the one place that says nothing.
-    pub title: Option<&'a str>,
-    /// What answers the session in view. A room answers nobody (ADR-0011 §1),
-    /// and that one fact is what tells a room's own transcript — where its
-    /// conversation is read — from a member's, where none of it belongs
-    /// (ADR-0034).
-    pub driver: Driver,
     /// A newer release than this build, when the start-up check found one
     /// (M63). Terminal-side, like the fold and the scroll: it is a fact about
     /// this machine, not about the conversation.
@@ -137,15 +129,15 @@ impl<'a> Rows<'a> {
         now: Now,
     ) -> Self {
         Self {
-            cwd: &state.summary.cwd,
+            state,
+            names: Vec::new(),
             width,
             folds,
             now,
             pictures,
             linked,
             slots: bingo_sdk::slot::placed(state),
-            title: state.summary.title.as_deref(),
-            driver: state.summary.driver,
+
             update: None,
             measure: None,
             opening: None,
@@ -154,6 +146,11 @@ impl<'a> Rows<'a> {
     }
 
     /// What the welcome box has to add: the release this build could become.
+    pub fn in_tree(mut self, tree: &tree::Tree) -> Self {
+        self.names = markdown::mentions::known(tree);
+        self
+    }
+
     pub fn saying(self, update: Option<&'a str>) -> Self {
         Self { update, ..self }
     }
@@ -238,7 +235,7 @@ impl Rows<'_> {
 
     /// A path as a person reads it, from this session's own directory.
     fn shorten(&self, text: &str) -> String {
-        paths::shorten_in(text, self.cwd, paths::home())
+        paths::shorten_in(text, &self.state.summary.cwd, paths::home())
     }
 }
 
@@ -368,7 +365,9 @@ fn default_item_lines(
 ) -> Block {
     match &item.body {
         ItemBody::Unknown { .. } => Block::default(),
-        ItemBody::User { parts, origin } => said::lines(item, parts, origin, fold, rows).into(),
+        ItemBody::User { parts, origin } => {
+            said::lines(item, parts, origin, place, fold, rows).into()
+        }
         ItemBody::Assistant { text } => assistant(text, item.status, fold, rows, cue),
         ItemBody::Reasoning { .. } => thinking::lines(item, place, fold, rows).into(),
         ItemBody::ToolCall { .. } => called(item, agents, fold, rows, cue).into(),
@@ -565,7 +564,11 @@ fn returns(body: Vec<Line<'static>>, rows: &Rows<'_>) -> Vec<Line<'static>> {
 /// of placeholder cells is not text, and cooling it would spend the colour the
 /// picture's own number is carried in.
 fn assistant(text: &str, status: ItemStatus, fold: Fold, rows: &Rows<'_>, cue: Cue) -> Block {
-    let written = markdown::rendered(text, rows.measured().saturating_sub(speaks_indent()));
+    let written = markdown::mentioned(
+        text,
+        rows.measured().saturating_sub(speaks_indent()),
+        &rows.names,
+    );
     let lit = match arriving(status, rows, cue) {
         Some(age) => comet(written.lines, age),
         None => written.lines,
@@ -767,7 +770,7 @@ fn child_row(child: &SessionState, input: &Value, rows: &Rows<'_>) -> Vec<Line<'
         )
     );
     let mut out = marked(
-        crate::face::face(&name).sigil,
+        crate::face::face(&name).sigil(),
         crate::face::pulse(&name, live, rows.now),
         vec![heading],
         rows,
@@ -1031,7 +1034,7 @@ mod tests {
     fn drawn_in_room(items: Vec<Item>) -> Vec<String> {
         let mut state = stated(items);
         state.summary.title = Some("#design".to_string());
-        state.summary.driver = Driver::Log;
+        state.summary.driver = bingo_sdk::Driver::Log;
         rendered(&state)
     }
 
@@ -1341,7 +1344,7 @@ mod tests {
                 "found it\n\nit was the cursor all along",
             )]),
             vec![
-                "⏺ scout: found it".to_string(),
+                "✦ scout: found it".to_string(),
                 String::new(),
                 "  it was the cursor all along".to_string(),
             ],
@@ -1356,7 +1359,7 @@ mod tests {
     fn an_unsigned_post_is_the_holders_and_says_so() {
         assert_eq!(
             drawn_in_room(vec![person("itm_1", "then let us ship it")]),
-            vec!["⏺ parent: then let us ship it"],
+            vec!["✦ parent: then let us ship it"],
         );
     }
 

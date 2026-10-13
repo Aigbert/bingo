@@ -43,6 +43,7 @@ pub struct Layout {
     /// Where this frame drew the way back to the foot ([`crate::foot`]), when
     /// the transcript was held: what a click there is answered against.
     pub foot: Option<ratatui::layout::Rect>,
+    pub crew: Option<ratatui::layout::Rect>,
 }
 
 impl Layout {

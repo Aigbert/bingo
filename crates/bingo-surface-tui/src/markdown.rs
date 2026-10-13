@@ -11,6 +11,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{theme, views};
 
+pub(crate) mod mentions;
 mod spaced;
 
 /// What this renderer understands beyond CommonMark: GFM's strikethrough and
@@ -27,8 +28,12 @@ pub fn render(text: &str, width: usize) -> Vec<Line<'static>> {
 /// one caller that can draw them ([`crate::transcript`]). Every other caller
 /// wants the lines alone, and gets the chip that names each picture in them.
 pub fn rendered(text: &str, width: usize) -> Rendered {
+    mentioned(text, width, &[])
+}
+
+pub fn mentioned(text: &str, width: usize, names: &[mentions::Name]) -> Rendered {
     let text = spaced::mended(text);
-    let mut out = Writer::new(width);
+    let mut out = Writer::new(width, names);
     for event in Parser::new_ext(&text, GFM) {
         out.event(event);
     }
@@ -143,7 +148,8 @@ impl Alt {
     }
 }
 
-struct Writer {
+struct Writer<'a> {
+    names: &'a [mentions::Name],
     width: usize,
     lines: Vec<Line<'static>>,
     spans: Vec<Span<'static>>,
@@ -170,10 +176,11 @@ struct Writer {
     images: Vec<Linked>,
 }
 
-impl Writer {
-    fn new(width: usize) -> Self {
+impl<'a> Writer<'a> {
+    fn new(width: usize, names: &'a [mentions::Name]) -> Self {
         Self {
             width,
+            names,
             lines: Vec::new(),
             spans: Vec::new(),
             styles: vec![theme::text()],
@@ -221,7 +228,7 @@ impl Writer {
             Md::Start(tag) => self.open(tag),
             Md::End(tag) => self.close(tag),
             Md::Text(text) if self.code.is_some() => self.code_text(&text),
-            Md::Text(text) => self.push(&text, self.style()),
+            Md::Text(text) => self.prose(&text),
             Md::Code(code) => self.push(&format!("`{code}`"), self.style()),
             Md::Html(html) | Md::InlineHtml(html) => self.push(html.trim_end(), theme::dim()),
             Md::SoftBreak => self.push(" ", self.style()),
@@ -408,6 +415,20 @@ impl Writer {
 
     fn style(&self) -> Style {
         self.styles.last().copied().unwrap_or_default()
+    }
+
+    fn prose(&mut self, text: &str) {
+        if self.spans.is_empty() {
+            self.spans = self.margin.spans();
+        }
+        self.words = true;
+        if self.link.is_some() {
+            self.spans
+                .push(Span::styled(text.to_string(), self.style()));
+        } else {
+            self.spans
+                .extend(mentions::spans(text, self.style(), self.names));
+        }
     }
 
     fn push(&mut self, text: &str, style: Style) {

@@ -21,8 +21,6 @@ use bingo_sdk::{
     Driver, Interaction, ItemBody, ItemId, SessionId, SessionState, SessionSummary, TreeState,
 };
 
-use crate::theme;
-
 /// The child a tool call spawned, by the item that called it. The child's own
 /// state is the whole of the row, so nothing about it is stored twice.
 pub type Agents<'a> = BTreeMap<ItemId, &'a SessionState>;
@@ -207,7 +205,7 @@ pub fn count(tree: &Tree, wants: Wants, scope: Scope<'_>) -> Option<usize> {
 /// The sessions a scope covers, resolved once for the whole count rather than
 /// walked again for every row. Neither scope covers the session it is written
 /// from: the one on screen is never one of its own notices.
-fn covered<'a>(tree: &'a Tree, scope: Scope<'_>) -> Vec<&'a SessionId> {
+pub(crate) fn covered<'a>(tree: &'a Tree, scope: Scope<'_>) -> Vec<&'a SessionId> {
     let listed: Vec<&SessionSummary> = tree.sessions().map(|state| &state.summary).collect();
     listed
         .iter()
@@ -393,23 +391,6 @@ pub fn seconds(state: &SessionState) -> i64 {
     match (first, last) {
         (Some(first), Some(last)) => last.duration_since(first).as_secs().max(0),
         _ => 0,
-    }
-}
-
-/// A session's bullet takes the colour a tool row in the same state takes, and
-/// one that wants a person takes bingo's own colour wherever it is drawn.
-pub fn bullet_style(
-    status: Option<Lifecycle>,
-    attention: bool,
-    last: Option<&bingo_sdk::TurnStatus>,
-) -> ratatui::style::Style {
-    if attention {
-        return theme::presence();
-    }
-    match status {
-        Some(Lifecycle::Working | Lifecycle::Asking) => theme::presence(),
-        Some(Lifecycle::Idle) if last.is_some() => theme::good(),
-        Some(Lifecycle::Idle | Lifecycle::Stored | Lifecycle::Unseated) | None => theme::dim(),
     }
 }
 
@@ -833,10 +814,6 @@ mod tests {
             rows[2].status, None,
             "a room answers nothing whether it is here or not, so the list \
              puts it where every other room goes"
-        );
-        assert_eq!(
-            bullet_style(Some(Lifecycle::Stored), false, None),
-            theme::dim()
         );
     }
 }

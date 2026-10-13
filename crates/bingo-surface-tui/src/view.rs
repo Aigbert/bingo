@@ -92,7 +92,18 @@ fn render_status(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now)
     let width = area.width as usize;
     let line = match ui.focus.search() {
         Some(search) => search::row(search),
-        None => status::line(tree, ui, width, now),
+        None => {
+            let (line, crew) = status::compose(tree, ui, width, now);
+            frame.crew = crew.map(|columns| {
+                Rect::new(
+                    area.x + columns.start as u16,
+                    area.y,
+                    columns.len() as u16,
+                    1,
+                )
+            });
+            line
+        }
     };
     frame.render_widget(Paragraph::new(vec![line]), area);
 }
@@ -408,6 +419,7 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
             &ui.linked,
             now,
         )
+        .in_tree(tree)
         .saying(ui.welcome.update.as_deref())
         .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
         .opening(ui.focus.intro().map(|intro| intro.seconds(now)))
@@ -1520,7 +1532,7 @@ mod tests {
         let tree = spawned(vec![child_frame(2, started("trn_9"))]);
         let (mut ui, now) = scene();
         let screen = render_tree(&tree, &mut ui, now);
-        assert!(screen.contains("⏺ reviewer(review the diff)"), "{screen}");
+        assert!(screen.contains("◗ reviewer(review the diff)"), "{screen}");
         assert!(screen.contains("⎿  working"), "{screen}");
         insta::assert_snapshot!(screen);
     }
@@ -1532,7 +1544,7 @@ mod tests {
         ui.dialog
             .focus_on(tree.open_interaction().map(|(_, open)| open));
         let screen = render_tree(&tree, &mut ui, now);
-        assert!(screen.contains("1 needs you (ctrl+g)"), "{screen}");
+        assert!(screen.contains("◗"), "{screen}");
         insta::assert_snapshot!(screen);
     }
 
@@ -1600,14 +1612,14 @@ mod tests {
         );
         let mut tree = spawned(vec![child_frame(2, started("trn_9"))]);
         let asleep = render_tree(&tree, &mut ui, now);
-        assert!(asleep.contains("⏺ scout"), "{asleep}");
+        assert!(asleep.contains("✦  scout"), "{asleep}");
         assert!(asleep.contains("stored"), "{asleep}");
         insta::assert_snapshot!("switcher_row_stored", asleep);
 
         tree.fold.apply(&woken(1, scout));
         let awake = render_tree(&tree, &mut ui, now);
         assert!(!awake.contains("stored"), "{awake}");
-        assert!(awake.contains("⏺ scout"), "{awake}");
+        assert!(awake.contains("✦  scout"), "{awake}");
         insta::assert_snapshot!("switcher_row_live", awake);
     }
 
@@ -1630,7 +1642,7 @@ mod tests {
             is[is.len() - 4..],
             "the box and the one line of furniture stay where they were"
         );
-        assert!(is.iter().any(|row| row.contains("❯ ⏺ project")));
+        assert!(is.iter().any(|row| row.contains("❯ ◆  project")));
         insta::assert_snapshot!(with_list);
     }
 
@@ -1673,16 +1685,16 @@ mod tests {
         ]);
         let (mut ui, now) = scene();
         let screen = render_tree(&tree, &mut ui, now);
-        assert!(screen.contains("⏺ reviewer: the plan"), "{screen}");
+        assert!(screen.contains("◗ reviewer: the plan"), "{screen}");
         assert!(
             screen.contains("  none of M9's exit criteria name one"),
             "the rest of a message is prose under the name, not a folded \
              result: {screen}"
         );
         assert!(!screen.contains("⎿"), "{screen}");
-        assert!(screen.contains("⏺ scout: M9's"), "{screen}");
+        assert!(screen.contains("✦ scout: M9's"), "{screen}");
         assert!(
-            screen.contains("⏺ parent: then let us ship it"),
+            screen.contains("✦ parent: then let us ship it"),
             "and what the person typed is a post like any other, under the \
              name the roster reads it by: {screen}"
         );

@@ -27,14 +27,24 @@ const CONTEXT_BAD: u64 = 90;
 pub const HINT: &str = keys::FOOTER_HINT;
 
 /// The status line at this width.
-pub fn line(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Line<'static> {
+pub fn compose(
+    tree: &Tree,
+    ui: &Ui,
+    width: usize,
+    now: Now,
+) -> (Line<'static>, Option<std::ops::Range<usize>>) {
     crate::layout::count::band(3);
-    place(
-        left(tree.viewed()),
-        middle(tree, ui, now),
-        right(tree),
-        width,
-    )
+    let right = clip(right(tree), width);
+    let left = clip(left(tree.viewed()), width.saturating_sub(cells(&right)));
+    let gaps = GAP * (!left.is_empty() as usize + !right.is_empty() as usize);
+    let room = width.saturating_sub(cells(&left) + cells(&right) + gaps);
+    let (middle, crew) = middle(tree, ui, width, room, now);
+    let middle = clip(middle, room);
+    let slack = width.saturating_sub(cells(&left) + cells(&middle) + cells(&right));
+    let before = if left.is_empty() { 0 } else { slack / 2 };
+    let start = cells(&left) + before;
+    let hit = (crew && !middle.is_empty()).then_some(start..start + cells(&middle));
+    (place(left, middle, right, width), hit)
 }
 
 /// A mode may leave its first, resting choice unsaid.
@@ -58,35 +68,46 @@ fn left(state: &SessionState) -> Vec<Span<'static>> {
 }
 
 /// Only what is true now, in the order the eye should take it.
-fn middle(tree: &Tree, ui: &Ui, now: Now) -> Vec<Span<'static>> {
-    let mut parts: Vec<Span<'static>> = Vec::new();
-    // The answer to the key a person just pressed outruns every queued
-    // notice: an armed exit says so now, or not at all.
+fn middle(tree: &Tree, ui: &Ui, width: usize, room: usize, now: Now) -> (Vec<Span<'static>>, bool) {
     if ui.exit_armed(now.instant) {
-        parts.push(Span::styled(crate::input::ARM_HINT, theme::text()));
+        return (
+            vec![Span::styled(crate::input::ARM_HINT, theme::text())],
+            false,
+        );
+    }
+    let notice = notice(ui, now);
+    if !notice.is_empty() {
+        return (join(notice), false);
+    }
+    let placed = placed_status(tree.viewed(), now);
+    if !placed.is_empty() {
+        return (join(placed), false);
+    }
+    let crew = crate::crew::spans(tree, width, room, now);
+    if !crew.is_empty() {
+        return (crew, true);
     }
     if let Some(waiting) = tree::count(tree, Wants::Attention, Scope::Others) {
-        parts.push(Span::styled(
-            format!("{waiting} needs you (ctrl+g)"),
-            theme::attention(now),
-        ));
+        return (
+            vec![Span::styled(
+                format!("{waiting} needs you (ctrl+g)"),
+                theme::attention(now),
+            )],
+            false,
+        );
     }
-    if let Some(running) = tree::count(tree, Wants::Running, Scope::Others) {
-        parts.push(Span::styled(format!("{running} running"), theme::dim()));
+    if ui.composer.is_empty() {
+        return (vec![Span::styled(HINT, theme::dim())], false);
     }
-    parts.extend(placed_status(tree.viewed(), now));
-    parts.extend(notice(ui, now));
-    if parts.is_empty() && ui.composer.is_empty() {
-        parts.push(Span::styled(HINT, theme::dim()));
-    }
-    join(parts)
+    (Vec::new(), false)
 }
 
 pub fn next_change(tree: &Tree, now: Now) -> Option<std::time::Instant> {
     let slots = bingo_sdk::slot::placed(tree.viewed());
     let attention = crate::tree::count(tree, crate::tree::Wants::Attention, crate::tree::Scope::Others).is_some()
         || slots.iter().any(|placed| matches!(&placed.slot, bingo_sdk::slot::Slot::Status { tone: bingo_sdk::Tone::Attention, until, .. } if until.is_none_or(|at| at > now.wall)));
-    let pulse = (now.motion && attention).then(|| clock::next_tick(now, theme::PULSE));
+    let pulse = (now.motion && (attention || !crate::crew::active(tree).is_empty()))
+        .then(|| clock::next_tick(now, theme::PULSE));
     slots
         .iter()
         .filter_map(|placed| {
@@ -350,6 +371,11 @@ fn cut(span: &Span<'static>, room: usize) -> Span<'static> {
 /// Every span of a drawn status line with the style it carries, for the tests
 /// that assert where a colour landed.
 #[cfg(test)]
+pub fn line(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Line<'static> {
+    compose(tree, ui, width, now).0
+}
+
+#[cfg(test)]
 pub fn styles(line: &Line<'static>) -> Vec<(String, ratatui::style::Style)> {
     line.spans
         .iter()
@@ -554,20 +580,23 @@ mod tests {
     }
 
     #[test]
-    fn the_children_that_want_you_and_the_ones_at_work_are_counted() {
+    fn the_children_that_want_you_and_work_wear_faces() {
         let tree = folded_tree(vec![
             child_frame(1, announced("reviewer")),
             child_frame(2, started("trn_9")),
         ]);
         let (ui, _) = scene();
-        assert!(text(&tree, &ui, 80).contains("1 running"));
+        assert!(text(&tree, &ui, 80).contains(crate::face::face("reviewer").sigil()));
 
         let waiting = folded_tree(vec![
             child_frame(1, announced("reviewer")),
             child_frame(2, opened(child_permission())),
         ]);
         let drawn = text(&waiting, &ui, 80);
-        assert!(drawn.contains("1 needs you (ctrl+g)"), "{drawn}");
+        assert!(
+            drawn.contains(crate::face::face("reviewer").sigil()),
+            "{drawn}"
+        );
     }
 
     #[test]

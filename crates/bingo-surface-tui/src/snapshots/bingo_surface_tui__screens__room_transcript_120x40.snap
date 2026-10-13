@@ -1,6 +1,5 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 36
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 "                                                                                                                        "
@@ -31,12 +30,12 @@ expression: "draw_tree(120, 40, tree, ui, now)"
 "                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "
-"⏺ reviewer: the plan is thin on tests                                                                                   "
+"◗ reviewer: the plan is thin on tests                                                                                   "
 "  none of M9's exit criteria name one                                                                                   "
 "                                                                                                                        "
-"⏺ scout: M9's exit criteria cover them                                                                                  "
+"✦ scout: M9's exit criteria cover them                                                                                  "
 "                                                                                                                        "
-"⏺ parent: then let us ship it                                                                                           "
+"✦ parent: then let us ship it                                                                                           "
 "                                                                                                                        "
 "                                                                                                                        "
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮"

@@ -51,7 +51,7 @@ pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Ef
     match mouse.kind {
         MouseEventKind::ScrollUp => scroll(ui, WHEEL, now),
         MouseEventKind::ScrollDown => scroll(ui, -WHEEL, now),
-        MouseEventKind::Down(MouseButton::Left) => return pressed(ui, tree, mouse),
+        MouseEventKind::Down(MouseButton::Left) => return pressed(ui, tree, mouse, now),
         MouseEventKind::Drag(MouseButton::Left) => drag(ui, mouse, now),
         MouseEventKind::Up(MouseButton::Left) => return released(ui, now),
         // The pointer is moving with nothing held down, so no hand is out past
@@ -75,7 +75,19 @@ fn layer_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent) -> Vec<Effect> {
 
 /// A press lands on whatever is under it: a card's option answers, a block
 /// takes the focus, opens what is folded under it and starts a run.
-fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent) -> Vec<Effect> {
+fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect> {
+    if ui
+        .shown
+        .crew
+        .is_some_and(|area| area.contains(Position::new(mouse.column, mouse.row)))
+    {
+        return input::on_key(
+            ui,
+            tree,
+            KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL),
+            now,
+        );
+    }
     // The way back to the foot answers a click as `end` answers a key.
     if on_foot(ui, mouse) {
         ui.scroll.end();

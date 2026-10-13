@@ -54,6 +54,7 @@ mod commands;
 mod complete;
 mod composer;
 mod count;
+mod crew;
 mod dialog;
 mod effect;
 mod face;
