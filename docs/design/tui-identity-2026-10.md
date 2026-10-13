@@ -98,6 +98,8 @@ none — and it obeys tui.md §6: it reports a state change. The air row is
 already held for the activity band (§3, *nothing jumps*); the foot
 (`↓ N lines below`) outranks embers on it. `BINGO_MOTION=off`: no embers.
 
+2026-10-14: M149 uses one token per four arriving characters for ember timing because usage is reported only after a round; billed token counters keep reported usage.
+
 **L4. bingo speaks with the caret.** The model's `⏺` becomes `▍`: bold
 `text` at rest, `presence` while the block streams (the comet tail is
 unchanged). Tool rows keep `⏺` and its state colours — the work is the

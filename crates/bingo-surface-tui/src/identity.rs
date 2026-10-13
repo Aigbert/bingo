@@ -78,7 +78,13 @@ fn code_language_shares_the_raised_band() {
 fn embers_hold_the_band_and_yield_to_motion_off_and_the_foot() {
     let (mut ui, now) = mid_turn();
     let mut state = folded(vec![frame(1, started("trn_1"))]);
-    state.turn.as_mut().unwrap().usage.output_tokens = 256;
+    state.apply(&frame(
+        2,
+        Event::ItemStarted {
+            item: assistant("itm_1", &"a".repeat(1024), ItemStatus::Running),
+        },
+    ));
+    assert_eq!(crate::embers::tokens(&state), 256);
     ui.embers.observe(0, &state, now.instant);
     let tree = solo(&state);
     let with = activity::lines(&tree, &ui, 80, now);

@@ -18,6 +18,26 @@ pub fn alive(births: &[Instant], now: Instant, motion: bool) -> Vec<Instant> {
         .collect()
 }
 
+/// Streaming usage is not reported until the round ends. Four characters
+/// per token is a motion estimate only; billed usage remains the fold's fact.
+pub fn tokens(state: &bingo_sdk::SessionState) -> u64 {
+    let Some(turn) = &state.turn else {
+        return 0;
+    };
+    let characters: usize = state
+        .transcript
+        .items()
+        .iter()
+        .filter(|item| item.turn.as_ref() == Some(&turn.id))
+        .map(|item| match &item.body {
+            bingo_sdk::ItemBody::Assistant { text }
+            | bingo_sdk::ItemBody::Reasoning { text, .. } => text.chars().count(),
+            _ => 0,
+        })
+        .sum();
+    (characters / 4) as u64
+}
+
 /// Only animation birth instants are retained; token counts come from the fold.
 #[derive(Debug, Default)]
 pub struct Embers(std::collections::BTreeMap<bingo_sdk::SessionId, Flight>);
@@ -38,7 +58,7 @@ impl Embers {
             self.0.remove(id);
             return;
         };
-        let births = crossings(before, turn.usage.output_tokens, now);
+        let births = crossings(before, tokens(state), now);
         let flight = self.0.entry(id.clone()).or_insert_with(|| Flight {
             turn: turn.id.clone(),
             births: Vec::new(),

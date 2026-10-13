@@ -49,6 +49,7 @@ pub(super) fn find_resume(run: &mut Run) {
     run.spawn(async move {
         host.sessions(filter).await.map(|sessions| {
             super::Reply::Resume(
+                id.clone(),
                 sessions
                     .into_iter()
                     .filter(|session| {
@@ -57,7 +58,8 @@ pub(super) fn find_resume(run: &mut Run) {
                             && session.driver == bingo_sdk::Driver::Model
                             && session.created_at < created
                     })
-                    .max_by_key(|session| session.updated_at),
+                    .max_by_key(|session| session.updated_at)
+                    .map(Box::new),
             )
         })
     });

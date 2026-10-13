@@ -1,8 +1,6 @@
-//! `View::Code`: fenced, syntax-highlighted, never wrapped — it folds to the
-//! width and opens in a sheet (design §5). The fence is the language on its own
-//! row and a four-cell indent, which is what a fence in an answer already looks
-//! like; past [`NUMBERED`] rows the indent becomes a line-number gutter, as a
-//! `Read` result's is.
+//! `View::Code`: syntax-highlighted on a raised band of its own width.
+//! The language shares the first row's right edge. Code never wraps; past
+//! eight lines the indent becomes a line-number gutter.
 //!
 //! A block whose language is a diff is a diff: it goes to the one unified-diff
 //! renderer and wears its tints, so a patch reads the same whether a plugin

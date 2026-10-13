@@ -1492,13 +1492,6 @@ mod tests {
         });
     }
 
-    fn light() -> Theme {
-        Theme {
-            colors: Colors::True(LIGHT),
-            glyphs: &UNICODE,
-        }
-    }
-
     #[test]
     fn a_notice_arrives_out_of_dim_and_leaves_into_it() {
         let level = bingo_sdk::Level::Error;

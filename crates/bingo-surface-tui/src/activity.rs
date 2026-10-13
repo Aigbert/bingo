@@ -237,7 +237,7 @@ fn pending(origin: &Origin) -> bool {
 /// says nothing at all, because a row that flashes reports nothing (§6).
 ///
 /// A turn a person has asked to stop reads `▍ Stopping… (4s · ↓ 1.2k)`
-/// from the frame the key was pressed and keeps its sparkle and its clock
+/// from the frame the key was pressed and dims its caret and keeps its clock
 /// until `TurnCompleted` takes the row away. The hint goes with the asking:
 /// `esc` has been pressed, and there is nothing further to press.
 ///
@@ -291,7 +291,7 @@ fn working(
 ///
 /// The wait is not a turn, so it wears none of a turn's furniture: no `esc to
 /// interrupt`, because there is no turn to end, and no clock and no token
-/// count, which are what a turn has spent. The sparkle cycles and breathes at
+/// count, which are what a turn has spent. The caret breathes at
 /// [`BREATH_BLOCKED`] — the pace that already means the waiting is somebody
 /// else's — and the input box's border stays dim, because nothing is arriving
 /// here ([`crate::view`]'s `border` reads `busy`, which this session is not).
@@ -323,7 +323,7 @@ fn waiting_for(running: usize) -> String {
 }
 
 /// How long one light takes to cross the working word and come round again.
-/// Slower than the sparkle's breath, so the two are read as two things.
+/// Slower than the caret's breath, so the two are read as two things.
 const BEAM: std::time::Duration = std::time::Duration::from_millis(2400);
 
 /// bingo's word with one light walking across it while the turn runs (user,
@@ -394,8 +394,7 @@ pub(crate) fn caret_style(state: &SessionState, stopping: bool, now: Now) -> rat
     }
 }
 
-/// bingo breathing: the sparkle and the input box's border share one clock,
-/// so the whole surface inhales together.
+/// The input border keeps its breath while the caret names the turn phase.
 pub(crate) fn breathing(state: &SessionState, now: Now) -> ratatui::style::Style {
     breathing_at(breath_of(state), now)
 }

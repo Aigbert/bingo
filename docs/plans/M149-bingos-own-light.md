@@ -34,7 +34,7 @@ ADRs checked: 0001, 0002, 0070 and 0081; no acceptance change is due here.
    - `motion`: the caret blinks at 530 ms before the first byte, is
      steady `glow` while words arrive, breathes at 2.2 s while a tool or
      an agent holds the turn, dims when stopping (L2).
-   - embers (L3): a pure function of the token count's crossings of 64
+   - embers (L3): a pure function of estimated streaming tokens crossing 64
      and `now`: at most four on the air row, each gone 0.6 s after it
      left, none under `BINGO_MOTION=off`, none while the foot holds the
      row, and the band's height unchanged in every case.
@@ -54,6 +54,8 @@ ADRs checked: 0001, 0002, 0070 and 0081; no acceptance change is due here.
 5. **Embers** (`embers.rs`, new): the pure function of brick 1 and its
    drawing on the activity band's air row. What the surface keeps is the
    instants of the last four crossings, per turn, cleared at its end.
+   Estimate one token per four arriving assistant/reasoning characters;
+   reported usage arrives only at round end and remains unchanged.
 6. **bingo speaks with the caret** (`transcript.rs` `assistant`): the
    model's block opens with `▍`, bold `text` at rest, `presence` while it
    streams; the comet tail is unchanged. Tool, child and post rows keep

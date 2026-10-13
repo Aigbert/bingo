@@ -18,7 +18,7 @@ mod storyboard;
 ///
 /// A frame is a pure function of how long ago that was, so there is nothing to
 /// hold in step and nothing to go stale — and the moment the piece has run out
-/// the fact is taken away, leaving the box the transcript has always had.
+/// the fact is taken away, leaving the resting wordmark.
 #[derive(Clone, Copy, Debug)]
 pub struct Playing(Instant);
 

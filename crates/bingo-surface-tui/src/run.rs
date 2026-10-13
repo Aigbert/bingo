@@ -75,7 +75,7 @@ enum Reply {
     /// attachment's own stream is dropped: the tree's carries the child.
     Handle(SessionId, SessionHandle),
     Sessions(Vec<SessionSummary>),
-    Resume(Option<SessionSummary>),
+    Resume(SessionId, Option<Box<SessionSummary>>),
     /// What the store holds, for the switcher's stored rows.
     Stored(Vec<SessionSummary>),
     Commands(Vec<CommandSpec>),
@@ -434,7 +434,8 @@ impl Run {
         self.painted = now.instant;
         self.hand_over(screen)?;
         look::pay(self, screen).map_err(stdio)?;
-        screen.title(&title(&self.session.tree)).map_err(stdio)?;
+        let title = self.detection.render().scope(|| title(&self.session.tree));
+        screen.title(&title).map_err(stdio)?;
         let began = Instant::now();
         let (width, height) = screen.size();
         self.ui.prepare(&self.session.tree.viewed().summary.cwd);
@@ -520,8 +521,7 @@ impl Run {
             .session
             .tree
             .state(&frame.session)
-            .and_then(|state| state.turn.as_ref())
-            .map_or(0, |turn| turn.usage.output_tokens);
+            .map_or(0, crate::embers::tokens);
         let before: Vec<_> = if matches!(
             frame.event,
             Event::SessionClosed {
@@ -945,7 +945,11 @@ impl Run {
                 }),
                 Instant::now(),
             ),
-            Reply::Resume(previous) => self.ui.welcome.resume = previous,
+            Reply::Resume(session, previous) => {
+                if &session == self.session.tree.root_id() {
+                    self.ui.welcome.resume = previous.map(|summary| *summary);
+                }
+            }
             Reply::Stored(sessions) => self.fill_switcher(sessions),
             Reply::Commands(specs) => self.ui.catalogs.commands = specs,
             Reply::Catalogue(source, ids) => {

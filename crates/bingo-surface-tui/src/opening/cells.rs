@@ -1,10 +1,10 @@
 //! One drawn row as the cells a terminal draws it in, and back again.
 //!
-//! The piece rewrites the welcome box cell by cell — a border glyph the light
+//! The piece rewrites the wordmark cell by cell — a mark the light
 //! has not reached is blank, a word the beam has not reached is blank — and a
 //! `Line` is runs of text rather than cells, so it is taken apart and put back
 //! together. Whatever shares a style comes back as one span, which is what
-//! makes the frame the piece lands on the box itself and not a wordier drawing
+//! makes the frame the piece lands on the wordmark itself and not a wordier drawing
 //! of it.
 
 use ratatui::style::Style;

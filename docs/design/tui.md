@@ -281,6 +281,12 @@ cues use this same contract.
 
 Budget: an animation tick of 33 ms while continuous motion runs, none otherwise; a full draw under 4 ms at 120×40; a keystroke echoes on the next frame. Every frame is written between the two halves of DEC mode 2026 (2026-09-04), so the terminal composites it whole instead of painting it as it arrives — not through a multiplexer, which consumes the mode rather than passing it on. Smoothness is the absence of flicker, tearing, jumps and dropped keys — the motion above sits on top of that, never instead of it.
 
+Embers (M149) rise into the reserved activity air row: one per 64 estimated
+streaming tokens, at most four, gone after 0.6 seconds. The estimate is one
+token per four arriving characters across this turn's assistant and reasoning
+text; reported token usage remains unchanged. The foot outranks embers, and
+motion-off draws none. Only their birth instants are held, cleared at turn end.
+
 ## 7. Ergonomics
 
 Keys and pointer events resolve one `Ui.focus` owner (M125): composer,

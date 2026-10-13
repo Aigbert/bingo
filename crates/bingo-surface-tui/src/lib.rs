@@ -76,7 +76,7 @@ mod lifecycle;
 mod markdown;
 mod matching;
 mod mentions;
-/// The opening (M72): the welcome box drawing itself, out of the motions the
+/// The opening (M149): the wordmark arriving, out of the motions the
 /// product already has.
 mod opening;
 mod pager;
