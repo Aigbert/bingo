@@ -73,3 +73,5 @@ kernel's identity.
 
 Amends ADR-0006 §7: the project memory file becomes a directory, gains a user
 scope, and stops putting its bodies in the prompt. Refs: ADR-0009 §3.
+
+2026-10-13: The memory plugin places call rows through its before-tool hook; the TUI reads slots (ADR-0070, M123).

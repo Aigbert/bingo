@@ -84,3 +84,5 @@ parent's included, shows none of it; a wake just opens a turn.
 
 ADR-0025 §2 (the copy), ADR-0028 §2 (holder delivery), ADR-0029 §1
 (the default ear) — each amended in place with a reference here.
+
+2026-10-13: §3: room nudges carry `Voice::Aside`; navigation reads `bingo-collab` (ADR-0070/0071, M123).
