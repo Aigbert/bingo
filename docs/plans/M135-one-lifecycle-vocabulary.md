@@ -29,7 +29,7 @@ and `Needs you` leave every surface and every model-facing text.
    actor's `pending` table, and `session/interactions.rs` republishes
    the summary after `InteractionOpened` and after every path that closes
    one (answered, cancelled, expired). Nothing else writes the field;
-   the 33 `SessionSummary { … }` literals gain it through
+   the `SessionSummary { … }` literals gain it through
    `..Default::default()` where they do not already.
 4. **The agents plugin.** `list.rs` `state()` → `of_summary(…).word()`;
    the list's tone follows the state; `team/command.rs` `NOT_SEATED` →
@@ -55,10 +55,14 @@ and `Needs you` leave every surface and every model-facing text.
 - `crates/bingo-core/src/{session.rs,session/interactions.rs}`
 - `crates/bingo-collab/src/lifecycle.rs` (new), `crates/bingo-collab/src/lib.rs`
 - `crates/bingo-agents/src/{list.rs,stop.rs,dismiss.rs,guide.md,team/command.rs}`
-- `crates/bingo-surface-tui/Cargo.toml` (only if M123 did not already add `bingo-collab`)
+- TUI already depends on `bingo-collab`; no dependency change.
 - `crates/bingo-surface-tui/src/{tree.rs,views/tree.rs,roster.rs,seats.rs,transcript.rs,run.rs}`
 - `SessionSummary` literals across the workspace (`rg -l 'SessionSummary \{' crates`)
-- `docs/adr/{0027,0029,0060}-*.md` (dated notes)
+- `docs/adr/{0027,0029,0060,0077}-*.md` (dated notes and acceptance)
+- Core `session/tests/{asking.rs,../tests.rs}`; SDK `event.rs` compatibility test
+- TUI `src/lifecycle.rs` (pure verdict), `src/lib.rs`, affected screen tests/snapshots
+- Generated `schema/{rpc,plugin}.json` and SDK record fixtures; mechanical
+  summary constructors and vocabulary fixtures elsewhere (protocol step 6).
 
 ## Exit criteria
 
@@ -99,3 +103,18 @@ and `Needs you` leave every surface and every model-facing text.
   M113's fixture mechanism for the summary; M134 (the ACP agent turn
   must open and close interactions through the same table); M111's test
   host for the agents tests. Line references are from `979a6d27`.
+
+## Re-verified (2026-10-13, f9eb788a)
+
+- M108–M125 and M127–M134 are present. M120's tree fold backs `tree.rs`;
+  M123's seats read collab; M125's focus/render context needs no change.
+- M134 `turn/endpoint.rs` selects Provider/Agent; both permission paths
+  reach the actor's `pending` table. Only `stamped()` changes in `session.rs`
+  (M136 independently edits hooks); `plugins.rs` is outside this work.
+- `interactions.rs` opens, answers and cancels; no expiry scheduler exists.
+  All cancellation paths converge on `cancel_each`.
+- M113's `fixtures/record/event/sessionUpdated.json` lacks `asking`; keep
+  a legacy copy to pin the default before regenerating current fixtures.
+- `StopAgent` between turns will refuse in words when no turn is active,
+  as Risks permits; the guide will direct the person to answer the prompt.
+- No new dependencies, live/credential tests, or shared tmux sessions.
