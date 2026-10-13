@@ -104,3 +104,8 @@ Refs: docs/design/horizons.md §2, docs/design/research/acp-provider.md
 
 *2026-10-13, M109: §7 describes a future surface. The tree has only
 `bingo-provider-acp` and its tool bridge; there is no `bingo-acp` surface.*
+
+*2026-10-13, M117: §6 cancellation is bounded by ADR-0068 §5. The child
+survives while it answers `session/cancel` within 10 s; after that the link
+is retired and its process tree killed. The link owns this wait even when
+the kernel drops the turn; the next prompt follows §3's fresh-child path.*

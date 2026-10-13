@@ -1,6 +1,6 @@
 # ADR-0068 — Every task has an owner
 
-Status: §1–4 accepted (M116); §5 proposed (M117) · 2026-10-13 · Amends: ADR-0002 §2,
+Status: accepted · 2026-10-13 · Plan: M117 · Amends: ADR-0002 §2,
 ADR-0008 §2, §7, ADR-0035 §6
 
 ## Context
@@ -95,3 +95,6 @@ mail; the actor never awaits it" — half of what is needed.
 
 Refs: ADR-0002, ADR-0008, ADR-0032, ADR-0064, ADR-0056; Plans: M108, M116, M117;
 audit-2026-10 §3
+
+*2026-10-13: §1–4 landed in M116; M117 implements and accepts §5.
+Request/response clients have a total bound; streams retain ADR-0056.*
