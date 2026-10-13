@@ -12,6 +12,7 @@ description = "On-disk session store for bingo: a JSONL journal, a sidecar lock,
 workspace = true
 
 [dependencies]
+bingo-digest.workspace = true
 bingo-claim.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true

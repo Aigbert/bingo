@@ -6,7 +6,7 @@
 
 mod migrate;
 
-use std::io::{ErrorKind, Write};
+use std::io::{BufRead, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use bingo_sdk::{Frame, KernelError, Seq, SessionId};
@@ -100,6 +100,28 @@ pub fn replay(dir: &Path, since: Seq) -> Result<Vec<Frame>, KernelError> {
     let lines = lines(&bytes);
     let version = check(lines.first(), &path)?;
     frames(&lines, since, &path, version)
+}
+
+/// Check the header, then seek straight to the verified checkpoint's tail.
+pub(crate) fn tail(dir: &Path, offset: u64) -> Result<Vec<Frame>, KernelError> {
+    let path = layout::journal(dir);
+    let file = std::fs::File::open(&path).map_err(|e| storage(format!("open journal: {e}")))?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut header = Vec::new();
+    reader
+        .read_until(b'\n', &mut header)
+        .map_err(|e| storage(format!("read header: {e}")))?;
+    let version = check(Some(&header.as_slice()), &path)?;
+    reader
+        .seek(SeekFrom::Start(offset))
+        .map_err(|e| storage(format!("seek journal: {e}")))?;
+    let mut bytes = Vec::new();
+    reader
+        .read_to_end(&mut bytes)
+        .map_err(|e| storage(format!("read tail: {e}")))?;
+    let mut tail = vec![header.as_slice()];
+    tail.extend(lines(&bytes));
+    frames(&tail, Seq::ZERO, &path, version)
 }
 
 /// The lines of the file, without the empty tail a trailing newline leaves.

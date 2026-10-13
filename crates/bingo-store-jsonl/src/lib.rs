@@ -13,7 +13,7 @@ pub mod lock;
 pub mod summary;
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use async_trait::async_trait;
 use bingo_sdk::{
@@ -35,6 +35,7 @@ pub(crate) fn storage(message: impl Into<String>) -> KernelError {
 pub struct JsonlStore {
     root: PathBuf,
     locks: Arc<Locks>,
+    checkpoints: Arc<Mutex<()>>,
 }
 
 impl JsonlStore {
@@ -42,6 +43,7 @@ impl JsonlStore {
         Self {
             root: root.into(),
             locks: Arc::new(Locks::default()),
+            checkpoints: Arc::new(Mutex::new(())),
         }
     }
 
@@ -108,6 +110,31 @@ impl SessionStore for JsonlStore {
         let store = self.clone();
         let session = session.clone();
         off_runtime(move || journal::replay(&store.existing(&session)?, since)).await
+    }
+
+    async fn checkpoint(
+        &self,
+        session: &SessionId,
+        checkpoint: &bingo_sdk::Checkpoint,
+    ) -> Result<(), KernelError> {
+        let store = self.clone();
+        let session = session.clone();
+        let checkpoint = checkpoint.clone();
+        off_runtime(move || {
+            let _guard = store.checkpoints.lock().unwrap_or_else(|e| e.into_inner());
+            checkpoint::write(&store.existing(&session)?, &session, &checkpoint)
+        })
+        .await
+    }
+
+    async fn resume(&self, session: &SessionId) -> Result<bingo_sdk::Resumed, KernelError> {
+        let store = self.clone();
+        let session = session.clone();
+        off_runtime(move || {
+            let _guard = store.checkpoints.lock().unwrap_or_else(|e| e.into_inner());
+            checkpoint::resume(&store.existing(&session)?, &session)
+        })
+        .await
     }
 
     async fn list(&self, filter: &SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
