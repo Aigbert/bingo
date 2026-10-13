@@ -161,20 +161,11 @@ fn usage(state: &SessionState) -> Option<Span<'static>> {
     Some(Span::styled(
         format!(
             "{}/{}{tail}",
-            thousands(context.used),
-            thousands(context.window)
+            crate::count::count(context.used),
+            crate::count::count(context.window)
         ),
         theme::warming(warmth(share)),
     ))
-}
-
-/// Tokens as a person counts them: `41k`, and the bare number under a
-/// thousand.
-fn thousands(tokens: u64) -> String {
-    match tokens {
-        t if t < 1000 => t.to_string(),
-        t => format!("{}k", t / 1000),
-    }
 }
 
 /// How far the context count has warmed: nothing until [`CONTEXT_WARM`] % of
@@ -368,17 +359,6 @@ pub fn styles(line: &Line<'static>) -> Vec<(String, ratatui::style::Style)> {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn rough_edges_counts_have_one_precision() {
-        for (n, expected) in [
-            (812, "812"),
-            (1_200, "1.2k"),
-            (13_812, "13k"),
-            (1_200_000, "1.2M"),
-        ] {
-            assert_eq!(thousands(n), expected);
-        }
-    }
 
     use super::*;
     use crate::test_support::*;
@@ -507,8 +487,8 @@ mod tests {
             !text(&solo(&folded(vec![])), &ui, 80).contains("/200k"),
             "no turn has run, so there is nothing to count"
         );
-        assert_eq!(thousands(999), "999");
-        assert_eq!(thousands(41_900), "41k");
+        assert_eq!(crate::count::count(999), "999");
+        assert_eq!(crate::count::count(41_900), "41k");
     }
 
     /// An ACP session as the frames arrive (ADR-0055): the agent's own count
@@ -549,7 +529,7 @@ mod tests {
             ),
         ]);
         let screen = render(&state, &mut ui, now);
-        assert!(screen.contains("400k/1000k"), "{screen}");
+        assert!(screen.contains("400k/1.0M"), "{screen}");
         assert!(
             !screen.contains("/compact"),
             "the agent cuts its own context, and 40% is not a warning: {screen}"

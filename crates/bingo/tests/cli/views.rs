@@ -110,3 +110,27 @@ fn a_binary_without_a_script_has_no_fake_provider() {
     assert!(err.contains("anthropic"), "{err}");
     assert!(!err.contains("fake"), "{err}");
 }
+
+#[test]
+fn status_groups_token_counts_in_text_and_ndjson() {
+    let home = tempfile::tempdir().unwrap();
+    let reply = "a".repeat(4_800);
+    let script =
+        script(&serde_json::json!({"responses":[{"steps":[{"text": reply}]}]}).to_string());
+    let out = scripted_run(home.path(), &script, &[], "count this answer");
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(!frames_of(&out).is_empty());
+    let status = run(bingo()
+        .envs(home_env(home.path()))
+        .env("BINGO_FAKE_SCRIPT", script.path())
+        .args(["--print", "--continue", "--cwd"])
+        .arg(home.path())
+        .arg("/status"));
+    assert_eq!(status.status.code(), Some(0), "{}", stderr(&status));
+    assert!(stdout(&status).contains("1,200 out"), "{}", stdout(&status));
+    assert!(!stdout(&status).contains("[tool]"));
+    let json = scripted_run(home.path(), &script, &["--continue"], "/status");
+    assert_eq!(json.status.code(), Some(0), "{}", stderr(&json));
+    assert!(!frames_of(&json).is_empty());
+    assert!(stdout(&json).contains("1,200 out"), "{}", stdout(&json));
+}

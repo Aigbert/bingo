@@ -82,6 +82,7 @@ because after M123 the TUI names no tool and no plugin.
 - `crates/bingo-surface-tui/src/{dialog,transcript,activity,tree,status,
   roster,paths,run,view,keys,commands,preview,lib}.rs`, `transcript/output.rs`, the
   new count module, `views/text.rs` if the dim rule lands there
+- `crates/bingo/tests/cli/views.rs`: black-box status text/NDJSON coverage.
 - TUI unit/screen tests and snapshots; the channel-adapter command-preview
   constructor (mechanical `description: None`, protocol step 6).
 - `docs/design/tui.md`, `docs/design/tui-identity-2026-10.md`

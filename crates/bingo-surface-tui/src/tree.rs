@@ -312,7 +312,7 @@ pub fn activity(state: &SessionState) -> Option<String> {
     let cost = if lifecycle == Lifecycle::Working
         || (lifecycle == Lifecycle::Idle && state.last_status().is_some())
     {
-        let mut cost = spent(state);
+        let mut cost = work(state);
         if state.last_status().is_some() && lifecycle == Lifecycle::Idle {
             cost.push_str(&format!(" · {}s", seconds(state)));
         }
@@ -364,8 +364,8 @@ fn opening(parts: &[bingo_sdk::ContentPart]) -> Option<String> {
         .map(str::to_string)
 }
 
-/// `3 tools · 1.2k tokens`.
-pub fn spent(state: &SessionState) -> String {
+/// `3 tools · ↓ 140`.
+pub fn work(state: &SessionState) -> String {
     let tools = state
         .transcript
         .items()
@@ -374,9 +374,9 @@ pub fn spent(state: &SessionState) -> String {
         .count();
     let usage = &state.summary.usage;
     format!(
-        "{tools} tool{} · {} tokens",
+        "{tools} tool{} · ↓ {}",
         if tools == 1 { "" } else { "s" },
-        thousands(usage.input_total() + usage.output_tokens)
+        crate::count::count(usage.output_tokens)
     )
 }
 
@@ -393,13 +393,6 @@ pub fn seconds(state: &SessionState) -> i64 {
     match (first, last) {
         (Some(first), Some(last)) => last.duration_since(first).as_secs().max(0),
         _ => 0,
-    }
-}
-
-fn thousands(n: u64) -> String {
-    match n < 1_000 {
-        true => n.to_string(),
-        false => format!("{:.1}k", n as f64 / 1000.0),
     }
 }
 
@@ -428,7 +421,7 @@ mod tests {
         state.summary.usage.input_tokens = 40_000;
         state.summary.usage.cache_read_tokens = 80_000;
         state.summary.usage.output_tokens = 8_100;
-        assert_eq!(spent(&state), "0 tools · ↓ 8.1k");
+        assert_eq!(work(&state), "0 tools · ↓ 8.1k");
     }
 
     use super::*;
@@ -575,7 +568,7 @@ mod tests {
     }
 
     #[test]
-    fn a_child_row_says_what_it_is_doing_and_what_it_has_spent() {
+    fn a_child_row_says_what_it_is_doing_and_what_it_has_work() {
         let mut tree = Tree::new(state());
         for frame in busy_child("reviewer") {
             tree.fold.apply(&frame);
@@ -583,7 +576,7 @@ mod tests {
         let running = tree.fold.sessions().nth(1).expect("the child");
         assert_eq!(
             activity(running).as_deref(),
-            Some("working · 3 tools · 1.2k tokens")
+            Some("working · 3 tools · ↓ 140")
         );
 
         tree.fold.apply(&child_frame(
@@ -593,7 +586,7 @@ mod tests {
         let done = tree.fold.sessions().nth(1).expect("the child");
         assert_eq!(
             activity(done).as_deref(),
-            Some("idle · completed · 3 tools · 1.2k tokens · 0s")
+            Some("idle · completed · 3 tools · ↓ 140 · 0s")
         );
 
         tree.fold.apply(&child_frame(7, opened(child_permission())));

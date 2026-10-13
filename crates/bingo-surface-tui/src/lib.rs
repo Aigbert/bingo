@@ -55,6 +55,7 @@ mod clock;
 mod commands;
 mod complete;
 mod composer;
+mod count;
 mod dialog;
 mod effect;
 mod focus;
