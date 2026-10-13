@@ -86,6 +86,8 @@ mod paths;
 mod pictures;
 mod pointer;
 mod pulled;
+mod pane;
+mod toast;
 mod preview;
 mod render;
 mod rewind;
