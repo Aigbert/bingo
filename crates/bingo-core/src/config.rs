@@ -30,3 +30,41 @@ pub(crate) async fn set(
     }
     result.map(|set: catalogue::ConfigSet| set.value)
 }
+
+/// A model change may also name a provider; an absent provider stays untouched.
+pub(crate) async fn change(
+    host: &Host,
+    session: &SessionId,
+    change: SessionChange,
+) -> Result<SessionChange, KernelError> {
+    Ok(match change {
+        SessionChange::Key(key) => SessionChange::Key(value(host, session, "key", key).await?),
+        SessionChange::Title(title) => {
+            SessionChange::Title(value(host, session, "title", title).await?)
+        }
+        SessionChange::Thinking(effort) => {
+            SessionChange::Thinking(value(host, session, "thinking", effort).await?)
+        }
+        SessionChange::Model { provider, model } => {
+            let provider = match provider {
+                Some(provider) => Some(value(host, session, "provider", provider).await?),
+                None => None,
+            };
+            let model = value(host, session, "model", model).await?;
+            SessionChange::Model { provider, model }
+        }
+    })
+}
+
+async fn value<T: serde::Serialize + serde::de::DeserializeOwned>(
+    host: &Host,
+    session: &SessionId,
+    key: &str,
+    value: T,
+) -> Result<T, KernelError> {
+    let value = serde_json::to_value(value).map_err(invalid)?;
+    serde_json::from_value(set(host, session, key, value).await?).map_err(invalid)
+}
+fn invalid(error: impl std::fmt::Display) -> KernelError {
+    KernelError::new(ErrorCode::InvalidInput, error.to_string())
+}

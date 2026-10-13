@@ -19,7 +19,7 @@ struct Caller {
 struct Ops(&'static str);
 
 pub fn install(host: &HostHandle) -> Result<(), KernelError> {
-    for noun in ["state", "store", "ui", "model", "session"] {
+    for noun in ["state", "store", "ui", "session"] {
         let key = key(noun);
         if host.service_wire(&key).is_none() {
             host.open_service(&key, Arc::new(Ops(noun)))?;
@@ -47,6 +47,16 @@ pub async fn call(
         return CALLER.scope(caller, service(host, plugin, params)).await;
     }
     let (noun, verb) = admit(host, plugin, method, &params).await?;
+    if method == "host/model/complete" {
+        return Operations {
+            plugin,
+            host,
+            state,
+        }
+        .answer(method, params)
+        .await
+        .map_err(|error| error.message);
+    }
     let wire = host
         .service_wire(&key(noun))
         .ok_or_else(|| format!("{noun}: host face is unavailable"))?;
@@ -114,7 +124,6 @@ fn wire_method(noun: &str, verb: &str) -> Option<&'static str> {
         ("state" | "store", "get") => Some("host/state/get"),
         ("state" | "store", "set") => Some("host/state/set"),
         ("ui", "status") => Some("host/place"),
-        ("model", "complete") => Some("host/model/complete"),
         ("session", "extend") => Some("host/extend"),
         ("session", "deliver") => Some("host/deliver"),
         _ => None,
@@ -129,7 +138,6 @@ impl WireService for Ops {
                 .method::<StateGet, Option<StateValue>>("get", false)
                 .method::<StateSet, StateValue>("set", false),
             "ui" => face.method::<Place, ()>("status", false),
-            "model" => face.method::<Complete, Completed>("complete", true),
             "session" => face
                 .method::<Extend, ()>("extend", false)
                 .method::<Deliver, ()>("deliver", false),
