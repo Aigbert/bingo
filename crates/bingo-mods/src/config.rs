@@ -18,12 +18,14 @@ pub(crate) struct Options {
     #[serde(rename = "memoryMiB")]
     pub memory_mib: NonZeroUsize,
     pub hook_ms: NonZeroU64,
+    pub every_ms: NonZeroU64,
 }
 impl Default for Options {
     fn default() -> Self {
         Self {
             memory_mib: NonZeroUsize::new(64).unwrap_or(NonZeroUsize::MIN),
             hook_ms: NonZeroU64::new(10_000).unwrap_or(NonZeroU64::MIN),
+            every_ms: NonZeroU64::new(1000).unwrap_or(NonZeroU64::MIN),
         }
     }
 }
@@ -36,6 +38,7 @@ impl Options {
             .ok_or_else(|| bingo_sdk::PluginError::Config("mods.memoryMiB is too large".into()))?;
         Ok(Limits {
             memory_bytes,
+            every_time: Duration::from_millis(self.every_ms.get()),
             hook_time: Duration::from_millis(self.hook_ms.get()),
             ..Limits::default()
         })

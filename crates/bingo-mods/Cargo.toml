@@ -31,6 +31,8 @@ futures.workspace = true
 async-trait.workspace = true
 url.workspace = true
 getrandom.workspace = true
+# M138: the host clock uses the workspace timestamp type.
+jiff.workspace = true
 
 thiserror.workspace = true
 

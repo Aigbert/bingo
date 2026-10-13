@@ -107,6 +107,9 @@ impl Manager {
         }
         self.watch();
     }
+    pub(crate) fn every_floor(&self) -> std::time::Duration {
+        self.limits.every_time
+    }
     pub(crate) fn publish_callbacks(&self, module: Arc<Module>) {
         self.callbacks.insert(
             module.found.name.clone(),

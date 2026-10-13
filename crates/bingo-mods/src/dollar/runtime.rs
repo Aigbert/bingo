@@ -14,6 +14,8 @@ use serde_json::{Value, json};
 use std::{path::PathBuf, sync::Arc};
 
 pub struct Runtime {
+    timers: super::clock::Timers,
+    every_floor: std::time::Duration,
     pub(super) registered: super::register::Registrations,
     sessions: Sessions,
     root: PathBuf,
@@ -23,8 +25,14 @@ struct Noun {
     runtime: Arc<Runtime>,
 }
 impl Runtime {
-    pub fn install(host: &HostHandle, root: PathBuf) -> Result<Arc<Self>, KernelError> {
+    pub fn install(
+        host: &HostHandle,
+        root: PathBuf,
+        every_floor: std::time::Duration,
+    ) -> Result<Arc<Self>, KernelError> {
         let runtime = Arc::new(Self {
+            timers: Default::default(),
+            every_floor,
             registered: Default::default(),
             sessions: Sessions::default(),
             root,
@@ -48,9 +56,11 @@ impl Runtime {
         self.registered.commands()
     }
     pub async fn stop(&self) {
+        self.timers.stop().await;
         self.sessions.stop().await;
     }
     pub async fn end(&self, session: &SessionId) {
+        self.timers.end(session).await;
         self.sessions.remove(session).await;
     }
 
@@ -116,6 +126,18 @@ impl Runtime {
                         .map_err(bingo_plugin_host::host::error_message)?
                 ))
             }
+            "clock.now" => Ok(json!(jiff::Timestamp::now().to_string())),
+            "clock.sleep" => {
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    parse::<Millis>(params)?.ms,
+                ))
+                .await;
+                Ok(Value::Null)
+            }
+            "clock.after" | "clock.every" => {
+                self.timer(caller, parse(params)?, method == "clock.every")
+                    .await
+            }
             "session.version" => Ok(json!(env!("CARGO_PKG_VERSION"))),
             "session.root" => Ok(json!(self.root)),
             "session.messages" => {
@@ -166,6 +188,41 @@ impl Runtime {
             _ => Err(format!("{method}: runtime operation is unavailable")),
         }
     }
+    async fn timer(&self, caller: &Caller, input: Timer, every: bool) -> Result<Value, String> {
+        let registry = caller
+            .host
+            .service(&bingo_plugin_host::callback::KEY)
+            .ok_or("callback registry is unavailable")?;
+        let executor = registry.get(&caller.plugin)?;
+        let state = self
+            .sessions
+            .get(&caller.host, &input.session)
+            .await?
+            .snapshot();
+        let cx = HookContext {
+            session: input.session,
+            turn: None,
+            item: None,
+            cwd: state.summary.cwd.into(),
+            provider: None,
+            model: state.summary.model,
+            host: caller.host.clone(),
+        };
+        let requested = std::time::Duration::from_millis(input.ms);
+        let period = if every {
+            requested.max(self.every_floor)
+        } else {
+            requested
+        };
+        Ok(json!(self.timers.start(
+            cx,
+            executor,
+            input.callback,
+            period,
+            every
+        )))
+    }
+
     async fn input(&self, caller: &Caller, method: &str, params: Value) -> Result<Value, String> {
         let session: catalogue::Session = parse(params.clone())?;
         let live = self.sessions.get(&caller.host, &session.session).await?;

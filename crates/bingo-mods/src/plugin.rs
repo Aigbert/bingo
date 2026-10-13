@@ -84,7 +84,12 @@ impl Plugin for ModsPlugin {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|error| PluginError::Failed(error.to_string()))?;
-        let dollar = crate::dollar::Runtime::install(&host, cwd.clone())
+        let floor = self
+            .manager
+            .get()
+            .map(|manager| manager.every_floor())
+            .unwrap_or(std::time::Duration::from_secs(1));
+        let dollar = crate::dollar::Runtime::install(&host, cwd.clone(), floor)
             .map_err(|error| PluginError::Failed(error.message))?;
         bingo_plugin_host::ops::install(&host)
             .map_err(|error| PluginError::Failed(error.message))?;

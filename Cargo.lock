@@ -637,6 +637,7 @@ dependencies = [
  "bingo-sdk",
  "futures",
  "getrandom 0.4.3",
+ "jiff",
  "oxc_allocator",
  "oxc_ast",
  "oxc_codegen",

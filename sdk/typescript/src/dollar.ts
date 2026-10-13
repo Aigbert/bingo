@@ -39,6 +39,15 @@ export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root:
       return rpc.request<{ result: unknown }>('service/call', { key: route.face, method, params }).then(reply => reply.result);
     };
   }
+  for (const method of ['after', 'every']) {
+    const schedule = hostApi.clock[method];
+    hostApi.clock[method] = (ms: number, handler: Callback) => {
+      if (!callbacks) throw new Error('callback runtime is unavailable');
+      return schedule({ms,callback:callbacks.put('clock',handler)});
+    };
+  }
+  const sleep = hostApi.clock.sleep;
+  hostApi.clock.sleep = (ms: number) => sleep({ms});
   const deleteKey = hostApi.store.delete;
   hostApi.store.delete = (key: string) => deleteKey({scope:'global',key});
   for (const noun of ['tool', 'command']) {

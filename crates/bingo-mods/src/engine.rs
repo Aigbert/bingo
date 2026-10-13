@@ -14,6 +14,7 @@ pub struct Limits {
     pub memory_bytes: usize,
     pub stack_bytes: usize,
     pub hook_time: Duration,
+    pub every_time: Duration,
 }
 impl Default for Limits {
     fn default() -> Self {
@@ -21,6 +22,7 @@ impl Default for Limits {
             memory_bytes: 64 * 1024 * 1024,
             stack_bytes: 512 * 1024,
             hook_time: Duration::from_secs(10),
+            every_time: Duration::from_secs(1),
         }
     }
 }
