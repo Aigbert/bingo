@@ -279,6 +279,8 @@ impl SessionPort for TestSession {
     }
 }
 
+// Kept instead of the SDK TestHost: wire tests control live SessionPorts and
+// their replay/history cuts to exercise the real transport boundary.
 pub struct TestHost {
     session: Arc<TestSession>,
     snapshot: SessionState,
