@@ -29,7 +29,7 @@ behaviour and pins it with tests that will survive that refactor.
      then a new answer: `ContextView::items` must not contain the
      dropped id. Use the existing `TurnRetrying` frame in
      `bingo-core/fixtures/frames-v1.jsonl` if it fits.
-   - Session-level (`session/tests/`, with `bingo-provider-fake`): a
+   - Session-level (`session/tests/`, with the existing `ScriptedProvider`): a
      scripted retryable failure after partial text, a successful retry,
      then a second turn. The second turn's request must not contain the
      withdrawn text. Then close, resume from the same store, submit
@@ -60,8 +60,8 @@ behaviour and pins it with tests that will survive that refactor.
    `JsonlStore::append` (`bingo-store-jsonl/src/lib.rs`), once
    `journal::append` succeeded, a failure of `summary::write` or
    `summary::count_message` is logged and `Ok(())` is returned: the
-   line is written, and the summary is derived (ADR-0005 §5). Test it
-   with a read-only `summary.json`.
+   line is written, and the summary is derived (ADR-0005 §5). Test both summary paths
+   with a directory at `summary.json` (replacement must fail on every OS).
 5. Dated note on ADR-0002 §2: "enforced by M108: a failed append stops
    the session". No new ADR.
 
@@ -70,7 +70,8 @@ behaviour and pins it with tests that will survive that refactor.
 - `crates/bingo-core/src/context.rs` and its tests
 - `crates/bingo-core/src/session.rs` (`publish`, close path), a new
   `crates/bingo-core/src/session/storage.rs` if the stop needs a module
-- `crates/bingo-core/src/session/tests/` (new `retry.rs`, `storage.rs`)
+- `crates/bingo-core/src/session/{inputs,interactions,mailbox}.rs` (propagation)
+- `crates/bingo-core/src/session/tests.rs` and `tests/` (new `retry.rs`, `storage.rs`)
 - `crates/bingo-core/src/test_support.rs` (a failing store fake, if none)
 - `crates/bingo-store-jsonl/src/lib.rs` and its tests
 - `docs/adr/0002-event-stream.md` (dated note)
@@ -102,3 +103,12 @@ behaviour and pins it with tests that will survive that refactor.
   assert the turn's token is cancelled in the storage test.
 - Re-verify at start: `publish`, `ContextView::items`, `turn_retrying`
   and `JsonlStore::append` by name, not by line.
+
+## Re-verification (2026-10-13)
+
+At `82e78d22`, all named symbols and bugs remain. Publication callers in
+`inputs.rs` and `interactions.rs` need fallible propagation; mailbox replies
+must not acknowledge failed writes. Existing `ScriptedProvider` records
+requests; no provider dependency is needed. `summary::write` renames a
+temporary file, so a read-only destination does not fail reliably on Unix.
+Use a destination directory to test the same failure portably.
