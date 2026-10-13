@@ -8,7 +8,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bingo_sdk::{Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits};
+use bingo_sdk::{ContentPart, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits};
 use serde_json::{Value, json};
 
 use crate::codec::{INTERNAL_ERROR, RpcError};
@@ -109,17 +109,24 @@ impl PluginTool {
 }
 
 async fn output(plugin: &str, reply: Reply) -> Result<ToolOutput, ToolError> {
-        match reply {
-            Ok(value) => serde_json::from_value::<ToolCallResult>(value)
-                .map(|result| result.output)
-                .map_err(|e| ToolError::Failed(format!("{}: {e}", plugin))),
-            Err(error) => Err(ToolError::Failed(format!(
-                "{}: {}",
-                plugin, error.message
-            ))),
-        }
+    let value = reply.map_err(|error| ToolError::Failed(format!("{plugin}: {}", error.message)))?;
+    let result: ToolCallResult = serde_json::from_value(value)
+        .map_err(|error| ToolError::Failed(format!("{plugin}: {error}")))?;
+    let mut parts = Vec::with_capacity(result.output.parts.len());
+    for part in result.output.parts {
+        parts.push(bounded_part(part).await);
     }
+    Ok(ToolOutput { parts, ..result.output })
+}
 
+async fn bounded_part(part: ContentPart) -> ContentPart {
+    let ContentPart::Image(image) = part else { return part };
+    let media_type = image.media_type.clone();
+    match bingo_pictures::taken(image).await {
+        Ok(image) => ContentPart::Image(image),
+        Err(why) => ContentPart::text(format!("[{media_type} is not a picture: {why}]")),
+    }
+}
 
 /// Says `tool/cancel` when the kernel stops waiting for a call before the
 /// plugin answered it.
