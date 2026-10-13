@@ -13,10 +13,12 @@ existing hook tests pass unedited. Audit §3, Mods gap 1.
 
 1. **Contract and failing tests.** In `bingo-sdk`: `Interceptor` (one
    defaulted method per point, each `next.run(input)`), `Next<'_, I, O>`
-   consumed by value, `LinkPoint`, `LinkMatcher` (points + tool name,
+   consumed by value, `LinkPoint` (the seven catalogue names of
+   ADR-0074 §1, serialised as `tool.check` etc.; M136 makes it the
+   catalogue), `LinkMatcher` (points + tool name,
    `hook_applies` semantics), `Tier { Tighten, Rewrite, Full }`,
    `Contribution::Interceptor` and `Registrar::external_interceptor(name,
-   link)`. Tests that fail on the tree: a link at `tool.run` answers for
+   link)`. Tests that fail on the tree: a link at `tool.call` answers for
    the engine and the tool never runs; an invoked call is seen by an
    `AfterTool` hook (`session/invoke.rs` runs none today).
 2. **The adapter's contract, pinned before it moves.** One test per rule
@@ -34,20 +36,21 @@ existing hook tests pass unedited. Audit §3, Mods gap 1.
    matcher filter, tier check per link, the `HOOK` deadline on an external
    link, skip-with-notice on error, timeout or overstep. Generic over the
    point; one module.
-5. **`tool.gate` and `tool.run`.** `gate_call` becomes the kernel link
+5. **`tool.check` and `tool.call`.** `gate_call` becomes the kernel link
    (policy then person) behind plugin links; the `BeforeTool` adapter is
    `run_hooks` moved, not rewritten. `execute`/`execute_one` become the
-   `tool.run` kernel link; `after_tool_hooks` becomes the `AfterTool`
+   `tool.call` kernel link; `after_tool_hooks` becomes the `AfterTool`
    adapter. The turn's `gate`, `run_tools` and the bridged door
    (`Bridged::gated`, `serve`) all call the two chains (§5).
-6. **`submit` and `stop`.** `submit_prose`'s hook loop and `stop_hooks`
+6. **`prompt.submit` and `turn.stop`.** `submit_prose`'s hook loop and `stop_hooks`
    become adapters over their chains; the actor's dispositions (reject,
-   redirect, queue, start) are the `submit` kernel link.
-7. **`model.request`, `context.compose`, `compact`.** The provider stream
+   redirect, queue, start) are the `prompt.submit` kernel link.
+7. **`turn.step`, `prompt.compose`, `session.compact`.** The provider stream
    in `turn/stream.rs`, `assemble_request` and `Turn::compact`'s call to
    the strategy become kernel links. Only in-process links exist until
    M132; the tier check already applies.
-8. **`pluginTrust`.** A kernel key beside `enabledPlugins`, read from the
+8. **`pluginTrust`.** A kernel key beside `enabledPlugins`,
+   `{"<name>": {"tier", "uses"}}` (`uses` is read from M137 on), from the
    user layer only; a value in a project or CLI layer is ignored with a
    notice. `bingo plugins list` prints each external plugin's tier.
 
@@ -66,14 +69,14 @@ existing hook tests pass unedited. Audit §3, Mods gap 1.
 ## Exit criteria
 
 - [ ] `cargo test -p bingo-core chain::` passes: a `full` link answers at
-      `tool.run`, `model.request` and `compact` without the kernel link
+      `tool.call`, `turn.step` and `session.compact` without the kernel link
       running; a `rewrite` link's Allow over `next`'s Ask is skipped with a
-      notice; a `tighten` link at `model.request` observes only.
+      notice; a `tighten` link at `turn.step` observes only.
 - [ ] `cargo test -p bingo-core hook_contract::` passes: one test per rule
       in ADR-0074 §2, and each was green before brick 5 (pasted).
 - [ ] `cargo test -p bingo-core invoke::` shows an `AfterTool` hook seeing
       a call handed in through `HostApi::invoke`.
-- [ ] A test interrupts a turn while a link at `tool.gate` never returns:
+- [ ] A test interrupts a turn while a link at `tool.check` never returns:
       the turn ends `Interrupted` within the supervised-future bound (M116).
 - [ ] `pluginTrust` in a project layer grants nothing: a settings test.
 - [ ] `bingo plugins list` prints the tier: a black-box CLI test.
@@ -95,10 +98,10 @@ existing hook tests pass unedited. Audit §3, Mods gap 1.
 - `Next` borrowing the remaining links across an `.await` may fight the
   borrow checker in the turn, which holds `&mut self`; fall back to
   `Arc<[Arc<dyn Interceptor>]>` plus an index, not to cloning the turn.
-- `context.compose` and the ruler interact: a link that grows the request
+- `prompt.compose` and the ruler interact: a link that grows the request
   after measurement would overflow. Compose runs before the ruler
   measures; say so in the trait's doc and test it.
-- A `tool.run` answer for the engine must still journal a receipt naming
+- A `tool.call` answer for the engine must still journal a receipt naming
   the link, or a rewritten result would be indistinguishable in `/rewind`.
 - Per-round cost on long turns: gather links once per round, as hooks are.
 - Re-verify at start: M116 (ADR-0068) will have made the turn one

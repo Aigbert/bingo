@@ -8,7 +8,9 @@ author runs — `bingo plugins validate <dir>` and `bingo plugins test
 <dir>` — and an example, `examples/plugins/ts-status`, that does Phase 5's
 acceptance test from a directory outside the workspace: it places a status
 entry, intercepts a tool call, and keeps its state across a hot reload.
-No JS engine is embedded; the SDK runs under node, deno or bun.
+The module is ADR-0078 §2's `register(on)`: the SDK runs it under node,
+deno or bun over protocol 2, and M137's in-process runtime runs the same
+file unchanged.
 
 ## Bricks, in build order
 
@@ -19,7 +21,7 @@ No JS engine is embedded; the SDK runs under node, deno or bun.
    — `slot {slot, contains}`, `tool {name, contains}`, `denied {name}`,
    `notice {contains}`. A Rust type with its schema committed as
    `schema/plugin-scenario.json` (the `BINGO_UPDATE_SCHEMA` test of
-   `schema.rs`). In `bingo-plugin-rpc`, `wire_ts.rs` renders
+   `schema.rs`). A new library crate, `bingo-schema-ts`, renders
    `sdk/typescript/src/wire.ts` from the plugin schema the same way, and a
    test fails when the committed file differs. Both fail first.
 2. **The TS renderer as a pure brick.** `render(schema: &Value) -> String`
@@ -31,15 +33,20 @@ No JS engine is embedded; the SDK runs under node, deno or bun.
    only (`readline`, `process`):
    - `rpc.ts` — one JSON-RPC message per line, ids, the pending table,
      `METHOD_NOT_FOUND` for a method it has no handler for.
-   - `plugin.ts` — `definePlugin({name, tools, commands, links})`; the
-     handshake with protocol 2 and its capabilities; `tools/changed`.
-   - `link.ts` — `before(point, matcher, (host, input) => …)` answers in
-     one phase; `around(point, matcher, async (host, input, next) => …)`
-     declares `after`, suspends at `await next(input)` until the
-     `/after` phase and answers with what the handler returns;
-     `intercept/cancel` rejects the pending `next` with a cancellation.
-   - `host.ts` — `place`, `extend`, `deliver`, `state.get/set` with
-     `ifVersion`, `complete`, `service`.
+   - `plugin.ts` — the entry a manifest's `command` runs: imports the
+     author's module, calls `register(on, options)`, declares each hooked
+     event at the handshake (protocol 2 capabilities); `tools/changed`.
+   - `on.ts` — `on(pattern, matcher?, hook)` with ADR-0078 §2's patterns;
+     a pure `matches(matcher, e)` (scalar, RegExp, array, nested) with
+     table tests. A hook `($, e, next)` crosses as `intercept/<event>`
+     with `after` declared: returning without `next` answers in one
+     phase; `next(e2)` answers `{next: e2}` and resolves with the
+     `/after` result; `intercept/cancel` rejects the pending `next`.
+   - `dollar.ts` — `$` over the protocol-2 verbs, named as ADR-0078's
+     `$` table names them: `$.ui.status` (`host/place`), `$.state` and
+     `$.store` (`host/state` session and global), `$.model.complete`,
+     `$.session.deliver`/`extend`, `$.<noun>.<method>` (`service/call`).
+     A method this transport lacks is absent from its type.
    - `index.ts` exports; imports use `import type` and `.ts` extensions.
 4. **`bingo plugins validate <dir>`.** In `bingo-plugin-rpc`,
    `validate.rs`: parse the manifest (name rules, entry, `config` is a
@@ -53,10 +60,11 @@ No JS engine is embedded; the SDK runs under node, deno or bun.
    step asks the plugin host to reload now — the path the poll takes — so
    no step waits on a clock. Exit 0, or 1 with the failing step and what
    the session showed instead.
-6. **`examples/plugins/ts-status`.** Counts the tool calls it has seen in
-   `host/state` (`global`), shows the count in the status slot, and at
-   `tool.gate` denies `Bash` whose command starts with `rm -rf` — the
-   `tighten` tier's own right, no trust grant needed.
+6. **`examples/plugins/ts-status`.** `hooks/register.ts` counts the tool
+   calls it has seen in `$.store`, shows the count with `$.ui.status`, and
+   at `tool.check` (`{ tool: 'Bash' }`) denies a command starting with
+   `rm -rf` — the `tighten` tier's own right, no grant needed. `main.ts`
+   is the two-line node entry; M137 loads `register.ts` itself.
    `scenarios/acceptance.json` reads a file twice, reloads, reads again,
    expects `3` in the slot, then sees `rm -rf` denied.
 7. **The acceptance run.** A black-box test copies `ts-status` and
@@ -68,19 +76,22 @@ No JS engine is embedded; the SDK runs under node, deno or bun.
 ## Files
 
 - `sdk/typescript/{package.json (private, no dependencies),README.md}`
-- `sdk/typescript/src/{wire.ts (generated),rpc.ts,plugin.ts,link.ts,host.ts,index.ts}`
-- `crates/bingo-plugin-rpc/src/{wire_ts.rs,validate.rs}` (new), `lib.rs`, `schema.rs`
+- `sdk/typescript/src/{wire.ts (generated),rpc.ts,plugin.ts,on.ts,dollar.ts,index.ts}`
+- `crates/bingo-schema-ts/src/lib.rs` (new, `tier = "library"`, serde_json
+  only; the desktop (M143) and the catalogue (M136) render with it too)
+- `crates/bingo-plugin-rpc/src/{wire_ts.rs,validate.rs}` (new; `wire_ts`
+  calls the renderer and owns the drift test), `lib.rs`, `schema.rs`
 - `crates/bingo/src/plugins.rs` → `plugins/{mod.rs,switch.rs,validate.rs,scenario.rs}`
 - `crates/bingo/src/main.rs` (`plugins::Action::{Validate,Test}`)
 - `schema/plugin-scenario.json` (new)
-- `examples/plugins/ts-status/{plugin.json,main.ts,scenarios/acceptance.json,README.md}`
+- `examples/plugins/ts-status/{plugin.json,hooks/register.ts,main.ts,scenarios/acceptance.json,README.md}`
 - `crates/bingo/tests/plugin_kit.rs` (new)
 - `.github/workflows/ci.yml` — `actions/setup-node`, pinned, Linux job
   only, so the acceptance run is not skipped there (this line justifies it)
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-plugin-rpc wire_ts::` passes; editing
+- [ ] `cargo test -p bingo-schema-ts` and `-p bingo-plugin-rpc wire_ts::` pass; editing
       `wire.ts` by hand makes it fail (shown once, pasted).
 - [ ] `cargo test -p bingo-plugin-rpc validate::`: a missing entry, a bad
       name and a protocol-1 plugin each fail with the field named.
@@ -98,7 +109,8 @@ No JS engine is embedded; the SDK runs under node, deno or bun.
 - Publishing the SDK to a registry; `bingo plugins new`; a template.
 - Type-checking the SDK in CI (type stripping checks nothing; `tsc` is a
   dependency); the example running is the test.
-- An SDK in another language; an in-process JS engine (refused).
+- An SDK in another language; the in-process runtime (M137, whose first
+  module is this `register.ts`); `*.test.ts` (M142 replaces scenarios).
 - Expectations over plugin state directly: the example shows its state
   in its slot, which is what a person would see.
 
@@ -107,7 +119,7 @@ No JS engine is embedded; the SDK runs under node, deno or bun.
 - Node's default type stripping arrived in 23.6 and was backported to
   22.18 (believed; verify both, and what deno and bun need) — the skip
   reads the version, not the name.
-- `around` holds a pending promise across two requests; a plugin that
+- A hook holds a pending `next` across two requests; a plugin that
   never calls `next` and never returns holds a chain until the `HOOK`
   deadline. The deadline is the host's (ADR-0074 §4), not the SDK's.
 - `FakeProvider` in a user-facing command: it is already in the bin;
@@ -116,4 +128,4 @@ No JS engine is embedded; the SDK runs under node, deno or bun.
   generator reads them, it does not restate them); ADR-0070 slots as
   M121/M123 built them (what `expect slot` reads off `SessionState`);
   M128's `bingo-process` for `validate`'s spawn; ADR-0068/M116 for the
-  esc test of `around`; M111's test host for the bin's unit tests.
+  esc test of a pending `next`; M111's test host for the bin's unit tests.

@@ -19,6 +19,7 @@ M133's; this milestone makes every verb it needs answerable.
    host does not serve gets `METHOD_NOT_FOUND` (today: no reply); a plugin
    that says `protocol: 1` is refused with both numbers in the notice.
 2. **Capabilities.** `initialize` carries the host's `capabilities` and
+   `plugin_name` beside `plugin_root` (for `$.plugin`, ADR-0078), and
    the answer the plugin's; `negotiated(host, plugin) -> BTreeSet<Cap>` is
    a pure brick with table tests. A verb neither side named is
    `METHOD_NOT_FOUND`; one only the host named is refused in words.
@@ -36,10 +37,11 @@ M133's; this milestone makes every verb it needs answerable.
    `GatewayEvent::SessionRemoved`. A conflict answers the held version.
 6. **`HostApi::complete`.** In `bingo-sdk`, defaulted to
    `Unsupported`; in `bingo-core`, one request on the session's resolved
-   model with its provider, refused unless a turn is running, its `Usage`
-   added to that turn's bill (`TurnCompleted.usage` sums it; no context
-   reading changes). `host/model/complete` calls it. A test: a stub
-   plugin's completion shows in the turn's usage.
+   model with its provider, its `Usage` added to the running turn's bill
+   (`TurnCompleted.usage` sums it), or with no turn running charged to the
+   session by a `UsageCharged` without a turn (ADR-0075 §2, revised). No
+   context reading changes. `host/model/complete` calls it. A test: a
+   stub plugin's completion shows in the turn's usage.
 7. **`tools/changed`.** Replaces the plugin's held tool list (and
    `commands/changed` its commands); `PluginTools` already reads the
    manager per round, so no kernel change.
@@ -57,7 +59,7 @@ M133's; this milestone makes every verb it needs answerable.
 10. **Hot reload.** `--plugin-dir` writes `pluginDirs` in `cli_layer`;
     discovery adds them as the last layer. `reload.rs`: a pure
     `changed(before, after: &Stamps) -> bool` over (path, len, mtime),
-    then a poll once a second on the session's clock (M111), then stop
+    then a poll once a second on tokio time (paused in tests, M111), then stop
     → spawn → handshake → re-read → notice. A changed `providers` or
     `services` declaration is reported as needing a restart.
 
@@ -80,11 +82,11 @@ M133's; this milestone makes every verb it needs answerable.
 - [ ] `cargo test -p bingo-plugin-rpc --test plugin` covers every verb of
       ADR-0075 §2 through the stub plugin, `METHOD_NOT_FOUND`, the
       protocol-1 refusal and a state conflict.
-- [ ] An intercept test: a stub link at `tool.run` with `after` sees the
+- [ ] An intercept test: a stub link at `tool.call` with `after` sees the
       result; esc during its first phase sends `intercept/cancel` and the
       turn ends `Interrupted` (M116 bound).
 - [ ] `cargo test -p bingo-core complete::`: usage of a side call is in
-      `TurnCompleted.usage`; outside a turn it is refused.
+      `TurnCompleted.usage`; outside a turn it is the session's charge.
 - [ ] A grandchild-leak test passes on unix and in CI's `windows` job.
 - [ ] A reload test: touching the stub's manifest re-handshakes, keeps a
       `global` state value and posts one notice; no sleep in the test.
