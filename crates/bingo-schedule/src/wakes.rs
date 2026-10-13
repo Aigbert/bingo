@@ -220,19 +220,21 @@ mod tests {
         assert!(fixture.host.delivered().is_empty());
     }
 
-    /// The loop itself, on a real clock: a wake set for now is delivered
-    /// without waiting for a sleep to end, because setting one rings the bell.
-    #[tokio::test]
+    /// Setting an already-due wake rings the bell even while time is paused.
+    #[tokio::test(start_paused = true)]
     async fn the_loop_delivers_a_wake_the_moment_it_is_set_for() {
         let fixture = Fixture::new();
         let wakes = Arc::new(Wakes::default());
         let cancel = CancellationToken::new();
         let loop_ = tokio::spawn(run(Arc::clone(&wakes), fixture.handle(), cancel.clone()));
         wakes.set(&session("ses_now"), wake(0));
-        let started = std::time::Instant::now();
-        while fixture.host.delivered().is_empty() && started.elapsed() < Duration::from_secs(10) {
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while fixture.host.delivered().is_empty() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("the loop delivers the due wake");
         cancel.cancel();
         loop_.await.expect("the loop ends when told");
         assert_eq!(fixture.host.delivered().len(), 1, "delivered once");

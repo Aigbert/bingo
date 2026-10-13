@@ -11,8 +11,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bingo_sdk::{
     Answer, AnswerSpec, CancellationToken, CommandContext, Delivery, Env, HostApi, HostHandle,
-    Input, IntentId, InteractionKind, ItemBody, ItemId, KernelError, Prompter, SessionId,
-    ToolContext, ToolHost, ToolOutput, TurnId, testing::NoHost,
+    Input, InteractionKind, ItemBody, ItemId, KernelError, Prompter, SessionId, ToolContext,
+    ToolHost, ToolOutput, TurnId, testing::NoHost,
 };
 use serde_json::Value;
 
