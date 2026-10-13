@@ -35,7 +35,7 @@ use crate::prompt::{self, PromptInput};
 use crate::session::{self, Mailbox};
 use crate::settings::{self, Claim, Layer, Merged, SettingsError};
 use crate::turn::{
-    self, CompactorSet, ContributorSet, HookSet, ModelChoice, ToolSet, TurnBudget, TurnConfig,
+    CompactorSet, ContributorSet, HookSet, ModelChoice, ToolSet, TurnBudget, TurnConfig,
 };
 
 /// Gateway events buffered per subscriber before the oldest is dropped.
@@ -114,9 +114,7 @@ pub struct Host {
 #[derive(Clone)]
 struct Live {
     mailbox: Mailbox,
-    key: Option<String>,
-    cwd: String,
-    parent: Option<SessionId>,
+    changing: Arc<tokio::sync::Mutex<()>>,
     created_at: Timestamp,
     /// What the session was opened with, resolved: `/model` and `/think`
     /// rewrite it (ADR-0008 §4, ADR-0047 §1), and it is the one holder of
@@ -128,9 +126,7 @@ impl Live {
     fn new(mailbox: Mailbox, summary: &SessionSummary, spec: SessionSpec) -> Self {
         Self {
             mailbox,
-            key: summary.key.clone(),
-            cwd: summary.cwd.clone(),
-            parent: summary.parent.as_ref().map(|p| p.session.clone()),
+            changing: Arc::new(tokio::sync::Mutex::new(())),
             created_at: summary.created_at,
             spec,
         }
@@ -355,7 +351,7 @@ impl Host {
         let mut frontier = vec![root.clone()];
         while let Some(parent) = frontier.pop() {
             for (id, live) in sessions.iter() {
-                if live.parent.as_ref() == Some(&parent) {
+                if live.spec.parent.as_ref().map(|p| &p.session) == Some(&parent) {
                     out.push((id.clone(), live.mailbox.clone()));
                     frontier.push(id.clone());
                 }
@@ -388,10 +384,14 @@ impl Host {
     fn depth(&self, id: &SessionId) -> u32 {
         let sessions = self.lock();
         let mut depth = 0;
-        let mut cursor = sessions.get(id).and_then(|l| l.parent.clone());
+        let mut cursor = sessions
+            .get(id)
+            .and_then(|l| l.spec.parent.as_ref().map(|p| p.session.clone()));
         while let Some(parent) = cursor {
             depth += 1;
-            cursor = sessions.get(&parent).and_then(|l| l.parent.clone());
+            cursor = sessions
+                .get(&parent)
+                .and_then(|l| l.spec.parent.as_ref().map(|p| p.session.clone()));
         }
         depth
     }
@@ -429,7 +429,7 @@ impl Host {
         let children = self
             .lock()
             .values()
-            .filter(|l| l.parent.as_ref() == Some(parent))
+            .filter(|l| l.spec.parent.as_ref().map(|p| &p.session) == Some(parent))
             .count();
         if children >= max {
             return Err(KernelError::new(
@@ -454,7 +454,7 @@ impl Host {
         if self
             .lock()
             .iter()
-            .any(|(id, l)| except != Some(id) && l.key.as_deref() == Some(key))
+            .any(|(id, l)| except != Some(id) && l.spec.key.as_deref() == Some(key))
         {
             return Err(KernelError::new(
                 ErrorCode::SessionLocked,
@@ -464,21 +464,20 @@ impl Host {
         Ok(())
     }
 
-    /// A session's identity, as its spec gives it. What answers it is not
-    /// here: [`turn::runs_on`] stamps that from the resolved choice.
-    fn summarize(&self, spec: &SessionSpec) -> SessionSummary {
+    /// The identity and initial progress of a newly minted session.
+    fn summarize(&self) -> SessionSummary {
         let now = Timestamp::now();
         SessionSummary {
-            driver: spec.driver,
+            driver: Driver::default(),
             id: SessionId::mint(),
-            key: spec.key.clone(),
-            title: spec.title.clone(),
-            cwd: spec.cwd.display().to_string(),
-            parent: spec.parent.clone(),
+            key: None,
+            title: None,
+            cwd: String::new(),
+            parent: None,
             model: None,
             provider: None,
-            system_extra: spec.system_extra.clone(),
-            tools: spec.tools.clone(),
+            system_extra: None,
+            tools: None,
             created_at: now,
             updated_at: now,
             usage: Usage::default(),
@@ -532,7 +531,8 @@ impl Host {
             .map(|choice| self.system_blocks(spec, choice))
             .unwrap_or_default();
         TurnConfig {
-            session: summary.clone(),
+            spec: Arc::new(spec.clone()),
+            session: crate::spec::stated(spec, choice.as_ref(), summary.clone()),
             cwd: spec.cwd.clone(),
             model: choice,
             system,
@@ -572,7 +572,7 @@ impl Host {
         self.check_key_free(spec.key.as_deref())?;
         let spec = self.inherited(spec);
         let choice = self.model_for(&spec).await?;
-        let summary = turn::runs_on(self.summarize(&spec), choice.as_ref());
+        let summary = crate::spec::stated(&spec, choice.as_ref(), self.summarize());
         if let Some(store) = &self.registry.store {
             store.create(&summary).await?;
             store.acquire(&summary.id).await?;
@@ -663,17 +663,16 @@ impl Host {
             SessionSelector::ById { id } => sessions.get(id).map(|l| l.mailbox.clone()),
             SessionSelector::ByKey { key } => sessions
                 .values()
-                .find(|l| l.key.as_deref() == Some(key.as_str()))
+                .find(|l| l.spec.key.as_deref() == Some(key.as_str()))
                 .map(|l| l.mailbox.clone()),
             // A person's own session, never one of its children: a role or a
             // room under it is newer, and is not what `--continue` means.
             SessionSelector::Latest { cwd } => {
-                let cwd = cwd.display().to_string();
-                let here: Vec<&Live> = sessions.values().filter(|l| l.cwd == cwd).collect();
+                let here: Vec<&Live> = sessions.values().filter(|l| &l.spec.cwd == cwd).collect();
                 here.iter()
-                    .filter(|l| l.parent.is_none())
+                    .filter(|l| l.spec.parent.is_none())
                     .chain(here.iter())
-                    .max_by_key(|l| (l.parent.is_none(), l.created_at))
+                    .max_by_key(|l| (l.spec.parent.is_none(), l.created_at))
                     .map(|l| l.mailbox.clone())
             }
         }
@@ -689,14 +688,14 @@ impl HostApi for Host {
             if filter
                 .cwd
                 .as_ref()
-                .is_some_and(|cwd| cwd.display().to_string() != session.cwd)
+                .is_some_and(|cwd| cwd != &session.spec.cwd)
             {
                 continue;
             }
             if filter
                 .parent
                 .as_ref()
-                .is_some_and(|p| session.parent.as_ref() != Some(p))
+                .is_some_and(|p| session.spec.parent.as_ref().map(|link| &link.session) != Some(p))
             {
                 continue;
             }
@@ -852,6 +851,8 @@ impl HostApi for Host {
         session: &SessionId,
         change: SessionChange,
     ) -> Result<(), KernelError> {
+        let changing = self.live(session)?.changing;
+        let _guard = changing.lock().await;
         let live = self.live(session)?;
         if !matches!(change, SessionChange::Key(_)) && live.spec.driver == Driver::Log {
             return Err(KernelError::new(
@@ -865,17 +866,10 @@ impl HostApi for Host {
         let mut spec = live.spec.clone();
         apply(change, &mut spec);
         let choice = self.model_for(&spec).await?;
-        // The spec is what the session was asked to be, the actor's summary
-        // what it has become: a rename is the one thing here the spec knows
-        // first, and a name the actor minted is one the spec never had.
-        let mut summary = live.mailbox.summary().await?;
-        summary.key = spec.key.clone();
-        summary.title = spec.title.clone().or(summary.title);
-        let summary = turn::runs_on(summary, choice.as_ref());
+        let summary = live.mailbox.summary().await?;
         let config = Arc::new(self.turn_config(&spec, &summary, choice, &live.mailbox));
         if let Some(entry) = self.lock().get_mut(session) {
             entry.spec = spec;
-            entry.key = entry.spec.key.clone();
         }
         live.mailbox.reconfigure(config);
         Ok(())

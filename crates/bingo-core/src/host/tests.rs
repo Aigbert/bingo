@@ -18,6 +18,7 @@ mod resume;
 mod rewind;
 mod routes;
 mod services;
+mod spec_owner;
 mod tree;
 mod views;
 

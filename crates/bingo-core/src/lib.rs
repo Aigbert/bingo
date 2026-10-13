@@ -16,6 +16,7 @@ pub mod prompt;
 pub mod rewind;
 pub mod session;
 pub mod settings;
+mod spec;
 pub mod turn;
 
 #[cfg(test)]

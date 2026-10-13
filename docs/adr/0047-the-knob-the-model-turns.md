@@ -34,6 +34,7 @@ doors open.
    model, and from then on the spec is the one holder: `Live.thinking`
    goes, `Change::Thinking` writes the spec, the choice reads it, a
    resume fills it from the config view as before.
+   *(Amended 2026-10-13, M118: `bingo-core/src/spec.rs` joins the live spec and durable fold, including effort; `Live` drops its duplicate key, cwd and parent.)*
 2. **A spawn says it in words.** `SpawnAgent{thinking}` and a
    definition's `thinking:` take the seven words `/think` takes — `off`
    and the six levels — from one list on `Effort`, parsed by one
