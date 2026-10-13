@@ -57,6 +57,19 @@ pub struct PluginTrust {
     pub uses: Vec<String>,
 }
 
+/// A process identity accompanies every dynamically supplied link.
+#[derive(Clone)]
+pub struct ExternalInterceptor {
+    pub plugin: String,
+    pub link: std::sync::Arc<dyn Interceptor>,
+}
+
+#[async_trait]
+pub trait InterceptorSource: Send + Sync {
+    fn id(&self) -> &str;
+    async fn interceptors(&self) -> Vec<ExternalInterceptor>;
+}
+
 /// The continuation cannot be cloned or called twice.
 ///
 /// ```compile_fail

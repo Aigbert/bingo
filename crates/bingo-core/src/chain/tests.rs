@@ -154,3 +154,31 @@ async fn a_rewrite_allow_over_nexts_ask_is_skipped() {
     assert!(matches!(result.decision, Decision::Ask { .. }));
     assert_eq!(report.take().len(), 1);
 }
+
+#[tokio::test]
+async fn dynamic_links_are_read_again_and_receive_only_the_user_grant() {
+    struct Source(std::sync::atomic::AtomicBool);
+    struct Observer;
+    #[async_trait::async_trait]
+    impl Interceptor for Observer {
+        fn id(&self) -> &str { "observer" }
+        fn matcher(&self) -> LinkMatcher { LinkMatcher::default() }
+    }
+    #[async_trait::async_trait]
+    impl InterceptorSource for Source {
+        fn id(&self) -> &str { "source" }
+        async fn interceptors(&self) -> Vec<ExternalInterceptor> {
+            if self.0.load(std::sync::atomic::Ordering::Relaxed) {
+                vec![ExternalInterceptor { plugin: "outside".into(), link: Arc::new(Observer) }]
+            } else { vec![] }
+        }
+    }
+    let source = Arc::new(Source(std::sync::atomic::AtomicBool::new(true)));
+    let mut hooks = crate::turn::HookSet::default();
+    hooks.interceptors.push(source.clone());
+    assert_eq!(hooks.links().await[0].tier, Tier::Tighten);
+    hooks.grants.insert("outside".into(), PluginTrust { tier: Tier::Rewrite, uses: vec![] });
+    assert_eq!(hooks.links().await[0].tier, Tier::Rewrite);
+    source.0.store(false, std::sync::atomic::Ordering::Relaxed);
+    assert!(hooks.links().await.is_empty());
+}
