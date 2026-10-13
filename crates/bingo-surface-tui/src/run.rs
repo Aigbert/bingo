@@ -1,12 +1,6 @@
-//! The loop. It selects over four things — the terminal, the frame stream, a
-//! tick, and the results of the few host calls it makes — and it never awaits
-//! the kernel: `submit`, `interrupt` and `answer` return nothing, and `open`,
-//! `events_since`, `sessions` and `catalog` are spawned and mailed back. A key
-//! press can therefore never wait for a turn.
-//!
-//! The attachment carries the whole tree (ADR-0010 §3): one stream, every
-//! frame stamped with its own session, folded into one reducer state each by
-//! [`crate::tree::Tree`].
+//! Terminal input never waits for a turn: host calls are spawned and mailed
+//! back while the loop selects over input, frames, ticks and replies.
+//! One attachment carries the tree, folded by [`bingo_sdk::TreeState`].
 
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -560,13 +554,7 @@ impl Run {
             .map_err(stdio)
     }
 
-    /// The root closing ends the run. A child deleted leaves the tree, and
-    /// the view comes back to the root with it; a child closed for any other
-    /// reason is still in the store with everything it said, and stays in
-    /// the tree as a stored session — the close its journal replays is the
-    /// end of the process that wrote it, and the summary that follows it in
-    /// the same stream is the child, open again. Either way its mailbox is
-    /// gone.
+    /// Even a child kept for replay loses its mailbox when it closes.
     fn closed(&mut self, session: &SessionId) {
         if self.session.tree.is_root(session) {
             self.exit = Some(Exit { code: 0 });
@@ -575,12 +563,8 @@ impl Run {
         self.session.handles.remove(session);
     }
 
-    /// The host says a session is gone from the store. A live child says so
-    /// itself, with a `SessionClosed { Deleted }` on its own stream; one
-    /// that was only stored — replayed into the tree from its journal, or
-    /// listed by the switcher — has no stream to say it on, and this is the
-    /// one word that reaches it (ADR-0060 §2). The root is never removed
-    /// from under its own run.
+    /// Stored children have no stream: gateway removal is their only notice
+    /// of deletion (ADR-0060 §2).
     fn removed(&mut self, session: &SessionId) {
         if self.session.tree.is_root(session) {
             return;
@@ -607,15 +591,12 @@ impl Run {
         }
     }
 
-    /// The dialog follows the tree's first open interaction, whosever it is.
     fn refocus(&mut self) {
         let open = self.session.tree.open_interaction().map(|(_, open)| open);
         self.ui.dialog.focus_on(open);
     }
 
-    /// An ack for an intent this client minted; another client's is its own
-    /// business. A refusal names the line it refused, so a person sees which
-    /// of theirs came back.
+    /// Only this client's intents have a line to restore on refusal.
     fn ack(&mut self, intent: &IntentId, outcome: &IntentOutcome) {
         let Some(about) = self.mine.remove(intent) else {
             return;
