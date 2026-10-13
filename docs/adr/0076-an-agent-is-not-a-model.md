@@ -109,3 +109,7 @@ stopping mid-answer fails the turn without withdrawing speech or work and
 without `TurnRetrying`. It is buried with one `ACP_RESPAWN`; the next prompt
 uses a new child. Before anything was said, the plugin may still replace a
 dead child and ask again inside the same run.*
+
+*2026-10-13, at the merge: ADR-0010's check (`agent` is a plugin noun) now
+exempts only this seam's modules and their tests. The agent turn opens the
+bridged-call door around its stream, as a model's round trip does.*

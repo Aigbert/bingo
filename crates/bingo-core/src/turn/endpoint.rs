@@ -33,6 +33,11 @@ impl Endpoint {
             Self::Provider(_) => None,
         }
     }
+    /// An endpoint that keeps the conversation on its own side; bingo
+    /// neither compacts nor measures it.
+    pub fn holds_context(&self) -> bool {
+        matches!(self, Self::Agent(_))
+    }
     pub async fn stream(
         &self,
         request: ModelRequest,

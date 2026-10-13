@@ -198,7 +198,7 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
         ruler: Ruler::new(
             model.capabilities.context_window,
             model.max_tokens,
-            model.endpoint.agent().is_some(),
+            model.endpoint.holds_context(),
         ),
         model,
         host,

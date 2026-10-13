@@ -507,7 +507,7 @@ impl Actor {
             .config
             .model
             .as_ref()
-            .filter(|m| m.endpoint.agent().is_some())
+            .filter(|m| m.endpoint.holds_context())
         {
             return Err(KernelError::new(
                 ErrorCode::InvalidInput,

@@ -74,7 +74,10 @@ fi
 # 4b. `agent` is a plugin noun too (ADR-0010): as an identifier in the kernel it is a leak;
 #     in a string it is prose (the system prompt calls the product an agent) or a test's surface name;
 #     a string continued with a trailing backslash is a string line too.
-agents=$(grep -rEinw 'agents?' crates/bingo-sdk/src crates/bingo-core/src --include='*.rs' 2>/dev/null | grep -vE '^[^:]+:[0-9]+:\s*//' | grep -v '"' | grep -vE '\\$' || true)
+#     ADR-0076 opens one door: an external agent is an endpoint the kernel drives, and the
+#     seam's own modules (and tests) name it. Anywhere else the word is still a leak.
+seam='^crates/bingo-sdk/src/(agent|lib|plugin)\.rs:|^crates/bingo-core/src/turn(/agent|/endpoint)?\.rs:|^crates/bingo-core/src/host/(choose|refresh|registry|catalog)\.rs:|^crates/bingo-core/src/(test_support|session/tests)\.rs:|/tests/'
+agents=$(grep -rEinw 'agents?' crates/bingo-sdk/src crates/bingo-core/src --include='*.rs' 2>/dev/null | grep -vE '^[^:]+:[0-9]+:\s*//' | grep -v '"' | grep -vE '\\$' | grep -vE "$seam" || true)
 if [ -n "$agents" ]; then
   say "agent noun found in kernel/sdk code:"; say "$agents" | head; fail=1
 fi
