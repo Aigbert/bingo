@@ -539,9 +539,9 @@ mod tests {
             crate::deadline::HANDSHAKE,
             connection.request("initialize", json!({})),
         )
-            .await
-            .expect("a closed pipe answers within the handshake bound")
-            .expect_err("a process that says nothing answers nothing");
+        .await
+        .expect("a closed pipe answers within the handshake bound")
+        .expect_err("a process that says nothing answers nothing");
         assert_eq!(error.code, TRANSPORT_ERROR);
         assert!(!connection.is_alive());
         assert!(connection.claim_death(), "the first to notice reports it");

@@ -717,7 +717,8 @@ async fn deadline_call(seconds: Option<u64>) {
     if let Some(seconds) = seconds {
         row["toolTimeout"] = json!(seconds);
     }
-    let server = serde_json::from_value(row).expect("toolTimeout is a server setting");
+    let server = serde_json::from_value(row)
+        .unwrap_or_else(|error| panic!("toolTimeout is a server setting: {error}"));
     let (manager, _data) = manager(&[("slow", server)], &[]);
     manager.dial_enabled().await;
     let tool = tool_named(&manager, "mcp__slow__echo").await;
@@ -739,9 +740,9 @@ async fn deadline_call(seconds: Option<u64>) {
     let result = tokio::time::timeout(Duration::from_secs(2), &mut running).await;
     drop(running);
     tokio::time::resume();
-    let error = result
-        .expect("MCP calls must have a deadline")
-        .expect_err("a timeout");
+    let Ok(Err(error)) = result else {
+        panic!("MCP calls must return a timeout: {result:?}");
+    };
     let bingo_sdk::ToolError::Failed(message) = error else {
         panic!("{error}")
     };
