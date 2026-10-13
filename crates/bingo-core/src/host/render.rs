@@ -66,3 +66,15 @@ pub(super) async fn invalidate(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn invalidation_never_opens_a_session_that_is_not_live() {
+        let dir=tempfile::tempdir().unwrap();
+        let host=Host::build(vec![],HostConfig::new(Env::rooted(dir.path()))).await.unwrap();
+        host.invalidate(&SessionId::from_raw("closed"),vec!["pane".into()]).await.unwrap();
+        assert!(host.lock().is_empty());
+    }
+}
