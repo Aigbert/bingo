@@ -42,6 +42,7 @@ export type Before6 = { "chain": string; "input": Turn; "site": HookSite; "tier"
 export type Before7 = { "chain": string; "input": ToolSpec; "site": HookSite; "tier": Tier; [key: string]: unknown; };
 export type Before8 = { "chain": string; "input": Catalog; "site": HookSite; "tier": Tier; [key: string]: unknown; };
 export type Before9 = { "chain": string; "input": Send; "site": HookSite; "tier": Tier; [key: string]: unknown; };
+export type CallbackParams = { "callback": string; "chain": string; "input": unknown; "site": HookSite; [key: string]: unknown; };
 export type CallingHook = { "hook": number; "plugin": string; [key: string]: unknown; };
 export type Cancel = { "chain": string; [key: string]: unknown; };
 export type CancelReason = (("turnEnded" | "interrupted" | "sessionClosed" | "expired" | "superseded") | "commandEnded");

@@ -3,6 +3,7 @@
   "title": "bingo plugin",
   "protocol": 2,
   "capabilities": [
+    "callback/run",
     "command/run",
     "commands/changed",
     "compactor/compact",
@@ -1048,6 +1049,27 @@
         "tier",
         "site",
         "input"
+      ]
+    },
+    "CallbackParams": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "callback": {
+          "type": "string"
+        },
+        "input": true,
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        }
+      },
+      "required": [
+        "chain",
+        "callback",
+        "input",
+        "site"
       ]
     },
     "CallingHook": {
@@ -7991,6 +8013,12 @@
       "result": {
         "$ref": "#/$defs/Completed"
       }
+    },
+    "callback/run": {
+      "params": {
+        "$ref": "#/$defs/CallbackParams"
+      },
+      "result": true
     },
     "intercept/prompt.submit": {
       "params": {

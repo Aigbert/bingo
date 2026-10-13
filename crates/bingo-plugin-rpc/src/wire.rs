@@ -583,7 +583,20 @@ pub type Method = (&'static str, Ref, Ref);
 /// A notification: its name and its params.
 pub type Notification = (&'static str, Ref);
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct CallbackParams {
+    pub chain: String,
+    pub callback: String,
+    pub input: Value,
+    pub site: HookSite,
+}
+
 pub static METHODS: &[Method] = &[
+    (
+        "callback/run",
+        schema_of::<CallbackParams>,
+        schema_of::<Value>,
+    ),
     (
         "intercept/prompt.submit",
         schema_of::<crate::intercept::Before<Input>>,

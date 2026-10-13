@@ -321,3 +321,39 @@ async fn an_append_keeps_its_calling_hook_across_the_mailbox() {
     );
     fixture.host.shutdown().await;
 }
+
+#[tokio::test]
+async fn a_registered_tool_is_prefixed_and_offered_by_the_catalogue() {
+    let fixture = support::Fixture::new(
+        r#"
+      export function register(on) {
+        on('fixture.echo', async ($, e) => ({name:await $.tool.register({
+          name:'hello',description:'Say hello',inputSchema:{type:'object'}
+        }, async ($, input) => ({content:[{type:'text',text:'hello'}],isError:false}))}));
+      }
+    "#,
+        &["tool"],
+        json!({}),
+    )
+    .await;
+    let answer = fixture
+        .call(
+            "fixture",
+            "echo",
+            json!({"session":fixture.attachment.session}),
+        )
+        .await;
+    assert_eq!(answer["name"], "plugin__fixture__hello");
+    let tools = fixture
+        .host
+        .catalog(bingo_sdk::CatalogKind::Tools)
+        .await
+        .unwrap();
+    assert!(
+        tools
+            .entries
+            .iter()
+            .any(|tool| tool.id == "plugin__fixture__hello")
+    );
+    fixture.host.shutdown().await;
+}
