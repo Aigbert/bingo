@@ -101,3 +101,23 @@ test('cancel while the after hook is waiting rejects after', { timeout: 5000 }, 
   await rejected;
   assert.equal(hooks.pending.size, 0);
 });
+
+test('registration rejects duplicate hooks and duplicate catch handlers', () => {
+  const hooks = new Hooks();
+  const registered = hooks.on('tool.call', () => { throw new Error('broken'); });
+  registered.catch(($, e, next) => next(e));
+  assert.throws(() => registered.catch(() => null), /catch.*once/);
+  assert.throws(() => hooks.on('tool.call', () => null), /duplicate/);
+});
+
+test('a hook catch receives the original error and continuation state', async () => {
+  const hooks = new Hooks();
+  hooks.on('tool.call', () => { throw new Error('broken'); }).catch(($, e, next) => {
+    assert.equal(next.called, false);
+    assert.equal(next.error.kind, 'throw');
+    assert.match(next.error.message, /broken/);
+    return next(e);
+  });
+  assert.deepEqual(await hooks.before('tool.call', { chain: 'caught', input: {} }, {}), { next: {} });
+  assert.deepEqual(await hooks.after({ chain: 'caught', result: 7 }), { result: 7 });
+});
