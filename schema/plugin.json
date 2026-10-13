@@ -4221,6 +4221,12 @@
             "cwd": {
               "type": "string"
             },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "kind": {
               "type": "string",
               "const": "command"

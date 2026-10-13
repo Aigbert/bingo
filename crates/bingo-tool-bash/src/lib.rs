@@ -376,6 +376,15 @@ impl Tool for BashTool {
             .unwrap_or_default()
     }
 
+    fn preview(&self, input: &Value, cwd: &Path) -> Option<bingo_sdk::Preview> {
+        let args: BashArgs = serde_json::from_value(input.clone()).ok()?;
+        Some(bingo_sdk::Preview::Command {
+            command: args.command,
+            cwd: cwd.display().to_string(),
+            description: args.description,
+        })
+    }
+
     async fn call(&self, input: Value, cx: &ToolContext) -> Result<ToolOutput, ToolError> {
         let args: BashArgs =
             serde_json::from_value(input).map_err(|e| ToolError::InvalidInput(e.to_string()))?;

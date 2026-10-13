@@ -975,6 +975,7 @@ mod tests {
                 None,
                 Some(Preview::Command {
                     command: "rm -rf build".into(),
+                    description: None,
                     cwd: "/tmp/project".into(),
                 }),
             )),
