@@ -710,6 +710,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bingo-shelf"
+version = "0.6.6"
+dependencies = [
+ "serde",
+ "serde_json",
+ "similar 3.2.0",
+ "tempfile",
+ "thiserror 2.0.20",
+ "ulid",
+]
+
+[[package]]
 name = "bingo-skills"
 version = "0.6.6"
 dependencies = [
