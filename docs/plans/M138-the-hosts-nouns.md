@@ -144,4 +144,6 @@ left: []; right: [Read { plugin: "owner", scope: "global", key: "key", version: 
 cargo test -p bingo-mods --lib --locked dollar::clock
 timer did not fire: Elapsed(())
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s
+cargo test -p bingo-mods --lib --locked dollar::model
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.04s
 ```

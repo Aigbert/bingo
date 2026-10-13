@@ -10,4 +10,5 @@ pub use runtime::Runtime;
 
 pub(crate) mod callback;
 mod clock;
+mod model;
 mod register;
