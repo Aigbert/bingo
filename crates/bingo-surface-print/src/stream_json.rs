@@ -161,6 +161,11 @@ impl Encoder {
             Event::TurnStarted { .. } | Event::TurnUsage { .. } | Event::TurnCompleted { .. } => {
                 None
             }
+            Event::UsageCharged { .. } => Some(json!({
+                "type": "event",
+                "session_id": scope.session_id(),
+                "event": &frame.event,
+            })),
             Event::ItemStarted { item } => started(item, &scope),
             Event::ItemCompleted { item } => self.completed(item, &scope),
             // A delta is a `stream_event` line, which Claude Code writes only
@@ -456,6 +461,23 @@ mod tests {
         SessionId, TurnId, TurnOrigin,
     };
     use jiff::Timestamp;
+
+    #[test]
+    fn side_charges_are_events_and_never_model_rounds() {
+        let charge = frame(2, Event::UsageCharged {
+            turn: Some(TurnId::from_raw("trn_1")),
+            plugin: "stub".into(),
+            usage: counted(),
+        });
+        let text = play(Mode::Text, std::slice::from_ref(&charge));
+        assert!(text.out().is_empty());
+        assert!(text.err().is_empty());
+        let state = session_state();
+        let mut encoder = Encoder::new(tools());
+        let line = encoder.line(&charge, &state, &state).unwrap();
+        assert_eq!(line["event"], serde_json::to_value(&charge.event).unwrap());
+        assert_eq!(encoder.turn.rounds, 0);
+    }
 
     /// The fixed instant `crate::tests::frame` stamps every frame with.
     const START_MS: i64 = 1_700_000_000_000;
