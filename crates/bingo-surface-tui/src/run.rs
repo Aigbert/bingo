@@ -2708,6 +2708,22 @@ mod tests {
     }
 
     #[test]
+    fn a_notice_created_after_painting_owes_a_frame() {
+        let (_, now) = scene();
+        let mut run = idle(now.instant);
+        run.ui.shown = crate::layout::layout(
+            crate::layout::Layout::default(),
+            &run.session.tree,
+            &run.ui,
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+            now,
+        );
+        assert_eq!(run.next_draw(), None);
+        run.grumble(SLOW_DRAW);
+        assert_eq!(run.next_draw(), Some(run.painted + TICK));
+    }
+
+    #[test]
     fn a_slow_draw_is_owned_up_to_once_and_a_quick_one_never() {
         assert_eq!(slow_draw(Duration::from_millis(3), false), None);
         let said = slow_draw(SLOW_DRAW, false).expect("several frames is worth a word");
