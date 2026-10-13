@@ -52,6 +52,7 @@ No new host verb or external dependency.
    hook at `on_turn(Start)` on the prompt item when its first line is
    one of the plugin's own `/name`s. Both doors keep today's `❖`; the
    TUI draws the mark ADR-0070 §1 gives `Row`, and names no skill.
+   2026-10-13: caption added; body keeps replacement semantics.
 8. **Promote is a placed action.** Bash's jobs signal gains one `Row`
    per foreground call in flight, with the action
    `{ label: "background", action: Action { name: "bash.promote",
@@ -87,20 +88,20 @@ No new host verb or external dependency.
   `crates/bingo-schedule/src/{wake,runner}.rs`, `crates/bingo-channels/src/runner.rs`
 - `crates/bingo-collab/src/room.rs` and `room/readers.rs` (readers)
 - `crates/bingo-surface-tui/{Cargo.toml,src/{transcript,transcript/said,transcript/slots,pager,blocks,input,seats,roster,mentions,activity,theme}.rs}`;
-  `{memory,skill}.rs` deleted; `screens.rs`, `screens/skills.rs`, `test_support.rs`, `lib.rs`
+  `{memory,skill}.rs` deleted; `screens.rs`, `screens/skills.rs`, `screens/colours.rs`, `test_support.rs`, `lib.rs`
 - `Cargo.lock` (TUI library dependency); mechanical `Origin`/`HookContext`
   constructors in core, checkpoints, provider-acp, hooks-shell, plugin-rpc,
-  agents, rooms, context, schedule and bin tests; sdk schema golden fixtures.
+  agents, rooms, context, schedule and bin tests; `test_lanes.rs` adds only absent captions.
 - `scripts/check_discipline.sh`, `docs/design/tui.md`,
   `docs/adr/{0034,0044,0070,0071}-*.md`
 
 ## Exit criteria
 
 - [x] `cargo test -p bingo-sdk voice` passes; the failing first run is pasted.
-- [ ] `rg '"_?bingo\.' crates/bingo-surface-tui/src --glob '!**/tests/**'` finds nothing outside `#[cfg(test)]` code but the TUI's own manifest id, and check 4f fails on a seeded literal (output pasted).
-- [ ] `rg 'QUIET_SURFACES|ROOMS_READING|PROMOTE|fn running_shell' crates/bingo-surface-tui/src` finds only the frozen voiceless table.
+- [x] `rg '"_?bingo\.' crates/bingo-surface-tui/src --glob '!**/tests/**'` finds nothing in production except the manifest id and the ADR-0076 ACP exception; check 4f rejects seeded plugin/tool literals (output pasted).
+- [x] `rg 'QUIET_SURFACES|ROOMS_READING|PROMOTE|fn running_shell' crates/bingo-surface-tui/src` finds nothing; only `LEGACY_VOICES` retains old surface words.
 - [ ] Each producer asserts its voice or its `Row` beside the record; the stranger test draws a `Row`'s title, badge and action.
-- [ ] `screens/` snapshots are unchanged except the model's skill row bullet; the diff is pasted.
+- [x] All `screens/` snapshots are unchanged; the diff is empty.
 - [ ] `scripts/tui-smoke.sh` passes, and a tmux drive shows a memory row, `/guide` and a model `Skill` call, ctrl+b on a running Bash call, a room's switcher columns and `@` completion.
 - [ ] All gates of the upgrade protocol, plus the Windows cross-check for the TUI and every producer crate touched.
 
@@ -118,7 +119,7 @@ No new host verb or external dependency.
   `Row.body` keeps replacement semantics. Keep `test_lanes.rs:201` unchanged.
 - Contract first: pin rows with/without caption and its optional schema;
   regenerate plugin/RPC schemas only through the repository generator.
-- Remaining: TUI rows/input, discipline, integration tests, records, snapshots, tmux and gates.
+- Resumed at `dde18848`: rows/input, producer voices, collab readers and check 4f are implemented. Remaining: producer assertions, stranger test, smoke/tmux, gates and final records.
 - Re-verified at `e415e97e`: M131 dispatch is in `chain/tool.rs`; M122's
   bounce is a tool result and its holder constant is `name::PARENT`;
 
