@@ -11,6 +11,32 @@ use bingo_sdk::Env;
 use crate::definition::Definition;
 use crate::layers;
 
+#[derive(Debug, Default)]
+pub struct Definitions(std::sync::Mutex<Vec<Definition>>);
+impl Definitions {
+    pub fn register(&self, definition: Definition) -> Result<(), bingo_sdk::ServiceError> {
+        if definition.name.trim().is_empty() {
+            return Err(bingo_sdk::ServiceError(
+                "agent definition needs a name".into(),
+            ));
+        }
+        let mut held = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        held.retain(|d| d.name != definition.name);
+        held.push(definition);
+        Ok(())
+    }
+    pub fn load(&self, env: &Env, cwd: &Path) -> Vec<Definition> {
+        let mut definitions = self.0.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let mut seen: HashSet<_> = definitions.iter().map(|d| d.name.clone()).collect();
+        definitions.extend(
+            load(env, cwd)
+                .into_iter()
+                .filter(|d| seen.insert(d.name.clone())),
+        );
+        definitions
+    }
+}
+
 /// What a definition file is called.
 const SUFFIX: &str = ".md";
 

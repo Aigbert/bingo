@@ -75,3 +75,5 @@ Amended 2026-10-14 (M136, ADR-0078 §1): wire faces declare noun/method event na
 Verified 2026-10-14 (M137, ADR-0078): module host operations use registered noun faces through the existing wire door; model/service admission consults the registered grant.
 
 Verified 2026-10-14 (M138, ADR-0078 §6): host noun faces own versioned session/global state, owner-bound writes, the plugin quota and per-hook read logs; both runtimes use the same doors.
+
+Verified 2026-10-14 (M139, ADR-0078): world faces carry unsafe method metadata; process service/call uses the same grant admission and owner-bound dispatch as modules.

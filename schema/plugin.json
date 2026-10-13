@@ -408,6 +408,21 @@
         "stretch"
       ]
     },
+    "Ancestors": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "name"
+      ]
+    },
     "Answer": {
       "oneOf": [
         {
@@ -2239,6 +2254,13 @@
       ],
       "description": "Reasoning effort, in the vocabulary providers converge on."
     },
+    "Encoding": {
+      "type": "string",
+      "enum": [
+        "utf8",
+        "base64"
+      ]
+    },
     "EndpointCapabilities": {
       "type": "object",
       "properties": {
@@ -2292,6 +2314,40 @@
         "command"
       ],
       "description": "The process to spawn."
+    },
+    "EnvGet": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "name"
+      ]
+    },
+    "EnvSet": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "name",
+        "value"
+      ]
     },
     "ErrorCode": {
       "oneOf": [
@@ -2947,6 +3003,190 @@
         "session",
         "key",
         "value"
+      ]
+    },
+    "Fetch": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "url": {
+          "type": "string"
+        },
+        "method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "headers": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "url"
+      ]
+    },
+    "Fetched": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "notice": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "headers",
+        "body",
+        "truncated"
+      ]
+    },
+    "FileList": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "path": {
+          "type": "string"
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "session",
+        "path"
+      ]
+    },
+    "FilePath": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "path"
+      ]
+    },
+    "FileRead": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "path": {
+          "type": "string"
+        },
+        "encoding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Encoding"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "path"
+      ]
+    },
+    "FileStat": {
+      "type": "object",
+      "properties": {
+        "size": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "directory": {
+          "type": "boolean"
+        },
+        "file": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "size",
+        "directory",
+        "file"
+      ]
+    },
+    "FileWrite": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "path": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "encoding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Encoding"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "path",
+        "body"
       ]
     },
     "FinishReason": {
@@ -5818,6 +6058,96 @@
           ],
           "additionalProperties": false
         }
+      ]
+    },
+    "ProcessId": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ]
+    },
+    "ProcessInput": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timeoutMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "session",
+        "argv"
+      ]
+    },
+    "ProcessOutput": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "stdout",
+        "stderr"
+      ]
+    },
+    "ProcessWrite": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "id": {
+          "type": "string"
+        },
+        "body": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "id"
       ]
     },
     "PromptView": {

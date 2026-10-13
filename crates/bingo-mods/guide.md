@@ -88,3 +88,23 @@ cargo test -p bingo-mods --test engine fifty_idle_modules_rss --locked -- --igno
 
 The 2026-10-14 macOS run measured 3,232 KiB before and 29,792 KiB with 50 idle
 modules. This is a measurement, not a CI threshold.
+
+World nouns (`fs`, `http`, `process`, `env`) use the same service-call chain
+under QuickJS and Node. Declare each noun in `uses`. Project modules need a
+user-layer `pluginTrust` grant for unsafe operations; process plugins also
+keep their default `tighten` tier until granted. Refusals name the settings
+file. The first unsafe noun use per plugin and session posts a notice.
+
+Filesystem reads stay inside the project and plugin data roots. Writes to
+`<data_dir>/plugins/<name>/data` are safe; other writes inside the project
+need the unsafe `fs` grant. The runtime opens the canonical scoped path.
+A concurrent replacement of a directory with a symlink between validation
+and open remains a TOCTOU limitation. Files and process streams have a 4 MiB
+limit. HTTP responses stop at that limit and return `truncated` and `notice`.
+
+`process.spawn` returns a handle with `id`, `read()`, `write(text | null)`
+(null closes stdin), and `kill()`. Reads collect stdout and stderr through
+EOF. Handles belong to the creating plugin and session; reload, session end
+and shutdown terminate their trees. `process.run` is bounded by the host
+operation deadline. Arguments are argv, with no implicit shell. `env.set`
+changes only the caller's child-process overlay; `env.get` reads the host.

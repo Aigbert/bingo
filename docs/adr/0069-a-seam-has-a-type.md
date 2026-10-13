@@ -122,3 +122,5 @@ Amended 2026-10-14 (M136, ADR-0078): optional `WireService::face()` declares nou
 Verified 2026-10-14 (M137, ADR-0078 §5): external uses includes host nouns; registered grants gate both runtimes, and unsafe face methods require explicit authority.
 
 Verified 2026-10-14 (M138, ADR-0078): one noun table declares kernel and face doors; generated schemas and TypeScript share it, and both transports preserve registered grants.
+
+Verified 2026-10-14 (M139, ADR-0078): face nouns resolve through the existing registry with key/noun collision checks; MCP and agents own their world contracts.

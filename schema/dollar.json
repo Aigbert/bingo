@@ -1,537 +1,33 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
-    "Messages": {
+    "ToolOutput": {
       "type": "object",
       "properties": {
-        "session": {
-          "$ref": "#/$defs/SessionId"
-        },
-        "page": {
-          "$ref": "#/$defs/HistoryPage"
-        }
-      },
-      "required": [
-        "session",
-        "page"
-      ]
-    },
-    "SessionId": {
-      "type": "string",
-      "description": "One persisted context: one journal, one actor."
-    },
-    "HistoryPage": {
-      "type": "object",
-      "properties": {
-        "before": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ItemId"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "limit": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0,
-          "default": 0
-        },
-        "maxBytes": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint",
-          "minimum": 0,
-          "description": "Optional byte budget for the whole JSON-RPC response; absent preserves\n`limit == 0` meaning all, not an implicit bounded page."
-        },
-        "generation": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint64",
-          "minimum": 0,
-          "description": "Reject a stale page after a rewind/compaction rather than mixing views."
-        }
-      }
-    },
-    "ItemId": {
-      "type": "string",
-      "description": "One unit in the transcript order."
-    },
-    "HistoryChunk": {
-      "type": "object",
-      "properties": {
-        "items": {
+        "parts": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Item"
+            "$ref": "#/$defs/ContentPart"
           }
         },
-        "next": {
+        "isError": {
+          "type": "boolean"
+        },
+        "display": {
           "anyOf": [
             {
-              "$ref": "#/$defs/ItemId"
+              "$ref": "#/$defs/View"
             },
             {
               "type": "null"
             }
           ]
-        },
-        "generation": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0
-        },
-        "oversized": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/OversizedItem"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "This item alone cannot fit the requested page. Fetch it explicitly in\nparts before following `next`, which excludes that item."
         }
       },
       "required": [
-        "items",
-        "generation"
-      ]
-    },
-    "Item": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "$ref": "#/$defs/ItemId"
-        },
-        "turn": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/TurnId"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "round": {
-          "type": "integer",
-          "format": "uint32",
-          "minimum": 0,
-          "default": 0
-        },
-        "status": {
-          "$ref": "#/$defs/ItemStatus"
-        },
-        "startedAt": {
-          "type": "string"
-        },
-        "completedAt": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "intent": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/IntentId"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The client intent that produced this item, when one did (user items)."
-        },
-        "body": {
-          "$ref": "#/$defs/ItemBody"
-        },
-        "meta": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      "required": [
-        "id",
-        "status",
-        "startedAt",
-        "body"
-      ]
-    },
-    "TurnId": {
-      "type": "string",
-      "description": "One run of the turn loop, closed exactly once."
-    },
-    "ItemStatus": {
-      "type": "string",
-      "enum": [
-        "pending",
-        "running",
-        "completed",
-        "failed",
-        "interrupted"
-      ]
-    },
-    "IntentId": {
-      "type": "string",
-      "description": "A client-minted write id; the outcome arrives as `IntentAck`."
-    },
-    "ItemBody": {
-      "anyOf": [
-        {
-          "type": "object",
-          "properties": {
-            "parts": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ContentPart"
-              }
-            },
-            "origin": {
-              "$ref": "#/$defs/Origin"
-            },
-            "kind": {
-              "type": "string",
-              "const": "user"
-            }
-          },
-          "required": [
-            "kind",
-            "parts",
-            "origin"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "text": {
-              "type": "string"
-            },
-            "kind": {
-              "type": "string",
-              "const": "assistant"
-            }
-          },
-          "required": [
-            "kind",
-            "text"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "text": {
-              "type": "string"
-            },
-            "providerMetadata": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            },
-            "kind": {
-              "type": "string",
-              "const": "reasoning"
-            }
-          },
-          "required": [
-            "kind",
-            "text"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "callId": {
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            },
-            "input": true,
-            "output": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/ToolOutput"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "progress": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "durationMs": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "format": "uint64",
-              "minimum": 0
-            },
-            "quiet": {
-              "type": "boolean"
-            },
-            "kind": {
-              "type": "string",
-              "const": "toolCall"
-            }
-          },
-          "required": [
-            "kind",
-            "callId",
-            "name",
-            "input"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "type": "string"
-            },
-            "output": {
-              "type": "string"
-            },
-            "exit": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "format": "int32"
-            },
-            "cwd": {
-              "type": "string"
-            },
-            "kind": {
-              "type": "string",
-              "const": "shell"
-            }
-          },
-          "required": [
-            "kind",
-            "command",
-            "output",
-            "cwd"
-          ],
-          "description": "A shell line a person ran themselves (`!<command>`, ADR-0008 §5): no\nturn was spent on it and no model asked for it. `exit` is the code the\ncommand came to; `None` says it never reached one — its timeout or an\ninterrupt ended it, and `output` carries the line that says which."
-        },
-        {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "args": {
-              "default": null
-            },
-            "result": true,
-            "kind": {
-              "type": "string",
-              "const": "action"
-            }
-          },
-          "required": [
-            "kind",
-            "name"
-          ],
-          "description": "A long-running non-turn operation (login, reconnect, team start)."
-        },
-        {
-          "type": "object",
-          "properties": {
-            "summary": {
-              "type": "string"
-            },
-            "replaced": {
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0
-            },
-            "before": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0
-            },
-            "after": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0
-            },
-            "durationMs": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0
-            },
-            "kind": {
-              "type": "string",
-              "const": "compaction"
-            }
-          },
-          "required": [
-            "kind",
-            "summary",
-            "replaced",
-            "before",
-            "after",
-            "durationMs"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "toTurn": {
-              "$ref": "#/$defs/TurnId"
-            },
-            "dropped": {
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0
-            },
-            "kind": {
-              "type": "string",
-              "const": "rewind"
-            }
-          },
-          "required": [
-            "kind",
-            "toTurn",
-            "dropped"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "marker": {
-              "type": "string"
-            },
-            "kind": {
-              "type": "string",
-              "const": "interruption"
-            }
-          },
-          "required": [
-            "kind",
-            "marker"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "level": {
-              "$ref": "#/$defs/Level"
-            },
-            "code": {
-              "type": "string"
-            },
-            "text": {
-              "type": "string"
-            },
-            "kind": {
-              "type": "string",
-              "const": "notice"
-            }
-          },
-          "required": [
-            "kind",
-            "level",
-            "code",
-            "text"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "interaction": {
-              "$ref": "#/$defs/InteractionId"
-            },
-            "question": {
-              "type": "string"
-            },
-            "answer": {
-              "type": "string"
-            },
-            "kind": {
-              "type": "string",
-              "const": "questionAnswer"
-            }
-          },
-          "required": [
-            "kind",
-            "interaction",
-            "question",
-            "answer"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "interaction": {
-              "$ref": "#/$defs/InteractionId"
-            },
-            "tool": {
-              "type": "string"
-            },
-            "decision": {
-              "$ref": "#/$defs/DecisionKind"
-            },
-            "feedback": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "kind": {
-              "type": "string",
-              "const": "permissionReceipt"
-            }
-          },
-          "required": [
-            "kind",
-            "interaction",
-            "tool",
-            "decision"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "asset": {
-              "type": "string"
-            },
-            "label": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "kind": {
-              "type": "string",
-              "const": "asset"
-            }
-          },
-          "required": [
-            "kind",
-            "asset"
-          ]
-        },
-        {
-          "type": "object",
-          "additionalProperties": true,
-          "description": "A payload this build cannot read, carried without interpretation."
-        }
-      ]
+        "parts"
+      ],
+      "description": "What a tool returned: the parts the model sees, plus what a person sees\ninstead when the tool has something better than the text (ADR-0013 §2)."
     },
     "ContentPart": {
       "oneOf": [
@@ -677,78 +173,6 @@
         "data"
       ],
       "description": "A picture handed to the model, already the shape the journal keeps and a\nprovider's request encodes: one struct, so a surface that reads a picture\noff disk, a wire client that already holds the bytes, and a tool result\nthat returns one all produce the same thing."
-    },
-    "Origin": {
-      "type": "object",
-      "properties": {
-        "voice": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Voice"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "surface": {
-          "type": "string"
-        },
-        "principal": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "conversation": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "surface"
-      ],
-      "description": "Who submitted the input, as every surface records it."
-    },
-    "Voice": {
-      "type": "string",
-      "enum": [
-        "said",
-        "note",
-        "quiet",
-        "aside"
-      ],
-      "description": "How a producer intends an utterance to be drawn."
-    },
-    "ToolOutput": {
-      "type": "object",
-      "properties": {
-        "parts": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ContentPart"
-          }
-        },
-        "isError": {
-          "type": "boolean"
-        },
-        "display": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/View"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "parts"
-      ],
-      "description": "What a tool returned: the parts the model sees, plus what a person sees\ninstead when the tool has something better than the text (ADR-0013 §2)."
     },
     "View": {
       "oneOf": [
@@ -1739,6 +1163,1104 @@
         "Pane"
       ]
     },
+    "Session": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
+    "SessionId": {
+      "type": "string",
+      "description": "One persisted context: one journal, one actor."
+    },
+    "SessionSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ParentLink"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "driver": {
+          "$ref": "#/$defs/Driver",
+          "default": "model"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "systemExtra": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "What the session was opened with and a resume must give it back:\nthe prompt appended to the kernel's own, and the tool set it is held to."
+        },
+        "tools": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage",
+          "default": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "reasoningTokens": 0
+          }
+        },
+        "busy": {
+          "type": "boolean",
+          "description": "A turn is running. A summary travels without the turn it describes —\na host listing carries no `SessionState` — so the kernel stamps this\non every summary it publishes and nothing else writes it. A client\nthat holds the state derives the same fact with `SessionState::busy`.",
+          "default": false
+        },
+        "asking": {
+          "type": "boolean",
+          "description": "An interaction is open; stamped only by the session actor.",
+          "default": false
+        },
+        "messages": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "How many messages have been said in this session, by\n[`Event::completes_a_message`]. `None` is \"never counted\" — a summary\nwritten before the field existed — and must be shown as nothing rather\nthan as a `0` it does not mean."
+        }
+      },
+      "required": [
+        "id",
+        "cwd",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ParentLink": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "item": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ItemId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "description": "Where a child hangs in the tree: its parent, and the tool call that\nspawned it when one did (ADR-0011 §3)."
+    },
+    "ItemId": {
+      "type": "string",
+      "description": "One unit in the transcript order."
+    },
+    "Driver": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "model",
+          "description": "A model answers: every prose input opens a turn."
+        },
+        {
+          "type": "string",
+          "const": "log",
+          "description": "Nothing answers: every input is recorded, and the journal is the point."
+        }
+      ],
+      "description": "What a session does with what it is told (ADR-0011 §1)."
+    },
+    "Usage": {
+      "type": "object",
+      "properties": {
+        "inputTokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "outputTokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "cacheReadTokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 0
+        },
+        "cacheWriteTokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 0
+        },
+        "reasoningTokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 0
+        }
+      },
+      "required": [
+        "inputTokens",
+        "outputTokens"
+      ],
+      "description": "Token counts as the provider reports them, the three input counts kept\napart: `input_tokens` is what the model read fresh, the cache counts are\nwhat it read from or wrote to a cached prefix. The whole input side is\n`input_total()`."
+    },
+    "Fetch": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "url": {
+          "type": "string"
+        },
+        "method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "headers": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "url"
+      ]
+    },
+    "Fetched": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "notice": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "headers",
+        "body",
+        "truncated"
+      ]
+    },
+    "EnvGet": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "name"
+      ]
+    },
+    "EnvSet": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "name",
+        "value"
+      ]
+    },
+    "ProcessInput": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timeoutMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "session",
+        "argv"
+      ]
+    },
+    "ProcessOutput": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "stdout",
+        "stderr"
+      ]
+    },
+    "ProcessId": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ]
+    },
+    "ProcessWrite": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "id": {
+          "type": "string"
+        },
+        "body": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ]
+    },
+    "FileRead": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "path": {
+          "type": "string"
+        },
+        "encoding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Encoding"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "path"
+      ]
+    },
+    "Encoding": {
+      "type": "string",
+      "enum": [
+        "utf8",
+        "base64"
+      ]
+    },
+    "FileWrite": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "path": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "encoding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Encoding"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "path",
+        "body"
+      ]
+    },
+    "FileList": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "path": {
+          "type": "string"
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "session",
+        "path"
+      ]
+    },
+    "FilePath": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "path"
+      ]
+    },
+    "FileStat": {
+      "type": "object",
+      "properties": {
+        "size": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "directory": {
+          "type": "boolean"
+        },
+        "file": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "size",
+        "directory",
+        "file"
+      ]
+    },
+    "Ancestors": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "name"
+      ]
+    },
+    "Messages": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "page": {
+          "$ref": "#/$defs/HistoryPage"
+        }
+      },
+      "required": [
+        "session",
+        "page"
+      ]
+    },
+    "HistoryPage": {
+      "type": "object",
+      "properties": {
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ItemId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 0
+        },
+        "maxBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0,
+          "description": "Optional byte budget for the whole JSON-RPC response; absent preserves\n`limit == 0` meaning all, not an implicit bounded page."
+        },
+        "generation": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Reject a stale page after a rewind/compaction rather than mixing views."
+        }
+      }
+    },
+    "HistoryChunk": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Item"
+          }
+        },
+        "next": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ItemId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "generation": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "oversized": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OversizedItem"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "This item alone cannot fit the requested page. Fetch it explicitly in\nparts before following `next`, which excludes that item."
+        }
+      },
+      "required": [
+        "items",
+        "generation"
+      ]
+    },
+    "Item": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ItemId"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "round": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 0
+        },
+        "status": {
+          "$ref": "#/$defs/ItemStatus"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "intent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntentId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The client intent that produced this item, when one did (user items)."
+        },
+        "body": {
+          "$ref": "#/$defs/ItemBody"
+        },
+        "meta": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "startedAt",
+        "body"
+      ]
+    },
+    "TurnId": {
+      "type": "string",
+      "description": "One run of the turn loop, closed exactly once."
+    },
+    "ItemStatus": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "interrupted"
+      ]
+    },
+    "IntentId": {
+      "type": "string",
+      "description": "A client-minted write id; the outcome arrives as `IntentAck`."
+    },
+    "ItemBody": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "parts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ContentPart"
+              }
+            },
+            "origin": {
+              "$ref": "#/$defs/Origin"
+            },
+            "kind": {
+              "type": "string",
+              "const": "user"
+            }
+          },
+          "required": [
+            "kind",
+            "parts",
+            "origin"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "assistant"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "providerMetadata": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "reasoning"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "callId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "input": true,
+            "output": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolOutput"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "progress": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "durationMs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "quiet": {
+              "type": "boolean"
+            },
+            "kind": {
+              "type": "string",
+              "const": "toolCall"
+            }
+          },
+          "required": [
+            "kind",
+            "callId",
+            "name",
+            "input"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string"
+            },
+            "output": {
+              "type": "string"
+            },
+            "exit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "cwd": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "shell"
+            }
+          },
+          "required": [
+            "kind",
+            "command",
+            "output",
+            "cwd"
+          ],
+          "description": "A shell line a person ran themselves (`!<command>`, ADR-0008 §5): no\nturn was spent on it and no model asked for it. `exit` is the code the\ncommand came to; `None` says it never reached one — its timeout or an\ninterrupt ended it, and `output` carries the line that says which."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "args": {
+              "default": null
+            },
+            "result": true,
+            "kind": {
+              "type": "string",
+              "const": "action"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "description": "A long-running non-turn operation (login, reconnect, team start)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "summary": {
+              "type": "string"
+            },
+            "replaced": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "before": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "after": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "durationMs": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "compaction"
+            }
+          },
+          "required": [
+            "kind",
+            "summary",
+            "replaced",
+            "before",
+            "after",
+            "durationMs"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "toTurn": {
+              "$ref": "#/$defs/TurnId"
+            },
+            "dropped": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "rewind"
+            }
+          },
+          "required": [
+            "kind",
+            "toTurn",
+            "dropped"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "marker": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "interruption"
+            }
+          },
+          "required": [
+            "kind",
+            "marker"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "level": {
+              "$ref": "#/$defs/Level"
+            },
+            "code": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "notice"
+            }
+          },
+          "required": [
+            "kind",
+            "level",
+            "code",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "interaction": {
+              "$ref": "#/$defs/InteractionId"
+            },
+            "question": {
+              "type": "string"
+            },
+            "answer": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "questionAnswer"
+            }
+          },
+          "required": [
+            "kind",
+            "interaction",
+            "question",
+            "answer"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "interaction": {
+              "$ref": "#/$defs/InteractionId"
+            },
+            "tool": {
+              "type": "string"
+            },
+            "decision": {
+              "$ref": "#/$defs/DecisionKind"
+            },
+            "feedback": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "permissionReceipt"
+            }
+          },
+          "required": [
+            "kind",
+            "interaction",
+            "tool",
+            "decision"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string"
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "asset"
+            }
+          },
+          "required": [
+            "kind",
+            "asset"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "A payload this build cannot read, carried without interpretation."
+        }
+      ]
+    },
+    "Origin": {
+      "type": "object",
+      "properties": {
+        "voice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Voice"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "surface": {
+          "type": "string"
+        },
+        "principal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conversation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "surface"
+      ],
+      "description": "Who submitted the input, as every surface records it."
+    },
+    "Voice": {
+      "type": "string",
+      "enum": [
+        "said",
+        "note",
+        "quiet",
+        "aside"
+      ],
+      "description": "How a producer intends an utterance to be drawn."
+    },
     "Level": {
       "type": "string",
       "enum": [
@@ -1781,17 +2303,6 @@
         "checksum"
       ],
       "description": "The actor's factual observation; only the RPC server can add a\nconnection-scoped availability token after pinning an immutable Item."
-    },
-    "Session": {
-      "type": "object",
-      "properties": {
-        "session": {
-          "$ref": "#/$defs/SessionId"
-        }
-      },
-      "required": [
-        "session"
-      ]
     },
     "ClientIdentity": {
       "type": "object",
@@ -1838,44 +2349,6 @@
       "required": [
         "session"
       ]
-    },
-    "Usage": {
-      "type": "object",
-      "properties": {
-        "inputTokens": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0
-        },
-        "outputTokens": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0
-        },
-        "cacheReadTokens": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 0
-        },
-        "cacheWriteTokens": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 0
-        },
-        "reasoningTokens": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 0
-        }
-      },
-      "required": [
-        "inputTokens",
-        "outputTokens"
-      ],
-      "description": "Token counts as the provider reports them, the three input counts kept\napart: `input_tokens` is what the model read fresh, the cache counts are\nwhat it read from or wrote to a cached prefix. The whole input side is\n`input_total()`."
     },
     "ContextUsage": {
       "type": "object",
@@ -3541,6 +4014,55 @@
     "DollarInputs": {
       "type": "object",
       "properties": {
+        "mcp.call": true,
+        "mcp.connect": true,
+        "agent.spawn": true,
+        "agent.list": {
+          "$ref": "#/$defs/Session"
+        },
+        "agent.register": true,
+        "http.fetch": {
+          "$ref": "#/$defs/Fetch"
+        },
+        "env.get": {
+          "$ref": "#/$defs/EnvGet"
+        },
+        "env.set": {
+          "$ref": "#/$defs/EnvSet"
+        },
+        "process.run": {
+          "$ref": "#/$defs/ProcessInput"
+        },
+        "process.spawn": {
+          "$ref": "#/$defs/ProcessInput"
+        },
+        "process.read": {
+          "$ref": "#/$defs/ProcessId"
+        },
+        "process.write": {
+          "$ref": "#/$defs/ProcessWrite"
+        },
+        "process.kill": {
+          "$ref": "#/$defs/ProcessId"
+        },
+        "fs.read": {
+          "$ref": "#/$defs/FileRead"
+        },
+        "fs.write": {
+          "$ref": "#/$defs/FileWrite"
+        },
+        "fs.list": {
+          "$ref": "#/$defs/FileList"
+        },
+        "fs.exists": {
+          "$ref": "#/$defs/FilePath"
+        },
+        "fs.stat": {
+          "$ref": "#/$defs/FilePath"
+        },
+        "fs.ancestors": {
+          "$ref": "#/$defs/Ancestors"
+        },
         "session.messages": {
           "$ref": "#/$defs/Messages"
         },
@@ -3657,6 +4179,25 @@
         }
       },
       "required": [
+        "mcp.call",
+        "mcp.connect",
+        "agent.spawn",
+        "agent.list",
+        "agent.register",
+        "http.fetch",
+        "env.get",
+        "env.set",
+        "process.run",
+        "process.spawn",
+        "process.read",
+        "process.write",
+        "process.kill",
+        "fs.read",
+        "fs.write",
+        "fs.list",
+        "fs.exists",
+        "fs.stat",
+        "fs.ancestors",
         "session.messages",
         "session.cwd",
         "session.root",
@@ -3701,6 +4242,75 @@
     "DollarResults": {
       "type": "object",
       "properties": {
+        "mcp.call": {
+          "$ref": "#/$defs/ToolOutput"
+        },
+        "mcp.connect": {
+          "type": "null"
+        },
+        "agent.spawn": {
+          "$ref": "#/$defs/ToolOutput"
+        },
+        "agent.list": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionSummary"
+          }
+        },
+        "agent.register": {
+          "type": "null"
+        },
+        "http.fetch": {
+          "$ref": "#/$defs/Fetched"
+        },
+        "env.get": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "env.set": {
+          "type": "null"
+        },
+        "process.run": {
+          "$ref": "#/$defs/ProcessOutput"
+        },
+        "process.spawn": {
+          "type": "string"
+        },
+        "process.read": {
+          "$ref": "#/$defs/ProcessOutput"
+        },
+        "process.write": {
+          "type": "null"
+        },
+        "process.kill": {
+          "type": "null"
+        },
+        "fs.read": {
+          "type": "string"
+        },
+        "fs.write": {
+          "type": "null"
+        },
+        "fs.list": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fs.exists": {
+          "type": "boolean"
+        },
+        "fs.stat": {
+          "$ref": "#/$defs/FileStat"
+        },
+        "fs.ancestors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "session.messages": {
           "$ref": "#/$defs/HistoryChunk"
         },
@@ -3844,6 +4454,25 @@
         }
       },
       "required": [
+        "mcp.call",
+        "mcp.connect",
+        "agent.spawn",
+        "agent.list",
+        "agent.register",
+        "http.fetch",
+        "env.get",
+        "env.set",
+        "process.run",
+        "process.spawn",
+        "process.read",
+        "process.write",
+        "process.kill",
+        "fs.read",
+        "fs.write",
+        "fs.list",
+        "fs.exists",
+        "fs.stat",
+        "fs.ancestors",
         "session.messages",
         "session.cwd",
         "session.root",
@@ -3887,6 +4516,281 @@
     }
   },
   "methods": {
+    "mcp.call": {
+      "noun": "mcp",
+      "method": "call",
+      "door": {
+        "face": "mcp",
+        "owner": true
+      },
+      "unsafe": false,
+      "input": true,
+      "result": {
+        "$ref": "#/$defs/ToolOutput"
+      }
+    },
+    "mcp.connect": {
+      "noun": "mcp",
+      "method": "connect",
+      "door": {
+        "face": "mcp",
+        "owner": true
+      },
+      "unsafe": true,
+      "input": true,
+      "result": {
+        "type": "null"
+      }
+    },
+    "agent.spawn": {
+      "noun": "agent",
+      "method": "spawn",
+      "door": {
+        "face": "agent",
+        "owner": true
+      },
+      "unsafe": true,
+      "input": true,
+      "result": {
+        "$ref": "#/$defs/ToolOutput"
+      }
+    },
+    "agent.list": {
+      "noun": "agent",
+      "method": "list",
+      "door": {
+        "face": "agent",
+        "owner": true
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/SessionSummary"
+        }
+      }
+    },
+    "agent.register": {
+      "noun": "agent",
+      "method": "register",
+      "door": {
+        "face": "agent",
+        "owner": true
+      },
+      "unsafe": false,
+      "input": true,
+      "result": {
+        "type": "null"
+      }
+    },
+    "http.fetch": {
+      "noun": "http",
+      "method": "fetch",
+      "door": {
+        "face": "bingo.plugin.http"
+      },
+      "unsafe": true,
+      "input": {
+        "$ref": "#/$defs/Fetch"
+      },
+      "result": {
+        "$ref": "#/$defs/Fetched"
+      }
+    },
+    "env.get": {
+      "noun": "env",
+      "method": "get",
+      "door": {
+        "face": "bingo.plugin.env"
+      },
+      "unsafe": true,
+      "input": {
+        "$ref": "#/$defs/EnvGet"
+      },
+      "result": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "env.set": {
+      "noun": "env",
+      "method": "set",
+      "door": {
+        "face": "bingo.plugin.env"
+      },
+      "unsafe": true,
+      "input": {
+        "$ref": "#/$defs/EnvSet"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "process.run": {
+      "noun": "process",
+      "method": "run",
+      "door": {
+        "face": "bingo.plugin.process"
+      },
+      "unsafe": true,
+      "input": {
+        "$ref": "#/$defs/ProcessInput"
+      },
+      "result": {
+        "$ref": "#/$defs/ProcessOutput"
+      }
+    },
+    "process.spawn": {
+      "noun": "process",
+      "method": "spawn",
+      "door": {
+        "face": "bingo.plugin.process"
+      },
+      "unsafe": true,
+      "input": {
+        "$ref": "#/$defs/ProcessInput"
+      },
+      "result": {
+        "type": "string"
+      }
+    },
+    "process.read": {
+      "noun": "process",
+      "method": "read",
+      "door": {
+        "face": "bingo.plugin.process"
+      },
+      "unsafe": true,
+      "input": {
+        "$ref": "#/$defs/ProcessId"
+      },
+      "result": {
+        "$ref": "#/$defs/ProcessOutput"
+      }
+    },
+    "process.write": {
+      "noun": "process",
+      "method": "write",
+      "door": {
+        "face": "bingo.plugin.process"
+      },
+      "unsafe": true,
+      "input": {
+        "$ref": "#/$defs/ProcessWrite"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "process.kill": {
+      "noun": "process",
+      "method": "kill",
+      "door": {
+        "face": "bingo.plugin.process"
+      },
+      "unsafe": true,
+      "input": {
+        "$ref": "#/$defs/ProcessId"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "fs.read": {
+      "noun": "fs",
+      "method": "read",
+      "door": {
+        "face": "bingo.plugin.fs"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/FileRead"
+      },
+      "result": {
+        "type": "string"
+      }
+    },
+    "fs.write": {
+      "noun": "fs",
+      "method": "write",
+      "door": {
+        "face": "bingo.plugin.fs"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/FileWrite"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "fs.list": {
+      "noun": "fs",
+      "method": "list",
+      "door": {
+        "face": "bingo.plugin.fs"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/FileList"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "fs.exists": {
+      "noun": "fs",
+      "method": "exists",
+      "door": {
+        "face": "bingo.plugin.fs"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/FilePath"
+      },
+      "result": {
+        "type": "boolean"
+      }
+    },
+    "fs.stat": {
+      "noun": "fs",
+      "method": "stat",
+      "door": {
+        "face": "bingo.plugin.fs"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/FilePath"
+      },
+      "result": {
+        "$ref": "#/$defs/FileStat"
+      }
+    },
+    "fs.ancestors": {
+      "noun": "fs",
+      "method": "ancestors",
+      "door": {
+        "face": "bingo.plugin.fs"
+      },
+      "unsafe": false,
+      "input": {
+        "$ref": "#/$defs/Ancestors"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
     "session.messages": {
       "noun": "session",
       "method": "messages",

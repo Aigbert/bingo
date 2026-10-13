@@ -15,6 +15,15 @@ impl Rows {
 }
 #[async_trait]
 impl Servers for Rows {
+    async fn call(
+        &self,
+        input: bingo_services::mcp::Call,
+    ) -> Result<bingo_sdk::ToolOutput, bingo_sdk::ServiceError> {
+        self.manager.call(input).await
+    }
+    async fn connect(&self, server: &str) -> Result<(), bingo_sdk::ServiceError> {
+        self.manager.connect(server).await
+    }
     async fn servers(&self) -> Map<String, Value> {
         self.manager.rows().await
     }
@@ -95,5 +104,27 @@ mod tests {
             .await
             .expect_err("a refusal");
         assert!(refused.to_string().contains("servers"), "{refused}");
+    }
+}
+
+#[cfg(test)]
+mod world_contract {
+    use super::*;
+    #[tokio::test]
+    async fn unknown_servers_are_refused_without_dialling() {
+        let manager = Arc::new(Manager::new(
+            bingo_http::client(bingo_http::Bounds::CALL).unwrap(),
+            Default::default(),
+            &[],
+            std::env::temp_dir(),
+        ));
+        let rows = Rows::new(manager);
+        assert!(
+            rows.connect("unconfigured")
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("not configured")
+        );
     }
 }

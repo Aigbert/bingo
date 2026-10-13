@@ -107,6 +107,9 @@ impl Manager {
         }
         self.watch();
     }
+    pub(crate) fn env(&self) -> &Env {
+        &self.env
+    }
     pub(crate) fn every_floor(&self) -> std::time::Duration {
         self.limits.every_time
     }

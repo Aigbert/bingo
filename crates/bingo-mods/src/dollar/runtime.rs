@@ -18,7 +18,11 @@ pub struct Runtime {
     every_floor: std::time::Duration,
     pub(super) registered: super::register::Registrations,
     sessions: Sessions,
-    root: PathBuf,
+    files: super::fs::Files,
+    http: super::http::Http,
+    processes: super::process::Processes,
+    env: super::env::Overlay,
+    audit: Arc<bingo_plugin_host::grant::Audit>,
 }
 struct Noun {
     noun: &'static str,
@@ -30,14 +34,30 @@ impl Runtime {
         root: PathBuf,
         every_floor: std::time::Duration,
     ) -> Result<Arc<Self>, KernelError> {
+        Self::install_in(host, root.clone(), &Env::rooted(root), every_floor)
+    }
+    pub fn install_in(
+        host: &HostHandle,
+        root: PathBuf,
+        env: &Env,
+        every_floor: std::time::Duration,
+    ) -> Result<Arc<Self>, KernelError> {
         let runtime = Arc::new(Self {
             timers: Default::default(),
             every_floor,
             registered: Default::default(),
             sessions: Sessions::default(),
-            root,
+            files: super::fs::Files::new(root, env.data_dir.clone()),
+            http: super::http::Http::new().map_err(|e| KernelError::new(ErrorCode::Internal, e))?,
+            processes: Default::default(),
+            env: Default::default(),
+            audit: bingo_plugin_host::grant::Audit::install(host, env)?,
         });
-        let nouns: std::collections::BTreeSet<_> = ROWS.iter().map(|row| row.noun).collect();
+        let nouns: std::collections::BTreeSet<_> = ROWS
+            .iter()
+            .filter(|row| !matches!(row.door, Door::Service(_)))
+            .map(|row| row.noun)
+            .collect();
         for noun in nouns {
             host.open_service(
                 &format!("bingo.plugin.{noun}"),
@@ -63,11 +83,18 @@ impl Runtime {
     pub(crate) fn commands(&self) -> Vec<Arc<dyn Command>> {
         self.registered.commands()
     }
+    pub async fn reload(&self, plugin: &str) {
+        self.processes.remove(Some(plugin), None).await;
+        self.env.remove(plugin);
+    }
     pub async fn stop(&self) {
+        self.processes.remove(None, None).await;
         self.timers.stop().await;
         self.sessions.stop().await;
     }
     pub async fn end(&self, session: &SessionId) {
+        self.processes.remove(None, Some(session)).await;
+        self.audit.end(session);
         self.timers.end(session).await;
         self.sessions.remove(session).await;
     }
@@ -117,6 +144,11 @@ impl Runtime {
                 return Err("operation scope does not match its noun".into());
             }
         }
+        if let Some((noun, method)) = method.split_once('.')
+            && matches!(noun, "fs" | "http" | "process" | "env")
+        {
+            return self.world(caller, noun, method, params).await;
+        }
         match method {
             "store.keys" | "store.delete" => store(caller, method, params).await,
             "clock.now" => Ok(json!(jiff::Timestamp::now().to_string())),
@@ -132,7 +164,7 @@ impl Runtime {
                     .await
             }
             "session.version" => Ok(json!(env!("CARGO_PKG_VERSION"))),
-            "session.root" => Ok(json!(self.root)),
+            "session.root" => Ok(json!(self.files.project)),
             "session.messages" => self.messages(caller, parse(params)?).await,
             "session.id" | "session.cwd" | "session.model" | "session.turns" | "session.usage"
             | "session.surfaces" | "config.list" | "config.read" | "prompt.read" => {
@@ -158,6 +190,79 @@ impl Runtime {
             }
             _ => Err(format!("{method}: runtime operation is unavailable")),
         }
+    }
+    async fn world(
+        &self,
+        caller: &Caller,
+        noun: &str,
+        method: &str,
+        params: Value,
+    ) -> Result<Value, String> {
+        match (noun, method) {
+            ("fs", method) => self.files.call(caller, method, params).await,
+            ("http", "fetch") => Ok(json!(self.http.fetch(parse(params)?).await?)),
+            ("env", "get") => Ok(json!(self.env.get(parse(params)?)?)),
+            ("env", "set") => {
+                self.env.set(&caller.plugin, parse(params)?)?;
+                Ok(Value::Null)
+            }
+            ("process", "spawn" | "run") => {
+                self.start_process(caller, method, parse(params)?).await
+            }
+            ("process", "write") => {
+                let input: super::world::ProcessWrite = parse(params)?;
+                self.processes
+                    .write(&caller.plugin, &input.session, &input.id, input.body)
+                    .await?;
+                Ok(Value::Null)
+            }
+            ("process", "read" | "kill") => {
+                let input: super::world::ProcessId = parse(params)?;
+                if method == "read" {
+                    return Ok(json!(
+                        self.processes
+                            .read(&caller.plugin, &input.session, &input.id)
+                            .await?
+                    ));
+                }
+                self.processes
+                    .kill(&caller.plugin, &input.session, &input.id)
+                    .await?;
+                Ok(Value::Null)
+            }
+            _ => Err("unknown world method".into()),
+        }
+    }
+    async fn start_process(
+        &self,
+        caller: &Caller,
+        method: &str,
+        input: super::world::ProcessInput,
+    ) -> Result<Value, String> {
+        let cwd = self.files.path(
+            caller,
+            input.cwd.as_deref().unwrap_or(&self.files.project),
+            super::scope::Access::Read,
+        )?;
+        let env = self.env.values(&caller.plugin);
+        if method == "spawn" {
+            let generation = caller
+                .host
+                .service(&bingo_plugin_host::callback::KEY)
+                .ok_or("callback registry is unavailable")?
+                .get(&caller.plugin)?
+                .stopped();
+            return Ok(json!(self.processes.spawn(
+                &caller.plugin,
+                &input,
+                &cwd,
+                env,
+                generation
+            )?));
+        }
+        Ok(json!(
+            super::process::run(&caller.plugin, input, &cwd, env).await?
+        ))
     }
     async fn messages(&self, caller: &Caller, input: Messages) -> Result<Value, String> {
         let live = self.sessions.get(&caller.host, &input.session).await?;

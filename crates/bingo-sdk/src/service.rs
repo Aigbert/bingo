@@ -141,7 +141,18 @@ impl Services {
         if services.contains_key(&key) {
             return Err(format!("service {key} is already registered"));
         }
+        if let Some((owner, _)) = services.iter().find(|(_, registered)| {
+            registered
+                .face
+                .as_ref()
+                .is_some_and(|face| face.noun == key)
+        }) {
+            return Err(format!("service {key} is already a noun of {owner}"));
+        }
         if let Some(face) = &face {
+            if face.noun != key && services.contains_key(&face.noun) {
+                return Err(format!("noun {} is already a service key", face.noun));
+            }
             check_face(&key, face, &services)?;
         }
         services.insert(key, Registered { service, face });
@@ -169,13 +180,11 @@ impl Services {
     }
 
     pub fn wire(&self, key: &str) -> Option<Arc<dyn WireService>> {
-        self.held()
-            .get(key)
-            .and_then(|service| service.service.wire.clone())
+        resolve(&self.held(), key).and_then(|service| service.service.wire.clone())
     }
 
     pub fn face(&self, key: &str) -> Option<Face> {
-        self.held().get(key).and_then(|s| s.face.clone())
+        resolve(&self.held(), key).and_then(|service| service.face.clone())
     }
 
     pub fn keys(&self) -> Vec<String> {
@@ -187,6 +196,17 @@ impl Services {
     fn held(&self) -> MutexGuard<'_, HashMap<String, Registered>> {
         self.0.lock().unwrap_or_else(|held| held.into_inner())
     }
+}
+
+fn resolve<'a>(services: &'a HashMap<String, Registered>, key: &str) -> Option<&'a Registered> {
+    services.get(key).or_else(|| {
+        services.values().find(|registered| {
+            registered
+                .face
+                .as_ref()
+                .is_some_and(|face| face.noun == key)
+        })
+    })
 }
 
 fn check_face(
@@ -217,6 +237,17 @@ fn check_face(
                 "event {name} is owned by {prior}; {owner} cannot register it"
             ));
         }
+    }
+    if let Some((key, _)) = services.iter().find(|(_, registered)| {
+        registered
+            .face
+            .as_ref()
+            .is_some_and(|prior| prior.noun == face.noun)
+    }) {
+        return Err(format!(
+            "noun {} is owned by {key}; {owner} cannot register it",
+            face.noun
+        ));
     }
     Ok(())
 }
@@ -293,6 +324,39 @@ mod tests {
         services.open("first", Arc::new(Named("mcp"))).unwrap();
         let why = services.open("second", Arc::new(Named("mcp"))).unwrap_err();
         assert!(why.contains("mcp.servers") && why.contains("first") && why.contains("second"));
+    }
+
+    #[test]
+    fn noun_lookup_resolves_the_same_wire_and_face() {
+        let services = Services::default();
+        services
+            .open("test.owner", Arc::new(Named("sample")))
+            .unwrap();
+        assert!(Arc::ptr_eq(
+            &services.wire("test.owner").unwrap(),
+            &services.wire("sample").expect("noun lookup")
+        ));
+        assert_eq!(services.face("sample").unwrap().noun, "sample");
+    }
+
+    #[test]
+    fn noun_and_key_collisions_are_refused_in_both_orders() {
+        for reverse in [false, true] {
+            let services = Services::default();
+            let entries = if reverse {
+                [("sample", "other"), ("owner", "sample")]
+            } else {
+                [("owner", "sample"), ("sample", "other")]
+            };
+            services
+                .open(entries[0].0, Arc::new(Named(entries[0].1)))
+                .unwrap();
+            assert!(
+                services
+                    .open(entries[1].0, Arc::new(Named(entries[1].1)))
+                    .is_err()
+            );
+        }
     }
 
     struct Kv;

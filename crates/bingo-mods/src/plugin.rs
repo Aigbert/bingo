@@ -89,7 +89,11 @@ impl Plugin for ModsPlugin {
             .get()
             .map(|manager| manager.every_floor())
             .unwrap_or(std::time::Duration::from_secs(1));
-        let dollar = crate::dollar::Runtime::install(&host, cwd.clone(), floor)
+        let manager = self
+            .manager
+            .get()
+            .ok_or_else(|| PluginError::Failed("module manager unavailable".into()))?;
+        let dollar = crate::dollar::Runtime::install_in(&host, cwd.clone(), manager.env(), floor)
             .map_err(|error| PluginError::Failed(error.message))?;
         bingo_plugin_host::ops::install(&host)
             .map_err(|error| PluginError::Failed(error.message))?;

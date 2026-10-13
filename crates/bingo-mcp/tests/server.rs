@@ -769,3 +769,46 @@ async fn deadline_bounds_an_mcp_call() {
 async fn deadline_uses_the_server_override() {
     deadline_call(Some(5)).await;
 }
+
+#[tokio::test]
+async fn the_mcp_noun_connects_and_calls_the_local_server_through_invoke() {
+    let (manager, _data) = manager(
+        &[("test", stdio(echo_server().display().to_string(), &[]))],
+        &[],
+    );
+    let wire = bingo_services::mcp::wire(Arc::new(bingo_mcp::Rows::new(manager.clone())));
+    wire.call("connect", json!({"server":"test","session":"ses_test"}))
+        .await
+        .unwrap();
+    let tool = tool_named(&manager, "mcp__test__echo").await;
+    let host = bingo_sdk::testing::TestHost::default();
+    host.on_invoke(move |session, call| {
+        let tool = tool.clone();
+        async move {
+            assert_eq!(session, SessionId::from_raw("ses_test"));
+            assert_eq!(call.name, "mcp__test__echo");
+            let output = tool
+                .call(call.input, &tool_context(CancellationToken::new()))
+                .await
+                .unwrap();
+            Ok(bingo_sdk::ToolOutcome {
+                item: ItemId::mint(),
+                call_id: call.call_id,
+                output,
+                status: bingo_sdk::ItemStatus::Completed,
+                duration_ms: 0,
+            })
+        }
+    });
+    let handle = host.handle();
+    manager.bind(&handle);
+    let answer = wire
+        .call(
+            "call",
+            json!({"server":"test","tool":"echo","args":{"text":"world"},"session":"ses_test"}),
+        )
+        .await
+        .unwrap();
+    assert!(answer.to_string().contains("world"), "{answer}");
+    manager.shutdown().await;
+}

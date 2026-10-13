@@ -630,11 +630,15 @@ name = "bingo-mods"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "base64 0.23.1",
  "bingo-core",
  "bingo-digest",
+ "bingo-http",
  "bingo-plugin-host",
+ "bingo-process",
  "bingo-schema-ts",
  "bingo-sdk",
+ "dunce",
  "futures",
  "getrandom 0.4.3",
  "jiff",
@@ -645,6 +649,7 @@ dependencies = [
  "oxc_semantic",
  "oxc_span",
  "oxc_transformer",
+ "reqwest",
  "rquickjs",
  "schemars 1.2.2",
  "serde",

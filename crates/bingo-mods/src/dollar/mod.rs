@@ -18,3 +18,13 @@ mod contract;
 
 #[cfg(test)]
 mod chain_contract;
+
+mod scope;
+
+pub mod world;
+
+mod fs;
+
+mod env;
+mod http;
+mod process;

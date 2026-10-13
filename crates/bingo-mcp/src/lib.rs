@@ -105,10 +105,11 @@ impl Plugin for McpPlugin {
     }
 
     /// Returns the moment the dialling is on its own task, not when it lands.
-    async fn start(&self, _host: HostHandle) -> Result<(), PluginError> {
+    async fn start(&self, host: HostHandle) -> Result<(), PluginError> {
         let Some(manager) = self.manager.get().cloned() else {
             return Ok(());
         };
+        manager.bind(&host);
         tokio::spawn(async move { manager.dial_enabled().await });
         Ok(())
     }
