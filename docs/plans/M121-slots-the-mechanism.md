@@ -81,7 +81,8 @@ no new dependency.
   `crates/bingo-permissions/src/lib.rs`
 - `crates/bingo-surface-tui/src/{status,activity,rail,panel,transcript,blocks,input,run,ui}.rs`;
   `{tasks,shells,wake,permission}.rs` deleted; `screens/{tasks,shells}.rs`,
-  `lib.rs`, `test_support.rs`, `test_lanes.rs`, `theme.rs` (token file map), slot rendering tests
+  `lib.rs`, `test_support.rs`, `test_lanes.rs`, `theme.rs` (token file map),
+  `transcript/slots.rs` (row rendering keeps `transcript.rs` below 1,000 lines), slot tests
 - `docs/design/tui.md`, `docs/adr/{0013,0019,0070}-*.md`
 
 ## Exit criteria
