@@ -62,8 +62,8 @@ desktop half was dropped on 2026-10-13 with M143–M145 (ADR-0080).
    owns, never a terminal app and never a foreign process, runs
    `bingo --plugin-dir <mod>` with a `BINGO_FAKE_SCRIPT` that edits
    `.env`, runs Bash with padded whitespace, and fails once. The window
-   is set to 160 and then 100 columns, so the pane shows docked and
-   inline. Each step's `capture-pane` output is pasted.
+   is set to 160 and then 100 columns; the pane sits inline at both
+   (ADR-0081 §7). Each step's `capture-pane` output is pasted.
 5. **Two transports.** `tool-call` also runs out of process, under node
    through the SDK (M133), and its test gives the same results. `band`
    and `pane` are `.tsx`, and node's type stripping does no JSX.
@@ -93,7 +93,7 @@ desktop half was dropped on 2026-10-13 with M143–M145 (ADR-0080).
 - [ ] `cargo test -p bingo --test mods_parity` passes, and the node run
       is not skipped on CI's Linux job.
 - [ ] The tmux drive's `capture-pane` output is pasted: the denial, the
-      status, the band, the pane docked and inline, and the tool row.
+      status, the band, the pane inline at both widths, and the tool row.
 - [ ] Every row in §2 and §3 has a Status cell. An `awk` count of the
       rows without one prints 0 (pasted).
 - [ ] `rg` finds each §8 gap in its owner's Non-goals (pasted). All
@@ -120,6 +120,7 @@ Each gap in parity §8, with its owner and its reason:
   `Hook` adapter.
 - The desktop, vscode and mobile surfaces. None is in this tree; the
   GUI stays in its own repository (ADR-0080, rejected).
+- A docked pane (M140). The person chose no side column (ADR-0081).
 - `telemetry.*` and `attribution.text`: not applicable.
 
 Also out: committing the originals without terms that allow it; running

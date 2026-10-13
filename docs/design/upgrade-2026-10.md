@@ -49,7 +49,7 @@ rejected). Phases 6 and 7 are independent.
 
 **Phase 8 — bingo's own face.** Added 2026-10-13 at the person's request
 ([tui-identity-2026-10.md](tui-identity-2026-10.md)): the defects a live
-drive found, the rail and the panel sheet given back to the person, the
+drive found, the rail and the panel sheet removed (the person's word), the
 ember look (the caret, embers, the wordmark, an accent of its own) and the
 crew (agents with faces, a crew strip, rooms read as chats). It rides on
 Phase 3's TUI work and is independent of Phases 4–7.

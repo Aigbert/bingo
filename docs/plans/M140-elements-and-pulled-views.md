@@ -91,9 +91,9 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
     do not fit becomes a column; taffy only if a fixture needs it (budget
     pasted either way). `views/{button,input,select,link,image,raster}.rs`;
     `text.rs` draws spans; `Button` uses the `Actions` marks, `Input` the
-    composer's editor. Pure `pane.rs`: `asked` docks at ≥110 columns or
-    sits inline above the composer at a third of the height; unasked docks
-    at ≥144 or waits (counted in `status`). `toast.rs` stacks toasts above
+    composer's editor. Pure `pane.rs` (ADR-0081 §7): `asked` sits inline
+    above the composer at a third of the height at every width, never
+    docked; unasked waits (`1 pane waiting` in `status`, a click opens). `toast.rs` stacks toasts above
     the status line (`until` feeds `next_frame`; held while a `hold_toasts`
     pane shows; a new `alert` notifies the unfocused terminal).
     `pulled.rs` memoises on `(component, requestId, props, columns,
@@ -125,8 +125,8 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
       `-p bingo --test mods_ui`: a read subscribes, a write invalidates,
       `set` in a render is refused, brick 11 passes.
 - [ ] `cargo test -p bingo-surface-tui`: a `TestBackend` test per element;
-      panes asked (docked at 120, inline at 80) and unasked (waiting at
-      120); a toast held by `hold_toasts` and gone at `until`.
+      panes asked (inline at 200 and 80) and unasked (waiting at 200,
+      opened by a click); a toast held by `hold_toasts`, gone at `until`.
 - [ ] The `schedule`, `experience` and `demo-ui` narrow snapshots are
       unchanged; any diff is pasted and driven in tmux.
 - [ ] `scripts/tui-smoke.sh` passes with `counter`, a tmux drive pasted;
@@ -135,9 +135,9 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
 
 ## Non-goals
 
-- Components and `$.ui.log` (M141); the desktop table (ADR-0080); `Client`,
-  `blit`, styling beyond the subset; OSC 8 links (no hyperlink in a
-  cell); `isPlaced`, `$.ui.copy`/`scroll`/`focus`/`selection` (design §8).
+- Components and `$.ui.log` (M141); the desktop table (ADR-0080); a docked
+  pane (ADR-0081 §7); `Client`, `blit`, styling beyond the subset; OSC 8
+  links; `isPlaced`, `$.ui.copy`/`scroll`/`focus`/`selection` (design §8).
 
 ## Risks
 

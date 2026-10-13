@@ -179,22 +179,22 @@ name once; a post addressed to the reader is marked `→ you`; `#room` and
 `@name` are in their colours. The room's members stand on one dim row
 under its first message instead of in a rail card.
 
-**C5. The screen is the person's.** An unasked card seats at 144 columns
-or more; under that it waits in the panel sheet. A card the person pinned
-seats at any width that leaves 80 for the transcript. A payload without
-`slots` (ADR-0013's legacy lanes) goes to the panel sheet, never to the
-rail. The rooms plugin stops publishing `owed` and `members` as cards: C3
-and the session list say both. The panel sheet is titled in the plugin's
-own words (`Slot::Panel.title`, else the kind made readable), hides an
-empty view, and says what `⏎` does (`pin`).
+**C5. The screen is the person's.** Revised 2026-10-13 at the person's
+word: no rail and no panel sheet. The transcript takes the width at every
+size; `ctrl+p` is unbound. A plugin is seen only where it placed itself
+(`Status`, `Activity`, `Mode`, `Row`, an asked `Pane`); a payload without
+`slots` is not drawn by the TUI. The rooms plugin's `owed` and `members`
+are data: C3 and the session list say both. demo-ui's board is a `Row`.
+A mod's pane sits inline above the composer when asked and never docks.
 
 ## 5. Subtractions
 
 The welcome box and its border; `/help for help` (the status line says
 `? for shortcuts`); the command list in `?` (the `/` menu is that list);
 `/quit` as a second row (an alias of `/exit`); the sparkle cycle; the
-`N running` words; the rooms plugin's `owed` and `members` cards; the
-debug-build drawing notice outside a debug build.
+`N running` words; the rail, its pins and the `ctrl+p` panel sheet; the
+rooms plugin's `owed` and `members` cards; the debug-build drawing notice
+outside a debug build.
 
 ## 6. Milestones
 
@@ -208,8 +208,8 @@ debug-build drawing notice outside a debug build.
 M147 is R1–R10, no change of taste; most of it lives outside the TUI
 (tool-fs, tool-bash, core, permissions, the command specs), and what is in
 the TUI touches no file M124 or M125 restructures beyond a line. M148 is
-C5 and waits for M124, which moves the rail's and the panel sheet's
-targets into the layout. M149 is the look (L1–L8) and waits for M125,
+C5 and waits for M124, so that the rail and the sheet leave the layout
+pass rather than the old frame. M149 is the look (L1–L8) and waits for M125,
 which moves the theme into the render context. M150 is the crew (C1–C4)
 and waits for M135, which names the agent states it draws.
 

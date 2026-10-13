@@ -4,71 +4,71 @@
 
 [tui-identity-2026-10.md](../design/tui-identity-2026-10.md) §2 and C5,
 [ADR-0081](../adr/0081-the-screen-is-the-persons.md). The rail and the
-`ctrl+p` sheet — what the person called "the board" — stop showing
-plugin data nobody asked for. The rail holds what a person pinned, and
-what a plugin placed when the terminal has room for it (144 columns);
-the sheet names things in the plugin's words and hides what is empty;
-the rooms plugin's `owed` and `members` become data, said by the session
-list. No new dependency.
+`ctrl+p` sheet — what the person called "the board" — go, by the
+person's word of 2026-10-13. The transcript takes the width at every
+size. A plugin is seen in the TUI only where it placed itself; the
+in-tree producers that relied on the legacy lanes place themselves or
+become data. No new dependency.
 
 ## Bricks, in build order
 
 1. **Failing tests first**:
    - sdk `state.rs`: `extended(.., Value::Null)` removes the kind, like
      `signalled`; a fixture journal with an extension then a `Null` folds
-     to no entry (ADR-0081 §4).
-   - TUI `frame.rs`: a legacy payload draws no rail at 200 columns; a
-     `Slot::Rail` card seats at 144 and not at 143; a pinned panel seats
-     at `80 + RAIL_WIDTH` and not one column under.
-   - TUI `panel.rs`: a payload of `Null` or an empty view is not a row;
-     `bingo.schedule`/`wake` is named `wake` with `schedule` beside it; a
-     placed `Panel` keeps its title; the cursor row says `pin`/`unpin`.
+     to no entry (ADR-0081 §5).
+   - TUI `frame.rs`: at 200 columns a legacy panel payload, a live
+     signal, a `Slot::Rail` and a `Slot::Panel` each leave the transcript
+     its full width and draw nothing beside it.
+   - TUI `keys.rs`: `ctrl+p` is unbound; the `?` sheet has no `ctrl+p`.
+   - demo-ui: `/board` places a `Row` whose body is the table and whose
+     actions are Tick and Reset; the progress tool places an `Activity`.
    - rooms: the `owed` signal and the `members` extension carry
      `slots: []`; `seats.rs`'s readers still read both by name.
-   - TUI: a session with only `owed` and `members` draws no rail and no
-     sheet rows at any width.
+   - TUI: a session with only `owed`, `members` and a schedule `wake`
+     draws nothing for them at any width.
 2. **The reducer** (sdk `state.rs` `extended`): `Null` removes. Check
    every `extensions` reader for a `Null` it relied on (the schedule's
    wake, `bingo-schedule/src/wake.rs`) and list them.
-3. **The rail's gate** (`frame.rs`, `rail.rs`, and M124's layout): two
-   thresholds, `RAIL_UNASKED = 144` for placed cards and
-   `80 + RAIL_WIDTH` for pinned ones, replacing `RAIL_AT`. Legacy
-   payloads leave `rail::cards` and the under-the-running-rows lane;
-   `rail.rs`'s module header and tui.md §3 say so.
-4. **The waiting notice**: the first frame a placed card cannot seat, one
-   `Info` notice `a card is waiting · ctrl+p`, once per session; derived
-   from the layout, nothing kept but the once.
-5. **The sheet** (`panel.rs`): the naming rule, the empty rule, the `⏎`
-   word; `NOTHING` stays for a session with no row.
-6. **Rooms' data** (`bingo-rooms` `owed.rs`, the `members` writer in
-   `roster.rs`/`bingo-collab`): `slots: []` on both. The seats readers
-   (`seats.rs`, through M123's `bingo-collab` types) keep reading.
-7. **Records.** ADR-0081 accepted; dated notes on ADR-0013 §2 §4 and
-   ADR-0070 §1; tui.md §3 *Rail*, §8's lane table and §10.
+3. **Subtract** (`frame.rs`, `rail.rs`, `panel.rs`, M124's layout,
+   `pointer.rs`, `keys.rs`, `view.rs`, `status.rs`): the rail, its
+   threshold and width, pins, the panel sheet and its key, the legacy
+   lanes' drawing and the under-the-running-rows lane. Every caller of
+   what goes is listed; nothing is kept "for later".
+4. **The producers move.** demo-ui (`board.rs`, `command.rs`,
+   `progress.rs`, `lib.rs` module header): the board as a `Row`, the
+   progress as an `Activity`, placed through ADR-0070's `slot::with`.
+   rooms (`owed.rs`, the `members` writer in `roster.rs`/`bingo-collab`)
+   and schedule (`wake.rs`): `slots: []`.
+5. **Records.** ADR-0081 accepted; dated notes on ADR-0013 §2 §4,
+   ADR-0070 §1 and ADR-0079 §3; tui.md §3 (*Rail* removed), §8's lane
+   table, §10 dated entry; the guide pages that name `ctrl+p` or the
+   rail.
 
 ## Files
 
 - `crates/bingo-sdk/src/state.rs` and its fixtures
-- `crates/bingo-surface-tui/src/{frame,rail,panel,layout,status,keys}.rs`
-  (`layout.rs` is M124's)
+- `crates/bingo-surface-tui/src/{frame,rail,panel,layout,pointer,status,keys,view}.rs`
+  (`rail.rs` and `panel.rs` deleted; `layout.rs` is M124's)
+- `crates/bingo-demo-ui/src/{board,command,progress,lib,tests}.rs`
 - `crates/bingo-rooms/src/{owed,roster}.rs`, `crates/bingo-collab/src/room.rs`
-- `crates/bingo-schedule/src/wake.rs` (only if brick 2 finds it relied on
-  `Null` staying)
-- `docs/adr/{0013,0070,0081}-*.md`, `docs/design/tui.md`,
+- `crates/bingo-schedule/src/wake.rs`
+- `scripts/tui-smoke.sh`, the guide pages naming `ctrl+p` or the rail
+- `docs/adr/{0013,0070,0079,0081}-*.md`, `docs/design/tui.md`,
   `docs/design/tui-identity-2026-10.md`
 
 ## Exit criteria
 
 - [ ] Each brick-1 test failed first (output pasted) and passes now.
-- [ ] `rg 'RAIL_AT' crates/` finds nothing.
-- [ ] A tmux drive at 120×40 and 150×40 with a room open and the
-      `--demo-ui` board: no rail at 120; at 150 only placed cards; `ctrl+p`
-      lists `Board` and `progress` by their words, no `–` row, no
-      `members`; `⏎` pins the board and it seats at 120.
-- [ ] The removed snapshots (`owed_*`, the rail cases of `roster_*`,
-      `the_rail_holds_*`) are listed with the reason; the rest unchanged.
-- [ ] `scripts/tui-smoke.sh` passes; its `❯ Board` step now reaches the
-      board through `ctrl+p` (edit the step, say so).
+- [ ] `rg 'RAIL_AT|RAIL_WIDTH|mod rail|mod panel|ctrl\+p' crates/bingo-surface-tui/src`
+      finds nothing.
+- [ ] A tmux drive at 80×24, 120×40 and 200×50 with a room open and
+      `--demo-ui`: no column beside the transcript at any width; `/board`
+      shows the board row and its Tick button changes the table; the
+      progress bar runs in the activity band; `ctrl+p` does nothing.
+- [ ] The removed snapshots (rail, sheet, pins, `owed_*`, the rail cases
+      of `roster_*`) are listed with the reason; the rest unchanged.
+- [ ] `scripts/tui-smoke.sh` passes; its `❯ Board` and pinned-board steps
+      now go through `/board` (edit the steps, say so).
 - [ ] All gates of the upgrade protocol, plus the Windows cross-check
       for every touched crate.
 
@@ -76,17 +76,19 @@ list. No new dependency.
 
 - The crew strip (M150), which is where `owed` is said on the status
   line; until then the session list's row says it, as it does today.
-- Pins kept across runs; a rail width other than 24; the panel sheet's
-  look beyond naming (M149 restyles everything at once).
-- External plugins: no protocol change; they are drawn by §1.
+- Panes (M140), which follow ADR-0081 §7 when they land.
+- Removing `Slot::Rail` or `Slot::Panel` from the wire (ADR-0081 §4).
+- External plugins: no protocol change; one on the legacy lanes is not
+  drawn until it places itself.
 
 ## Risks
 
-- A plugin that relied on the rail to be noticed is now one key away.
-  The notice in brick 4 covers placed cards only, by design: a legacy
-  payload never asked for a place.
+- A protocol-1 plugin that drew only through the panel lane disappears
+  from the TUI. That is the decision; its guide page says how to place
+  itself, and its data stays in the fold.
 - `Null` removing an extension changes a journaled fold. Old journals
   fold to fewer entries, never more; the fixture pins it.
 - Re-verify at start: M124's layout targets for the rail and the sheet,
-  M123's readers for `owed`/`members`, and how M121 carries `slots` on a
-  payload that is itself a `View`.
+  M123's readers for `owed`/`members`, how M121 carries `slots` on a
+  payload that is itself a `View`, and whether a `Row` holds a table body
+  and two actions as the board needs.

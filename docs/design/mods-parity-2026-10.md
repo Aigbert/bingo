@@ -144,7 +144,9 @@ kernel events.
   `holdToasts` pane (bingo: `Slot::Pane.hold_toasts`).
 
 In bingo, ADR-0079 maps all of this, under Claude Code's names, except
-`Client` modules, `blit` and `open`'s `isPlaced` (§8).
+`Client` modules, `blit` and `open`'s `isPlaced` (§8), and docking: a
+bingo pane sits inline and only when asked (ADR-0081 §7, the person's
+choice of 2026-10-13).
 
 ## 5. State
 
@@ -217,6 +219,7 @@ M142.
 - `audio`.
 - `classic.*`.
 - The vscode and mobile surfaces.
+- A docked pane: a bingo pane sits inline when asked (ADR-0081 §7).
 - `$.ui.scroll`, `focus`, `selection`, `copy`, and `open`'s `isPlaced`:
   a surface's scroll, focus, selection, clipboard and placement are its
   own (ADR-0013 §4), and the host has no verb toward a surface.
