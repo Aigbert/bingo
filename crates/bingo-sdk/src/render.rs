@@ -79,3 +79,12 @@ mod tests {
         assert!(serde_json::from_value::<Component>(serde_json::json!("Permission")).is_err());
     }
 }
+
+tokio::task_local! { static PERSON_INPUT: bool; }
+/// The core binds this at the input boundary; a mod cannot set it through JSON.
+pub fn asked() -> bool {
+    PERSON_INPUT.try_with(|asked| *asked).unwrap_or(false)
+}
+pub async fn under_input<T>(asked: bool, future: impl std::future::Future<Output = T>) -> T {
+    PERSON_INPUT.scope(asked, future).await
+}

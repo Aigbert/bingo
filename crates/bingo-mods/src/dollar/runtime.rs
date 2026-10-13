@@ -47,6 +47,7 @@ impl Runtime {
                 }),
             )?;
         }
+        crate::ui::install(host, runtime.clone())?;
         Ok(runtime)
     }
     pub(crate) fn tools(&self) -> Vec<Arc<dyn Tool>> {
