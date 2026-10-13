@@ -102,3 +102,35 @@ fn catalogue_capability(method: &str) -> Option<&'static str> {
         && bingo_sdk::catalogue::Pattern::parse(event).is_ok())
     .then_some(capability)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bingo_sdk::{Catalog, CatalogEntry, CatalogKind};
+    use serde_json::json;
+
+    struct NoServices;
+    #[async_trait::async_trait]
+    impl ServiceCalls for NoServices {
+        async fn call(&self, _: Value) -> Result<Value, RpcError> { Err(unknown("service/call")) }
+    }
+
+    #[tokio::test]
+    async fn model_completion_requires_the_catalogues_granted_noun() {
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_catalog(|kind| async move {
+            assert_eq!(kind, CatalogKind::Plugins);
+            Ok(Catalog { kind, entries: vec![CatalogEntry {
+                id: "stub".into(), label: "stub".into(),
+                meta: json!({"enabled":true, "tier":"rewrite", "uses":[]}),
+            }] })
+        });
+        let home = tempfile::tempdir().unwrap();
+        let server = Server::new("stub", host.handle(), Arc::new(NoServices), crate::state::Store::new(home.path(), "stub"));
+        server.initialize(&crate::wire::capabilities());
+        let error = server.answer(name::MODEL_COMPLETE, json!({"session":"ses_1", "request":{
+            "model":"fake", "maxTokens":1, "system":[], "messages":[], "tools":[]
+        }})).await.unwrap_err();
+        assert!(error.message.contains("model grant"), "{}", error.message);
+    }
+}
