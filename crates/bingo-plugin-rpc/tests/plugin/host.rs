@@ -30,3 +30,27 @@ async fn reverse_verbs_bind_the_process_identity_and_do_not_wait_for_a_turn() {
     assert_eq!(unknown["error"]["code"], -32601);
     started.manager.shutdown().await;
 }
+
+#[tokio::test]
+async fn state_versions_refuse_stale_writes_and_survive_a_restart() {
+    let started = started_with(&[("stub", &[])]).await;
+    let get = json!({"scope":"global","key":"greeting"});
+    let missing = reverse(&started, "host/state/get", get.clone()).await;
+    assert!(missing.get("error").is_none(), "{missing}");
+    assert_eq!(missing["result"], Value::Null);
+    let set = json!({"scope":"global","key":"greeting","value":"hello"});
+    let first = reverse(&started, "host/state/set", set.clone()).await;
+    assert_eq!(first["result"], json!({"version":1,"value":"hello"}));
+    let mut stale = set;
+    stale["ifVersion"] = json!(9);
+    let conflict = reverse(&started, "host/state/set", stale).await;
+    assert_eq!(conflict["error"]["data"]["version"], 1);
+    started.manager.shutdown().await;
+    let manager = bingo_plugin_rpc::Manager::new(bingo_sdk::Env::rooted(started.home.path()), Default::default(), Default::default());
+    manager.start(started.project.path(), started.host.clone()).await;
+    let tool = only_tool(&manager).await;
+    let (_, result) = call(&tool, json!({"host":{"method":"host/state/get","params":get}}), started.project.path()).await;
+    let value: Value = serde_json::from_str(&said(&result.unwrap())).unwrap();
+    assert_eq!(value["result"], first["result"]);
+    manager.shutdown().await;
+}
