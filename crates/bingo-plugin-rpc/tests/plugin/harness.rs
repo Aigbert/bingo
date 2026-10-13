@@ -9,11 +9,9 @@ use std::time::Duration;
 use async_trait::async_trait;
 use bingo_plugin_rpc::Manager;
 use bingo_sdk::{
-    Answer, AnswerSpec, Attachment, CancellationToken, Catalog, CatalogKind, ClientIdentity,
-    CloseReason, Delivery, Env, GatewayStream, HostApi, HostHandle, Input, IntentId,
-    InteractionKind, ItemBody, ItemId, KernelError, Level, OpenOptions, Prompter, SessionFilter,
-    SessionId, SessionSelector, SessionSummary, Tool, ToolContext, ToolError, ToolHost, ToolOutput,
-    TurnId, WireService,
+    Answer, AnswerSpec, CancellationToken, Env, HostHandle, InteractionKind, ItemBody, ItemId,
+    KernelError, Level, Prompter, SessionId, Tool, ToolContext, ToolError, ToolHost, ToolOutput,
+    TurnId,
 };
 use serde_json::{Value, json};
 
@@ -105,7 +103,7 @@ pub async fn started_with(plugins: &[(&str, &[&str])]) -> Started {
         BTreeSet::new(),
     ));
     let listener = Arc::new(Listening::new());
-    let host = HostHandle(Arc::clone(&listener) as Arc<dyn HostApi>);
+    let host = listener.host.handle();
     manager.start(project.path(), host.clone()).await;
     Started {
         manager,
@@ -143,117 +141,37 @@ pub async fn respawned(manager: &Manager) -> Vec<Arc<dyn Tool>> {
 
 // --------------------------------------------------------------- the doubles
 
-/// A host that keeps services and, unlike `ServiceHost`, is somewhere a notice
-/// can land: the one drain says a notice through the host rather than through
-/// a call, so this is where a test reads what the bridge said. Everything else
-/// is the absent host's.
+/// The shared host keeps services and the notices emitted by the bridge.
 pub struct Listening {
-    services: HostHandle,
-    said: Mutex<Vec<(Level, String, String)>>,
+    host: bingo_sdk::testing::TestHost,
 }
 
 impl Listening {
     pub fn new() -> Self {
-        Self {
-            services: bingo_sdk::testing::ServiceHost::handle(),
-            said: Mutex::new(Vec::new()),
-        }
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_notice(|_, _, _| async { Ok(()) });
+        Self { host }
     }
 
     /// The level and text of the first notice filed under this code.
     pub fn heard(&self, code: &str) -> Option<(Level, String)> {
-        self.said
-            .lock()
-            .unwrap()
-            .iter()
+        self.all()
+            .into_iter()
             .find(|(_, said, _)| said == code)
-            .map(|(level, _, text)| (*level, text.clone()))
+            .map(|(level, _, text)| (level, text))
     }
 
     pub fn all(&self) -> Vec<(Level, String, String)> {
-        self.said.lock().unwrap().clone()
-    }
-}
-
-#[async_trait]
-impl HostApi for Listening {
-    async fn sessions(&self, filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        self.services.0.sessions(filter).await
-    }
-
-    async fn open(
-        &self,
-        selector: SessionSelector,
-        who: ClientIdentity,
-        options: OpenOptions,
-    ) -> Result<Attachment, KernelError> {
-        self.services.0.open(selector, who, options).await
-    }
-
-    async fn close(&self, session: &SessionId, reason: CloseReason) -> Result<(), KernelError> {
-        self.services.0.close(session, reason).await
-    }
-
-    async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
-        self.services.0.delete(session).await
-    }
-
-    async fn deliver(
-        &self,
-        to: &SessionId,
-        intent: IntentId,
-        input: Input,
-        delivery: Delivery,
-    ) -> Result<(), KernelError> {
-        self.services.0.deliver(to, intent, input, delivery).await
-    }
-
-    async fn extend(
-        &self,
-        session: &SessionId,
-        plugin: &str,
-        kind: &str,
-        payload: Value,
-    ) -> Result<(), KernelError> {
-        self.services.0.extend(session, plugin, kind, payload).await
-    }
-
-    async fn signal(
-        &self,
-        session: &SessionId,
-        plugin: &str,
-        kind: &str,
-        payload: Value,
-    ) -> Result<(), KernelError> {
-        self.services.0.signal(session, plugin, kind, payload).await
-    }
-
-    async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
-        self.services.0.catalog(kind).await
-    }
-
-    async fn notice(&self, level: Level, code: &str, text: &str) -> Result<(), KernelError> {
-        self.said
-            .lock()
-            .unwrap()
-            .push((level, code.to_string(), text.to_string()));
-        Ok(())
-    }
-
-    fn gateway_events(&self) -> GatewayStream {
-        self.services.0.gateway_events()
-    }
-
-    fn service_any(&self, key: &str) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
-        self.services.0.service_any(key)
-    }
-
-    fn service_wire(&self, key: &str) -> Option<Arc<dyn WireService>> {
-        self.services.0.service_wire(key)
-    }
-
-    fn open_service(&self, key: &str, wire: Arc<dyn WireService>) -> Result<(), KernelError> {
-        self.services.0.open_service(key, wire)
+        self.host
+            .calls()
+            .into_iter()
+            .filter_map(|call| match call {
+                bingo_sdk::testing::HostCall::Notice { level, code, text } => {
+                    Some((level, code, text))
+                }
+                _ => None,
+            })
+            .collect()
     }
 }
 
