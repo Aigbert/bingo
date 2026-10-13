@@ -7,18 +7,23 @@
 
 pub mod actions;
 mod badge;
+mod button;
 /// A fence in an answer is the same block a plugin publishes, so
 /// [`crate::markdown`] hands its language and text straight to this renderer
 /// (M11e).
 pub mod code;
-mod columns;
 mod diff;
+mod flex;
+mod image;
+mod input;
 mod keyvalue;
+mod link;
 mod list;
 mod markdown;
 mod panel;
 mod progress;
-mod stack;
+mod raster;
+mod select;
 /// A GFM table in an answer is the same table a plugin publishes, so
 /// [`crate::markdown`] hands its rows straight to this renderer (M11e).
 pub mod table;
@@ -83,8 +88,18 @@ pub fn render(view: &View, width: usize) -> Vec<Line<'static>> {
 /// A view as styled lines.
 pub fn marked(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
     match view {
-        View::Text { children, .. } => text::lines(&bingo_sdk::view::text_children(children)),
-        View::Markdown { text, .. } => markdown::lines(text, width),
+        View::Text { children, style } => text::styled(children, style, width),
+        View::Markdown { text, dim_color } => {
+            let mut lines = markdown::lines(text, width);
+            if *dim_color {
+                for line in &mut lines {
+                    for span in &mut line.spans {
+                        span.style = span.style.patch(theme::dim());
+                    }
+                }
+            }
+            lines
+        }
         View::Code { language, source } => code::lines(language.as_deref(), source, width),
         View::Diff { unified } => diff::lines(unified),
         View::List { items } => list::lines(items),
@@ -97,20 +112,30 @@ pub fn marked(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
         } => progress::lines(*value, *total, label.as_deref(), width, marks.beat),
         View::Badge { text, tone } => badge::lines(text, *tone),
         View::Tree { nodes } => tree::lines(nodes),
-        View::Box { children, layout } => {
-            if layout.flex_direction == Some(bingo_sdk::view::Direction::Row) {
-                columns::lines(children, width, marks)
-            } else {
-                stack::lines(children, width, marks)
-            }
-        }
+        View::Box { children, layout } => flex::lines(children, layout, width, marks),
+        View::Button { children, button } => button::lines(children, button, width, marks),
+        View::Input { input } => input::lines(input, width),
+        View::Select { select } => select::lines(select, width),
+        View::Link { href, label } => link::lines(href, label.as_deref(), width),
+        View::Image {
+            source,
+            alt,
+            columns,
+            rows,
+        } => image::lines(source, alt, *columns, *rows, width),
+        View::Raster {
+            columns,
+            rows,
+            cells,
+        } => raster::lines(*columns, *rows, cells, width),
+        View::Svg { alt, .. } => text::lines(alt),
+        View::Engine { .. } => Vec::new(),
         View::Panel { title, child } => panel::lines(title, child, width, marks),
         View::Actions { items } => actions::lines(items, width, marks),
         // A word this surface has not learned is the text its author wrote
         // for exactly this (ADR-0038 §1). Learning a kind richly is a
         // surface's own affair, and no kind is learned here yet.
         View::Custom { fold, .. } => text::lines(fold),
-        _ => text::lines(&view.fold()),
     }
 }
 
@@ -151,7 +176,7 @@ pub fn indent(line: Line<'static>, by: usize) -> Line<'static> {
 }
 
 /// One line cut and padded to exactly `width` cells: what a column of
-/// [`columns`] and a placed view are laid out on.
+/// [`flex`] and a placed view are laid out on.
 pub fn fit(line: Line<'static>, width: usize) -> Line<'static> {
     let mut spans: Vec<Span<'static>> = Vec::new();
     let mut used = 0usize;
