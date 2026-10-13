@@ -71,6 +71,12 @@ impl Server {
         if method == name::SERVICE_CALL {
             return self.service.call(params).await;
         }
+        if method == name::MODEL_COMPLETE {
+            let grant = bingo_plugin_host::grant::granted(&self.host, &self.plugin)
+                .await
+                .map_err(failed)?;
+            bingo_plugin_host::grant::admits(&grant, "model", "complete", true).map_err(failed)?;
+        }
         bingo_plugin_host::host::Operations {
             plugin: &self.plugin,
             host: &self.host,
@@ -112,7 +118,9 @@ mod tests {
     struct NoServices;
     #[async_trait::async_trait]
     impl ServiceCalls for NoServices {
-        async fn call(&self, _: Value) -> Result<Value, RpcError> { Err(unknown("service/call")) }
+        async fn call(&self, _: Value) -> Result<Value, RpcError> {
+            Err(unknown("service/call"))
+        }
     }
 
     #[tokio::test]
@@ -120,17 +128,32 @@ mod tests {
         let host = bingo_sdk::testing::TestHost::default();
         host.on_catalog(|kind| async move {
             assert_eq!(kind, CatalogKind::Plugins);
-            Ok(Catalog { kind, entries: vec![CatalogEntry {
-                id: "stub".into(), label: "stub".into(),
-                meta: json!({"enabled":true, "tier":"rewrite", "uses":[]}),
-            }] })
+            Ok(Catalog {
+                kind,
+                entries: vec![CatalogEntry {
+                    id: "stub".into(),
+                    label: "stub".into(),
+                    meta: json!({"enabled":true, "tier":"rewrite", "uses":[]}),
+                }],
+            })
         });
         let home = tempfile::tempdir().unwrap();
-        let server = Server::new("stub", host.handle(), Arc::new(NoServices), crate::state::Store::new(home.path(), "stub"));
+        let server = Server::new(
+            "stub",
+            host.handle(),
+            Arc::new(NoServices),
+            crate::state::Store::new(home.path(), "stub"),
+        );
         server.initialize(&crate::wire::capabilities());
-        let error = server.answer(name::MODEL_COMPLETE, json!({"session":"ses_1", "request":{
-            "model":"fake", "maxTokens":1, "system":[], "messages":[], "tools":[]
-        }})).await.unwrap_err();
+        let error = server
+            .answer(
+                name::MODEL_COMPLETE,
+                json!({"session":"ses_1", "request":{
+                    "model":"fake", "maxTokens":1, "system":[], "messages":[], "tools":[]
+                }}),
+            )
+            .await
+            .unwrap_err();
         assert!(error.message.contains("model grant"), "{}", error.message);
     }
 }

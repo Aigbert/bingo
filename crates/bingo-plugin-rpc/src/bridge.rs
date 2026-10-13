@@ -104,6 +104,7 @@ pub struct Setting {
 
 /// Everything about one plugin that does not change, and the one thing that does.
 pub struct Bridge {
+    registration: Option<Arc<bingo_plugin_host::registration::Registration>>,
     name: String,
     root: PathBuf,
     /// Already resolved: `${PLUGIN_ROOT}` is a manifest's spelling, not a
@@ -144,6 +145,7 @@ impl Bridge {
     ) -> Self {
         let name = name.into();
         Self {
+            registration: None,
             store: crate::state::Store::new(&setting.data_dir, &name),
             name,
             root,
@@ -159,6 +161,13 @@ impl Bridge {
         }
     }
 
+    pub(crate) fn with_registration(
+        mut self,
+        registration: Arc<bingo_plugin_host::registration::Registration>,
+    ) -> Self {
+        self.registration = Some(registration);
+        self
+    }
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -408,6 +417,9 @@ impl Bridge {
         };
         if let Some(live) = &old {
             live.connection.stop().await;
+        }
+        if let Some(registration) = &self.registration {
+            registration.update(&manifest);
         }
         *self.launch.write().unwrap_or_else(|e| e.into_inner()) =
             (entry.rooted(&self.root), manifest.call_timeout);

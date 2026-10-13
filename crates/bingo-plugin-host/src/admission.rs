@@ -23,21 +23,36 @@ impl Admission {
         runtime: PluginRuntime,
         trust: Option<&PluginTrust>,
     ) -> Option<PluginRegistration> {
-        let mut state = self.0.lock().unwrap_or_else(|e| e.into_inner());
-        if !matches!(*state, State::Pending) {
-            return None;
-        }
-        let grant = grant(found.origin, trust, &found.manifest.uses);
-        *state = State::Checking(grant.clone());
-        Some(PluginRegistration {
+        self.claim_registration(PluginRegistration {
             name: found.name.clone(),
             version: found.manifest.version.clone(),
             execution: PluginExecution {
                 origin: found.origin,
                 runtime,
-                grant,
+                grant: grant(found.origin, trust, &found.manifest.uses),
             },
         })
+    }
+    pub fn claim_registration(
+        &self,
+        registration: PluginRegistration,
+    ) -> Option<PluginRegistration> {
+        let mut state = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        if !matches!(*state, State::Pending) {
+            return None;
+        }
+        *state = State::Checking(registration.execution.grant.clone());
+        Some(registration)
+    }
+    pub fn reset(&self) {
+        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = State::Pending;
+    }
+    pub fn decision(&self) -> Result<Option<PluginGrant>, String> {
+        match &*self.0.lock().unwrap_or_else(|e| e.into_inner()) {
+            State::Pending | State::Checking(_) => Ok(None),
+            State::Allowed(grant) => Ok(Some(grant.clone())),
+            State::Refused(_, reason) => Err(reason.clone()),
+        }
     }
     pub fn finish(&self, result: Result<PluginGrant, String>) {
         let mut state = self.0.lock().unwrap_or_else(|e| e.into_inner());

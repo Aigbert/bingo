@@ -6,6 +6,7 @@ pub mod host;
 pub mod manifest;
 pub mod notice;
 pub mod ops;
+pub mod registration;
 pub mod runtime;
 pub mod stamps;
 pub mod state;
