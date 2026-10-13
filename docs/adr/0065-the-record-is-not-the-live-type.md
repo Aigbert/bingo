@@ -1,6 +1,6 @@
 # ADR-0065 — The record is not the live type
 
-Status: proposed · 2026-10-13 · Plan: M113 · Amends: ADR-0005 §2–3
+Status: accepted · 2026-10-13 · Plan: M113 · Amends: ADR-0005 §2–3
 
 ## Context
 
@@ -64,9 +64,9 @@ when it changes how an existing record reads.
 
 ## Consequences
 
-- A session written before 2026-09-04 resumes instead of failing; the
-  frames whose shape left the vocabulary are visible as unknown to a
-  client that asks, and to nobody else.
+- A session with valid envelopes and unknown payloads resumes instead of
+  failing; opaque records are visible to a client that asks, while
+  already-readable historical records remain known.
 - An unknown event takes a `seq` like any other, so `seq` stays gapless
   for durable frames (ADR-0002 §2).
 - Every `Event` or `ItemBody` change now touches a fixture; a breaking
