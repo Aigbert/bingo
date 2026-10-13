@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Handlers } from './ui.ts';
+
+test('render handlers travel as owned tokens and fire on the current invocation', async () => {
+  const handlers = new Handlers();
+  const oldPort = { request: async () => { throw new Error('expired render invocation'); } } as any;
+  const requests: any[] = [];
+  const current = { request: async (method: string, params: any) => { requests.push({method, params}); return null; } } as any;
+  const callback = async (value: string) => oldPort.request('host/state/set', {value});
+  const tree = handlers.mint('counter', 'session', 'pane', 'first', {kind:'Input', onInput: callback}, oldPort);
+  assert.equal(tree.onInput.name, 'counter:ui');
+  assert.equal(typeof tree.onInput.args.handler, 'string');
+  assert.equal(tree.onInput.args.event, 'input');
+  const events: string[] = [];
+  const dispatch = async (event: string, input: any, next: () => Promise<unknown>) => { events.push(event); return next(); };
+  assert.deepEqual(await handlers.fire('session', {...tree.onInput.args, value:'typed'}, current, dispatch), {stale:false});
+  assert.deepEqual(requests, [{method:'host/state/set', params:{value:'typed'}}]);
+  assert.deepEqual(events, ['ui.input']);
+  handlers.mint('counter', 'session', 'pane', 'second', {kind:'Text',children:['new']}, oldPort);
+  assert.deepEqual(await handlers.fire('session', tree.onInput.args, current, dispatch), {stale:true});
+});
+
+test('handler tokens cannot cross sessions or change their event', async () => {
+  const handlers = new Handlers();
+  const port = {request:async () => null} as any;
+  let calls = 0;
+  const tree = handlers.mint('counter','one','pane','generation',{kind:'Button',onPress:()=>{calls++;}},port);
+  const dispatch = async (_: string, __: any, next: () => Promise<unknown>) => next();
+  assert.deepEqual(await handlers.fire('two',tree.onPress.args,port,dispatch),{stale:true});
+  assert.deepEqual(await handlers.fire('one',{...tree.onPress.args,event:'select'},port,dispatch),{stale:true});
+  assert.equal(calls,0);
+});
