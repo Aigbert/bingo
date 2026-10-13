@@ -43,8 +43,8 @@ This is the first use of M113's version line.
    - append: for each picture part, decode base64, `put`, and write the
      line in v2 shape; this is the store's record type, distinct from
      `Event` (ADR-0065: the record is not the live type) — a
-     `record::encode(&Frame) -> Value` / `record::decode(Value) -> Frame`
-     pair with the blob lookups injected;
+     raw-JSON record codec with blob lookups injected. Keep opaque payloads
+     in RawValue (a Value round trip would normalize their bytes);
    - `VERSION = 2`; the first append to a v1 journal writes the version
      line first (M113's writer); the 1→2 step is the identity.
    - replay resolves references, or the missing-blob text part.
@@ -71,6 +71,7 @@ This is the first use of M113's version line.
 - Mechanical Image/schema fixtures in provider, core, print, TUI, MCP and RPC tests
 - `crates/bingo/tests/cli/images.rs`: resolve stored pictures through journal replay
   in its fixture reader; keep the existing CLI assertions unchanged
+- Dimension-only expected Image fixtures in pictures, MCP, print and Read tests
 - `docs/adr/{0067,0005,0040,0061,0062}*.md`
 
 ## Exit criteria
