@@ -99,6 +99,7 @@ fn spawn_with(
         subscribers: Subscribers::default(),
         running: None,
         queue: Queue::default(),
+        gate: Default::default(),
         commands,
         tracker,
         cancel,

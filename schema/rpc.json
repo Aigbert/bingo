@@ -718,7 +718,6 @@
             "SESSION_CLOSED",
             "INTERACTION_CLOSED",
             "NOT_READY",
-        "INTERRUPTED",
             "STALE_GENERATION",
             "NOT_INITIALIZED",
             "INVALID_INPUT",
@@ -736,6 +735,11 @@
             "TURN_BUDGET_EXHAUSTED",
             "INTERNAL"
           ]
+        },
+        {
+          "type": "string",
+          "const": "INTERRUPTED",
+          "description": "The person stopped it; not a failure."
         },
         {
           "type": "string",

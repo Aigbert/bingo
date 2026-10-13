@@ -4,6 +4,7 @@
 //! and fans them out to bounded subscriber channels. It never awaits a client.
 
 mod commands;
+mod gate;
 mod inputs;
 mod interactions;
 mod invoke;
@@ -71,6 +72,7 @@ struct Actor {
     running: Option<Running>,
     queue: Queue,
     commands: Commands,
+    gate: gate::InputGate,
     /// Work that outlives a turn: the hooks that run after `TurnCompleted`.
     tracker: TaskTracker,
     cancel: CancellationToken,
@@ -125,6 +127,7 @@ impl Actor {
     async fn dispatch(&mut self, msg: Msg) -> Result<Flow, KernelError> {
         match msg {
             Msg::Submit { intent, input } => self.submit(intent, input).await?,
+            Msg::Gated { intent, verdict } => self.gated(intent, verdict).await?,
             Msg::Deliver {
                 intent,
                 input,
@@ -936,6 +939,7 @@ impl Actor {
             return Ok(Flow::Stop);
         }
         self.cancel.cancel();
+        self.close_gate().await?;
         // Before the turn is told to stop, and whether or not there is one: a
         // question opened between turns (ADR-0039 §1) is closed by the same
         // close as any other.

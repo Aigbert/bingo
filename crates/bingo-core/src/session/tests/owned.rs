@@ -157,3 +157,104 @@ async fn a_hung_submit_keeps_queries_and_other_sessions_responsive() {
     bounded(mailbox.wait_closed()).await;
     bounded(second.wait_closed()).await;
 }
+
+#[tokio::test(start_paused = true)]
+async fn gate_fifo_keeps_prose_command_prose_in_arrival_order() {
+    let hung = Hung::at(HookPoint::Submit);
+    let provider = ScriptedProvider::new(vec![
+        Script::Hang(vec![ModelEvent::TextStart { id: "first".into() }]),
+        Script::Events(text("second")),
+    ]);
+    let mut cfg = config(provider, vec![], Arc::new(NoHost));
+    cfg.hooks = HookSet::fixed(vec![hung.clone()]);
+    let command =
+        ScriptedCommand::new("echo", false, Ok(CommandOutcome::Applied { message: None }));
+    let mailbox = configured(cfg, vec![command.clone()]);
+    let (mut state, mut events) = mailbox.attach().await.unwrap();
+    let blocked = IntentId::mint();
+    mailbox.submit(blocked.clone(), input("hang"));
+    bounded(hung.entered.notified()).await;
+    let first = IntentId::mint();
+    let middle = IntentId::mint();
+    let last = IntentId::mint();
+    mailbox.submit(first.clone(), input("first"));
+    mailbox.submit(middle.clone(), input("/echo middle"));
+    mailbox.submit(last.clone(), input("last"));
+    mailbox.interrupt(IntentId::mint(), InterruptScope::Head);
+    rejected(&mut events, &mut state, &blocked).await;
+    let frames = bounded(frames_until(
+        &mut events,
+        &mut state,
+        |frame| matches!(&frame.event, Event::IntentAck { intent, .. } if intent == &last),
+    ))
+    .await;
+    let acks: Vec<_> = frames
+        .iter()
+        .filter_map(|frame| match &frame.event {
+            Event::IntentAck { intent, .. }
+                if [first.clone(), middle.clone(), last.clone()].contains(intent) =>
+            {
+                Some(intent.clone())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(acks, [first, middle.clone(), last.clone()]);
+    mailbox.interrupt(IntentId::mint(), InterruptScope::Head);
+    bounded(drive(&mut events, &mut state, turn_completed)).await;
+    let rest = bounded(frames_until(&mut events, &mut state, turn_completed)).await;
+    let completed: Vec<_> = rest
+        .iter()
+        .filter_map(|frame| match &frame.event {
+            Event::IntentAck {
+                intent,
+                outcome: IntentOutcome::Applied { .. } | IntentOutcome::TurnStarted { .. },
+            } => Some(intent.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(completed, [middle, last]);
+    assert_eq!(command.calls(), ["middle"]);
+    assert_eq!(user_texts(&state), ["first", "last"]);
+    mailbox.close(CloseReason::Client);
+    bounded(mailbox.wait_closed()).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn close_joins_a_hung_command_within_the_grace() {
+    let hung = Hung::at(HookPoint::Submit);
+    let mailbox = configured(tool_config(), vec![hung.clone()]);
+    mailbox.attach().await.unwrap();
+    mailbox.submit(IntentId::mint(), input("/hang"));
+    bounded(hung.entered.notified()).await;
+    mailbox.close(CloseReason::Client);
+    bounded(mailbox.wait_closed()).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn close_rejects_the_gate_head_and_every_waiting_input() {
+    let hung = Hung::at(HookPoint::Submit);
+    let mut cfg = tool_config();
+    cfg.hooks = HookSet::fixed(vec![hung.clone()]);
+    let mailbox = configured(cfg, vec![]);
+    let (_, mut events) = mailbox.attach().await.unwrap();
+    let head = IntentId::mint();
+    let tail = IntentId::mint();
+    mailbox.submit(head.clone(), input("hang"));
+    bounded(hung.entered.notified()).await;
+    mailbox.submit(tail.clone(), input("tail"));
+    mailbox.close(CloseReason::Client);
+    bounded(mailbox.wait_closed()).await;
+    let frames: Vec<_> = bounded(events.by_ref().collect()).await;
+    let rejected: Vec<_> = frames
+        .iter()
+        .filter_map(|frame| match &frame.event {
+            Event::IntentAck {
+                intent,
+                outcome: IntentOutcome::Rejected { error },
+            } if error.code == ErrorCode::SessionClosed => Some(intent.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(rejected, [head, tail]);
+}

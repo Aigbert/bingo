@@ -58,6 +58,7 @@ async fn failing_actor() -> (Actor, Arc<FailingStore>) {
         subscribers: Subscribers::default(),
         running: None,
         queue: Queue::default(),
+        gate: Default::default(),
         commands: Commands::new(
             Services::none(),
             mailbox,

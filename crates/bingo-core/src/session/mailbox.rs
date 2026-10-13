@@ -12,6 +12,10 @@ use tokio::sync::{mpsc, oneshot, watch};
 use crate::turn::{TurnConfig, TurnHost};
 
 pub(crate) enum Msg {
+    Gated {
+        intent: IntentId,
+        verdict: super::gate::Verdict,
+    },
     Submit {
         intent: IntentId,
         input: Input,
