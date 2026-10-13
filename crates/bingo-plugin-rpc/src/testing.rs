@@ -19,13 +19,14 @@ use crate::manifest::Entry;
 /// be a request the router ignores anyway.
 pub fn unanswering() -> Arc<Connection> {
     let dir = tempfile::tempdir().expect("a temporary directory");
+    let shell = bingo_process::shell::resolve().expect("the supported shell");
     let entry = Entry {
-        command: "cat".into(),
-        args: Vec::new(),
+        command: shell.path().to_string_lossy().into_owned(),
+        args: vec!["-c".into(), "cat".into()],
         env: Default::default(),
     };
     let connection = Connection::spawn("quiet", &entry, dir.path(), dir.path(), None)
-        .expect("`cat` exists on every unix");
+        .expect("the supported shell runs cat");
     Arc::new(connection)
 }
 

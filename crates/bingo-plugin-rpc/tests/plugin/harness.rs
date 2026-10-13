@@ -22,7 +22,9 @@ pub fn stub_plugin() -> PathBuf {
         .parent()
         .and_then(Path::parent)
         .expect("a test binary lives at target/<profile>/deps/<test>");
-    let stub = profile.join("examples").join("stub_plugin");
+    let stub = profile
+        .join("examples")
+        .join(format!("stub_plugin{}", std::env::consts::EXE_SUFFIX));
     assert!(
         stub.exists(),
         "cargo test builds this crate's examples; {} is missing",
