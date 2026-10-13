@@ -665,7 +665,7 @@ impl Actor {
         let mut used = serde_json::to_vec(&snapshot).map_or(available, |bytes| bytes.len());
         let mut start = self.state.transcript.items().len();
         while start > 0 {
-            let size = serde_json::to_vec(&self.state.transcript.items()[start - 1])
+            let size = serde_json::to_vec(self.state.transcript.items()[start - 1].as_ref())
                 .map_or(available, |bytes| bytes.len());
             if used.saturating_add(size).saturating_add(1) > available {
                 break;
@@ -792,7 +792,7 @@ impl Actor {
         let mut start = end;
         let mut used = 256usize; // JSON-RPC envelope, generation and cursor.
         while start > 0 && end - start < limit {
-            let size = serde_json::to_vec(&items[start - 1])
+            let size = serde_json::to_vec(items[start - 1].as_ref())
                 .map_err(|error| {
                     KernelError::new(
                         ErrorCode::Internal,
@@ -809,7 +809,7 @@ impl Actor {
         let slice = &items[start..end];
         let oversized = if slice.is_empty() && start > 0 {
             let item = &items[start - 1];
-            let raw = serde_json::to_vec(item).map_err(|error| {
+            let raw = serde_json::to_vec(item.as_ref()).map_err(|error| {
                 KernelError::new(
                     ErrorCode::Internal,
                     format!("item cannot serialize: {error}"),
