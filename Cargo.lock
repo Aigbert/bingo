@@ -318,6 +318,7 @@ dependencies = [
  "async-trait",
  "base64 0.23.1",
  "bingo-auth-oauth",
+ "bingo-claim",
  "bingo-pictures",
  "bingo-sdk",
  "futures",
@@ -435,6 +436,7 @@ name = "bingo-gateway"
 version = "0.6.6"
 dependencies = [
  "bingo-channels",
+ "bingo-claim",
  "bingo-core",
  "bingo-schedule",
  "bingo-sdk",

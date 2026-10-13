@@ -18,6 +18,7 @@ async fn a_live_channel_host_excludes_another_and_a_killed_one_releases() {
             .args(["--channels", &format!("loopback={address}")])
             .envs(support::home::home_env(home.path()))
             .env_remove("BINGO_FAKE_SCRIPT")
+            .env_remove("OPENAI_API_KEY").env_remove("ANTHROPIC_API_KEY")
             .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped())
             .kill_on_drop(true);
         command

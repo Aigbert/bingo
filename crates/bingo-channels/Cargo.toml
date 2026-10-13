@@ -12,6 +12,7 @@ description = "IM channels surface for bingo: one deliverer, adapters that hand 
 workspace = true
 
 [dependencies]
+bingo-claim.workspace = true
 bingo-sdk.workspace = true
 # M17 (ADR-0020 §8): a gateway started at boot has no exported environment, so
 # a channel secret may live in the one credential store. The library tier

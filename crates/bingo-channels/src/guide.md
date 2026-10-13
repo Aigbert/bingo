@@ -112,3 +112,11 @@ the ceiling. It is gated on the path, so a permission rule can allow it.
   logins through launchd or systemd. `doctor` reads the settings, the
   credentials and every lock and says what to do; `--fix` removes exactly the
   locks whose process is gone.
+
+### Upgrading channel claims
+
+Channel claims now use OS locks on permanent `channels/*.lock` files. A
+crash releases ownership automatically; never remove a modern claim file.
+An older bare-PID or empty claim is refused without changing it. Stop every
+bingo using that data directory, inspect and remove the named legacy file,
+then restart. The first start publishes the modern marker.

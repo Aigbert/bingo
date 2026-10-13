@@ -621,7 +621,7 @@ async fn the_working_sign_brackets_the_turn_a_message_started() {
 /// The one thing a chat must never do quietly: two processes on one app take
 /// half of its events each and neither knows (ADR-0016 §5).
 #[test]
-fn a_second_process_on_one_credential_refuses_loudly() {
+fn a_legacy_channel_pid_file_refuses_loudly() {
     let home = tempfile::tempdir().unwrap();
     let settings = home.path().join("channels.json");
     // A peer nobody is listening on: the claim is taken before the dial, so
@@ -654,15 +654,15 @@ fn a_second_process_on_one_credential_refuses_loudly() {
         stderr.contains("the loopback peer"),
         "the refusal names what could not be reached: {stderr}"
     );
-    // A claim left behind by a process that is still running is refused.
+    // A legacy PID file is refused without guessing whether its owner is alive.
     let held = home.path().join(".bingo/data/channels");
     std::fs::create_dir_all(&held).unwrap();
     std::fs::write(held.join("loopback-127.0.0.1_9.lock"), "1").unwrap();
     let second = command().output().unwrap();
     let stderr = String::from_utf8_lossy(&second.stderr).into_owned();
     assert!(
-        stderr.contains("another bingo already runs"),
-        "a second process refuses loudly: {stderr}"
+        stderr.contains("legacy") && stderr.contains("stop every bingo"),
+        "a legacy file refuses with its migration remedy: {stderr}"
     );
 }
 
