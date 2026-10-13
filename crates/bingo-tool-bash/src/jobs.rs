@@ -360,6 +360,20 @@ mod tests {
     }
 
     #[test]
+    fn slots_place_the_running_count_and_the_call_row() {
+        let jobs = Jobs::new();
+        let job = job("sleep 1");
+        jobs.file(job.clone());
+        let payload = jobs.view(&session());
+        let slots: Vec<bingo_sdk::slot::Slot> = serde_json::from_value(payload["slots"].clone()).unwrap();
+        assert!(matches!(&slots[0], bingo_sdk::slot::Slot::Status { text, .. } if text == "1 shell"));
+        assert!(matches!(&slots[1], bingo_sdk::slot::Slot::Row { body: Some(body), .. }
+            if body == &View::text("Running in the background")));
+        job.finished(State::Killed);
+        assert_eq!(jobs.view(&session()), Value::Null);
+    }
+
+    #[test]
     fn a_job_reads_its_id_back_out_of_the_log_it_writes() {
         assert_eq!(id_of(Path::new("/data/bash/ab12cd34.log")), "ab12cd34");
         assert_eq!(id_of(Path::new("")), "");

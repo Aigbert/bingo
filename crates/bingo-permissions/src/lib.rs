@@ -281,6 +281,22 @@ mod tests {
     }
 
     #[test]
+    fn slots_place_the_mode_and_each_action() {
+        let policy = PermissionsPolicy::new(Permissions::default(), None).unwrap();
+        let session = SessionId::from_raw("ses_slots");
+        let payload = policy.describe(&session);
+        let slots: Vec<bingo_sdk::slot::Slot> = serde_json::from_value(payload["slots"].clone()).unwrap();
+        let bingo_sdk::slot::Slot::Mode { current, modes } = &slots[0] else { panic!("mode") };
+        assert_eq!(current, "default");
+        assert_eq!(modes.len(), Mode::ALL.len());
+        for (item, mode) in modes.iter().zip(Mode::ALL) {
+            assert_eq!(item.label, mode.as_str());
+            assert_eq!(item.action.name, "permission");
+            assert_eq!(item.action.args, json!(mode));
+        }
+    }
+
+    #[test]
     fn the_manifest_says_what_it_provides() {
         assert_eq!(MANIFEST.id, "bingo.permissions");
         assert_eq!(

@@ -71,6 +71,33 @@ mod tests {
     use serde_json::json;
 
     #[tokio::test]
+    async fn slots_upgrade_an_old_array_with_its_activity() {
+        let journals = Journals::new();
+        let session = journals.session();
+        let host = journals.handle();
+        let old: serde_json::Value = serde_json::from_str(include_str!("../fixtures/pre-m121.json")).unwrap();
+        host.extend(&session, PLUGIN, KIND, old.clone()).await.unwrap();
+        let tasks = read(&host, &session).await.unwrap();
+        assert_eq!(tasks.len(), 1);
+        write(&host, &session, &tasks).await.unwrap();
+        let state = host.open(SessionSelector::ById { id: session }, ClientIdentity {
+            name: "test".into(), surface: "test".into(),
+        }, OpenOptions::default()).await.unwrap().snapshot;
+        assert_eq!(state.extensions[PLUGIN][KIND]["tasks"], old);
+        assert_eq!(bingo_sdk::slot::placed(&state)[0].slot, bingo_sdk::slot::Slot::Activity {
+            verb: Some("Shipping".into()),
+            view: bingo_sdk::View::Panel {
+                title: "1 task (0 done, 1 in progress, 0 open)".into(),
+                child: Box::new(bingo_sdk::View::Tree { nodes: vec![bingo_sdk::TreeNode {
+                    label: "Ship it".into(), badge: Some("Scout".into()),
+                    tone: bingo_sdk::Tone::Attention, children: vec![],
+                }] }),
+            },
+        });
+        assert_eq!(read(&host, &state.summary.id).await.unwrap(), tasks);
+    }
+
+    #[tokio::test]
     async fn a_session_that_wrote_nothing_has_no_tasks() {
         let journals = Journals::new();
         let session = journals.session();

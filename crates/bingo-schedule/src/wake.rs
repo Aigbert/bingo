@@ -102,6 +102,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn slots_place_the_wake_countdown_with_its_record() {
+        let wake = set(Timestamp::UNIX_EPOCH, SignedDuration::from_mins(5), "check".into());
+        let payload = payload(Some(&wake));
+        let slots: Vec<bingo_sdk::slot::Slot> = serde_json::from_value(payload["slots"].clone()).unwrap();
+        assert_eq!(slots, vec![bingo_sdk::slot::Slot::Status {
+            text: "wake".into(), tone: bingo_sdk::Tone::Neutral, until: Some(wake.at),
+        }]);
+        assert_eq!(payload[AT], wake.at.to_string());
+        assert_eq!(payload[NOTE], "check");
+    }
+
+    #[test]
     fn an_interval_inside_the_bounds_is_the_one_that_was_asked_for() {
         for seconds in [10, 60, 900, 3600] {
             let asked = SignedDuration::from_secs(seconds);
