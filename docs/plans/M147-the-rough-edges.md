@@ -901,3 +901,62 @@ error: 5 targets failed:
 mbx[cache]: 557 hits, 163 misses, 10 not looked up, 11 bypassed; 0 B downloaded, 0 B uploaded, 219.0 MiB stored locally
 mbx[savings]: quietly substituted 557 cached compilations. nobody noticed. that is the job. (4m 50s saved)
 ```
+
+### Changed snapshots
+
+All paths below are under `crates/bingo-surface-tui/src/`.
+
+- `screens/snapshots/bingo_surface_tui__screens__teams__roster_in_the_rooms.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__motion__card_reveal.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__motion__sheet_close.snap` — R8 keys/command hints, R10 output count.
+- `snapshots/bingo_surface_tui__motion__sheet_slide.snap` — R8 keys/command hints, R10 output count.
+- `snapshots/bingo_surface_tui__screens__ascii_permission.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__child_done_120x40.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__screens__child_done_80x24.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__screens__child_needs_you_120x40.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__child_needs_you_80x24.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__child_running_120x40.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__screens__child_running_80x24.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__screens__dropdown_120x40.snap` — R8 keys/command hints.
+- `snapshots/bingo_surface_tui__screens__dropdown_80x24.snap` — R8 keys/command hints.
+- `snapshots/bingo_surface_tui__screens__help_100x30.snap` — R8 keys/command hints, R10 output count.
+- `snapshots/bingo_surface_tui__screens__help_80x30.snap` — R8 keys/command hints, R10 output count.
+- `snapshots/bingo_surface_tui__screens__long_path_120x40.snap` — R4 permission sentence, R9 root segment.
+- `snapshots/bingo_surface_tui__screens__long_path_80x24.snap` — R4 permission sentence, R9 root segment.
+- `snapshots/bingo_surface_tui__screens__no_colour_permission.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__permission_collapsed_120x40.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__permission_collapsed_80x24.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__permission_expanded_120x40.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__permission_expanded_80x24.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__permission_feedback_120x40.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__permission_feedback_80x24.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__permission_word_diff_120x40.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__permission_word_diff_80x24.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__screens__roster_120x40.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__screens__roster_80x24.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__screens__switcher_120x40.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__screens__switcher_80x24.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__screens__switcher_query_120x40.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__screens__switcher_query_80x24.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__screens__switcher_stored_120x40.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__screens__switcher_stored_80x24.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__view__tests__a_card_comes_down_from_its_top_edge.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__view__tests__a_card_hangs_under_the_row_that_asked_for_it.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__view__tests__a_child_that_needs_a_person_is_counted_on_the_status_line.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__view__tests__a_tool_call_that_spawned_an_agent_says_what_it_is_doing.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__view__tests__dropdown.snap` — R8 keys/command hints.
+- `snapshots/bingo_surface_tui__view__tests__help_panel.snap` — R8 keys/command hints, R10 output count.
+- `snapshots/bingo_surface_tui__view__tests__permission_collapsed.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__view__tests__permission_expanded.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__view__tests__permission_with_the_feedback_row_open.snap` — R4 permission sentence.
+- `snapshots/bingo_surface_tui__view__tests__switcher_row_live.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__view__tests__switcher_row_stored.snap` — R10 output count.
+- `snapshots/bingo_surface_tui__view__tests__the_list_covers_the_transcript_and_moves_nothing_under_it.snap` — R10 output count.
+
+### Focused verification
+
+`INSTA_UPDATE=always cargo test -p bingo-surface-tui --lib`: 1134 passed; 2 pre-existing ignored. All changed snapshots were reviewed; `the_help_sheet` also checks every binding and the footer at 80×24.
+
+`cargo test -p bingo --test cli status_groups_token_counts_in_text_and_ndjson`: 1 passed (plain stdout, valid NDJSON, exit 0).
+
+`cargo test -p bingo-tool-fs --lib`: 83 passed. Bash: 148 passed with the preview test deferred to its brick, then both M147 Bash tests passed after the preview implementation.

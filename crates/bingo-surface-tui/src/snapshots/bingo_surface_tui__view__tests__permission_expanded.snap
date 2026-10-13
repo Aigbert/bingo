@@ -1,6 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/view.rs
-expression: "draw_sized(80, 34, &state, &ui, now)"
+expression: "draw_sized(80, 34, &state, &mut ui, now)"
 ---
 "                                                                                "
 "                                                                                "
@@ -27,7 +27,7 @@ expression: "draw_sized(80, 34, &state, &ui, now)"
 "│   +line 18                                                                   │"
 "│   +line 19                                                                   │"
 "│                                                                              │"
-"│ Do you want to edit src/lib.rs?                                              │"
+"│ Do you want to Edit src/lib.rs?                                              │"
 "│ ❯ 1. Yes                                                                     │"
 "│   2. Yes, allow Edit(src/) during this session                               │"
 "│   3. No, and tell bingo what to do differently (esc)                         │"

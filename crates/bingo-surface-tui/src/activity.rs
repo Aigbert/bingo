@@ -426,6 +426,28 @@ fn blocking(item: &bingo_sdk::Item) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn twelve_tokens_are_visible_early_in_a_turn() {
+        let state = folded(vec![
+            frame(1, started("trn_1")),
+            frame(
+                2,
+                bingo_sdk::Event::TurnUsage {
+                    turn: bingo_sdk::TurnId::from_raw("trn_1"),
+                    usage: bingo_sdk::Usage {
+                        output_tokens: 12,
+                        ..Default::default()
+                    },
+                    context: Default::default(),
+                },
+            ),
+        ]);
+        let (mut ui, now) = scene();
+        let screen = draw_tree(80, 24, &solo(&state), &mut ui, later(now, 4_000));
+        assert!(screen.contains("↓ 12"), "{screen}");
+        assert!(!screen.contains("0.0k"), "{screen}");
+    }
+
     use super::*;
     use crate::test_support::*;
 
