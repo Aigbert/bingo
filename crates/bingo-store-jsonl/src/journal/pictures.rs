@@ -98,8 +98,46 @@ fn the_planned_v2_picture_line_length_is_independent_of_picture_size() {
     let record = realistic_picture_record();
     let small = picture_record_line(record.clone(), b"x");
     let large = picture_record_line(record, &vec![0; 3_000_000]);
+    eprintln!(
+        "picture lines: {} / {} bytes before newline",
+        small.len(),
+        large.len()
+    );
     assert_eq!(
         large.len() - small.len(),
         3_000_000usize.to_string().len() - 1usize.to_string().len()
+    );
+}
+
+#[test]
+fn deleting_a_blob_keeps_the_size_note_and_the_session_readable() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut frame: Frame = serde_json::from_str(
+        include_str!("../../fixtures/picture-v1.jsonl")
+            .lines()
+            .nth(1)
+            .unwrap(),
+    )
+    .unwrap();
+    let Event::ItemCompleted { item } = &mut frame.event else {
+        panic!("item")
+    };
+    let ItemBody::User { parts, .. } = &mut item.body else {
+        panic!("user")
+    };
+    parts[0] =
+        ContentPart::Image(bingo_sdk::Image::from_bytes("image/png", &vec![0; 1_200_000]).unwrap());
+    create(dir.path(), &frame.session).unwrap();
+    append(dir.path(), &frame).unwrap();
+    let blob = std::fs::read_dir(dir.path().join("blobs"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    std::fs::remove_file(blob).unwrap();
+    assert_eq!(
+        picture(&replay(dir.path(), Seq::ZERO).unwrap()[0]),
+        [ContentPart::text("[picture missing: image/png 1.2 MB]")]
     );
 }

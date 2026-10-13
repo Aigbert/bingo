@@ -2,13 +2,30 @@
 
 use serde_json::Value;
 
-pub(super) const STEPS: &[fn(Value) -> Value] = &[];
+pub(super) const STEPS: &[fn(Value) -> Value] = &[std::convert::identity];
 
 pub(super) fn upgrade(value: Value, version: u32, steps: &[fn(Value) -> Value]) -> Value {
     steps
         .iter()
         .skip(version.saturating_sub(1) as usize)
         .fold(value, |value, step| step(value))
+}
+
+/// Identity steps must not normalize the bytes of opaque event/item payloads.
+pub(super) fn line(
+    bytes: &[u8],
+    version: u32,
+) -> Result<std::borrow::Cow<'_, [u8]>, serde_json::Error> {
+    if version == super::VERSION {
+        return Ok(std::borrow::Cow::Borrowed(bytes));
+    }
+    let value: Value = serde_json::from_slice(bytes)?;
+    let migrated = upgrade(value.clone(), version, STEPS);
+    if migrated == value {
+        Ok(std::borrow::Cow::Borrowed(bytes))
+    } else {
+        serde_json::to_vec(&migrated).map(std::borrow::Cow::Owned)
+    }
 }
 
 #[cfg(test)]

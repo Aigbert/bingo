@@ -77,5 +77,8 @@ fn version_one_opaque_payloads_keep_their_bytes_across_the_identity_step() {
     assert_eq!(serde_json::to_string(&frames[0].event).unwrap(), raw);
     append(dir.path(), &crate::tests::frame(2, frames[0].event.clone())).unwrap();
     assert!(!dir.path().join("blobs").exists());
-    assert_eq!(serde_json::to_string(&replay(dir.path(), Seq::ZERO).unwrap()[1].event).unwrap(), raw);
+    assert_eq!(
+        serde_json::to_string(&replay(dir.path(), Seq::ZERO).unwrap()[1].event).unwrap(),
+        raw
+    );
 }

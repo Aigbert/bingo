@@ -672,6 +672,19 @@ mod tests {
     /// newtype variant flattens the struct's fields beside the tag, and this
     /// is the exact JSON a client and the journal both read.
     #[test]
+    fn cloning_an_image_shares_its_base64_allocation() {
+        let image = Image::from_bytes("image/png", b"picture").unwrap();
+        let clone = image.clone();
+        assert!(std::sync::Arc::ptr_eq(&image.data, &clone.data));
+        assert_eq!(
+            serde_json::to_value(image).unwrap(),
+            serde_json::json!({
+                "mediaType": "image/png", "data": "cGljdHVyZQ=="
+            })
+        );
+    }
+
+    #[test]
     fn an_image_part_tags_and_flattens_beside_it() {
         let part = ContentPart::Image(Image {
             media_type: "image/png".into(),

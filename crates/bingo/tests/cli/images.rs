@@ -62,10 +62,10 @@ fn journal(home: &std::path::Path) -> Vec<Value> {
         .map(|entry| entry.path())
         .find(|path| path.join("journal.jsonl").exists())
         .expect("one session");
-    std::fs::read_to_string(dir.join("journal.jsonl"))
-        .unwrap()
-        .lines()
-        .map(|line| serde_json::from_str(line).unwrap())
+    bingo_store_jsonl::journal::replay(&dir, bingo_sdk::Seq::ZERO)
+        .expect("replay the journal")
+        .into_iter()
+        .map(|frame| serde_json::to_value(frame).expect("live frame"))
         .collect()
 }
 

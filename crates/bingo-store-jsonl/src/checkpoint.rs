@@ -7,7 +7,7 @@ use std::path::Path;
 use bingo_sdk::store::{CHECKPOINT_FORMAT, CHECKPOINT_VERSION};
 use bingo_sdk::{Checkpoint, Event, KernelError, Resumed, Seq, SessionId, SessionState};
 
-use crate::{journal, storage};
+use crate::{blobs, journal, record, storage};
 
 pub(crate) fn write(
     dir: &Path,
@@ -24,8 +24,7 @@ pub(crate) fn write(
     let (offset, line) = witness::locate(dir, session, checkpoint.seq)?;
     checkpoint.offset = offset;
     checkpoint.line_hash = bingo_digest::hex(&bingo_digest::digest(&line));
-    let bytes =
-        serde_json::to_vec(&checkpoint).map_err(|e| storage(format!("encode checkpoint: {e}")))?;
+    let bytes = record::encode_checkpoint(&checkpoint, &mut |bytes| blobs::put(dir, bytes))?;
     let temporary = dir.join("checkpoint.json.tmp");
     std::fs::write(&temporary, bytes)
         .and_then(|()| std::fs::rename(&temporary, dir.join("checkpoint.json")))
@@ -45,8 +44,7 @@ fn check_identity(checkpoint: &Checkpoint, session: &SessionId) -> Result<(), Ke
 fn read(dir: &Path, session: &SessionId) -> Result<Checkpoint, KernelError> {
     let bytes = std::fs::read(dir.join("checkpoint.json"))
         .map_err(|e| storage(format!("read checkpoint: {e}")))?;
-    let checkpoint: Checkpoint =
-        serde_json::from_slice(&bytes).map_err(|e| storage(format!("decode checkpoint: {e}")))?;
+    let checkpoint = record::decode_checkpoint(&bytes, &mut |sha| blobs::get(dir, sha))?;
     check_identity(&checkpoint, session)?;
     let line = witness::at(dir, checkpoint.offset)?;
     if bingo_digest::hex(&bingo_digest::digest(&line)) != checkpoint.line_hash {
@@ -92,7 +90,9 @@ fn repair(dir: &Path, session: &SessionId, frames: &[bingo_sdk::Frame]) {
         state.apply(frame);
     }
     state.transcript.drop_before_cut();
-    if let Err(error) = write(dir, session, &Checkpoint::new(state)) {
+    if let Err(error) =
+        journal::prepare(dir).and_then(|()| write(dir, session, &Checkpoint::new(state)))
+    {
         tracing::warn!(%session, %error, "checkpoint repair failed");
     }
 }

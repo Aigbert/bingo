@@ -17,7 +17,8 @@ bingo-claim.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
+base64.workspace = true
 jiff.workspace = true
 tracing.workspace = true
 tokio.workspace = true

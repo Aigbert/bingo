@@ -5,11 +5,13 @@
 //! journal body, and the lock is the only claim of ownership. The kernel says
 //! when to take and give back that claim — `create` does not lock by itself.
 
+mod blobs;
 mod checkpoint;
 pub mod gc;
 pub mod journal;
 pub mod layout;
 pub mod lock;
+mod record;
 pub mod summary;
 
 use std::path::{Path, PathBuf};
@@ -35,7 +37,7 @@ pub(crate) fn storage(message: impl Into<String>) -> KernelError {
 pub struct JsonlStore {
     root: PathBuf,
     locks: Arc<Locks>,
-    checkpoints: Arc<Mutex<()>>,
+    writer: Arc<Mutex<journal::Writer>>,
 }
 
 impl JsonlStore {
@@ -43,7 +45,7 @@ impl JsonlStore {
         Self {
             root: root.into(),
             locks: Arc::new(Locks::default()),
-            checkpoints: Arc::new(Mutex::new(())),
+            writer: Arc::new(Mutex::new(journal::Writer::default())),
         }
     }
 
@@ -69,7 +71,10 @@ impl JsonlStore {
 impl JsonlStore {
     fn append_frame(&self, session: &SessionId, frame: &Frame) -> Result<(), KernelError> {
         let dir = self.existing(session)?;
-        journal::append(&dir, frame)?;
+        self.writer
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .append(&dir, frame)?;
         let derived = match &frame.event {
             Event::SessionUpdated { summary } => summary::write(&dir, summary),
             // A message is worth no frame of its own, so the derived file — not
@@ -121,8 +126,10 @@ impl SessionStore for JsonlStore {
         let session = session.clone();
         let checkpoint = checkpoint.clone();
         off_runtime(move || {
-            let _guard = store.checkpoints.lock().unwrap_or_else(|e| e.into_inner());
-            checkpoint::write(&store.existing(&session)?, &session, &checkpoint)
+            let mut writer = store.writer.lock().unwrap_or_else(|e| e.into_inner());
+            let dir = store.existing(&session)?;
+            writer.prepare(&dir)?;
+            checkpoint::write(&dir, &session, &checkpoint)
         })
         .await
     }
@@ -131,8 +138,13 @@ impl SessionStore for JsonlStore {
         let store = self.clone();
         let session = session.clone();
         off_runtime(move || {
-            let _guard = store.checkpoints.lock().unwrap_or_else(|e| e.into_inner());
-            checkpoint::resume(&store.existing(&session)?, &session)
+            let mut writer = store.writer.lock().unwrap_or_else(|e| e.into_inner());
+            let dir = store.existing(&session)?;
+            let resumed = checkpoint::resume(&dir, &session)?;
+            if resumed.state.is_some() {
+                writer.resumed(&dir);
+            }
+            Ok(resumed)
         })
         .await
     }
@@ -148,6 +160,8 @@ impl SessionStore for JsonlStore {
         let session = session.clone();
         off_runtime(move || {
             let dir = store.existing(&session)?;
+            let mut writer = store.writer.lock().unwrap_or_else(|e| e.into_inner());
+            writer.forget(&dir);
             store.locks.release(&session);
             std::fs::remove_dir_all(&dir)
                 .map_err(|e| storage(format!("remove {}: {e}", dir.display())))
@@ -168,10 +182,12 @@ impl SessionStore for JsonlStore {
     }
 
     async fn release(&self, session: &SessionId) -> Result<(), KernelError> {
-        let locks = self.locks.clone();
+        let store = self.clone();
         let session = session.clone();
         off_runtime(move || {
-            locks.release(&session);
+            let mut writer = store.writer.lock().unwrap_or_else(|e| e.into_inner());
+            writer.forget(&layout::session_dir(store.root(), &session));
+            store.locks.release(&session);
             Ok(())
         })
         .await
