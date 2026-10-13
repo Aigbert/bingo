@@ -102,3 +102,10 @@ its own conversation is an agent. Fixtures pin absent and legacy true.*
 carries `tools: Vec<ToolSpec>`, the turn's already resolved offer. ADR-0036
 §1 requires the unchanged bridge to offer exactly those tools; this adds
 no history, host reader or second selection.*
+
+*2026-10-13, §1 clarification by the person's delegate: ADR-0009 §6's open
+retry is a model's, not an agent's: the agent may already have acted. A child
+stopping mid-answer fails the turn without withdrawing speech or work and
+without `TurnRetrying`. It is buried with one `ACP_RESPAWN`; the next prompt
+uses a new child. Before anything was said, the plugin may still replace a
+dead child and ask again inside the same run.*

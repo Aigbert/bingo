@@ -23,3 +23,7 @@
 ## Supersedes
 
 —
+
+*2026-10-13, §6 clarification (ADR-0076): the kernel's open retry applies
+to model calls only. An agent may already have edited files or run commands;
+a mid-answer failure keeps its journaled work and is not repeated.*

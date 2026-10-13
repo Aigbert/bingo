@@ -67,8 +67,8 @@ Audit §6.
 - `crates/bingo-surface-print/src/render.rs` (an external call prints as a tool line)
 - `holds_context` literals in `bingo-{context,experience,persona,plugin-rpc,rooms,skills,tasks}`; mechanical constructor fixtures per protocol step 6
 - `crates/bingo-plugin-rpc/src/{wire.rs,schema.rs,bridge.rs,legacy.rs (new),lib.rs}, legacy fixtures` and generated `schema/plugin.json` and generator-produced `schema/plugin-2.json`
-- `crates/bingo/tests/{acp_asked.rs,cli/acp.rs,cli/acp/{asking,bridge}.rs}`
-- `docs/adr/{0035,0039,0055}-*.md` (dated notes)
+- `crates/bingo/tests/{acp_asked.rs,cli/acp.rs,cli/acp/{asking,bridge,life}.rs}`
+- `docs/adr/{0009,0035,0039,0055}-*.md` (dated notes)
 ## Exit criteria
 - [ ] `cargo test -p bingo-sdk agent::` (fixture round-trip) and
       `cargo test -p bingo-core judge::` (kind table); ACP tests pin `narrowest`.
@@ -124,27 +124,13 @@ Audit §6.
   Actual TUI files changed: the nine TUI paths listed in Files, plus the four
   deleted `screens__acp_*` snapshots. No layout code or M133-owned code.
 
-## STOP — mid-stream retry (2026-10-13)
+## Decision — mid-stream retry (2026-10-13)
 
-Both prior Decisions were resolved. A third validation conflict remains:
-`cargo test -p bingo --test acp_asked --test cli acp --locked` reports
-`38 passed; 2 failed`. The metadata assertion in planned `cli/acp.rs` is
-an expected M134 update. The other failure is outside Files:
-`cli/acp/life.rs:152`, `a_child_that_dies_mid_stream_fails_the_turn_it_was_answering`:
-```
-left: Some(1)
-right: Some(0)
-stderr: [error] code=PROVIDER_UNAVAILABLE msg=transport: the connection closed
-```
-That test requires one visible kernel retry and success after partial speech.
-M134's one `Agent::run` per turn no longer enters the provider retry loop.
-Protocol step 6 requires a Decision before changing this behavioral assertion.
-**Recommend A:** keep one run; fail and retain journaled work after a mid-stream
-loss, authorize the `life.rs` assertion change and clarify ADR-0076 §1.
-**B:** preserve automatic retries; decide their owner and revise the one-run
-contract, including what happens when external calls have already acted.
-Implementation is uncommitted; required gates are not yet run. Focused SDK/core,
-ACP, migration, checkpoints and surface tests have passed during development;
-the newest scope/context tests still need verification. No push, merge or PR.
+The person's delegate chose A: the open retry (ADR-0009 §6) is a model's,
+not an agent's. Mid-answer loss fails with a reason, emits no `TurnRetrying`,
+and retains journaled speech/work. Bury the child with one `ACP_RESPAWN`;
+the next prompt uses a new child. The existing silent-death retry inside
+`Agent::run` stays. `cli/acp/life.rs` is authorized for this behavioral test.
+Add dated notes to ADR-0076 and ADR-0009. All three stops are resolved.
 
 Dev moved `TurnHost` to `turn/host.rs` after this branch; M134 leaves the trait unchanged.
