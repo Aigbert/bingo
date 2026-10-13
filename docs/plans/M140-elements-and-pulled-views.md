@@ -1,13 +1,10 @@
 # M140 — Elements and pulled views
 ## Goal
-
 ADR-0079 §1–3, §5, §6 (components are M141). `View` grows nine elements
-in Claude Code's words, each with a fold; each surface publishes its
-table. A pulled pane is asked for at its drawn width (`HostApi::render`,
-`ui/render`) and again when its runtime calls `HostApi::invalidate`
-(`host/ui/invalidate`). Handlers return through `Input::Action` as
-`ui.press`/`input`/`select`. The TUI draws the terminal table, seats
-panes, stacks toasts. After M121, M123–M125, M137, M138.
+with folds and surface tables. Pulled panes render at drawn width and invalidate
+through HostApi::render/invalidate (ui/render, host/ui/invalidate). Handlers return
+via Input::Action as ui.press/input/select. TUI draws elements, panes and toasts.
+After M121, M123–M125, M137, M138.
 ## Bricks, in build order
 
 1. **Elements, tests first.** Split sdk `view.rs` into `view/{mod,read,fold,table,tests}.rs`.
@@ -76,8 +73,7 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
   producers, fixtures and generators; exclude M139 world nouns, grant.rs, MCP/agents service rows.
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-sdk`: each node
-      round-trips/folds; legacy Stack/Columns/Text/Code read; every `answer_ok` refusal.
+- [ ] `cargo test -p bingo-sdk`: each node round-trips/folds; legacy Stack/Columns/Text/Code read; every `answer_ok` refusal.
       `rg -n 'View::(Stack|Columns)' crates` prints nothing.
 - [ ] `cargo test -p bingo-core chain::render` and `cargo test -p bingo-core host::throttle`: the kernel
       link answers `Engine`; a throwing hook and a bad tree each answer
@@ -88,8 +84,7 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
 - [ ] `cargo test -p bingo-surface-tui`: a `TestBackend` test per element;
       panes asked (inline at 200 and 80) and unasked (waiting at 200,
       clicked open); toasts held by `hold_toasts`, gone at `until`.
-- [ ] The `schedule`, `experience` and `demo-ui` narrow snapshots are
-      unchanged; any diff is pasted and driven in tmux.
+- [ ] Schedule/experience/demo-ui narrow snapshots unchanged; any diff pasted and driven in tmux.
 - [ ] `scripts/tui-smoke.sh` passes with `counter`, a tmux drive pasted;
       every gate; the Windows check of `bingo-surface-tui` and
       `bingo-mods`; budget output pasted with the taffy decision.
@@ -98,12 +93,18 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
 - Components/`$.ui.log` (M141), desktop rendering, non-above placement (M151),
   Client/blit, extra styling, OSC 8, isPlaced, copy/scroll/focus/selection (design §8).
 ## Risks
-
 - `onInput` per keystroke crosses command/hook/write/render; coalesce per frame if slow.
 - Re-verified at `5581b978`: M148 layout/canvas replaces rail/sheet; M131's
   runner/catalogue and M138's `Call.reads`/`ReadLog` exist; render guard does not.
   `globals.js` still emits `{type,props,children}`. Direct Text writers need migration.
 - 2026-10-14, person's delegate: authorize the scoped pre-release View/Shown/place/ui-render baseline amendment; protocol 2 freezes at its first release (ADR-0075).
+- **Stopped (2026-10-14), protocol step 6:** workspace check requires production
+  Event::Invalidated arms in bingo-surface-print/src/{render,stream_json}.rs,
+  outside Files. The mechanical exception covers tests/fixtures only. Proposed fix:
+  add Invalidated to each existing ignored ephemeral-event arm. Authorize these two
+  files, or revise the scope; keeping the event absent would violate ADR-0079 §5.
+  In-scope Shown migrations, artifact regeneration and remaining M140 bricks/gates
+  are unfinished; no exit criterion is fully verified and no completion is claimed.
 ## Verified (2026-10-14)
 ```text
 cargo fmt --all -- --check
@@ -134,4 +135,16 @@ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods dollar::tests::schema_and_types_a
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out
 BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema::tests::the_committed_schema_is_this_document --locked
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema::tests::the_committed_schema_is_this_document --locked
+test schema::tests::the_committed_schema_is_this_document ... ok
+cargo test -p bingo-sdk view::validate --locked
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 140 filtered out
+cargo test -p bingo-sdk view::validate --locked
+test view::validate::tests::answers_reject_wrong_engines_foreign_handlers_and_oversized_trees ... ok
+cargo test -p bingo-sdk slot::pull_contract --locked
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 142 filtered out
+cargo check --workspace --all-targets --locked
+error[E0004]: non-exhaustive patterns: `&bingo_sdk::Event::Invalidated { .. }` not covered
+error: could not compile `bingo-surface-print` (lib) due to 2 previous errors
+error: could not compile `bingo-surface-tui` (lib) due to 3 previous errors
 ```
