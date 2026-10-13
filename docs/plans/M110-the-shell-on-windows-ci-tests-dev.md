@@ -60,7 +60,8 @@ Windows binary the release ships can run the model's commands.
 
 ## Files
 
-- `crates/bingo-process/**` (new), workspace `Cargo.toml`
+- `crates/bingo-process/**` (new), workspace `Cargo.toml`, `Cargo.lock`
+- `scripts/budget.toml` (+1 member: 342 → 343; no new external dependency)
 - `crates/bingo-tool-bash/{Cargo.toml,src/run.rs,src/lib.rs}` and tests
 - `crates/bingo-hooks-shell/{Cargo.toml,src/run.rs}` and tests
 - `.github/workflows/ci.yml`
@@ -69,8 +70,8 @@ Windows binary the release ships can run the model's commands.
 
 ## Exit criteria
 
-- [ ] `rg -n 'fn shell\(' crates` finds one definition, in
-      `bingo-process`.
+- [ ] `rg -n 'fn shell\(' crates/bingo-{tool-bash,hooks-shell}` finds
+      no definitions; both callers use `bingo_process::shell::resolve`.
 - [ ] Resolution unit tests cover every case in brick 1 and pass on
       the host platform (output pasted).
 - [ ] With `BINGO_SHELL=/nonexistent`, a session offers no Bash tool and
@@ -98,4 +99,8 @@ Windows binary the release ships can run the model's commands.
   timeout bound it. A suite that needs more is a finding, not a reason
   to keep the step soft.
 - Pushing to run CI is the person's decision (protocol step 9).
-- Re-verify at start: both `shell()` copies and their callers by name.
+- Re-verified at `82e78d22`: both resolvers and description call exist;
+  registration uses `Registrar` contributions. A session-start hook can
+  publish the missing-shell notice through `HostApi::notice`.
+- Local Windows execution is unavailable; cross-compilation checks types,
+  and CI will be the first real Windows run (no push authorized).
