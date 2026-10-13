@@ -28,15 +28,13 @@ impl ContextView {
             match &frame.event {
                 Event::ItemStarted { item }
                 | Event::ItemUpdated { item }
-                | Event::ItemCompleted { item } => {
-                    match positions.get(&item.id) {
-                        Some(&index) => items[index] = item.clone(),
-                        None => {
-                            positions.insert(item.id.clone(), items.len());
-                            items.push(item.clone());
-                        }
+                | Event::ItemCompleted { item } => match positions.get(&item.id) {
+                    Some(&index) => items[index] = item.clone(),
+                    None => {
+                        positions.insert(item.id.clone(), items.len());
+                        items.push(item.clone());
                     }
-                }
+                },
                 Event::Compacted {
                     boundary,
                     kept,
@@ -70,7 +68,11 @@ impl ContextView {
 }
 
 fn item_positions(items: &[Item]) -> HashMap<ItemId, usize> {
-    items.iter().enumerate().map(|(index, item)| (item.id.clone(), index)).collect()
+    items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| (item.id.clone(), index))
+        .collect()
 }
 
 /// The one splice a compaction performs: before `cut` only `kept` survives, the

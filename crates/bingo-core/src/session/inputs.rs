@@ -22,21 +22,31 @@ use super::{Actor, commands, invoke};
 use crate::turn::TurnKind;
 
 impl Actor {
-    pub(super) async fn submit(&mut self, intent: IntentId, input: Input) {
+    pub(super) async fn submit(
+        &mut self,
+        intent: IntentId,
+        input: Input,
+    ) -> Result<(), KernelError> {
         if self.state.closed || self.closing.is_some() {
             return self
                 .reject(intent, ErrorCode::SessionClosed, "the session is closed")
                 .await;
         }
         match commands::parse(&input) {
-            Some(parsed) => self.submit_command(intent, input, parsed).await,
-            None => self.submit_prose(intent, input).await,
+            Some(parsed) => self.submit_command(intent, input, parsed).await?,
+            None => self.submit_prose(intent, input).await?,
         }
+        Ok(())
     }
 
     /// A command line: run now if instant, else behind whatever is running.
     /// A shell line is the person's own and nobody else's ([`commands`]).
-    async fn submit_command(&mut self, intent: IntentId, input: Input, parsed: commands::Parsed) {
+    async fn submit_command(
+        &mut self,
+        intent: IntentId,
+        input: Input,
+        parsed: commands::Parsed,
+    ) -> Result<(), KernelError> {
         if commands::is_shell(&parsed.name) && !commands::may_run_shell(&input) {
             return self
                 .reject(
@@ -61,7 +71,8 @@ impl Actor {
         }
         let invocation = commands::Invocation::of(&input, &parsed);
         self.run_command(intent, invocation, command, parsed.args, !instant)
-            .await;
+            .await?;
+        Ok(())
     }
 
     async fn run_command(
@@ -71,7 +82,7 @@ impl Actor {
         command: Arc<dyn Command>,
         args: String,
         holds: bool,
-    ) {
+    ) -> Result<(), KernelError> {
         let spawned = self.commands.spawn(commands::Run {
             intent: intent.clone(),
             invocation,
@@ -80,8 +91,9 @@ impl Actor {
             holds,
         });
         if let Err(e) = spawned {
-            self.reject(intent, e.code, e.message).await;
+            self.reject(intent, e.code, e.message).await?;
         }
+        Ok(())
     }
 
     /// The command's outcome becomes its ack (ADR-0008 §3); then the queue
@@ -90,13 +102,13 @@ impl Actor {
         &mut self,
         intent: IntentId,
         outcome: Result<CommandOutcome, KernelError>,
-    ) {
+    ) -> Result<(), KernelError> {
         let Some((invocation, held)) = self.commands.finish(&intent) else {
             tracing::warn!(session = %self.id, %intent, "completion from a command that is not running");
-            return;
+            return Ok(());
         };
         if held {
-            self.cancel_command_interactions().await;
+            self.cancel_command_interactions().await?;
         }
         match outcome {
             Ok(CommandOutcome::Applied { message }) => {
@@ -104,27 +116,28 @@ impl Actor {
                     Some(message) => json!({ "message": message }),
                     None => json!({}),
                 };
-                self.applied(intent, result).await;
+                self.applied(intent, result).await?;
             }
             Ok(CommandOutcome::View { view }) => {
-                self.applied(intent, json!({ "view": view })).await
+                self.applied(intent, json!({ "view": view })).await?
             }
             Ok(CommandOutcome::Record { body }) => {
-                let item = self.record(body).await;
-                self.applied(intent, json!({ "item": item })).await;
+                let item = self.record(body).await?;
+                self.applied(intent, json!({ "item": item })).await?;
             }
             Ok(CommandOutcome::Prompt { text }) => {
                 let text = invocation.prompt(&text);
                 self.submit_prose(intent, Input::text(text, invocation.origin))
-                    .await;
+                    .await?;
             }
-            Err(e) => self.reject(intent, e.code, e.message).await,
+            Err(e) => self.reject(intent, e.code, e.message).await?,
         }
-        self.refresh_config().await;
-        self.drain_queue().await;
+        self.refresh_config().await?;
+        self.drain_queue().await?;
+        Ok(())
     }
 
-    async fn submit_prose(&mut self, intent: IntentId, input: Input) {
+    async fn submit_prose(&mut self, intent: IntentId, input: Input) -> Result<(), KernelError> {
         let mut input = input;
         if let Err(message) = validate(&input) {
             return self.reject(intent, ErrorCode::InvalidInput, message).await;
@@ -149,14 +162,15 @@ impl Actor {
         if self.busy() {
             return self.enqueue(intent, input).await;
         }
-        let inputs = self.held_then(intent, input).await;
+        let inputs = self.held_then(intent, input).await?;
         self.start_turn(inputs, TurnOrigin::Submit, TurnKind::Respond)
-            .await;
+            .await?;
+        Ok(())
     }
 
     /// A `Log` session's input (ADR-0011 §1): a user item in the journal at
     /// once, acknowledged as applied, and nothing answers it.
-    async fn log_input(&mut self, intent: IntentId, input: Input) {
+    async fn log_input(&mut self, intent: IntentId, input: Input) -> Result<(), KernelError> {
         let Input::Text {
             text,
             images,
@@ -170,27 +184,39 @@ impl Actor {
         };
         let id = self
             .journal_prose(None, intent.clone(), text, images, origin)
-            .await;
-        self.applied(intent, json!({ "item": id })).await;
+            .await?;
+        self.applied(intent, json!({ "item": id })).await?;
+        Ok(())
     }
 
     /// `@name` and the like (ADR-0010 §2): the input as the hook left it goes
     /// to another session under an intent of its own; this one says where.
-    async fn redirect(&mut self, intent: IntentId, to: SessionId, input: Input) {
+    async fn redirect(
+        &mut self,
+        intent: IntentId,
+        to: SessionId,
+        input: Input,
+    ) -> Result<(), KernelError> {
         let sent = self
             .config
             .host
             .deliver(&to, IntentId::mint(), input, Delivery::Wake)
             .await;
         match sent {
-            Ok(()) => self.applied(intent, json!({ "redirected": to })).await,
-            Err(e) => self.reject(intent, e.code, e.message).await,
+            Ok(()) => self.applied(intent, json!({ "redirected": to })).await?,
+            Err(e) => self.reject(intent, e.code, e.message).await?,
         }
+        Ok(())
     }
 
     /// A peer's message (ADR-0010 §1): prose from another session, past the
     /// command parser and the submit hooks, into the queue or a `Peer` turn.
-    pub(super) async fn deliver(&mut self, intent: IntentId, input: Input, delivery: Delivery) {
+    pub(super) async fn deliver(
+        &mut self,
+        intent: IntentId,
+        input: Input,
+        delivery: Delivery,
+    ) -> Result<(), KernelError> {
         let input = stamped(input, delivery);
         if self.state.closed || self.closing.is_some() {
             return self
@@ -211,22 +237,27 @@ impl Actor {
         if self.busy() || input.is_held() {
             return self.enqueue(intent, input).await;
         }
-        let inputs = self.held_then(intent, input).await;
+        let inputs = self.held_then(intent, input).await?;
         self.start_turn(inputs, TurnOrigin::Peer, TurnKind::Respond)
-            .await;
+            .await?;
+        Ok(())
     }
 
     /// Prose held in an idle session's queue goes first, in order.
-    async fn held_then(&mut self, intent: IntentId, input: Input) -> Vec<(IntentId, Input)> {
-        let mut inputs = self.take_queue().await;
+    async fn held_then(
+        &mut self,
+        intent: IntentId,
+        input: Input,
+    ) -> Result<Vec<(IntentId, Input)>, KernelError> {
+        let mut inputs = self.take_queue().await?;
         inputs.push((intent, input));
-        inputs
+        Ok(inputs)
     }
 
-    async fn enqueue(&mut self, intent: IntentId, input: Input) {
+    async fn enqueue(&mut self, intent: IntentId, input: Input) -> Result<(), KernelError> {
         let position = self.queue.push(intent.clone(), input);
         let changed = self.queue.changed();
-        self.publish(changed, None).await;
+        self.publish(changed, None).await?;
         self.publish(
             Event::IntentAck {
                 intent: intent.clone(),
@@ -234,10 +265,15 @@ impl Actor {
             },
             Some(intent),
         )
-        .await;
+        .await?;
+        Ok(())
     }
 
-    pub(super) async fn interrupt(&mut self, intent: IntentId, scope: InterruptScope) {
+    pub(super) async fn interrupt(
+        &mut self,
+        intent: IntentId,
+        scope: InterruptScope,
+    ) -> Result<(), KernelError> {
         let Some(running) = &self.running else {
             return self
                 .reject(intent, ErrorCode::NotReady, "no turn is running")
@@ -252,8 +288,9 @@ impl Actor {
         }
         running.cancel.cancel();
         let turn = running.turn.clone();
-        self.cancel_interactions(CancelReason::Interrupted).await;
-        self.applied(intent, json!({ "turn": turn })).await;
+        self.cancel_interactions(CancelReason::Interrupted).await?;
+        self.applied(intent, json!({ "turn": turn })).await?;
+        Ok(())
     }
 
     // ----- a call handed into the running turn (ADR-0036 §2) -----
@@ -261,15 +298,19 @@ impl Actor {
     /// Refuse the call, or open its item and hand it to a server beside the
     /// turn. Nothing here waits for the call: the actor goes on reading its
     /// mailbox, which is what keeps the turn streaming and one `esc` heard.
-    pub(super) async fn invoke(&mut self, call: ToolCall, reply: invoke::Reply) {
+    pub(super) async fn invoke(
+        &mut self,
+        call: ToolCall,
+        reply: invoke::Reply,
+    ) -> Result<(), KernelError> {
         let serving = match self.serving(&call.name) {
             Ok(serving) => serving,
             Err(refusal) => {
                 let _ = reply.send(Err(refusal));
-                return;
+                return Ok(());
             }
         };
-        let item = self.open_call(&serving.turn, &call).await;
+        let item = self.open_call(&serving.turn, &call).await?;
         let bridged = invoke::Bridged {
             config: serving.config,
             mailbox: self.mailbox.clone(),
@@ -280,6 +321,7 @@ impl Actor {
             call,
         };
         self.tracker.spawn(bridged.serve(reply));
+        Ok(())
     }
 
     /// The pieces this call would be served with, or why there are none. Fail
@@ -327,7 +369,7 @@ impl Actor {
     /// The call's own item, journaled under the turn as the model's calls are
     /// and marked as none of the model's: it is the caller's, and the
     /// provider fold skips it (ADR-0036 §2).
-    async fn open_call(&mut self, turn: &TurnId, call: &ToolCall) -> ItemId {
+    async fn open_call(&mut self, turn: &TurnId, call: &ToolCall) -> Result<ItemId, KernelError> {
         let body = ItemBody::ToolCall {
             call_id: call.call_id.clone(),
             name: call.name.clone(),
@@ -341,29 +383,34 @@ impl Actor {
         item.completed_at = None;
         item.mark_external();
         let id = item.id.clone();
-        self.publish(Event::ItemStarted { item }, None).await;
-        id
+        self.publish(Event::ItemStarted { item }, None).await?;
+        Ok(id)
     }
 
     /// The gate let it through: the item goes `Running` and carries whatever a
     /// hook rewrote, exactly as a call of the model's own does.
-    pub(super) async fn call_allowed(&mut self, item: &ItemId, input: Value) {
+    pub(super) async fn call_allowed(
+        &mut self,
+        item: &ItemId,
+        input: Value,
+    ) -> Result<(), KernelError> {
         let Some(mut item) = self.item(item) else {
-            return;
+            return Ok(());
         };
         item.status = ItemStatus::Running;
         if let ItemBody::ToolCall { input: held, .. } = &mut item.body {
             *held = input;
         }
-        self.publish(Event::ItemUpdated { item }, None).await;
+        self.publish(Event::ItemUpdated { item }, None).await?;
+        Ok(())
     }
 
     /// What the call came to, folded into its item. The turn it ran under may
     /// already have ended — an `esc` drops a bridged call where it stands —
     /// so this is published on its own account and never as the turn's.
-    pub(super) async fn call_finished(&mut self, outcome: ToolOutcome) {
+    pub(super) async fn call_finished(&mut self, outcome: ToolOutcome) -> Result<(), KernelError> {
         let Some(mut item) = self.item(&outcome.item) else {
-            return;
+            return Ok(());
         };
         item.status = outcome.status;
         item.completed_at = Some(Timestamp::now());
@@ -378,7 +425,8 @@ impl Actor {
             *duration_ms = Some(outcome.duration_ms);
             *progress = None;
         }
-        self.publish(Event::ItemCompleted { item }, None).await;
+        self.publish(Event::ItemCompleted { item }, None).await?;
+        Ok(())
     }
 
     fn item(&self, id: &ItemId) -> Option<Item> {
@@ -390,7 +438,7 @@ impl Actor {
     /// What an opening turn takes off the queue with it: the prose at the
     /// head, up to the first command. A line that asked to wait is in it —
     /// this is the turn it was waiting for.
-    pub(super) async fn take_queue(&mut self) -> Vec<(IntentId, Input)> {
+    pub(super) async fn take_queue(&mut self) -> Result<Vec<(IntentId, Input)>, KernelError> {
         let taken = self.queue.take_prose();
         self.queue_moved(taken).await
     }
@@ -398,18 +446,21 @@ impl Actor {
     /// What a running turn's barrier may be steered with (ADR-0008 §2): the
     /// prose at the head, up to the first command and the first line that
     /// asked to wait for the turn to end (M68).
-    pub(super) async fn take_steers(&mut self) -> Vec<(IntentId, Input)> {
+    pub(super) async fn take_steers(&mut self) -> Result<Vec<(IntentId, Input)>, KernelError> {
         let taken = self.queue.take_steers();
         self.queue_moved(taken).await
     }
 
     /// Whatever came off the queue, with every client told when anything did.
-    async fn queue_moved(&mut self, taken: Vec<(IntentId, Input)>) -> Vec<(IntentId, Input)> {
+    async fn queue_moved(
+        &mut self,
+        taken: Vec<(IntentId, Input)>,
+    ) -> Result<Vec<(IntentId, Input)>, KernelError> {
         if !taken.is_empty() {
             let changed = self.queue.changed();
-            self.publish(changed, None).await;
+            self.publish(changed, None).await?;
         }
-        taken
+        Ok(taken)
     }
 
     /// A queued line back out of the queue and into the hands of the surface
@@ -428,42 +479,45 @@ impl Actor {
                 ErrorCode::PermissionDenied,
                 format!("that line is {}'s to take back", origin.surface),
             )),
-            Some(_) => self.take_back(&intent).await.ok_or_else(|| gone(&intent)),
+            Some(_) => self.take_back(&intent).await?.ok_or_else(|| gone(&intent)),
         }
     }
 
     /// It is queued and it is the caller's: out it comes, and every client's
     /// fold loses the row.
-    async fn take_back(&mut self, intent: &IntentId) -> Option<Input> {
-        let input = self.queue.take(intent)?;
+    async fn take_back(&mut self, intent: &IntentId) -> Result<Option<Input>, KernelError> {
+        let Some(input) = self.queue.take(intent) else {
+            return Ok(None);
+        };
         let changed = self.queue.changed();
-        self.publish(changed, None).await;
-        Some(input)
+        self.publish(changed, None).await?;
+        Ok(Some(input))
     }
 
     /// An idle session takes the next unit off the queue (ADR-0008 §2).
-    pub(super) async fn drain_queue(&mut self) {
+    pub(super) async fn drain_queue(&mut self) -> Result<(), KernelError> {
         if self.busy() {
-            return;
+            return Ok(());
         }
         let Some(unit) = self.queue.take_unit() else {
-            return;
+            return Ok(());
         };
         match unit {
             Unit::Prose(inputs) => {
                 self.start_turn(inputs, TurnOrigin::Queue, TurnKind::Respond)
-                    .await
+                    .await?
             }
-            Unit::Command(intent, input) => self.run_queued(intent, input).await,
+            Unit::Command(intent, input) => self.run_queued(intent, input).await?,
         }
         // Announced after the unit is under way, so no client ever folds an
         // empty queue beside no turn while the next one is about to open.
         let changed = self.queue.changed();
-        self.publish(changed, None).await;
+        self.publish(changed, None).await?;
+        Ok(())
     }
 
     /// A command that waited its turn; the table may have lost it meanwhile.
-    async fn run_queued(&mut self, intent: IntentId, input: Input) {
+    async fn run_queued(&mut self, intent: IntentId, input: Input) -> Result<(), KernelError> {
         let parsed = commands::parse(&input);
         let command = match &parsed {
             Some(p) => self.commands.find(&p.name).await,
@@ -473,13 +527,14 @@ impl Actor {
             (Some(parsed), Some(command)) => {
                 let invocation = commands::Invocation::of(&input, &parsed);
                 self.run_command(intent, invocation, command, parsed.args, true)
-                    .await
+                    .await?
             }
             _ => {
                 self.reject(intent, ErrorCode::InvalidInput, "unknown command")
-                    .await
+                    .await?
             }
         }
+        Ok(())
     }
 
     // ----- opening a turn -----
@@ -489,9 +544,9 @@ impl Actor {
         inputs: Vec<(IntentId, Input)>,
         origin: TurnOrigin,
         kind: TurnKind,
-    ) {
+    ) -> Result<(), KernelError> {
         let turn = TurnId::mint();
-        let (ids, acks) = self.record_inputs(&turn, inputs).await;
+        let (ids, acks) = self.record_inputs(&turn, inputs).await?;
         self.publish(
             Event::TurnStarted {
                 turn: turn.clone(),
@@ -500,15 +555,16 @@ impl Actor {
             },
             None,
         )
-        .await;
+        .await?;
         // A queued intent was acknowledged `Queued` when it waited; the turn
         // that runs it acknowledges it again, so a client learns which turn
         // is its own without matching items.
-        self.ack_turn_started(&turn, acks).await;
+        self.ack_turn_started(&turn, acks).await?;
         let running = Running::spawn(self, turn, CancellationToken::new(), kind);
         // Registered after the spawn: the task's first mail is handled only
         // once this function returns, so nothing can race the registration.
         self.running = Some(running);
+        Ok(())
     }
 
     /// Journal one user item per text input; the item ids open the turn and
@@ -517,7 +573,7 @@ impl Actor {
         &mut self,
         turn: &TurnId,
         inputs: Vec<(IntentId, Input)>,
-    ) -> (Vec<ItemId>, Vec<IntentId>) {
+    ) -> Result<(Vec<ItemId>, Vec<IntentId>), KernelError> {
         let mut ids = Vec::new();
         let mut acks = Vec::new();
         for (intent, input) in inputs {
@@ -533,10 +589,10 @@ impl Actor {
             acks.push(intent.clone());
             ids.push(
                 self.journal_prose(Some(turn.clone()), intent, text, images, origin)
-                    .await,
+                    .await?,
             );
         }
-        (ids, acks)
+        Ok((ids, acks))
     }
 
     /// A person's prose enters the journal here and nowhere else, which is why
@@ -549,7 +605,7 @@ impl Actor {
         text: String,
         images: Vec<Image>,
         origin: Origin,
-    ) -> ItemId {
+    ) -> Result<ItemId, KernelError> {
         let body = ItemBody::User {
             parts: user_parts(text, images),
             origin,
@@ -557,12 +613,16 @@ impl Actor {
         let item = self.fresh(turn, Some(intent.clone()), body);
         let id = item.id.clone();
         self.publish(Event::ItemCompleted { item }, Some(intent))
-            .await;
-        self.mint_title().await;
-        id
+            .await?;
+        self.mint_title().await?;
+        Ok(id)
     }
 
-    async fn ack_turn_started(&mut self, turn: &TurnId, intents: Vec<IntentId>) {
+    async fn ack_turn_started(
+        &mut self,
+        turn: &TurnId,
+        intents: Vec<IntentId>,
+    ) -> Result<(), KernelError> {
         for intent in intents {
             self.publish(
                 Event::IntentAck {
@@ -571,8 +631,9 @@ impl Actor {
                 },
                 Some(intent),
             )
-            .await;
+            .await?;
         }
+        Ok(())
     }
 }
 

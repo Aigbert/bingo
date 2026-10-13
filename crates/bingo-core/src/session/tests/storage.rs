@@ -70,8 +70,8 @@ async fn failing_actor() -> (Actor, Arc<FailingStore>) {
 #[tokio::test]
 async fn storage_failure_never_publishes_or_observes_the_failed_frame() {
     let (mut actor, store) = failing_actor().await;
-    actor.open().await.await;
-    let mut events = actor.subscribe(actor.seq);
+    actor.open().await.unwrap().await;
+    let events = actor.subscribe(actor.seq);
     let (observed, mut observations) = mpsc::unbounded_channel();
     actor.observed = Some(observed);
     let cancel = CancellationToken::new();
@@ -153,4 +153,38 @@ async fn storage_failure_stops_the_actor_mailbox() {
         mailbox.summary().await.unwrap_err().code,
         ErrorCode::SessionClosed
     );
+}
+
+#[tokio::test]
+async fn storage_failure_stops_opening_at_the_first_failed_append() {
+    for nth in 1..=2 {
+        let (mut actor, store) = failing_actor().await;
+        store.fail_at.store(nth, Ordering::SeqCst);
+        assert!(actor.open().await.is_err());
+        assert_eq!(store.appends.load(Ordering::SeqCst), nth);
+        assert_eq!(actor.journal.len(), nth - 1);
+        assert!(actor.state.closed);
+    }
+}
+
+#[tokio::test]
+async fn storage_failure_stops_a_batch_before_spawning_a_turn() {
+    let (mut actor, store) = failing_actor().await;
+    actor.open().await.unwrap().await;
+    let before = store.appends.load(Ordering::SeqCst);
+    store.fail_at.store(before + 1, Ordering::SeqCst);
+    let inputs = ["one", "two"]
+        .into_iter()
+        .map(|text| (IntentId::mint(), Input::text(text, Origin::surface("test"))))
+        .collect();
+    assert!(
+        actor
+            .start_turn(inputs, TurnOrigin::Submit, TurnKind::Respond)
+            .await
+            .is_err()
+    );
+    assert_eq!(store.appends.load(Ordering::SeqCst), before + 1);
+    assert_eq!(actor.journal.len(), before);
+    assert!(actor.state.items.is_empty());
+    assert!(actor.running.is_none());
 }

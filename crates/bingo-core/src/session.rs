@@ -11,6 +11,7 @@ mod mailbox;
 mod queue;
 mod running;
 mod spawn;
+mod storage;
 mod subscribers;
 mod title;
 
@@ -82,9 +83,10 @@ struct Actor {
 
 impl Actor {
     async fn run(mut self) {
-        let starting = self.open().await;
-        let held = self.serve_start(starting).await;
-        let mut flow = Flow::Continue;
+        let (held, mut flow) = match self.open().await {
+            Ok(starting) => (self.serve_start(starting).await, Flow::Continue),
+            Err(_) => (Vec::new(), Flow::Stop),
+        };
         for msg in held {
             if self.handle(msg).await == Flow::Stop {
                 flow = Flow::Stop;
@@ -112,30 +114,34 @@ impl Actor {
     }
 
     async fn handle(&mut self, msg: Msg) -> Flow {
+        self.dispatch(msg).await.unwrap_or(Flow::Stop)
+    }
+
+    async fn dispatch(&mut self, msg: Msg) -> Result<Flow, KernelError> {
         match msg {
-            Msg::Submit { intent, input } => self.submit(intent, input).await,
+            Msg::Submit { intent, input } => self.submit(intent, input).await?,
             Msg::Deliver {
                 intent,
                 input,
                 delivery,
-            } => self.deliver(intent, input, delivery).await,
+            } => self.deliver(intent, input, delivery).await?,
             Msg::Extend {
                 plugin,
                 kind,
                 payload,
-            } => self.extend(plugin, kind, payload).await,
+            } => self.extend(plugin, kind, payload).await?,
             Msg::Signal {
                 plugin,
                 kind,
                 payload,
-            } => self.signal(plugin, kind, payload).await,
-            Msg::Interrupt { intent, scope } => self.interrupt(intent, scope).await,
+            } => self.signal(plugin, kind, payload).await?,
+            Msg::Interrupt { intent, scope } => self.interrupt(intent, scope).await?,
             Msg::Withdraw {
                 intent,
                 surface,
                 reply,
             } => drop(reply.send(self.withdraw(intent, surface).await)),
-            Msg::Answer(answered) => self.answer(answered).await,
+            Msg::Answer(answered) => self.answer(answered).await?,
             Msg::Attach { max_bytes, reply } => drop(reply.send(self.attached(max_bytes))),
             Msg::TailEvents { reply } => {
                 let seq = self.state.seq;
@@ -149,25 +155,25 @@ impl Actor {
                 reply,
             } => drop(reply.send(self.item_for_pin(&id, generation))),
             Msg::Summary { reply } => drop(reply.send(self.stamped(self.state.summary.clone()))),
-            Msg::Emit { turn, event } => self.emit(turn, *event).await,
+            Msg::Emit { turn, event } => self.emit(turn, *event).await?,
             Msg::Ask {
                 item,
                 kind,
                 answers,
                 reply,
-            } => self.open_interaction(item, kind, answers, reply).await,
-            Msg::Absorb { turn, reply } => drop(reply.send(self.absorb(&turn).await)),
+            } => self.open_interaction(item, kind, answers, reply).await?,
+            Msg::Absorb { turn, reply } => drop(reply.send(self.absorb(&turn).await?)),
             Msg::TurnFinished { turn, outcome } => return self.turn_finished(turn, outcome).await,
-            Msg::Record { body, reply } => drop(reply.send(self.record(body).await)),
-            Msg::Progress { item, tail } => self.progress(item, tail).await,
+            Msg::Record { body, reply } => drop(reply.send(self.record(body).await?)),
+            Msg::Progress { item, tail } => self.progress(item, tail).await?,
             Msg::CommandFinished { intent, outcome } => {
-                self.command_finished(intent, outcome).await
+                self.command_finished(intent, outcome).await?
             }
-            Msg::Reconfigure { config } => self.reconfigure(config).await,
+            Msg::Reconfigure { config } => self.reconfigure(config).await?,
             Msg::Offered { turn, tools } => self.turn_offers(&turn, tools),
-            Msg::Invoke { call, reply } => self.invoke(call, reply).await,
-            Msg::CallAllowed { item, input } => self.call_allowed(&item, input).await,
-            Msg::CallFinished { outcome } => self.call_finished(outcome).await,
+            Msg::Invoke { call, reply } => self.invoke(call, reply).await?,
+            Msg::CallAllowed { item, input } => self.call_allowed(&item, input).await?,
+            Msg::CallFinished { outcome } => self.call_finished(outcome).await?,
             Msg::Rewind { to_turn, reply } => drop(reply.send(self.rewind(&to_turn).await)),
             Msg::Compact {
                 instructions,
@@ -175,28 +181,44 @@ impl Actor {
             } => drop(reply.send(self.compact(instructions).await)),
             Msg::Close { reason } => return self.close(reason).await,
         }
-        Flow::Continue
+        Ok(if self.state.closed {
+            Flow::Stop
+        } else {
+            Flow::Continue
+        })
     }
 
     /// A plugin's state, whole, as a durable frame (ADR-0011 §2).
-    async fn extend(&mut self, plugin: String, kind: String, payload: Value) {
+    async fn extend(
+        &mut self,
+        plugin: String,
+        kind: String,
+        payload: Value,
+    ) -> Result<(), KernelError> {
         let event = Event::Extension {
             plugin,
             kind,
             payload,
         };
-        self.publish(event, None).await;
+        self.publish(event, None).await?;
+        Ok(())
     }
 
     /// A plugin's live state as an ephemeral frame (ADR-0013 §2): `publish`
     /// keeps it off the journal because `Event::Signal` is not durable.
-    async fn signal(&mut self, plugin: String, kind: String, payload: Value) {
+    async fn signal(
+        &mut self,
+        plugin: String,
+        kind: String,
+        payload: Value,
+    ) -> Result<(), KernelError> {
         let event = Event::Signal {
             plugin,
             kind,
             payload,
         };
-        self.publish(event, None).await;
+        self.publish(event, None).await?;
+        Ok(())
     }
 
     /// The session's name: the one it was given, else the one its first ask
@@ -213,17 +235,18 @@ impl Actor {
     /// The mint's own `SessionUpdated`, sent once when the first prose lands
     /// live — the heads of a segment carry it the rest of the time, and no
     /// item or turn is worth a frame of its own (ADR-0005 §5).
-    async fn mint_title(&mut self) {
+    async fn mint_title(&mut self) -> Result<(), KernelError> {
         let minted = self.title();
         if minted == self.state.summary.title {
-            return;
+            return Ok(());
         }
         let summary = SessionSummary {
             title: minted,
             updated_at: Timestamp::now(),
             ..self.state.summary.clone()
         };
-        self.publish_summary(summary).await;
+        self.publish_summary(summary).await?;
+        Ok(())
     }
 
     /// A summary as it leaves the actor. `busy` is decided here and nowhere
@@ -238,18 +261,20 @@ impl Actor {
     }
 
     /// The one way a summary reaches the journal.
-    async fn publish_summary(&mut self, summary: SessionSummary) {
+    async fn publish_summary(&mut self, summary: SessionSummary) -> Result<(), KernelError> {
         let summary = self.stamped(summary);
-        self.publish(Event::SessionUpdated { summary }, None).await;
+        self.publish(Event::SessionUpdated { summary }, None)
+            .await?;
+        Ok(())
     }
 
     /// What a barrier may steer the running turn with: the held prose, and
     /// nothing for a turn that is not the one running.
-    async fn absorb(&mut self, turn: &TurnId) -> Vec<(IntentId, Input)> {
+    async fn absorb(&mut self, turn: &TurnId) -> Result<Vec<(IntentId, Input)>, KernelError> {
         if self.is_running(turn) {
             self.take_steers().await
         } else {
-            Vec::new()
+            Ok(Vec::new())
         }
     }
 
@@ -274,22 +299,22 @@ impl Actor {
 
     /// The head of this segment of the journal: what the session is now.
     /// The start hooks it hands back run while the session opens for reads.
-    async fn open(&mut self) -> Starting {
+    async fn open(&mut self) -> Result<Starting, KernelError> {
         let summary = SessionSummary {
             title: self.title(),
             ..self.restated()
         };
         self.observe_journal();
-        self.publish_summary(summary).await;
-        self.restate_extensions().await;
-        self.refresh_config().await;
-        self.recover().await;
+        self.publish_summary(summary).await?;
+        self.restate_extensions().await?;
+        self.refresh_config().await?;
+        self.recover().await?;
         let cx = self.hook_context();
-        Box::pin(run_session_hooks(
+        Ok(Box::pin(run_session_hooks(
             self.config.hooks.clone(),
             Phase::Start,
             cx,
-        ))
+        )))
     }
 
     /// While the start hooks run the session answers its summary and holds
@@ -315,7 +340,7 @@ impl Actor {
     /// The head of a segment restates the plugin state the journal already
     /// holds (ADR-0011 §2), so an observer that joins here — a hook after a
     /// restart — folds the same state a client is handed in its snapshot.
-    async fn restate_extensions(&mut self) {
+    async fn restate_extensions(&mut self) -> Result<(), KernelError> {
         let held: Vec<(String, String, Value)> = self
             .state
             .extensions
@@ -327,14 +352,15 @@ impl Actor {
             })
             .collect();
         for (plugin, kind, payload) in held {
-            self.extend(plugin, kind, payload).await;
+            self.extend(plugin, kind, payload).await?;
         }
+        Ok(())
     }
 
     /// What a client may read of this session's configuration: the kernel's
     /// own keys (ADR-0008 §4) and what the policy says of itself (ADR-0009 §5).
     /// Published when it differs from what the clients already hold.
-    async fn refresh_config(&mut self) {
+    async fn refresh_config(&mut self) -> Result<(), KernelError> {
         let policy = &self.config.policy;
         let mut plugins = std::collections::BTreeMap::new();
         let described = policy.describe(&self.id);
@@ -346,8 +372,9 @@ impl Actor {
             plugins,
         };
         if config != self.state.config {
-            self.publish(Event::ConfigChanged { config }, None).await;
+            self.publish(Event::ConfigChanged { config }, None).await?;
         }
+        Ok(())
     }
 
     /// The end-of-session hooks, off the stopping actor's path. The set is
@@ -383,11 +410,12 @@ impl Actor {
 
     /// The next turn runs on a config the host rebuilt; the running one
     /// keeps its own. The summary says what changed.
-    async fn reconfigure(&mut self, config: Arc<TurnConfig>) {
+    async fn reconfigure(&mut self, config: Arc<TurnConfig>) -> Result<(), KernelError> {
         self.config = config;
         let summary = self.restated();
-        self.publish_summary(summary).await;
-        self.refresh_config().await;
+        self.publish_summary(summary).await?;
+        self.refresh_config().await?;
+        Ok(())
     }
 
     /// Undo a turn and everything after it (ADR-0045 §1): the item that says
@@ -413,7 +441,7 @@ impl Actor {
             to_turn: to_turn.clone(),
             dropped: count,
         })
-        .await;
+        .await?;
         self.publish(
             Event::Rewound {
                 generation: self.state.history_generation + 1,
@@ -425,7 +453,7 @@ impl Actor {
             },
             None,
         )
-        .await;
+        .await?;
         Ok(count)
     }
 
@@ -460,7 +488,7 @@ impl Actor {
             TurnOrigin::Auto,
             TurnKind::Compact { instructions },
         )
-        .await;
+        .await?;
         Ok(())
     }
 
@@ -489,7 +517,7 @@ impl Actor {
     /// A resumed journal may end inside a turn the old process never
     /// finished. Its questions can no longer be answered and its turn is
     /// lost; both are said before anything new happens.
-    async fn recover(&mut self) {
+    async fn recover(&mut self) -> Result<(), KernelError> {
         let open: Vec<InteractionId> = self
             .state
             .interactions
@@ -504,7 +532,7 @@ impl Actor {
                 },
                 None,
             )
-            .await;
+            .await?;
         }
         if let Some(turn) = self.state.turn.clone() {
             self.publish(
@@ -520,8 +548,9 @@ impl Actor {
                 },
                 None,
             )
-            .await;
+            .await?;
         }
+        Ok(())
     }
 
     fn is_running(&self, turn: &TurnId) -> bool {
@@ -531,23 +560,24 @@ impl Actor {
     /// An event from the running turn. One from a turn that already ended is
     /// dropped: its seq would land after the `TurnCompleted` that closed it.
     /// A permission receipt means the policy may have installed a rule.
-    async fn emit(&mut self, turn: TurnId, event: Event) {
+    async fn emit(&mut self, turn: TurnId, event: Event) -> Result<(), KernelError> {
         if !self.is_running(&turn) {
             tracing::warn!(session = %self.id, %turn, "event from a turn that is not running");
-            return;
+            return Ok(());
         }
         let receipt = matches!(
             &event,
             Event::ItemCompleted { item } if matches!(item.body, ItemBody::PermissionReceipt { .. })
         );
-        self.publish(event, None).await;
+        self.publish(event, None).await?;
         if receipt {
-            self.refresh_config().await;
+            self.refresh_config().await?;
         }
+        Ok(())
     }
 
     /// A running tool's own tail, numbered per session so clients can order it.
-    async fn progress(&mut self, item: ItemId, tail: String) {
+    async fn progress(&mut self, item: ItemId, tail: String) -> Result<(), KernelError> {
         self.progress_n += 1;
         self.publish(
             Event::ItemDelta {
@@ -558,12 +588,13 @@ impl Actor {
             },
             None,
         )
-        .await;
+        .await?;
+        Ok(())
     }
 
     // ----- publishing -----
 
-    async fn publish(&mut self, event: Event, cause: Option<IntentId>) -> Seq {
+    async fn publish(&mut self, event: Event, cause: Option<IntentId>) -> Result<Seq, KernelError> {
         self.seq = self.seq.next();
         let frame = Frame {
             seq: self.seq,
@@ -576,12 +607,17 @@ impl Actor {
             if let Some(store) = &self.store
                 && let Err(e) = store.append(&self.id, &frame).await
             {
-                tracing::error!(session = %self.id, error = %e, "journal append failed");
+                self.storage_failed(&e);
+                return Err(e);
             }
             self.journal.push(frame.clone());
         }
-        // Observers see notices too, which the journal does not keep; only
-        // the deltas, which are volume and nothing else, are spared them.
+        self.broadcast(frame);
+        Ok(self.seq)
+    }
+
+    fn broadcast(&mut self, frame: Frame) {
+        // Observers see notices too; only the high-volume deltas are spared.
         if let Some(observed) = &self.observed
             && !matches!(frame.event, Event::ItemDelta { .. })
         {
@@ -589,7 +625,6 @@ impl Actor {
         }
         self.state.apply(&frame);
         self.subscribers.fanout(&frame);
-        frame.seq
     }
 
     /// The snapshot and its stream are cut by the same mailbox message. A
@@ -653,7 +688,12 @@ impl Actor {
         self.subscribers.add(self.id.clone(), replay)
     }
 
-    async fn reject(&mut self, intent: IntentId, code: ErrorCode, message: impl Into<String>) {
+    async fn reject(
+        &mut self,
+        intent: IntentId,
+        code: ErrorCode,
+        message: impl Into<String>,
+    ) -> Result<(), KernelError> {
         self.publish(
             Event::IntentAck {
                 intent: intent.clone(),
@@ -663,10 +703,11 @@ impl Actor {
             },
             Some(intent),
         )
-        .await;
+        .await?;
+        Ok(())
     }
 
-    async fn applied(&mut self, intent: IntentId, result: Value) {
+    async fn applied(&mut self, intent: IntentId, result: Value) -> Result<(), KernelError> {
         self.publish(
             Event::IntentAck {
                 intent: intent.clone(),
@@ -674,7 +715,8 @@ impl Actor {
             },
             Some(intent),
         )
-        .await;
+        .await?;
+        Ok(())
     }
 
     fn fresh(&self, turn: Option<TurnId>, intent: Option<IntentId>, body: ItemBody) -> Item {
@@ -692,12 +734,12 @@ impl Actor {
         }
     }
 
-    async fn record(&mut self, body: ItemBody) -> ItemId {
+    async fn record(&mut self, body: ItemBody) -> Result<ItemId, KernelError> {
         let turn = self.running.as_ref().map(|r| r.turn.clone());
         let item = self.fresh(turn, None, body);
         let id = item.id.clone();
-        self.publish(Event::ItemCompleted { item }, None).await;
-        id
+        self.publish(Event::ItemCompleted { item }, None).await?;
+        Ok(id)
     }
 
     fn history(&self, page: &HistoryPage) -> Result<HistoryChunk, KernelError> {
@@ -811,12 +853,16 @@ impl Actor {
             })
     }
 
-    async fn turn_finished(&mut self, turn: TurnId, outcome: Result<TurnOutcome, String>) -> Flow {
+    async fn turn_finished(
+        &mut self,
+        turn: TurnId,
+        outcome: Result<TurnOutcome, String>,
+    ) -> Result<Flow, KernelError> {
         if !self.is_running(&turn) {
             tracing::warn!(session = %self.id, %turn, "completion from a turn that is not running");
-            return Flow::Continue;
+            return Ok(Flow::Continue);
         }
-        self.cancel_interactions(CancelReason::TurnEnded).await;
+        self.cancel_interactions(CancelReason::TurnEnded).await?;
         let (status, usage, items) = match outcome {
             Ok(outcome) => (outcome.status, outcome.usage, outcome.items),
             Err(panic) => (
@@ -839,13 +885,13 @@ impl Actor {
             },
             None,
         )
-        .await;
+        .await?;
         self.after_turn(turn, items);
         if let Some(reason) = self.closing.take() {
             return self.finish_close(reason).await;
         }
-        self.drain_queue().await;
-        Flow::Continue
+        self.drain_queue().await?;
+        Ok(Flow::Continue)
     }
 
     /// The turn-end hooks run after the terminal event (ADR-0008 §7), on a
@@ -868,31 +914,32 @@ impl Actor {
 
     // ----- closing -----
 
-    async fn close(&mut self, reason: CloseReason) -> Flow {
+    async fn close(&mut self, reason: CloseReason) -> Result<Flow, KernelError> {
         if self.state.closed {
-            return Flow::Stop;
+            return Ok(Flow::Stop);
         }
         // Before the turn is told to stop, and whether or not there is one: a
         // question opened between turns (ADR-0039 §1) is closed by the same
         // close as any other.
-        self.cancel_interactions(CancelReason::SessionClosed).await;
+        self.cancel_interactions(CancelReason::SessionClosed)
+            .await?;
         if let Some(running) = &self.running {
             running.cancel.cancel();
             self.closing = Some(reason);
-            return Flow::Continue;
+            return Ok(Flow::Continue);
         }
         self.finish_close(reason).await
     }
 
-    async fn finish_close(&mut self, reason: CloseReason) -> Flow {
+    async fn finish_close(&mut self, reason: CloseReason) -> Result<Flow, KernelError> {
         for (intent, _) in self.queue.drain_all() {
             self.reject(intent, ErrorCode::SessionClosed, "the session is closed")
-                .await;
+                .await?;
         }
-        self.publish(Event::SessionClosed { reason }, None).await;
+        self.publish(Event::SessionClosed { reason }, None).await?;
         self.subscribers.clear();
         self.session_hooks(Phase::End);
-        Flow::Stop
+        Ok(Flow::Stop)
     }
 }
 
