@@ -22,7 +22,14 @@ pub fn spawn(
     services: Services,
     config: impl FnOnce(&Mailbox) -> Arc<TurnConfig>,
 ) -> Mailbox {
-    spawn_with(summary, Vec::new(), store, services, config)
+    spawn_with(
+        SessionState::new(summary),
+        Vec::new(),
+        Seq::ZERO,
+        store,
+        services,
+        config,
+    )
 }
 
 /// A session read back from its journal (ADR-0005): the frames are the
@@ -34,8 +41,48 @@ pub fn resume(
     services: Services,
     config: impl FnOnce(&Mailbox) -> Arc<TurnConfig>,
 ) -> Result<Mailbox, KernelError> {
-    let head = head_summary(&frames)?;
-    Ok(spawn_with(head, frames, store, services, config))
+    resume_checkpoint(
+        Resumed {
+            state: None,
+            tail: frames,
+        },
+        store,
+        services,
+        config,
+    )
+}
+
+pub(crate) fn resume_checkpoint(
+    resumed: Resumed,
+    store: Option<Arc<dyn SessionStore>>,
+    services: Services,
+    config: impl FnOnce(&Mailbox) -> Arc<TurnConfig>,
+) -> Result<Mailbox, KernelError> {
+    let checkpoint_seq = resumed.state.as_ref().map_or(Seq::ZERO, |state| state.seq);
+    let mut state = fold_resumed(&resumed)?;
+    if checkpoint_seq > Seq::ZERO {
+        state.transcript.drop_before_cut();
+    }
+    state.signals.clear();
+    Ok(spawn_with(
+        state,
+        resumed.tail,
+        checkpoint_seq,
+        store,
+        services,
+        config,
+    ))
+}
+
+pub(crate) fn fold_resumed(resumed: &Resumed) -> Result<SessionState, KernelError> {
+    let mut state = match &resumed.state {
+        Some(state) => state.clone(),
+        None => SessionState::new(head_summary(&resumed.tail)?),
+    };
+    for frame in &resumed.tail {
+        state.apply(frame);
+    }
+    Ok(state)
 }
 
 /// The first frame of every journal is the session saying what it is.
@@ -64,12 +111,14 @@ fn fold(head: SessionSummary, journal: &[Frame]) -> SessionState {
 }
 
 fn spawn_with(
-    head: SessionSummary,
+    state: SessionState,
     journal: Vec<Frame>,
+    checkpoint_seq: Seq,
     store: Option<Arc<dyn SessionStore>>,
     services: Services,
     config: impl FnOnce(&Mailbox) -> Arc<TurnConfig>,
 ) -> Mailbox {
+    let head = state.summary.clone();
     let (tx, rx) = mpsc::unbounded_channel();
     let (done, finished) = watch::channel(false);
     let mailbox = Mailbox::new(head.id.clone(), tx, finished);
@@ -86,12 +135,12 @@ fn spawn_with(
     // A `SessionClosed` in the journal ended the last process's segment, not
     // the session: the summary `open` publishes first is what opens it again,
     // for this fold and for every client's alike.
-    let state = fold(head.clone(), &journal);
     let actor = Actor {
         id: head.id,
         mailbox: mailbox.clone(),
         rx,
-        seq: journal.last().map_or(Seq::ZERO, |f| f.seq),
+        seq: state.seq,
+        checkpoint_seq,
         state,
         journal,
         store,

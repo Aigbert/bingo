@@ -154,6 +154,23 @@ impl Transcript {
         }
     }
 
+    /// Combine storage's full client order with the live window at the same
+    /// mailbox cut. Live bodies include deltas that are not durable frames.
+    pub fn with_history(&self, mut history: Self) -> Self {
+        for item in &mut history.items {
+            if let Some(&at) = self.positions.get(&item.id) {
+                *item = self.items[at].clone();
+            }
+        }
+        history.model_order = self.model_order.clone();
+        history.model_ids = self.model_ids.clone();
+        history.generation = self.generation;
+        history.cut = self.cut.clone();
+        history.hidden = 0;
+        history.has_more = false;
+        history
+    }
+
     fn upsert(&mut self, item: &Item) -> Applied {
         match self.positions.get(&item.id) {
             Some(&at) => self.items[at] = Arc::new(item.clone()),

@@ -7,6 +7,15 @@ pub(super) struct FailingStore {
     inner: MemoryStore,
     appends: AtomicUsize,
     fail_at: AtomicUsize,
+    checkpoint_wait: std::sync::Mutex<Option<Arc<tokio::sync::Notify>>>,
+}
+
+impl FailingStore {
+    pub(super) fn hold_checkpoints(&self) -> Arc<tokio::sync::Notify> {
+        let wait = Arc::new(tokio::sync::Notify::new());
+        *self.checkpoint_wait.lock().unwrap() = Some(wait.clone());
+        wait
+    }
 }
 
 #[async_trait::async_trait]
@@ -20,6 +29,13 @@ impl SessionStore for FailingStore {
             return Err(KernelError::new(ErrorCode::Storage, "disk full"));
         }
         self.inner.append(id, frame).await
+    }
+    async fn checkpoint(&self, _: &SessionId, _: &Checkpoint) -> Result<(), KernelError> {
+        let wait = self.checkpoint_wait.lock().unwrap().clone();
+        if let Some(wait) = wait {
+            wait.notified().await;
+        }
+        Ok(())
     }
     async fn replay(&self, id: &SessionId, since: Seq) -> Result<Vec<Frame>, KernelError> {
         self.inner.replay(id, since).await
@@ -52,6 +68,7 @@ pub(super) async fn failing_actor() -> (Actor, Arc<FailingStore>) {
         rx,
         state: SessionState::new(head),
         journal: vec![],
+        checkpoint_seq: Seq::ZERO,
         seq: Seq::ZERO,
         store: Some(store.clone()),
         config: cfg,

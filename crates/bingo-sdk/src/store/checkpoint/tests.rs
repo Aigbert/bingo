@@ -85,3 +85,28 @@ async fn checkpoint_defaults_replay_without_losing_frames() {
         }
     );
 }
+
+#[test]
+fn checkpoint_codec_preserves_opaque_item_bytes() {
+    let mut checkpoint: Checkpoint =
+        serde_json::from_str(include_str!("../../../fixtures/checkpoint-v1.json")).unwrap();
+    let raw = r#"{ "kind" : "future", "payload" : [1,  2] }"#;
+    let body: ItemBody = serde_json::from_str(raw).unwrap();
+    let mut item = checkpoint
+        .state
+        .transcript
+        .get(&ItemId::from_raw("i1"))
+        .unwrap()
+        .clone();
+    item.body = body;
+    checkpoint
+        .state
+        .transcript
+        .apply(&Event::ItemUpdated { item });
+    let encoded = serde_json::to_string(&checkpoint).unwrap();
+    assert!(encoded.contains(raw), "{encoded}");
+    assert_eq!(
+        serde_json::from_str::<Checkpoint>(&encoded).unwrap(),
+        checkpoint
+    );
+}

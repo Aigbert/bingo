@@ -12,6 +12,16 @@ use tokio::sync::{mpsc, oneshot, watch};
 use crate::turn::{TurnConfig, TurnHost};
 
 pub(crate) enum Msg {
+    Checkpointed {
+        seq: Seq,
+        result: Result<(), KernelError>,
+    },
+    PastLoaded {
+        cut: Seq,
+        generation: u64,
+        transcript: Result<Transcript, KernelError>,
+        request: Box<super::past::Request>,
+    },
     Gated {
         intent: IntentId,
         verdict: super::gate::Verdict,
