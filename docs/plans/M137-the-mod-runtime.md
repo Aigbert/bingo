@@ -3,161 +3,197 @@
 ## Goal
 
 ADR-0078 §2–5 and §7. A plugin whose manifest names a `module` runs in
-process: `bingo-mods` gives each mod a QuickJS-NG runtime, strips TS with
-oxc, runs `register(on, options)`, and serves its hooks as links at M136's
-entries. Sandbox, budgets, fail-open, grants and reload are each pinned by
-a test; manifest, discovery and the state store move into
-`bingo-plugin-host`. The acceptance: M133's `ts-status` runs in process
-as it does under node.
+process: one QuickJS-NG runtime per mod, TS stripped with oxc,
+`register(on, options)` and hooks at M136's catalogue entries. Shared
+manifest, discovery and state live in `bingo-plugin-host`. M133's
+`ts-status` must run in process and under node with the same results.
 
 Re-verified at `23810b23` on 2026-10-14; M108–M136 and M147 are landed.
-The decisions hold; the current paths and required adapters are listed below.
+Current paths and required adapters replace the original plan's stale paths.
 
 ## Bricks, in build order
 
-1. **The shared library, moved before it grows.** Create
-   `crates/bingo-plugin-host` (`tier = "library"`) and move into it
-   plugin-rpc's `manifest.rs`, `discovery.rs` (with M132's `--plugin-dir`
-   layer), `tool_name`, M132's `changed` over stamps and its state store
-   (`swap`, the shelf layout), `StateValue` and discovery notices. Keep
-   RPC re-exports so existing tests pass unedited, then its
-   copies go. The manifest gains `module`, beside a `command` if it likes;
-   a pure `runtime_of(manifest, mods_stand) -> Module | Process` decides,
-   so one plugin name runs in exactly one runtime.
-2. **Failing tests.** Fixture mods under `crates/bingo-mods/tests/mods/`:
-   `hello` (its `tool.call` hook answers), `loop` (`while (true) {}`),
-   `hog` (allocates past the cap), `thrower` (throws, with a `.catch`),
-   `reentrant` (calls a `$` method whose event it hooks), `escaper`
-   (`eval`, `new Function`, `import()`, `require`). No runtime yet.
-3. **The engine, pinned, and its cost.** `rquickjs = "=0.14.0"` with
-   `futures`, `loader`, `parallel` (no `bindgen`); the oxc crates at
-   `=0.152.0`; the person accepted both on 2026-10-13. A `deny.toml` note
-   by the `onig` ban says why a C engine is admitted (ADR-0078). Paste
-   `scripts/budget.sh` before and after; raise `max_dependencies` by the
-   measured count, one comment line per family; `cargo deny check`.
-   **Threading** (ADR-0078 §2): each mod's thread holds its `AsyncRuntime`
-   on a current-thread tokio runtime, calls crossing by channel, so a JS
-   loop never holds the worker the turn and its `esc` run on (ADR-0068).
-4. **Strip and load, pure.** `strip(path, source) -> Result<String,
-   StripError>`: oxc parser, semantic, transformer (TS stripped, JSX to
-   `h`/`Fragment`), codegen. It refuses `import()`, `require`, and any
-   specifier that is neither a relative path inside the mod's root nor
-   `bingo`, naming `file:line`. The loader resolves only those two kinds.
-5. **The sandbox (§3).** `Context::custom` without the `Eval` intrinsic,
-   so `eval` and `Function` throw; QuickJS has no timers or WebAssembly
-   to remove. Rust installs `h`/`Fragment` (JSON nodes, typed in M140),
-   `URL` (`url`, in tree), UTF-8 `TextEncoder`/`TextDecoder`,
-   `AbortController` (a short prelude), `crypto.randomUUID` (`uuid`),
-   `crypto.subtle.digest('SHA-256')` (`bingo-digest`, M114) and
-   `performance.now`. `set_memory_limit` (`mods.memoryMiB`, 64) and
-   `set_max_stack_size`. Tests: every `escaper` attempt fails in words;
-   `hog` is skipped as out of memory, the host lives on.
-6. **One `'bingo'` for both runtimes.** M133's `on.ts` splits: `on.ts`
-   keeps patterns, matcher and registration table (pure); `cross.ts`
-   takes node's `intercept/`. `'bingo'` exports `Register` (the type of
-   `register(on, options)`) and each event's types under Claude Code's
-   names (`ToolCall`, `Turn`, …, from M136's `events.ts`); M141 adds the
-   state helpers (`state.ts`), M142 their types and tests. In process it
-   is `on.ts` (`include_str!`, stripped at start). `on` throws on a hook
-   registered twice; one `.catch` each; `options` is the valid `config`.
-7. **Hooks as links.** `Mods` implements `InterceptorSource`, one
-   `Interceptor` per mod, matched by its hooks' patterns and prefilter
-   (M136). `chain` runs them on the mod's thread with `e` deeply frozen;
-   `next` runs the rest at most once (again throws), carrying `called`,
-   `signal` (aborted on `esc` or drop), `origin {plugin, tier}`, `budget
-   {ms, remainingMs}`. `observe` ignores what a hook returns.
-8. **Budgets and fail-open (§3, §4).** A pure `Budget { resume(now),
-   suspend(now), spent() }`, table-tested over fake instants, suspended
-   around `next` and each `$` await. The interrupt handler stops a hook
-   at 10 s of its own time (a setting; tests set 50 ms and assert the
-   outcome, never a duration). `.catch` gets 1 s more, with `next.error
-   { kind: throw | timeout | re-entry | shape, message }` and
-   `next.called`. A skipped hook lets the links beneath run, or its last
-   `next` result stands; one notice names plugin, event and reason. The
-   runtime skips a hook already on its own stack (re-entry), so only the
-   caller is left out. Each `$` await has a wall bound (tokio, paused in
-   tests). A dropped chain sets the interrupt flag and aborts `signal`.
-9. **Grants (§5).** Pure, in the library: `grant(origin, trust, uses) ->
-   Grant { tier, uses }` (user dir or `--plugin-dir`: `rewrite` with the
-   declared uses; project dir: `tighten`, safe nouns only; `pluginTrust`
-   (M131) lifts either and alone gives `full`) and `admits(grant, noun,
-   method)`, refusing in words `UNSAFE` (`process`, `http`, `env`,
-   `model`, `fs` writes outside the data dir) and a face method declared
-   unsafe (M136). `uses` is one list of nouns, service keys and the
-   host's alike. `plugin.register`, a catalogue chain, is raised by core
-   when a `PluginSource` first reports a plugin or reloads it, on `{ name,
-   version, origin, runtime, tier, uses }`; a link lowers the tier, drops
-   a use, or denies (switched off, with its reason). Both runtimes read
-   the granted `uses` from `catalog(Plugins)`.
-10. **Reload (§7).** A `--plugin-dir` mod is polled with `changed` on
-    tokio time; a change marks it stale, and it reloads at the turn's end
-    (the runtime's own link at `turn.complete`, which only calls `next`)
-    or before one of its own tools or commands runs (M138 registers them;
-    the check lands here). A reload drops the thread, runs `register` in
-    a fresh runtime, raises `session.start` per open session; state stays.
-11. **Parity, and the acceptance run.** Until M138, `$` is exactly what
-    M133's `dollar.ts` offers, each a translation onto the same door:
-    `$.ui.status`, `$.state`/`$.store` (the library's store),
-    `$.model.complete`, `$.session.deliver` and `extend`, `$.<noun>.<method>`;
-    plugin-rpc's `host/model/complete` calls the same `admits`. `ts-status`
-    gains `"module": "hooks/register.ts"`; M133's scenario runs in process
-    and again with `bingo-mods` switched off, so `command` runs it under node.
+1. **Shared library.** Move manifest, discovery, tool names, file stamps,
+   state (`swap`, shelf layout, `StateValue`) and discovery notices into
+   library-tier `bingo-plugin-host`. Preserve RPC re-exports and existing
+   tests. Add `module` alongside the optional process entry; pure
+   `runtime_of(manifest, mods_stand)` selects exactly one runtime per name.
+2. **Failing contracts.** Pin module manifests and runtime selection first.
+   Fixture mods: `hello` answers `tool.call`; `loop` loops; `hog` exceeds
+   memory; `thrower` throws with `.catch`; `reentrant` calls the event it
+   hooks; `escaper` attempts eval, Function, import() and require.
+3. **Engine and cost.** Pin `rquickjs = "=0.14.0"` with futures, loader,
+   parallel and no bindgen; oxc crates `=0.152.0` (accepted 2026-10-13).
+   Each mod's thread owns its AsyncRuntime on current-thread tokio; calls
+   cross channels, so JS never occupies the worker handling esc. Explain
+   the C-engine exception by the onig ban in deny.toml. Measure budget
+   before/after; increase dependencies by measured families; cargo deny.
+4. **Strip/load.** Pure `strip(path, source)` uses oxc parser, semantic,
+   transformer and codegen; strip TS and compile JSX to h/Fragment.
+   Refuse import(), require and specifiers other than bingo or relative
+   files inside the mod root, naming file:line. Loader enforces the same.
+5. **Sandbox.** Custom context without Eval; no Function, Node, DOM,
+   WebAssembly or timers. Install h/Fragment JSON nodes, URL (url), UTF-8
+   TextEncoder/Decoder, AbortController, randomUUID (uuid), SHA-256
+   (bingo-digest) and performance.now. Memory defaults to mods.memoryMiB=64;
+   cap the stack. Escaper fails in words; hog fails without killing host.
+6. **One bingo module.** Split pure registration/matching in on.ts from
+   node intercept transport in cross.ts. Export Register and event types
+   under Claude Code names; include/strip on.ts in process. Duplicate
+   registration throws; one catch per hook; options is validated config.
+   State helpers/types remain M141/M142.
+7. **Links.** Mods implements InterceptorSource, one Interceptor per mod,
+   matched by patterns/prefilter. Run on its thread with deeply frozen e;
+   next runs once, exposing called, signal, origin {plugin,tier}, budget
+   {ms,remainingMs}. Observation return values are ignored.
+8. **Budgets/fail-open.** Pure Budget resume/suspend/spent with fake-time
+   table tests. Count own time only, suspended around next and dollar.
+   Interrupt after 10 s (setting; tests use 50 ms and assert outcome).
+   Catch gets 1 s with next.error {kind,message}, kinds throw/timeout/
+   re-entry/shape, and next.called. Skip a failed hook or keep its last
+   next result; one notice names plugin/event/reason. Re-entry leaves out
+   only the calling hook. Dollar awaits have wall bounds, tested with
+   paused tokio; dropped chains interrupt JS and abort signal.
+9. **Grants.** Pure library grant(origin,trust,uses) and admits(grant,noun,
+   method). User/explicit directories default rewrite with declared uses;
+   project defaults tighten/safe nouns; user-only pluginTrust lifts grants
+   and alone gives full. Refuse unsafe process/http/env/model, external fs
+   writes and unsafe face methods without grants. Uses includes host and
+   service nouns. Core raises plugin.register on first source report and
+   reload, with name/version/origin/runtime/tier/uses. Links may only lower
+   tier, drop uses or deny with reason. Both runtimes read granted uses
+   from catalog(Plugins), including RPC model/complete admission.
+10. **Reload.** Poll explicit directories on tokio time; changed marks stale.
+    Reload after turn.complete (own link calls next) or before own tools/
+    commands (M138 registers them). Drop/join old thread, fresh register,
+    session.start for every open session; keep host state. No test sleeps.
+11. **Parity.** Until M138, dollar maps M133's status, state/store, model
+    complete, session deliver/extend and service faces to existing doors.
+    ts-status adds module hooks/register.ts and imports bingo. Run M133's
+    scenario in process and with mods disabled, falling back to node.
 
 ## Files
 
-- `crates/bingo-plugin-host/{Cargo.toml,src/*}` (new shared mechanisms)
-- `crates/bingo-mods/{Cargo.toml,src/*,tests/*}` (new runtime and fixtures)
-- `crates/bingo-plugin-rpc/{Cargo.toml,src/{manifest,discovery,notice,tool,reload,state,host,lib,manager,bridge,source,service,validate,schema,wire_ts,events_ts}.rs}` (shared adapters)
-- `crates/bingo-sdk/src/{plugin,intercept,catalogue}.rs`, `catalogue/payload.rs`;
-  `crates/bingo-core/src/{plugins.rs,turn/late.rs,chain/*,host.rs,host/{registry,catalog,interception}.rs}`
-  (source registration, granted catalogue, mod budget ownership)
-- `crates/bingo/{Cargo.toml,src/main.rs,src/plugins/*,tests/plugin_kit.rs}`
-  (runtime selection, isolated scenario host, listing); `Cargo.toml`, `Cargo.lock`
-- `sdk/typescript/src/{on,cross,plugin,index,events,wire}.ts`, `on.test.ts`;
-  `examples/plugins/ts-status/{plugin.json,hooks/register.ts}`; generated `schema/*`
-- `deny.toml`, `scripts/budget.toml`
+- New `crates/bingo-plugin-host/{Cargo.toml,src/*,tests/*}` and
+  `crates/bingo-mods/{Cargo.toml,src/*,tests/*}`; runtime guide.md.
+- `crates/bingo-plugin-rpc/Cargo.toml`, `src/{manifest,discovery,notice,tool,
+  reload,state,host,lib,manager,bridge,source,service,validate,schema,
+  wire_ts,events_ts}.rs`: shared mechanisms and runtime/grant adapters.
+- `crates/bingo-sdk/src/{plugin,intercept,catalogue}.rs`, catalogue/payload.rs;
+  `crates/bingo-core/src/{plugins,host}.rs`, turn/late.rs, chain/*,
+  host/{registry,catalog,interception}.rs: registration and granted catalogue.
+- `crates/bingo/{Cargo.toml,src/main.rs,src/plugins/*,tests/plugin_kit.rs}`:
+  runtime selection, isolated scenario host and runtime listing column.
+- `sdk/typescript/src/{on,cross,plugin,index,events,wire}.ts`, on.test.ts;
+  `examples/plugins/ts-status/{plugin.json,hooks/register.ts}`.
+- Cargo.toml, Cargo.lock, deny.toml, scripts/budget.toml; generated schema/*.
+  Regenerate schemas/fixtures/events.json/wire.ts with BINGO_UPDATE_SCHEMA=1.
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-plugin-host`; plugin-rpc's tests unedited.
-- [ ] `cargo test -p bingo-mods`: each `strip` refusal names `file:line`;
-      `escaper`, `hog`, `loop`, `thrower`, `reentrant` each end as brick 2
-      says, one notice each; `thrower`'s `.catch` sees `kind: "throw"`.
-- [ ] While a `loop` hook holds `tool.check`, `esc` ends the turn
-      `Interrupted` within M116's bound.
-- [ ] A project-dir mod's `$.model.complete` is refused in words, and
-      answers once `pluginTrust` grants `model`. A denying
-      `plugin.register` link switches a mod off, its reason shown by
-      `bingo plugins list`.
-- [ ] A mod touched mid-turn reloads after `turn.complete` and keeps its
-      `$.store` value; no sleep in the test.
-- [ ] `cargo test -p bingo --test plugin_kit`: `ts-status` passes in
-      process and under node (M133's skip rule).
-- [ ] `budget.sh` before and after; `cargo deny check`; all gates; MSVC
-      cross-check each touched crate; record C-header-only failures as
-      deferred to Windows CI per protocol step 7 (no push in this run).
+- [ ] Shared library contracts pass; plugin-rpc's existing assertions unchanged.
+- [ ] Mod tests cover strip file:line, all six fixtures and one notice each;
+      thrower's catch sees kind=throw.
+- [ ] Esc during loop at tool.check ends Interrupted within M116's bound.
+- [ ] Project model call refused, then allowed by pluginTrust; denied
+      plugin.register switches off the mod and plugins list shows why.
+- [ ] Mid-turn edit reloads after turn.complete; store survives; no sleeps.
+- [ ] plugin_kit runs ts-status in process and node (M133's node skip rule).
+- [ ] Before/after budget, all serial gates and each touched crate's MSVC
+      check; C-header-only failures deferred to Windows CI per step 7.
 
 ## Non-goals
 
-- `$` beyond M133's set (M138, M139); elements (M140); mod `validate` and
-  `test` (M142); npm imports; threads of a mod's own; timers; a runtime
-  shared by two mods; `Client` modules; a file-watcher dependency;
-  reloading mods that `--plugin-dir` does not name.
+Dollar beyond M133 (M138/139), elements (M140), module validate/test (M142),
+npm imports, mod-owned threads/timers, shared JS runtimes, Client modules,
+file-watcher dependencies, watching non-explicit directories; no live tests.
 
 ## Risks
 
-- rquickjs with `parallel` and exotic classes (issue #764): natives are
-  plain functions and objects. The interrupt fires only while JS runs, so
-  no native blocks; each spawns onto the host and awaits under a bound.
-- QuickJS-NG under MSVC is tested only in CI; a failure is fixed before
-  landing, never `cfg`-gated away. oxc releases weekly: the pin is exact.
-- A thread per mod parks when idle: paste 50 fixture mods' RSS, assert none.
-- Current manifest has required `entry.command`; preserve process manifests
-  while adding module-only manifests. `plugin.register` is not yet catalogued.
-- M136 links still apply a 5 s external deadline; mods must own their 10 s
-  active-time budget without weakening process deadlines. Core uses user-only
-  `pluginTrust`; catalogue currently exposes only enabled/reason/from.
-- `on.ts` currently holds both registration and transport; the acceptance
-  module uses a relative type import outside its root and needs `bingo`.
-- Shared state errors are `bingo-jsonrpc` library errors, not a plugin edge.
-  M148 owns SDK `state.rs` and TUI/demo/rooms/schedule; leave them untouched.
+- QuickJS parallel/exotic-class issue #764: natives are plain functions and
+  objects, host work is asynchronous and bounded. MSVC builds are checked
+  locally where possible and in Windows CI; never cfg-gate failures away.
+- Pin weekly oxc; measure 50 idle fixture mods' RSS without an assertion.
+- Core's current external deadline is 5 s: preserve it for process links
+  while allowing mods to own their 10 s active-time budget.
+- Current catalogue has only enabled/reason/from; plugin.register is absent.
+  Shared state uses bingo-jsonrpc library errors, never a plugin dependency.
+- M148 owns SDK state.rs and TUI/demo/rooms/schedule; leave them untouched.
+- **Stopped 2026-10-14, protocol step 6: manifest/schema boundary.** The
+  shared Manifest and frozen schema/plugin-2.json require entry.command.
+  ADR-0078 §2 requires a module without a process entry. Removing entry from
+  required fails schema::tests::preserves, which pins every structural key.
+  ADR-0075 authorizes only the named earlier pre-release exceptions, not
+  this relaxation. The module contract and compatibility probe fail below.
+  Option A: authorize a narrow pre-release exception for module manifests
+  (entry optional only when module exists), with generator/baseline tests.
+  Option B: preserve the process wire manifest exactly and define a distinct
+  module-manifest schema boundary with shared underlying parsing/state.
+  Neither exception nor schema split has been implemented. Runtime work and
+  ADR acceptance remain pending the decision; the extraction is committed.
+
+## Verified (2026-10-14)
+
+Branch: `m137-the-mod-runtime`, base `23810b23`. No push, merge or PR.
+The following are partial verification, not milestone completion.
+
+Before extraction, `scripts/budget.sh` (exit 0):
+```text
+dependencies (unique, normal): 355 (max  355)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 0 GB (soft max  5)
+test binaries: 0
+budget ok
+```
+
+`cargo test -p bingo-plugin-host -p bingo-plugin-rpc` (exit 0, before new
+failing contracts): library, RPC unit, RPC integration, then two doc-test totals:
+```text
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 124 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.31s
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+`cargo fmt --all` (exit 0, no output); after extraction,
+`scripts/budget.sh` (exit 0):
+```text
+dependencies (unique, normal): 356 (max  356)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 0 GB (soft max  5)
+test binaries: 3
+budget ok
+```
+
+`cargo test -p bingo-plugin-host --test module_manifest` (exit 101):
+```text
+test a_module_manifest_needs_no_process_entry ... FAILED
+ADR-0078 permits a module without a process entry: Error("missing field `entry`", line: 5, column: 1)
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p bingo-plugin-host --test module_manifest`
+```
+
+`cargo test -p bingo-plugin-rpc schema::tests::protocol_two_can_describe_a_module_without_a_process_entry -- --exact` (exit 101):
+```text
+test schema::tests::protocol_two_can_describe_a_module_without_a_process_entry ... FAILED
+ADR-0078 module-only manifests conflict with the ADR-0075 frozen required entry
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 124 filtered out; finished in 0.02s
+error: test failed, to rerun pass `-p bingo-plugin-rpc --lib`
+```
+
+Remaining gates were not run: protocol stop before runtime implementation.
+
+| Command | Result |
+|---|---|
+| `cargo fmt --all -- --check` | Not run. |
+| `cargo check --workspace --all-targets --locked` | Not run. |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Not run. |
+| `cargo test --workspace --locked` | Not run; two intentional contract failures remain. |
+| `scripts/check_discipline.sh` | Not run. |
+| `scripts/budget.sh` | Passed before and after extraction; output above. |
+| `cargo deny check` | Not run; no external dependency added. |
+| `cargo check -p bingo-plugin-host --all-targets --target x86_64-pc-windows-msvc` | Not run. |
+| `cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc` | Not run. |
