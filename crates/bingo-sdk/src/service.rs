@@ -142,6 +142,40 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    trait Counter: Send + Sync {
+        fn count(&self) -> u32;
+    }
+
+    impl Counter for u32 {
+        fn count(&self) -> u32 { *self }
+    }
+
+    #[test]
+    fn a_service_key_carries_a_trait_object_type() {
+        const KEY: ServiceKey<dyn Counter> = ServiceKey::new("test.counter");
+        let value: Arc<dyn Counter> = Arc::new(7u32);
+        let host = crate::testing::ServiceHost::holding(&KEY, value.clone());
+        let found = host.service(&KEY).expect("the registered trait");
+        assert!(Arc::ptr_eq(&found, &value));
+        assert_eq!(found.count(), 7);
+        assert!(host.service(&ServiceKey::<String>::new(KEY.name())).is_none());
+        assert!(host.service(&ServiceKey::<dyn Counter>::new("absent")).is_none());
+        let crate::Contribution::Service { key, value, wire } =
+            crate::Contribution::service(&KEY, value, None) else { panic!("a service") };
+        assert_eq!(key, KEY.name());
+        assert!(value.is::<Arc<dyn Counter>>());
+        assert!(wire.is_none());
+    }
+
+    #[test]
+    fn a_service_family_is_found_by_its_computed_name() {
+        let key = crate::Pages::key("test.plugin");
+        assert_eq!(key.name(), "test.plugin.pages");
+        let host = crate::testing::ServiceHost::holding(&key, Arc::new(crate::Pages(&[])));
+        let computed = ServiceKey::<crate::Pages>::named("test.plugin.pages".to_string());
+        assert_eq!(host.service(&computed).as_deref(), Some(&crate::Pages(&[])));
+    }
+
     struct Kv;
 
     #[async_trait]

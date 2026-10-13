@@ -61,3 +61,21 @@ async fn a_service_opened_late_answers_by_key_and_by_wire() {
     assert_eq!(taken.code, ErrorCode::InvalidInput);
     assert!(taken.message.contains("test.kv"), "{taken}");
 }
+
+#[tokio::test]
+async fn an_undeclared_service_is_refused_with_its_plugin_and_key() {
+    let plugins = vec![TestPlugin::boxed(
+        &PROVIDER,
+        vec![Contribution::Service {
+            key: "test.undeclared".into(),
+            value: Arc::new(7u32),
+            wire: None,
+        }],
+    )];
+    let error = match Host::build(plugins, HostConfig::new(env())).await {
+        Ok(_) => panic!("an undeclared service must be refused"),
+        Err(error) => error.to_string(),
+    };
+    assert!(error.contains(PROVIDER.id), "{error}");
+    assert!(error.contains("test.undeclared"), "{error}");
+}
