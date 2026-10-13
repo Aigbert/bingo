@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 use bingo_core::{Host, HostConfig};
 use bingo_mods::ModsPlugin;
 use bingo_sdk::{CatalogKind, Env, HostApi};
