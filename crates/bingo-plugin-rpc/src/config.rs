@@ -15,6 +15,7 @@ use serde_json::Value;
 pub struct Settings {
     /// Each plugin's own slice, by plugin name. What is in one is the
     /// plugin's business, not this host's.
+    pub plugin_dirs: Vec<std::path::PathBuf>,
     pub plugins: BTreeMap<String, Value>,
 }
 

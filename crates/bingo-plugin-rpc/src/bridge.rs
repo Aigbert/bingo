@@ -85,6 +85,7 @@ struct State {
     /// Why the last attempt failed, for a listing to show long after the
     /// notice that said it has been drained (ADR-0057 §5).
     failed: Option<String>,
+    stopped: bool,
 }
 
 /// The setting every bridge shares: where the host lives, where a process's
@@ -106,9 +107,9 @@ pub struct Bridge {
     root: PathBuf,
     /// Already resolved: `${PLUGIN_ROOT}` is a manifest's spelling, not a
     /// process's, so nothing past this point knows the placeholder exists.
-    entry: Entry,
+    launch: std::sync::RwLock<(Entry, Option<std::num::NonZeroU64>)>,
     config: Value,
-    call_timeout: Option<std::num::NonZeroU64>,
+    lifecycle: Mutex<()>,
     env: HostEnv,
     data_dir: PathBuf,
     notices: Arc<Notices>,
@@ -145,9 +146,9 @@ impl Bridge {
             store: crate::state::Store::new(&setting.data_dir, &name),
             name,
             root,
-            entry,
+            launch: std::sync::RwLock::new((entry, call_timeout)),
             config,
-            call_timeout,
+            lifecycle: Mutex::new(()),
             env: setting.env,
             data_dir: setting.data_dir,
             notices: setting.notices,
@@ -168,6 +169,7 @@ impl Bridge {
     /// Whatever services the process declared are published after the process
     /// is filed, so a call that arrives at once finds a bridge that is ready.
     pub async fn connect(self: &Arc<Self>) {
+        let _guard = self.lifecycle.lock().await;
         if !self.claim().await {
             return;
         }
@@ -234,7 +236,7 @@ impl Bridge {
                     spec.clone(),
                     Arc::clone(&live.connection),
                     Arc::clone(&self.notices),
-                    self.call_timeout
+                    self.launch.read().unwrap_or_else(|e| e.into_inner()).1
                         .map(|seconds| Duration::from_secs(seconds.get()))
                         .unwrap_or(deadline::TOOL_CALL),
                 )) as Arc<dyn Tool>
@@ -254,7 +256,7 @@ impl Bridge {
                     &self.name,
                     spec.clone(),
                     Arc::clone(&live.connection),
-                    self.call_timeout
+                    self.launch.read().unwrap_or_else(|e| e.into_inner()).1
                         .map(|seconds| Duration::from_secs(seconds.get()))
                         .unwrap_or(deadline::COMMAND_RUN),
                 )) as Arc<dyn SdkCommand>
@@ -347,10 +349,36 @@ impl Bridge {
 
     /// End the process, and leave nothing that would respawn it.
     pub async fn stop(&self) {
+        let _guard = self.lifecycle.lock().await;
         let mut state = self.state.lock().await;
+        state.stopped = true;
         state.next_attempt = None;
         if let Some(live) = state.live.take() {
             live.connection.stop().await;
+        }
+    }
+
+    pub async fn reload(self: &Arc<Self>, manifest: crate::Manifest) {
+        let _guard = self.lifecycle.lock().await;
+        let old = {
+            let mut state = self.state.lock().await;
+            if state.stopped { return; }
+            state.starting = true;
+            state.live.take()
+        };
+        if let Some(live) = &old { live.connection.stop().await; }
+        *self.launch.write().unwrap_or_else(|e| e.into_inner()) =
+            (manifest.entry.rooted(&self.root), manifest.call_timeout);
+        let outcome = self.handshake().await;
+        let restart = match (&old, &outcome) {
+            (Some(old), Ok(new)) => old.providers != new.providers || old.services != new.services,
+            _ => false,
+        };
+        let succeeded = outcome.is_ok();
+        self.file(outcome).await;
+        if succeeded {
+            let suffix = if restart { "; provider or service declarations changed; restart required" } else { "" };
+            self.notices.push(Notice::warn("PLUGIN_RELOADED", format!("the {} plugin reloaded{suffix}", self.name)));
         }
     }
 
@@ -400,7 +428,7 @@ impl Bridge {
     /// enough to say so: the spawn that follows holds nothing.
     async fn claim(&self) -> bool {
         let mut state = self.state.lock().await;
-        if state.starting || state.live.is_some() {
+        if state.stopped || state.starting || state.live.is_some() {
             return false;
         }
         if state.next_attempt.is_some_and(|at| Instant::now() < at) {
@@ -443,9 +471,10 @@ impl Bridge {
             self.host.clone(),
             self.doors.face(caller),
         ));
+        let entry = self.launch.read().unwrap_or_else(|e| e.into_inner()).0.clone();
         let connection = Arc::new(Connection::spawn(
             &self.name,
-            &self.entry,
+            &entry,
             &self.root,
             &self.data_dir,
             Some(Arc::new(crate::host::Server::new(&self.name, self.host.clone(), hub, self.store.clone()))),

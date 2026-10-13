@@ -66,6 +66,8 @@ pub struct Manager {
     /// Stops the one notice drain when the host does.
     stop: CancellationToken,
     installed: OnceLock<Vec<Installed>>,
+    directories: Vec<std::path::PathBuf>,
+    watchers: std::sync::Mutex<Vec<tokio::task::JoinHandle<()>>>,
     cleanup: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
@@ -93,7 +95,14 @@ impl Manager {
             stop: CancellationToken::new(),
             installed: OnceLock::new(),
             cleanup: Default::default(),
+            directories: Vec::new(),
+            watchers: Default::default(),
         }
+    }
+
+    pub fn with_dirs(mut self, directories: Vec<std::path::PathBuf>) -> Self {
+        self.directories = directories;
+        self
     }
 
     pub fn notices(&self) -> &Arc<Notices> {
@@ -125,7 +134,7 @@ impl Manager {
     /// session has whatever they contribute; with nothing discovered it does
     /// nothing at all.
     pub async fn start(&self, cwd: &Path, host: HostHandle) {
-        let found = discovery::discover(&discovery::dirs(&self.env, cwd), &self.notices);
+        let found = discovery::with_explicit(&discovery::dirs(&self.env, cwd), &self.directories, &self.notices);
         let installed: Vec<Installed> = found
             .into_iter()
             .map(|f| self.install(f, host.clone()))
@@ -223,6 +232,8 @@ impl Manager {
 
     pub async fn shutdown(&self) {
         self.stop.cancel();
+        let watchers = std::mem::take(&mut *self.watchers.lock().unwrap_or_else(|e| e.into_inner()));
+        for watcher in watchers { let _ = watcher.await; }
         let task = self.cleanup.lock().unwrap_or_else(|e| e.into_inner()).take();
         if let Some(task) = task { let _ = task.await; }
         for bridge in self.bridges() {
@@ -284,7 +295,9 @@ impl Manager {
 
     fn bridge(&self, found: Found, host: HostHandle) -> Arc<Bridge> {
         let config = self.settings.get(&found.name).cloned().unwrap_or_default();
-        Arc::new(Bridge::new(
+        let watched = self.directories.contains(&found.root);
+        let root = found.root.clone();
+        let bridge = Arc::new(Bridge::new(
             found.name,
             found.root.clone(),
             found.manifest.entry.rooted(&found.root),
@@ -297,7 +310,15 @@ impl Manager {
                 doors: Arc::clone(&self.doors),
                 host,
             },
-        ))
+        ));
+        if watched {
+            match crate::reload::Watch::new(root, bridge.clone(), self.notices.clone()) {
+                Ok(watch) => self.watchers.lock().unwrap_or_else(|e| e.into_inner())
+                    .push(tokio::spawn(watch.run(self.stop.clone()))),
+                Err(error) => self.notices.push(notice::Notice::warn("PLUGIN_UNREADABLE", error.to_string())),
+            }
+        }
+        bridge
     }
 }
 

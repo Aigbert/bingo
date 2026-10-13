@@ -54,6 +54,18 @@ pub fn discover(dirs: &[PathBuf], notices: &Notices) -> Vec<Found> {
     found.into_values().collect()
 }
 
+/// Explicit directories form the final layer, in argument order.
+pub fn with_explicit(dirs: &[PathBuf], explicit: &[PathBuf], notices: &Notices) -> Vec<Found> {
+    let mut found: BTreeMap<_, _> = discover(dirs, notices).into_iter()
+        .map(|plugin| (plugin.name.clone(), plugin)).collect();
+    for root in explicit {
+        if let Some(plugin) = read(root, notices) {
+            found.insert(plugin.name.clone(), plugin);
+        }
+    }
+    found.into_values().collect()
+}
+
 fn layer(dir: &Path, notices: &Notices) -> Vec<Found> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
@@ -70,7 +82,7 @@ fn layer(dir: &Path, notices: &Notices) -> Vec<Found> {
 /// One directory, if it holds a manifest that names itself. A directory with
 /// no `plugin.json` is somebody else's; a `plugin.json` that will not parse is
 /// a plugin a person meant to have, so that one is reported.
-fn read(root: &Path, notices: &Notices) -> Option<Found> {
+pub(crate) fn read(root: &Path, notices: &Notices) -> Option<Found> {
     let name = root.file_name()?.to_str()?.to_string();
     let raw = std::fs::read_to_string(root.join(MANIFEST_FILE)).ok()?;
     match serde_json::from_str::<Manifest>(&raw) {

@@ -148,6 +148,10 @@ struct Cli {
     /// (ADR-0016). Repeatable; the `channels` setting says the same thing.
     #[arg(long, value_name = "ADAPTER", global = true)]
     channels: Vec<String>,
+
+    /// Load and watch a plugin directory. Repeatable.
+    #[arg(long = "plugin-dir")]
+    plugin_dirs: Vec<PathBuf>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -927,6 +931,9 @@ fn mcp_layer(path: &std::path::Path) -> Result<settings::Layer, KernelError> {
 /// The command line as the highest settings layer: only what was given.
 fn cli_layer(cli: &Cli) -> Map<String, Value> {
     let mut layer = Map::new();
+    if !cli.plugin_dirs.is_empty() {
+        layer.insert("pluginDirs".into(), json!(cli.plugin_dirs));
+    }
     if let Some(provider) = &cli.provider {
         layer.insert("provider".into(), json!(provider));
     }

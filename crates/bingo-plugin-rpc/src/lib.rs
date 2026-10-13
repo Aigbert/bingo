@@ -88,7 +88,7 @@ static MANIFEST: PluginManifest = PluginManifest {
     ],
     requires: &[],
     config: Some(ConfigClaim {
-        keys: &[("plugins", Merge::ByName)],
+        keys: &[("plugins", Merge::ByName), ("pluginDirs", Merge::Accumulate)],
         schema,
     }),
 };
@@ -119,7 +119,7 @@ impl Plugin for PluginRpcPlugin {
             registrar.env().clone(),
             settings.plugins,
             registrar.switched_off().clone(),
-        ));
+        ).with_dirs(settings.plugin_dirs));
         registrar.add(Contribution::Tools(
             Arc::new(PluginTools::new(Arc::clone(&manager))) as Arc<dyn ToolSource>,
         ));
@@ -205,7 +205,7 @@ mod tests {
         );
         assert!(MANIFEST.requires.is_empty());
         let claim = MANIFEST.config.expect("a config claim");
-        assert_eq!(claim.keys, [("plugins", Merge::ByName)]);
+        assert_eq!(claim.keys, [("plugins", Merge::ByName), ("pluginDirs", Merge::Accumulate)]);
     }
 
     /// One source per kind the bridge opens, all answering to the same id:
@@ -217,7 +217,7 @@ mod tests {
             .register(&mut registrar)
             .expect("register");
         let contributions = registrar.into_contributions();
-        assert_eq!(contributions.len(), 7);
+        assert_eq!(contributions.len(), 8);
         for contribution in &contributions {
             let id = match contribution {
                 Contribution::Tools(source) => source.id(),
@@ -227,6 +227,7 @@ mod tests {
                 Contribution::Providers(source) => source.id(),
                 Contribution::Hooks(source) => source.id(),
                 Contribution::Plugins(source) => source.id(),
+                Contribution::Interceptors(source) => source.id(),
                 other => panic!("expected a source, got {other:?}"),
             };
             assert_eq!(id, ID);
