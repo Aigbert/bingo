@@ -199,14 +199,14 @@ impl Actor {
                 turn,
                 request,
                 reply,
-            } => self.complete(turn, *request, reply),
+            } => complete::complete(self, turn, *request, reply),
             Msg::Charge {
                 turn,
                 plugin,
                 usage,
                 reply,
             } => {
-                let result = self.charge(turn, plugin, usage).await;
+                let result = complete::charge(self, turn, plugin, usage).await;
                 let _ = reply.send(result);
             }
             Msg::Invoke { call, reply } => self.invoke(call, reply).await?,

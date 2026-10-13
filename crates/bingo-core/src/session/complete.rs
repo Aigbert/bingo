@@ -7,60 +7,60 @@ use tokio::sync::oneshot;
 
 pub(super) type Reply = oneshot::Sender<Result<Vec<ModelEvent>, KernelError>>;
 
-impl Actor {
-    pub(super) fn complete(&self, turn: Option<TurnId>, request: Completion, mut reply: Reply) {
-        let selected = self.completion_model(turn.as_ref());
-        let (model, cancel) = match selected {
-            Ok(value) => value,
-            Err(error) => {
-                let _ = reply.send(Err(error));
-                return;
-            }
+pub(super) fn complete(actor: &Actor, turn: Option<TurnId>, request: Completion, mut reply: Reply) {
+    let selected = completion_model(actor, turn.as_ref());
+    let (model, cancel) = match selected {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = reply.send(Err(error));
+            return;
+        }
+    };
+    let mailbox = actor.mailbox.clone();
+    actor.tracker.spawn(async move {
+        let _stop = cancel.clone().drop_guard();
+        let result = tokio::select! {
+            biased;
+            _ = reply.closed() => return,
+            _ = cancel.cancelled() => Err(KernelError::new(ErrorCode::Interrupted, "model call interrupted")),
+            result = drain(&mailbox, turn, request, model, cancel.clone()) => result,
         };
-        let mailbox = self.mailbox.clone();
-        self.tracker.spawn(async move {
-            let _stop = cancel.clone().drop_guard();
-            let result = tokio::select! {
-                biased;
-                _ = reply.closed() => return,
-                _ = cancel.cancelled() => Err(KernelError::new(ErrorCode::Interrupted, "model call interrupted")),
-                result = drain(&mailbox, turn, request, model, cancel.clone()) => result,
-            };
-            let _ = reply.send(result);
-        });
-    }
+        let _ = reply.send(result);
+    });
+}
 
-    fn completion_model(
-        &self,
-        turn: Option<&TurnId>,
-    ) -> Result<(ModelChoice, CancellationToken), KernelError> {
-        let (config, cancel) = match turn {
-            Some(turn) => {
-                let running = self
-                    .running
-                    .as_ref()
-                    .filter(|running| &running.turn == turn)
-                    .ok_or_else(|| {
-                        KernelError::new(ErrorCode::NotReady, "the requested turn is not running")
-                    })?;
-                (&running.config, running.cancel.child_token())
-            }
-            None => (&self.config, self.cancel.child_token()),
-        };
-        let model = config.model.clone().ok_or_else(|| {
-            KernelError::new(ErrorCode::ProviderUnavailable, "the session has no model")
-        })?;
-        Ok((model, cancel))
-    }
+fn completion_model(
+    actor: &Actor,
+    turn: Option<&TurnId>,
+) -> Result<(ModelChoice, CancellationToken), KernelError> {
+    let (config, cancel) = match turn {
+        Some(turn) => {
+            let running = actor
+                .running
+                .as_ref()
+                .filter(|running| &running.turn == turn)
+                .ok_or_else(|| {
+                    KernelError::new(ErrorCode::NotReady, "the requested turn is not running")
+                })?;
+            (&running.config, running.cancel.child_token())
+        }
+        None => (&actor.config, actor.cancel.child_token()),
+    };
+    let model = config.model.clone().ok_or_else(|| {
+        KernelError::new(ErrorCode::ProviderUnavailable, "the session has no model")
+    })?;
+    Ok((model, cancel))
+}
 
-    pub(super) async fn charge(
-        &mut self,
-        turn: Option<TurnId>,
-        plugin: String,
-        usage: Usage,
-    ) -> Result<(), KernelError> {
-        let turn = turn.filter(|turn| self.is_running(turn));
-        self.publish(
+pub(super) async fn charge(
+    actor: &mut Actor,
+    turn: Option<TurnId>,
+    plugin: String,
+    usage: Usage,
+) -> Result<(), KernelError> {
+    let turn = turn.filter(|turn| actor.is_running(turn));
+    actor
+        .publish(
             Event::UsageCharged {
                 turn,
                 plugin,
@@ -70,7 +70,6 @@ impl Actor {
         )
         .await
         .map(|_| ())
-    }
 }
 
 async fn drain(
