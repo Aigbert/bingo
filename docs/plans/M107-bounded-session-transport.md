@@ -86,6 +86,7 @@ implementation. This plan covers the Core producer, not Rei's IPC or UI.
 
 - Bounded cold replay from persistent storage: resume still reads and folds
   the complete journal before the actor exists. Do not skip old records.
+  2026-10-13: cold replay: done in [M114](M114-resume-starts-at-a-checkpoint.md) (ADR-0066).
 - Rei's trusted Main-to-renderer ACK stream, UI unloaded ledger, and
   user-authorized export destination; those belong to the separate client
   implementation and acceptance tests.

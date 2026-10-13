@@ -79,17 +79,17 @@ kernel holds.
 
 ## Exit criteria
 
-- [ ] Every corrupted-checkpoint case falls back to full replay and
+- [x] Every corrupted-checkpoint case falls back to full replay and
       rewrites a good one (tests pasted).
-- [ ] Resume after compaction reads the tail only; state equals full
+- [x] Resume after compaction reads the tail only; state equals full
       replay.
-- [ ] After a checkpoint the actor holds no covered frame and no item
+- [x] After a checkpoint the actor holds no covered frame and no item
       outside both model order and the client tail at/after the boundary.
-- [ ] Four-item cut: model `[i1,i4,i3]`, client `[i3,i4]`, storage page
+- [x] Four-item cut: model `[i1,i4,i3]`, client `[i3,i4]`, storage page
       `[i1,i2]`; no gaps/duplicates, and model order survives the cut.
-- [ ] Catch-up from seq 0 and history paging past the window return
+- [x] Catch-up from seq 0 and history paging past the window return
       what an un-windowed session returned (test pasted).
-- [ ] All gates, `scripts/tui-smoke.sh` included.
+- [x] All gates, `scripts/tui-smoke.sh` included; step 7 Windows C-header exception below.
 
 ## Non-goals
 
@@ -114,33 +114,35 @@ kernel holds.
 - 2026-10-13 decision: invalidate the checkpoint after mentions' fixture journal edit; assertions unchanged; equivalent session-directory fixtures are authorized.
 - A checkpoint verifies only the line at its offset; a hand edit to an earlier journal line is not detected. Deleting checkpoint.json forces a full replay.
 
-## Verified (2026-10-13; remaining gates pending)
+## Verified (2026-10-13)
 
 - Branch `m114-resume-starts-at-a-checkpoint`, base `1335830b`; clean on entry.
-  RED contracts committed before implementation:
-  `cargo test -p bingo-sdk checkpoint --locked`: `2 failed` (codec/window);
+- RED, committed before implementation: `cargo test -p bingo-sdk checkpoint --locked`: `2 failed` (codec/window);
   `cargo test -p bingo-store-jsonl checkpoint --locked`: `2 failed` (sidecar);
-  `cargo test -p bingo-core checkpoint_ack --locked`: `1 failed` (frames).
-- GREEN: `cargo test -p bingo-digest -p bingo-update`: `3 passed` / `47 passed`;
-  initial `scripts/budget.sh`: `349 (max 349)`, `budget ok`.
-  `cargo test -p bingo-sdk -p bingo-store-jsonl --locked`: SDK `111 passed`
-  plus record/opaque/docs; store `54 passed; 1 ignored` (measurement).
-  `cargo test -p bingo-core --locked`: `432 passed`; extra cases:
-  `cargo test -p bingo-core checkpoint --locked`: `9 passed; 0 failed`.
-- Final-tree gates: `cargo fmt --all -- --check`: exit 0;
-  `cargo check --workspace --all-targets --locked`: exit 0 (2.89s);
-  `cargo clippy --workspace --all-targets --locked -- -D warnings`: exit 0.
-- Jobs/agents now read only `journal.jsonl`; assertions unchanged; three watch
-  tests pass. Other recursive journal readers already filter by filename.
-- `cargo test --workspace --locked -- --test-threads=1 --skip
-  a_token_may_be_dialled_again_once_its_stream_has_closed --skip
-  a_proxy_with_a_token_this_run_never_minted_gets_nothing`: exit 101;
-  CLI `250 passed; 1 failed` (`target/m114-workspace-tests.log`).
-- Exact mention test alone via `cargo test -p bingo --test cli --locked`:
-  `1 passed`. With workspace features, `cargo test --workspace --locked
-  mentions::a_question_left_unanswered_is_chased_when_the_next_process_opens_the_room
-  -- --exact --test-threads=1`: `0 passed; 1 failed` (exit 101):
-  `one overdue question, one nudge: []; left: 0; right: 1`.
-  Logs: `target/m114-mentions-{isolated,workspace}.log`.
-- Pending: remaining tests, discipline, final budget, deny, Windows, TUI smoke;
-  criteria unticked; ADR-0066 proposed. No push/merge/PR.
+  `cargo test -p bingo-core checkpoint_ack --locked`: `1 failed` (covered frames).
+- GREEN: `cargo test -p bingo-digest -p bingo-update`: `3 passed` / `47 passed`.
+  `cargo test -p bingo-sdk -p bingo-store-jsonl --locked`: SDK `111 passed` plus records/opaque/docs; store `54 passed; 1 ignored`.
+  `checkpoint_corruption_replays_and_repairs ... ok`: missing/JSON/version/session/hash/offset/truncated/edited all repair.
+- `cargo test -p bingo-core checkpoint --locked`: `9 passed; 0 failed` (also after cohesion refactor).
+  `checkpoint_host_resume_reads_only_the_tail_and_clean_close_writes ... ok`;
+  `checkpoint_ack_releases_only_unneeded_items_and_covered_frames ... ok`;
+  `checkpoint_history_pages_join_the_client_window_without_duplicates ... ok`;
+  `checkpoint_catch_up_includes_the_cut_once_then_live_frames ... ok`.
+  SDK four-item window test `... ok`: model `[i1,i4,i3]`, client `[i3,i4]`; core storage page `[i1,i2]`.
+- `cargo fmt --all -- --check`: exit 0; `cargo check --workspace --all-targets --locked`: exit 0 (9.69s).
+  `cargo clippy --workspace --all-targets --locked -- -D warnings`: exit 0 (9.42s).
+- `cargo test --workspace --locked -- --test-threads=1 --skip a_token_may_be_dialled_again_once_its_stream_has_closed
+  --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing`: exit 0; totals `5072 passed; 0 failed; 4 ignored; 2 filtered out`.
+  CLI `251 passed; 0 failed`; PTY passed. The four existing ignored tests are measurement/stress/interactive previews.
+- `cargo test -p bingo-provider-acp --test bridge --locked a_token_may_be_dialled_again_once_its_stream_has_closed -- --exact --test-threads=1`: `1 passed; 0 failed`.
+  `cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1`: `1 passed; 0 failed`.
+- `scripts/check_discipline.sh`: `discipline ok`; checkpoint/past use module functions after the Actor-cohesion failure.
+- `scripts/budget.sh`: `349 (max 349)` dependencies; warm core `1s (max 20s)`; relink `0`; target `5 GB (soft max 5)`; `budget ok`.
+- `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
+- `cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc`, each sequentially:
+  `bingo-digest`, `bingo-sdk`, `bingo-store-jsonl`, `bingo-core`, `bingo-update`: exit 0.
+  `bingo`: exit 101, `aws-lc-sys` cannot find `stdlib.h`/`windows.h`; left to Windows CI per step 7. No toolchain installed.
+- `scripts/tui-smoke.sh` on a private `TMUX_TMPDIR`: `tui-smoke ok` (exit 0).
+- Fixture blockers resolved: jobs/agents read journals only; mentions removes its checkpoint after editing; assertions unchanged.
+  Audit of other journal writers found fresh fixtures or intentional checkpoint-corruption tests, needing no fixture adaptation.
+- ADR-0066 accepted; ADR-0005 §5/§7 and M107 annotated. Logs: `target/m114-*.log`. No push, merge, PR or parallel-owner edits.

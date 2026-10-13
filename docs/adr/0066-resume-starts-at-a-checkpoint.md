@@ -1,6 +1,6 @@
 # ADR-0066 — Resume starts at a checkpoint
 
-Status: proposed · 2026-10-13 · Plan: M114 · Amends: ADR-0005 §5, §7
+Status: accepted · 2026-10-13 · Plan: M114 · Amends: ADR-0005 §5, §7
 
 ## Context
 

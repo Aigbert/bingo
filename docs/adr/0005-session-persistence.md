@@ -28,3 +28,5 @@ The journal is the session (ADR-0002): a session on disk is that journal written
 —
 
 2026-10-13 — [ADR-0065](0065-the-record-is-not-the-live-type.md) amends §2–3: appended version lines select chained raw-JSON migrations; unreadable payloads with valid envelopes are retained as opaque Unknown records. Envelope/JSON corruption rules remain.
+
+2026-10-13 — [ADR-0066](0066-resume-starts-at-a-checkpoint.md) amends §5 and §7: a derived `checkpoint.json` verifies the resume boundary; the kernel folds its state plus the journal tail and reads older history from storage.
