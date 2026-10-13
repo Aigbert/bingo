@@ -12,8 +12,7 @@ use std::time::Instant;
 use bingo_sdk::{
     Activation, Answer, Applied, Attachment, CancelReason, ClientIdentity, Delivery, ErrorCode,
     Event, Frame, FrameStream, HostHandle, Image, Input, IntentId, InteractionId, KernelError,
-    OpenOptions, Origin, SessionChange, SessionHandle, SessionId, SessionSelector, SessionSpec,
-    TreeState,
+    OpenOptions, Origin, SessionChange, SessionHandle, SessionSelector, SessionSpec, TreeState,
 };
 use futures::StreamExt;
 use tokio::sync::mpsc;
@@ -714,7 +713,7 @@ async fn attach(
 mod tests {
     use super::*;
     use crate::{fixtures, loopback::Loopback};
-    use bingo_sdk::{CloseReason, ParentLink};
+    use bingo_sdk::{CloseReason, ParentLink, SessionId};
 
     #[tokio::test]
     async fn a_deleted_child_leaves_the_chat_fold() {
