@@ -108,3 +108,40 @@ pub fn pin_board(ui: &mut Ui) {
         card: demo_card("board"),
     });
 }
+
+#[test]
+fn a_stranger_places_every_slot_without_a_surface_registration() {
+    use bingo_sdk::{Action, ActionItem, ItemId, ItemStatus, Tone, ToolOutput, slot::{self, Slot}};
+    use crate::{effect::Effect, input, panel, rail, test_support::*};
+    let (mut ui, now) = scene();
+    let payload = slot::with(serde_json::json!({}), [
+        Slot::Status { text: "stranger status".into(), tone: Tone::Good, until: None },
+        Slot::Activity { verb: Some("Inspecting".into()), view: View::Panel {
+            title: "stranger activity".into(), child: Box::new(View::text("activity body")),
+        } },
+        Slot::Rail { title: "stranger rail".into(), view: View::text("rail body") },
+        Slot::Panel { title: "stranger panel".into(), view: View::text("panel body") },
+        Slot::Mode { current: "awake".into(), modes: ["rest", "awake"].map(|label| ActionItem {
+            label: label.into(), action: Action { name: "stranger.choose".into(), args: label.into() }, key: None,
+        }).to_vec() },
+        Slot::Row { item: ItemId::from_raw("itm_slot"), mark: Some('!'), title: Some("stranger row".into()),
+            badge: Some("badge".into()), body: Some(View::text("row body")), actions: vec![] },
+    ]);
+    let state = folded(vec![
+        frame(1, Event::ItemCompleted { item: tool("itm_slot", "Unfamiliar", serde_json::json!({}),
+            Some(ToolOutput::text("old body")), ItemStatus::Completed) }),
+        frame(2, signalled("stranger", "placed", payload)),
+    ]);
+    let screen = draw_sized(120, 40, &state, &ui, now);
+    for text in ["stranger status", "stranger activity", "activity body", "stranger rail", "rail body", "awake", "stranger row", "badge", "row body"] {
+        assert!(screen.contains(text), "missing {text}:\n{screen}");
+    }
+    assert!(!screen.contains("old body"));
+    assert_eq!(rail::cards(&state, &state.summary.id, &ui.pinned).len(), 1);
+    let sheet = panel::lines(&state, &state.summary.id, 0, &ui.pinned, 80, 30, now);
+    let sheet = sheet.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n");
+    assert!(sheet.contains("stranger panel") && sheet.contains("panel body"), "{sheet}");
+    let effects = input::on_key(&mut ui, &solo(&state), key(crossterm::event::KeyCode::BackTab), now);
+    assert!(matches!(&effects[..], [Effect::Submit(bingo_sdk::Input::Action { action })]
+        if action.name == "stranger.choose" && action.args == "rest"));
+}
