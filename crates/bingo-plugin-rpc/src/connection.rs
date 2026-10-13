@@ -33,7 +33,7 @@ use tokio::sync::mpsc::{Sender, UnboundedSender};
 
 use crate::codec::{Message, Notification, Request, Response, RpcError, TRANSPORT_ERROR};
 use crate::manifest::Entry;
-use crate::service::ServiceCalls;
+use crate::host::Server;
 use crate::wire::{ProviderDeltaParams, ToolProgressParams, name};
 
 /// What a request came back with.
@@ -49,7 +49,7 @@ pub fn log_path(data_dir: &Path, plugin: &str) -> std::path::PathBuf {
 /// a host that keeps no services — and then that request is refused like any
 /// other (ADR-0031 §4).
 struct Serving {
-    calls: Arc<dyn ServiceCalls>,
+    calls: Arc<Server>,
 }
 
 impl std::fmt::Debug for Serving {
@@ -63,7 +63,7 @@ impl Serving {
     /// reader, which is also carrying this process's replies and deltas.
     async fn answer(&self, request: Request, writer: bingo_jsonrpc::Sender) {
         let calls = &self.calls;
-        let answered = match calls.call(request.params).await {
+        let answered = match calls.answer(&request.method, request.params).await {
             Ok(result) => Response::ok(request.id, result),
             Err(error) => Response::failed(Some(request.id), error),
         };
@@ -71,12 +71,6 @@ impl Serving {
             tracing::debug!(%why, "an answer to a plugin went nowhere");
         }
     }
-}
-
-/// Whether the host answers a request a process sent at all. Exactly one
-/// method, by name (ADR-0031 §4).
-fn served(method: &str) -> bool {
-    method == name::SERVICE_CALL
 }
 
 /// One tool call this process is running: where its progress line goes, and
@@ -131,7 +125,7 @@ impl Router {
 
     async fn asked(&self, plugin: &str, request: Request, sender: Option<bingo_jsonrpc::Sender>) {
         let Some(sender) = sender else { return; };
-        if let Some(serving) = self.serving.as_ref().filter(|_| served(&request.method)) {
+        if let Some(serving) = self.serving.as_ref() {
             serving.answer(request, sender).await;
         } else {
             let error = RpcError::new(crate::codec::METHOD_NOT_FOUND,
@@ -209,7 +203,7 @@ impl Connection {
         entry: &Entry,
         root: &Path,
         data_dir: &Path,
-        serving: Option<Arc<dyn ServiceCalls>>,
+        serving: Option<Arc<Server>>,
     ) -> Result<Self, String> {
         let mut command = Command::new(&entry.command);
         command
@@ -232,7 +226,7 @@ impl Connection {
         child: Tree,
         stdin: ChildStdin,
         stdout: ChildStdout,
-        serving: Option<Arc<dyn ServiceCalls>>,
+        serving: Option<Arc<Server>>,
     ) -> Self {
         let router = Arc::new(Router {
             #[cfg(test)]
@@ -253,6 +247,12 @@ impl Connection {
         }
     }
 
+    pub fn negotiate(&self, capabilities: &std::collections::BTreeSet<crate::wire::Cap>) {
+        if let Some(serving) = &self.router.serving {
+            serving.calls.initialize(capabilities);
+        }
+    }
+
     /// Whether the process is still on the other end of the pipe.
     pub fn is_alive(&self) -> bool {
         self.peer.is_alive()
@@ -266,6 +266,9 @@ impl Connection {
 
     /// Ask, and wait for the answer or for the process to end.
     pub async fn request(&self, method: &str, params: Value) -> Reply {
+        if method != name::INITIALIZE && let Some(serving) = &self.router.serving {
+            serving.calls.permits(method)?;
+        }
         self.peer
             .request(method, params)
             .await
@@ -635,26 +638,6 @@ mod tests {
             Connection::spawn("quiet", &entry("cat", &[]), dir.path(), dir.path(), None)
                 .expect("`cat` exists on every unix");
         assert_ne!(connection.next_call(), connection.next_call());
-    }
-
-    /// The whole of the reverse lane's width (ADR-0031 §4): one method. What
-    /// else a process may ask the host for is a decision nobody has taken.
-    #[test]
-    fn exactly_one_method_travels_from_a_process_to_the_host() {
-        assert!(served(name::SERVICE_CALL));
-        for other in [
-            name::INITIALIZE,
-            name::TOOL_CALL,
-            name::COMMAND_RUN,
-            name::CONTEXT_CONTRIBUTE,
-            name::COMPACTOR_COMPACT,
-            name::PROVIDER_STREAM,
-        ] {
-            assert!(
-                !served(other),
-                "{other} is the host's to ask, not to answer"
-            );
-        }
     }
 
     /// A request nobody serves is refused where it arrives, and the reader

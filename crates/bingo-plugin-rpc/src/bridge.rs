@@ -439,7 +439,7 @@ impl Bridge {
             &self.entry,
             &self.root,
             &self.data_dir,
-            Some(hub),
+            Some(Arc::new(crate::host::Server::new(&self.name, self.host.clone(), hub))),
         )?);
         let answered =
             tokio::time::timeout(deadline::HANDSHAKE, self.initialize(&connection)).await;
@@ -485,6 +485,7 @@ impl Bridge {
         let result: InitializeResult =
             serde_json::from_value(answer).map_err(|e| format!("initialize: {e}"))?;
         check_protocol(&result)?;
+        connection.negotiate(&result.capabilities);
         Ok(result)
     }
 }

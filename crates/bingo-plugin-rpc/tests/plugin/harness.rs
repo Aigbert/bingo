@@ -160,7 +160,7 @@ pub async fn respawned(manager: &Manager) -> Vec<Arc<dyn Tool>> {
 
 /// The shared host keeps services and the notices emitted by the bridge.
 pub struct Listening {
-    host: bingo_sdk::testing::TestHost,
+    pub host: bingo_sdk::testing::TestHost,
 }
 
 impl Listening {

@@ -64,3 +64,98 @@ pub struct Complete {
 pub struct Completed {
     pub events: Vec<ModelEvent>,
 }
+
+use std::collections::BTreeSet;
+use std::sync::Arc;
+use bingo_sdk::{Delivery, HostHandle, IntentId, Origin, SessionFilter};
+use crate::codec::{INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, RpcError};
+use crate::service::ServiceCalls;
+use crate::wire::{Cap, name};
+
+pub struct Server {
+    plugin: String,
+    host: HostHandle,
+    service: Arc<dyn ServiceCalls>,
+    capabilities: tokio::sync::watch::Sender<Option<BTreeSet<Cap>>>,
+}
+
+impl Server {
+    pub fn new(plugin: &str, host: HostHandle, service: Arc<dyn ServiceCalls>) -> Self {
+        Self { plugin: plugin.into(), host, service,
+            capabilities: tokio::sync::watch::channel(None).0 }
+    }
+
+    pub fn initialize(&self, plugin: &BTreeSet<Cap>) {
+        self.capabilities.send_replace(Some(crate::wire::negotiated(
+            &crate::wire::capabilities(), plugin)));
+    }
+
+    pub fn permits(&self, method: &str) -> Result<(), RpcError> {
+        if !crate::wire::capabilities().contains(method) {
+            return Err(unknown(method));
+        }
+        if self.capabilities.borrow().as_ref().is_some_and(|caps| caps.contains(method)) {
+            return Ok(());
+        }
+        Err(RpcError::new(METHOD_NOT_FOUND,
+            format!("{} did not negotiate capability {method}", self.plugin)))
+    }
+
+    pub async fn answer(&self, method: &str, params: Value) -> Result<Value, RpcError> {
+        if !crate::wire::capabilities().contains(method) { return Err(unknown(method)); }
+        let mut capabilities = self.capabilities.subscribe();
+        capabilities.wait_for(|caps| caps.is_some()).await.map_err(failed)?;
+        self.permits(method)?;
+        match method {
+            name::SERVICE_CALL => self.service.call(params).await,
+            name::HOST_PLACE => self.place(parse(params)?).await,
+            name::HOST_EXTEND => self.extend(parse(params)?).await,
+            name::HOST_DELIVER => self.deliver(parse(params)?).await,
+            _ => Err(unknown(method)),
+        }
+    }
+
+    async fn place(&self, params: Place) -> Result<Value, RpcError> {
+        let payload = match params.view {
+            Some(view) => bingo_sdk::slot::with(serde_json::json!({}), [view]),
+            None => Value::Null,
+        };
+        let sessions = match params.session {
+            Some(session) => vec![session],
+            None => self.host.sessions(SessionFilter::default()).await.map_err(failed)?
+                .into_iter().map(|summary| summary.id).collect(),
+        };
+        for session in sessions {
+            self.host.signal(&session, &self.plugin, &params.slot, payload.clone())
+                .await.map_err(failed)?;
+        }
+        Ok(Value::Null)
+    }
+
+    async fn extend(&self, params: Extend) -> Result<Value, RpcError> {
+        self.host.extend(&params.session, &self.plugin, &params.key, params.value)
+            .await.map_err(failed)?;
+        Ok(Value::Null)
+    }
+
+    async fn deliver(&self, mut params: Deliver) -> Result<Value, RpcError> {
+        let Input::Text { origin, .. } = &mut params.input else {
+            return Err(RpcError::new(INVALID_PARAMS, "host/deliver requires text input"));
+        };
+        *origin = Origin::surface(format!("plugin:{}", self.plugin));
+        let delivery = if params.wake { Delivery::Wake } else { Delivery::Hold };
+        self.host.deliver(&params.session, IntentId::mint(), params.input, delivery)
+            .await.map_err(failed)?;
+        Ok(Value::Null)
+    }
+}
+
+pub(crate) fn unknown(method: &str) -> RpcError {
+    RpcError::new(METHOD_NOT_FOUND, format!("the host does not serve {method}"))
+}
+fn parse<T: serde::de::DeserializeOwned>(params: Value) -> Result<T, RpcError> {
+    serde_json::from_value(params).map_err(|error| RpcError::new(INVALID_PARAMS, error.to_string()))
+}
+fn failed(error: impl std::fmt::Display) -> RpcError {
+    RpcError::new(INTERNAL_ERROR, error.to_string())
+}

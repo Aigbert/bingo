@@ -59,7 +59,7 @@ struct State {
     /// Service calls this process asked the host for, each with the tool call
     /// that is waiting to say what came back — or nothing, for one this
     /// process asked on its own account.
-    pending: Vec<(i64, Option<bingo_plugin_rpc::codec::Id>)>,
+    pending: Vec<(i64, Option<bingo_plugin_rpc::codec::Id>, bool)>,
     asked: i64,
 }
 
@@ -310,7 +310,7 @@ fn announce(options: &Options, state: &mut State) {
 /// nothing may wait inside one.
 fn crossed(asked: &Value, call: Option<bingo_plugin_rpc::codec::Id>, state: &mut State) {
     let id = state.next_id();
-    state.pending.push((id, call));
+    state.pending.push((id, call, false));
     send(&Message::Request(Request::new(
         bingo_plugin_rpc::codec::Id::Number(id),
         name::SERVICE_CALL,
@@ -325,11 +325,18 @@ fn came_back(response: Response, state: &mut State) {
     let Some(at) = state
         .pending
         .iter()
-        .position(|(asked, _)| Some(bingo_plugin_rpc::codec::Id::Number(*asked)) == response.id)
+        .position(|(asked, _, _)| Some(bingo_plugin_rpc::codec::Id::Number(*asked)) == response.id)
     else {
         return;
     };
-    let (_, call) = state.pending.remove(at);
+    let (_, call, raw) = state.pending.remove(at);
+    if raw {
+        if let Some(call) = call {
+            let value = serde_json::to_value(response).unwrap_or(Value::Null);
+            answer(call, output(value.to_string()));
+        }
+        return;
+    }
     let said = match response.outcome {
         Outcome::Result(value) => serde_json::from_value::<ServiceCallResult>(value)
             .map(|answered| said_of(&answered.result))
@@ -441,6 +448,15 @@ fn call(id: bingo_plugin_rpc::codec::Id, params: Value, state: &mut State) -> bo
     }
     if params.input.get("cancelled").is_some() {
         answer(id, output(state.cancelled.join(",")));
+        return true;
+    }
+    if let Some(asked) = params.input.get("host") {
+        let request = state.next_id();
+        state.pending.push((request, Some(id), true));
+        send(&Message::Request(Request::new(
+            bingo_plugin_rpc::codec::Id::Number(request),
+            asked["method"].as_str().unwrap_or("unknown"), asked["params"].clone(),
+        )));
         return true;
     }
     if let Some(asked) = params.input.get("call").cloned() {

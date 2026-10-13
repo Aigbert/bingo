@@ -1,0 +1,32 @@
+use super::harness::*;
+use bingo_sdk::{Delivery, Input, testing::HostCall};
+use serde_json::{Value, json};
+
+async fn reverse(started: &Started, method: &str, params: Value) -> Value {
+    let tool = only_tool(&started.manager).await;
+    let (_, result) = call(&tool, json!({"host":{"method":method,"params":params}}), started.project.path()).await;
+    serde_json::from_str(&said(&result.unwrap())).unwrap()
+}
+
+#[tokio::test]
+async fn reverse_verbs_bind_the_process_identity_and_do_not_wait_for_a_turn() {
+    let started = started_with(&[("stub", &[])]).await;
+    started.listener.host.on_signal(|_, _, _, _| async { Ok(()) });
+    started.listener.host.on_extend(|_, _, _, _| async { Ok(()) });
+    started.listener.host.on_deliver(|_, _, _, _| async { Ok(()) });
+    let slot = json!({"kind":"status","text":"Ready","tone":"neutral","until":null});
+    let place = reverse(&started, "host/place", json!({"session":"ses_1","slot":"status","view":slot})).await;
+    assert!(place.get("error").is_none(), "{place}");
+    assert_eq!(place["result"], Value::Null);
+    let extend = reverse(&started, "host/extend", json!({"session":"ses_1","key":"record","value":42})).await;
+    assert!(extend.get("error").is_none(), "{extend}");
+    let delivered = reverse(&started, "host/deliver", json!({"session":"ses_1","input":{"kind":"text","text":"hello","origin":{"surface":"forged"}},"wake":false})).await;
+    assert!(delivered.get("error").is_none(), "{delivered}");
+    let calls = started.listener.host.calls();
+    assert!(calls.iter().any(|call| matches!(call, HostCall::Signal { plugin, payload, .. } if plugin == "stub" && payload["slots"][0] == slot)));
+    assert!(calls.iter().any(|call| matches!(call, HostCall::Extend { plugin, kind, payload, .. } if plugin == "stub" && kind == "record" && payload == &json!(42))));
+    assert!(calls.iter().any(|call| matches!(call, HostCall::Deliver { input: Input::Text { origin, .. }, delivery: Delivery::Hold, .. } if origin.surface == "plugin:stub")));
+    let unknown = reverse(&started, "future/verb", json!({})).await;
+    assert_eq!(unknown["error"]["code"], -32601);
+    started.manager.shutdown().await;
+}
