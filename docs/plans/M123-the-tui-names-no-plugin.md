@@ -34,8 +34,8 @@ code. No `HostApi` verb, no new external dependency.
      `runner.rs`; core's command prompt (`session/commands.rs`,
      `Invocation::of`).
    - `Note`: schedule `wake.rs` `origin()`.
-   - `Aside`: rooms' nudge and the serial bounce (`post.rs`, `serial.rs`
-     after M122).
+   - `Aside`: rooms' nudge (`post.rs`). M122's serial bounce is now a
+     `ToolOutput`, with no origin to stamp.
    - `Said`: channels `runner.rs` and agents `hook.rs`, explicitly.
    - Contributor pieces carry none: `Origin::is_context` already omits
      them, so `ContextPiece` is unchanged.
@@ -144,6 +144,6 @@ code. No `HostApi` verb, no new external dependency.
 
 M121 already provides `Row.mark` and `transcript/slots.rs`; no slot wire change.
 M131 keeps `HookContext` in `hook.rs`; after-tool dispatch is in `chain/tool.rs`.
-M122 has `room::HOLDER` and record fixtures; TUI presentation readers remain to move.
+M122 has `name::PARENT` and record fixtures; add the `room::HOLDER` alias; TUI presentation readers remain to move.
 Turn-start hooks receive the prompt in the transcript. Bash foreground calls are
 owned by `promote.rs`; publish their placed actions beside the jobs signal.
