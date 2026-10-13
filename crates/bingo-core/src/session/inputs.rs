@@ -18,7 +18,11 @@ use serde_json::Value;
 
 use super::queue::{self, Unit};
 use super::running::Running;
-use super::{Actor, commands, gate::Kind, invoke};
+use super::{
+    Actor, commands,
+    gate::{self, Kind},
+    invoke,
+};
 use crate::turn::TurnKind;
 
 impl Actor {
@@ -32,7 +36,7 @@ impl Actor {
                 .reject(intent, ErrorCode::SessionClosed, "the session is closed")
                 .await;
         }
-        self.gate_input(intent, input, Kind::Submit);
+        gate::gate_input(self, intent, input, Kind::Submit);
         Ok(())
     }
 
@@ -108,7 +112,12 @@ impl Actor {
             }
             Ok(CommandOutcome::Prompt { text }) => {
                 let text = invocation.prompt(&text);
-                self.gate_input(intent, Input::text(text, invocation.origin), Kind::Prose);
+                gate::gate_input(
+                    self,
+                    intent,
+                    Input::text(text, invocation.origin),
+                    Kind::Prose,
+                );
             }
             Err(e) => self.reject(intent, e.code, e.message).await?,
         }
@@ -164,7 +173,7 @@ impl Actor {
         delivery: Delivery,
     ) -> Result<(), KernelError> {
         if self.gate.busy() {
-            self.gate_input(intent, input, Kind::Deliver(delivery));
+            gate::gate_input(self, intent, input, Kind::Deliver(delivery));
             return Ok(());
         }
         self.deliver_ready(intent, input, delivery).await
@@ -488,7 +497,7 @@ impl Actor {
 
     /// A command that waited its turn; the table may have lost it meanwhile.
     async fn run_queued(&mut self, intent: IntentId, input: Input) -> Result<(), KernelError> {
-        self.gate_input(intent, input, Kind::Queued);
+        gate::gate_input(self, intent, input, Kind::Queued);
         Ok(())
     }
 

@@ -89,101 +89,105 @@ pub(crate) enum Verdict {
     },
 }
 
-impl Actor {
-    pub(super) fn gate_input(&mut self, intent: IntentId, input: Input, kind: Kind) {
-        let waiting = Waiting {
-            intent,
+pub(super) fn gate_input(actor: &mut Actor, intent: IntentId, input: Input, kind: Kind) {
+    let waiting = Waiting {
+        intent,
+        input,
+        kind,
+    };
+    if matches!(waiting.kind, Kind::Queued | Kind::Prose) {
+        actor.gate.waiting.push_front(waiting);
+    } else {
+        actor.gate.waiting.push_back(waiting);
+    }
+    start_gate(actor);
+}
+
+fn start_gate(actor: &mut Actor) {
+    if actor.gate.flight.is_some() || actor.closing.is_some() || actor.state.closed {
+        return;
+    }
+    let Some(waiting) = actor.gate.waiting.pop_front() else {
+        return;
+    };
+    let cancel = actor.cancel.child_token();
+    actor.gate.flight = Some(Flight {
+        intent: waiting.intent.clone(),
+        cancel: cancel.clone(),
+    });
+    let lookup = actor.commands.lookup();
+    let hooks = actor.config.hooks.clone();
+    let cx = actor.hook_context();
+    let mailbox = actor.mailbox.clone();
+    actor.tracker.spawn(async move {
+        let intent = waiting.intent.clone();
+        let work = AssertUnwindSafe(evaluate(waiting, lookup, hooks, cx)).catch_unwind();
+        let verdict = match supervised(work, &cancel).await {
+            _ if cancel.is_cancelled() => Verdict::Rejected(commands::interrupted()),
+            Some(Ok(verdict)) => verdict,
+            Some(Err(panic)) => Verdict::Rejected(KernelError::new(
+                ErrorCode::Internal,
+                format!("the input gate panicked: {}", super::panic_message(panic)),
+            )),
+            None => Verdict::Rejected(commands::interrupted()),
+        };
+        mailbox.send(Msg::Gated { intent, verdict });
+    });
+}
+
+pub(super) async fn gated(
+    actor: &mut Actor,
+    intent: IntentId,
+    verdict: Verdict,
+) -> Result<(), KernelError> {
+    let Some(cancelled) = actor.gate.finish(&intent) else {
+        return Ok(());
+    };
+    let verdict = if cancelled {
+        Verdict::Rejected(commands::interrupted())
+    } else {
+        verdict
+    };
+    apply_gate(actor, intent, verdict).await?;
+    start_gate(actor);
+    actor.drain_queue().await
+}
+
+async fn apply_gate(
+    actor: &mut Actor,
+    intent: IntentId,
+    verdict: Verdict,
+) -> Result<(), KernelError> {
+    match verdict {
+        Verdict::Prose(input) => actor.submit_prose(intent, input).await,
+        Verdict::Command {
             input,
-            kind,
-        };
-        if matches!(waiting.kind, Kind::Queued | Kind::Prose) {
-            self.gate.waiting.push_front(waiting);
-        } else {
-            self.gate.waiting.push_back(waiting);
+            parsed,
+            command,
+            queued,
+        } => {
+            actor
+                .submit_command(intent, input, parsed, command, queued)
+                .await
         }
-        self.start_gate();
-    }
-
-    fn start_gate(&mut self) {
-        if self.gate.flight.is_some() || self.closing.is_some() || self.state.closed {
-            return;
-        }
-        let Some(waiting) = self.gate.waiting.pop_front() else {
-            return;
-        };
-        let cancel = self.cancel.child_token();
-        self.gate.flight = Some(Flight {
-            intent: waiting.intent.clone(),
-            cancel: cancel.clone(),
-        });
-        let lookup = self.commands.lookup();
-        let hooks = self.config.hooks.clone();
-        let cx = self.hook_context();
-        let mailbox = self.mailbox.clone();
-        self.tracker.spawn(async move {
-            let intent = waiting.intent.clone();
-            let work = AssertUnwindSafe(evaluate(waiting, lookup, hooks, cx)).catch_unwind();
-            let verdict = match supervised(work, &cancel).await {
-                _ if cancel.is_cancelled() => Verdict::Rejected(commands::interrupted()),
-                Some(Ok(verdict)) => verdict,
-                Some(Err(panic)) => Verdict::Rejected(KernelError::new(
-                    ErrorCode::Internal,
-                    format!("the input gate panicked: {}", super::panic_message(panic)),
-                )),
-                None => Verdict::Rejected(commands::interrupted()),
-            };
-            mailbox.send(Msg::Gated { intent, verdict });
-        });
-    }
-
-    pub(super) async fn gated(
-        &mut self,
-        intent: IntentId,
-        verdict: Verdict,
-    ) -> Result<(), KernelError> {
-        let Some(cancelled) = self.gate.finish(&intent) else {
-            return Ok(());
-        };
-        let verdict = if cancelled {
-            Verdict::Rejected(commands::interrupted())
-        } else {
-            verdict
-        };
-        self.apply_gate(intent, verdict).await?;
-        self.start_gate();
-        self.drain_queue().await
-    }
-
-    async fn apply_gate(&mut self, intent: IntentId, verdict: Verdict) -> Result<(), KernelError> {
-        match verdict {
-            Verdict::Prose(input) => self.submit_prose(intent, input).await,
-            Verdict::Command {
-                input,
-                parsed,
-                command,
-                queued,
-            } => {
-                self.submit_command(intent, input, parsed, command, queued)
-                    .await
-            }
-            Verdict::Rejected(error) => self.reject(intent, error.code, error.message).await,
-            Verdict::Redirected { to, result } => match result {
-                Ok(()) => self.applied(intent, json!({ "redirected": to })).await,
-                Err(error) => self.reject(intent, error.code, error.message).await,
-            },
-            Verdict::Delivered { input, delivery } => {
-                self.deliver_ready(intent, input, delivery).await
-            }
+        Verdict::Rejected(error) => actor.reject(intent, error.code, error.message).await,
+        Verdict::Redirected { to, result } => match result {
+            Ok(()) => actor.applied(intent, json!({ "redirected": to })).await,
+            Err(error) => actor.reject(intent, error.code, error.message).await,
+        },
+        Verdict::Delivered { input, delivery } => {
+            actor.deliver_ready(intent, input, delivery).await
         }
     }
+}
 
-    pub(super) async fn close_gate(&mut self) -> Result<(), KernelError> {
-        for intent in self.gate.drain() {
-            self.reject(intent, ErrorCode::SessionClosed, "the session is closed")
-                .await?;
-        }
-        Ok(())
+pub(super) async fn close_gate(actor: &mut Actor) -> Result<(), KernelError> {
+    for intent in actor.gate.drain() {
+        actor
+            .reject(intent, ErrorCode::SessionClosed, "the session is closed")
+            .await?;
     }
+    Ok(())
 }
 
 async fn evaluate(

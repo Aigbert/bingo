@@ -95,44 +95,43 @@ impl Running {
     }
 }
 
-impl Actor {
-    pub(super) async fn close_dropped_turn(
-        &mut self,
-        turn: &TurnId,
-    ) -> Result<TurnOutcome, KernelError> {
-        let open: Vec<_> = self.state.transcript.open_items(turn).cloned().collect();
-        for mut item in open {
-            item.status = ItemStatus::Interrupted;
-            item.completed_at = Some(jiff::Timestamp::now());
-            self.publish(Event::ItemCompleted { item }, None).await?;
-        }
-        let marker = self.fresh(
-            Some(turn.clone()),
-            None,
-            ItemBody::Interruption {
-                marker: INTERRUPTED_MARKER.into(),
-            },
-        );
-        self.publish(Event::ItemCompleted { item: marker }, None)
-            .await?;
-        Ok(TurnOutcome {
-            status: TurnStatus::Interrupted {
-                reason: InterruptReason::UserCancel,
-            },
-            usage: self
-                .state
-                .turn
-                .as_ref()
-                .map(|live| live.usage)
-                .unwrap_or_default(),
-            items: self
-                .state
-                .transcript
-                .items()
-                .iter()
-                .filter(|item| item.turn.as_ref() == Some(turn))
-                .map(|item| item.as_ref().clone())
-                .collect(),
-        })
+pub(super) async fn close_dropped_turn(
+    actor: &mut Actor,
+    turn: &TurnId,
+) -> Result<TurnOutcome, KernelError> {
+    let open: Vec<_> = actor.state.transcript.open_items(turn).cloned().collect();
+    for mut item in open {
+        item.status = ItemStatus::Interrupted;
+        item.completed_at = Some(jiff::Timestamp::now());
+        actor.publish(Event::ItemCompleted { item }, None).await?;
     }
+    let marker = actor.fresh(
+        Some(turn.clone()),
+        None,
+        ItemBody::Interruption {
+            marker: INTERRUPTED_MARKER.into(),
+        },
+    );
+    actor
+        .publish(Event::ItemCompleted { item: marker }, None)
+        .await?;
+    Ok(TurnOutcome {
+        status: TurnStatus::Interrupted {
+            reason: InterruptReason::UserCancel,
+        },
+        usage: actor
+            .state
+            .turn
+            .as_ref()
+            .map(|live| live.usage)
+            .unwrap_or_default(),
+        items: actor
+            .state
+            .transcript
+            .items()
+            .iter()
+            .filter(|item| item.turn.as_ref() == Some(turn))
+            .map(|item| item.as_ref().clone())
+            .collect(),
+    })
 }
