@@ -18,6 +18,10 @@ impl Interceptor for Wrap {
         next: Next<'_, ToolCall, ToolOutput>,
     ) -> Result<ToolOutput, KernelError> {
         match self.0 {
+            "drain" => next.run_then(input, |output| async move {
+                tokio::time::sleep(HOOK_DEADLINE * 3).await;
+                output
+            }).await,
             "answer" => Ok(ToolOutput::text("link")),
             "error-before" => Err(KernelError::new(ErrorCode::Internal, "before")),
             "hang-before" => std::future::pending().await,
@@ -193,4 +197,13 @@ async fn an_external_links_deadline_excludes_its_continuation() {
     let result = run::<tool::Call>(&[link("observer", Tier::Tighten)], kernel, &cx(), call(), report.clone()).await.unwrap();
     assert_eq!(result, ToolOutput::text("kernel"));
     assert!(report.take().is_empty(), "waiting for next is not plugin time");
+}
+
+#[tokio::test(start_paused = true)]
+async fn draining_a_continuation_is_not_plugin_phase_time() {
+    let kernel = Next::new(|_| Box::pin(async { Ok(ToolOutput::text("kernel")) }));
+    let report = Report::default();
+    let result = run::<tool::Call>(&[link("drain", Tier::Tighten)], kernel, &cx(), call(), report.clone()).await.unwrap();
+    assert_eq!(result, ToolOutput::text("kernel"));
+    assert!(report.take().is_empty());
 }
