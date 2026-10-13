@@ -18,7 +18,7 @@ impl Command for CompactCommand {
     fn spec(&self) -> CommandSpec {
         super::spec(
             "compact",
-            "summarize the conversation to make room",
+            "summarize the conversation",
             ArgSpec::Free {
                 hint: "[instructions]".into(),
             },
