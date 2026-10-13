@@ -123,7 +123,7 @@ impl Actor {
                 .state
                 .turn
                 .as_ref()
-                .map(|live| live.usage.clone())
+                .map(|live| live.usage)
                 .unwrap_or_default(),
             items: self
                 .state
