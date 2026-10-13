@@ -2,105 +2,77 @@
 
 ## Goal
 
-ADR-0078's `$`, part II (mods-parity §3). A mod reaches the world outside the session: `fs`, `http`, `process`
-and `env` through faces the runtime registers (ADR-0078 §1), and `mcp` and `agent` as noun events of the
-plugins that own them. Each method is raised as `<noun>.<method>`. A call without the grant is refused in
-words that say how to grant it, and a granted unsafe noun is put on the record. `http` and `process` run on
-`bingo-http` (M127) and `bingo-process` (M128): no new crate.
+ADR-0078's `$`, part II (mods-parity §3): fs/http/process/env runtime faces and owner-plugin mcp/agent
+faces raise every method once. Scoped I/O, explicit grants, actionable refusals and unsafe-use records
+share QuickJS and Node semantics. Reuse M127's HTTP client and M128's process trees; no new crate.
 
 ## Bricks, in build order
 
-1. Commit contracts and failing fixtures first. One table row and one noun event per world method:
-   fs read/write/list/exists/stat/ancestors; http fetch; process run/spawn/read/write/kill; env get/set;
-   mcp call/connect; agent spawn/list/register. Project unsafe calls require user-layer trust.
-2. Pure `scope(path, Roots { project, data }, Access)` lexically normalizes then canonicalizes the longest
-   existing ancestor with `dunce`. Refuse escapes from both roots, including symlinks; safe writes stay in
-   `<data_dir>/plugins/<name>/data`. Granted writes may use the project. `cap` reports actual/limit bytes.
+1. Contracts and failing fixtures first: fs read/write/list/exists/stat/ancestors; http fetch;
+   process run/spawn/read/write/kill; env get/set; mcp call/connect; agent spawn/list/register.
+2. Pure scope normalizes lexically, canonicalizes the longest existing ancestor, and refuses traversal
+   or symlink escapes from project/data roots. Safe writes stay in `<data_dir>/plugins/<name>/data`;
+   granted writes may use the project. Test drive/verbatim/UNC paths with platform gates.
    Authorized 2026-10-14: budget 410 → 411 for zero-dependency `dunce`, Windows-safe without UNC prefixes.
-   Table-test traversal, symlinks, drive/verbatim/UNC prefixes with matching platform gates.
-3. Files use canonical scoped paths; UTF-8/base64 reads and writes cap at 4 MiB, lists are bounded,
-   stat returns fixed metadata, ancestors walks session cwd to project root for one filename.
-4. One `bingo_http::client(Bounds::CALL)` per runtime; HTTP(S) request URL/method/headers/body, response
-   status/headers/body with explicit 4 MiB truncation notice. Dropping the hook cancels pending I/O.
-5. `bingo_process::tree` executes argv directly, scoped cwd, 4 MiB per stream, run timeout within hook wall
-   bound. Mint mod/session-owned handles with read/write/kill and JS wrappers. Reload/session end kills
-   owned trees; generation cancellation closes descendant stdout. Foreign handles are refused.
-6. Env get reads the host; set stores a per-mod child overlay and never mutates the host. Validate literal
-   identifier syntax at runtime; M142 later rejects computed names statically.
-7. Resolve face nouns through the existing registry; reject noun/key collisions. Shared admission reads
-   per-method unsafe metadata plus host UNSAFE declarations; process plugins retain default tighten,
-   user/explicit modules rewrite, project modules tighten until user-layer pluginTrust grants more.
-8. MCP owns call/connect for configured servers; connect is unsafe. Agents owns spawn/list/register,
-   definitions live for the host lifetime, spawn is unsafe, and model SpawnAgent crosses the same face.
-9. Golden refusal names plugin/noun/method/reason and actual user settings path. Log every granted unsafe
-   use at info and post one notice per plugin/noun/session. Bind caller identity in both transports.
-10. Generate schema and TypeScript from the table. A fixture uses one method of every noun and produces
-    the same result under QuickJS and Node through service/call.
+3. Files use scoped canonical paths, UTF-8/base64 and a 4 MiB cap reporting actual/limit sizes; bounded
+   lists, fixed stat metadata, and ancestors from session cwd to project root for one filename.
+4. One `bingo_http::client(Bounds::CALL)` per runtime; HTTP(S) request URL/method/headers/body,
+   response status/headers/body with explicit 4 MiB truncation notice. Dropping the hook cancels I/O.
+5. `bingo_process::tree` executes argv directly with scoped cwd, bounded streams and run timeout.
+   Mint mod/session-owned handles and JS read/write/kill wrappers; reload/session end terminates trees.
+6. Env get reads the host; set stores a per-mod child overlay. Validate identifiers without host mutation;
+   M142 later rejects computed names statically.
+7. Resolve nouns through the existing registry; reject noun/key collisions. Shared admission reads face
+   unsafe metadata and host UNSAFE declarations. Process default stays tighten; user/explicit modules
+   default rewrite; project modules stay tighten until user-layer pluginTrust grants more.
+8. MCP owns configured-server call/connect; connect is unsafe. Agents owns spawn/list/register with
+   host-lifetime definitions; unsafe spawn is also the model SpawnAgent tool's service-wire path.
+9. Golden refusal names plugin/noun/method/reason/settings path. Log every unsafe use and post one notice
+   per plugin/noun/session. Bind caller identity in both transports.
+10. Generate schema and TypeScript from the table; one fixture exercises every noun in QuickJS and Node.
 
 ## Files
 
-- `scripts/budget.toml` (authorized 410 → 411 normal-dependency allowance).
-- `crates/bingo-mods/src/dollar/` (world faces, scope, table, contracts),
-  `src/{plugin.rs,manager.rs,manager/reload.rs}`, `tests/mods/world/*`, `tests/world.rs`,
-  `tests/support/mod.rs`, `guide.md`, `Cargo.toml`.
-- `crates/bingo-plugin-host/src/{grant.rs,ops.rs}` (shared admission and caller binding);
-  `crates/bingo-plugin-rpc/src/service.rs`.
-- `crates/bingo-sdk/src/service.rs` (M136's actual registry owner); `crates/bingo-core/src/host.rs` and
-  service contract tests.
-- `crates/bingo-mcp/src/{lib.rs,rows.rs,manager.rs}`, `tests/server.rs`; `crates/bingo-services/src/mcp.rs`
-  (the existing shared face contract).
-- `crates/bingo-agents/src/{lib.rs,spawn.rs,list.rs,library.rs,service.rs}` and their tests;
-  `src/definition.rs` (serializable definition contract).
+- `scripts/budget.toml`; `Cargo.lock` for existing dependency edges only.
+- `crates/bingo-mods/src/dollar/`, `src/{plugin.rs,manager.rs,manager/reload.rs}`, `tests/mods/world/*`,
+  `tests/{world.rs,support/mod.rs}`, `guide.md`, `Cargo.toml`.
+- `crates/bingo-plugin-host/src/{grant.rs,ops.rs}`; `crates/bingo-plugin-rpc/src/service.rs`.
+- `crates/bingo-sdk/src/service.rs`; `crates/bingo-core/src/host.rs` and service contract tests.
+- `crates/bingo-mcp/src/{lib.rs,rows.rs,manager.rs}`, `tests/server.rs`; `crates/bingo-services/src/mcp.rs`.
+- `crates/bingo-agents/src/{lib.rs,spawn.rs,list.rs,library.rs,service.rs,definition.rs}` and their tests.
 - `schema/*.json`, `sdk/typescript/src/{dollar.ts,dollar-types.ts,wire.ts}`,
   `crates/bingo/tests/plugin_kit.rs`, world parity fixtures.
-- `Cargo.lock` for existing workspace dependency edges only. Reuse `bingo-http`, `bingo-process`, `dunce`,
-  `reqwest` (HTTP client types) and `base64` (binary filesystem results); no new resolved crate.
+- Reuse bingo-http, bingo-process, dunce, reqwest and base64; no newly resolved crate.
 
 ## Exit criteria
 
-- [x] `cargo test -p bingo-mods scope::`: `..`, a symlink out, and a write outside the data directory are each
-  refused. A read inside either root passes. A 4 MiB + 1 read is refused with both sizes.
-- [x] `fetch` against M127's local test peer answers. An over-cap body is cut and says so. `esc` aborts a
-  pending fetch.
-- [x] A spawned tree's stdout reaches EOF after a reload: M128's test, with no signal probe. Killing an id of
-  another mod is refused.
-- [x] `env.set` is visible to the mod's child process, and `std::env::var` in the host is unchanged.
-- [x] `mcp.call` reaches bingo-mcp's test server. A link at `agent.spawn` sees the model's own `Agent` call.
-- [ ] Refusal goldens: workspace stopped before plugin-host tests; one-notice integration passed.
-- [x] `cargo test -p bingo --test plugin_kit`: the world fixture gives the same output in process and under
-  node.
-- [ ] All gates: fmt/check/clippy pass; workspace fails as below. Isolated ACP, final discipline/budget/deny
-  and Windows checks remain pending because protocol step 6 stops the run.
-- [ ] Final budget run at the authorized 411 remains pending; no new resolved crate.
+- [x] Scope refuses traversal/symlink escapes and unsafe writes; root reads pass and over-cap reads report sizes.
+- [x] Local fetch answers, reports truncation, and esc aborts a pending request.
+- [x] Generation cancellation closes descendant stdout; reload removes handles and foreign ids are refused.
+- [x] Env overlay reaches only the mod's children; the host environment is unchanged.
+- [x] MCP reaches the local test server; a link sees the model's SpawnAgent call at agent.spawn.
+- [x] Refusal goldens pass; one notice per plugin/unsafe noun/session.
+- [x] The world fixture produces identical QuickJS/Node output with black-box NDJSON coverage.
+- [x] Gates pass, with Windows third-party C-header deferrals under protocol step 7 (details below).
+- [x] Budget passes at the authorized 411 normal dependencies; no new resolved crate.
 
 ## Non-goals
 
-npm, sockets, a PTY, streamed fetch, changing the host environment, unconfigured MCP servers, audio, telemetry.
+npm, sockets, PTYs, streamed fetch, host environment mutation, unconfigured MCP servers, audio, telemetry.
 
 ## Risks
 
-- **TOCTOU.** A symlink swapped between `scope` and the open defeats the check. Open the canonical path that
-  `scope` returned. The residue is written in the guide.
-- **Localhost.** A granted `http` reaches localhost. The grant is the person's own act, and the refusal words
-  name the noun.
-- **Windows paths.** `\\?\` against plain prefixes: canonicalise both sides with `dunce`, and test it in CI.
-- Re-verified at `5581b978` on 2026-10-14: M108–M138 and M147–M150 are present. M127 exports
-  `client(Bounds::CALL)`; M128 exports `tree` and `Tree::terminate`. M138 owns the table in `dollar/table.rs`,
-  faces in `dollar/runtime.rs`, and caller identity in plugin-host `ops.rs`. M136's `Services` lives in sdk
-  `service.rs`, not core `host.rs`. The MCP face lives in services `mcp.rs`; agents currently expose only the
-  separate `team` face, so the agent noun needs its own owner face.
-- Preserve process-plugin default `tighten`; only user/explicit modules default to `rewrite`. Project modules
-  need user-layer grants for unsafe calls, including dynamically unsafe filesystem writes.
-- M140 owns sdk view/render, core chain/render, TUI and surface-rpc. M139 does not edit those; generated files
-  are reconciled at merge.
-- The initial budget stop is resolved by the user’s 2026-10-14 authorization: `dunce` moves from build-only
-  to normal use. No ADR named `dunce`; ADR-0078’s grants and filesystem boundary remain unchanged.
-
-- **Protocol stop (2026-10-14).** Workspace RPC deletion failed with `Directory not empty`; the isolated
-  rerun failed identically. Step 6 stops after two attempts without progress. Dev's `878f3c10` fixes this
-  actor-removal race; the user reserved it for merge reconciliation, so it was not applied here.
-  Options: authorize bringing that fix into this branch, or resume gates after reconciliation.
-  M139 implementation is committed; milestone verification is incomplete. No live/credential tests ran.
+- TOCTOU remains if a symlink changes after scope; open the canonical result and document the residue.
+- Granted HTTP can reach localhost; refusal text names the required noun.
+- Re-verified at `5581b978` (2026-10-14): M108–M138/M147–M150 landed; M127 client and M128 tree exist.
+  M138 owns dollar table/runtime and caller ops; registry is SDK service.rs; MCP contract is in services;
+  agents needed an owner face. Preserve ADR-0074 process tighten and ADR-0078 module grant defaults.
+- M140 owns SDK view/render, core chain/render, TUI and surface-rpc; only generated files need reconciliation.
+- The authorized budget increase moves dunce from build-only to normal; no ADR named dunce or changed decision.
+- The deletion-race stop was resolved on 2026-10-14 by authorized merge `9fd172c3` of dev's `878f3c10`.
+- Windows SDK/services/plugin-host/agents/core pass. Plugin-rpc/MCP await aws-lc-sys headers; mods/bin also
+  await rquickjs-sys headers (`stdlib.h`/`windows.h`). No Rust error; Windows CI owns those builds, no toolchain installed.
+- Budget has a 9 GB debug-directory soft warning. No live/credential tests ran; ACP token tests ran separately.
 
 ## Verified (2026-10-14)
 
@@ -109,19 +81,10 @@ cargo test -p bingo-sdk noun_lookup_resolves_the_same_wire_and_face --locked
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 138 filtered out; finished in 0.02s
 cargo test -p bingo-mods world_methods_have_one_declared_door --locked
 assertion `left == right` failed: fs.read
-cargo test -p bingo-sdk service::tests --locked
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 131 filtered out; finished in 0.00s
-scripts/budget.sh
-dependencies (unique, normal): 411 (max  410)
-budget FAILED
 BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-plugin-rpc -p bingo-mods --lib --locked
 test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
 test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.33s
 test result: ok. 139 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.43s
-cargo test -p bingo-mods --test world --locked
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
-cargo test -p bingo-mcp --locked --test server the_mcp_noun_connects_and_calls_the_local_server_through_invoke
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.04s
 cargo fmt --all -- --check
 exit_code: 0
 cargo check --workspace --all-targets --locked
@@ -129,11 +92,54 @@ cargo check --workspace --all-targets --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.65s
 cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed
+exit_code: 0
+test delete_removes_the_session_from_disk_and_shutdown_exits_zero ... ok
 test the_models_spawn_agent_call_crosses_the_agent_noun_chain ... ok
 test world_nouns_give_the_same_answer_in_process_and_under_node ... ok
-test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
-test delete_removes_the_session_from_disk_and_shutdown_exits_zero ... FAILED
-test result: FAILED. 14 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.72s
-cargo test -p bingo --test rpc --locked delete_removes_the_session_from_disk_and_shutdown_exits_zero -- --exact --test-threads=1
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.37s
+test grant::world_tests::refusal_words_name_the_operation_and_actual_settings ... ok
+test the_mcp_noun_connects_and_calls_the_local_server_through_invoke ... ok
+test dollar::scope::tests::symlinks_cannot_leave_either_root ... ok
+test dollar::scope::tests::roots_bound_reads_and_writes_including_new_paths ... ok
+test dollar::process::tests::generation_drop_closes_grandchild_stdout_and_foreign_ids_are_refused ... ok
+test dollar::http::tests::local_fetch_answers_and_reports_a_cut_body ... ok
+test esc_drops_a_pending_http_request ... ok
+test a_granted_noun_posts_one_notice_per_session ... ok
+test environment_overlay_reaches_only_its_child ... ok
+test filesystem_methods_are_bounded_and_support_binary_data ... ok
+test spawned_process_streams_are_owned_and_reload_closes_the_tree ... ok
+test grant::world_tests::unsafe_nouns_are_recorded_once_per_plugin_and_session ... ok
+cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
+cargo test -p bingo-provider-acp --test bridge --locked token -- --test-threads=1
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+scripts/check_discipline.sh
+discipline ok
+scripts/budget.sh
+dependencies (unique, normal): 411 (max  411)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 9 GB (soft max  5)
+budget ok
+cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.40s
+cargo check -p bingo-services --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.34s
+cargo check -p bingo-plugin-host --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.72s
+cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `rquickjs-sys v0.14.0`
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+cargo check -p bingo-mcp --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+cargo check -p bingo-agents --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.80s
+cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.00s
+CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+error: failed to run custom build command for `rquickjs-sys v0.14.0`
 ```
