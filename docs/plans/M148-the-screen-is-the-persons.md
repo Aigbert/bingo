@@ -55,6 +55,7 @@ become data. No new dependency.
 - `crates/bingo-demo-ui/src/{board,command,journal,progress,lib,tests}.rs`
 - `crates/bingo-rooms/src/{owed,roster}.rs`, `crates/bingo-collab/src/{room,owed}.rs`
 - `crates/bingo-schedule/src/wake.rs`
+- `crates/bingo-context/src/baseline/lifecycle.rs` (approved Null-absence assertion)
 - `scripts/tui-smoke.sh`, the guide pages naming `ctrl+p` or the rail
 - `docs/adr/{0013,0070,0079,0081}-*.md`, `docs/design/tui.md`,
   `docs/design/tui-identity-2026-10.md`
@@ -92,21 +93,11 @@ become data. No new dependency.
   itself, and its data stays in the fold.
 - `Null` removing an extension changes a journaled fold. Old journals
   fold to fewer entries, never more; the fixture pins it.
-- **Stopped at re-verification (2026-10-14), protocol step 6.** Outside
-  Files, `crates/bingo-context/src/baseline/lifecycle.rs:121`, test
-  `session_start_invalidates_both_keys_without_opening_the_session`, asserts
-  `fixture.journal.state().extensions[PLUGIN][id].is_null()`.
-  `BaselineHook::on_session` invalidates these keys with `extend(..., Null)`.
-  ADR-0081 §5 removes the keys, so the indexed assertion would panic.
-  This is an assertion change, not the mechanical constructor/fixture
-  exception allowed by step 6; no implementation or test was changed.
-- Recommended resolution: authorize adding that lifecycle test to Files and
-  assert key absence with `extensions.get(PLUGIN).is_none_or(|kinds|
-  !kinds.contains_key(id))`. Keep its refresh, stable-recapture and sequence
-  assertions. The production `baseline::retained` reader already accepts
-  a missing key, so no context production change is indicated.
-  Alternative: defer §5 to a separately approved milestone, requiring an
-  explicit revision of this plan/ADR's implementation scope.
+- Scope approval (2026-10-14): the baseline lifecycle assertion may change
+  from present-as-null to absent. The same sole assertion change elsewhere
+  is approved; list every such test here. No other outside-scope change is
+  authorized. Currently identified: context
+  `session_start_invalidates_both_keys_without_opening_the_session`.
 
 ## Re-verified (2026-10-14, `23810b23`)
 
@@ -118,8 +109,8 @@ become data. No new dependency.
 - `slot::with` adds `slots` to a View object without losing its other fields;
   `Slot::Row` holds a body and actions, but requires an existing `ItemId`.
   `/board` currently returns `Applied` and journals only an extension.
-  Its anchor mechanism remains to be resolved before implementation;
-  `CommandOutcome::Record` plus an event observer is an existing-door option.
+  Use `CommandOutcome::Record` for a board notice anchor and a demo-ui
+  event observer to place the row on its recorded id; no new kernel door.
 - The shared owed/member writers are in `bingo-collab`, not `roster.rs`.
   TUI `seats.rs` uses the collab readers. Schedule `wake::payload` currently
   places a `Status` countdown; M148 intentionally changes it to empty slots.
@@ -132,9 +123,9 @@ become data. No new dependency.
 
 ## Verified (2026-10-14)
 
-Re-verification only; stopped under protocol step 6 before code. Exit
-criteria remain unticked, ADR-0081 remains proposed, and no gate, live test,
-credential test or tmux drive was run. No schema or fixture was regenerated.
+The initial re-verification stopped before code; the user approved the
+Null-absence assertion updates on 2026-10-14. Implementation resumed from
+`dd226ee6`. Gate evidence follows as checks run.
 
 ```text
 $ git branch --show-current
