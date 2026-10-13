@@ -52,7 +52,7 @@ dependency.
    `Registrar::config::<T>()`, keeping them for `run`.
    `settings::given`, `run/updates.rs`'s `args` read and
    `showing::cache_days(&opts.args)` go; the cache days come from
-   `Options`, filled from `KernelSettings` (`picture_cache_days`).
+   `Options`, filled from `KernelSettings` (`picture_cache_days`, added by this milestone).
 5. **The bin resolves once.** `Decided`, `update_wanted`,
    `tui_measure`, `demo_ui` and `channels_wanted`'s walk are deleted.
    The bin merges the layers with the static manifests' claims and
@@ -79,14 +79,14 @@ dependency.
 
 ## Files
 
-- `crates/bingo-sdk/src/surface.rs`
-- `crates/bingo-surface-print/src/{lib,input,render}.rs`
+- `crates/bingo-sdk/src/surface.rs`, `crates/bingo-core/src/settings{,/merge}.rs`
+- `crates/bingo-surface-print/src/{lib,input,render,options}.rs`, hosted tests
 - `crates/bingo-surface-rpc/src/lib.rs`
 - `crates/bingo-surface-tui/src/{lib,run,settings}.rs`, `run/{showing,updates}.rs`
 - `crates/bingo-channels/src/{lib,settings}.rs`
 - `crates/bingo-demo-ui/src/lib.rs`, `crates/bingo-experience/src/lib.rs`
-- `crates/bingo-mcp/src/lib.rs`, `crates/bingo-provider-{openai,anthropic}/src/{lib,instances}.rs`
-- `crates/bingo/src/{main,mcp,provider,plugins}.rs`, `crates/bingo/tests/cli/`
+- `crates/bingo-mcp/src/lib.rs`, `crates/bingo-provider-{openai,anthropic}/src/{lib,settings,instances}.rs`
+- `crates/bingo/src/{main,composition,mcp,provider,plugins}.rs`, `crates/bingo/tests/cli/`
 - every guide page that names `demoUi` or `experience.enabled`
 - `docs/adr/{0003,0043,0057,0069}-*.md`
 
@@ -133,3 +133,23 @@ dependency.
   `Claim::from_manifest` (`core/settings.rs`), each provider's
   `instances.rs` and which crate owns `codex`, and that no plugin-rpc
   message carries `SurfaceOptions`.
+
+## Re-verified (2026-10-13, f9eb788a)
+
+- M108–M125 and M127–M134 are present; branch and worktree are clean.
+  M134's ACP is an agent; composition retains its existing constructor.
+- All named layer walks and `SurfaceOptions.args` remain. TUI already claims
+  both roots; only its registration read is missing. Print has `Mode` and
+  `input::Format` today; promote those to the public option enums.
+- `KernelSettings` has no cache-days field: add it in settings/merge and
+  read pictures through the same deep merge, retaining validation and aliases.
+- M130's channels `wanted` takes `Platforms`; use the merged claimed slice.
+  Claims come from the build's manifests, including the opt-in demo.
+- Provider endpoint shapes are in `settings.rs`, re-exported by `lib.rs`;
+  add exported key constants and serialization there. OpenAI owns codex.
+- No plugin-rpc message carries `SurfaceOptions`; regenerate schemas/fixtures
+  only with `BINGO_UPDATE_SCHEMA=1` (including M133's TS wire if affected).
+- Mechanical constructor updates include channels host tests, TUI doubles/run
+  tests and print hosted tests. Keep TUI run.rs changes to option plumbing.
+- Guides are crate-local (`bingo-experience/src/guide.md`, channels guide).
+  No new dependency; no live/credential tests; only this run's tmux session.
