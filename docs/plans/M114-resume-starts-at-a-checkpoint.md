@@ -73,6 +73,7 @@ kernel holds.
 - `crates/bingo-store-jsonl/src/{lib.rs,journal.rs,checkpoint.rs,checkpoint/**}`
 - `crates/bingo-core/src/{session.rs,session/*.rs,host/resume.rs}`
 - `crates/bingo/tests/cli/{jobs,agents}.rs::journal_text` (journal files only)
+- `crates/bingo/tests/cli/mentions.rs::age_the_posts` (invalidate derived checkpoint)
 - Workspace/crate `Cargo.toml`, `Cargo.lock`, `scripts/budget.toml` (+1 member)
 - tests/fixtures beside each, core host tests; `docs/adr/{0066,0005}*.md`, `docs/plans/M107-*.md`
 
@@ -110,15 +111,10 @@ kernel holds.
 
 - 2026-10-13 decision: restrict jobs/agents test journal helpers to `journal.jsonl`; assertions unchanged.
 
-- **STOP (2026-10-13, protocol step 6):** out-of-Files
-  `cli/mentions.rs::age_the_posts` rewrites covered journal timestamps without
-  invalidating `checkpoint.json`; an unchanged anchor/offset can validate old
-  timestamps. The mention-resume test finds `0` nudges, expected `1`.
-- Options: authorize removing the derived sidecar when this fixture rewrites
-  its journal (recommended, assertions unchanged), or change ADR-0066's
-  validation contract. Neither done; this is not a type-only fixture update.
+- 2026-10-13 decision: invalidate the checkpoint after mentions' fixture journal edit; assertions unchanged; equivalent session-directory fixtures are authorized.
+- A checkpoint verifies only the line at its offset; a hand edit to an earlier journal line is not detected. Deleting checkpoint.json forces a full replay.
 
-## Verified (2026-10-13; stopped at workspace test gate)
+## Verified (2026-10-13; remaining gates pending)
 
 - Branch `m114-resume-starts-at-a-checkpoint`, base `1335830b`; clean on entry.
   RED contracts committed before implementation:

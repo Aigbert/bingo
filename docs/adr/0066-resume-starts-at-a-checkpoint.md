@@ -72,6 +72,8 @@ opens.
 
 ## Consequences
 
+- 2026-10-13: A checkpoint verifies only the line at its offset; a hand edit to an earlier journal line is not detected. Deleting checkpoint.json forces a full replay.
+
 - Resume of a long session reads one sidecar and the frames since the
   last compaction; memory is bounded by the context window, not the
   session's age.
