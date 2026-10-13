@@ -4,6 +4,8 @@
 pub mod budget;
 pub mod elide;
 
+use std::collections::{HashMap, HashSet};
+
 use bingo_sdk::*;
 use serde_json::Value;
 
@@ -21,14 +23,18 @@ impl ContextView {
     /// The transcript after compaction and rewind, in order.
     pub fn items(frames: &[Frame]) -> Vec<Item> {
         let mut items: Vec<Item> = Vec::new();
+        let mut positions: HashMap<ItemId, usize> = HashMap::new();
         for frame in frames {
             match &frame.event {
                 Event::ItemStarted { item }
                 | Event::ItemUpdated { item }
                 | Event::ItemCompleted { item } => {
-                    match items.iter_mut().find(|i| i.id == item.id) {
-                        Some(slot) => *slot = item.clone(),
-                        None => items.push(item.clone()),
+                    match positions.get(&item.id) {
+                        Some(&index) => items[index] = item.clone(),
+                        None => {
+                            positions.insert(item.id.clone(), items.len());
+                            items.push(item.clone());
+                        }
                     }
                 }
                 Event::Compacted {
@@ -40,9 +46,14 @@ impl ContextView {
                     // A boundary this journal never saw is not a cut it can make.
                     if let Some(cut) = items.iter().position(|i| &i.id == boundary) {
                         splice_compaction(&mut items, cut, kept, summary);
+                        positions = item_positions(&items);
                     }
                 }
-                Event::Rewound { dropped, .. } => items.retain(|i| !dropped.contains(&i.id)),
+                Event::Rewound { dropped, .. } | Event::TurnRetrying { dropped, .. } => {
+                    let dropped: HashSet<_> = dropped.iter().collect();
+                    items.retain(|item| !dropped.contains(&item.id));
+                    positions = item_positions(&items);
+                }
                 _ => {}
             }
         }
@@ -56,6 +67,10 @@ impl ContextView {
         }
         out.finish()
     }
+}
+
+fn item_positions(items: &[Item]) -> HashMap<ItemId, usize> {
+    items.iter().enumerate().map(|(index, item)| (item.id.clone(), index)).collect()
 }
 
 /// The one splice a compaction performs: before `cut` only `kept` survives, the
