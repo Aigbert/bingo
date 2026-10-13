@@ -15,6 +15,7 @@ tier = "library"
 workspace = true
 
 [dependencies]
+thiserror.workspace = true
 bingo-sdk.workspace = true
 bingo-shelf.workspace = true
 bingo-jsonrpc.workspace = true

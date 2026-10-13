@@ -1,5 +1,6 @@
 //! Mechanisms shared by process plugins and sandboxed modules.
 pub mod discovery;
+pub mod grant;
 pub mod manifest;
 pub mod notice;
 pub mod stamps;
