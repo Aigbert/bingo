@@ -1,7 +1,7 @@
 # Architecture upgrade — 2026-10
 
-> The work [audit-2026-10.md](audit-2026-10.md) leads to: 40 milestones
-> (M108–M150, M143–M145 dropped) in eight phases, 18 proposed ADRs
+> The work [audit-2026-10.md](audit-2026-10.md) leads to: 41 milestones
+> (M108–M151, M143–M145 dropped) in eight phases, 18 proposed ADRs
 > (0063–0079, 0081) and one rejected (0080), and the protocol an executing
 > agent follows. Phase 7 was added the same day, at the person's request
 > for mods at Claude Code's capability
@@ -52,7 +52,8 @@ rejected). Phases 6 and 7 are independent.
 drive found, the rail and the panel sheet removed (the person's word), the
 ember look (the caret, embers, the wordmark, an accent of its own) and the
 crew (agents with faces, a crew strip, rooms read as chats). It rides on
-Phase 3's TUI work and is independent of Phases 4–7.
+Phase 3's TUI work and is independent of Phases 4–7, save M151: a pane
+that says where it wants to be, after M140.
 
 ## Milestones
 
@@ -101,6 +102,7 @@ Phase 3's TUI work and is independent of Phases 4–7.
 | 148 | The screen is the person's | 0081 | 124, 147 |
 | 149 | bingo's own light | — | 125, 148 |
 | 150 | The crew on screen | — | 135, 149 |
+| 151 | A pane says where it wants to be | 0081 | 140, 148 |
 
 Run in table order. "After" is the hard dependency; anything not listed is
 ordered only so that two milestones do not edit the same files at once.

@@ -120,7 +120,8 @@ Each gap in parity §8, with its owner and its reason:
   `Hook` adapter.
 - The desktop, vscode and mobile surfaces. None is in this tree; the
   GUI stays in its own repository (ADR-0080, rejected).
-- A docked pane (M140). The person chose no side column (ADR-0081).
+- A pane docked by the engine's width rule: a bingo pane goes where it
+  declares, when asked (ADR-0081 §7, M151).
 - `telemetry.*` and `attribution.text`: not applicable.
 
 Also out: committing the originals without terms that allow it; running

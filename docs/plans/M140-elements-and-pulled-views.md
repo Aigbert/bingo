@@ -7,7 +7,7 @@ in Claude Code's words, each with a fold; each surface publishes its
 table. A pulled pane is asked for at its drawn width (`HostApi::render`,
 `ui/render`) and again when its runtime calls `HostApi::invalidate`
 (`host/ui/invalidate`). Handlers return through `Input::Action` as
-`ui.press`/`input`/`select`. The TUI draws the terminal table, docks
+`ui.press`/`input`/`select`. The TUI draws the terminal table, seats
 panes, stacks toasts. After M121, M123–M125, M137, M138.
 
 ## Bricks, in build order
@@ -91,9 +91,9 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
     do not fit becomes a column; taffy only if a fixture needs it (budget
     pasted either way). `views/{button,input,select,link,image,raster}.rs`;
     `text.rs` draws spans; `Button` uses the `Actions` marks, `Input` the
-    composer's editor. Pure `pane.rs` (ADR-0081 §7): `asked` sits inline
-    above the composer at a third of the height at every width, never
-    docked; unasked waits (`1 pane waiting` in `status`, a click opens). `toast.rs` stacks toasts above
+    composer's editor. Pure `pane.rs` (ADR-0081 §7): `asked` sits above
+    the composer at a third of the height at every width (M151 adds the
+    other places); unasked waits (`1 pane waiting` in `status`, a click opens). `toast.rs` stacks toasts above
     the status line (`until` feeds `next_frame`; held while a `hold_toasts`
     pane shows; a new `alert` notifies the unfocused terminal).
     `pulled.rs` memoises on `(component, requestId, props, columns,
@@ -135,8 +135,8 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
 
 ## Non-goals
 
-- Components and `$.ui.log` (M141); the desktop table (ADR-0080); a docked
-  pane (ADR-0081 §7); `Client`, `blit`, styling beyond the subset; OSC 8
+- Components and `$.ui.log` (M141); the desktop table (ADR-0080); a pane
+  placed other than `above` (M151); `Client`, `blit`, styling beyond the subset; OSC 8
   links; `isPlaced`, `$.ui.copy`/`scroll`/`focus`/`selection` (design §8).
 
 ## Risks

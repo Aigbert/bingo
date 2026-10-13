@@ -185,7 +185,8 @@ size; `ctrl+p` is unbound. A plugin is seen only where it placed itself
 (`Status`, `Activity`, `Mode`, `Row`, an asked `Pane`); a payload without
 `slots` is not drawn by the TUI. The rooms plugin's `owed` and `members`
 are data: C3 and the session list say both. demo-ui's board is a `Row`.
-A mod's pane sits inline above the composer when asked and never docks.
+A mod's pane, once asked for, sits where it declares and fits (`above`,
+`side`, `overlay` or a rect; ADR-0081 §7, M151).
 
 ## 5. Subtractions
 
