@@ -100,7 +100,8 @@ fn activity(tasks: &[Task]) -> Option<bingo_sdk::slot::Slot> {
         view: View::Panel {
             title,
             child: Box::new(child),
-        },
+        }
+        .into(),
     })
 }
 
@@ -185,7 +186,8 @@ mod tests {
                             children: vec![],
                         }]
                     }),
-                },
+                }
+                .into(),
             }
         );
         assert_eq!(read(&host, &state.summary.id).await.unwrap(), tasks);

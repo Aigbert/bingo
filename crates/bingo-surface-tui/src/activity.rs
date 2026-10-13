@@ -58,7 +58,7 @@ pub fn next_change(tree: &Tree, ui: &Ui, now: Now) -> Option<std::time::Instant>
     let slots = bingo_sdk::slot::placed(tree.viewed());
     let views = slots.iter().filter_map(|placed| match &placed.slot {
         bingo_sdk::slot::Slot::Activity { view, .. } if !ui.activity_hidden => {
-            views::next_change(view, now)
+            view.view().and_then(|view| views::next_change(view, now))
         }
         _ => None,
     });
@@ -108,7 +108,11 @@ fn band(
     let mut out: Vec<_> = row.into_iter().collect();
     if !ui.activity_hidden {
         for placed in slots {
-            if let bingo_sdk::slot::Slot::Activity { view, .. } = &placed.slot {
+            if let bingo_sdk::slot::Slot::Activity {
+                view: bingo_sdk::slot::Shown::View(view),
+                ..
+            } = &placed.slot
+            {
                 let view = match (running, view) {
                     (true, bingo_sdk::View::Panel { child, .. }) => child,
                     _ => view,

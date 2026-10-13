@@ -98,14 +98,10 @@ After M121, M123–M125, M137, M138.
   runner/catalogue and M138's `Call.reads`/`ReadLog` exist; render guard does not.
   `globals.js` still emits `{type,props,children}`. Direct Text writers need migration.
 - 2026-10-14, person's delegate: authorize the scoped pre-release View/Shown/place/ui-render baseline amendment; protocol 2 freezes at its first release (ADR-0075).
-- **Stopped (2026-10-14), protocol step 6:** workspace check requires production
-  Event::Invalidated arms in bingo-surface-print/src/{render,stream_json}.rs,
-  outside Files. The mechanical exception covers tests/fixtures only. Proposed fix:
-  add Invalidated to each existing ignored ephemeral-event arm. Authorize these two
-  files, or revise the scope; keeping the event absent would violate ADR-0079 §5.
-  In-scope Shown migrations, artifact regeneration and remaining M140 bricks/gates
-  are unfinished; no exit criterion is fully verified and no completion is claimed.
+- 2026-10-14, person's delegate: authorize print Invalidated ignore arms and all mechanical Event/Shown/element sibling mappings; record files below, stop only for new out-of-scope behaviour.
 ## Verified (2026-10-14)
+
+Mechanical match updates: `bingo-surface-print/src/{render,stream_json}.rs` (ignore Invalidated).
 ```text
 cargo fmt --all -- --check
 exit_code: 0

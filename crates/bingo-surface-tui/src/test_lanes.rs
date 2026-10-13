@@ -108,15 +108,16 @@ fn stranger_payload() -> Value {
                 view: View::Panel {
                     title: "stranger activity".into(),
                     child: Box::new(View::text("activity body")),
-                },
+                }
+                .into(),
             },
             Slot::Rail {
                 title: "stranger rail".into(),
-                view: View::text("rail body"),
+                view: View::text("rail body").into(),
             },
             Slot::Panel {
                 title: "stranger panel".into(),
-                view: View::text("panel body"),
+                view: View::text("panel body").into(),
             },
             Slot::Mode {
                 current: "awake".into(),
@@ -258,7 +259,8 @@ pub fn task_payload(records: Value) -> Value {
             view: View::Panel {
                 title,
                 child: Box::new(child),
-            },
+            }
+            .into(),
         }]
     };
     slot::with(serde_json::json!({"tasks": records}), slots)
