@@ -508,6 +508,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bingo-jsonrpc"
+version = "0.6.6"
+dependencies = [
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "bingo-loopback"
 version = "0.6.6"
 dependencies = [
