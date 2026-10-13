@@ -49,15 +49,15 @@ is M137's. With no link installed, a person sees no change.
    module each under `chain/`:
    - `tool.describe`: the round's specs after `gather`, matcher `tool`;
      a link rewrites or drops a spec, never adds one (`name` pinned).
-   - `prompt.autocomplete`: `HostApi::catalog`'s answer (`host.rs:873`);
+   - `prompt.autocomplete`: `HostApi::catalog`'s answer (`host.rs:904`);
      matcher `kind`.
-   - `session.send` at `HostApi::deliver` (`host.rs:756`), before the
+   - `session.send` at `HostApi::deliver` (`host.rs:792`), before the
      mailbox, matcher `to`; `session.receive` at the actor's `deliver`
-     (`session/inputs.rs:214`), matcher `origin.surface`. One delivery is
+     (`session/inputs.rs:169`), matcher `origin.surface`. One delivery is
      raised once out and once in.
-   - `session.append`: the actor's `extend` (`session.rs:192`), matcher
+   - `session.append`: the actor's `extend` (`session.rs:230`), matcher
      `plugin`, `kind`; rewrites only of the link's own plugin's rows.
-   - `turn.complete`: at the turn's end (`session.rs:910`), on the turn's
+   - `turn.complete`: at the turn's end (`session.rs:800`), on the turn's
      id, outcome, usage and answer text. Its result is text drawn under
      the answer: the kernel link answers none, `next` resolves to what
      the links beneath answered, and a non-empty answer is appended as an
@@ -72,8 +72,8 @@ is M137's. With no link installed, a person sees no change.
    Value)>` reads `turn.start` (`TurnStarted`) and `session.measure`
    (`TurnUsage`'s context reading) off the stream; the payload is the
    frame's own fields. `session.start` and `.end` come from `on_session`
-   (`session.rs:948`); `session.attach` and `.detach` from
-   `HostApi::open`/`close` (`host.rs:713`), carrying the `ClientIdentity`.
+   (`session.rs:904`); `session.attach` and `.detach` from
+   `HostApi::open`/`close` (`host.rs:749/773`), carrying the `ClientIdentity`.
    Observers run after the fact under the session's owner (M116).
 7. **Faces.** `WireService::face(&self) -> Option<Face>`, default `None`;
    `Face { noun, methods }`, each method an `Entry` built at registration
@@ -84,12 +84,12 @@ is M137's. With no link installed, a person sees no change.
    both owners: a face may share a noun with the kernel, never a name.
    `HostApi::service_wire` returns the face wrapped, so a call raises
    `<noun>.<method>` with the owner's call as the kernel link; plugin-rpc's
-   `service/call` already goes through it. bingo-agents' `team` and
-   bingo-mcp's `rows` declare faces, so the first noun events
+   `service/call` already goes through it. The `bingo-services` adapters
+   declare faces, so the first noun events
    (`team.section`, `mcp.servers`) are tested against real owners.
 8. **The wire**, additions to protocol 2: `intercept/<event>` takes any
    chain entry; observations cross as `hook/observe { event, payload }`.
-9. **TypeScript.** M133's `render` writes `events.ts` from
+9. **TypeScript.** `bingo-schema-ts::render` writes `events.ts` from
    `schema/events.json`, drift-tested. It exports each event's types
    under Claude Code's names; `on.ts` types `on(name)` by it, and the
    `'bingo'` module re-exports them (M137).
@@ -99,10 +99,11 @@ is M137's. With no link installed, a person sees no change.
 - `crates/bingo-sdk/src/{catalogue.rs (new),intercept.rs,service.rs,lib.rs}`
 - `crates/bingo-core/src/chain/{describe,autocomplete,deliver,append,complete,command,config,observe}.rs` (new), `chain/mod.rs`
 - `crates/bingo-core/src/{host,session,plugins,config (new),commands/mod,turn/late,session/inputs,session/commands}.rs`
-- `crates/bingo-agents/src/team/service.rs`, `crates/bingo-mcp/src/rows.rs` (faces)
-- `crates/bingo-plugin-rpc/src/{intercept.rs,wire.rs,service.rs,events_ts.rs (new)}`
+- `crates/bingo-services/src/{team,mcp}.rs` (M119 owns both wire adapters)
+- `crates/bingo-plugin-rpc/src/{intercept,wire,service,schema,lib,events_ts (new)}.rs`
 - `crates/bingo/tests/catalogue.rs` (new), `schema/events.json` (new), `schema/plugin.json`
-- `sdk/typescript/src/{events.ts (generated),on.ts}`, `sdk/typescript/test/cases.json`, `scripts/check_discipline.sh`
+- `sdk/typescript/src/{events.ts (generated),on.ts,on.test.ts,index.ts}`,
+  `sdk/typescript/test/cases.json`, `scripts/check_discipline.sh`
 
 ## Exit criteria
 
@@ -137,14 +138,32 @@ is M137's. With no link installed, a person sees no change.
 
 ## Risks
 
-- Every wire call now consults the links: gather them once per round, as
-  hooks are, so an empty set costs one lookup.
-- `config.set` runs its chain before it reconfigures, or a denied set has
-  already moved the session; a test pins the order. `session.measure`
-  reads `TurnUsage`, and M132's `UsageCharged` must not raise it.
-- Re-verify at start: M131's `Interceptor`, `Next`, `LinkPoint`,
-  `LinkMatcher`, `admits`, `chain::run` and typed `tool.call` input as
-  landed; M132's `intercept.rs` and freeze test; M133's `render` and the
-  `on.ts` case table; M119's `team` and `mcp` modules (the faces may
-  belong beside their adapters); M116's owner; M111's test host. Line
-  numbers are from `fa042aa6`.
+- **STOP, step 6, at `60deb2b9`:** `LinkPoint::TurnStop`, `point_name`,
+  `wire::METHODS` and frozen protocol 2 name the old stop hook `turn.complete`
+  (`null → StopResult`); `catalogue_tool_fields_and_completion_spelling`
+  asserts it. M136 needs that name for metadata → completion text and names
+  the old hook `turn.stop`. Retyping breaks ADR-0075 §1; keeping the schema
+  while changing dispatch breaks its behaviour. This is not a mechanical fixture update.
+- Options: (A) preserve protocol 2's legacy stop transport and negotiate a
+  distinct catalogue transport (recommended; record a compatibility exception),
+  or (B) protocol 3 with protocol 2 support (expands M136). Decision required.
+- Gather links once per round; chain config before writes; never measure
+  `UsageCharged`; keep actor plugin work on M116-owned tasks.
+
+## Verified — re-verification only; implementation blocked
+
+Read the protocol, audit, parity design and ADRs 0078, 0074, 0079, 0075,
+0069 and 0068. Initial tree clean, requested branch at `60deb2b9`.
+Corrected call sites, M119 adapter paths, M133's `bingo-schema-ts::render`
+(`wire_ts.rs` is the drift-test example) and matcher cases (`on.test.ts`).
+Read-only Python inspection resolved method references in both schemas:
+
+```text
+FROZEN intercept/turn.complete: input=null; answer=#/$defs/StopResult
+CURRENT intercept/turn.complete: input=null; answer=#/$defs/StopResult
+FROZEN intercept/turn.complete/after: result=#/$defs/StopResult
+CURRENT intercept/turn.complete/after: result=#/$defs/StopResult
+```
+
+Implementation and gates not run: steps 2/6 require stopping on this conflict.
+No schemas regenerated; no live or credential tests run.
