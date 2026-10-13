@@ -1,0 +1,28 @@
+//! A loaded module and the registration decision for its current generation.
+use crate::engine::{Engine, Limits};
+use bingo_plugin_host::{admission::Admission, discovery::Found, manifest::Launch, state::Store};
+use bingo_sdk::*;
+use serde_json::Value;
+use std::sync::Arc;
+
+pub(crate) struct Module {
+    pub found: Found,
+    pub admission: Admission,
+    pub engine: Option<Arc<Engine>>,
+    pub store: Store,
+}
+impl Module {
+    pub async fn load(found: Found, config: Value, limits: Limits, env: &Env, switched_off: bool) -> Arc<Self> {
+        let admission = Admission::default();
+        let engine = if switched_off {
+            admission.refuse(SWITCHED_OFF.into()); None
+        } else if let Launch::Module(module) = &found.manifest.launch {
+            match Engine::start(&found.root, module, config, limits).await {
+                Ok(engine) => Some(engine),
+                Err(error) => { admission.refuse(format!("{}: {error}", found.name)); None }
+            }
+        } else { None };
+        Arc::new(Self { store: Store::new(&env.data_dir, &found.name), found, admission, engine })
+    }
+    pub async fn close(&self) { if let Some(engine) = &self.engine { engine.close().await; } }
+}

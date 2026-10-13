@@ -9,3 +9,5 @@ pub mod strip;
 mod thread;
 mod plugin;
 pub use plugin::ModsPlugin;
+mod manager;
+mod module;
