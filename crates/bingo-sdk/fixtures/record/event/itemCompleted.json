@@ -1,0 +1,1 @@
+{"type":"itemCompleted","item":{"id":"itm_1","turn":"trn_1","round":0,"status":"completed","startedAt":"2023-11-14T22:13:20Z","completedAt":"2023-11-14T22:13:20Z","body":{"kind":"user","parts":[{"type":"text","text":"run tests"}],"origin":{"surface":"tui"}}}}

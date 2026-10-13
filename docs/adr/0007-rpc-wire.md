@@ -25,3 +25,5 @@ A GUI, an IDE, an IM gateway and a remote TUI all need to drive the kernel from 
 ## Supersedes
 
 —
+
+2026-10-13 — [ADR-0065](0065-the-record-is-not-the-live-type.md) adds opaque Unknown event/item payloads to the wire schema: clients retain them for replay and serialization, and skip their interpretation in folds and presentation.

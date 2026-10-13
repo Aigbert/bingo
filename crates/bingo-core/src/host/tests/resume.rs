@@ -991,3 +991,5 @@ async fn a_child_a_start_hook_reopens_is_followed_from_its_head() {
     let folded = session::replayed(&owned).unwrap();
     assert!(!folded.closed, "the fold reads the child as open again");
 }
+
+mod record;

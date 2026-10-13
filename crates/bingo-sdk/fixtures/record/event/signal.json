@@ -1,0 +1,1 @@
+{"type":"signal","plugin":"bingo.demo.ui","kind":"progress","payload":{"kind":"progress","value":3,"total":10}}

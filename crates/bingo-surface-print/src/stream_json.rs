@@ -184,7 +184,8 @@ impl Encoder {
             | Event::Notice { .. }
             | Event::Extension { .. }
             | Event::Signal { .. }
-            | Event::Lagged { .. } => None,
+            | Event::Lagged { .. }
+            | Event::Unknown { .. } => None,
         }
     }
 
@@ -215,7 +216,8 @@ impl Encoder {
             | ItemBody::Notice { .. }
             | ItemBody::QuestionAnswer { .. }
             | ItemBody::PermissionReceipt { .. }
-            | ItemBody::Asset { .. } => None,
+            | ItemBody::Asset { .. }
+            | ItemBody::Unknown { .. } => None,
         }
     }
 

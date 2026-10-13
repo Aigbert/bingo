@@ -1,0 +1,1 @@
+{"type":"turnUsage","turn":"trn_1","usage":{"inputTokens":10,"outputTokens":4,"cacheReadTokens":0,"cacheWriteTokens":0,"reasoningTokens":0},"context":{"used":14,"window":200000,"trigger":180000}}

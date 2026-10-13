@@ -1,0 +1,1 @@
+{"type":"interactionOpened","interaction":{"id":"int_1","session":"ses_1","turn":"trn_1","item":"itm_3","openedAt":"2023-11-14T22:13:20Z","kind":{"kind":"permission","tool":"Edit","summary":"Edit src/lib.rs","preview":{"kind":"diff","unified":"--- a\n+++ b\n"},"sessionScope":"Edit(src/)"},"answers":["allowOnce","allowSession","deny"]}}

@@ -4,6 +4,8 @@
 //! A crash mid-write leaves half a line at the end, which replay drops; an
 //! unreadable line anywhere else is corruption and is reported, not skipped.
 
+mod migrate;
+
 use std::io::{ErrorKind, Write};
 use std::path::Path;
 
@@ -54,13 +56,28 @@ fn header(session: &SessionId) -> Result<String, KernelError> {
 /// a map: one small append costs nothing beside the model round-trip that
 /// produced the frame, and there is no second place to invalidate on delete.
 pub fn append(dir: &Path, frame: &Frame) -> Result<(), KernelError> {
-    let path = layout::journal(dir);
     let line = serde_json::to_string(frame).map_err(|e| storage(format!("encode frame: {e}")))?;
+    append_line(dir, &line)
+}
+
+/// Reserved for the first format bump (M115); current appends never call it.
+pub fn append_version(dir: &Path) -> Result<(), KernelError> {
+    let marker = VersionLine {
+        format: FORMAT.into(),
+        version: VERSION,
+    };
+    let line =
+        serde_json::to_string(&marker).map_err(|e| storage(format!("encode version: {e}")))?;
+    append_line(dir, &line)
+}
+
+fn append_line(dir: &Path, line: &str) -> Result<(), KernelError> {
+    let path = layout::journal(dir);
     let mut file = std::fs::OpenOptions::new()
         .append(true)
         .open(&path)
         .map_err(|e| storage(format!("open {}: {e}", path.display())))?;
-    write_line(&mut file, &line, &path)
+    write_line(&mut file, line, &path)
 }
 
 /// One `write_all` per line, so a crash truncates a line rather than
@@ -81,8 +98,8 @@ pub fn replay(dir: &Path, since: Seq) -> Result<Vec<Frame>, KernelError> {
     let bytes =
         std::fs::read(&path).map_err(|e| storage(format!("read {}: {e}", path.display())))?;
     let lines = lines(&bytes);
-    check(lines.first(), &path)?;
-    frames(&lines, since, &path)
+    let version = check(lines.first(), &path)?;
+    frames(&lines, since, &path, version)
 }
 
 /// The lines of the file, without the empty tail a trailing newline leaves.
@@ -94,39 +111,81 @@ fn lines(bytes: &[u8]) -> Vec<&[u8]> {
     lines
 }
 
-fn check(line: Option<&&[u8]>, path: &Path) -> Result<(), KernelError> {
+#[derive(Serialize, Deserialize)]
+struct VersionLine {
+    format: String,
+    version: u32,
+}
+
+fn check(line: Option<&&[u8]>, path: &Path) -> Result<u32, KernelError> {
     let header: Header = line
         .and_then(|line| serde_json::from_slice(line).ok())
         .ok_or_else(|| storage(format!("{} is not a bingo journal", path.display())))?;
-    if header.format != FORMAT {
-        return Err(storage(format!(
-            "{} is not a bingo journal: format {}",
-            path.display(),
-            header.format
-        )));
-    }
-    if header.version > VERSION {
-        return Err(storage(format!(
-            "{} was written by a newer bingo (journal version {}, this build reads {VERSION})",
-            path.display(),
-            header.version
-        )));
-    }
-    Ok(())
+    checked_version(&header.format, header.version, path)
 }
 
-fn frames(lines: &[&[u8]], since: Seq, path: &Path) -> Result<Vec<Frame>, KernelError> {
+fn checked_version(format: &str, version: u32, path: &Path) -> Result<u32, KernelError> {
+    if format != FORMAT || version == 0 {
+        return Err(storage(format!(
+            "{} is not a bingo journal: format {format}, version {version}",
+            path.display()
+        )));
+    }
+    if version > VERSION {
+        return Err(storage(format!(
+            "{} was written by a newer bingo (journal version {version}, this build reads {VERSION})",
+            path.display()
+        )));
+    }
+    Ok(version)
+}
+
+enum Line {
+    Version(VersionLine),
+    Frame(Box<Frame>),
+}
+
+fn decode(line: &[u8], version: u32) -> Result<Line, serde_json::Error> {
+    #[derive(Deserialize)]
+    struct Probe {
+        #[serde(default)]
+        format: Option<Box<serde_json::value::RawValue>>,
+    }
+    if serde_json::from_slice::<Probe>(line)?.format.is_some() {
+        return serde_json::from_slice(line).map(Line::Version);
+    }
+    // No migration means no JSON rewrite: opaque payload bytes stay intact.
+    let frame = if version == VERSION {
+        serde_json::from_slice(line)?
+    } else {
+        serde_json::from_value(migrate::upgrade(
+            serde_json::from_slice(line)?,
+            version,
+            migrate::STEPS,
+        ))?
+    };
+    Ok(Line::Frame(Box::new(frame)))
+}
+
+fn frames(
+    lines: &[&[u8]],
+    since: Seq,
+    path: &Path,
+    mut version: u32,
+) -> Result<Vec<Frame>, KernelError> {
     let last = lines.len().saturating_sub(1);
     let mut frames = Vec::new();
     for (index, line) in lines.iter().enumerate().skip(1) {
-        match serde_json::from_slice::<Frame>(line) {
-            Ok(frame) => {
+        match decode(line, version) {
+            Ok(Line::Version(marker)) => {
+                version = checked_version(&marker.format, marker.version, path)?;
+            }
+            Ok(Line::Frame(frame)) => {
                 if frame.seq > since {
-                    frames.push(frame);
+                    frames.push(*frame);
                 }
             }
-            // The tail is what a crash mid-write leaves; replay ends at the
-            // last whole frame.
+            // A crash can leave an incomplete final JSON value or envelope.
             Err(_) if index == last => break,
             Err(e) => {
                 return Err(storage(format!(
@@ -248,3 +307,9 @@ mod tests {
         assert_eq!(replay(&dir, Seq::ZERO).expect("replay").len(), 1);
     }
 }
+
+#[cfg(test)]
+mod compatibility;
+
+#[cfg(test)]
+mod versions;

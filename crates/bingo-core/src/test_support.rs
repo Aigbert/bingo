@@ -285,6 +285,7 @@ pub fn kind(item: &Item) -> String {
         ItemBody::QuestionAnswer { .. } => "qa",
         ItemBody::PermissionReceipt { .. } => "receipt",
         ItemBody::Asset { .. } => "asset",
+        ItemBody::Unknown { .. } => "unknown",
     };
     format!("{body}/{:?}", item.status).to_lowercase()
 }

@@ -353,6 +353,7 @@ fn item_lines(
     fold: Fold,
 ) -> Block {
     match &item.body {
+        ItemBody::Unknown { .. } => Block::default(),
         ItemBody::User { parts, origin } => said::lines(item, parts, origin, fold, rows).into(),
         ItemBody::Assistant { text } => assistant(text, item.status, fold, rows, cue),
         // An agent that runs its own tools journals each finished call as a
@@ -2130,5 +2131,33 @@ mod tests {
         );
         assert_eq!(output::expand_tabs("a\tb\tc"), "a       b       c");
         assert_eq!(output::expand_tabs("no tabs"), "no tabs");
+    }
+    #[test]
+    fn an_opaque_item_draws_no_terminal_cells() {
+        let known = assistant("itm_known", "known answer", ItemStatus::Completed);
+        let body = serde_json::from_str(include_str!(
+            "../../bingo-sdk/fixtures/record/unknown/item.json"
+        ))
+        .unwrap();
+        let opaque = item("itm_opaque", ItemStatus::Completed, body);
+        let before = stated(vec![known.clone()]);
+        let after = stated(vec![known, opaque]);
+        assert_eq!(
+            drawn(
+                after
+                    .transcript
+                    .items()
+                    .iter()
+                    .map(|i| i.as_ref().clone())
+                    .collect()
+            ),
+            rendered(&before)
+        );
+        let (ui, now) = scene();
+        assert_eq!(
+            crate::test_support::render(&before, &ui, now),
+            crate::test_support::render(&after, &ui, now)
+        );
+        assert_eq!(after.transcript.items().len(), 2, "retained, but not drawn");
     }
 }

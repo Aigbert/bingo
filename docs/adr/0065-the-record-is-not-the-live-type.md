@@ -1,21 +1,20 @@
 # ADR-0065 — The record is not the live type
 
-Status: proposed · 2026-10-13 · Plan: M113 · Amends: ADR-0005 §2–3
+Status: accepted · 2026-10-13 · Plan: M113 · Amends: ADR-0005 §2–3
 
 ## Context
 
 ADR-0005 §2 promised that a format change is a new `version` and a
 migrator. The header has said `version: 1` since the first journal
 (`bingo-store-jsonl/src/journal.rs`, `VERSION`), while the type it
-serialises has changed shape under it: `379bd04c` (2026-08-29) and
-`4afd43d3` (2026-08-30) removed or renamed variants, and `6471cde6`
-(2026-09-04) restructured `Question`. The journal line is simply
-whatever `serde` makes of today's `Event`, so every such change is a
-format change nobody wrote down. A journal holding one of the old shapes
-fails `replay` with `STORAGE` on that line (§3: "an unreadable line
-anywhere else is a STORAGE error"), and the whole session is lost to
-resume over one frame. The reverse holds too: a binary that adds a
-variant writes lines every older binary refuses.
+serialises has changed: `379bd04c` removed the optional `childSession`
+field, `4afd43d3` replaced `Display` with `View`, and `6471cde6`
+extracted `Question` without changing its wire shape. Re-verification
+found all three still readable. The journal line is whatever `serde`
+makes of today's `Event`; a genuinely unknown event or item kind instead
+fails `replay` with `STORAGE` on a middle line (§3: "an unreadable line
+anywhere else is a STORAGE error"). Thus a newer binary adding a variant
+can write a journal an older binary cannot resume.
 
 The fixture `bingo-core/fixtures/frames-v1.jsonl` covers part of the
 vocabulary; nothing makes a change to `Event` or `ItemBody` fail a test
@@ -56,13 +55,18 @@ when it changes how an existing record reads.
    today. The reader for version lines ships with this ADR, before any
    writer needs one.
 7. **No migrator for the past.** The shapes removed before this ADR read
-   as `Unknown`; their sessions open, without those records.
+   as `Unknown` when this build cannot read them; their sessions open.
+   2026-10-13 clarification: the three cited changes remain known, as the
+   M113 `cited_historical_shapes_already_replay` probe at `eddd0ebc`
+   demonstrated (5 frames replayed, no `STORAGE`; recorded in `face05fb`).
+   `Unknown` covers a kind this build does not know, for example a record
+   written by a newer build; already-readable shapes stay known.
 
 ## Consequences
 
-- A session written before 2026-09-04 resumes instead of failing; the
-  frames whose shape left the vocabulary are visible as unknown to a
-  client that asks, and to nobody else.
+- A session with valid envelopes and unknown payloads resumes instead of
+  failing; opaque records are visible to a client that asks, while
+  already-readable historical records remain known.
 - An unknown event takes a `seq` like any other, so `seq` stays gapless
   for durable frames (ADR-0002 §2).
 - Every `Event` or `ItemBody` change now touches a fixture; a breaking

@@ -172,7 +172,8 @@ impl Folder {
             | ItemBody::Rewind { .. }
             | ItemBody::Notice { .. }
             | ItemBody::PermissionReceipt { .. }
-            | ItemBody::Asset { .. } => {}
+            | ItemBody::Asset { .. }
+            | ItemBody::Unknown { .. } => {}
         }
     }
 

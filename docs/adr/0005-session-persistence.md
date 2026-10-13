@@ -26,3 +26,5 @@ The journal is the session (ADR-0002): a session on disk is that journal written
 ## Supersedes
 
 —
+
+2026-10-13 — [ADR-0065](0065-the-record-is-not-the-live-type.md) amends §2–3: appended version lines select chained raw-JSON migrations; unreadable payloads with valid envelopes are retained as opaque Unknown records. Envelope/JSON corruption rules remain.

@@ -213,7 +213,8 @@ impl Renderer {
             | Event::CatalogChanged { .. }
             | Event::Extension { .. }
             | Event::Signal { .. }
-            | Event::Lagged { .. } => {}
+            | Event::Lagged { .. }
+            | Event::Unknown { .. } => {}
         }
         Ok(())
     }
@@ -286,7 +287,8 @@ impl Renderer {
             | ItemBody::Rewind { .. }
             | ItemBody::QuestionAnswer { .. }
             | ItemBody::PermissionReceipt { .. }
-            | ItemBody::Asset { .. } => {}
+            | ItemBody::Asset { .. }
+            | ItemBody::Unknown { .. } => {}
         }
         Ok(())
     }
@@ -885,5 +887,31 @@ pub(crate) mod tests {
         let sinks = play(Mode::Text, &frames);
         assert_eq!(sinks.out(), "model: fake/one\nmode: default\n");
         assert_eq!(sinks.err(), "", "a receipt is an answer, not a diagnostic");
+    }
+    #[test]
+    fn opaque_records_are_silent_except_in_raw_json() {
+        let raw = include_str!("../../bingo-sdk/fixtures/record/unknown/event.json").trim_end();
+        let event = serde_json::from_str(raw).unwrap();
+        let mut item = assistant("itm_opaque", "", ItemStatus::Completed);
+        item.body = serde_json::from_str(include_str!(
+            "../../bingo-sdk/fixtures/record/unknown/item.json"
+        ))
+        .unwrap();
+        let frames = [frame(1, event), frame(2, Event::ItemCompleted { item })];
+        let text = play(Mode::Text, &frames);
+        assert!(text.out().is_empty());
+        assert!(text.err().is_empty());
+        let stream = play(Mode::StreamJson, &frames);
+        assert_eq!(stream.out().lines().count(), 1, "only the init envelope");
+        assert!(!stream.out().contains("future"));
+        let json = play(Mode::Json, &frames);
+        assert!(json.err().is_empty());
+        assert!(json.out().contains(raw));
+        let decoded: Vec<Frame> = json
+            .out()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(decoded, frames);
     }
 }
