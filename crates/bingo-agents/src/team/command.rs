@@ -13,8 +13,6 @@ use crate::{list, names};
 /// The columns a team has: what was declared, and what is running.
 pub const HEADERS: [&str; 4] = ["role", "agent", "session", "state"];
 
-/// A role nobody has seated yet has no session to name.
-
 /// A role that names no definition and is its own.
 const NO_DEFINITION: &str = "-";
 
