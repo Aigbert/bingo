@@ -6,9 +6,9 @@
 //! arriving from a child may be any of the three and the reader learns which
 //! only by looking.
 //!
-//! `bingo-plugin-rpc`'s codec is the same animal, host-side. Sharing it would
-//! make a plugin import a plugin (ADR-0001), and two codecs are mechanism, not
-//! a second representation of a fact.
+//! The scripted agent retains this schema vocabulary as an independent wire
+//! fixture. Live ACP connections use `bingo-jsonrpc`'s codec and peer
+//! (ADR-0072).
 
 use agent_client_protocol_schema::rpc::{JsonRpcMessage, Notification, Request, RequestId};
 use agent_client_protocol_schema::v1::Error;

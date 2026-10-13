@@ -16,7 +16,6 @@ bingo-process.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
 # M7: a hook is its own process group, killed whole at its deadline.
-process-wrap.workspace = true
 # M7: a matcher is a whole-string-anchored regex over the event's subject.
 regex.workspace = true
 schemars.workspace = true

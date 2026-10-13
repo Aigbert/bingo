@@ -12,8 +12,8 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use bingo_process::Tree;
 use bingo_sdk::HostHandle;
-use process_wrap::tokio::ChildWrapper;
 use tokio::sync::Mutex;
 // The tokio clock, so a test can drive the quiet window instead of waiting it
 // out: `std::time::Instant` would not move under `tokio::time::pause`.
@@ -24,9 +24,7 @@ use crate::notify::{self, Cadence, Conditions, Notice, Tally, Wake};
 use crate::run::{self, Running};
 use crate::sink::Sink;
 
-/// How long a `SIGTERM`ed group has to leave on its own terms. Unix only:
-/// nothing is asked on Windows, so nothing there waits to be answered.
-#[cfg(unix)]
+/// How long a group has to leave on its own terms on unix.
 const GRACE: Duration = Duration::from_secs(2);
 
 /// How often a watched job's new output is read for a condition.
@@ -82,7 +80,7 @@ async fn supervise(watch: Watch) {
 /// Wait for the job to end, or for someone to ask it to, reading what it
 /// writes on a slow clock while it works.
 async fn wait_out(
-    child: &mut Box<dyn ChildWrapper>,
+    child: &mut Tree,
     job: &Job,
     scan: &mut Scan<'_>,
     host: &HostHandle,
@@ -105,27 +103,13 @@ async fn wait_out(
     }
 }
 
-/// `SIGTERM` first, so a program that cleans up after itself gets to; the
-/// signal it cannot answer only once the grace is spent.
-#[cfg(unix)]
-async fn end_it(child: &mut Box<dyn ChildWrapper>) -> State {
-    let _ = child.signal(run::TERM);
-    if let Ok(Ok(status)) = tokio::time::timeout(GRACE, child.wait()).await {
-        return state_of(status);
-    }
-    run::kill(child).await;
-    State::Killed
-}
-
-/// The same end, on a platform with no signal to ask with.
-///
-/// Windows has nothing a process may answer and decline: a job object is
-/// ended, not asked. Waiting a grace first would buy the program no chance to
-/// clean up, only a slower kill, so the kill is the whole of it.
-#[cfg(windows)]
-async fn end_it(child: &mut Box<dyn ChildWrapper>) -> State {
-    run::kill(child).await;
-    State::Killed
+async fn end_it(child: &mut Tree) -> State {
+    tokio::time::timeout(GRACE + Duration::from_secs(2), child.terminate(GRACE))
+        .await
+        .ok()
+        .and_then(Result::ok)
+        .map(state_of)
+        .unwrap_or(State::Killed)
 }
 
 /// A status as a job's state. A process that took a signal has no code of its

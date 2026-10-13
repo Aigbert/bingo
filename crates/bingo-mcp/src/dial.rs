@@ -12,7 +12,6 @@ use std::time::Duration;
 
 use reqwest::header::{HeaderName, HeaderValue};
 use rmcp::service::RunningService;
-use rmcp::transport::TokioChildProcess;
 use rmcp::transport::streamable_http_client::{
     StreamableHttpClientTransport, StreamableHttpClientTransportConfig,
 };
@@ -37,7 +36,18 @@ pub const TOOL_CALL: Duration = Duration::from_secs(600);
 /// The client side of one live server. The handler is this client's own
 /// [`Client`], because a server may ask *us* something (`elicitation/create`)
 /// while it answers a call.
-pub type Service = RunningService<RoleClient, Client>;
+pub struct Service {
+    inner: RunningService<RoleClient, Client>,
+    _tree: Option<bingo_process::Tree>,
+}
+
+impl std::ops::Deref for Service {
+    type Target = RunningService<RoleClient, Client>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
 
 /// What a handshake leaves behind: the running service, what it said it can do,
 /// and who a question from it reaches while a call is in flight.
@@ -105,7 +115,7 @@ async fn connect(
             cwd,
             ..
         } => {
-            let service = spawn_child(
+            let service = serve_child(
                 server_name,
                 command,
                 args,
@@ -168,7 +178,7 @@ fn order_tools(tools: &mut [rmcp::model::Tool]) {
     tools.sort_by(|left, right| left.name.cmp(&right.name));
 }
 
-async fn spawn_child(
+async fn serve_child(
     server_name: &str,
     command: &str,
     args: &[String],
@@ -177,18 +187,37 @@ async fn spawn_child(
     data_dir: &Path,
     asker: Arc<Asker>,
 ) -> Result<Service, String> {
+    let mut tree = spawn_child(server_name, command, args, env, cwd, data_dir)?;
+    let stdout = tree.take_stdout().ok_or("the server has no stdout")?;
+    let stdin = tree.take_stdin().ok_or("the server has no stdin")?;
+    let inner = serve_client(Client::new(asker), (stdout, stdin))
+        .await
+        .map_err(|e| format!("handshake: {e}"))?;
+    Ok(Service {
+        inner,
+        _tree: Some(tree),
+    })
+}
+
+fn spawn_child(
+    server_name: &str,
+    command: &str,
+    args: &[String],
+    env: &BTreeMap<String, String>,
+    cwd: Option<&Path>,
+    data_dir: &Path,
+) -> Result<bingo_process::Tree, String> {
     let mut child = Command::new(command);
-    child.args(args).envs(env);
+    child
+        .args(args)
+        .envs(env)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(stderr_sink(data_dir, server_name));
     if let Some(cwd) = cwd {
         child.current_dir(cwd);
     }
-    let (transport, _stderr) = TokioChildProcess::builder(child)
-        .stderr(stderr_sink(data_dir, server_name))
-        .spawn()
-        .map_err(|e| format!("spawning {command}: {e}"))?;
-    serve_client(Client::new(asker), transport)
-        .await
-        .map_err(|e| format!("handshake: {e}"))
+    bingo_process::tree(child).map_err(|e| format!("spawning {command}: {e}"))
 }
 
 async fn open_http(
@@ -203,6 +232,7 @@ async fn open_http(
         StreamableHttpClientTransport::from_config(config),
     )
     .await
+    .map(|inner| Service { inner, _tree: None })
     .map_err(|e| {
         let why = format!("handshake: {e}");
         match crate::auth::handshake_wants_authorization(&e) {
@@ -267,6 +297,35 @@ fn open_log(data_dir: &Path, server_name: &str) -> std::io::Result<std::fs::File
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn dropping_a_server_closes_a_grandchilds_stdout() {
+        use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+        let shell = bingo_process::shell::resolve().expect("shell");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let args = vec!["-c".into(), "sleep 60 & echo ready; wait".into()];
+        let mut tree = spawn_child(
+            "tree",
+            shell.path().to_str().expect("path"),
+            &args,
+            &BTreeMap::new(),
+            Some(dir.path()),
+            dir.path(),
+        )
+        .expect("spawn");
+        let mut stdout = BufReader::new(tree.take_stdout().expect("stdout"));
+        let mut ready = String::new();
+        tokio::time::timeout(Duration::from_secs(10), stdout.read_line(&mut ready))
+            .await
+            .expect("ready deadline")
+            .expect("ready");
+        assert_eq!(ready, "ready\n");
+        drop(tree);
+        tokio::time::timeout(Duration::from_secs(3), stdout.read_to_end(&mut Vec::new()))
+            .await
+            .expect("the grandchild closes stdout")
+            .expect("EOF");
+    }
 
     #[test]
     fn catalogue_order_preserves_duplicate_definitions_and_precedence() {

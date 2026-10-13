@@ -37,8 +37,8 @@ async fn a_method_before_initialize_is_refused() {
 #[tokio::test(flavor = "multi_thread")]
 async fn stdout_carries_json_rpc_lines_only_and_an_unknown_method_is_refused() {
     let mut server = Server::spawn(TEXT_TURN);
-    let mut stdin = server.child.stdin.take().unwrap();
-    let mut lines = BufReader::new(server.child.stdout.take().unwrap()).lines();
+    let mut stdin = server.child.take_stdin().unwrap();
+    let mut lines = BufReader::new(server.child.take_stdout().unwrap()).lines();
     let mut next = async |n: u32| -> serde_json::Value {
         let line = tokio::time::timeout(Duration::from_secs(20), lines.next_line())
             .await
@@ -677,8 +677,8 @@ struct Raw {
 impl Raw {
     fn new(server: &mut Server) -> Raw {
         Raw {
-            stdin: server.child.stdin.take().unwrap(),
-            lines: BufReader::new(server.child.stdout.take().unwrap()).lines(),
+            stdin: server.child.take_stdin().unwrap(),
+            lines: BufReader::new(server.child.take_stdout().unwrap()).lines(),
             id: 0,
         }
     }

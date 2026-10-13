@@ -17,7 +17,6 @@ bingo-sdk.workspace = true
 async-trait.workspace = true
 # M16: a job's card says when it started, and the sdk re-exports no clock.
 jiff.workspace = true
-process-wrap.workspace = true
 schemars.workspace = true
 # M16: `notify_regex` is a caller's pattern over a job's output (ADR-0018 §4).
 regex.workspace = true

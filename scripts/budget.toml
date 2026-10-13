@@ -97,6 +97,7 @@
 # M130 (ADR-0073): the channel contract and platform add two members.
 # M119 (ADR-0069 §2): bingo-services adds one member, no external crate.
 # M114 (ADR-0066): bingo-digest lifts SHA-256, one member, no external crate.
-max_dependencies = 349
+# M128 (ADR-0072 §4): bingo-jsonrpc adds one member, no external crate.
+max_dependencies = 350
 max_core_check_seconds = 20
 max_target_gb = 5

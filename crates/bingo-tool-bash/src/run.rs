@@ -14,7 +14,7 @@
 //! the same process and the same pipes go to the job table (ADR-0018 §6).
 //!
 //! There is a fourth way a run ends, and it writes no answer at all: a person
-//! stops the turn, the kernel drops the call's future, and [`Group`] takes the
+//! stops the turn, the kernel drops the call's future, and [`Tree`] takes the
 //! process tree down on its way out. Nothing is waited for and the output is
 //! forfeit — a background job is not a call and is never ended this way.
 //!
@@ -25,12 +25,8 @@ use std::process::{ExitStatus, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
+use bingo_process::Tree;
 use bingo_sdk::{CancellationToken, ToolContext, ToolError};
-#[cfg(windows)]
-use process_wrap::tokio::JobObject;
-#[cfg(unix)]
-use process_wrap::tokio::ProcessGroup;
-use process_wrap::tokio::{ChildWrapper, CommandWrap, KillOnDrop};
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::Command;
 use tokio::sync::Mutex;
@@ -44,14 +40,6 @@ use crate::tail::{self, Progress, Tail, ToCall, Unwatched};
 /// inherited them and outlived the kill must not hold the turn open.
 const DRAIN: Duration = Duration::from_secs(2);
 
-/// `SIGTERM`, the signal a program is given the chance to answer before the
-/// one it cannot. POSIX fixes the number; nothing here needs libc for it.
-///
-/// Unix only: Windows has no signal a process may answer, so there a job
-/// object is ended rather than asked (see `supervise::end_it`).
-#[cfg(unix)]
-pub const TERM: i32 = 15;
-
 /// What a command left behind: everything it wrote, within the cap, and the way
 /// it ended.
 #[derive(Debug)]
@@ -64,48 +52,9 @@ pub struct Run {
 /// where its output is going. All three move together, which is what lets a
 /// running command change hands without restarting.
 pub struct Running {
-    pub child: Group,
+    pub child: Tree,
     pub readers: Vec<Reader>,
     pub sink: Arc<Mutex<Sink>>,
-}
-
-/// The whole tree the shell leads, held so that letting go of it ends it.
-///
-/// A turn's interrupt is a dropped future (`bingo_core::executor`), so what
-/// drop does is the whole of what an interrupt does here. `KillOnDrop` is not
-/// enough on its own: tokio's kill-on-drop signals the one pid it spawned,
-/// which leaves anything the shell started behind — on Windows the job object
-/// closes with the handle and takes the tree, on unix a `sleep` the command
-/// backgrounded would outlive the person who stopped it. `start_kill` is the
-/// wrapper's own spelling of "end the group": a `killpg` on unix, ending the
-/// job object on Windows, on both platforms in the same line.
-pub struct Group(Box<dyn ChildWrapper>);
-
-impl Drop for Group {
-    fn drop(&mut self) {
-        // A reaped child's group id is no longer ours to signal: the number
-        // may already name somebody else's work.
-        if self.0.id().is_none() {
-            return;
-        }
-        // Nothing waits: a drop cannot, and an interrupted command's output
-        // is forfeit anyway.
-        let _ = self.0.start_kill();
-    }
-}
-
-impl std::ops::Deref for Group {
-    type Target = Box<dyn ChildWrapper>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::ops::DerefMut for Group {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
 }
 
 /// What running a command takes from whoever asked for it: the directory it
@@ -114,7 +63,7 @@ impl std::ops::DerefMut for Group {
 /// lends only the first.
 ///
 /// The turn's interrupt is not among them and needs no token here: it is the
-/// call's future being dropped, which takes [`Group`] and the process tree
+/// call's future being dropped, which takes [`Tree`] and the process tree
 /// with it. A second reading of the same interrupt would be a second answer
 /// to one keypress.
 pub struct Context<'a> {
@@ -159,9 +108,9 @@ pub async fn run(command: &str, timeout: Duration, cx: &Context<'_>) -> Result<R
 
 /// Spawn a command and start draining its pipes into `sink`.
 pub fn start(command: &str, cwd: &Path, sink: Sink) -> Result<Running, ToolError> {
-    let mut child = Group(spawn(command, cwd)?);
+    let mut child = spawn(command, cwd)?;
     let sink = Arc::new(Mutex::new(sink));
-    let readers = read_pipes(child.as_mut(), &sink);
+    let readers = read_pipes(&mut child, &sink);
     Ok(Running {
         child,
         readers,
@@ -169,7 +118,7 @@ pub fn start(command: &str, cwd: &Path, sink: Sink) -> Result<Running, ToolError
     })
 }
 
-fn spawn(command: &str, cwd: &Path) -> Result<Box<dyn ChildWrapper>, ToolError> {
+fn spawn(command: &str, cwd: &Path) -> Result<Tree, ToolError> {
     let shell =
         bingo_process::shell::resolve().map_err(|error| ToolError::Failed(error.to_string()))?;
     let mut shell_command = Command::new(shell.path());
@@ -180,17 +129,7 @@ fn spawn(command: &str, cwd: &Path) -> Result<Box<dyn ChildWrapper>, ToolError> 
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut wrapped = CommandWrap::from(shell_command);
-    // One handle for the whole tree, so a kill takes what the shell started
-    // and not just the shell. The two platforms spell that differently: a
-    // process group on unix, a job object on Windows.
-    #[cfg(unix)]
-    wrapped.wrap(ProcessGroup::leader());
-    #[cfg(windows)]
-    wrapped.wrap(JobObject);
-    wrapped.wrap(KillOnDrop);
-    wrapped
-        .spawn()
+    bingo_process::tree(shell_command)
         .map_err(|e| ToolError::Failed(format!("could not run {}: {e}", shell.path().display())))
 }
 
@@ -270,7 +209,7 @@ pub async fn conclude(
 /// `SIGKILL` to the whole group — the wrapper's `start_kill` is a `killpg`, so a
 /// grandchild that outlived its parent goes with it — then reap what is left,
 /// bounded so an escapee cannot hold the turn.
-pub async fn kill(child: &mut Box<dyn ChildWrapper>) {
+pub async fn kill(child: &mut Tree) {
     let _ = child.start_kill();
     let _ = tokio::time::timeout(DRAIN, child.wait()).await;
 }
@@ -279,10 +218,10 @@ pub type Reader = JoinHandle<()>;
 
 /// One task per pipe, both writing into the same sink, so stdout and stderr
 /// interleave in the order they arrived.
-fn read_pipes(child: &mut dyn ChildWrapper, sink: &Arc<Mutex<Sink>>) -> Vec<Reader> {
+fn read_pipes(child: &mut Tree, sink: &Arc<Mutex<Sink>>) -> Vec<Reader> {
     let pipes = [
-        child.stdout().take().map(boxed),
-        child.stderr().take().map(boxed),
+        child.take_stdout().map(boxed),
+        child.take_stderr().map(boxed),
     ];
     pipes
         .into_iter()

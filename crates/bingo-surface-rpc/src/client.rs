@@ -4,34 +4,29 @@
 
 use std::collections::HashMap;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use async_trait::async_trait;
+use bingo_jsonrpc::{Handler, Peer, PeerError};
 use bingo_sdk::{
     Activation, Answer, Attachment, Catalog, CatalogKind, ClientIdentity, CloseReason, Delivery,
     ErrorCode, Frame, FrameStream, GatewayEvent, GatewayStream, HistoryChunk, HistoryPage, HostApi,
     HostHandle, Input, IntentId, InteractionId, InterruptScope, KernelError, OpenOptions, Seq,
     SessionFilter, SessionHandle, SessionId, SessionPort, SessionSelector, SessionSummary,
 };
-use futures::{SinkExt, Stream, StreamExt};
+use futures::{FutureExt, Stream};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
-use tokio::sync::oneshot;
-use tokio::task::JoinHandle;
-use tokio_util::codec::{FramedRead, FramedWrite};
 
-use crate::codec::{self, Id, Message, Notification, Outcome, Request, Response};
+use crate::codec::{self, Message, Notification, Outcome};
 use crate::methods::{
     AnswerParams, CatalogParams, DeliverParams, Empty, EventParams, EventsParams, ExtendParams,
     HistoryParams, InitializeParams, InitializeResult, InterruptParams, ListParams, ListResult,
     OpenParams, OpenResult, PROTOCOL, SessionParams, SignalParams, SubmitParams, name,
 };
-
-type Waiting = oneshot::Sender<Result<Value, KernelError>>;
 
 /// Where a session's frames go. The receiver waits here until `open` claims it,
 /// so a frame that arrives before the caller knows the session id is kept.
@@ -63,54 +58,15 @@ impl Route {
 /// Where a reply and a notification go.
 #[derive(Default)]
 struct Router {
-    pending: Mutex<HashMap<Id, Waiting>>,
     routes: Mutex<HashMap<SessionId, Route>>,
     gateway: Mutex<Option<UnboundedSender<GatewayEvent>>>,
 }
 
 impl Router {
-    fn pending(&self) -> MutexGuard<'_, HashMap<Id, Waiting>> {
-        self.pending
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-
     fn routes(&self) -> MutexGuard<'_, HashMap<SessionId, Route>> {
         self.routes
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-
-    fn line(&self, line: &str) {
-        match serde_json::from_str::<Message>(line) {
-            Ok(Message::Response(response)) => self.response(response),
-            Ok(Message::Notification(notification)) => self.notification(notification),
-            Ok(Message::Request(request)) => {
-                tracing::warn!(method = %request.method, "the server asked, which it may not");
-            }
-            Err(error) => tracing::warn!(%error, "the server sent a line that is not a message"),
-        }
-    }
-
-    fn response(&self, response: Response) {
-        let outcome = match response.outcome {
-            Outcome::Result(value) => Ok(value),
-            Outcome::Error(error) => Err(KernelError::from(error)),
-        };
-        let Some(id) = response.id else {
-            tracing::error!(?outcome, "the server answered without an id");
-            return;
-        };
-        match self.pending().remove(&id) {
-            Some(waiting) => {
-                let _ = waiting.send(outcome);
-            }
-            // A write fires and forgets, so this is where its failure surfaces.
-            None => match outcome {
-                Err(error) => tracing::error!(%id, %error, "a request failed"),
-                Ok(_) => tracing::debug!(%id, "a reply nobody was waiting for"),
-            },
-        }
     }
 
     fn notification(&self, notification: Notification) {
@@ -184,7 +140,6 @@ impl Router {
 
     /// The connection ended; everyone waiting learns it rather than hanging.
     fn disconnect(&self) {
-        self.pending().clear();
         self.routes().clear();
     }
 }
@@ -208,44 +163,55 @@ fn stream<T: Send + 'static>(
     }))
 }
 
-/// The tasks die with the last handle onto the connection.
-struct Tasks {
-    reading: JoinHandle<()>,
-    writing: JoinHandle<()>,
-}
-
-impl Drop for Tasks {
-    fn drop(&mut self) {
-        self.reading.abort();
-        self.writing.abort();
+impl Handler for Router {
+    fn handle(
+        &self,
+        message: Message,
+        _: bingo_jsonrpc::Sender,
+    ) -> futures::future::BoxFuture<'_, ()> {
+        async move {
+            match message {
+                Message::Notification(note) => self.notification(note),
+                Message::Response(response) => {
+                    if let Outcome::Error(error) = response.outcome {
+                        tracing::error!(error = %error.message, "a request failed");
+                    }
+                }
+                Message::Request(request) => {
+                    tracing::warn!(method = %request.method, "the server asked, which it may not")
+                }
+            }
+        }
+        .boxed()
+    }
+    fn closed(&self, _: &PeerError) {
+        self.disconnect();
     }
 }
 
 struct Connection {
-    out: UnboundedSender<Message>,
-    next: AtomicU64,
+    peer: Peer,
     router: Arc<Router>,
-    _tasks: Tasks,
+}
+
+fn transport(error: PeerError) -> KernelError {
+    match error {
+        PeerError::Remote(error) => codec::to_kernel(error),
+        error => KernelError::new(ErrorCode::Offline, error.to_string()),
+    }
 }
 
 impl Connection {
-    fn id(&self) -> Id {
-        Id::Number(self.next.fetch_add(1, Ordering::Relaxed) as i64)
-    }
-
-    /// Ask, and wait for the answer.
     async fn call<P: Serialize, R: DeserializeOwned>(
         &self,
         method: &'static str,
         params: &P,
     ) -> Result<R, KernelError> {
-        let id = self.id();
-        let (answer, wait) = oneshot::channel();
-        self.router.pending().insert(id.clone(), answer);
-        self.request(id, method, params)?;
-        let value = wait
+        let value = self
+            .peer
+            .request(method, parameters(params)?)
             .await
-            .map_err(|_| KernelError::new(ErrorCode::Offline, "the connection closed"))??;
+            .map_err(transport)?;
         serde_json::from_value(value).map_err(|error| {
             KernelError::new(
                 ErrorCode::Internal,
@@ -254,28 +220,19 @@ impl Connection {
         })
     }
 
-    /// Ask without waiting: the trait's writes are synchronous, and the outcome
-    /// arrives as an `IntentAck` frame. A failed reply is logged by the router.
     fn fire<P: Serialize>(&self, method: &'static str, params: &P) {
-        let id = self.id();
-        if let Err(error) = self.request(id, method, params) {
+        if let Err(error) =
+            parameters(params).and_then(|params| self.peer.fire(method, params).map_err(transport))
+        {
             tracing::error!(%error, method, "a write never reached the server");
         }
     }
+}
 
-    fn request<P: Serialize>(
-        &self,
-        id: Id,
-        method: &'static str,
-        params: &P,
-    ) -> Result<(), KernelError> {
-        let params = serde_json::to_value(params).map_err(|error| {
-            KernelError::new(ErrorCode::InvalidInput, format!("unserialisable: {error}"))
-        })?;
-        self.out
-            .send(Message::Request(Request::new(id, method, params)))
-            .map_err(|_| KernelError::new(ErrorCode::Offline, "the connection closed"))
-    }
+fn parameters(params: &impl Serialize) -> Result<Value, KernelError> {
+    serde_json::to_value(params).map_err(|error| {
+        KernelError::new(ErrorCode::InvalidInput, format!("unserialisable: {error}"))
+    })
 }
 
 /// A kernel on the other end of a pipe.
@@ -291,18 +248,9 @@ impl RemoteKernel {
         W: AsyncWrite + Unpin + Send + 'static,
     {
         let router = Arc::new(Router::default());
-        let (out, queue) = unbounded_channel();
-        let tasks = Tasks {
-            reading: tokio::spawn(read_lines(reader, Arc::clone(&router))),
-            writing: tokio::spawn(write_lines(writer, queue)),
-        };
+        let peer = Peer::spawn(reader, writer, router.clone());
         RemoteKernel {
-            connection: Arc::new(Connection {
-                out,
-                next: AtomicU64::new(1),
-                router,
-                _tasks: tasks,
-            }),
+            connection: Arc::new(Connection { peer, router }),
         }
     }
 
@@ -332,43 +280,6 @@ impl RemoteKernel {
     /// Hand this kernel to a surface written against `HostHandle`.
     pub fn into_host(self) -> HostHandle {
         HostHandle(Arc::new(self))
-    }
-}
-
-async fn read_lines<R>(reader: R, router: Arc<Router>)
-where
-    R: AsyncRead + Unpin + Send + 'static,
-{
-    let mut lines = FramedRead::new(reader, codec::lines());
-    while let Some(line) = lines.next().await {
-        match line {
-            Ok(line) => router.line(&line),
-            Err(error) => {
-                tracing::warn!(%error, "the connection failed while reading");
-                break;
-            }
-        }
-    }
-    router.disconnect();
-}
-
-async fn write_lines<W>(writer: W, mut queue: UnboundedReceiver<Message>)
-where
-    W: AsyncWrite + Unpin + Send + 'static,
-{
-    let mut sink = FramedWrite::new(writer, codec::lines());
-    while let Some(message) = queue.recv().await {
-        let line = match serde_json::to_string(&message) {
-            Ok(line) => line,
-            Err(error) => {
-                tracing::error!(%error, "an unserialisable request");
-                continue;
-            }
-        };
-        if let Err(error) = sink.send(line).await {
-            tracing::warn!(%error, "the connection failed while writing");
-            break;
-        }
     }
 }
 

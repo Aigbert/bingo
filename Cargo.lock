@@ -245,6 +245,7 @@ dependencies = [
  "bingo-persona",
  "bingo-pictures",
  "bingo-plugin-rpc",
+ "bingo-process",
  "bingo-provider-acp",
  "bingo-provider-anthropic",
  "bingo-provider-fake",
@@ -501,7 +502,6 @@ dependencies = [
  "bingo-sdk",
  "insta",
  "jiff",
- "process-wrap 10.0.0",
  "regex",
  "schemars 1.2.2",
  "serde",
@@ -510,6 +510,18 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "bingo-jsonrpc"
+version = "0.6.6"
+dependencies = [
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -530,6 +542,7 @@ dependencies = [
  "async-trait",
  "bingo-auth-oauth",
  "bingo-pictures",
+ "bingo-process",
  "bingo-sdk",
  "bingo-services",
  "insta",
@@ -597,7 +610,9 @@ name = "bingo-plugin-rpc"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-jsonrpc",
  "bingo-pictures",
+ "bingo-process",
  "bingo-sdk",
  "futures",
  "schemars 1.2.2",
@@ -612,7 +627,9 @@ dependencies = [
 name = "bingo-process"
 version = "0.6.6"
 dependencies = [
+ "process-wrap 10.0.0",
  "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]
@@ -622,12 +639,13 @@ dependencies = [
  "agent-client-protocol-schema",
  "async-trait",
  "base64 0.23.1",
+ "bingo-jsonrpc",
+ "bingo-process",
  "bingo-sdk",
  "bingo-services",
  "futures",
  "getrandom 0.4.3",
  "jiff",
- "process-wrap 10.0.0",
  "rmcp",
  "schemars 1.2.2",
  "serde",
@@ -829,6 +847,7 @@ name = "bingo-surface-rpc"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-jsonrpc",
  "bingo-sdk",
  "futures",
  "jiff",
@@ -899,7 +918,6 @@ dependencies = [
  "bingo-process",
  "bingo-sdk",
  "jiff",
- "process-wrap 10.0.0",
  "regex",
  "schemars 1.2.2",
  "serde",

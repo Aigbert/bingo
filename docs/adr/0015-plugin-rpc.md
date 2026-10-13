@@ -1,5 +1,8 @@
 # 0015 — The cross-process plugin bridge
 
+Amended 2026-10-13 · M128: the copied codec and pending map now live in
+`bingo-jsonrpc` (ADR-0072 §4); plugin protocol vocabulary stays here.
+
 ## Context
 
 `Contribution` was written as "one enum so the in-process path and a future out-of-process bridge share one representation" (sdk `plugin.rs`), and the plan gated that bridge on the traits being proven by three in-process consumers — done since M11. Two out-of-process instances already exist, each on a foreign contract: MCP (tools only, a protocol with its own runtime and no notion of our commands, previews or views) and shell hooks (lifecycle shell-outs on Claude Code's contract). Neither lets a third party ship a bingo-native contribution — a `/command` with completion and an instant flag, a tool whose `ToolOutput.display` is a `View` — without writing Rust in this repository. The exit the plan names: a third party writes one Tool and one Command in a language that is not Rust, and both run.

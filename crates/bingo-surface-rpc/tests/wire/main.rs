@@ -34,8 +34,8 @@ use tokio_util::codec::{FramedRead, FramedWrite};
 /// A client that writes lines and reads them back, so the assertions are about
 /// bytes rather than about the server's insides.
 struct Wire {
-    reader: FramedRead<ReadHalf<DuplexStream>, tokio_util::codec::LinesCodec>,
-    writer: FramedWrite<WriteHalf<DuplexStream>, tokio_util::codec::LinesCodec>,
+    reader: FramedRead<ReadHalf<DuplexStream>, bingo_jsonrpc::codec::Lines>,
+    writer: FramedWrite<WriteHalf<DuplexStream>, bingo_jsonrpc::codec::Lines>,
     served: JoinHandle<Result<Exit, KernelError>>,
     next: i64,
     line_bytes: Vec<usize>,
@@ -47,8 +47,8 @@ impl Wire {
         let (server_reader, server_writer) = tokio::io::split(server);
         let (client_reader, client_writer) = tokio::io::split(client);
         Wire {
-            reader: FramedRead::new(client_reader, codec::lines()),
-            writer: FramedWrite::new(client_writer, codec::lines()),
+            reader: FramedRead::new(client_reader, codec::lines(codec::MAX_LINE)),
+            writer: FramedWrite::new(client_writer, codec::lines(codec::MAX_LINE)),
             served: tokio::spawn(serve(host, server_reader, server_writer)),
             next: 1,
             line_bytes: Vec::new(),

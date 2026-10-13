@@ -20,19 +20,18 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use bingo_jsonrpc::{Handler, Peer, PeerError};
+use bingo_process::Tree;
 use bingo_sdk::{ModelEvent, ToolHost};
+use futures::FutureExt;
 use serde_json::Value;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::process::{ChildStdin, ChildStdout, Command};
 use tokio::sync::mpsc::{Sender, UnboundedSender};
-use tokio::sync::oneshot;
 
-use crate::codec::{
-    Id, Message, Notification, Outcome, Request, Response, RpcError, TRANSPORT_ERROR,
-};
+use crate::codec::{Message, Notification, Request, Response, RpcError, TRANSPORT_ERROR};
 use crate::manifest::Entry;
 use crate::service::ServiceCalls;
 use crate::wire::{ProviderDeltaParams, ToolProgressParams, name};
@@ -45,32 +44,12 @@ pub fn log_path(data_dir: &Path, plugin: &str) -> std::path::PathBuf {
     data_dir.join("logs").join(format!("plugin-{plugin}.log"))
 }
 
-/// The writing half of the pipe: one whole message at a time, in the order
-/// the host wrote them. The reader answers a process's own request on it, so
-/// it is shared rather than owned by the connection alone.
-#[derive(Debug)]
-struct Writer(tokio::sync::Mutex<ChildStdin>);
-
-impl Writer {
-    async fn write(&self, message: Message) -> Result<(), String> {
-        let line = message.line().map_err(|e| e.to_string())?;
-        let mut stdin = self.0.lock().await;
-        stdin
-            .write_all(line.as_bytes())
-            .await
-            .map_err(|e| e.to_string())?;
-        stdin.write_all(b"\n").await.map_err(|e| e.to_string())?;
-        stdin.flush().await.map_err(|e| e.to_string())
-    }
-}
-
 /// Who answers the one request a process may send, and how the answer gets
 /// back to it. Absent where nobody is serving — a connection a test drives,
 /// a host that keeps no services — and then that request is refused like any
 /// other (ADR-0031 §4).
 struct Serving {
     calls: Arc<dyn ServiceCalls>,
-    writer: Arc<Writer>,
 }
 
 impl std::fmt::Debug for Serving {
@@ -82,17 +61,15 @@ impl std::fmt::Debug for Serving {
 impl Serving {
     /// On a task of its own: a service that takes a second must not stop the
     /// reader, which is also carrying this process's replies and deltas.
-    fn answer(&self, request: Request) {
-        let (calls, writer) = (Arc::clone(&self.calls), Arc::clone(&self.writer));
-        tokio::spawn(async move {
-            let answered = match calls.call(request.params).await {
-                Ok(result) => Response::ok(request.id, result),
-                Err(error) => Response::failed(Some(request.id), error),
-            };
-            if let Err(why) = writer.write(Message::Response(answered)).await {
-                tracing::debug!(%why, "an answer to a plugin went nowhere");
-            }
-        });
+    async fn answer(&self, request: Request, writer: bingo_jsonrpc::Sender) {
+        let calls = &self.calls;
+        let answered = match calls.call(request.params).await {
+            Ok(result) => Response::ok(request.id, result),
+            Err(error) => Response::failed(Some(request.id), error),
+        };
+        if let Err(why) = writer.send(Message::Response(answered)) {
+            tracing::debug!(%why, "an answer to a plugin went nowhere");
+        }
     }
 }
 
@@ -123,20 +100,16 @@ impl std::fmt::Debug for Running {
 /// to send either, and who answers the one thing it may ask.
 #[derive(Debug, Default)]
 struct Router {
+    #[cfg(test)]
     alive: AtomicBool,
     /// Set by whoever first reports the death, so it is reported once.
     announced: AtomicBool,
-    waiting: Mutex<HashMap<Id, oneshot::Sender<Reply>>>,
     running: Mutex<HashMap<String, Running>>,
     streaming: Mutex<HashMap<String, Sender<ModelEvent>>>,
     serving: Option<Serving>,
 }
 
 impl Router {
-    fn waiting(&self) -> MutexGuard<'_, HashMap<Id, oneshot::Sender<Reply>>> {
-        self.waiting.lock().unwrap_or_else(|held| held.into_inner())
-    }
-
     fn running(&self) -> MutexGuard<'_, HashMap<String, Running>> {
         self.running.lock().unwrap_or_else(|held| held.into_inner())
     }
@@ -147,44 +120,24 @@ impl Router {
             .unwrap_or_else(|held| held.into_inner())
     }
 
+    #[cfg(test)]
     async fn line(&self, plugin: &str, line: &str) {
         match serde_json::from_str::<Message>(line) {
-            Ok(Message::Response(response)) => self.response(plugin, response),
-            Ok(Message::Notification(notification)) => {
-                self.notification(plugin, notification).await
-            }
-            Ok(Message::Request(request)) => self.asked(plugin, request),
-            Err(error) => {
-                tracing::warn!(plugin, %error, "a plugin sent a line that is not a message");
-            }
+            Ok(Message::Notification(note)) => self.notification(plugin, note).await,
+            Ok(Message::Request(request)) => self.asked(plugin, request, None).await,
+            _ => {}
         }
     }
 
-    /// The one request a process may send the host, and the refusal every
-    /// other one has always had.
-    fn asked(&self, plugin: &str, request: Request) {
-        match self.serving.as_ref().filter(|_| served(&request.method)) {
-            Some(serving) => serving.answer(request),
-            None => {
-                tracing::warn!(plugin, method = %request.method, "a plugin asked, which it may not");
+    async fn asked(&self, plugin: &str, request: Request, sender: Option<bingo_jsonrpc::Sender>) {
+        match (
+            self.serving.as_ref().filter(|_| served(&request.method)),
+            sender,
+        ) {
+            (Some(serving), Some(sender)) => serving.answer(request, sender).await,
+            _ => {
+                tracing::warn!(plugin, method = %request.method, "a plugin asked, which it may not")
             }
-        }
-    }
-
-    fn response(&self, plugin: &str, response: Response) {
-        let outcome = match response.outcome {
-            Outcome::Result(value) => Ok(value),
-            Outcome::Error(error) => Err(error),
-        };
-        let Some(id) = response.id else {
-            tracing::warn!(plugin, "a plugin answered without an id");
-            return;
-        };
-        match self.waiting().remove(&id) {
-            Some(waiting) => {
-                let _ = waiting.send(outcome);
-            }
-            None => tracing::debug!(plugin, id, "a reply nobody was waiting for"),
         }
     }
 
@@ -224,13 +177,8 @@ impl Router {
     /// The pipe closed: nothing more will ever arrive, so everything waiting
     /// fails now rather than never.
     fn closed(&self) {
+        #[cfg(test)]
         self.alive.store(false, Ordering::Release);
-        for (_, waiting) in self.waiting().drain() {
-            let _ = waiting.send(Err(RpcError::new(
-                TRANSPORT_ERROR,
-                "the plugin process ended",
-            )));
-        }
         self.running().clear();
         self.streaming().clear();
     }
@@ -239,9 +187,8 @@ impl Router {
 /// One live plugin process.
 pub struct Connection {
     plugin: String,
-    child: tokio::sync::Mutex<Child>,
-    writer: Arc<Writer>,
-    next_id: AtomicI64,
+    child: tokio::sync::Mutex<Tree>,
+    peer: Peer,
     router: Arc<Router>,
 }
 
@@ -272,12 +219,10 @@ impl Connection {
             .current_dir(root)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(stderr_sink(data_dir, plugin))
-            .kill_on_drop(true);
-        let mut child = command
-            .spawn()
-            .map_err(|e| format!("spawning {}: {e}", entry.command))?;
-        let (Some(stdin), Some(stdout)) = (child.stdin.take(), child.stdout.take()) else {
+            .stderr(stderr_sink(data_dir, plugin));
+        let mut child =
+            bingo_process::tree(command).map_err(|e| format!("spawning {}: {e}", entry.command))?;
+        let (Some(stdin), Some(stdout)) = (child.take_stdin(), child.take_stdout()) else {
             return Err("the child was spawned without pipes".to_string());
         };
         Ok(Self::over(plugin, child, stdin, stdout, serving))
@@ -285,33 +230,33 @@ impl Connection {
 
     fn over(
         plugin: &str,
-        child: Child,
+        child: Tree,
         stdin: ChildStdin,
         stdout: ChildStdout,
         serving: Option<Arc<dyn ServiceCalls>>,
     ) -> Self {
-        let writer = Arc::new(Writer(tokio::sync::Mutex::new(stdin)));
         let router = Arc::new(Router {
+            #[cfg(test)]
             alive: AtomicBool::new(true),
-            serving: serving.map(|calls| Serving {
-                calls,
-                writer: Arc::clone(&writer),
-            }),
+            serving: serving.map(|calls| Serving { calls }),
             ..Router::default()
         });
-        tokio::spawn(pump(plugin.to_string(), stdout, Arc::clone(&router)));
+        let handler = Arc::new(Inbound {
+            plugin: plugin.to_string(),
+            router: router.clone(),
+        });
+        let peer = Peer::spawn(stdout, stdin, handler);
         Self {
             plugin: plugin.to_string(),
             child: tokio::sync::Mutex::new(child),
-            writer,
-            next_id: AtomicI64::new(1),
+            peer,
             router,
         }
     }
 
     /// Whether the process is still on the other end of the pipe.
     pub fn is_alive(&self) -> bool {
-        self.router.alive.load(Ordering::Acquire)
+        self.peer.is_alive()
     }
 
     /// True for the first caller to find this process gone, so one death is
@@ -322,30 +267,18 @@ impl Connection {
 
     /// Ask, and wait for the answer or for the process to end.
     pub async fn request(&self, method: &str, params: Value) -> Reply {
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        let (sender, answer) = oneshot::channel();
-        self.router.waiting().insert(id, sender);
-        if let Err(why) = self
-            .write(Message::Request(Request::new(id, method, params)))
+        self.peer
+            .request(method, params)
             .await
-        {
-            self.router.waiting().remove(&id);
-            return Err(RpcError::new(TRANSPORT_ERROR, why));
-        }
-        match answer.await {
-            Ok(reply) => reply,
-            // The router drops a sender only when the pipe closed.
-            Err(_) => Err(RpcError::new(TRANSPORT_ERROR, "the plugin process ended")),
-        }
+            .map_err(|error| match error {
+                PeerError::Remote(error) => error,
+                PeerError::Closed => RpcError::new(TRANSPORT_ERROR, "the plugin process ended"),
+                error => RpcError::new(TRANSPORT_ERROR, error.to_string()),
+            })
     }
 
-    /// Tell, and do not wait. A notification the process never reads is not
-    /// an error the caller can do anything about.
     pub async fn notify(&self, method: &str, params: Value) {
-        if let Err(why) = self
-            .write(Message::Notification(Notification::new(method, params)))
-            .await
-        {
+        if let Err(why) = self.peer.notify(method, params) {
             tracing::debug!(plugin = %self.plugin, method, %why, "a notification went nowhere");
         }
     }
@@ -391,27 +324,19 @@ impl Connection {
     /// A name for one stream on this pipe, unique while the process lives. The
     /// counter is the request ids', so one process mints one series.
     pub fn next_call(&self) -> String {
-        format!("call-{}", self.next_id.fetch_add(1, Ordering::Relaxed))
+        format!("call-{}", self.peer.next_id())
     }
 
     /// End the process. The host is closing, or the plugin refused the
     /// handshake and will never be spoken to again.
     pub async fn stop(&self) {
-        self.router.closed();
-        if let Err(error) = self.child.lock().await.kill().await {
+        self.peer.close();
+        let mut child = self.child.lock().await;
+        if let Err(error) = child.start_kill() {
             tracing::debug!(plugin = %self.plugin, %error, "the plugin process was already gone");
+            return;
         }
-    }
-
-    /// One line out. A pipe that will not take it is a process that has
-    /// ended, and everything waiting on that process fails now — the reader
-    /// says the same a moment later, and saying it twice is harmless.
-    async fn write(&self, message: Message) -> Result<(), String> {
-        let sent = self.writer.write(message).await;
-        if sent.is_err() {
-            self.router.closed();
-        }
-        sent
+        let _ = child.wait().await;
     }
 }
 
@@ -439,20 +364,33 @@ impl Drop for StreamWatch {
     }
 }
 
-/// The reader: every line the process writes, until it writes no more.
-async fn pump(plugin: String, stdout: ChildStdout, router: Arc<Router>) {
-    let mut lines = BufReader::new(stdout).lines();
-    loop {
-        match lines.next_line().await {
-            Ok(Some(line)) => router.line(&plugin, &line).await,
-            Ok(None) => break,
-            Err(error) => {
-                tracing::warn!(plugin, %error, "the plugin's output could not be read");
-                break;
+struct Inbound {
+    plugin: String,
+    router: Arc<Router>,
+}
+
+impl Handler for Inbound {
+    fn handle(
+        &self,
+        message: Message,
+        sender: bingo_jsonrpc::Sender,
+    ) -> futures::future::BoxFuture<'_, ()> {
+        async move {
+            match message {
+                Message::Notification(note) => self.router.notification(&self.plugin, note).await,
+                Message::Request(request) => {
+                    self.router.asked(&self.plugin, request, Some(sender)).await
+                }
+                Message::Response(_) => {
+                    tracing::debug!(plugin = %self.plugin, "a reply nobody was waiting for")
+                }
             }
         }
+        .boxed()
     }
-    router.closed();
+    fn closed(&self, _: &PeerError) {
+        self.router.closed();
+    }
 }
 
 /// Where a child's stderr goes. Left alone it inherits the terminal and paints
@@ -493,6 +431,37 @@ mod tests {
             args: args.iter().map(|arg| (*arg).to_string()).collect(),
             env: Default::default(),
         }
+    }
+
+    #[tokio::test]
+    async fn dropping_a_connection_closes_a_grandchilds_stdout() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let shell = bingo_process::shell::resolve().expect("shell");
+        let command = entry(
+            shell.path().to_str().expect("shell path"),
+            &[
+                "-c",
+                "sleep 60 & read line; echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}'; wait",
+            ],
+        );
+        let connection =
+            Connection::spawn("tree", &command, dir.path(), dir.path(), None).expect("spawn");
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            connection.request("ready", json!({})),
+        )
+        .await
+        .expect("ready deadline")
+        .expect("ready");
+        let router = connection.router.clone();
+        drop(connection.child);
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            while router.alive.load(Ordering::Acquire) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("the grandchild must close stdout when its connection drops");
     }
 
     #[test]

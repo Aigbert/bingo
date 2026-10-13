@@ -12,6 +12,7 @@ description = "JSON-RPC surface plugin and remote kernel client for bingo"
 workspace = true
 
 [dependencies]
+bingo-jsonrpc.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
 futures.workspace = true
