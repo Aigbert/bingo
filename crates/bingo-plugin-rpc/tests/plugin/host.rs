@@ -112,3 +112,33 @@ async fn contribution_notifications_replace_the_whole_list() {
     assert!(started.manager.commands().await.is_empty());
     started.manager.shutdown().await;
 }
+
+#[tokio::test]
+async fn model_completion_reaches_the_hosts_default_refusal() {
+    let started = started_with(&[("stub", &[])]).await;
+    let request = bingo_sdk::ModelRequest {
+        model: "ignored".into(),
+        max_tokens: 100,
+        system: Vec::new(),
+        messages: Vec::new(),
+        tools: Vec::new(),
+        reasoning: None,
+        session: None,
+        provider_options: Default::default(),
+    };
+    let answer = reverse(
+        &started,
+        "host/model/complete",
+        json!({"session":"ses_1","request":request}),
+    )
+    .await;
+    assert_eq!(answer["error"]["code"], -32603);
+    assert!(
+        answer["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("this host does not complete model requests"),
+        "{answer}"
+    );
+    started.manager.shutdown().await;
+}

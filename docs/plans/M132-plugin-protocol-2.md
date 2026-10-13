@@ -71,7 +71,7 @@ M133's; this milestone makes every verb it needs answerable.
 - `crates/bingo-plugin-rpc/src/{host.rs,state.rs,intercept.rs,reload.rs}` (new; one noun each)
 - `crates/bingo-plugin-rpc/examples/stub_plugin/{main.rs,hooks.rs}`, `tests/plugin/*.rs`
 - `crates/bingo-sdk/src/{host.rs,error.rs,intercept.rs,plugin.rs,event.rs,state.rs}`
-- `crates/bingo-sdk/src/event/raw.rs`, `tests/record.rs`, `fixtures/record/event/usageCharged.json`
+- `crates/bingo-sdk/src/event/raw.rs`, `tests/{record,intercept}.rs`, `fixtures/record/event/usageCharged.json`
   (all under `crates/bingo-sdk`); `src/testing/{api.rs,calls.rs}` as needed.
 - `crates/bingo-core/src/{host.rs,plugins.rs,session.rs,turn.rs}`;
   `host/{registry.rs,complete.rs}`, `session/{mailbox.rs,running.rs,complete.rs}`,
@@ -84,7 +84,7 @@ M133's; this milestone makes every verb it needs answerable.
   `bingo-shelf` dependency for state (ADR-0072); no external dependency.
 - `crates/bingo-sdk/src/lib.rs`: export the interceptor source contract.
 - Mechanical test constructors and generated schema fixtures outside these
-  files follow execution protocol step 6; production match arms do not.
+  files follow step 6 (`tests/intercept.rs`: ADR-0078 `turn.complete` name).
 
 ## Exit criteria
 

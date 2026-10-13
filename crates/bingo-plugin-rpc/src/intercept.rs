@@ -53,31 +53,6 @@ pub struct ToolEvent {
     pub input: BTreeMap<String, Value>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn catalogue_tool_fields_and_completion_spelling() {
-        let event: ToolEvent = serde_json::from_value(
-            serde_json::json!({"tool":"Bash","tool_use_id":"c1","command":"ls"}),
-        )
-        .unwrap();
-        assert_eq!(event.input["command"], "ls");
-        assert_eq!(
-            serde_json::to_value(LinkPoint::TurnStop).unwrap(),
-            "turn.complete"
-        );
-        let next = Proceed::<_, ToolOutput>::Next(event);
-        let value = serde_json::to_value(next).unwrap();
-        assert_eq!(value["next"]["tool_use_id"], "c1");
-        assert!(value["next"].get("input").is_none());
-        let result = serde_json::to_value(ResultValue {
-            result: ToolOutput::error("failed"),
-        })
-        .unwrap();
-        assert_eq!(result["result"]["isError"], true);
-    }
-}
 use crate::connection::Connection;
 use async_trait::async_trait;
 use futures::{FutureExt, StreamExt};
@@ -312,5 +287,31 @@ impl Interceptor for Remote {
         Ok(result.map(|events| {
             StepStream::new(Box::pin(futures::stream::iter(events.into_iter().map(Ok))))
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn catalogue_tool_fields_and_completion_spelling() {
+        let event: ToolEvent = serde_json::from_value(
+            serde_json::json!({"tool":"Bash","tool_use_id":"c1","command":"ls"}),
+        )
+        .unwrap();
+        assert_eq!(event.input["command"], "ls");
+        assert_eq!(
+            serde_json::to_value(LinkPoint::TurnStop).unwrap(),
+            "turn.complete"
+        );
+        let next = Proceed::<_, ToolOutput>::Next(event);
+        let value = serde_json::to_value(next).unwrap();
+        assert_eq!(value["next"]["tool_use_id"], "c1");
+        assert!(value["next"].get("input").is_none());
+        let result = serde_json::to_value(ResultValue {
+            result: ToolOutput::error("failed"),
+        })
+        .unwrap();
+        assert_eq!(result["result"]["isError"], true);
     }
 }

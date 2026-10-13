@@ -20,7 +20,7 @@ fn the_seven_points_use_the_catalogue_names() {
             "turn.step",
             "prompt.compose",
             "session.compact",
-            "turn.stop"
+            "turn.complete"
         ])
     );
     assert_eq!(serde_json::to_value(Tier::default()).unwrap(), "tighten");
