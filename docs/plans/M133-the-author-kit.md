@@ -86,7 +86,9 @@ file unchanged.
 - `schema/plugin-scenario.json` (new)
 - Workspace and affected Cargo manifests/lock: the renderer uses existing
   `serde_json`; bin adds existing `serde`, `schemars`, `futures`, `tempfile`
-  for scenarios and isolated homes. Fake script types derive `JsonSchema`
+  for scenarios and isolated homes. `tempfile` moves from dev to normal;
+  `scripts/budget.toml` permits two normal-tree crates: that existing crate
+  and the new renderer (353 → 355). Fake script types derive `JsonSchema`
   (existing `schemars` edge) so the scenario contract never copies them.
 - `crates/bingo-provider-fake/{Cargo.toml,src/lib.rs}` (schema derives only)
 - `examples/plugins/ts-status/{plugin.json,hooks/register.ts,main.ts,scenarios/acceptance.json,README.md}`
@@ -107,7 +109,7 @@ file unchanged.
 - [ ] CI's Linux job log shows acceptance ran (pending CI; no push authorized).
 - [ ] `node sdk/typescript/src/index.ts` exits 0 with no output on the
       pinned node (the SDK parses under type stripping), pasted.
-- [ ] All gates of the protocol; `scripts/budget.sh` unchanged in crates.
+- [ ] All gates of the protocol; normal-tree budget 355 (+renderer, +existing tempfile).
 
 ## Non-goals
 
@@ -116,19 +118,18 @@ file unchanged.
   dependency); the example running is the test.
 - An SDK in another language; the in-process runtime (M137, whose first
   module is this `register.ts`); `*.test.ts` (M142 replaces scenarios).
-- Expectations over plugin state directly: the example shows its state
-  in its slot, which is what a person would see.
+- Expectations read displayed slots/transcript, never private plugin state.
 
 ## Risks
 
-- Node's default type stripping arrived in 23.6 and was backported to
-  22.18 (believed; verify both, and what deno and bun need) — the skip
-  reads the version, not the name.
+- Node 22.18 / 23.6 enable default stripping; CI pins 24.17.0.
+  Deno/Bun runtime guidance cites their docs; Node runs acceptance.
 - A hook holds a pending `next` across two requests; a plugin that
   never calls `next` and never returns holds a chain until the `HOOK`
   deadline. The deadline is the host's (ADR-0074 §4), not the SDK's.
-- `FakeProvider` in a user-facing command: it is already in the bin;
-  if M111 or M118 moved it, `plugins test` follows it there.
+- Scenarios isolate both home and project discovery and use only FakeProvider.
+  A missing state key is null; reload notices are transcript items.
+  `denied` reads error text containing “denied”; the stream carries no verdict.
 - Re-verify at start: M132's verbs and capability names as landed (the
   generator reads them, it does not restate them); ADR-0070 slots as
   M121/M123 built them (what `expect slot` reads off `SessionState`);
