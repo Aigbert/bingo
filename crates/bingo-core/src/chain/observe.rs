@@ -5,7 +5,7 @@ use serde_json::Value;
 
 pub(crate) enum Work {
     Task(BoxFuture<'static, ()>),
-    Frame(Frame, HookContext),
+    Frame(Box<Frame>, HookContext),
     Named(LinkPoint, Value, HookContext),
 }
 
@@ -20,7 +20,7 @@ pub(crate) fn observed(event: &Event) -> Option<(LinkPoint, Value)> {
             serde_json::to_value(catalogue::TurnStart {
                 turn: turn.clone(),
                 inputs: inputs.clone(),
-                origin: origin.clone(),
+                origin: *origin,
             })
             .ok()?,
         )),

@@ -694,7 +694,7 @@ impl Actor {
             && !matches!(frame.event, Event::ItemDelta { .. })
         {
             let _ = observed.send(crate::chain::observe::Work::Frame(
-                frame.clone(),
+                Box::new(frame.clone()),
                 self.hook_context(),
             ));
         }
