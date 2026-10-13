@@ -1,5 +1,7 @@
 # 0015 — The cross-process plugin bridge
 
+Amended 2026-10-13 · M132: [ADR-0075](0075-plugin-protocol-2.md) freezes protocol 2, negotiates host verbs and links, and adds state and explicit-directory reload.
+
 Amended 2026-10-13 · M128: the copied codec and pending map now live in
 `bingo-jsonrpc` (ADR-0072 §4); plugin protocol vocabulary stays here.
 
