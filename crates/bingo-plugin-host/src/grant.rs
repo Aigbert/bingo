@@ -78,6 +78,24 @@ pub async fn granted(host: &bingo_sdk::HostHandle, plugin: &str) -> Result<Grant
     serde_json::from_value(entry.meta).map_err(|_| format!("{plugin}: plugin has no granted nouns"))
 }
 
+/// Face metadata decides the noun and whether the method needs unsafe authority.
+pub async fn admit_service(
+    host: &bingo_sdk::HostHandle,
+    plugin: &str,
+    key: &str,
+    method: &str,
+    wire: &dyn bingo_sdk::WireService,
+) -> Result<(), String> {
+    let face = wire.face();
+    let noun = face.as_ref().map(|face| face.noun.as_str()).unwrap_or(key);
+    let unsafe_call = face
+        .as_ref()
+        .and_then(|face| face.find(method))
+        .is_none_or(|method| method.unsafe_call);
+    admits(&granted(host, plugin).await?, noun, method, unsafe_call)
+        .map_err(|error| format!("{plugin}: {error}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

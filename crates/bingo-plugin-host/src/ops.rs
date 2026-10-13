@@ -75,14 +75,7 @@ async fn service(host: &HostHandle, plugin: &str, params: Value) -> Result<Value
     let wire = host
         .service_wire(key)
         .ok_or_else(|| format!("service {key} is unavailable"))?;
-    let face = wire.face();
-    let noun = face.as_ref().map(|face| face.noun.as_str()).unwrap_or(key);
-    let unsafe_call = face
-        .as_ref()
-        .and_then(|face| face.find(method))
-        .is_none_or(|method| method.unsafe_call);
-    admits(&granted(host, plugin).await?, noun, method, unsafe_call)
-        .map_err(|error| error.to_string())?;
+    crate::grant::admit_service(host, plugin, key, method, wire.as_ref()).await?;
     let result = wire
         .call(method, params.get("params").cloned().unwrap_or(Value::Null))
         .await
