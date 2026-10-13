@@ -29,7 +29,7 @@ impl Actor {
         kind: InteractionKind,
         answers: Vec<AnswerSpec>,
         reply: oneshot::Sender<Result<Answer, KernelError>>,
-    ) {
+    ) -> Result<(), KernelError> {
         // A turn's call asks under the turn; a holding command (ADR-0012 §5)
         // and a question handed in between turns (ADR-0039 §1) ask under
         // none: an interaction is the session's, not the turn's.
@@ -58,7 +58,8 @@ impl Actor {
             },
         );
         self.publish(Event::InteractionOpened { interaction }, None)
-            .await;
+            .await?;
+        Ok(())
     }
 
     /// Why this answer cannot be taken, if it cannot.
@@ -92,7 +93,7 @@ impl Actor {
         None
     }
 
-    pub(super) async fn answer(&mut self, answered: Answered) {
+    pub(super) async fn answer(&mut self, answered: Answered) -> Result<(), KernelError> {
         let Answered {
             intent,
             interaction: id,
@@ -104,7 +105,7 @@ impl Actor {
             return self.reject(intent, code, message).await;
         }
         let Some(pending) = self.pending.remove(&id) else {
-            return;
+            return Ok(());
         };
         let _ = pending.reply.send(Ok(answer.clone()));
         self.publish(
@@ -118,18 +119,23 @@ impl Actor {
             },
             Some(intent.clone()),
         )
-        .await;
-        self.applied(intent, Value::Null).await;
+        .await?;
+        self.applied(intent, Value::Null).await?;
+        Ok(())
     }
 
-    pub(super) async fn cancel_interactions(&mut self, reason: CancelReason) {
+    pub(super) async fn cancel_interactions(
+        &mut self,
+        reason: CancelReason,
+    ) -> Result<(), KernelError> {
         let pending: Vec<_> = self.pending.drain().collect();
-        self.cancel_each(pending, reason).await;
+        self.cancel_each(pending, reason).await?;
+        Ok(())
     }
 
     /// The holding command that asked is done: what it left open closes, and
     /// what anything else opened — a turn's, a door's — is not touched.
-    pub(super) async fn cancel_command_interactions(&mut self) {
+    pub(super) async fn cancel_command_interactions(&mut self) -> Result<(), KernelError> {
         let ids: Vec<InteractionId> = self
             .pending
             .iter()
@@ -140,17 +146,24 @@ impl Actor {
             .into_iter()
             .filter_map(|id| self.pending.remove(&id).map(|p| (id, p)))
             .collect();
-        self.cancel_each(pending, CancelReason::CommandEnded).await;
+        self.cancel_each(pending, CancelReason::CommandEnded)
+            .await?;
+        Ok(())
     }
 
-    async fn cancel_each(&mut self, pending: Vec<(InteractionId, Pending)>, reason: CancelReason) {
+    async fn cancel_each(
+        &mut self,
+        pending: Vec<(InteractionId, Pending)>,
+        reason: CancelReason,
+    ) -> Result<(), KernelError> {
         for (id, pending) in pending {
             let _ = pending.reply.send(Err(KernelError::new(
                 ErrorCode::InteractionClosed,
                 format!("cancelled: {reason:?}"),
             )));
             self.publish(Event::InteractionCancelled { id, reason }, None)
-                .await;
+                .await?;
         }
+        Ok(())
     }
 }
