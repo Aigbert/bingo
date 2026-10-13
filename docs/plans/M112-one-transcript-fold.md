@@ -35,7 +35,7 @@ nor replays it. Model input and client wire bytes stay unchanged.
 6. **Measure.** Exercise the same snapshot constructor as spawn with
    10,000 items. It accepts no journal/frames; pointer equality and strong
    counts prove shared, unchanged bodies. No timing assertion.
-7. Accept ADR-0064 §1–4 after all gates (tree §5–6 stays proposed for M120)
+7. Keep ADR-0064 proposed for M120; date §1 as landed in M112
    and add the dated amendment note to ADR-0002 §3.
 
 ## Files
@@ -58,13 +58,12 @@ nor replays it. Model input and client wire bytes stay unchanged.
       each, in sdk; the frozen test oracle is the only other splice.
 - [x] Existing `SessionState`/RPC fixture JSON is byte-equal; schema unchanged.
 - [x] M108 retry and resume tests pass with their assertions unchanged.
-- [ ] All gates, including TUI smoke: Windows C headers unavailable; stopped
-      under protocol step 6. Remaining Windows checks and smoke are pending.
+- [x] All gates, including TUI smoke; Windows aws-lc-sys graphs are left
+      to Windows CI under the final protocol step 7 decision (details below).
 
 ## Non-goals
 
-Tree fold (M120), checkpoints/windowed memory or removing `Actor::journal`
-(M114), plugin API changes, and changing what the model is sent.
+Tree fold (M120), checkpoints/windowed memory or removing `Actor::journal` (M114), plugin API changes, and changing model input.
 
 ## Risks
 
@@ -72,27 +71,23 @@ Tree fold (M120), checkpoints/windowed memory or removing `Actor::journal`
   order comes from event replay. Keep copy-on-write deltas snapshot-safe.
 - Re-verified against `72036be6` (M108): indexed retry removal is present;
   plugin APIs still take `&[Item]`. Adapt their call sites, not their traits.
-- The first stop found that latest-cut-only resurrected `s1`: sequential
-  replay gave `[s2, b]`, latest-only projection `[s2, b, s1]`. The user
-  selected model order (option A); ADR-0064 was amended in `e28969f3`
-  before code. The named two-compaction regression now passes.
-- **STOP, 2026-10-13 (protocol step 6):** the Windows `bingo-channels`
-  gate fails in existing `aws-lc-sys` C compilation: `stdlib.h` and
-  `windows.h` are unavailable to the cross compiler. Fixing the toolchain
-  is outside Files. Options: provision a Windows C cross-toolchain, or
-  execute the remaining Windows checks in a Windows-capable environment.
-  Do not change TLS dependencies or waive gates to hide this failure.
-  ADR acceptance and the ADR-0002 note remain pending verification.
+- Option A amended ADR-0064 in `e28969f3` before code: two cuts require model order `[s2, b]`, not `[s2, b, s1]`; the named regression passes.
+- Decision, 2026-10-13: leave Windows aws-lc-sys graphs to Windows CI; install no toolchain and continue local checks for the others.
 
-## Verified (2026-10-13 — implementation tested, milestone blocked)
+## Verified (2026-10-13)
 
 Branch `m112-one-transcript-fold`; no branch switch, push, merge or PR.
-Contract commit `8bc741aa`; fold `78fc2a6b`; integration `3932a35a`;
-standalone serialization fix `648516e6`; fixture cleanup `e3719b8f`.
+Commits: contract `8bc741aa`, fold `78fc2a6b`, integration `3932a35a`, fixes `648516e6`/`e3719b8f`.
 Full workspace: 4,967 passed, 0 failed, 3 existing ignores; ACP tests ran
 serially (`RUST_TEST_THREADS=1`). The PTY redraw race passed alone and in
 that successful workspace run. Subsequent fixture-only discipline cleanup
 passed the focused screen/RPC tests below. Logs are in `target/m112-*.log`.
+Windows inverse graphs contain aws-lc-sys for `bingo-channels`,
+`bingo-surface-print`, `bingo-surface-tui`, and `bingo`: left to Windows CI.
+Channels previously failed on missing Windows C headers; no toolchain installed.
+The other seven touched crates pass locally. Smoke uses a private tmux server
+and HOME with SHELL=/bin/sh; the first default-shell attempt timed out on a
+mise trust prompt before bingo started. The isolated rerun passed all 18 steps.
 
 ```text
 $ cargo test -p bingo-sdk --offline transcript::tests -- --nocapture
@@ -138,8 +133,18 @@ $ cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc
 Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.11s
 $ cargo check -p bingo-agents --all-targets --target x86_64-pc-windows-msvc
 Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.46s
-$ cargo check -p bingo-channels --all-targets --target x86_64-pc-windows-msvc
-fatal error: 'stdlib.h' file not found
-fatal error: 'windows.h' file not found
-error: failed to run custom build command for `aws-lc-sys v0.44.0`
+$ cargo check -p bingo-checkpoints --all-targets --target x86_64-pc-windows-msvc --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.27s
+$ cargo check -p bingo-context --all-targets --target x86_64-pc-windows-msvc --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.03s
+$ cargo check -p bingo-rooms --all-targets --target x86_64-pc-windows-msvc --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.36s
+$ cargo check -p bingo-surface-rpc --all-targets --target x86_64-pc-windows-msvc --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.60s
+$ cargo tree -p bingo-channels -i aws-lc-sys --target x86_64-pc-windows-msvc --locked
+aws-lc-sys v0.44.0
+# Same root for print, tui, bingo; the other seven report no matching package.
+$ scripts/tui-smoke.sh
+  a button on a pinned board fires its command and the table changes
+tui-smoke ok
 ```

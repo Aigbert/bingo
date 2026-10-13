@@ -2,6 +2,8 @@
 
 Status: proposed · 2026-10-13 · Plans: M112 (transcript), M120 (tree) · Amends: ADR-0002 §3
 
+2026-10-13: §1 (the transcript) landed in M112; the tree fold remains proposed for M120.
+
 ## Context
 
 ADR-0002 §3 named two reducers over one journal: `SessionState::apply`
