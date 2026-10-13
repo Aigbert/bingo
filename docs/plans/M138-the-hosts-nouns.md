@@ -26,6 +26,8 @@ it: natives in process, and M133's `dollar.ts` under node.
 
 ## Files
 
+- `crates/bingo-demo-ui/src/{journal,tests}.rs`: authorized prerequisite repair, deterministic ordered race test, then a separate `fix(demo-ui)` commit. Serialize placement reads and board publications through one session writer; retain only the journal as board state.
+
 - `crates/bingo-mods/src/dollar/*.rs` (new), `src/{lib,link,chain,engine,thread,module,manager,plugin,load,config}.rs`, `src/{thread.js,manager/reload.rs}`, `tests/{contracts,plugin}.rs`, `tests/mods/nouns/*` (new), `guide.md`, `Cargo.toml`
 - `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs,invocation.rs,lib.rs,testing/api.rs,testing/calls.rs,testing/scripts.rs,testing/tests.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/completion.rs,host/tests/complete.rs,host/tests/catalogue.rs,session.rs,session/mailbox.rs,session/catalogue.rs,session/gate.rs,session/inputs.rs,session/commands.rs,chain/observe.rs}`
 - `crates/bingo-plugin-host/src/{state,ops,host,invocation,callback,lib}.rs`
@@ -45,7 +47,7 @@ it: natives in process, and M133's `dollar.ts` under node.
 - [x] Clock: under paused time, `every` fires once per period, and no timer survives a reload.
 - [ ] `model.classify` and `model.fork` show as `UsageCharged` in the turn's usage; called from a timer, in the session's. Without the `model` grant, each is refused in words.
 - [x] `cargo test -p bingo --test plugin_kit`: the nouns fixture gives the same output in process and under node.
-- [ ] All gates pass, including Windows checks — stopped at the workspace test gate below; later gates were not rerun for the runtime changes.
+- [ ] All gates pass, including Windows checks — resume after the authorized demo-UI prerequisite.
 
 ## Non-goals
 
@@ -69,8 +71,7 @@ it: natives in process, and M133's `dollar.ts` under node.
 - The empty-stdin gate exposed a close/observer read cycle. `265e5cf1` releases unanswered actor mail before joining observers; the unchanged isolated CLI test passes.
 - Negative probes temporarily doubled `session.version`, then edited each generated dollar artifact; all failed as intended and were restored.
 
-- **Stopped at protocol step 6:** the workspace gate fails `bingo/tests/views.rs:204`, `a_second_run_reads_the_board_back_and_not_the_bar` (`pending`, expected `running`). The likely race is `bingo-demo-ui/src/journal.rs::place`: it reads a board, then asynchronously writes that snapshot after a newer command may have advanced it. The repair is behavioral and outside Files; neither the demo nor its assertion was changed.
-- Options: authorize a separate demo-UI prerequisite fix before resuming M138 (recommended), or explicitly expand M138 to include that repair. Do not weaken the persistence assertion. Remaining unchecked criteria await the resumed verification; ADR-0078 §6 stays proposed until M138 verifies.
+- Demo-UI prerequisite authorized on 2026-10-14. Dev `c1d95e8c` passes the persistence test 3/3; M138's timing exposes a real stale placement write. Prove the ordered race before fixing it; keep `bingo/tests/views.rs:204` unchanged. The writer must await publication, because `HostApi::extend` queues rather than acknowledges its frame.
 
 ## Verified (2026-10-14)
 
