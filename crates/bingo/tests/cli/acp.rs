@@ -445,17 +445,22 @@ fn a_turn_through_an_adapter_streams_text_thought_and_the_agents_own_call() {
             .any(|(text, marked)| text == "weighing it" && !marked),
         "the agent's thinking is its own, and wears no mark: {reasoning:?}"
     );
-    assert!(
-        reasoning
-            .iter()
-            .any(|(text, marked)| text.contains("Read src/lib.rs") && *marked),
-        "the agent's own call wears `acp.external`: {reasoning:?}"
+    assert_eq!(
+        reasoning.len(),
+        1,
+        "only the agent's actual thought is reasoning"
     );
+    let calls: Vec<_> = frames_of(&out)
+        .into_iter()
+        .filter_map(|frame| match frame.event {
+            Event::ItemCompleted { item } if item.external() => Some(item),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(calls.len(), 1);
     assert!(
-        !bodies(frames_of(&out))
-            .iter()
-            .any(|body| matches!(body, ItemBody::ToolCall { .. })),
-        "and the loop was asked to run nothing"
+        matches!(&calls[0].body, ItemBody::ToolCall { name, input, output: Some(_), .. }
+        if name == "scripted:read" && input["title"] == "Read src/lib.rs")
     );
     assert_eq!(
         adapter.methods(),

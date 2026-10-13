@@ -4,8 +4,8 @@ mod harness;
 #[path = "harness/prompt_host.rs"]
 mod prompt_host;
 
-use bingo_provider_acp::{provider::AcpProvider, session::Sessions};
-use bingo_sdk::{CancellationToken, Env, ModelRequest, Provider};
+use bingo_provider_acp::{agent::AcpAgent, session::Sessions};
+use bingo_sdk::{Agent, Env, ModelRequest};
 use futures::StreamExt;
 use harness::{Fake, LIMIT, agent_binary};
 use serde_json::json;
@@ -30,22 +30,15 @@ async fn scenario(ignore: bool) {
     let sessions = Sessions::new(Env::rooted(fake.cwd()));
     sessions.set_host(prompt_host::host(fake.cwd())).await;
     let adapter = serde_json::from_value(json!({"command":agent_binary(),"env":env})).unwrap();
-    let provider = AcpProvider::new("scripted".into(), adapter, sessions.clone());
-    let cancel = CancellationToken::new();
-    let mut stream = provider.stream(request(), cancel.clone()).await.unwrap();
+    let provider = AcpAgent::new("scripted".into(), adapter, sessions.clone());
+    let stream = provider.run(harness::turn(request())).await.unwrap();
     let (mut lifetime, _) = tokio::time::timeout(LIMIT, listener.accept())
         .await
         .unwrap()
         .unwrap();
     fake.wait_for("session/prompt").await;
-    cancel.cancel();
-    fake.wait_for("session/cancel").await;
-    if !ignore {
-        while let Some(event) = tokio::time::timeout(LIMIT, stream.next()).await.unwrap() {
-            event.unwrap();
-        }
-    }
     drop(stream);
+    fake.wait_for("session/cancel").await;
     tokio::time::pause();
     tokio::time::advance(Duration::from_secs(9)).await;
     tokio::task::yield_now().await;
@@ -67,11 +60,10 @@ async fn scenario(ignore: bool) {
         );
         fake.rewrite(json!({"turns":[{}]}));
     }
-    let mut next =
-        tokio::time::timeout(LIMIT, provider.stream(request(), CancellationToken::new()))
-            .await
-            .unwrap()
-            .unwrap();
+    let mut next = tokio::time::timeout(LIMIT, provider.run(harness::turn(request())))
+        .await
+        .unwrap()
+        .unwrap();
     while let Some(event) = tokio::time::timeout(LIMIT, next.next()).await.unwrap() {
         event.unwrap();
     }

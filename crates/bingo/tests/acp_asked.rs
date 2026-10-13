@@ -14,9 +14,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use bingo_sdk::{
-    Activation, Answer, AnswerRole, Attachment, Event, Frame, HostApi, Input, IntentId,
-    Interaction, InteractionKind, ItemBody, OpenOptions, Origin, Question, QuestionOption,
-    SessionSelector, SessionSpec,
+    Activation, Answer, Attachment, Event, Frame, HostApi, Input, IntentId, Interaction,
+    InteractionKind, ItemBody, OpenOptions, Origin, SessionSelector, SessionSpec,
 };
 use futures::StreamExt;
 use serde_json::{Value, json};
@@ -164,13 +163,6 @@ async fn until_asked(attachment: &mut Attachment) -> Interaction {
     }
 }
 
-fn options(kind: &InteractionKind) -> Vec<QuestionOption> {
-    match kind {
-        InteractionKind::Question(Question { options, .. }) => options.clone(),
-        other => panic!("a permission request is a question: {other:?}"),
-    }
-}
-
 fn notices(frames: &[Frame]) -> Vec<String> {
     frames
         .iter()
@@ -211,48 +203,18 @@ async fn a_person_answers_the_agents_question_and_the_agent_gets_their_choice() 
     );
 
     let asked = until_asked(&mut attachment).await;
-    let InteractionKind::Question(Question {
-        question, header, ..
-    }) = &asked.kind
-    else {
-        panic!("a permission request is a question: {:?}", asked.kind);
+    let InteractionKind::Permission { tool, summary, .. } = &asked.kind else {
+        panic!("the agent reaches the tool gate: {:?}", asked.kind);
     };
-    assert_eq!(question, "Edit src/lib.rs", "the agent's own title");
-    assert_eq!(header.as_deref(), Some("scripted"), "and its own name");
-    assert_eq!(
-        options(&asked.kind)
-            .iter()
-            .map(|option| (option.id.clone(), option.label.clone(), option.role))
-            .collect::<Vec<_>>(),
-        [
-            (
-                "allow-once".to_string(),
-                "Yes".to_string(),
-                Some(AnswerRole::Allowing)
-            ),
-            (
-                "allow-always".to_string(),
-                "Yes, and stop asking".to_string(),
-                None
-            ),
-            (
-                "reject".to_string(),
-                "No".to_string(),
-                Some(AnswerRole::Refusing)
-            )
-        ],
-        "the agent's ids and labels verbatim"
-    );
+    assert_eq!(tool, "scripted:edit");
+    assert!(summary.contains("Edit src/lib.rs"));
 
     // As a surface answers: not from the keyboard, so the stray-keystroke
     // guard on a freshly opened question has nothing to guard against.
     attachment.handle.answer(
         IntentId::mint(),
         asked.id.clone(),
-        Answer::Choice {
-            ids: vec!["allow-once".into()],
-            other: None,
-        },
+        Answer::AllowOnce,
         Activation::Pointer,
     );
     let frames = until_completed(&mut attachment).await;
@@ -303,15 +265,12 @@ async fn a_person_answers_the_agents_question_and_the_agent_gets_their_choice() 
         .iter()
         .find(|line| line["event"]["type"] == "interactionOpened")
         .expect("the question is journaled");
-    assert_eq!(
-        opened["event"]["interaction"]["kind"]["options"][0]["role"], "allowing",
-        "the role rides the option it was written on"
-    );
+    assert_eq!(opened["event"]["interaction"]["kind"]["kind"], "permission");
     let resolved = journaled
         .iter()
         .find(|line| line["event"]["type"] == "interactionResolved")
         .expect("and so is the answer");
-    assert_eq!(resolved["event"]["answer"]["ids"][0], "allow-once");
+    assert_eq!(resolved["event"]["answer"]["kind"], "allowOnce");
 }
 
 /// Every frame every session of this run journaled.
@@ -337,4 +296,70 @@ fn collect(dir: &Path, into: &mut Vec<Value>) {
             );
         }
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_session_allow_answers_twice_with_once_and_asks_the_person_once() {
+    let Some(agent) = fake_agent() else { return };
+    let (configured, home) = Configured::new(&agent);
+    let mut script = asks_first();
+    let turn = script["turns"][0].clone();
+    script["turns"].as_array_mut().unwrap().push(turn);
+    std::fs::write(home.path().join("acp-script.json"), script.to_string()).unwrap();
+    let mut server = Server::spawn_at(
+        home,
+        r#"{"responses":[]}"#,
+        &["--settings", &configured.settings],
+    );
+    let kernel = ready(&mut server).await;
+    let mut attachment = kernel
+        .open(
+            session(configured.cwd.clone()),
+            who(),
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap();
+    attachment.handle.submit(
+        IntentId::mint(),
+        Input::text("edit", Origin::surface("test")),
+    );
+    let asked = until_asked(&mut attachment).await;
+    let InteractionKind::Permission {
+        session_scope: Some(scope),
+        ..
+    } = asked.kind
+    else {
+        panic!("session scope offered")
+    };
+    attachment.handle.answer(
+        IntentId::mint(),
+        asked.id,
+        Answer::AllowSession { scope },
+        Activation::Pointer,
+    );
+    until_completed(&mut attachment).await;
+    attachment.handle.submit(
+        IntentId::mint(),
+        Input::text("again", Origin::surface("test")),
+    );
+    let frames = until_completed(&mut attachment).await;
+    assert!(
+        !frames
+            .iter()
+            .any(|f| matches!(f.event, Event::InteractionOpened { .. })),
+        "policy kept the scope"
+    );
+    let log = std::fs::read_to_string(&configured.log).unwrap();
+    let answers: Vec<Value> = log
+        .lines()
+        .map(|l| serde_json::from_str::<Value>(l).unwrap())
+        .filter(|l| l["method"] == "permission/answered")
+        .map(|l| l["params"]["outcome"]["optionId"].clone())
+        .collect();
+    assert_eq!(answers, [json!("allow-once"), json!("allow-once")]);
+    tokio::time::timeout(Duration::from_secs(10), kernel.shutdown())
+        .await
+        .unwrap()
+        .unwrap();
 }

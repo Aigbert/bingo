@@ -1,13 +1,13 @@
-//! What this client answers when a question came back with no answer
+//! What this client answers when a permission came back with no answer
 //! (ADR-0039 §3).
 //!
 //! A `session/request_permission` is put to whoever is at the session
-//! ([`crate::question`]). This is the other end of that: what is answered when
+//! ([`crate::permission`]). This is the other end of that: what is answered when
 //! nothing chose an option — no session behind this conversation, a door that
 //! refused it, a surface that declined what it was handed. It fails closed, in
 //! the agent's own words: the answer is one of the ids the agent itself
 //! offered, never one invented here, and where it offered nothing to refuse
-//! with, the question is cancelled instead.
+//! with, the permission is cancelled instead.
 //!
 //! The person is told, once, because a refusal nobody chose is a decision made
 //! by a rule they cannot see. The row is where they change it (ADR-0039 §4):
@@ -19,16 +19,16 @@ use agent_client_protocol_schema::v1::{
 };
 use bingo_sdk::Level;
 
-use crate::question;
+use crate::permission;
 
 /// The notice code a person sees when an adapter asked and nobody answered.
 pub const CODE: &str = "ACP_ASKED";
 
-/// The agent's own way of saying no, or that the question went away.
+/// The agent's own way of saying no, or that the permission went away.
 pub fn refused(request: &RequestPermissionRequest) -> RequestPermissionResponse {
-    match question::refusing(request) {
-        Some(option) => question::selected(option),
-        // An agent that offers no way to say no is told the question went
+    match permission::refusing(request) {
+        Some(option) => permission::selected(option),
+        // An agent that offers no way to say no is told the permission went
         // away, which ACP has an outcome for. Inventing an id would be
         // answering something else.
         None => RequestPermissionResponse::new(RequestPermissionOutcome::Cancelled),
@@ -48,7 +48,7 @@ pub fn declined() -> CreateElicitationResponse {
 ///
 /// It says "got no answer" rather than "nobody was there", because both ways of
 /// reaching here look the same from the agent's side: a run with nobody at it
-/// declines every question it is handed, and so does a person who leaves the
+/// declines every permission it is handed, and so does a person who leaves the
 /// prompt.
 pub fn told(adapter: &str) -> (Level, String, String) {
     (
@@ -90,10 +90,10 @@ mod tests {
         );
     }
 
-    /// An agent that offers only ways to say yes is told the question went
+    /// An agent that offers only ways to say yes is told the permission went
     /// away. Picking one of them would be allowing what nobody read.
     #[test]
-    fn an_agent_that_offers_no_way_to_refuse_is_told_the_question_is_gone() {
+    fn an_agent_that_offers_no_way_to_refuse_is_told_the_permission_is_gone() {
         assert_eq!(
             answered(json!({
                 "sessionId": "s",

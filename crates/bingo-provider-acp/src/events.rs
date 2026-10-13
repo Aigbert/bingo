@@ -1,24 +1,4 @@
-//! ACP's stream in bingo's vocabulary. Pure: no I/O, no clock, no channel.
-//!
-//! One decision shapes the whole file, and it is not the one ADR-0035 §4
-//! wrote. The ADR asks for the agent's tool calls as `ModelEvent::ToolCall`
-//! wearing `acp.external: true`, with "the loop never executes what wears the
-//! mark". The loop is the kernel, and reading that mark is a kernel change
-//! this milestone does not have: today `ModelEvent::ToolCall` has no
-//! `provider_options`, every call it carries reaches `gate_call` and the
-//! executor, and — worse — a non-empty `tool_calls` sends `Turn::decide` into
-//! another round, which for a stateful ACP session means a second
-//! `session/prompt` for a turn the agent has already finished.
-//!
-//! So the mark went where the kernel already carries provider-private data
-//! through to the journal untouched: `ReasoningEnd { provider_metadata }`, and
-//! `ItemBody::Reasoning { provider_metadata }` after it. An agent's tool call
-//! becomes one reasoning block whose text is what a person reads and whose
-//! `acp` metadata is the whole call — id, kind, status, title, locations, raw
-//! input and output, every content block. Nothing is executed, no second
-//! prompt is sent, and the journal holds enough for a surface to draw a tool
-//! row the day the kernel learns the mark. Flipping this to `ToolCall` is then
-//! one match arm here.
+//! ACP updates mapped to speech and external calls, with no surface-private metadata.
 
 use std::collections::BTreeMap;
 
@@ -26,8 +6,11 @@ use agent_client_protocol_schema::v1::{
     ContentBlock, ContentChunk, PromptResponse, SessionUpdate, StopReason, ToolCall,
     ToolCallContent, ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolKind, UsageUpdate,
 };
-use bingo_sdk::{FinishReason, ModelEvent, ProviderMetadata, UnifiedFinish, Usage};
-use serde_json::{Value, json};
+use bingo_sdk::{
+    AgentEvent, CallKind, CallLocation, ExternalCall, FinishReason, ModelEvent, ProviderMetadata,
+    ToolOutput, UnifiedFinish, Usage,
+};
+use serde_json::Value;
 
 use crate::render;
 
@@ -113,15 +96,16 @@ impl Mapper {
     /// One update, in bingo's vocabulary. An update this build has no meaning
     /// for — a plan, a mode, a slash-command list (ADR-0035 §6) — is no
     /// events, deliberately.
-    pub fn update(&mut self, update: SessionUpdate) -> Vec<ModelEvent> {
-        match update {
+    pub fn update(&mut self, update: SessionUpdate) -> Vec<AgentEvent> {
+        let said = match update {
             SessionUpdate::AgentMessageChunk(chunk) => self.say(chunk),
             SessionUpdate::AgentThoughtChunk(chunk) => self.think(chunk),
-            SessionUpdate::ToolCall(call) => self.open_call(call),
-            SessionUpdate::ToolCallUpdate(update) => self.advance_call(update),
+            SessionUpdate::ToolCall(call) => return self.open_call(call),
+            SessionUpdate::ToolCallUpdate(update) => return self.advance_call(update),
             SessionUpdate::UsageUpdate(usage) => self.read(&usage),
             _ => Vec::new(),
-        }
+        };
+        said.into_iter().map(AgentEvent::Said).collect()
     }
 
     /// Every reading is the context as the agent counts it (ADR-0055 §2); one
@@ -147,12 +131,18 @@ impl Mapper {
 
     /// Close whatever the last update left open. A turn ends once, and every
     /// block it opened has to end with it or a surface waits for ever.
-    pub fn finish(&mut self, response: &PromptResponse) -> Vec<ModelEvent> {
+    pub fn finish(&mut self, response: &PromptResponse) -> Vec<AgentEvent> {
         let mut events = self.close_open_blocks();
-        events.push(ModelEvent::Finish {
+        if let Some(reading) = self.held {
+            events.push(AgentEvent::Said(ModelEvent::Context {
+                used: reading.used,
+                window: reading.window,
+            }));
+        }
+        events.push(AgentEvent::Said(ModelEvent::Finish {
             usage: self.usage(response),
             finish_reason: finish_reason(response.stop_reason),
-        });
+        }));
         events
     }
 
@@ -177,19 +167,18 @@ impl Mapper {
         }
     }
 
-    fn close_open_blocks(&mut self) -> Vec<ModelEvent> {
+    fn close_open_blocks(&mut self) -> Vec<AgentEvent> {
         let mut events = Vec::new();
         if let Some(id) = self.text.take() {
-            events.push(ModelEvent::TextEnd { id });
+            events.push(AgentEvent::Said(ModelEvent::TextEnd { id }));
         }
         if let Some(id) = self.thought.take() {
-            events.push(ModelEvent::ReasoningEnd {
+            events.push(AgentEvent::Said(ModelEvent::ReasoningEnd {
                 id,
                 provider_metadata: ProviderMetadata::new(),
-            });
+            }));
         }
-        let unfinished: Vec<String> = self.calls.keys().cloned().collect();
-        for id in unfinished {
+        for id in self.calls.keys().cloned().collect::<Vec<_>>() {
             events.extend(self.close_call(&id));
         }
         events
@@ -231,29 +220,20 @@ impl Mapper {
         events
     }
 
-    /// A first notification may already carry content — `codex-acp` announces
-    /// a command with its terminal in the same breath — so the opening is the
-    /// heading and whatever came with it.
-    fn open_call(&mut self, call: ToolCall) -> Vec<ModelEvent> {
-        let id = block_id(&call.tool_call_id.0);
-        let mut opening = vec![render::heading(call.kind, &call.title)];
-        let mut open = Call::from(call);
-        let arrived = std::mem::take(&mut open.content);
-        opening.extend(open.absorb(Some(arrived)));
-        self.calls.insert(id.clone(), open);
-        vec![
-            ModelEvent::ReasoningStart { id: id.clone() },
-            ModelEvent::ReasoningDelta {
-                id,
-                delta: opening.join("\n"),
-            },
-        ]
+    fn open_call(&mut self, call: ToolCall) -> Vec<AgentEvent> {
+        let id = call.tool_call_id.to_string();
+        let call = Call::from(call);
+        let done = call.status.is_over();
+        let mut events = vec![AgentEvent::Call(call.external())];
+        self.calls.insert(id.clone(), call);
+        if done {
+            events.extend(self.close_call(&id));
+        }
+        events
     }
 
-    /// An update for a call nobody announced still becomes a block: an adapter
-    /// that skips the opening notification is a bug we show rather than hide.
-    fn advance_call(&mut self, update: ToolCallUpdate) -> Vec<ModelEvent> {
-        let id = block_id(&update.tool_call_id.0);
+    fn advance_call(&mut self, update: ToolCallUpdate) -> Vec<AgentEvent> {
+        let id = update.tool_call_id.to_string();
         let mut events = Vec::new();
         if !self.calls.contains_key(&id) {
             events.extend(self.open_call(bare_call(&update)));
@@ -261,26 +241,40 @@ impl Mapper {
         let Some(call) = self.calls.get_mut(&id) else {
             return events;
         };
-        let added = call.merge(update);
-        if !added.is_empty() {
-            events.push(ModelEvent::ReasoningDelta {
-                id: id.clone(),
-                delta: added,
-            });
-        }
+        call.merge(update);
+        events.push(AgentEvent::Update(call.external()));
         if call.status.is_over() {
             events.extend(self.close_call(&id));
         }
         events
     }
 
-    fn close_call(&mut self, id: &str) -> Vec<ModelEvent> {
+    fn close_call(&mut self, id: &str) -> Vec<AgentEvent> {
         let Some(call) = self.calls.remove(id) else {
             return Vec::new();
         };
-        vec![ModelEvent::ReasoningEnd {
-            id: id.to_string(),
-            provider_metadata: call.metadata(),
+        let text = call
+            .content
+            .iter()
+            .map(render::block)
+            .collect::<Vec<_>>()
+            .join("\n");
+        let text = if text.is_empty() {
+            call.raw_output
+                .as_ref()
+                .map(Value::to_string)
+                .unwrap_or_default()
+        } else {
+            text
+        };
+        let output = if call.status == ToolCallStatus::Failed {
+            ToolOutput::error(text)
+        } else {
+            ToolOutput::text(text)
+        };
+        vec![AgentEvent::Done {
+            call: call.external(),
+            output,
         }]
     }
 }
@@ -331,24 +325,21 @@ impl Call {
         said
     }
 
-    /// The call, whole, for a surface that knows what to do with it — and the
-    /// flag that says bingo never ran it (ADR-0035 §4).
-    fn metadata(&self) -> ProviderMetadata {
-        let mut acp = serde_json::Map::new();
-        acp.insert(EXTERNAL.to_string(), Value::Bool(true));
-        acp.insert("toolCallId".into(), json!(self.id));
-        acp.insert("title".into(), json!(self.title));
-        acp.insert("kind".into(), to_value(&self.kind));
-        acp.insert("status".into(), to_value(&self.status));
-        acp.insert("content".into(), to_value(&self.content));
-        acp.insert("locations".into(), to_value(&self.locations));
-        if let Some(input) = &self.raw_input {
-            acp.insert("rawInput".into(), input.clone());
+    fn external(&self) -> ExternalCall {
+        ExternalCall {
+            id: self.id.clone(),
+            kind: kind(self.kind),
+            title: self.title.clone(),
+            locations: self
+                .locations
+                .iter()
+                .map(|l| CallLocation {
+                    path: l.path.clone(),
+                    line: l.line,
+                })
+                .collect(),
+            raw: self.raw_input.clone().unwrap_or(Value::Null),
         }
-        if let Some(output) = &self.raw_output {
-            acp.insert("rawOutput".into(), output.clone());
-        }
-        ProviderMetadata::from([(NAMESPACE.to_string(), acp)])
     }
 }
 
@@ -399,10 +390,6 @@ fn raw_stop(stop: StopReason) -> Option<String> {
         .and_then(|value| value.as_str().map(str::to_string))
 }
 
-fn block_id(tool_call_id: &str) -> String {
-    format!("tool:{tool_call_id}")
-}
-
 fn key(chunk: &ContentChunk, fallback: &str) -> String {
     chunk
         .message_id
@@ -429,8 +416,18 @@ fn kind_of(content: &ContentBlock) -> &'static str {
     }
 }
 
-fn to_value<T: serde::Serialize>(value: &T) -> Value {
-    serde_json::to_value(value).unwrap_or(Value::Null)
+pub fn kind(kind: ToolKind) -> CallKind {
+    match kind {
+        ToolKind::Read => CallKind::Read,
+        ToolKind::Edit => CallKind::Edit,
+        ToolKind::Delete => CallKind::Delete,
+        ToolKind::Move => CallKind::Move,
+        ToolKind::Search => CallKind::Search,
+        ToolKind::Execute => CallKind::Execute,
+        ToolKind::Think => CallKind::Think,
+        ToolKind::Fetch => CallKind::Fetch,
+        _ => CallKind::Other,
+    }
 }
 
 #[cfg(test)]

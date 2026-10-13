@@ -181,3 +181,26 @@ pub fn connect(fake: &Fake, client: Arc<dyn Client>) -> Live {
         adapter,
     }
 }
+
+pub struct Denied;
+#[async_trait]
+impl bingo_sdk::Judge for Denied {
+    async fn judge(&self, _: bingo_sdk::ExternalCall) -> bingo_sdk::Verdict {
+        bingo_sdk::Verdict::Deny { feedback: None }
+    }
+}
+pub fn turn(request: bingo_sdk::ModelRequest) -> bingo_sdk::AgentTurn {
+    bingo_sdk::AgentTurn {
+        session: request.session.unwrap(),
+        cwd: PathBuf::new(),
+        input: request
+            .messages
+            .last()
+            .map(|m| m.parts.clone())
+            .unwrap_or_default(),
+        tools: request.tools,
+        model: request.model,
+        reasoning: request.reasoning,
+        judge: Arc::new(Denied),
+    }
+}
