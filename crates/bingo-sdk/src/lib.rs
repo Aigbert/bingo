@@ -5,6 +5,7 @@
 //! One frame type crosses kernel → client; one transcript fold supplies the
 //! client view and the provider context (ADR-0002, ADR-0064).
 
+pub mod agent;
 pub mod bytes;
 pub mod command;
 pub mod compactor;
@@ -34,6 +35,7 @@ pub mod transcript;
 pub mod tree;
 pub mod view;
 
+pub use agent::{Agent, AgentEvent, AgentStream, AgentTurn, CallKind, CallLocation, ExternalCall, Judge};
 pub use command::{ArgSpec, Command, CommandContext, CommandOutcome, CommandSpec};
 pub use compactor::{CompactContext, CompactError, CompactReason, Compaction, Compactor};
 pub use contributor::{
