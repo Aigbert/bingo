@@ -34,6 +34,7 @@ pub mod intercept;
 pub mod manager;
 pub mod manifest;
 pub mod notice;
+mod legacy;
 pub mod provider;
 pub mod reload;
 pub mod schema;
