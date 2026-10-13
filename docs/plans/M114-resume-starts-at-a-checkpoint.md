@@ -110,37 +110,41 @@ kernel holds.
 
 - 2026-10-13 decision: restrict jobs/agents test journal helpers to `journal.jsonl`; assertions unchanged.
 
-## Verified (2026-10-13; remaining gates pending)
+- **STOP (2026-10-13, protocol step 6):** out-of-Files
+  `cli/mentions.rs::age_the_posts` rewrites covered journal timestamps without
+  invalidating `checkpoint.json`; an unchanged anchor/offset can validate old
+  timestamps. The mention-resume test finds `0` nudges, expected `1`.
+- Options: authorize removing the derived sidecar when this fixture rewrites
+  its journal (recommended, assertions unchanged), or change ADR-0066's
+  validation contract. Neither done; this is not a type-only fixture update.
+
+## Verified (2026-10-13; stopped at workspace test gate)
 
 - Branch `m114-resume-starts-at-a-checkpoint`, base `1335830b`; clean on entry.
-  Temporary probes (`cargo test -p bingo-sdk m114_reverification --locked
-  -- --nocapture`): `0 passed; 2 failed`. Window model `[i4,i3]` and
-  serialized model `[i1,i2,i3,i4]` differed from `[i1,i4,i3]`. Probes removed;
-  the user decision above resolved that initial stop.
-- RED contracts: `cargo test -p bingo-sdk checkpoint --locked`: `2 failed`
-  (missing codec, client still i1–i4); `cargo test -p bingo-store-jsonl
-  checkpoint --locked`: `2 failed` (state None, sidecar absent);
-  `cargo test -p bingo-core checkpoint_ack --locked`: `1 failed`
-  (`actor.journal.is_empty()`). Contract commits precede implementations.
+  RED contracts committed before implementation:
+  `cargo test -p bingo-sdk checkpoint --locked`: `2 failed` (codec/window);
+  `cargo test -p bingo-store-jsonl checkpoint --locked`: `2 failed` (sidecar);
+  `cargo test -p bingo-core checkpoint_ack --locked`: `1 failed` (frames).
 - GREEN: `cargo test -p bingo-digest -p bingo-update`: `3 passed` / `47 passed`;
-  `scripts/budget.sh`: `349 (max 349)`, `budget ok`.
+  initial `scripts/budget.sh`: `349 (max 349)`, `budget ok`.
   `cargo test -p bingo-sdk -p bingo-store-jsonl --locked`: SDK `111 passed`
-  plus record/opaque tests/docs; store `54 passed; 1 ignored` (measurement).
-  `cargo test -p bingo-core --locked`: `432 passed`; then the additional
-  held-write/oversized-page cases with `cargo test -p bingo-core checkpoint
-  --locked`: `9 passed; 0 failed`. Logs: `target/m114-*-tests.log` and
-  `target/m114-core-checkpoints.log`.
-- Gates: fmt exit 0; workspace all-targets locked check exit 0 (54.56s);
-  workspace all-targets locked clippy with `-D warnings` exit 0 (26.75s).
+  plus record/opaque/docs; store `54 passed; 1 ignored` (measurement).
+  `cargo test -p bingo-core --locked`: `432 passed`; extra cases:
+  `cargo test -p bingo-core checkpoint --locked`: `9 passed; 0 failed`.
+- Final-tree gates: `cargo fmt --all -- --check`: exit 0;
+  `cargo check --workspace --all-targets --locked`: exit 0 (2.89s);
+  `cargo clippy --workspace --all-targets --locked -- -D warnings`: exit 0.
+- Jobs/agents now read only `journal.jsonl`; assertions unchanged; three watch
+  tests pass. Other recursive journal readers already filter by filename.
 - `cargo test --workspace --locked -- --test-threads=1 --skip
   a_token_may_be_dialled_again_once_its_stream_has_closed --skip
-  a_proxy_with_a_token_this_run_never_minted_gets_nothing`: exit 101.
-  `target/m114-workspace-tests.log`, CLI: `248 passed; 3 failed`:
-  ```text
-  jobs::a_default_watch_still_says_it_once_and_counts_nothing: 2 != 1
-  jobs::a_pinned_watch_wakes_once_and_counts_the_rest_onto_the_end: 2 != 1
-  jobs::an_ongoing_watch_on_a_slow_stream_wakes_on_every_line: 4 != 2
-  ```
-- Stopped before remaining tests (including isolated ACP), discipline, final
-  budget, deny, Windows and TUI smoke. Exit criteria await final verification;
-  ADR-0066 remains proposed. No push, merge, PR or parallel-owner file edits.
+  a_proxy_with_a_token_this_run_never_minted_gets_nothing`: exit 101;
+  CLI `250 passed; 1 failed` (`target/m114-workspace-tests.log`).
+- Exact mention test alone via `cargo test -p bingo --test cli --locked`:
+  `1 passed`. With workspace features, `cargo test --workspace --locked
+  mentions::a_question_left_unanswered_is_chased_when_the_next_process_opens_the_room
+  -- --exact --test-threads=1`: `0 passed; 1 failed` (exit 101):
+  `one overdue question, one nudge: []; left: 0; right: 1`.
+  Logs: `target/m114-mentions-{isolated,workspace}.log`.
+- Pending: remaining tests, discipline, final budget, deny, Windows, TUI smoke;
+  criteria unticked; ADR-0066 proposed. No push/merge/PR.
