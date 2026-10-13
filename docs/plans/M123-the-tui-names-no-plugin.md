@@ -48,7 +48,7 @@ code. No `HostApi` verb, no new external dependency.
    `before_tool` from `GateInput.item`, and M131’s `chain/tool.rs::after_outcomes` from the
    outcome's item. Every other construction says `None`.
 6. **Memory places.** `bingo-context` gains a `before_tool` hook
-   (matcher `Read|Write|Edit`). When the path's parent is a memory
+   (filters `Read`, `Write`, `Edit`; matchers support no alternation). When the path's parent is a memory
    directory, it extends `row:<item>` with
    `Row { item, title: verb, badge: memory name }`. The verbs and the
    name rule move from `memory.rs` with its tests. The `memory`
@@ -93,8 +93,8 @@ code. No `HostApi` verb, no new external dependency.
 - `crates/bingo-agents/src/{message,hook}.rs`, `crates/bingo-rooms/src/{post,serial}.rs`,
   `crates/bingo-schedule/src/{wake,runner}.rs`, `crates/bingo-channels/src/runner.rs`
 - `crates/bingo-collab/src/room.rs` and `room/readers.rs` (readers)
-- `crates/bingo-surface-tui/{Cargo.toml,src/{transcript,transcript/said,pager,blocks,input,seats,roster,mentions,activity}.rs}`;
-  `{memory,skill}.rs` deleted; `screens.rs`, `test_support.rs`
+- `crates/bingo-surface-tui/{Cargo.toml,src/{transcript,transcript/said,transcript/slots,pager,blocks,input,seats,roster,mentions,activity,theme}.rs}`;
+  `{memory,skill}.rs` deleted; `screens.rs`, `screens/skills.rs`, `test_support.rs`, `lib.rs`
 - `Cargo.lock` (TUI library dependency); mechanical `Origin`/`HookContext`
   constructors in core, checkpoints, provider-acp, hooks-shell, plugin-rpc,
   agents, rooms, context, schedule and bin tests; sdk schema golden fixtures.
