@@ -99,3 +99,52 @@ kernel holds.
   prefix; it must use `Transcript`, not a fourth fold.
 - Re-verify at start: M112 and M113 have landed; `resume_frames`,
   `subscribe`, `bounded_snapshot`, `HostApi::history` by name.
+
+- **STOP (2026-10-13, protocol steps 2/6): the literal window conflicts
+  with the existing compaction contract.** At `1335830b`, ADR-0064 §1,
+  `sdk/transcript.rs::splice_compaction`, `sdk/compactor.rs::Compaction`
+  and `core/context.rs`'s kept-item regression preserve `kept` ids before
+  `boundary`. ADR-0066 §4 and this plan's window exit criterion instead
+  require no item before that boundary. Example: client items
+  `[i1, i2, i3, i4]`, boundary `i3`, kept `[i1]`, summary `i4` produce
+  model order `[i1, i4, i3]`; a boundary-only window loses `i1`.
+  This is a Decision conflict, not mechanical fixture drift.
+- **Options requiring a decision:** (A, recommended) clarify ADR-0066 §4
+  and the window criterion to retain model-required pre-boundary items,
+  with history paging handling the resulting gaps; (B) keep the strict
+  boundary rule and change ADR-0064/the compaction contract to disallow
+  pre-boundary `kept` items, which changes existing model behavior.
+  Neither option is implemented; the supplied decisions remain unchanged.
+- **Checkpoint codec finding:** M112's `Transcript` serializer writes
+  only `historyGeneration` and client `items`; deserialization rebuilds
+  model order from client order. A plain `SessionState` round trip is
+  therefore not a checkpoint after compaction. Once the window decision
+  is resolved, brick 2 needs a checkpoint-specific state codec preserving
+  model order (and window metadata), without changing the client wire
+  promised by ADR-0064. Re-verify the complete Files list before coding;
+  manifests, lockfile and the dependency budget also need the new member.
+
+## Verified (2026-10-13; stopped at re-verification)
+
+- Branch `m114-resume-starts-at-a-checkpoint`, base `1335830b`; clean on
+  entry. Read the execution protocol, audit and ADR-0066/0005, plus the
+  relevant ADR-0064/0065 and M107 contracts. No implementation started.
+- Temporary SDK probes constructed the four-item example above, applied
+  `Compacted`, then compared model ids after a boundary window and a
+  `SessionState` JSON round trip. Command:
+  `cargo test -p bingo-sdk m114_reverification --locked -- --nocapture`.
+  Actual output (trimmed):
+  ```text
+  m114_reverification_boundary_window_preserves_model ... FAILED
+  left: ["i4", "i3"]
+  right: ["i1", "i4", "i3"]
+  m114_reverification_checkpoint_state_roundtrip ... FAILED
+  left: ["i1", "i2", "i3", "i4"]
+  right: ["i1", "i4", "i3"]
+  test result: FAILED. 0 passed; 2 failed; 0 ignored
+  ```
+  Exit 101; both failures demonstrate the findings, not a build failure.
+  The temporary probes were removed; only this plan is changed.
+- All exit criteria remain unticked. Implementation gates, Windows checks
+  and PTY smoke were not run because protocol step 6 ends this run.
+  ADR-0066 remains proposed. No push, merge or PR.
