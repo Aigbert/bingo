@@ -1,10 +1,12 @@
 # Architecture upgrade — 2026-10
 
-> The work [audit-2026-10.md](audit-2026-10.md) leads to: 43 milestones
-> (M108–M150) in eight phases, 19 proposed ADRs (0063–0081), and the protocol
-> an executing agent follows. Phase 7 was added the same day, at the
-> person's request for mods at Claude Code's capability and a desktop app
-> rebuilt as a surface ([mods-parity-2026-10.md](mods-parity-2026-10.md)). Each milestone has a plan in `docs/plans/`;
+> The work [audit-2026-10.md](audit-2026-10.md) leads to: 40 milestones
+> (M108–M150, M143–M145 dropped) in eight phases, 18 proposed ADRs
+> (0063–0079, 0081) and one rejected (0080), and the protocol an executing
+> agent follows. Phase 7 was added the same day, at the person's request
+> for mods at Claude Code's capability
+> ([mods-parity-2026-10.md](mods-parity-2026-10.md)); its desktop app was
+> dropped the same day, since the GUI stays in its own repository. Each milestone has a plan in `docs/plans/`;
 > each ADR is `Status: proposed` until the milestone that implements it
 > lands. Written 2026-10-13 at `979a6d27`. The ordering principle: fix what
 > is false first, then make the journal and the turn cheap and honest, then
@@ -37,13 +39,13 @@ so Phase 7 runs the same file in process.
 **Phase 6 — Agents.** The ACP seam split from `Provider`; one lifecycle
 vocabulary.
 
-**Phase 7 — Mods at parity, and the desktop app.** The event catalogue, an
-in-process QuickJS runtime that runs a mod module, `$` over the host and
-the world, elements and sites drawn where they are asked for, the mod
-kit, and the desktop app rebuilt in this repository as a surface that
-draws what the TUI draws. The acceptance test: Claude Code's example
-mods, ported by their imports, run in the TUI and on the desktop.
-Phases 6 and 7 are independent; M143 can start once M113, M123 and M133 land.
+**Phase 7 — Mods at parity.** The event catalogue, an in-process QuickJS
+runtime that runs a mod module, `$` over the host and the world, elements
+and sites drawn where they are asked for, and the mod kit. The acceptance
+test: Claude Code's example mods, ported by their imports, run in the TUI.
+The desktop app (M143–M145) was dropped on 2026-10-13: the GUI stays in
+its own repository and reads the wire as any client does (ADR-0080,
+rejected). Phases 6 and 7 are independent.
 
 **Phase 8 — bingo's own face.** Added 2026-10-13 at the person's request
 ([tui-identity-2026-10.md](tui-identity-2026-10.md)): the defects a live
@@ -91,10 +93,10 @@ Phase 3's TUI work and is independent of Phases 4–7.
 | 140 | Elements and pulled views | 0079 | 121, 123, 124, 125, 137, 138 |
 | 141 | Components | 0079 | 138, 140 |
 | 142 | The mod kit | 0078 | 137, 140 |
-| 143 | The desktop app: the shell and the wire | 0080 | 113, 123, 133 |
-| 144 | The desktop app draws what mods draw | 0079, 0080 | 140, 141, 143 |
-| 145 | Rei's features as views | 0080 | 144 |
-| 146 | Parity: Claude Code's examples run in both | — | 139, 141, 142, 144 |
+| 143 | ~~The desktop app: the shell and the wire~~ dropped | 0080 | — |
+| 144 | ~~The desktop app draws what mods draw~~ dropped | 0080 | — |
+| 145 | ~~Rei's features as views~~ dropped | 0080 | — |
+| 146 | Parity: Claude Code's examples run in the TUI | — | 139, 141, 142 |
 | 147 | The rough edges | — | 123 |
 | 148 | The screen is the person's | 0081 | 124, 147 |
 | 149 | bingo's own light | — | 125, 148 |
@@ -108,12 +110,11 @@ written at the same commit and **must be re-verified at their start**
 
 ## New crates
 
-Fifteen. Through Phase 6, all `tier = "library"` except the Feishu
+Fourteen. Through Phase 6, all `tier = "library"` except the Feishu
 platform, with no new external dependency; each plan raises
 `scripts/budget.toml` by its own. Phase 7 brings the first external ones,
-each justified in ADR-0078 or ADR-0080 and measured: `rquickjs`, `oxc`,
-and `wasm-bindgen` for the fold. The desktop app is an npm package at
-`apps/desktop`, outside cargo.
+`rquickjs` and `oxc`, justified in ADR-0078, measured, and accepted by the
+person on 2026-10-13.
 
 | Crate | Milestone | Holds |
 |---|---|---|
@@ -131,7 +132,6 @@ and `wasm-bindgen` for the fold. The desktop app is an npm package at
 | `bingo-channel-feishu` | 130 | the Feishu platform (a plugin) |
 | `bingo-plugin-host` | 137 | the plugin manifest, discovery and state store both runtimes read |
 | `bingo-mods` | 137 | the in-process mod runtime (a plugin) |
-| `bingo-fold-wasm` | 143 | `SessionState::apply` for the desktop app |
 
 ## ADRs (proposed)
 
@@ -154,7 +154,7 @@ and `wasm-bindgen` for the fold. The desktop app is an npm package at
 | 0077 | One lifecycle vocabulary for an agent | 0027, 0029, 0060 |
 | 0078 | A mod is a module the host runs | 0074 §1 §3, 0075, 0031 §6 |
 | 0079 | A view is drawn where it is asked for | 0013 §1 §3, 0070 §1 |
-| 0080 | The desktop app is a surface in this repository | 0007, 0046 §1 |
+| 0080 | The desktop app is a surface in this repository (rejected) | — |
 
 A proposed ADR's Decision is the contract the milestone implements. When the
 milestone lands, its status becomes `accepted · <date> · Plan: M<n>` and
@@ -182,10 +182,8 @@ ask (protocol step 6).
   acceptance test above (M133).
 - The same `register.ts` loads in process; a mod hooks any catalogue
   event, calls any `$` noun its grant allows, and draws a pane, a band and
-  a tool row in the TUI and on the desktop (M137–M144).
-- `rg '"_?bingo\.' apps/desktop/src` finds nothing, and the desktop app
-  folds with the sdk's own fold (M143).
-- Claude Code's example mods run in both surfaces; the parity matrix has
+  a tool row in the TUI (M137–M142).
+- Claude Code's example mods run in the TUI; the parity matrix has
   evidence for every row and a written reason for every gap (M146).
 
 ## Execution protocol

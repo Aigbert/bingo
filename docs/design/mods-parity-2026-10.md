@@ -5,7 +5,8 @@
 > 2.1.296 ships with its authoring skill: `types/claude-code.d.ts`,
 > 21 461 lines, plus `reference.md` and the examples. Line numbers below
 > are that file's. Written 2026-10-13 for ADR-0078 (the runtime),
-> ADR-0079 (drawing) and ADR-0080 (the desktop app). Phase 7 of
+> ADR-0079 (drawing) and ADR-0080 (the desktop app, rejected the same
+> day: the GUI stays in its own repository). Phase 7 of
 > [upgrade-2026-10.md](upgrade-2026-10.md) implements it.
 
 ## 1. The contract every event shares

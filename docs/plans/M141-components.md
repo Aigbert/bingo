@@ -125,7 +125,7 @@ examples of those names do and draw in the TUI. After M138 and M140.
 - `$.ui.copy`, `scroll`, `focus`, `selection` and `open`'s `isPlaced`:
   gaps in design §8, since a surface's scroll, focus, selection,
   clipboard and placement are its own.
-- The desktop app drawing components (M144); print and channels asking
+- A desktop drawing components (ADR-0080); print and channels asking
   (`text` folds); vscode and mobile.
 - `bingo plugins test`, `$.ui.mount` and the examples' tests (M142);
   `prompt.edit`.

@@ -109,8 +109,8 @@ ADR-0079's render pair; the runtime is a plugin, `$` maps onto doors.
 - `rquickjs` is a C engine, and `deny.toml` bans `onig` for being one
   where a Rust engine does the job. No Rust engine caps memory and time,
   and the sandbox rests on both. `oxc` adds about 122 crates; its parser
-  is also what `validate` needs. M137 raises `budget.toml` by the
-  measured count, one line per crate family.
+  is also what `validate` needs. The person accepted both (2026-10-13);
+  M137 raises `budget.toml` by the count, one line per crate family.
 - QuickJS-NG builds with MSVC; the Windows CI job checks it (M110). This
   record withdraws ADR-0074's and ADR-0075's "no JS engine in process".
 

@@ -16,8 +16,8 @@ no sdk change.
    faces.json` — twenty names and the face each gets — and the rule that
    produces it: FNV-1a 32-bit over the name's UTF-8; sigil `h % 6` over
    `◆ ● ▲ ■ ◗ ✦`, hue `(h >> 8) % 5` over lime, teal, violet, orchid,
-   pink. The fixture is the contract another surface (the desktop app,
-   M144) tests against; it is written before the function.
+   pink. The fixture is the contract a wire client (the GUI, in its own
+   repository) can test against; it is written before the function.
 2. **Failing tests first** (TUI):
    - `face(name)` matches the fixture; ASCII sigils `@ # % & + =` by the
      same index.
@@ -84,7 +84,7 @@ no sdk change.
 ## Non-goals
 
 - Faces chosen by a person or a persona; a face in `--print` or in a
-  channel; the desktop's drawing of faces (M144 reads the fixture).
+  channel; the GUI's drawing of faces (it can read the fixture).
 - Any change to what rooms record or deliver (ADR-0034).
 - A per-agent colour for anything but the sigil and the name.
 

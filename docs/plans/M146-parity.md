@@ -1,16 +1,17 @@
-# M146 — Parity: Claude Code's examples run in both
+# M146 — Parity: Claude Code's examples run in the TUI
 
 ## Goal
 
 The Phase 7 acceptance test. Claude Code's three example mods (the
 tool-call guard, the band above the prompt, the tool-calls pane) run in
-process (QuickJS, M137) in the TUI and on the desktop. A port changes
+process (QuickJS, M137) in the TUI. A port changes
 only its import specifier, plus the tool names and inputs it matches
 where bingo's differ (ADR-0079 §1), and each port's diff is pasted.
 `bingo plugins test` passes a test for each. `design/mods-parity-2026-10.md`
 gains a Status column, and every row names its evidence: a test, a
 drive, or the non-goal that owns the gap. Every gap in its §8 is written
-down as a non-goal with its reason. After M139, M141, M142 and M144.
+down as a non-goal with its reason. After M139, M141 and M142. The
+desktop half was dropped on 2026-10-13 with M143–M145 (ADR-0080).
 
 ## Bricks, in build order
 
@@ -63,12 +64,10 @@ down as a non-goal with its reason. After M139, M141, M142 and M144.
    `.env`, runs Bash with padded whitespace, and fails once. The window
    is set to 160 and then 100 columns, so the pane shows docked and
    inline. Each step's `capture-pane` output is pasted.
-5. **On the desktop.** `apps/desktop/tests/parity.e2e.ts` loads the same
-   three examples, asserts what the drive shows, and keeps screenshots.
-6. **Two transports.** `tool-call` also runs out of process, under node
+5. **Two transports.** `tool-call` also runs out of process, under node
    through the SDK (M133), and its test gives the same results. `band`
    and `pane` are `.tsx`, and node's type stripping does no JSX.
-7. **The matrix.**
+6. **The matrix.**
    - §2 and §3 gain a Status column. Each cell reads
      `done — <test or drive>`, `gap — non-goal in M<n>`, or `n/a`.
    - §4–§6 each end with an evidence line.
@@ -82,7 +81,6 @@ down as a non-goal with its reason. After M139, M141, M142 and M144.
 - `scripts/port_examples.sh` (new)
 - `crates/bingo/tests/mods_parity.rs` (new): `bingo plugins test` on
   each example, and on `tool-call` under node
-- `apps/desktop/tests/parity.e2e.ts` (new)
 - `docs/design/mods-parity-2026-10.md` (Status)
 
 ## Exit criteria
@@ -96,8 +94,6 @@ down as a non-goal with its reason. After M139, M141, M142 and M144.
       is not skipped on CI's Linux job.
 - [ ] The tmux drive's `capture-pane` output is pasted: the denial, the
       status, the band, the pane docked and inline, and the tool row.
-- [ ] `npm --prefix apps/desktop run test:e2e -- parity` passes on macOS
-      locally and on CI's ubuntu and Windows.
 - [ ] Every row in §2 and §3 has a Status cell. An `awk` count of the
       rows without one prints 0 (pasted).
 - [ ] `rg` finds each §8 gap in its owner's Non-goals (pasted). All
@@ -114,7 +110,7 @@ Each gap in parity §8, with its owner and its reason:
 - `prompt.attachment` and `prompt.mention` (M136). Surfaces resolve `@`,
   and a hook sees the result in `prompt.submit`.
 - `$.ui.scroll`, `focus`, `selection` and `copy`, and `open`'s
-  `isPlaced` (M140, M141, M144). These belong to the surface
+  `isPlaced` (M140, M141). These belong to the surface
   (ADR-0013 §4), and the host has no verb toward a surface.
 - `$.tool.check` without a run, `$.prompt.compose` as a read, and
   `$.session.repo` (M138). Each would need a kernel door of its own.
@@ -122,8 +118,8 @@ Each gap in parity §8, with its owner and its reason:
   stack.
 - `classic.*` (M136). Shell hooks stay with hooks-shell, behind the
   `Hook` adapter.
-- The vscode and mobile surfaces (M144). Neither exists here
-  (ADR-0080).
+- The desktop, vscode and mobile surfaces. None is in this tree; the
+  GUI stays in its own repository (ADR-0080, rejected).
 - `telemetry.*` and `attribution.text`: not applicable.
 
 Also out: committing the originals without terms that allow it; running
@@ -145,5 +141,4 @@ only Claude Code has, such as `AbovePrompt`'s `hasSurvey`, which reads
   `$.plugin` and the `$` methods (M138, M139); element, prop and
   component names (M140, M141); `'bingo'`'s exports, the `*.test.ts`
   runner, `bingo/testing` and what sits in `examples/plugins/` (M141,
-  M142); bingo's `Edit` and `Bash` inputs; the desktop's mod spec
-  (M144); the parity doc's rows.
+  M142); bingo's `Edit` and `Bash` inputs; the parity doc's rows.

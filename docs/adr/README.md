@@ -63,5 +63,5 @@ first record; 0036 §2 answered it before it was named).
 - [0077 — One lifecycle vocabulary for an agent](0077-one-lifecycle-vocabulary.md)
 - [0078 — A mod is a module the host runs](0078-a-mod-is-a-module-the-host-runs.md)
 - [0079 — A view is drawn where it is asked for](0079-a-view-is-drawn-where-it-is-asked-for.md)
-- [0080 — The desktop app is a surface in this repository](0080-the-desktop-app-is-a-surface-in-this-repository.md)
+- [0080 — The desktop app is a surface in this repository](0080-the-desktop-app-is-a-surface-in-this-repository.md) — rejected
 - [0081 — The screen is the person's](0081-the-screen-is-the-persons.md)

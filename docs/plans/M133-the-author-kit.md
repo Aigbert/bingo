@@ -78,7 +78,7 @@ file unchanged.
 - `sdk/typescript/{package.json (private, no dependencies),README.md}`
 - `sdk/typescript/src/{wire.ts (generated),rpc.ts,plugin.ts,on.ts,dollar.ts,index.ts}`
 - `crates/bingo-schema-ts/src/lib.rs` (new, `tier = "library"`, serde_json
-  only; the desktop (M143) and the catalogue (M136) render with it too)
+  only; the catalogue (M136) renders with it too)
 - `crates/bingo-plugin-rpc/src/{wire_ts.rs,validate.rs}` (new; `wire_ts`
   calls the renderer and owns the drift test), `lib.rs`, `schema.rs`
 - `crates/bingo/src/plugins.rs` → `plugins/{mod.rs,switch.rs,validate.rs,scenario.rs}`

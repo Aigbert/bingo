@@ -112,8 +112,8 @@ twice as far from `bad` (hue 25° against 5°, where `#d97757` stood at 15°):
 | glow | `#ffc278` | `#e07a2a` | bright yellow |
 
 Grounds, tints, `good`, `bad` and `mode` are unchanged. The site's
-`tokens.ts` follows in its own repository; the desktop app (M143–M145)
-takes the surface's tokens as it already plans to.
+`tokens.ts` and the GUI follow in their own repositories; the person
+carries the two tokens over.
 
 **L6. The opening is the wordmark.** The site's grid, four rows of
 half-blocks, with the caret at its end:

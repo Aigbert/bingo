@@ -103,8 +103,8 @@ the state the host holds (ADR-0078 §6). This door opens, no other.
 
 ## Consequences
 
-- `View` grows by nine nodes with folds; the desktop's and mods' types
-  come from the regenerated `schema/rpc.json`.
+- `View` grows by nine nodes with folds, typed from `schema/rpc.json`.
+  `desktop` is a table for wire clients; no surface here draws it.
 - The TUI's layout pass (M124) lays out a `Box`: direction, gap,
   padding, grow, fixed sizes and wrap, where a row whose children do not
   fit stacks them. Whether a layout crate pays for itself is M140's

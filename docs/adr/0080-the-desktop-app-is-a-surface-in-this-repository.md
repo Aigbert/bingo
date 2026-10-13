@@ -1,7 +1,12 @@
 # ADR-0080 — The desktop app is a surface in this repository
 
-Status: proposed · 2026-10-13 · Plans: M143, M144, M145 · Amends:
-ADR-0007 (Consequences), ADR-0046 §1
+Status: rejected · 2026-10-13 · Plans: M143, M144, M145, all dropped
+
+**Rejected 2026-10-13.** The person keeps the GUI in its own repository
+and may rewrite it from scratch, so nothing below moves in: no
+`apps/desktop`, no node job, no `bingo-fold-wasm` (its `wasm-bindgen`
+output is `unsafe`, which AGENTS.md forbids). The GUI stays a wire
+client; ADR-0079's `desktop` table stays defined for it. Kept as history.
 
 ## Context
 

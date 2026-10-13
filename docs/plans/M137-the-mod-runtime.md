@@ -27,8 +27,8 @@ as it does under node.
    (`eval`, `new Function`, `import()`, `require`). No runtime yet.
 3. **The engine, pinned, and its cost.** `rquickjs = "=0.14.0"` with
    `futures`, `loader`, `parallel` (no `bindgen`); the oxc crates at
-   `=0.152.0`. A `deny.toml` comment beside the `onig` ban says why a C
-   engine is admitted here (ADR-0078 Consequences). Paste
+   `=0.152.0`; the person accepted both on 2026-10-13. A `deny.toml` note
+   by the `onig` ban says why a C engine is admitted (ADR-0078). Paste
    `scripts/budget.sh` before and after; raise `max_dependencies` by the
    measured count, one comment line per family; `cargo deny check`.
    **Threading** (ADR-0078 §2): each mod's thread holds its `AsyncRuntime`

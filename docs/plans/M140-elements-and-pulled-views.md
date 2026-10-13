@@ -135,7 +135,7 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
 
 ## Non-goals
 
-- Components and `$.ui.log` (M141); the desktop table (M144); `Client`,
+- Components and `$.ui.log` (M141); the desktop table (ADR-0080); `Client`,
   `blit`, styling beyond the subset; OSC 8 links (no hyperlink in a
   cell); `isPlaced`, `$.ui.copy`/`scroll`/`focus`/`selection` (design §8).
 

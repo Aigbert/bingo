@@ -94,9 +94,8 @@ No new dependency, no sdk change.
 ## Non-goals
 
 - Agents' sigils and hues, the crew strip, rooms as chat (M150).
-- The site's `tokens.ts` and hero (`../bingo-site`, its own repository):
-  the person is told the two tokens to carry over.
-- The desktop app's look: M143–M145 take the TUI's tokens as planned.
+- The site's `tokens.ts` and hero (`../bingo-site`) and the GUI, each in
+  its own repository: the person is told the two tokens to carry over.
 - Inline code's backticks (M73's choice stands).
 
 ## Risks
