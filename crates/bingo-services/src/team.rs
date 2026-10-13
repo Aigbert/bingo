@@ -13,8 +13,46 @@ pub trait TeamFile: Send + Sync {
     async fn section(&self, cwd: &Path, key: &str) -> Result<Value, TeamError>;
 }
 
-pub fn wire(_service: Arc<dyn TeamFile>) -> Arc<dyn WireService> { unimplemented!() }
-pub fn find(_host: &HostHandle) -> Option<Arc<dyn TeamFile>> { unimplemented!() }
+pub fn wire(service: Arc<dyn TeamFile>) -> Arc<dyn WireService> {
+    Arc::new(ToWire(service))
+}
+
+pub fn find(host: &HostHandle) -> Option<Arc<dyn TeamFile>> {
+    host.service(&KEY).or_else(|| {
+        host.service_wire(KEY.name()).map(|wire| Arc::new(FromWire(wire)) as Arc<dyn TeamFile>)
+    })
+}
+
+struct ToWire(Arc<dyn TeamFile>);
+
+#[derive(serde::Deserialize)]
+struct Asked {
+    cwd: std::path::PathBuf,
+    key: String,
+}
+
+#[async_trait]
+impl WireService for ToWire {
+    async fn call(&self, method: &str, params: Value) -> Result<Value, TeamError> {
+        if method != "section" {
+            return Err(TeamError(format!("{} speaks `section`, not `{method}`", KEY.name())));
+        }
+        let asked: Asked = serde_json::from_value(params).map_err(|error| TeamError(error.to_string()))?;
+        let section = self.0.section(&asked.cwd, &asked.key).await?;
+        Ok(serde_json::json!({ "section": section }))
+    }
+}
+
+struct FromWire(Arc<dyn WireService>);
+
+#[async_trait]
+impl TeamFile for FromWire {
+    async fn section(&self, cwd: &Path, key: &str) -> Result<Value, TeamError> {
+        let cwd = cwd.to_str().ok_or_else(|| TeamError(format!("{} is not a directory name this can ask about", cwd.display())))?;
+        let answer = self.0.call("section", serde_json::json!({ "cwd": cwd, "key": key })).await?;
+        Ok(answer["section"].clone())
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -12,8 +12,37 @@ pub trait Servers: Send + Sync {
     async fn servers(&self) -> Map<String, Value>;
 }
 
-pub fn wire(_service: Arc<dyn Servers>) -> Arc<dyn WireService> { unimplemented!() }
-pub fn find(_host: &HostHandle) -> Option<Arc<dyn Servers>> { unimplemented!() }
+pub fn wire(service: Arc<dyn Servers>) -> Arc<dyn WireService> {
+    Arc::new(ToWire(service))
+}
+
+pub fn find(host: &HostHandle) -> Option<Arc<dyn Servers>> {
+    host.service(&KEY).or_else(|| {
+        host.service_wire(KEY.name()).map(|wire| Arc::new(FromWire(wire)) as Arc<dyn Servers>)
+    })
+}
+
+struct ToWire(Arc<dyn Servers>);
+
+#[async_trait]
+impl WireService for ToWire {
+    async fn call(&self, method: &str, _params: Value) -> Result<Value, bingo_sdk::ServiceError> {
+        if method != "servers" {
+            return Err(bingo_sdk::ServiceError(format!("{} speaks `servers`, not `{method}`", KEY.name())));
+        }
+        Ok(serde_json::json!({ "servers": self.0.servers().await }))
+    }
+}
+
+struct FromWire(Arc<dyn WireService>);
+
+#[async_trait]
+impl Servers for FromWire {
+    async fn servers(&self) -> Map<String, Value> {
+        let Ok(answer) = self.0.call("servers", Value::Null).await else { return Map::new(); };
+        answer["servers"].as_object().cloned().unwrap_or_default()
+    }
+}
 
 #[cfg(test)]
 mod tests {
