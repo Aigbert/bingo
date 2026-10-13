@@ -9,30 +9,38 @@ use std::time::{Duration, Instant};
 
 use std::collections::BTreeSet;
 
-use bingo_sdk::{
-    Action, CommandSpec, Level, Seq, SessionId, SessionState, SessionSummary, TurnId, View,
-};
+use bingo_sdk::{Action, CommandSpec, Level, Seq, SessionId, SessionState, SessionSummary, View};
 
 use crate::clock::{Anim, FRAME, Now};
 use crate::commands::{self, Suggestion};
 use crate::complete;
-use crate::composer::Composer;
-use crate::dialog::Dialog;
-use crate::focus::Focus;
 use crate::fold::Folds;
 use crate::graphics::{Decoded, Linked};
-use crate::history::PromptHistory;
 use crate::layers::{self, Reveal};
 use crate::layout::Layout;
 use crate::pager::Pager;
-use crate::pictures::Held;
 use crate::rail::Pin;
 use crate::rewind::Rewind;
 use crate::roster;
 use crate::scroll::Scroll;
-use crate::select::{self, Cell, Dragging, Edge, Select};
+use crate::select::{self, Cell, Dragging, Edge};
 use crate::tree::{self, Row, Tree};
 use crate::views::Marks;
+
+mod controls;
+
+// Keep callers at the UI boundary while input state has one owner.
+impl std::ops::Deref for Ui {
+    type Target = controls::Controls;
+    fn deref(&self) -> &Self::Target {
+        &self.controls
+    }
+}
+impl std::ops::DerefMut for Ui {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.controls
+    }
+}
 
 /// How long a transient notice holds the status line's middle slot (§3),
 /// between the frames it fades in over and the ones it fades out over.
@@ -322,15 +330,8 @@ impl Layer {
 
 #[derive(Debug)]
 pub struct Ui {
-    pub composer: Composer,
-    /// The pasted pictures behind the composer's line, by their `[image N]`.
-    pub pictures: Held,
-    pub history: PromptHistory,
-    pub dialog: Dialog,
+    controls: controls::Controls,
     pub scroll: Scroll,
-    pub menu: Menu,
-    /// What the transcript is holding: a focused block, a run of cells.
-    pub select: Select,
     pub notices: Vec<Notice>,
     /// A command's `View`, shown until the next key.
     pub block: Option<View>,
@@ -341,31 +342,10 @@ pub struct Ui {
     /// the task being done either way: hiding the list is about rows, not
     /// about what the turn is doing.
     pub activity_hidden: bool,
-    /// The one owner of keys and pointer events.
-    pub focus: Focus,
-    /// The panel sheet's cursor: the row `⏎` would pin.
-    pub panel: usize,
-    /// An action fired and not yet answered.
-    pub pending: Option<Pending>,
     /// How much of each block a person opened or shut, with `ctrl+o` or a
     /// click (§7). A block that is not in it wears its kind's own start
     /// ([`crate::fold`]), so the default is never written down twice.
     pub folds: Folds,
-    /// When ctrl+c was pressed on an empty composer.
-    pub armed: Option<Instant>,
-    /// The turn this surface has asked to stop, so the activity row answers
-    /// the key on the very frame it was pressed (§7). The kernel decides what
-    /// an interrupt does and its `TurnCompleted` is the end of the story; this
-    /// is a fact about the keypress, not a copy of session state, and it is
-    /// kept by turn id so it can never speak for the turn after this one.
-    pub stop_asked: Option<TurnId>,
-    /// An `esc` closed nothing, so the next one is the second of `esc esc`.
-    /// It needs no clock: any other key clears it.
-    pub esc_armed: bool,
-    /// What the kernel offers the dropdown, read once at start.
-    pub catalogs: Catalogs,
-    /// An `open` is in flight; the swap happens when it lands.
-    pub opening: bool,
     /// Whether the terminal window is being looked at. A window nobody is
     /// looking at is the one that may say something to the desktop (§6).
     pub focused: bool,
@@ -406,54 +386,15 @@ struct Files {
 }
 
 impl Ui {
-    pub fn start_selection(&mut self, at: Cell) {
-        self.focus = Focus::Select(select::Run {
-            anchor: at,
-            head: at,
-        });
-        self.select.dragging = None;
-    }
-    pub fn extend_selection(&mut self, to: Cell) {
-        if let Some(run) = self.focus.selection_mut() {
-            run.head = to;
-        }
-    }
-    pub fn walk_selection(&mut self, lines: isize, columns: isize, height: usize) {
-        if let Some(run) = self.focus.selection_mut() {
-            run.walk(lines, columns, height);
-        }
-    }
-    pub fn clear_selection(&mut self) {
-        if matches!(self.focus, Focus::Select(_)) {
-            self.focus = Focus::Composer;
-        }
-        self.select.dragging = None;
-    }
-}
-
-impl Ui {
     pub fn new(history: Vec<String>, _now: Instant) -> Self {
         Self {
-            composer: Composer::default(),
-            pictures: Held::default(),
-            history: PromptHistory::new(history),
-            dialog: Dialog::default(),
+            controls: controls::Controls::new(history),
             scroll: Scroll::default(),
-            menu: Menu::default(),
-            select: Select::default(),
             notices: Vec::new(),
             block: None,
             pinned: BTreeSet::new(),
             activity_hidden: false,
-            focus: Focus::Composer,
-            panel: 0,
-            pending: None,
             folds: Folds::new(),
-            armed: None,
-            stop_asked: None,
-            esc_armed: false,
-            catalogs: Catalogs::default(),
-            opening: false,
             focused: true,
             switched: None,
             sent: None,

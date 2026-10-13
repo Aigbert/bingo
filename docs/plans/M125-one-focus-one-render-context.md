@@ -40,7 +40,7 @@ sdk change or redesign of the rail/panel that M148 removes (ADR-0081).
 
 All source paths below are under `crates/bingo-surface-tui/src/`:
 
-- New `focus.rs`, `render.rs`, `terminal/probe.rs`.
+- New `focus.rs`, `render.rs`, `terminal/probe.rs`, `ui/controls.rs`.
 - `ui.rs`, `input.rs`, `input/switcher.rs`, `pointer.rs`, `select.rs`,
   `view.rs`, `pager.rs`, `layout.rs`, `layout/{deadline,tests}.rs`.
 - `theme.rs`, `graphics/{mod,tmux}.rs`, `clock.rs`, `terminal.rs`, `lib.rs`,
@@ -71,6 +71,10 @@ passing `&Render` through hundreds of style helpers; redesigning the rail
 or panel; live or credential tests; another milestone; push, merge or PR.
 
 ## Risks
+
+- Removing `Layer::is` exposed `Ui` to the discipline scanner, which had
+  stopped at that test-only method. Group input state in `ui/controls.rs`
+  instead of hiding the 29-field violation behind another test marker.
 
 - Old flags could coexist. One explicit focus replaces another; pager's
   internal search remains nested within the pager. Closing is visual residue.

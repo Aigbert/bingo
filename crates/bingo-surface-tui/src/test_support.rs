@@ -280,7 +280,7 @@ pub fn drafted(ui: &mut crate::ui::Ui, image: bingo_sdk::Image) -> u32 {
         dest,
         result: Ok(image),
     });
-    ui.pictures.hold(ui.composer.text(), path);
+    ui.hold_picture(path);
     ui.composer.insert(&crate::pictures::placeholder(token));
     token
 }

@@ -848,7 +848,7 @@ fn walk_back(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
     if let Some(intent) = newest_of_ours(tree.viewed()) {
         return vec![Effect::Withdraw(intent)];
     }
-    let older = ui.history.older(ui.composer.text());
+    let older = ui.older();
     recall(ui, older);
     Vec::new()
 }

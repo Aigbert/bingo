@@ -733,7 +733,7 @@ impl Run {
         };
         match pasted(&self.data_dir, &bytes) {
             Ok(path) => {
-                let n = self.ui.pictures.hold(self.ui.composer.text(), path);
+                let n = self.ui.hold_picture(path);
                 self.ui.composer.insert(&pictures::placeholder(n));
                 self.ui.edited();
             }
