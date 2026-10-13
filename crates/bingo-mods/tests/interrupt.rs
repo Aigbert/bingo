@@ -5,6 +5,9 @@ use futures::StreamExt;
 use serde_json::{Value, json};
 use std::{sync::Arc, time::Duration};
 
+const GRACE: Duration = bingo_core::session::INTERRUPT_GRACE;
+const TIMER_TICK: Duration = Duration::from_millis(1);
+
 struct Offline;
 static MANIFEST: PluginManifest = PluginManifest {
     id: "test.offline",
@@ -125,7 +128,7 @@ async fn esc_during_a_tool_check_loop_ends_interrupted_within_the_grace() {
     attachment
         .handle
         .interrupt(IntentId::mint(), InterruptScope::Head);
-    let status = tokio::time::timeout(Duration::from_millis(2001), async {
+    let status = tokio::time::timeout(GRACE + TIMER_TICK, async {
         while let Some(frame) = attachment.events.next().await {
             if let Event::TurnCompleted { status, .. } = frame.event {
                 return status;
@@ -135,8 +138,9 @@ async fn esc_during_a_tool_check_loop_ends_interrupted_within_the_grace() {
     })
     .await
     .unwrap();
+    // Pausing after JS startup exposes Tokio's deadline rounding to the next millisecond tick.
     assert!(
-        tokio::time::Instant::now() - start <= Duration::from_secs(2),
+        tokio::time::Instant::now() - start <= GRACE + TIMER_TICK,
         "interrupt elapsed: {:?}",
         tokio::time::Instant::now() - start
     );

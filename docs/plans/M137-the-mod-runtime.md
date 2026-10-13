@@ -139,9 +139,7 @@ file-watcher dependencies, watching non-explicit directories; no live tests.
   catalogue and declared uses. Keep every assertion, including default
   model refusal; no new dev dependency. Do not merge or rebase dev.
 
-- Resolved 2026-10-14: Option B authorizes a ten-minute comparison of M116
-  and the mod interrupt path. Keep the 2 s grace; allow one named timer tick
-  only if rounding alone explains the delay, otherwise repair the real hop.
+- Root cause (2026-10-14): pausing after JS startup exposes Tokio's ≤1 ms deadline rounding; the actor adds no hop and the grace remains 2 s.
 
 ## Verified (2026-10-14)
 
@@ -742,5 +740,21 @@ test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 cargo test -p bingo-mods --test interrupt --locked
 esc_during_a_tool_check_loop_ends_interrupted_within_the_grace ... FAILED
 interrupt elapsed: 2.001s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+```
+
+```text
+cargo test -p bingo-core session::tests::owned::interrupt_drops_a_hung --locked -- --nocapture
+M116 observed 2s
+M116 observed 2s
+M116 observed 2s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 495 filtered out; finished in 0.01s
+cargo test -p bingo-mods --test interrupt --locked -- --nocapture
+M137 standalone timer 2.001s
+M137 interrupts Instant { tv_sec: 21912, tv_nsec: 551198458 }
+M137 grace starts Instant { tv_sec: 21912, tv_nsec: 551198458 }
+M137 grace returns 2.001s
+M137 sends TurnFinished Instant { tv_sec: 21914, tv_nsec: 552198458 }
+M137 observed 2.001s
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
 ```
