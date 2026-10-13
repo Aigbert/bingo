@@ -16,7 +16,8 @@ impl Server {
                 parent: Some(params.parent),
                 ..SessionFilter::default()
             })
-            .await?;
+            .await
+            .map_err(crate::codec::from_kernel)?;
         let mut ids: Vec<_> = summaries.into_iter().map(|summary| summary.id).collect();
         ids.sort();
         let candidates: Vec<_> = ids
@@ -50,7 +51,11 @@ impl Server {
             parent: params.filter.parent,
             limit: None,
         };
-        let mut sessions = self.host.sessions(filter).await?;
+        let mut sessions = self
+            .host
+            .sessions(filter)
+            .await
+            .map_err(crate::codec::from_kernel)?;
         sessions.sort_by(|a, b| a.id.cmp(&b.id));
         let candidates: Vec<_> = sessions
             .into_iter()

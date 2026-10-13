@@ -24,7 +24,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::{self, Receiver, Sender};
-use tokio_util::codec::{FramedRead, FramedWrite, LinesCodecError};
+use tokio_util::codec::{FramedRead, FramedWrite};
 
 use crate::codec::{
     self, INVALID_PARAMS, INVALID_REQUEST, Id, KERNEL_ERROR, METHOD_NOT_FOUND, Message,
@@ -72,7 +72,7 @@ async fn write_lines<W>(writer: W, mut queue: Receiver<Message>) -> Result<(), K
 where
     W: AsyncWrite + Unpin + Send,
 {
-    let mut sink = FramedWrite::new(writer, codec::lines());
+    let mut sink = FramedWrite::new(writer, codec::lines(codec::MAX_LINE));
     while let Some(message) = queue.recv().await {
         let line = serde_json::to_string(&message).map_err(|error| {
             KernelError::new(
@@ -85,7 +85,7 @@ where
     Ok(())
 }
 
-fn broken_pipe(error: LinesCodecError) -> KernelError {
+fn broken_pipe(error: codec::CodecError) -> KernelError {
     KernelError::new(
         ErrorCode::Internal,
         format!("the rpc transport failed: {error}"),
@@ -165,12 +165,12 @@ impl Server {
     where
         R: AsyncRead + Unpin + Send,
     {
-        let mut lines = FramedRead::new(reader, codec::lines());
+        let mut lines = FramedRead::new(reader, codec::lines(codec::MAX_LINE));
         while self.exit.is_none() {
             match lines.next().await {
                 None => break,
                 Some(Ok(line)) => self.line(line).await?,
-                Some(Err(LinesCodecError::MaxLineLengthExceeded)) => {
+                Some(Err(codec::CodecError::LineTooLong)) => {
                     self.fail(None, RpcError::new(PARSE_ERROR, "the line is too long"))
                         .await?;
                 }
@@ -230,9 +230,10 @@ impl Server {
 
     async fn dispatch(&mut self, method: &str, params: Value, id: &Id) -> Result<Reply, RpcError> {
         if method != name::INITIALIZE && self.client.is_none() {
-            return Err(
-                KernelError::new(ErrorCode::NotInitialized, "call initialize first").into(),
-            );
+            return Err(crate::codec::from_kernel(KernelError::new(
+                ErrorCode::NotInitialized,
+                "call initialize first",
+            )));
         }
         match method {
             name::INITIALIZE => self.initialize(params),
@@ -280,7 +281,11 @@ impl Server {
 
     async fn list(&mut self, params: Value) -> Result<Reply, RpcError> {
         let params: ListParams = parse(params)?;
-        let sessions = self.host.sessions(params.filter).await?;
+        let sessions = self
+            .host
+            .sessions(params.filter)
+            .await
+            .map_err(crate::codec::from_kernel)?;
         Reply::of(&ListResult { sessions })
     }
 
@@ -292,11 +297,10 @@ impl Server {
         if params.options.tree_backfill.is_some()
             && (!params.options.children || params.options.max_snapshot_bytes.is_none())
         {
-            return Err(KernelError::new(
+            return Err(crate::codec::from_kernel(KernelError::new(
                 ErrorCode::InvalidInput,
                 "live-only tree requires bounded children attachment",
-            )
-            .into());
+            )));
         }
         let who = self.who()?;
         let Attachment {
@@ -305,7 +309,11 @@ impl Server {
             history,
             events,
             handle,
-        } = self.host.open(params.selector, who, params.options).await?;
+        } = self
+            .host
+            .open(params.selector, who, params.options)
+            .await
+            .map_err(crate::codec::from_kernel)?;
         self.pins.remove_session(&session);
         let generation = snapshot.transcript.generation();
         let result = OpenResult {
@@ -345,7 +353,8 @@ impl Server {
         self.pins.remove_session(&params.session);
         self.host
             .close(&params.session, CloseReason::Client)
-            .await?;
+            .await
+            .map_err(crate::codec::from_kernel)?;
         Reply::empty()
     }
 
@@ -353,7 +362,10 @@ impl Server {
         let params: SessionParams = parse(params)?;
         self.open.remove(&params.session);
         self.pins.remove_session(&params.session);
-        self.host.delete(&params.session).await?;
+        self.host
+            .delete(&params.session)
+            .await
+            .map_err(crate::codec::from_kernel)?;
         Reply::empty()
     }
 
@@ -366,7 +378,8 @@ impl Server {
                 params.input,
                 params.delivery,
             )
-            .await?;
+            .await
+            .map_err(crate::codec::from_kernel)?;
         Reply::empty()
     }
 
@@ -379,7 +392,8 @@ impl Server {
                 &params.kind,
                 params.payload,
             )
-            .await?;
+            .await
+            .map_err(crate::codec::from_kernel)?;
         Reply::empty()
     }
 
@@ -392,7 +406,8 @@ impl Server {
                 &params.kind,
                 params.payload,
             )
-            .await?;
+            .await
+            .map_err(crate::codec::from_kernel)?;
         Reply::empty()
     }
 
@@ -405,7 +420,10 @@ impl Server {
             page.max_bytes = Some(budget.saturating_sub(512));
         }
         let handle = self.port(&params.session)?;
-        let chunk = handle.history(page).await?;
+        let chunk = handle
+            .history(page)
+            .await
+            .map_err(crate::codec::from_kernel)?;
         let result = self.pinned_history(&params.session, &handle, chunk).await?;
         if let Some(budget) = budget
             && response_len(id, &result)? > budget
@@ -435,7 +453,10 @@ impl Server {
                         reason: "pinBudgetExceeded".into(),
                     }
                 } else {
-                    let item = handle.item_for_pin(&marker.id, chunk.generation).await?;
+                    let item = handle
+                        .item_for_pin(&marker.id, chunk.generation)
+                        .await
+                        .map_err(crate::codec::from_kernel)?;
                     let raw = serde_json::to_string(&item).map_err(|error| {
                         RpcError::new(KERNEL_ERROR, format!("unserialisable item: {error}"))
                     })?;
@@ -443,11 +464,10 @@ impl Server {
                         || raw.len() != marker.total_bytes
                         || fnv1a64(raw.as_bytes()) != marker.checksum
                     {
-                        return Err(KernelError::new(
+                        return Err(crate::codec::from_kernel(KernelError::new(
                             ErrorCode::StaleGeneration,
                             "item changed before its history reference was pinned",
-                        )
-                        .into());
+                        )));
                     }
                     self.pins.add(
                         session.clone(),
@@ -481,14 +501,17 @@ impl Server {
         if params.token.is_empty() {
             return Err(protocol_limit("this item is not available"));
         }
-        let part = self.pins.part(
-            &params.session,
-            &params.token,
-            Kind::Item,
-            Some((&params.item, params.generation)),
-            params.offset,
-            params.max_bytes,
-        )?;
+        let part = self
+            .pins
+            .part(
+                &params.session,
+                &params.token,
+                Kind::Item,
+                Some((&params.item, params.generation)),
+                params.offset,
+                params.max_bytes,
+            )
+            .map_err(crate::codec::from_kernel)?;
         self.part_reply(id, &part)
     }
 
@@ -500,20 +523,24 @@ impl Server {
                 .owner_for(&params.session, &params.token)
                 .ok_or_else(|| {
                     KernelError::new(ErrorCode::SessionNotFound, "the source tree is not open")
-                })?;
+                })
+                .map_err(crate::codec::from_kernel)?;
             self.port(&owner)?;
         }
         if params.token.is_empty() {
             return Err(protocol_limit("this field is not available"));
         }
-        let part = self.pins.part(
-            &params.session,
-            &params.token,
-            kind,
-            None,
-            params.offset,
-            params.max_bytes,
-        )?;
+        let part = self
+            .pins
+            .part(
+                &params.session,
+                &params.token,
+                kind,
+                None,
+                params.offset,
+                params.max_bytes,
+            )
+            .map_err(crate::codec::from_kernel)?;
         self.part_reply(id, &part)
     }
 
@@ -535,11 +562,15 @@ impl Server {
         let forwarder = self
             .open
             .get(&params.session)
-            .ok_or_else(|| KernelError::new(ErrorCode::SessionNotFound, "session is not open"))?;
+            .ok_or_else(|| KernelError::new(ErrorCode::SessionNotFound, "session is not open"))
+            .map_err(crate::codec::from_kernel)?;
         let handle = forwarder.handle.clone();
         let max_bytes = forwarder.max_bytes;
         let generation = forwarder.generation.load(Ordering::Acquire);
-        let events = handle.events_since(params.since).await?;
+        let events = handle
+            .events_since(params.since)
+            .await
+            .map_err(crate::codec::from_kernel)?;
         Ok(Reply::empty()?.then(Start::Session {
             session: params.session,
             events,
@@ -577,7 +608,11 @@ impl Server {
 
     async fn catalog(&mut self, params: Value) -> Result<Reply, RpcError> {
         let params: CatalogParams = parse(params)?;
-        let catalog = self.host.catalog(params.kind).await?;
+        let catalog = self
+            .host
+            .catalog(params.kind)
+            .await
+            .map_err(crate::codec::from_kernel)?;
         Reply::of(&catalog)
     }
 
@@ -636,17 +671,19 @@ impl Server {
             .get(session)
             .map(|forwarder| forwarder.handle.clone())
             .ok_or_else(|| {
-                KernelError::new(
+                crate::codec::from_kernel(KernelError::new(
                     ErrorCode::SessionNotFound,
                     format!("session {session} is not open on this connection"),
-                )
-                .into()
+                ))
             })
     }
 
     fn who(&self) -> Result<ClientIdentity, RpcError> {
         self.client.clone().ok_or_else(|| {
-            KernelError::new(ErrorCode::NotInitialized, "call initialize first").into()
+            crate::codec::from_kernel(KernelError::new(
+                ErrorCode::NotInitialized,
+                "call initialize first",
+            ))
         })
     }
 
@@ -687,14 +724,15 @@ fn response_len<T: Serialize>(id: &Id, value: &T) -> Result<usize, RpcError> {
 }
 
 fn protocol_limit(message: &str) -> RpcError {
-    KernelError::new(ErrorCode::ProtocolLimit, message).into()
+    crate::codec::from_kernel(KernelError::new(ErrorCode::ProtocolLimit, message))
 }
 
 fn validate_budget(budget: usize) -> Result<(), RpcError> {
     if !(1024..=MAX_BOUNDED_LINE_BYTES).contains(&budget) {
-        return Err(
-            KernelError::new(ErrorCode::InvalidInput, "invalid bounded line budget").into(),
-        );
+        return Err(crate::codec::from_kernel(KernelError::new(
+            ErrorCode::InvalidInput,
+            "invalid bounded line budget",
+        )));
     }
     Ok(())
 }

@@ -84,7 +84,10 @@ run is long.
   `crates/bingo-surface-rpc/src/{codec,server,client}.rs`
 - `docs/adr/{0015,0072}-*.md`, `Cargo.lock`, and each touched crate's `Cargo.toml`
 - Consumer module declarations and protocol error conversions; new tests beside
-  each changed module. Mechanical fixture updates are listed when needed.
+  each changed module; `surface-rpc/src/server/discovery.rs` error conversions.
+- Mechanical fixture update: `surface-rpc/tests/wire/main.rs` uses shared
+  `Lines` and its explicit bound; plugin `examples/stub_plugin/{main,hooks}.rs`
+  uses the shared `Id` type. Assertions and wire values are unchanged.
 
 ## Exit criteria
 
