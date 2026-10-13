@@ -72,70 +72,49 @@ After M121, M123–M125, M137, M138.
 - 2026-10-14, person's delegate: authorize the scoped pre-release View/Shown/place/ui-render baseline amendment; protocol 2 freezes at its first release (ADR-0075).
 - 2026-10-14, person's delegate: authorize print Invalidated ignore arms and all mechanical Event/Shown/element sibling mappings; record files below, stop only for new out-of-scope behaviour.
 - 2026-10-14, person's delegate: authorize theme-test file additions only for fitting token roles, keep ember/accent lists and theme values unchanged; merge dev before regenerating and running final gates.
+- Pure flex layout adds no dependency; fixed-axis and legacy narrow fixtures pass. Budget remains unverified at this stop.
+- Stopped 2026-10-14 (protocol step 6): discipline bans the ADR-0079-required `Component::AskUserQuestion`; `scripts/check_discipline.sh` is outside Files. Authorize an exception for exactly this component declaration, preserving the ban elsewhere, or revise the ADR. Final gates (including the isolated ACP token tests), full smoke and Windows checks remain pending; ADR-0079 stays proposed.
 ## Verified (2026-10-14)
 
 Theme allowlist additions: text → `toast.rs`, `views/{input,select}.rs`; dim → `views/{button,flex,input,link,mod,text}.rs`; bad → `views/button.rs`; no ember/accent additions.
-Mechanical match updates: `bingo-surface-print/src/{render,stream_json}.rs` (ignore Invalidated).
-```text
-cargo fmt --all -- --check
-exit_code: 0
-cargo test -p bingo-sdk view::contract --locked
-unlearned: {"kind":"Box","children":[{"kind":"Text","children":["one"]},{"kind":"Text","children":["two"]}]}
-test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 137 filtered out
-cargo test -p bingo-sdk view::contract --locked
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 137 filtered out
-BINGO_UPDATE_SCHEMA=1 INSTA_UPDATE=always cargo test -p bingo-sdk --lib --locked
-test result: ok. 139 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-cargo check --workspace --all-targets --locked
-error[E0164]: expected tuple struct or tuple variant, found associated function `View::text`
-cargo check --workspace --all-targets --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.15s
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --test record --locked
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema:: --locked
-protocol 2 removed or retyped a frozen shape
-test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc schema::tests::the_committed_schema_is_this_document --locked
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc wire_ts:: --locked
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc events_ts:: --locked
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods dollar::tests::schema_and_types_are_generated_from_the_same_rows --locked
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema::tests::the_committed_schema_is_this_document --locked
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema::tests::the_committed_schema_is_this_document --locked
-test schema::tests::the_committed_schema_is_this_document ... ok
-cargo test -p bingo-sdk view::validate --locked
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 140 filtered out
-cargo test -p bingo-sdk view::validate --locked
-test view::validate::tests::answers_reject_wrong_engines_foreign_handlers_and_oversized_trees ... ok
-cargo test -p bingo-sdk slot::pull_contract --locked
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 142 filtered out
-cargo check --workspace --all-targets --locked
-error[E0004]: non-exhaustive patterns: `&bingo_sdk::Event::Invalidated { .. }` not covered
-error: could not compile `bingo-surface-print` (lib) due to 2 previous errors
-error: could not compile `bingo-surface-tui` (lib) due to 3 previous errors
-cargo test -p bingo-surface-tui views::tests --locked
-test result: FAILED. 9 passed; 3 failed; 0 ignored; 0 measured; 1090 filtered out
-cargo test -p bingo-surface-tui views::tests --locked
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1090 filtered out
-cargo test -p bingo-surface-tui pulled:: --locked
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1102 filtered out
-cargo test -p bingo-surface-tui pane:: --locked
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1104 filtered out
-cargo test -p bingo-surface-tui toast:: --locked
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1104 filtered out
-cargo test -p bingo-surface-tui pane:: --locked
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1104 filtered out
-cargo test -p bingo-surface-tui toast:: --locked
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1104 filtered out
-node --test sdk/typescript/src/ui.test.ts
-fail 1: Escape raises close in the mod and removes only its current closable pane
-node --test sdk/typescript/src/ui.test.ts
-pass 3; fail 0
-cargo test -p bingo-surface-tui --lib --locked
-theme::tests::every_token_is_spent_where_the_design_says: assertion failed: where `text` is spent
-test result: FAILED. 1104 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out
-```
+Mechanical match/fixture updates: `bingo-surface-print/src/{render,stream_json}.rs` (ignore Invalidated), `bingo-core/src/host/tests/commands.rs` (canonical View fold), `bingo-surface-rpc/tests/wire/main.rs` (ui/render params); existing View/CommandSpec constructors are the Files-authorized migration.
+
+| Command | Result lines |
+|---|---|
+| `cargo test -p bingo-sdk view::contract --locked` | test result: FAILED. 0 passed; 2 failed → test result: ok. 2 passed; 0 failed |
+| `cargo test -p bingo-sdk view::validate --locked` | test result: FAILED. 0 passed; 1 failed → answers_reject_wrong_engines_foreign_handlers_and_oversized_trees ... ok |
+| `cargo test -p bingo-sdk slot::pull_contract --locked` | test result: FAILED. 0 passed; 1 failed |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema:: --locked` | protocol 2 removed or retyped a frozen shape; test result: FAILED. 9 passed; 1 failed |
+| `cargo check --workspace --all-targets --locked` | error[E0164]: expected tuple struct or tuple variant, found associated function `View::text`; error[E0004]: `Event::Invalidated` not covered |
+| `cargo test -p bingo-surface-tui views::tests --locked` | test result: FAILED. 9 passed; 3 failed → test result: ok. 13 passed; 0 failed |
+| `cargo test -p bingo-surface-tui pulled:: --locked` | test result: FAILED. 0 passed; 1 failed |
+| `cargo test -p bingo-surface-tui pane:: --locked` | test result: FAILED. 0 passed; 1 failed |
+| `cargo test -p bingo-surface-tui toast:: --locked` | test result: FAILED. 0 passed; 1 failed |
+| `node --test sdk/typescript/src/ui.test.ts` | fail 1: Escape raises close in the mod and removes only its current closable pane → pass 3; fail 0 |
+| `cargo test -p bingo-surface-tui --lib --locked` | every_token_is_spent_where_the_design_says: assertion failed: where `text` is spent; test result: FAILED. 1104 passed; 1 failed; 2 ignored → test result: ok. 1105 passed; 0 failed; 2 ignored |
+| `git merge --no-ff dev -m 'merge: dev into M140'` | da6bc325 merge: dev into M140 (dev 686ad289) |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods dollar::tests::schema_and_types_are_generated_from_the_same_rows --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema::tests::the_committed_schema_is_this_document --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 INSTA_UPDATE=always cargo test -p bingo-sdk --lib --locked` | test result: ok. 146 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --test record --locked` | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc schema::tests::the_committed_schema_is_this_document --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc wire_ts:: --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc events_ts:: --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out |
+| `cargo test -p bingo-core host::throttle --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 501 filtered out |
+| `cargo test -p bingo-plugin-rpc --test plugin --locked` | test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `cargo test -p bingo --test mods_ui --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `cargo test -p bingo-surface-tui toast:: --locked` | test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 1106 filtered out |
+| `cargo test -p bingo-surface-tui toast:: --locked` | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1106 filtered out |
+| `bash /tmp/m140-counter-drive.sh` | 80x24: Counter 0→1; Input Ada persisted; Escape closed<br>200x24: Counter 0→1; Input Ada persisted; Escape closed<br>tui-smoke ok |
+| `cargo fmt --all -- --check` | exit_code: 0 |
+| `cargo check --workspace --all-targets --locked` | Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.28s |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.54s |
+| `cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed` | test result: FAILED. 41 passed; 1 failed; a_bound_port_is_a_real_one_and_a_range_lands_inside_itself: attempt to add with overflow |
+| `cargo test -p bingo-loopback --lib --locked server::tests::a_bound_port_is_a_real_one_and_a_range_lands_inside_itself -- --exact --test-threads=1` | test result: ok. 1 passed; 0 failed; 41 filtered out |
+| `cargo test --workspace --all-targets --locked --no-fail-fast -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed` | error: 2 targets failed: `-p bingo-surface-rpc --lib`, `-p bingo-surface-rpc --test wire` |
+| `node --test sdk/typescript/src/*.test.ts` | tests 20; pass 20; fail 0 |
+| `cargo test -p bingo-sdk -p bingo-core -p bingo-surface-tui -p bingo-surface-rpc --lib --locked` | test result: ok. 503 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 146 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 1106 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked` | test result: ok. 130 passed; 0 failed; 0 ignored |
+| `cargo test -p bingo-surface-rpc --test wire --locked` | test result: ok. 41 passed; 0 failed; 1 ignored |
+| `scripts/check_discipline.sh` | a tool named in kernel/sdk code: `crates/bingo-sdk/src/render.rs:10: AskUserQuestion,`<br>cohesion ok<br>discipline FAILED |
+| `cargo test -p bingo-surface-tui --lib --locked` | test result: ok. 1106 passed; 0 failed; 2 ignored |
