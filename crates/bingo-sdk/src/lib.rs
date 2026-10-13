@@ -14,6 +14,7 @@ pub mod event;
 pub mod hook;
 pub mod host;
 pub mod ids;
+pub mod intercept;
 pub mod model;
 pub mod page;
 pub mod plugin;
@@ -43,6 +44,7 @@ pub use event::*;
 pub use hook::{Hook, HookContext, HookMatcher, HookOutcome, HookPoint, Phase};
 pub use host::*;
 pub use ids::*;
+pub use intercept::*;
 pub use model::*;
 pub use page::{Page, Pages};
 pub use plugin::{

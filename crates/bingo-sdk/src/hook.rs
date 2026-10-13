@@ -39,7 +39,7 @@ pub struct HookMatcher {
     /// Empty wants every point.
     #[serde(default)]
     pub points: Vec<HookPoint>,
-    /// Anchored regex on the tool name for the tool points.
+    /// Exact tool name or a trailing `*` prefix for the tool points.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool: Option<String>,
 }

@@ -173,6 +173,15 @@ impl Host {
         let settings = settings::merge(&config.layers, &claims)?;
         let switched_off = settings.kernel.switched_off();
         let mut registry = Registry::load(&plugins, &settings.plugins, &config.env, &switched_off)?;
+        for link in &mut registry.links {
+            if let Some(name) = &link.external {
+                link.tier = settings
+                    .kernel
+                    .plugin_trust
+                    .get(name)
+                    .map_or(Tier::Tighten, |grant| grant.tier);
+            }
+        }
         let (gateway, _) = broadcast::channel(GATEWAY_CAPACITY);
         let learned = Arc::new(Learned::load(
             config.env.data_dir.join("learned-windows.json"),
@@ -266,6 +275,7 @@ impl Host {
             )
         });
         unknown
+            .chain(self.settings.notices.iter().cloned())
             .chain(self.registry.notices.iter().cloned())
             .collect()
     }
@@ -533,6 +543,7 @@ impl Host {
             },
             policy: self.policy(),
             hooks: HookSet {
+                links: self.registry.links.clone(),
                 fixed: self.registry.hooks.clone(),
                 sources: self.registry.sources.hooks.clone(),
             },

@@ -1,6 +1,6 @@
 # ADR-0074 — Every dispatch is a chain
 
-Status: proposed · 2026-10-13 · Plan: M131 · Amends: ADR-0032 §4
+Status: accepted · 2026-10-13 · Plan: M131 · Amends: ADR-0032 §4
 
 ## Context
 

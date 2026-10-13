@@ -37,6 +37,7 @@ pub const KERNEL_KEYS: &[&str] = &[
     "models",
     "pictures",
     crate::plugins::KEY,
+    "pluginTrust",
 ];
 
 /// The one key under `pictures`: the spelling every other kernel key uses, and
@@ -47,14 +48,22 @@ const CACHE_DAYS: [&str; 2] = ["cacheDays", "cache_days"];
 /// One settings source, lowest priority first when listed.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Layer {
+    user: bool,
     /// Where it came from, for messages: a path or `cli`.
     pub source: String,
     pub value: Map<String, Value>,
 }
 
 impl Layer {
+    /// Mark a layer supplied by the person, never a repository or CLI overlay.
+    pub fn user(mut self) -> Self {
+        self.user = true;
+        self
+    }
+
     pub fn new(source: impl Into<String>, value: Map<String, Value>) -> Self {
         Self {
+            user: false,
             source: source.into(),
             value,
         }
@@ -97,6 +106,8 @@ pub struct KernelSettings {
     pub max_tokens: Option<u32>,
     /// Per-model overrides of the catalogue, keyed `<provider>/<model>` (ADR-0004).
     pub models: BTreeMap<String, Declared>,
+    /// Authority granted explicitly in the user layer, keyed by external plugin name.
+    pub plugin_trust: BTreeMap<String, bingo_sdk::PluginTrust>,
     /// Which plugins run, by name: a manifest id for one this build ships, a
     /// directory name for one a bridge found. Absent is on (ADR-0057 §1).
     pub enabled_plugins: BTreeMap<String, bool>,
@@ -123,6 +134,7 @@ pub struct UnknownKey {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Merged {
+    pub notices: Vec<(String, String)>,
     pub kernel: KernelSettings,
     /// Each plugin's slice: an object holding only the roots it claimed.
     pub plugins: BTreeMap<String, Value>,
@@ -368,9 +380,9 @@ fn migrated(path: &Path) -> Result<(), SettingsError> {
 /// ones that do not exist.
 pub fn load(env: &Env, cwd: &Path, extra: Option<&Path>) -> Result<Vec<Layer>, SettingsError> {
     let mut layers = Vec::new();
-    for path in layer_paths(env, cwd) {
+    for (index, path) in layer_paths(env, cwd).into_iter().enumerate() {
         if let Some(layer) = standing_layer(&path)? {
-            layers.push(layer);
+            layers.push(if index == 0 { layer.user() } else { layer });
         }
     }
     if let Some(path) = extra

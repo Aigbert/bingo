@@ -39,6 +39,23 @@ path, the policy, and a hook is not it — `allow` reads as "no objection". A
 `PostToolUse` `decision: "block"` ends the turn after the round rather than
 undoing the call.
 
+## Order and stopping
+
+Submit hooks run in order; each sees the previous hook's rewritten input.
+The first denial, block or redirect ends submission. An ask continues.
+Before-tool hooks run in order until a denial, block or ask. An ask still
+lets the permission policy deny the call before anyone is prompted; a
+redirect at this point continues. Every matching after-tool hook sees every
+result, including calls handed in by another provider. Any block ends the
+turn after the round. At Stop, the first block supplies another user piece
+with origin `hook:<id>` and starts another round.
+
+Plugins may also register dispatch links. External links default to
+`tighten`; only `pluginTrust` in user settings grants `rewrite` or `full`.
+Project and CLI layers cannot grant trust. `bingo plugins list` shows the
+resolved tier. Protocol-1 shell and process hooks retain their existing
+rights, even when their plugin has a higher tier.
+
 ## The matcher
 
 A whole-string-anchored regex over the event's subject: the tool's name for

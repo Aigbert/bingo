@@ -236,3 +236,33 @@ fn a_missing_used_service_is_named_without_disabling_its_consumer() {
         "{said}"
     );
 }
+
+#[test]
+fn an_external_plugins_tier_is_listed_from_user_settings_only() {
+    let home = tempfile::tempdir().unwrap();
+    let project = tempfile::tempdir().unwrap();
+    install_wordcount(home.path());
+    let listed = run(plugins(home.path()).arg("list"));
+    assert_eq!(listed.status.code(), Some(0));
+    assert_eq!(row(&stdout(&listed), "wordcount")[4], "tighten");
+    std::fs::write(
+        user_settings(home.path()),
+        "[pluginTrust.wordcount]\ntier = 'rewrite'\nuses = ['fs']\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(project.path().join(".bingo")).unwrap();
+    std::fs::write(
+        project.path().join(".bingo/settings.toml"),
+        "[pluginTrust.wordcount]\ntier = 'full'\n",
+    )
+    .unwrap();
+    let listed = run(bingo()
+        .envs(home_env(home.path()))
+        .arg("--cwd")
+        .arg(project.path())
+        .args(["plugins", "list"]));
+    assert_eq!(listed.status.code(), Some(0), "{}", stderr(&listed));
+    assert_eq!(row(&stdout(&listed), "wordcount")[4], "rewrite");
+    assert!(stderr(&listed).contains("grants belong in user settings"));
+    assert!(!stdout(&listed).contains("ignored"));
+}

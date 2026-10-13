@@ -881,6 +881,7 @@ async fn a_source_s_hook_composes_where_a_second_registered_hook_would() {
 
     let mixed = Arc::new(Mutex::new(Vec::new()));
     gate_one_call(HookSet {
+        links: Vec::new(),
         fixed: vec![OrderingHook::new("first", &mixed)],
         sources: vec![ScriptedHookSource::new(vec![OrderingHook::new(
             "second", &mixed,
@@ -961,3 +962,9 @@ fn turn_start_shares_ten_thousand_bodies_without_a_journal() {
         assert_eq!(Arc::strong_count(original), 2);
     }
 }
+
+#[path = "../chain/hook_contract_turn.rs"]
+mod hook_contract;
+
+#[path = "../chain/turn_tests.rs"]
+mod chain;

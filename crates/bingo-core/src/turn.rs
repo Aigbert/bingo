@@ -24,13 +24,14 @@ pub use config::{Breaker, ModelChoice, TurnBudget, TurnConfig, runs_on};
 use late::Late;
 pub use late::{CompactorSet, ContributorSet, HookSet, ProviderSet, ToolSet};
 use ruler::Ruler;
-use stream::Streamed;
 pub use stream::{MAX_RETRY_DELAY, MAX_SERVER_RETRY_DELAY, backoff};
+use stream::{Streamed, stopped_early};
 
 use crate::accumulator::Finished;
-use crate::context::{ContextView, HOOK_PREFIX, KERNEL_SURFACE, budget, elide, estimate_tokens};
+use crate::chain::tool::AskVia;
+use crate::context::{ContextView, KERNEL_SURFACE, budget, elide, estimate_tokens};
 use crate::executor::{self, Gate, PendingCall};
-use crate::gate::{GateInput, gate_call, hook_applies};
+use crate::gate::{GateInput, gate_call};
 use crate::models::vision;
 
 pub const INTERRUPTED_MARKER: &str = "[Request interrupted by user]";
@@ -41,6 +42,10 @@ const MAX_THRESHOLD_COMPACTIONS: u32 = 2;
 /// The session actor as the turn sees it: a place to publish, a way to ask, a queue to absorb.
 #[async_trait]
 pub trait TurnHost: Send + Sync {
+    /// A bridged after-tool observer requested completion at this round's boundary.
+    fn stopped(&self) -> bool {
+        false
+    }
     fn emit(&self, event: Event);
     /// The tools this turn resolved when it started (ADR-0009 §1): the offer
     /// every one of its requests carries. The session keeps them so that a
@@ -169,25 +174,6 @@ fn mint(turn: &TurnId, round: u32, body: ItemBody, status: ItemStatus) -> Item {
 /// A turn stopped before it had gathered enough to be one. The marker still
 /// reaches the transcript and the clients: what a person sees when they press
 /// esc does not depend on how far the turn had got.
-fn stopped_early(host: &dyn TurnHost, turn: &TurnId, mut transcript: Transcript) -> TurnOutcome {
-    let item = mint(
-        turn,
-        0,
-        ItemBody::Interruption {
-            marker: INTERRUPTED_MARKER.into(),
-        },
-        ItemStatus::Completed,
-    );
-    emit_and_fold(&mut transcript, host, Event::ItemCompleted { item });
-    TurnOutcome {
-        status: TurnStatus::Interrupted {
-            reason: InterruptReason::UserCancel,
-        },
-        usage: Usage::default(),
-        items: transcript.model_items().cloned().collect(),
-    }
-}
-
 /// The actor opens no turn on a session nothing answers (ADR-0011 §1); this
 /// is the guard, not a path.
 fn unanswered(items: Vec<Item>) -> TurnOutcome {
@@ -502,36 +488,67 @@ impl Turn<'_> {
     /// Let the contributors speak, then measure. A first round that is already
     /// over the compaction threshold compacts before it sends anything.
     async fn assemble_request(&mut self) -> Option<(ModelRequest, ContextUsage)> {
-        let preliminary =
-            self.measure(&self.cfg.system, &ContextView::model_view(&self.transcript));
-        let extra_system = self
-            .contribute(
-                |p| matches!(p, Placement::System { .. } | Placement::RoundStart),
-                &preliminary,
-            )
-            .await?;
-        let mut system = self.cfg.system.clone();
-        system.extend(extra_system);
-        let full = self.without_images(ContextView::model_view(&self.transcript));
-        let recent = self.without_old_images(full);
-        let messages = self.elide_after_overflow(recent);
-        let usage = self.measure(&system, &messages);
         let request = ModelRequest {
             model: self.model.id.clone(),
             max_tokens: self.model.max_tokens,
-            system,
-            messages,
+            system: self.cfg.system.clone(),
+            messages: ContextView::model_view(&self.transcript),
             tools: self.tool_specs(),
             reasoning: self.model.reasoning,
-            // Whose turn this is: a provider that keeps a conversation of
-            // its own per session has no other way to know (ADR-0035 §3).
             session: Some(self.cfg.session.id.clone()),
             provider_options: ProviderMetadata::new(),
         };
+        let links = self.cfg.hooks.links.clone();
+        let cx = self.hook_cx.clone();
+        let report = crate::chain::Report::default();
+        let result = crate::chain::run::<crate::chain::compose::Compose>(
+            &links,
+            Next::new(|request| Box::pin(self.compose_request(request))),
+            &cx,
+            request,
+            report.clone(),
+        )
+        .await;
+        for notice in report.take() {
+            self.record(notice);
+        }
+        let request = result.ok()?;
+        let usage = self.ruler.measure(estimate_tokens(
+            &request.system,
+            &request.messages,
+            &request.tools,
+        ));
         self.recount(&request).await?;
         let usage = self.ruler.anchored(usage);
         self.warn_once(&usage);
         Some((request, usage))
+    }
+
+    async fn compose_request(
+        &mut self,
+        mut request: ModelRequest,
+    ) -> Result<ModelRequest, KernelError> {
+        let preliminary = self.ruler.measure(estimate_tokens(
+            &request.system,
+            &request.messages,
+            &request.tools,
+        ));
+        let original = ContextView::model_view(&self.transcript);
+        let extra = self
+            .contribute(
+                |p| matches!(p, Placement::System { .. } | Placement::RoundStart),
+                &preliminary,
+            )
+            .await
+            .ok_or_else(|| KernelError::new(ErrorCode::Interrupted, "composition interrupted"))?;
+        request.system.extend(extra);
+        if request.messages == original {
+            request.messages = ContextView::model_view(&self.transcript);
+        }
+        let full = self.without_images(request.messages);
+        let recent = self.without_old_images(full);
+        request.messages = self.elide_after_overflow(recent);
+        Ok(request)
     }
 
     async fn assemble(&mut self) -> Option<Assembled> {
@@ -631,6 +648,9 @@ impl Turn<'_> {
     /// What the response means when it asks for no tool: `None` means it does,
     /// and the round goes on to act.
     async fn decide(&mut self, finished: &Finished) -> Option<Step> {
+        if self.host.stopped() && finished.tool_calls.is_empty() {
+            return Some(Step::Closing(TurnStatus::Completed));
+        }
         if finished.items.is_empty() {
             // One empty response is a provider hiccup; two is an answer.
             if !self.empty_retry_used {
@@ -658,23 +678,27 @@ impl Turn<'_> {
 
     /// A `Stop` hook may push the turn into another round instead of ending it.
     async fn stop_hooks(&mut self) -> Step {
-        let Some(hooks) = self.racing(self.hooks(HookPoint::Stop)).await else {
-            return self.interrupted();
-        };
-        for hook in hooks {
-            let Some(outcome) = self.racing(hook.on_stop(&self.hook_cx)).await else {
-                return self.interrupted();
-            };
-            if let HookOutcome::Block { reason } = outcome {
-                self.user_piece(
-                    vec![ContentPart::text(reason)],
-                    format!("{HOOK_PREFIX}{}", hook.id()),
-                );
-                self.round += 1;
-                return Step::Assembling;
-            }
+        let report = crate::chain::Report::default();
+        let result = self
+            .racing(crate::chain::stop::dispatch(
+                &self.cfg.hooks,
+                &self.hook_cx,
+                report.clone(),
+            ))
+            .await;
+        for notice in report.take() {
+            self.record(notice);
         }
-        Step::Closing(TurnStatus::Completed)
+        match result {
+            Some(Ok(StopResult::Continue { origin, reason })) => {
+                self.user_piece(vec![ContentPart::text(reason)], origin);
+                self.round += 1;
+                Step::Assembling
+            }
+            Some(Ok(StopResult::Complete)) => Step::Closing(TurnStatus::Completed),
+            Some(Err(error)) => Step::Closing(TurnStatus::Failed { error }),
+            None => self.interrupted(),
+        }
     }
 
     /// Gate the calls, run them, then hold the barrier before the next round.
@@ -684,7 +708,7 @@ impl Turn<'_> {
         if self.cancel.is_cancelled() {
             return self.interrupted();
         }
-        if stop_after {
+        if stop_after || self.host.stopped() {
             return Step::Closing(TurnStatus::Completed);
         }
         if self.barrier().await.is_none() {
@@ -756,17 +780,28 @@ impl Turn<'_> {
         if self.compact_hooks(Phase::Start).await.is_none() {
             return false;
         }
-        let cx = CompactContext {
-            items: &self.transcript.model_items().cloned().collect::<Vec<_>>(),
+        let input = CompactInput {
+            items: self.transcript.model_items().cloned().collect(),
             usage,
-            capabilities: &self.model.capabilities,
-            provider: self.model.provider.clone(),
-            request,
-            cancel: self.cancel.child_token(),
+            request: request.clone(),
+            reason,
             failures: self.cfg.compaction.failures(),
             keep_budget: self.ruler.lines.keep,
         };
-        let outcome = compactor.compact(cx, reason).await;
+        let report = crate::chain::Report::default();
+        let outcome = crate::chain::compact::dispatch(
+            &self.cfg.hooks.links,
+            &self.hook_cx,
+            input,
+            compactor,
+            &self.model,
+            self.cancel.child_token(),
+            report.clone(),
+        )
+        .await;
+        for notice in report.take() {
+            self.record(notice);
+        }
         let _ = self.compact_hooks(Phase::End).await;
         match outcome {
             Ok(c) if c.after < c.before && !self.cancel.is_cancelled() => {
@@ -840,6 +875,7 @@ impl Turn<'_> {
             };
             let gated = gate_call(
                 GateInput {
+                    links: &self.cfg.hooks.links,
                     session: &self.cfg.session.id,
                     cwd: &self.cfg.cwd,
                     item: item_id,
@@ -852,6 +888,9 @@ impl Turn<'_> {
                 &prompter,
             )
             .await;
+            for notice in gated.notices {
+                self.record(notice);
+            }
             if let Some(receipt) = gated.receipt {
                 self.record(receipt);
             }
@@ -888,7 +927,13 @@ impl Turn<'_> {
         let turn = self.id.clone();
         let cancel = self.cancel.clone();
 
-        executor::execute(
+        let report = crate::chain::Report::default();
+        let dispatch = executor::Dispatch {
+            links: &cfg.hooks.links,
+            cx: &self.hook_cx.clone(),
+            report: report.clone(),
+        };
+        let outcomes = executor::execute_chain(
             calls,
             &cancel,
             |pc| ToolContext {
@@ -924,67 +969,25 @@ impl Turn<'_> {
                     );
                 }
             },
+            Some(&dispatch),
         )
-        .await
-    }
-
-    /// Let the `AfterTool` hooks see each result; one of them may stop the turn.
-    async fn after_tool_hooks(&self, outcomes: &[ToolOutcome]) -> bool {
-        let mut stop_after = false;
-        let Some(hooks) = self.racing(self.cfg.hooks.gather()).await else {
-            return stop_after;
-        };
-        for o in outcomes {
-            let Some(item) = self.transcript.get(&o.item) else {
-                continue;
-            };
-            let ItemBody::ToolCall {
-                call_id,
-                name,
-                input,
-                ..
-            } = &item.body
-            else {
-                continue;
-            };
-            let call = ToolCall {
-                call_id: call_id.clone(),
-                name: name.clone(),
-                input: input.clone(),
-            };
-            for hook in hooks
-                .iter()
-                .filter(|h| hook_applies(&h.matcher(), HookPoint::AfterTool, Some(name)))
-            {
-                let Some(outcome) = self
-                    .racing(hook.after_tool(&call, &o.output, &self.hook_cx))
-                    .await
-                else {
-                    return stop_after;
-                };
-                if let HookOutcome::Block { .. } = outcome {
-                    stop_after = true;
-                }
-            }
+        .await;
+        for notice in report.take() {
+            self.record(notice);
         }
-        stop_after
+        outcomes
     }
-}
 
-/// The permission prompter a gate uses: it opens the interaction on the turn host.
-struct AskVia<'a> {
-    host: &'a dyn TurnHost,
-    item: ItemId,
-}
-
-#[async_trait]
-impl Prompter for AskVia<'_> {
-    async fn ask(
-        &self,
-        kind: InteractionKind,
-        answers: Vec<AnswerSpec>,
-    ) -> Result<Answer, KernelError> {
-        self.host.ask(Some(self.item.clone()), kind, answers).await
+    /// Let the adapters observe the whole round before honoring a block.
+    async fn after_tool_hooks(&self, outcomes: &[ToolOutcome]) -> bool {
+        self.racing(crate::chain::tool::after_outcomes(
+            outcomes,
+            &self.transcript,
+            &self.cfg.hooks,
+            &self.hook_cx,
+        ))
+        .await
+        .unwrap_or(false)
     }
 }
 

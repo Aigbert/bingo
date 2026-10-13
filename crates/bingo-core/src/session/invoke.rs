@@ -31,6 +31,7 @@ pub(super) type Reply = oneshot::Sender<Result<ToolOutcome, KernelError>>;
 pub(super) struct Serving {
     pub(super) turn: TurnId,
     pub(super) cancel: CancellationToken,
+    pub(super) stopped: Arc<std::sync::atomic::AtomicBool>,
     pub(super) config: Arc<TurnConfig>,
     pub(super) tool: Arc<dyn Tool>,
 }
@@ -45,6 +46,7 @@ pub(super) struct Bridged {
     /// A child of the turn's: one `esc` ends the turn and drops this call
     /// where it stands.
     pub(super) cancel: CancellationToken,
+    pub(super) stopped: Arc<std::sync::atomic::AtomicBool>,
     pub(super) tool: Arc<dyn Tool>,
     pub(super) item: ItemId,
     pub(super) call: ToolCall,
@@ -54,10 +56,41 @@ impl Bridged {
     /// Gate it, run it, journal what it came to, then answer — in that order,
     /// so an interrupt reaches the caller as an outcome rather than silence.
     pub(super) async fn serve(self, reply: Reply) {
-        let pending = self.gated().await;
-        let outcome = executor::execute_one(pending, &self.cancel, self.context()).await;
+        let outcome = match super::running::supervised(self.run(), &self.cancel).await {
+            Some(outcome) => outcome,
+            None => ToolOutcome {
+                item: self.item.clone(),
+                call_id: self.call.call_id.clone(),
+                output: ToolOutput::error(executor::INTERRUPTED_MARKER),
+                status: ItemStatus::Interrupted,
+                duration_ms: 0,
+            },
+        };
         self.mailbox.call_finished(outcome.clone());
         let _ = reply.send(Ok(outcome));
+    }
+
+    async fn run(&self) -> ToolOutcome {
+        let pending = self.gated().await;
+        let call = pending.call.clone();
+        let report = crate::chain::Report::default();
+        let cx = self.hook_context();
+        let dispatch = executor::Dispatch {
+            links: &self.config.hooks.links,
+            cx: &cx,
+            report: report.clone(),
+        };
+        let outcome =
+            executor::execute_one_chain(pending, &self.cancel, self.context(), &dispatch).await;
+        for notice in report.take() {
+            let _ = self.mailbox.record(notice).await;
+        }
+        let hooks = self.config.hooks.gather().await;
+        if crate::chain::tool::after(&call, &outcome.output, &hooks, &cx).await {
+            self.stopped
+                .store(true, std::sync::atomic::Ordering::Release);
+        }
+        outcome
     }
 
     /// The turn's own gate: the same hooks, the same policy, the same person
@@ -72,6 +105,7 @@ impl Bridged {
         };
         let gated = gate_call(
             GateInput {
+                links: &self.config.hooks.links,
                 session: &self.config.session.id,
                 cwd: &self.config.cwd,
                 item: &self.item,
@@ -84,6 +118,9 @@ impl Bridged {
             &prompter,
         )
         .await;
+        for notice in gated.notices {
+            let _ = self.mailbox.record(notice).await;
+        }
         if let Some(receipt) = gated.receipt {
             let _ = self.mailbox.record(receipt).await;
         }

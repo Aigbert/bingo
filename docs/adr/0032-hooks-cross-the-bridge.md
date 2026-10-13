@@ -57,3 +57,8 @@ the bridge here repays a debt rather than granting anything new.
 Refs: ADR-0015 §4, ADR-0030.
 Non-goals: Policy over the wire; an `Allow` outcome; new hook points;
 any change to in-process hooks or hooks-shell.
+
+Amended 2026-10-13 by ADR-0074 (M131): §4's tighten-only rule is the
+external link's default tier. A user-layer `pluginTrust` grant may give
+an interceptor `rewrite` or `full` authority; `HookOutcome` still has no
+`Allow`, and existing bridge hooks retain their tightening contract.

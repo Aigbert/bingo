@@ -201,6 +201,10 @@ pub enum Contribution {
     Providers(Arc<dyn ProviderSource>),
     Policy(Arc<dyn PermissionPolicy>),
     Hook(Arc<dyn Hook>),
+    Interceptor {
+        external: Option<String>,
+        link: Arc<dyn crate::Interceptor>,
+    },
     /// Hooks resolved late, from a source that does its I/O elsewhere.
     Hooks(Arc<dyn HookSource>),
     Context(Arc<dyn ContextContributor>),
@@ -250,6 +254,9 @@ impl fmt::Debug for Contribution {
             Contribution::Provider(p) => write!(f, "Provider({})", p.id()),
             Contribution::Providers(s) => write!(f, "Providers({})", s.id()),
             Contribution::Policy(p) => write!(f, "Policy({})", p.id()),
+            Contribution::Interceptor { external, link } => {
+                write!(f, "Interceptor({external:?}, {})", link.id())
+            }
             Contribution::Hook(h) => write!(f, "Hook({})", h.id()),
             Contribution::Hooks(s) => write!(f, "Hooks({})", s.id()),
             Contribution::Context(c) => write!(f, "Context({})", c.id()),
@@ -277,6 +284,17 @@ pub struct Registrar {
 }
 
 impl Registrar {
+    pub fn external_interceptor(
+        &mut self,
+        name: impl Into<String>,
+        link: Arc<dyn crate::Interceptor>,
+    ) {
+        self.add(Contribution::Interceptor {
+            external: Some(name.into()),
+            link,
+        });
+    }
+
     pub fn new(
         plugin_id: impl Into<String>,
         config: Value,
