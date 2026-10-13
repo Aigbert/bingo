@@ -118,3 +118,16 @@ mod tests {
         assert_eq!(estimate(&system, &messages, &tools), 2 + 1 + 1 + 1 + 1);
     }
 }
+
+#[cfg(test)]
+mod pixel_contract {
+    #[test]
+    fn dimensions_set_the_picture_estimate() {
+        let image = serde_json::from_value(serde_json::json!({
+            "type": "image", "mediaType": "image/png", "data": "eA==",
+            "width": 2000, "height": 2000
+        }))
+        .unwrap();
+        assert_eq!(super::parts(&[image]), 4_000_000u64.div_ceil(750));
+    }
+}

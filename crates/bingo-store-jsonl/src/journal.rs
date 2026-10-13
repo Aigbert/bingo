@@ -335,3 +335,6 @@ mod compatibility;
 
 #[cfg(test)]
 mod versions;
+
+#[cfg(test)]
+mod pictures;

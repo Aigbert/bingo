@@ -220,3 +220,26 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod weight_contract {
+    use super::*;
+    #[test]
+    fn six_megabyte_pictures_keep_only_the_newest_four() {
+        let messages: Vec<_> = (0..6)
+            .map(|_| {
+                Message::user(vec![ContentPart::Image(
+                    Image::from_bytes("image/png", &vec![0; 1024 * 1024]).unwrap(),
+                )])
+            })
+            .collect();
+        let sent = elide_old_images(&messages, 3).expect("request weight is bounded");
+        for (i, message) in sent.iter().enumerate() {
+            assert_eq!(matches!(message.parts[0], ContentPart::Image(_)), i >= 2);
+        }
+        assert_eq!(
+            sent[0].parts,
+            [ContentPart::text("[image elided: image/png 1.0 MB]")]
+        );
+    }
+}
