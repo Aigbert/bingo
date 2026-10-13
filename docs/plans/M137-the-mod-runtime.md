@@ -10,13 +10,17 @@ a test; manifest, discovery and the state store move into
 `bingo-plugin-host`. The acceptance: M133's `ts-status` runs in process
 as it does under node.
 
+Re-verified at `23810b23` on 2026-10-14; M108–M136 and M147 are landed.
+The decisions hold; the current paths and required adapters are listed below.
+
 ## Bricks, in build order
 
 1. **The shared library, moved before it grows.** Create
    `crates/bingo-plugin-host` (`tier = "library"`) and move into it
    plugin-rpc's `manifest.rs`, `discovery.rs` (with M132's `--plugin-dir`
    layer), `tool_name`, M132's `changed` over stamps and its state store
-   (`swap`, the shelf layout). plugin-rpc's tests pass unedited, then its
+   (`swap`, the shelf layout), `StateValue` and discovery notices. Keep
+   RPC re-exports so existing tests pass unedited, then its
    copies go. The manifest gains `module`, beside a `command` if it likes;
    a pure `runtime_of(manifest, mods_stand) -> Module | Process` decides,
    so one plugin name runs in exactly one runtime.
@@ -101,12 +105,16 @@ as it does under node.
 
 ## Files
 
-- `crates/bingo-plugin-host/src/{lib,manifest,discovery,tool_name,stamps,grant,state}.rs` (new)
-- `crates/bingo-mods/src/{lib,strip,load,sandbox,globals,thread,link,budget,reload,dollar,guide}.rs`, `guide.md`, `tests/mods/*` (new)
-- `crates/bingo-plugin-rpc/src/{manifest,discovery,tool,reload,state,host,lib}.rs` (onto the library)
-- `crates/bingo-sdk/src/catalogue.rs`; `crates/bingo-core/src/{plugins.rs,host/registry.rs,chain/register.rs (new)}`
-- `crates/bingo/src/{main.rs,plugins.rs}` (a runtime column), `Cargo.toml`, `Cargo.lock`
-- `sdk/typescript/src/{on.ts,cross.ts (new),plugin.ts}`, `examples/plugins/ts-status/plugin.json`
+- `crates/bingo-plugin-host/{Cargo.toml,src/*}` (new shared mechanisms)
+- `crates/bingo-mods/{Cargo.toml,src/*,tests/*}` (new runtime and fixtures)
+- `crates/bingo-plugin-rpc/{Cargo.toml,src/{manifest,discovery,notice,tool,reload,state,host,lib,manager,bridge,source,service,validate,schema,wire_ts,events_ts}.rs}` (shared adapters)
+- `crates/bingo-sdk/src/{plugin,intercept,catalogue}.rs`, `catalogue/payload.rs`;
+  `crates/bingo-core/src/{plugins.rs,turn/late.rs,chain/*,host.rs,host/{registry,catalog,interception}.rs}`
+  (source registration, granted catalogue, mod budget ownership)
+- `crates/bingo/{Cargo.toml,src/main.rs,src/plugins/*,tests/plugin_kit.rs}`
+  (runtime selection, isolated scenario host, listing); `Cargo.toml`, `Cargo.lock`
+- `sdk/typescript/src/{on,cross,plugin,index,events,wire}.ts`, `on.test.ts`;
+  `examples/plugins/ts-status/{plugin.json,hooks/register.ts}`; generated `schema/*`
 - `deny.toml`, `scripts/budget.toml`
 
 ## Exit criteria
@@ -126,8 +134,8 @@ as it does under node.
 - [ ] `cargo test -p bingo --test plugin_kit`: `ts-status` passes in
       process and under node (M133's skip rule).
 - [ ] `budget.sh` before and after; `cargo deny check`; all gates; MSVC
-      `cargo check` for the library and plugin-rpc; CI's `windows` job
-      builds `bingo-mods` (log pasted), as in M109 and M110.
+      cross-check each touched crate; record C-header-only failures as
+      deferred to Windows CI per protocol step 7 (no push in this run).
 
 ## Non-goals
 
@@ -144,7 +152,12 @@ as it does under node.
 - QuickJS-NG under MSVC is tested only in CI; a failure is fixed before
   landing, never `cfg`-gated away. oxc releases weekly: the pin is exact.
 - A thread per mod parks when idle: paste 50 fixture mods' RSS, assert none.
-- Re-verify at start: M132's `state.rs`, `reload.rs`, `intercept.rs`,
-  `host/model/complete`, `--plugin-dir`; M133's `on.ts`, `dollar.ts`,
-  `ts-status`, `plugin_kit`; M136's `chain`, `observe`, `catalogue!`;
-  M131's `pluginTrust`, `Tier`; M116's owner; M114's `bingo-digest`.
+- Current manifest has required `entry.command`; preserve process manifests
+  while adding module-only manifests. `plugin.register` is not yet catalogued.
+- M136 links still apply a 5 s external deadline; mods must own their 10 s
+  active-time budget without weakening process deadlines. Core uses user-only
+  `pluginTrust`; catalogue currently exposes only enabled/reason/from.
+- `on.ts` currently holds both registration and transport; the acceptance
+  module uses a relative type import outside its root and needs `bingo`.
+- Shared state errors are `bingo-jsonrpc` library errors, not a plugin edge.
+  M148 owns SDK `state.rs` and TUI/demo/rooms/schedule; leave them untouched.
