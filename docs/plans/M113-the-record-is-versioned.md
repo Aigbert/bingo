@@ -36,7 +36,7 @@ steps provide the seam for breaking changes. Readable historical shapes stay kno
 
 - `crates/bingo-sdk/src/{event.rs,event/**,state.rs,transcript.rs}`,
   `crates/bingo-sdk/{Cargo.toml,fixtures/record/**,tests/**}`
-- `crates/bingo-core/src/{context.rs,host/tests/resume.rs,test_support.rs}`
+- `crates/bingo-core/src/{context.rs,host/tests/resume.rs,host/tests/resume/**,test_support.rs}`
 - `crates/bingo-store-jsonl/src/{journal.rs,journal/**}`, its fixtures
 - Surface exhaustive matches and tests listed below; `crates/bingo/tests/versioned_record.rs`
 - `docs/adr/{0065,0005,0007}*.md`, `schema/{rpc,plugin}.json`
