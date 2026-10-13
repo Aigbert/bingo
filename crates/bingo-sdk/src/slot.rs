@@ -51,12 +51,58 @@ pub struct Placed {
     pub slot: Slot,
 }
 
-pub fn with(payload: Value, _slots: impl IntoIterator<Item = Slot>) -> Value {
+/// Add placement to an object; a removal stays a removal.
+pub fn with(mut payload: Value, slots: impl IntoIterator<Item = Slot>) -> Value {
+    if let Some(object) = payload.as_object_mut() {
+        let slots = slots
+            .into_iter()
+            .filter_map(|slot| serde_json::to_value(slot).ok())
+            .collect();
+        object.insert("slots".into(), Value::Array(slots));
+    }
     payload
 }
 
-pub fn placed(_state: &SessionState) -> Vec<Placed> {
-    Vec::new()
+/// Read all three lanes in plugin and kind order, preserving each slot's order.
+/// An unreadable slot is skipped without losing its readable neighbours.
+pub fn placed(state: &SessionState) -> Vec<Placed> {
+    let mut payloads: Vec<(&str, &str, &Value)> = [&state.signals, &state.extensions]
+        .into_iter()
+        .flat_map(|lane| {
+            lane.iter().flat_map(|(plugin, kinds)| {
+                kinds
+                    .iter()
+                    .map(move |(kind, payload)| (plugin.as_str(), kind.as_str(), payload))
+            })
+        })
+        .chain(
+            state
+                .config
+                .plugins
+                .iter()
+                .map(|(plugin, payload)| (plugin.as_str(), "", payload)),
+        )
+        .collect();
+    payloads.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+    payloads
+        .into_iter()
+        .flat_map(|(plugin, kind, payload)| {
+            payload
+                .get("slots")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(move |value| {
+                    serde_json::from_value(value.clone())
+                        .ok()
+                        .map(|slot| Placed {
+                            plugin: plugin.into(),
+                            kind: kind.into(),
+                            slot,
+                        })
+                })
+        })
+        .collect()
 }
 
 #[cfg(test)]
