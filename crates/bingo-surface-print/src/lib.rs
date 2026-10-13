@@ -17,7 +17,6 @@ mod input;
 mod render;
 mod stream_json;
 
-use std::collections::BTreeMap;
 use std::io::{self, IsTerminal, Write};
 use std::sync::Arc;
 
@@ -26,8 +25,8 @@ use bingo_sdk::{
     Activation, Answer, AnswerSpec, Applied, Attachment, CatalogKind, ClientIdentity, CloseReason,
     Delivery, ErrorCode, Event, Exit, Frame, FrameStream, HostHandle, Image, Input, IntentId,
     IntentOutcome, Interaction, InteractionKind, KernelError, OpenOptions, Origin, Plugin,
-    PluginError, PluginManifest, Question, Registrar, Rung, SessionHandle, SessionId, SessionState,
-    Surface, SurfaceKind, SurfaceOptions,
+    PluginError, PluginManifest, Question, Registrar, Rung, SessionHandle, Surface, SurfaceKind,
+    SurfaceOptions,
 };
 use futures::StreamExt;
 use tokio::sync::mpsc;
@@ -208,9 +207,8 @@ async fn start(
 /// reports them — and the streams it writes to. Both loops share it, and
 /// neither keeps anything the states already hold.
 struct Attached<'a> {
-    root: SessionId,
     /// One reducer per session in the tree, the root's from the snapshot.
-    states: BTreeMap<SessionId, SessionState>,
+    tree: bingo_sdk::TreeState,
     events: FrameStream,
     handle: SessionHandle,
     renderer: Renderer,
@@ -229,7 +227,6 @@ impl<'a> Attached<'a> {
         err: &'a mut (dyn Write + Send),
     ) -> Result<Self, KernelError> {
         let Attachment {
-            session,
             snapshot,
             events,
             handle,
@@ -237,8 +234,7 @@ impl<'a> Attached<'a> {
         } = attachment;
         renderer.open(&snapshot, &mut *out).map_err(stdio_error)?;
         Ok(Self {
-            root: session.clone(),
-            states: BTreeMap::from([(session, snapshot)]),
+            tree: bingo_sdk::TreeState::new(snapshot),
             events,
             handle,
             renderer,
@@ -269,35 +265,24 @@ impl<'a> Attached<'a> {
     /// Fold and render one frame; `false` when it was stale or from a session
     /// this run has no head for, and nothing else should look at it.
     fn show(&mut self, frame: &Frame) -> Result<bool, KernelError> {
-        let Some(state) = self.state_of(frame) else {
-            return Ok(false);
-        };
-        if state.apply(frame) == Applied::Stale {
+        if self.tree.apply(frame) == Applied::Stale {
             return Ok(false);
         }
-        let (state, root) = (&self.states[&frame.session], &self.states[&self.root]);
+        let Some(state) = self.tree.get(&frame.session) else {
+            return Ok(false);
+        };
+        let root = self.tree.root();
         self.renderer
             .render(frame, state, root, &mut *self.out, &mut *self.err)
             .map_err(stdio_error)?;
         Ok(true)
     }
 
-    /// The frame's session, folded from its head when it is new.
-    fn state_of(&mut self, frame: &Frame) -> Option<&mut SessionState> {
-        if !self.states.contains_key(&frame.session) {
-            let Event::SessionUpdated { summary } = &frame.event else {
-                return None;
-            };
-            self.states
-                .insert(frame.session.clone(), SessionState::new(summary.clone()));
-        }
-        self.states.get_mut(&frame.session)
-    }
-
     /// A sub-session's frame concerns the run only when it needs a person:
     /// its turns, acks and closing are the root's business to report.
     fn concerns_the_run(&self, frame: &Frame) -> bool {
-        frame.session == self.root || asks_a_person(&frame.event)
+        self.tree.get(&frame.session).is_some()
+            && (frame.session == self.tree.root().summary.id || asks_a_person(&frame.event))
     }
 
     /// One prompt, one turn, one exit code.
@@ -1414,6 +1399,48 @@ pub(crate) mod tests {
             ),
             frame(3, done("trn_1")),
         ]
+    }
+
+    #[tokio::test]
+    async fn a_deleted_child_leaves_the_print_fold() {
+        let (host, _) = TestHost::with(Vec::new());
+        let attachment = host
+            .open(
+                options(None, json!({})).selector,
+                ClientIdentity {
+                    surface: SURFACE_ID.into(),
+                    name: "test".into(),
+                },
+                OpenOptions::default(),
+            )
+            .await
+            .unwrap();
+        let mut console = TestConsole::headless();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mut attached = Attached::open(
+            attachment,
+            Renderer::new(Mode::Json, false, Vec::new()),
+            &mut console,
+            &mut out,
+            &mut err,
+        )
+        .unwrap();
+        let announce = a_tree_with_a_childs_prompt().remove(1);
+        attached.show(&announce).unwrap();
+        assert!(attached.tree.get(&announce.session).is_some());
+        assert!(
+            !attached
+                .show(&child(
+                    2,
+                    Event::SessionClosed {
+                        reason: CloseReason::Deleted
+                    }
+                ))
+                .unwrap()
+        );
+        assert!(attached.tree.get(&announce.session).is_none());
+        assert!(!attached.show(&child(3, done("late"))).unwrap());
+        assert!(attached.tree.get(&announce.session).is_none());
     }
 
     /// The run is attached to the tree (ADR-0010 §3): a sub-session's turn

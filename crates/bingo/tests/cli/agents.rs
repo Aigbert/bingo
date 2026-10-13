@@ -694,6 +694,29 @@ fn a_dismissed_agent_s_session_is_deleted_from_the_data_dir() {
     assert_eq!(final_text(&out), "root done");
 }
 
+/// Deletion must not interrupt the print stream or leak human prose into it.
+#[test]
+fn dismissing_a_child_keeps_print_stdout_valid_ndjson() {
+    let home = tempfile::tempdir().unwrap();
+    let out = scripted_run(
+        home.path(),
+        &end_script("DismissAgent"),
+        &["--dangerously-skip-permissions"],
+        "spawn and dismiss scout",
+    );
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let frames = frames_of(&out);
+    assert!(!frames.is_empty());
+    let receipt = tool_result(&out, "DismissAgent");
+    assert!(!receipt.is_error, "{receipt:?}");
+    assert!(!session_dir(home.path(), &spawned_session(&out)).exists());
+    assert_eq!(final_text(&out), "root done");
+    assert!(matches!(
+        frames.last().unwrap().event,
+        Event::TurnCompleted { .. }
+    ));
+}
+
 /// Off a tty and without the bypass, the gate refuses the one destructive
 /// tool of the plugin, and the child stays where it was.
 #[test]
