@@ -31,3 +31,17 @@ test('handler tokens cannot cross sessions or change their event', async () => {
   assert.deepEqual(await handlers.fire('one',{...tree.onPress.args,event:'select'},port,dispatch),{stale:true});
   assert.equal(calls,0);
 });
+
+test('Escape raises close in the mod and removes only its current closable pane', async () => {
+  const handlers = new Handlers();
+  const calls: any[] = [];
+  const port = {request:async (_:string, params:any) => {calls.push(params);return {result:params.method==='panes' ? [{kind:'pane',id:'counter',closeOnEscape:true}] : null};}} as any;
+  const events: any[] = [];
+  const dispatch = async (event:string,input:any,next:()=>Promise<unknown>) => {events.push([event,input]);return next();};
+  const input = {handler:'counter',event:'close'};
+  assert.deepEqual(await handlers.fire('session',input,port,dispatch),{stale:false});
+  assert.deepEqual(events,[['ui.press',input]]);
+  assert.equal(calls.at(-1).method,'close');
+  assert.deepEqual(calls.at(-1).params,{session:'session',id:'counter'});
+  assert.deepEqual(await handlers.fire('session',{handler:'unknown',event:'close'},port,dispatch),{stale:true});
+});
