@@ -8,11 +8,13 @@ mod auth;
 mod catalog;
 mod choose;
 mod completion;
-mod throttle;
 mod interception;
 mod refresh;
 mod registry;
+mod render;
+mod render_queue;
 mod resume;
+mod throttle;
 mod tool_host;
 mod tree;
 mod unavailable;
@@ -118,6 +120,9 @@ pub struct Host {
 struct Live {
     mailbox: Mailbox,
     changing: Arc<tokio::sync::Mutex<()>>,
+    render: Arc<render_queue::Queue>,
+    render_started: tokio::time::Instant,
+    invalidations: Arc<Mutex<throttle::Throttle>>,
     created_at: Timestamp,
     /// What the session was opened with, resolved: `/model` and `/think`
     /// rewrite it (ADR-0008 §4, ADR-0047 §1), and it is the one holder of
@@ -130,6 +135,9 @@ impl Live {
         Self {
             mailbox,
             changing: Arc::new(tokio::sync::Mutex::new(())),
+            render: Arc::default(),
+            render_started: tokio::time::Instant::now(),
+            invalidations: Arc::default(),
             created_at: summary.created_at,
             spec,
         }
@@ -827,6 +835,21 @@ impl HostApi for Host {
             .await?
             .extend(plugin.to_string(), kind.to_string(), payload);
         Ok(())
+    }
+
+    async fn render(
+        &self,
+        session: &SessionId,
+        request: bingo_sdk::render::RenderRequest,
+    ) -> Result<View, KernelError> {
+        render::render(self, session, request).await
+    }
+    async fn invalidate(
+        &self,
+        session: &SessionId,
+        requests: Vec<String>,
+    ) -> Result<(), KernelError> {
+        render::invalidate(self, session, requests).await
     }
 
     async fn signal(

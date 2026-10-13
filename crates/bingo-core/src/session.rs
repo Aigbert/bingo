@@ -171,6 +171,9 @@ impl Actor {
                 kind,
                 payload,
             } => self.extend(plugin, kind, payload).await?,
+            Msg::Invalidated(requests) => {
+                self.publish(Event::Invalidated { requests }, None).await?;
+            }
             Msg::Signal {
                 plugin,
                 kind,
