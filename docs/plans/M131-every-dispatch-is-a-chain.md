@@ -60,9 +60,10 @@ existing hook tests pass unedited. Audit §3, Mods gap 1.
 - `crates/bingo-core/src/chain/{mod.rs,submit.rs,tool.rs,model.rs,compose.rs,compact.rs,stop.rs}` (new; one point each)
 - `crates/bingo-core/src/{gate.rs,executor.rs,turn.rs,plugins.rs}`
 - `crates/bingo-core/src/turn/{late.rs,stream.rs}` (`HookSet` gathers links too)
-- `crates/bingo-core/src/session/{gate.rs,inputs.rs,invoke.rs,mailbox.rs}`
+- `crates/bingo-core/src/session/{gate.rs,inputs.rs,invoke.rs,mailbox.rs,running.rs}`
 - `crates/bingo-core/src/{lib.rs,host.rs,settings.rs}` and `host/registry.rs`
 - `crates/bingo-core/src/{chain,session/tests}/` (new contract tests)
+- `crates/bingo-core/src/turn/tests.rs` (contract test modules, mechanical HookSet field)
 - `crates/bingo-sdk/tests/` (chain shape and receipt fixtures)
 - `crates/bingo/tests/` (headless tier listing)
 - `crates/bingo-core/src/settings/merge.rs` (`pluginTrust`, user layer)
@@ -109,6 +110,9 @@ existing hook tests pass unedited. Audit §3, Mods gap 1.
   at load time, never infer trust from a project path or its position.
 - Mechanical HookSet/Layer construction updates outside Files, if needed,
   follow protocol step 6; existing hook assertions remain unchanged.
+
+- Bridged AfterTool blocks share one per-turn stop flag through Running and
+  TurnMail; completion occurs at the round boundary, not by cancellation.
 
 ## Risks
 
