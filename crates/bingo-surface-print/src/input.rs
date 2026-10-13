@@ -203,7 +203,9 @@ async fn image_block(block: &Value) -> Option<Result<Image, ParseError>> {
     };
     let handed = Image {
         media_type: media_type.to_owned(),
-        data: data.to_owned(),
+        data: (data.to_owned()).into(),
+        width: None,
+        height: None,
         path: None,
     };
     Some(
@@ -385,7 +387,9 @@ mod tests {
                 text: "look at this\nand this".into(),
                 images: vec![Image {
                     media_type: "image/png".into(),
-                    data,
+                    data: data.into(),
+                    width: Some(4),
+                    height: Some(2),
                     path: None,
                 }],
             },

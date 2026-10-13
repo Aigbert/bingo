@@ -5,6 +5,8 @@
 //! unreadable line anywhere else is corruption and is reported, not skipped.
 
 mod migrate;
+mod writer;
+pub(crate) use writer::Writer;
 
 use std::io::{BufRead, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -16,7 +18,7 @@ use crate::layout;
 use crate::storage;
 
 pub const FORMAT: &str = "bingo-journal";
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
 
 /// Line 1. The version is in the header from the first byte so a reader knows
 /// what it is holding before it parses anything else.
@@ -56,11 +58,45 @@ fn header(session: &SessionId) -> Result<String, KernelError> {
 /// a map: one small append costs nothing beside the model round-trip that
 /// produced the frame, and there is no second place to invalidate on delete.
 pub fn append(dir: &Path, frame: &Frame) -> Result<(), KernelError> {
-    let line = serde_json::to_string(frame).map_err(|e| storage(format!("encode frame: {e}")))?;
+    prepare(dir)?;
+    append_prepared(dir, frame)
+}
+
+fn append_prepared(dir: &Path, frame: &Frame) -> Result<(), KernelError> {
+    let line = crate::record::encode(frame, &mut |bytes| crate::blobs::put(dir, bytes))?;
     append_line(dir, &line)
 }
 
-/// Reserved for the first format bump (M115); current appends never call it.
+/// A store writer calls this once per opened journal, under its write lock.
+pub(crate) fn prepare(dir: &Path) -> Result<(), KernelError> {
+    let path = layout::journal(dir);
+    let file = std::fs::File::open(&path).map_err(|e| storage(format!("open journal: {e}")))?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut line = Vec::new();
+    reader
+        .read_until(b'\n', &mut line)
+        .map_err(|e| storage(format!("read header: {e}")))?;
+    let mut version = check(Some(&line.as_slice()), &path)?;
+    loop {
+        line.clear();
+        if reader
+            .read_until(b'\n', &mut line)
+            .map_err(|e| storage(format!("read version: {e}")))?
+            == 0
+        {
+            break;
+        }
+        if let Ok(marker) = serde_json::from_slice::<VersionLine>(&line) {
+            version = checked_version(&marker.format, marker.version, &path)?;
+        }
+    }
+    if version < VERSION {
+        append_version(dir)?;
+    }
+    Ok(())
+}
+
+/// Advance an older journal without rewriting its existing records.
 pub fn append_version(dir: &Path) -> Result<(), KernelError> {
     let marker = VersionLine {
         format: FORMAT.into(),
@@ -167,7 +203,7 @@ enum Line {
     Frame(Box<Frame>),
 }
 
-fn decode(line: &[u8], version: u32) -> Result<Line, serde_json::Error> {
+fn decode(dir: &Path, line: &[u8], version: u32) -> Result<Line, serde_json::Error> {
     #[derive(Deserialize)]
     struct Probe {
         #[serde(default)]
@@ -176,16 +212,8 @@ fn decode(line: &[u8], version: u32) -> Result<Line, serde_json::Error> {
     if serde_json::from_slice::<Probe>(line)?.format.is_some() {
         return serde_json::from_slice(line).map(Line::Version);
     }
-    // No migration means no JSON rewrite: opaque payload bytes stay intact.
-    let frame = if version == VERSION {
-        serde_json::from_slice(line)?
-    } else {
-        serde_json::from_value(migrate::upgrade(
-            serde_json::from_slice(line)?,
-            version,
-            migrate::STEPS,
-        ))?
-    };
+    let migrated = migrate::line(line, version)?;
+    let frame = crate::record::decode(&migrated, &mut |sha| crate::blobs::get(dir, sha))?;
     Ok(Line::Frame(Box::new(frame)))
 }
 
@@ -198,7 +226,7 @@ fn frames(
     let last = lines.len().saturating_sub(1);
     let mut frames = Vec::new();
     for (index, line) in lines.iter().enumerate().skip(1) {
-        match decode(line, version) {
+        match decode(path.parent().unwrap_or(Path::new(".")), line, version) {
             Ok(Line::Version(marker)) => {
                 version = checked_version(&marker.format, marker.version, path)?;
             }
@@ -275,7 +303,7 @@ mod tests {
 
     #[test]
     fn a_newer_version_is_refused() {
-        let err = replayed("version2.jsonl", Seq::ZERO).expect_err("version 2 is not readable");
+        let err = replayed("version3.jsonl", Seq::ZERO).expect_err("version 3 is not readable");
         assert_eq!(err.code, ErrorCode::Storage);
         assert!(err.message.contains("newer bingo"), "{err}");
     }
@@ -312,7 +340,11 @@ mod tests {
         )
         .expect("append");
         let written = std::fs::read_to_string(layout::journal(&dir)).expect("read back");
-        assert_eq!(written, fixture("clean.jsonl"), "the format is a contract");
+        assert_eq!(
+            written,
+            fixture("clean.jsonl").replacen("\"version\":1", "\"version\":2", 1),
+            "the format is a contract"
+        );
     }
 
     #[test]
@@ -335,3 +367,6 @@ mod compatibility;
 
 #[cfg(test)]
 mod versions;
+
+#[cfg(test)]
+mod pictures;

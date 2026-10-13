@@ -83,3 +83,5 @@ them the `ContentPart::Image` the journal already keeps.
   no new crate in the lockfile).
 
 Refs: ADR-0002, ADR-0007, ADR-0009, ADR-0016; Plan: M45
+
+2026-10-13 — [ADR-0067](0067-the-picture-is-kept-once.md) amends §3: picture data is shared as Arc<str>, with optional produced dimensions. Live frames remain inline; the store alone resolves persisted blob references.

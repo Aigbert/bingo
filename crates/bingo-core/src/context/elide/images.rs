@@ -5,27 +5,20 @@
 
 use bingo_sdk::{ContentPart, Image, Message, Role, bytes::words};
 
-/// `messages` with every image the model has answered `rounds_kept` times or
-/// more replaced by [`note`]; `None` when no image is that old, so the common
-/// case pays a scan and never a clone.
+/// Apply the age rule, then spend the request's picture budget newest first.
+/// Return `None` when the projection leaves every part unchanged.
 pub fn elide_old_images(messages: &[Message], rounds_kept: usize) -> Option<Vec<Message>> {
-    let answered = answered_prefix(messages, rounds_kept);
-    if !messages[..answered]
-        .iter()
-        .any(|m| m.parts.iter().any(has_image))
-    {
+    if !messages.iter().any(|m| m.parts.iter().any(has_image)) {
         return None;
     }
-    Some(
-        messages
-            .iter()
-            .enumerate()
-            .map(|(n, message)| match n < answered {
-                true => elided(message),
-                false => message.clone(),
-            })
-            .collect(),
-    )
+    let answered = answered_prefix(messages, rounds_kept);
+    let mut remaining = super::super::budget::REQUEST_PICTURE_BYTES;
+    let mut projected = messages.to_vec();
+    let mut changed = false;
+    for (n, message) in projected.iter_mut().enumerate().rev() {
+        changed |= project(&mut message.parts, n < answered, &mut remaining);
+    }
+    changed.then_some(projected)
 }
 
 /// How many of the leading messages the model has answered `rounds_kept`
@@ -52,28 +45,20 @@ fn has_image(part: &ContentPart) -> bool {
     }
 }
 
-fn elided(message: &Message) -> Message {
-    Message {
-        role: message.role,
-        parts: message.parts.iter().map(project).collect(),
-        provider_options: message.provider_options.clone(),
+fn project(parts: &mut [ContentPart], old: bool, remaining: &mut usize) -> bool {
+    let mut changed = false;
+    for part in parts.iter_mut().rev() {
+        match part {
+            ContentPart::Image(image) if old || image.decoded_len() > *remaining => {
+                *part = ContentPart::text(note(image));
+                changed = true;
+            }
+            ContentPart::Image(image) => *remaining -= image.decoded_len(),
+            ContentPart::ToolResult { parts, .. } => changed |= project(parts, old, remaining),
+            _ => {}
+        }
     }
-}
-
-fn project(part: &ContentPart) -> ContentPart {
-    match part {
-        ContentPart::Image(image) => ContentPart::text(note(image)),
-        ContentPart::ToolResult {
-            tool_use_id,
-            parts,
-            is_error,
-        } => ContentPart::ToolResult {
-            tool_use_id: tool_use_id.clone(),
-            parts: parts.iter().map(project).collect(),
-            is_error: *is_error,
-        },
-        other => other.clone(),
-    }
+    changed
 }
 
 /// What stands in for the picture: what it was, what it weighed, and — when
@@ -218,5 +203,28 @@ mod tests {
             }
             prop_assert_eq!(elide_old_images(&once, rounds_kept), None);
         }
+    }
+}
+
+#[cfg(test)]
+mod weight_contract {
+    use super::*;
+    #[test]
+    fn six_megabyte_pictures_keep_only_the_newest_four() {
+        let messages: Vec<_> = (0..6)
+            .map(|_| {
+                Message::user(vec![ContentPart::Image(
+                    Image::from_bytes("image/png", &vec![0; 1024 * 1024]).unwrap(),
+                )])
+            })
+            .collect();
+        let sent = elide_old_images(&messages, 3).expect("request weight is bounded");
+        for (i, message) in sent.iter().enumerate() {
+            assert_eq!(matches!(message.parts[0], ContentPart::Image(_)), i >= 2);
+        }
+        assert_eq!(
+            sent[0].parts,
+            [ContentPart::text("[image elided: image/png 1.0 MB]")]
+        );
     }
 }

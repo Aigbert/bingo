@@ -178,6 +178,8 @@ mod tests {
             asked(vec![ContentPart::Image(Image {
                 media_type: "image/png".into(),
                 data: "AA".into(),
+                width: None,
+                height: None,
                 path: None,
             })]),
             asked(vec![ContentPart::text("fix the parser")]),

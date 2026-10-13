@@ -1,1 +1,1 @@
-{"kind":"user","parts":[{"type":"text","text":"hello"}],"origin":{"surface":"tui"}}
+{"kind":"user","parts":[{"type":"text","text":"hello"},{"type":"image","mediaType":"image/png","data":"eA==","width":2,"height":3}],"origin":{"surface":"tui"}}

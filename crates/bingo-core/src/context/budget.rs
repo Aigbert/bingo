@@ -17,6 +17,9 @@ pub const ELIDE_MIN_CHARS: usize = 1_000;
 /// two, and every round after that pays its megabytes again.
 pub const IMAGE_ROUNDS_KEPT: usize = 3;
 
+/// Decoded picture bytes retained in one model request, newest first.
+pub const REQUEST_PICTURE_BYTES: usize = 4 * 1024 * 1024;
+
 /// The lines for one model, all from the effective window: what is left for
 /// input once the output budget is reserved.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -70,7 +73,8 @@ impl Anchor {
     /// The conversation as the server would count it now: its last count,
     /// plus whatever the estimate says was added since.
     pub fn used(&self, estimate: u64) -> u64 {
-        self.server + estimate.saturating_sub(self.estimate)
+        self.server
+            .saturating_add(estimate.saturating_sub(self.estimate))
     }
 
     pub fn recount_due(&self, estimate: u64) -> bool {
@@ -173,5 +177,13 @@ mod tests {
             prop_assert!(lines.trigger <= lines.effective);
             prop_assert!(lines.keep <= lines.effective);
         }
+    }
+}
+
+#[cfg(test)]
+mod extreme_pixels {
+    #[test]
+    fn anchoring_a_saturated_pixel_estimate_stays_saturated() {
+        assert_eq!(super::Anchor::from_count(1, 0).used(u64::MAX), u64::MAX);
     }
 }

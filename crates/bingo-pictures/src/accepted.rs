@@ -63,7 +63,11 @@ mod tests {
             assert_eq!(image.media_type, media_type);
             assert_eq!(
                 image,
-                Image::from_bytes(media_type, &bytes).expect("within the cap"),
+                Image {
+                    width: Some(4),
+                    height: Some(4),
+                    ..Image::from_bytes(media_type, &bytes).expect("within the cap")
+                },
                 "the bytes are the ones handed over"
             );
         }
@@ -75,7 +79,7 @@ mod tests {
             let image = sniffed(&drawn(6, 3, format)).expect("a picture");
             assert_eq!(image.media_type, "image/png", "{format:?}");
             let bytes =
-                base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &image.data)
+                base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &*image.data)
                     .expect("base64");
             assert_eq!(png_size(&bytes), Some((6, 3)), "{format:?}");
         }
@@ -95,7 +99,14 @@ mod tests {
     #[test]
     fn a_handed_over_picture_the_table_takes_passes_through_untouched() {
         let image = handed(3, 3, ImageFormat::Jpeg);
-        assert_eq!(accepted(image.clone()).expect("a picture"), image);
+        assert_eq!(
+            accepted(image.clone()).expect("a picture"),
+            Image {
+                width: Some(3),
+                height: Some(3),
+                ..image
+            }
+        );
     }
 
     #[test]
@@ -103,7 +114,10 @@ mod tests {
         let bytes = drawn(5, 2, ImageFormat::Bmp);
         let wider = Image {
             media_type: "image/bmp".into(),
-            data: base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &bytes),
+            data: (base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &bytes))
+                .into(),
+            width: None,
+            height: None,
             path: None,
         };
         let image = accepted(wider).expect("a picture");
@@ -139,10 +153,13 @@ mod tests {
     fn a_handed_over_picture_nothing_reads_is_refused() {
         let wider = Image {
             media_type: "image/heic".into(),
-            data: base64::Engine::encode(
+            data: (base64::Engine::encode(
                 &base64::engine::general_purpose::STANDARD,
                 b"not a picture",
-            ),
+            ))
+            .into(),
+            width: None,
+            height: None,
             path: None,
         };
         assert!(matches!(accepted(wider), Err(PictureError::Undecodable(_))));

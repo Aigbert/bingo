@@ -73,7 +73,7 @@ const HEIGHT: std::ops::Range<usize> = 20..24;
 /// An animation is its first frame: a terminal draws a still, and the first
 /// frame is the one a person meant when they pasted it.
 pub fn to_png(image: &Image) -> Result<Png, PictureError> {
-    let bytes = base64::engine::general_purpose::STANDARD.decode(&image.data)?;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(&*image.data)?;
     match png_size(&bytes) {
         Some((width, height)) => Ok(Png {
             bytes,
@@ -159,7 +159,7 @@ pub(crate) fn measured(bytes: &[u8]) -> Option<(u32, u32)> {
 /// of milliseconds for a screenshot. Nothing may make it on a thread that
 /// draws (M61).
 pub fn fitted(image: &Image, within: (u32, u32)) -> Result<Png, PictureError> {
-    let bytes = base64::engine::general_purpose::STANDARD.decode(&image.data)?;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(&*image.data)?;
     match png_size(&bytes) {
         Some((width, height)) if inside(width, height, within) => Ok(Png {
             bytes,
@@ -291,6 +291,8 @@ mod tests {
         let image = Image {
             media_type: "image/png".into(),
             data: "!!!!not base64!!!!".into(),
+            width: None,
+            height: None,
             path: None,
         };
         assert!(matches!(to_png(&image), Err(PictureError::NotBase64(_))));

@@ -59,8 +59,12 @@ pub(crate) fn bounded_within(
     within: (u32, u32),
     budget: usize,
 ) -> Result<Image, PictureError> {
-    if untouched(media_type, bytes, within, budget) {
-        return Ok(Image::from_bytes(media_type, bytes)?);
+    if let Some((width, height)) = untouched(media_type, bytes, within, budget) {
+        return Ok(Image {
+            width: Some(width),
+            height: Some(height),
+            ..Image::from_bytes(media_type, bytes)?
+        });
     }
     let picture = image::load_from_memory(bytes)?;
     ladder(fitted_to_box(picture, within), budget)
@@ -69,10 +73,16 @@ pub(crate) fn bounded_within(
 /// Whether the bytes are already the picture a model is sent: a type the
 /// journal keeps, a size inside the box — read off the header, so a picture
 /// that fits costs no decode — and a length under the budget.
-fn untouched(media_type: &str, bytes: &[u8], within: (u32, u32), budget: usize) -> bool {
-    Image::is_known(media_type)
-        && bytes.len() <= budget
-        && measured(bytes).is_some_and(|(width, height)| inside(width, height, within))
+fn untouched(
+    media_type: &str,
+    bytes: &[u8],
+    within: (u32, u32),
+    budget: usize,
+) -> Option<(u32, u32)> {
+    if !Image::is_known(media_type) || bytes.len() > budget {
+        return None;
+    }
+    measured(bytes).filter(|&(width, height)| inside(width, height, within))
 }
 
 /// The picture at no more than `within`, its shape kept by the resize itself.
@@ -91,7 +101,13 @@ fn ladder(mut picture: DynamicImage, budget: usize) -> Result<Image, PictureErro
     let mut least = usize::MAX;
     for _ in 0..=SHRINKS {
         match rung(&picture, budget)? {
-            Rung::Under(image) => return Ok(image),
+            Rung::Under(image) => {
+                return Ok(Image {
+                    width: Some(picture.width()),
+                    height: Some(picture.height()),
+                    ..image
+                });
+            }
             Rung::Over(bytes) => least = least.min(bytes),
         }
         picture = three_quarters(&picture);
@@ -181,7 +197,7 @@ mod tests {
     const BUDGET: usize = 600_000;
 
     fn decoded(image: &Image) -> Vec<u8> {
-        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &image.data)
+        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &*image.data)
             .expect("base64")
     }
 
@@ -230,6 +246,7 @@ mod tests {
             assert_eq!(image.media_type, media_type, "{format:?}");
             assert_eq!(decoded(&image), bytes, "{format:?} the very bytes");
             assert_eq!(image.path, None, "the caller says where it is");
+            assert_eq!((image.width, image.height), (Some(40), Some(30)));
         }
     }
 
@@ -242,6 +259,7 @@ mod tests {
             bounded_within("image/png", &bytes, (200, 200), MODEL_BUDGET).expect("a picture");
         assert_eq!(image.media_type, "image/png", "flat colour stays PNG");
         assert_eq!(png_size(&decoded(&image)), Some((200, 150)));
+        assert_eq!((image.width, image.height), (Some(200), Some(150)));
     }
 
     /// Pixels no PNG can squeeze under the budget: the ladder goes lossy

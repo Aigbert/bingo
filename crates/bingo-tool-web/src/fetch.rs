@@ -356,9 +356,11 @@ mod tests {
         let out = tool.call(args(&url), &context()).await.expect("fetch");
         assert_eq!(
             out.parts,
-            vec![ContentPart::Image(
-                Image::from_bytes("image/png", &bytes).expect("within the cap")
-            )]
+            vec![ContentPart::Image(Image {
+                width: Some(6),
+                height: Some(4),
+                ..Image::from_bytes("image/png", &bytes).expect("within the cap")
+            })]
         );
         assert!(!out.is_error);
         assert_eq!(tool.cache.get(&url), None, "a picture is not cached");

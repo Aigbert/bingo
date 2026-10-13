@@ -62,7 +62,7 @@ fn block(part: &ContentPart) -> ContentBlock {
         ContentPart::Reasoning { text, .. } => ContentBlock::text(text.clone()),
         ContentPart::Image(Image {
             media_type, data, ..
-        }) => ContentBlock::image(data.clone(), media_type),
+        }) => ContentBlock::image(data.to_string(), media_type),
         other => ContentBlock::text(
             serde_json::to_string(other).unwrap_or_else(|_| "[unreadable content]".to_string()),
         ),
@@ -213,6 +213,8 @@ mod tests {
             parts: vec![ContentPart::Image(Image {
                 media_type: "image/png".into(),
                 data: "AAAA".into(),
+                width: None,
+                height: None,
                 path: None,
             })],
             is_error: false,

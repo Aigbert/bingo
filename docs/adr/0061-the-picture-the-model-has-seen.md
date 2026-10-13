@@ -59,3 +59,5 @@ when it leaves the wire against megabytes on every round it stays.
   provider's recorded requests are the test surface.
 
 Refs: ADR-0006, ADR-0040, ADR-0048, ADR-0052; Plan: M103
+
+2026-10-13 — [ADR-0067](0067-the-picture-is-kept-once.md) amends §1: after the age rule, a request retains pictures newest first within 4 × 1024 × 1024 decoded bytes; excess pictures receive the same projection note.

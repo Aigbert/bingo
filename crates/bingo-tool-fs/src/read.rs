@@ -127,8 +127,12 @@ Read it with original: true for the file as it is]",
 /// bytes and the cap.
 fn original(media_type: &'static str, bytes: &[u8], path: &Path) -> Result<ToolOutput, ToolError> {
     let shown = path.display().to_string();
-    let seen = Image::from_bytes(media_type, bytes)
+    let mut seen = Image::from_bytes(media_type, bytes)
         .map_err(|e| ToolError::Failed(format!("{shown}: {e}")))?;
+    if let Some((width, height)) = bingo_pictures::size(&seen) {
+        seen.width = Some(width);
+        seen.height = Some(height);
+    }
     Ok(ToolOutput {
         parts: vec![ContentPart::Image(seen.at(path))],
         is_error: false,
@@ -389,17 +393,21 @@ mod tests {
     #[tokio::test]
     async fn an_image_comes_back_as_an_image_part() {
         let dir = tempfile::tempdir().expect("temp dir");
-        for bytes in [
-            bingo_pictures::testing::png_bytes(40, 30),
-            bingo_pictures::testing::noise(220, 220),
+        for (width, height, bytes) in [
+            (40, 30, bingo_pictures::testing::png_bytes(40, 30)),
+            (220, 220, bingo_pictures::testing::noise(220, 220)),
         ] {
             std::fs::write(dir.path().join("pixel.PNG"), &bytes).expect("write");
             let image = read_picture(dir.path(), "pixel.PNG").await;
             assert_eq!(
                 image,
-                Image::from_bytes("image/png", &bytes)
-                    .expect("within the cap")
-                    .at(dir.path().join("pixel.PNG")),
+                Image {
+                    width: Some(width),
+                    height: Some(height),
+                    ..Image::from_bytes("image/png", &bytes)
+                        .expect("within the cap")
+                        .at(dir.path().join("pixel.PNG"))
+                },
                 "{} bytes: and the picture knows the file it is (ADR-0052)",
                 bytes.len()
             );
@@ -459,11 +467,13 @@ Read it with original: true for the file as it is]",
         let parts = read_parts(dir.path(), "noisy.png", true).await;
         assert_eq!(
             parts,
-            vec![ContentPart::Image(
-                Image::from_bytes("image/png", &bytes)
+            vec![ContentPart::Image(Image {
+                width: Some(700),
+                height: Some(700),
+                ..Image::from_bytes("image/png", &bytes)
                     .expect("within the cap")
                     .at(dir.path().join("noisy.png"))
-            )]
+            })]
         );
     }
 

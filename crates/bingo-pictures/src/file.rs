@@ -42,7 +42,7 @@ pub fn keep(dir: &Path, image: &Image) -> std::io::Result<PathBuf> {
 fn decoded(image: &Image) -> std::io::Result<Vec<u8>> {
     use base64::Engine;
     base64::engine::general_purpose::STANDARD
-        .decode(&image.data)
+        .decode(&*image.data)
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))
 }
 

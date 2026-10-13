@@ -1190,7 +1190,9 @@ mod tests {
         assert_eq!(bingo_sdk::tokens::text("你好"), 2);
         let msgs = vec![Message::user(vec![ContentPart::Image(Image {
             media_type: "image/png".into(),
-            data: String::new(),
+            data: (String::new()).into(),
+            width: None,
+            height: None,
             path: None,
         })])];
         assert_eq!(estimate_tokens(&[], &msgs, &[]), 1_600);

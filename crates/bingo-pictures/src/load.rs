@@ -173,7 +173,7 @@ mod tests {
     }
 
     fn decoded(image: &Image) -> Vec<u8> {
-        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &image.data)
+        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &*image.data)
             .expect("base64")
     }
 

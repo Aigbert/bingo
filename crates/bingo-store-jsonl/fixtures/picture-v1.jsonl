@@ -1,0 +1,2 @@
+{"format":"bingo-journal","version":1,"session":"s"}
+{"seq":1,"ts":"1970-01-01T00:00:00Z","session":"s","event":{"type":"itemCompleted","item":{"id":"i","round":0,"status":"completed","startedAt":"1970-01-01T00:00:00Z","body":{"kind":"user","parts":[{"type":"image","mediaType":"image/png","data":"eA==","width":2,"height":3}],"origin":{"surface":"tui"}}}}}
