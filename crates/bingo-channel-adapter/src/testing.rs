@@ -21,7 +21,7 @@ impl Platform for TestPlatform {
         }
     }
     fn build(&self, _slice: &Value, _env: &Env) -> Result<Arc<dyn ChannelAdapter>, String> {
-        Err("sample has no transport yet".into())
+        Ok(Arc::new(crate::loopback::Loopback::new(Default::default())))
     }
     fn secret(&self) -> Option<Requirement> {
         None

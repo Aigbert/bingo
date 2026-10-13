@@ -38,15 +38,49 @@ pub type Platforms = Vec<Arc<dyn Platform>>;
 
 /// Validate configured platform slices and return their credential requirements.
 pub fn configured(
-    _slices: &Map<String, Value>,
-    _platforms: &[Arc<dyn Platform>],
+    slices: &Map<String, Value>,
+    platforms: &[Arc<dyn Platform>],
 ) -> Result<Vec<Requirement>, String> {
-    Ok(Vec::new())
+    slices
+        .iter()
+        .filter(|(id, slice)| id.as_str() != "coalesce" && !slice.is_null())
+        .map(|(id, slice)| {
+            let platform = find(platforms, id)?;
+            platform.parse(&platform_slice(slice))?;
+            Ok(platform.secret().unwrap_or(Requirement {
+                id: platform.id(),
+                variable: None,
+            }))
+        })
+        .collect()
 }
 
 /// Resolve the platform named by a flag or settings slice.
-pub fn find<'a>(_platforms: &'a [Arc<dyn Platform>], id: &str) -> Result<&'a dyn Platform, String> {
-    Err(format!("no such channel adapter: {id}"))
+pub fn find<'a>(platforms: &'a [Arc<dyn Platform>], id: &str) -> Result<&'a dyn Platform, String> {
+    platforms
+        .iter()
+        .find(|platform| platform.id() == id)
+        .map(Arc::as_ref)
+        .ok_or_else(|| {
+            let message = format!("no such channel adapter: {id}");
+            if id == crate::loopback::Loopback::ID {
+                format!(
+                    "{message}; set {} to enable it",
+                    crate::loopback::ENABLE_ENV
+                )
+            } else {
+                message
+            }
+        })
+}
+
+/// Access belongs to the surface; platforms receive only their own fields.
+pub fn platform_slice(slice: &Value) -> Value {
+    let mut own = slice.clone();
+    if let Some(object) = own.as_object_mut() {
+        object.remove("access");
+    }
+    own
 }
 
 #[cfg(test)]

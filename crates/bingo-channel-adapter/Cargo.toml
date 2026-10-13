@@ -24,9 +24,11 @@ async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["net"] }
+base64.workspace = true
 jiff = { workspace = true, optional = true }
 
 [dev-dependencies]
+insta.workspace = true
 jiff.workspace = true
 tempfile.workspace = true

@@ -18,3 +18,5 @@ pub use platform::{Platform, Platforms};
 
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
+
+pub mod loopback;

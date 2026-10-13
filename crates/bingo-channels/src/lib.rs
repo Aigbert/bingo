@@ -32,7 +32,7 @@ pub mod guide;
 pub mod host;
 pub use bingo_channel_adapter::limits;
 pub mod lock;
-pub mod loopback;
+pub use bingo_channel_adapter::loopback;
 pub use bingo_channel_adapter::question;
 pub mod runner;
 pub mod secret;

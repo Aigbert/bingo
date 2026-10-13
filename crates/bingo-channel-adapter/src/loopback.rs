@@ -7,6 +7,9 @@
 //! speaks that record as NDJSON over a socket, which is what the black-box
 //! tests read through the real binary.
 
+mod platform;
+pub use platform::{ENABLE_ENV, Platform, enabled};
+
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
