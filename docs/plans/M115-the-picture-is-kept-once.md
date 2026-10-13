@@ -107,6 +107,12 @@ This is the first use of M113's version line.
 
 - 2026-10-13 decision: replace the guessed 300-byte limit with the revised size assertions above; keep ADR-0065 §1 and ADR-0067 §2 unchanged.
 
+- **STOP (2026-10-13, step 6):** exact equal-length lines conflict with
+  ADR-0067 §2's numeric `bytes`: `1` versus `3000000` adds six characters.
+  The revised fixture contracts mint real IDs and measure 432/438 bytes.
+  Owner options: permit exactly the byte-count digit delta (recommended),
+  or decide a different encoding; the latter was explicitly prohibited.
+
 ## Verified (2026-10-13 — initial run, not complete)
 
 Contracts were committed before implementation; the runtime is unchanged.
@@ -128,3 +134,15 @@ Other new contracts (replay/deduplication/missing blob/request budget) are
 committed but not yet run; the stop precedes implementation and full gates.
 All exit criteria remain unticked. ADR-0067 remains proposed. No older
 binary was built, no live data was touched, and no push/merge/PR was made.
+
+Revised contract probe (same dimensions and minted IDs, before newline):
+```text
+cargo test -p bingo-store-jsonl the_planned_v2_picture_line --locked
+  the_planned_v2_picture_line_is_under_one_kib ... ok
+  the_planned_v2_picture_line_length_is_independent_of_picture_size ... FAILED
+  left: 432; right: 438
+  test result: FAILED. 1 passed; 1 failed
+```
+The probe serializes the prescribed v2 shape, so implementation cannot fix
+this failure without changing the criterion or encoding. Full gates remain
+unrun; the milestone is incomplete and ADR-0067 remains proposed.
