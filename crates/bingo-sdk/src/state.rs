@@ -378,6 +378,7 @@ mod tests {
             updated_at: ts(),
             usage: Usage::default(),
             busy: false,
+            asking: false,
             messages: None,
         }
     }

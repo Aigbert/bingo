@@ -630,6 +630,7 @@ pub(crate) fn summary(id: &str, title: Option<&str>, parent: Option<SessionId>) 
         updated_at: ts(),
         usage: Usage::default(),
         busy: false,
+        asking: false,
         messages: None,
     }
 }

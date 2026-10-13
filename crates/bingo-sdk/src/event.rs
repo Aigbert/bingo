@@ -657,6 +657,9 @@ pub struct SessionSummary {
     /// that holds the state derives the same fact with `SessionState::busy`.
     #[serde(default)]
     pub busy: bool,
+    /// An interaction is open; stamped only by the session actor.
+    #[serde(default)]
+    pub asking: bool,
     /// How many messages have been said in this session, by
     /// [`Event::completes_a_message`]. `None` is "never counted" — a summary
     /// written before the field existed — and must be shown as nothing rather
@@ -678,6 +681,16 @@ pub struct ConfigView {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_summary_before_asking_defaults_to_false() {
+        let value: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/record/compat/summary-before-asking.json"
+        ))
+        .unwrap();
+        let summary: SessionSummary = serde_json::from_value(value["summary"].clone()).unwrap();
+        assert!(!summary.asking);
+    }
 
     fn ts() -> Timestamp {
         Timestamp::from_second(1_700_000_000).unwrap()
@@ -772,6 +785,7 @@ mod tests {
             updated_at: ts(),
             usage: Usage::default(),
             busy: false,
+            asking: false,
             messages: None,
         };
         let frames = vec![

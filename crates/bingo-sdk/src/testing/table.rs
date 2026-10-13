@@ -101,6 +101,7 @@ impl Table {
             updated_at: jiff::Timestamp::UNIX_EPOCH,
             usage: Usage::default(),
             busy: false,
+            asking: false,
             messages: Some(0),
         };
         self.sessions.insert(summary.id.clone(), summary.clone());

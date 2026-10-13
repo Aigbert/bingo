@@ -383,6 +383,7 @@ pub fn summary(id: &str) -> SessionSummary {
         updated_at: ts,
         usage: Usage::default(),
         busy: false,
+        asking: false,
         messages: None,
     }
 }

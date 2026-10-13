@@ -150,6 +150,7 @@ fn summary(cwd: &Path) -> SessionSummary {
         updated_at: Timestamp::UNIX_EPOCH,
         usage: Usage::default(),
         busy: false,
+        asking: false,
         messages: None,
     }
 }
