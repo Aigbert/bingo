@@ -205,6 +205,7 @@ pub enum Contribution {
         external: Option<String>,
         link: Arc<dyn crate::Interceptor>,
     },
+    Interceptors(Arc<dyn crate::InterceptorSource>),
     /// Hooks resolved late, from a source that does its I/O elsewhere.
     Hooks(Arc<dyn HookSource>),
     Context(Arc<dyn ContextContributor>),
@@ -257,6 +258,7 @@ impl fmt::Debug for Contribution {
             Contribution::Interceptor { external, link } => {
                 write!(f, "Interceptor({external:?}, {})", link.id())
             }
+            Contribution::Interceptors(source) => write!(f, "Interceptors({})", source.id()),
             Contribution::Hook(h) => write!(f, "Hook({})", h.id()),
             Contribution::Hooks(s) => write!(f, "Hooks({})", s.id()),
             Contribution::Context(c) => write!(f, "Context({})", c.id()),
@@ -283,16 +285,24 @@ pub struct Registrar {
     contributions: Vec<Contribution>,
 }
 
+struct OneInterceptor { plugin: String, link: Arc<dyn crate::Interceptor> }
+#[async_trait]
+impl crate::InterceptorSource for OneInterceptor {
+    fn id(&self) -> &str { &self.plugin }
+    async fn interceptors(&self) -> Vec<crate::ExternalInterceptor> {
+        vec![crate::ExternalInterceptor { plugin: self.plugin.clone(), link: self.link.clone() }]
+    }
+}
+
 impl Registrar {
     pub fn external_interceptor(
         &mut self,
         name: impl Into<String>,
         link: Arc<dyn crate::Interceptor>,
     ) {
-        self.add(Contribution::Interceptor {
-            external: Some(name.into()),
-            link,
-        });
+        self.add(Contribution::Interceptors(Arc::new(OneInterceptor {
+            plugin: name.into(), link,
+        })));
     }
 
     pub fn new(

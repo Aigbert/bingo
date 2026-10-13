@@ -106,15 +106,30 @@ impl ContributorSet {
 /// looked up by name.
 #[derive(Clone, Default)]
 pub struct HookSet {
+    pub interceptors: Vec<Arc<dyn InterceptorSource>>,
+    pub grants: std::collections::BTreeMap<String, PluginTrust>,
     pub links: Vec<crate::chain::Link>,
     pub fixed: Vec<Arc<dyn Hook>>,
     pub sources: Vec<Arc<dyn HookSource>>,
 }
 
 impl HookSet {
+    pub async fn links(&self) -> Vec<crate::chain::Link> {
+        let mut links = self.links.clone();
+        for source in &self.interceptors {
+            for external in source.interceptors().await {
+                let tier = self.grants.get(&external.plugin).map_or(Tier::Tighten, |grant| grant.tier);
+                links.push(crate::chain::Link { external: Some(external.plugin), interceptor: external.link, tier });
+            }
+        }
+        links
+    }
+
     pub fn fixed(hooks: Vec<Arc<dyn Hook>>) -> Self {
         Self {
             links: Vec::new(),
+            interceptors: Vec::new(),
+            grants: Default::default(),
             fixed: hooks,
             sources: Vec::new(),
         }
@@ -372,6 +387,8 @@ mod tests {
     async fn a_source_s_hooks_join_the_registered_ones_in_order() {
         let set = HookSet {
             links: Vec::new(),
+            interceptors: Vec::new(),
+            grants: Default::default(),
             fixed: vec![claims("early", vec![])],
             sources: vec![crate::test_support::ScriptedHookSource::new(vec![claims(
                 "late",

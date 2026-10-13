@@ -544,6 +544,8 @@ impl Host {
             policy: self.policy(),
             hooks: HookSet {
                 links: self.registry.links.clone(),
+                interceptors: self.registry.sources.interceptors.clone(),
+                grants: self.settings.kernel.plugin_trust.clone(),
                 fixed: self.registry.hooks.clone(),
                 sources: self.registry.sources.hooks.clone(),
             },

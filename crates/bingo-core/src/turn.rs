@@ -493,7 +493,7 @@ impl Turn<'_> {
             session: Some(self.cfg.session.id.clone()),
             provider_options: ProviderMetadata::new(),
         };
-        let links = self.cfg.hooks.links.clone();
+        let links = self.cfg.hooks.links().await;
         let cx = self.hook_cx.clone();
         let report = crate::chain::Report::default();
         let result = crate::chain::run::<crate::chain::compose::Compose>(
@@ -790,7 +790,7 @@ impl Turn<'_> {
         };
         let report = crate::chain::Report::default();
         let outcome = crate::chain::compact::dispatch(
-            &self.cfg.hooks.links,
+            &self.cfg.hooks.links().await,
             &self.hook_cx,
             input,
             compactor,
@@ -875,7 +875,7 @@ impl Turn<'_> {
             };
             let gated = gate_call(
                 GateInput {
-                    links: &self.cfg.hooks.links,
+                    links: &self.cfg.hooks.links().await,
                     session: &self.cfg.session.id,
                     cwd: &self.cfg.cwd,
                     item: item_id,
@@ -929,7 +929,7 @@ impl Turn<'_> {
 
         let report = crate::chain::Report::default();
         let dispatch = executor::Dispatch {
-            links: &cfg.hooks.links,
+            links: &cfg.hooks.links().await,
             cx: &self.hook_cx.clone(),
             report: report.clone(),
         };
