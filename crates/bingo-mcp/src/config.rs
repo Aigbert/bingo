@@ -46,6 +46,15 @@ pub enum Server {
     },
 }
 
+impl Server {
+    pub fn tool_timeout(&self) -> std::time::Duration {
+        let (Self::Stdio { tool_timeout, .. } | Self::Http { tool_timeout, .. }) = self;
+        tool_timeout
+            .map(|seconds| std::time::Duration::from_secs(seconds.get()))
+            .unwrap_or(crate::dial::TOOL_CALL)
+    }
+}
+
 /// The sign-in half of an HTTP server's entry. Only a client id: a public
 /// native client holds no secret, and a token never enters a settings file
 /// (ADR-0012 §2).

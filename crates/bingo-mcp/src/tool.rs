@@ -42,6 +42,7 @@ pub struct McpTool {
     /// §3). Weak: the manager owns the connection this tool answers on, and
     /// a tool a turn is still holding must not keep the manager alive.
     manager: Weak<Manager>,
+    timeout: std::time::Duration,
 }
 
 impl McpTool {
@@ -51,6 +52,7 @@ impl McpTool {
         service: Arc<Service>,
         asker: Arc<Asker>,
         manager: Weak<Manager>,
+        timeout: std::time::Duration,
     ) -> Self {
         Self {
             server: server.to_string(),
@@ -64,6 +66,7 @@ impl McpTool {
             service,
             asker,
             manager,
+            timeout,
         }
     }
 
@@ -193,6 +196,10 @@ impl Tool for McpTool {
         let answered = tokio::select! {
             biased;
             () = cx.cancel.cancelled() => return Err(ToolError::Cancelled),
+            () = tokio::time::sleep(self.timeout) => return Err(ToolError::Failed(format!(
+                "{}: tools/call timed out after {}s (configure toolTimeout for this server)",
+                self.server, self.timeout.as_secs(),
+            ))),
             answered = self.service.call_tool(params) => answered,
         };
         let result = match answered {

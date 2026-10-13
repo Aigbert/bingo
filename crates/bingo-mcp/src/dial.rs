@@ -30,6 +30,10 @@ use crate::config::Server;
 /// deadline is a failure a person retries with `/mcp reconnect`.
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Builds and crawls can take minutes. A server may override toolTimeout,
+/// but an unattended call must eventually return an error to the model.
+pub const TOOL_CALL: Duration = Duration::from_secs(600);
+
 /// The client side of one live server. The handler is this client's own
 /// [`Client`], because a server may ask *us* something (`elicitation/create`)
 /// while it answers a call.
