@@ -214,7 +214,7 @@ pub fn open_block(ui: &mut Ui, tree: &Tree, now: Now, focused: Option<&ItemId>) 
     else {
         return false;
     };
-    ui.layer.show(Open::Pager(Pager::open(id)), now.instant);
+    ui.focus.show(Open::Pager(Pager::open(id)), now.instant);
     true
 }
 
@@ -234,7 +234,7 @@ fn window_of(ui: &Ui, tree: &Tree) -> Window {
 
 /// What the open pager is showing, as the sheet lays it out.
 fn content_of(ui: &Ui, tree: &Tree) -> Vec<Line<'static>> {
-    let Open::Pager(open) = &ui.layer.open else {
+    let Open::Pager(open) = ui.focus.open() else {
         return Vec::new();
     };
     let width = width_of(ui);
@@ -260,14 +260,14 @@ pub fn keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         return Vec::new();
     }
     let window = window_of(ui, tree);
-    if let Open::Pager(open) = &mut ui.layer.open {
+    if let Some(Open::Pager(open)) = ui.focus.open_mut() {
         moved(open, key, window);
     }
     Vec::new()
 }
 
 fn searching(ui: &Ui) -> bool {
-    matches!(&ui.layer.open, Open::Pager(open) if open.search.is_some())
+    matches!(ui.focus.open(), Open::Pager(open) if open.search.is_some())
 }
 
 fn moved(open: &mut Pager, key: KeyEvent, window: Window) {
@@ -290,14 +290,14 @@ fn moved(open: &mut Pager, key: KeyEvent, window: Window) {
 /// in. Forgetting the entry *is* the fold: the start is written in one place
 /// ([`crate::fold`]) and never copied here.
 fn closed(ui: &mut Ui, now: Now) {
-    let opened = match &ui.layer.open {
+    let opened = match ui.focus.open() {
         Open::Pager(open) => Some(open.item.clone()),
         _ => None,
     };
     if let Some(item) = opened {
         ui.folds.remove(&item);
     }
-    ui.layer.close(now.instant);
+    ui.focus.close(now.instant);
 }
 
 /// `/` inside the sheet: the same query row as `ctrl+f`, over this block alone.
@@ -307,7 +307,7 @@ fn searched(ui: &mut Ui, tree: &Tree, key: KeyEvent) -> Vec<Effect> {
         .iter()
         .map(ToString::to_string)
         .collect();
-    let Open::Pager(open) = &mut ui.layer.open else {
+    let Some(Open::Pager(open)) = ui.focus.open_mut() else {
         return Vec::new();
     };
     if key.code == KeyCode::Esc {

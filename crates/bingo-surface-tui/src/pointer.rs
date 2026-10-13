@@ -29,10 +29,26 @@ pub const WHEEL: isize = 3;
 /// cells and the release copies it, a click lands on a block, on a child's
 /// row, or on a card's option.
 pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect> {
+    match crate::focus::owner(ui, tree) {
+        crate::focus::Owner::Intro => {
+            if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+                ui.focus = crate::focus::Focus::Composer;
+            }
+            return Vec::new();
+        }
+        crate::focus::Owner::Search => return Vec::new(),
+        crate::focus::Owner::Layer => return layer_mouse(ui, tree, mouse),
+        crate::focus::Owner::Interaction => {
+            return if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+                card_option(ui, mouse).map(|index| answer(ui, tree, index, now)).unwrap_or_default()
+            } else { Vec::new() };
+        }
+        _ => {}
+    }
     match mouse.kind {
         MouseEventKind::ScrollUp => scroll(ui, WHEEL, now),
         MouseEventKind::ScrollDown => scroll(ui, -WHEEL, now),
-        MouseEventKind::Down(MouseButton::Left) => return pressed(ui, tree, mouse, now),
+        MouseEventKind::Down(MouseButton::Left) => return pressed(ui, tree, mouse),
         MouseEventKind::Drag(MouseButton::Left) => drag(ui, mouse, now),
         MouseEventKind::Up(MouseButton::Left) => return released(ui, now),
         // The pointer is moving with nothing held down, so no hand is out past
@@ -43,20 +59,18 @@ pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Ef
     Vec::new()
 }
 
+fn layer_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent) -> Vec<Effect> {
+    if mouse.kind != MouseEventKind::Down(MouseButton::Left) { return Vec::new(); }
+    let Some(cursor) = listed_row(ui, mouse) else { return Vec::new(); };
+    let chosen = under(ui, tree, cursor);
+    walk_to(ui, tree, cursor, chosen)
+}
+
 /// A press lands on whatever is under it: a card's option answers, a block
 /// takes the focus, opens what is folded under it and starts a run.
-fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect> {
-    if let Some(index) = card_option(ui, mouse) {
-        return answer(ui, tree, index, now);
-    }
-    // A click on a row of the list does what the cursor there does (§7: a key
-    // means one direction, a click means both — here it means the walk).
-    if let Some(cursor) = listed_row(ui, mouse) {
-        let chosen = under(ui, tree, cursor);
-        return walk_to(ui, tree, cursor, chosen);
-    }
+fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent) -> Vec<Effect> {
     if let Some(card) = rail_card(ui, mouse) {
-        ui.focus = Some(card);
+        ui.focus = crate::focus::Focus::Card(card);
         return Vec::new();
     }
     // The way back to the foot answers a click as `end` answers a key.
@@ -82,7 +96,7 @@ fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect>
         cycle_fold(ui, tree.viewed(), item);
     }
     ui.select.block = block;
-    ui.select.start(cell);
+    ui.start_selection(cell);
     Vec::new()
 }
 
@@ -120,14 +134,14 @@ fn drag(ui: &mut Ui, mouse: MouseEvent, now: Now) {
 fn drag_inside(ui: &mut Ui, mouse: MouseEvent) {
     ui.select.dragging = None;
     if let Some(cell) = transcript_cell(ui, mouse) {
-        ui.select.extend(cell);
+        ui.extend_selection(cell);
     }
 }
 
 /// Past it, only a run being drawn asks for anything: a drag that started
 /// somewhere else is somebody else's gesture.
 fn drag_past(ui: &mut Ui, edge: Edge, mouse: MouseEvent, now: Now) {
-    if ui.select.run.is_none() {
+    if ui.focus.selection().is_none() {
         return;
     }
     ui.drag_edge(edge, column_under(ui, mouse), now);
@@ -139,9 +153,7 @@ fn drag_past(ui: &mut Ui, edge: Edge, mouse: MouseEvent, now: Now) {
 /// run that reaches nowhere is a click, and keeps every meaning a click has.
 fn released(ui: &mut Ui, now: Now) -> Vec<Effect> {
     ui.select.dragging = None;
-    let Some(lines) = ui
-        .select
-        .run
+    let Some(lines) = ui.focus.selection()
         .filter(|run| !run.empty())
         .map(|run| run.lines())
     else {
@@ -191,7 +203,7 @@ fn column_under(ui: &Ui, mouse: MouseEvent) -> usize {
 /// covered both, so while one is up the click is the layer's and no picture is
 /// under it.
 fn picture(ui: &Ui, mouse: MouseEvent) -> Option<crate::graphics::Picture> {
-    if ui.layer.showing() {
+    if ui.focus.showing() {
         return None;
     }
     ui.shown.picture_at(Position {
@@ -204,7 +216,7 @@ fn picture(ui: &Ui, mouse: MouseEvent) -> Option<crate::graphics::Picture> {
 /// frame drew one. A layer over the frame has covered it, so while one is up
 /// the click is the layer's.
 fn on_foot(ui: &Ui, mouse: MouseEvent) -> bool {
-    if ui.layer.showing() {
+    if ui.focus.showing() {
         return false;
     }
     ui.shown.foot.is_some_and(|area| {
@@ -246,7 +258,7 @@ fn mouse_enter() -> KeyEvent {
 /// The row of the list under the pointer, against the frame the last draw
 /// left: which line it landed on, and what that line is a row of.
 fn listed_row(ui: &Ui, mouse: MouseEvent) -> Option<roster::Cursor> {
-    if !ui.layer.captures() {
+    if !ui.focus.captures() {
         return None;
     }
     let painted = &ui.shown;
@@ -256,7 +268,7 @@ fn listed_row(ui: &Ui, mouse: MouseEvent) -> Option<roster::Cursor> {
 /// The session a row of the list names — the list as the query left it, so a
 /// click lands on the row a person can see.
 fn under(ui: &Ui, tree: &Tree, cursor: roster::Cursor) -> Option<SessionId> {
-    let Open::Switcher(open) = &ui.layer.open else {
+    let Open::Switcher(open) = ui.focus.open() else {
         return None;
     };
     open.session(tree, ui.composer.text(), cursor)

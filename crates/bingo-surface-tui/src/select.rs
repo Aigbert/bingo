@@ -66,47 +66,9 @@ pub struct Dragging {
 pub struct Select {
     /// The block a click or a key last landed on.
     pub block: Option<ItemId>,
-    /// The run being taken out of it.
-    pub run: Option<Run>,
     /// The hand is past an edge of the transcript and the view is walking
     /// towards it, a line every [`EDGE_PACE`].
     pub dragging: Option<Dragging>,
-}
-
-impl Select {
-    pub fn start(&mut self, at: Cell) {
-        self.run = Some(Run {
-            anchor: at,
-            head: at,
-        });
-        self.dragging = None;
-    }
-
-    pub fn extend(&mut self, to: Cell) {
-        if let Some(run) = self.run.as_mut() {
-            run.head = to;
-        }
-    }
-
-    /// Move the far end by lines and columns, within the transcript's shape.
-    pub fn walk(&mut self, lines: isize, columns: isize, height: usize) {
-        let Some(run) = self.run.as_mut() else {
-            return;
-        };
-        run.head = Cell {
-            line: run
-                .head
-                .line
-                .saturating_add_signed(lines)
-                .min(height.saturating_sub(1)),
-            column: run.head.column.saturating_add_signed(columns),
-        };
-    }
-
-    pub fn clear(&mut self) {
-        self.run = None;
-        self.dragging = None;
-    }
 }
 
 impl Edge {
@@ -158,6 +120,16 @@ impl Edge {
             Edge::Above(_) => Edge::Above(1),
             Edge::Below(_) => Edge::Below(1),
         }
+    }
+}
+
+impl Run {
+    /// Move the far end within the transcript's shape.
+    pub fn walk(&mut self, lines: isize, columns: isize, height: usize) {
+        self.head = Cell {
+            line: self.head.line.saturating_add_signed(lines).min(height.saturating_sub(1)),
+            column: self.head.column.saturating_add_signed(columns),
+        };
     }
 }
 
@@ -335,32 +307,32 @@ mod tests {
 
     #[test]
     fn walking_moves_the_far_end_and_stops_at_the_foot() {
-        let mut select = Select::default();
-        select.start(Cell { line: 1, column: 2 });
-        select.walk(1, 3, 3);
+        let mut select = crate::ui::Ui::new(Vec::new(), Instant::now());
+        select.start_selection(Cell { line: 1, column: 2 });
+        select.walk_selection(1, 3, 3);
         assert_eq!(
-            select.run.map(|r| r.head),
+            select.focus.selection().map(|r| r.head),
             Some(Cell { line: 2, column: 5 })
         );
-        select.walk(5, 0, 3);
-        assert_eq!(select.run.map(|r| r.head.line), Some(2));
-        select.walk(-9, -9, 3);
+        select.walk_selection(5, 0, 3);
+        assert_eq!(select.focus.selection().map(|r| r.head.line), Some(2));
+        select.walk_selection(-9, -9, 3);
         assert_eq!(
-            select.run.map(|r| r.head),
+            select.focus.selection().map(|r| r.head),
             Some(Cell { line: 0, column: 0 })
         );
     }
 
     #[test]
     fn a_run_that_reaches_nowhere_is_a_click() {
-        let mut select = Select::default();
-        select.start(Cell { line: 4, column: 2 });
-        assert!(select.run.is_some_and(|run| run.empty()));
-        assert_eq!(select.run.map(|run| run.lines()), Some(1));
-        select.extend(Cell { line: 6, column: 0 });
-        assert!(select.run.is_some_and(|run| !run.empty()));
+        let mut select = crate::ui::Ui::new(Vec::new(), Instant::now());
+        select.start_selection(Cell { line: 4, column: 2 });
+        assert!(select.focus.selection().is_some_and(|run| run.empty()));
+        assert_eq!(select.focus.selection().map(|run| run.lines()), Some(1));
+        select.extend_selection(Cell { line: 6, column: 0 });
+        assert!(select.focus.selection().is_some_and(|run| !run.empty()));
         assert_eq!(
-            select.run.map(|run| run.lines()),
+            select.focus.selection().map(|run| run.lines()),
             Some(3),
             "three lines, counted the way a person reads them"
         );

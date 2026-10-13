@@ -29,8 +29,90 @@ pub enum Owner {
     Menu,
 }
 
-fn resolve(_focus: &Focus, _interaction: bool, _menu: bool) -> Owner {
-    Owner::Composer
+pub fn owner(ui: &crate::ui::Ui, tree: &crate::tree::Tree) -> Owner {
+    resolve(&ui.focus, tree.open_interaction().is_some(), !ui.suggestions(
+        &tree.viewed().summary.cwd, &crate::mentions::targets(tree),
+    ).is_empty())
+}
+
+fn resolve(focus: &Focus, interaction: bool, menu: bool) -> Owner {
+    match focus {
+        Focus::Intro(_) => Owner::Intro,
+        Focus::Select(_) => Owner::Select,
+        Focus::Search(_) => Owner::Search,
+        Focus::Layer(layer) if layer.showing() && layer.open.captures() => Owner::Layer,
+        Focus::Card(_) => Owner::Card,
+        _ if interaction => Owner::Interaction,
+        _ if menu => Owner::Menu,
+        _ => Owner::Composer,
+    }
+}
+
+impl Focus {
+    pub fn intro(&self) -> Option<&Playing> {
+        if let Self::Intro(value) = self { Some(value) } else { None }
+    }
+    pub fn search(&self) -> Option<&Search> {
+        if let Self::Search(value) = self { Some(value) } else { None }
+    }
+    pub fn search_mut(&mut self) -> Option<&mut Search> {
+        if let Self::Search(value) = self { Some(value) } else { None }
+    }
+    pub fn selection(&self) -> Option<Run> {
+        if let Self::Select(value) = self { Some(*value) } else { None }
+    }
+    pub fn selection_mut(&mut self) -> Option<&mut Run> {
+        if let Self::Select(value) = self { Some(value) } else { None }
+    }
+    pub fn card(&self) -> Option<&CardId> {
+        if let Self::Card(value) = self { Some(value) } else { None }
+    }
+    pub fn open(&self) -> &crate::ui::Open {
+        if let Self::Layer(value) = self { &value.open } else { &crate::ui::Open::Nothing }
+    }
+    pub fn open_mut(&mut self) -> Option<&mut crate::ui::Open> {
+        if let Self::Layer(value) = self { Some(&mut value.open) } else { None }
+    }
+    pub fn show(&mut self, open: crate::ui::Open, now: std::time::Instant) {
+        let mut layer = Layer::shut(now);
+        layer.show(open, now);
+        *self = Self::Layer(layer);
+    }
+    pub fn close(&mut self, now: std::time::Instant) {
+        if let Self::Layer(layer) = self { layer.close(now); }
+    }
+    pub fn toggle(&mut self, open: crate::ui::Open, now: std::time::Instant) {
+        if self.open() == &open && self.showing() { self.close(now); }
+        else { self.show(open, now); }
+    }
+    pub fn showing(&self) -> bool {
+        matches!(self, Self::Layer(layer) if layer.showing())
+    }
+    pub fn captures(&self) -> bool {
+        self.showing() && self.open().captures()
+    }
+    pub fn drawn(&self, now: crate::clock::Now) -> Option<crate::layers::Reveal> {
+        if let Self::Layer(layer) = self { layer.drawn(now) } else { None }
+    }
+    #[cfg(test)]
+    pub fn reveal(&self, now: crate::clock::Now) -> crate::layers::Reveal {
+        self.drawn(now).unwrap_or_else(|| crate::layers::Reveal::none(0))
+    }
+    pub fn next_change(&self, now: crate::clock::Now) -> Option<std::time::Instant> {
+        if let Self::Layer(layer) = self { layer.next_change(now) } else { None }
+    }
+    pub fn expire(&mut self, now: crate::clock::Now) {
+        let over = match self {
+            Self::Intro(intro) => intro.over(now),
+            Self::Layer(layer) => layer.drawn(now).is_none(),
+            _ => false,
+        };
+        if over { *self = Self::Composer; }
+    }
+    #[cfg(test)]
+    pub fn is(&self, open: &crate::ui::Open) -> bool {
+        self.open() == open && self.showing()
+    }
 }
 
 #[cfg(test)]

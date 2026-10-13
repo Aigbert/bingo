@@ -98,7 +98,7 @@ fn layout_answers_picture_and_rail_clicks_without_painting() {
         .1
         .start;
     crate::pointer::on_mouse(&mut ui, &tree, click(rail.x + 1, rail.y + row as u16), now);
-    assert_eq!(ui.focus, Some(demo_card("board")));
+    assert_eq!(ui.focus.card().cloned(), Some(demo_card("board")));
 
     let mut state = state();
     let mut picture = user("itm_picture", "A picture.");
@@ -258,7 +258,7 @@ fn layout_unbounded_rail_schedules_its_next_step() {
 fn layout_layer_send_and_drag_report_their_own_deadlines() {
     let (mut ui, now) = scene();
     let tree = solo(&state());
-    ui.layer.show(crate::ui::Open::Help, now.instant);
+    ui.focus.show(crate::ui::Open::Help, now.instant);
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
     assert_eq!(first.next_frame, Some(now.instant + crate::clock::FRAME));
     let arrived = later(now, 200);

@@ -570,7 +570,7 @@ impl Run {
         for id in removed {
             self.session.handles.remove(id);
         }
-        if let Open::Switcher(open) = &mut self.ui.layer.open {
+        if let Some(Open::Switcher(open)) = self.ui.focus.open_mut() {
             open.stored.retain(|stored| !removed.contains(&stored.id));
         }
     }
@@ -908,7 +908,7 @@ impl Run {
             Reply::Handle(session, handle) => {
                 self.session.handles.insert(session, handle);
             }
-            Reply::Sessions(sessions) => self.ui.layer.show(
+            Reply::Sessions(sessions) => self.ui.focus.show(
                 Open::Picker(Picker {
                     sessions,
                     selected: 0,
@@ -935,7 +935,7 @@ impl Run {
     /// The store's answer lands after the card is already up. It fills the
     /// card while that is still what is open, and is dropped when it is not.
     fn fill_switcher(&mut self, sessions: Vec<SessionSummary>) {
-        if let Open::Switcher(open) = &mut self.ui.layer.open {
+        if let Some(Open::Switcher(open)) = self.ui.focus.open_mut() {
             open.stored = sessions;
         }
     }
@@ -950,7 +950,7 @@ impl Run {
         *events = Some(attachment.events);
         self.ui.opening = false;
         self.ui.scroll = Default::default();
-        self.ui.layer.close(Instant::now());
+        self.ui.focus.close(Instant::now());
         self.refocus();
     }
 }
@@ -2440,7 +2440,7 @@ mod tests {
             run.paint(&mut recorder, Wake::Frame, now)
                 .expect("the list");
         });
-        assert!(run.ui.layer.showing(), "the switcher is open");
+        assert!(run.ui.focus.showing(), "the switcher is open");
         assert!(
             placeholders(recorder.last()) < cells,
             "and it covers cells the picture had:\n{}",
@@ -2459,7 +2459,7 @@ mod tests {
             run.paint(&mut recorder, Wake::Frame, now)
                 .expect("back again");
         });
-        assert!(!run.ui.layer.showing());
+        assert!(!run.ui.focus.showing());
         assert_eq!(
             placeholders(recorder.last()),
             cells,
@@ -2656,7 +2656,7 @@ mod tests {
     fn a_frame_is_owed_while_the_one_on_the_screen_is_still_arriving() {
         let (_, opened) = scene();
         let mut run = idle(opened.instant);
-        run.ui.layer.show(Open::Help, opened.instant);
+        run.ui.focus.show(Open::Help, opened.instant);
         let after = later(opened, 200);
         run.ui.shown = crate::layout::layout(
             crate::layout::Layout::default(),

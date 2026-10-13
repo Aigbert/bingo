@@ -25,11 +25,11 @@ use crate::layers::{self, Reveal};
 use crate::layout::Layout;
 use crate::pager::Pager;
 use crate::pictures::Held;
-use crate::rail::{CardId, Pin};
+use crate::rail::Pin;
 use crate::rewind::Rewind;
 use crate::roster;
 use crate::scroll::Scroll;
-use crate::search::Search;
+use crate::focus::Focus;
 use crate::select::{self, Cell, Dragging, Edge, Select};
 use crate::tree::{self, Row, Tree};
 use crate::views::Marks;
@@ -315,28 +315,11 @@ impl Layer {
         self.closing = true;
     }
 
-    /// Open this one, or close it when it already is: what a toggle chord does.
-    pub fn toggle(&mut self, open: Open, now: Instant) {
-        match self.open == open && !self.closing {
-            true => self.close(now),
-            false => self.show(open, now),
-        }
-    }
-
-    #[cfg(test)]
-    pub fn is(&self, open: &Open) -> bool {
-        &self.open == open && !self.closing
-    }
-
     pub fn showing(&self) -> bool {
         self.open != Open::Nothing && !self.closing
     }
 
-    /// Whether the keyboard belongs to it. One on its way out has already
-    /// given the keys back.
-    pub fn captures(&self) -> bool {
-        self.showing() && self.open.captures()
-    }
+
 }
 
 #[derive(Debug)]
@@ -347,11 +330,7 @@ pub struct Ui {
     pub history: PromptHistory,
     pub dialog: Dialog,
     pub scroll: Scroll,
-    /// The one layer over the frame, and how far it has come in.
-    pub layer: Layer,
     pub menu: Menu,
-    /// `ctrl+f`: the query in the status line's row, while it is there.
-    pub search: Option<Search>,
     /// What the transcript is holding: a focused block, a run of cells.
     pub select: Select,
     pub notices: Vec<Notice>,
@@ -364,8 +343,8 @@ pub struct Ui {
     /// the task being done either way: hiding the list is about rows, not
     /// about what the turn is doing.
     pub activity_hidden: bool,
-    /// The rail card the keyboard talks to; `tab` cycles it, a click takes it.
-    pub focus: Option<CardId>,
+    /// The one owner of keys and pointer events.
+    pub focus: Focus,
     /// The panel sheet's cursor: the row `⏎` would pin.
     pub panel: usize,
     /// An action fired and not yet answered.
@@ -417,12 +396,6 @@ pub struct Ui {
     /// fold and the scroll, and read once at the start: it is a fact about
     /// this machine, not about the conversation.
     pub measure: Option<usize>,
-    /// The opening, while it is playing (M70, redrawn by M72; design §11). It
-    /// is drawn in the welcome box's place and it lands on that box, so the
-    /// moment it has run out it is taken away and the box the transcript has
-    /// always had is what is derived — there is no last frame that merely looks
-    /// like one.
-    pub intro: Option<crate::opening::Playing>,
     /// The paths the `@` dropdown ranks, walked when the first one asks.
     files: Files,
 }
@@ -435,22 +408,37 @@ struct Files {
 }
 
 impl Ui {
-    pub fn new(history: Vec<String>, now: Instant) -> Self {
+    pub fn start_selection(&mut self, at: Cell) {
+        self.focus = Focus::Select(select::Run { anchor: at, head: at });
+        self.select.dragging = None;
+    }
+    pub fn extend_selection(&mut self, to: Cell) {
+        if let Some(run) = self.focus.selection_mut() { run.head = to; }
+    }
+    pub fn walk_selection(&mut self, lines: isize, columns: isize, height: usize) {
+        if let Some(run) = self.focus.selection_mut() { run.walk(lines, columns, height); }
+    }
+    pub fn clear_selection(&mut self) {
+        if matches!(self.focus, Focus::Select(_)) { self.focus = Focus::Composer; }
+        self.select.dragging = None;
+    }
+}
+
+impl Ui {
+    pub fn new(history: Vec<String>, _now: Instant) -> Self {
         Self {
             composer: Composer::default(),
             pictures: Held::default(),
             history: PromptHistory::new(history),
             dialog: Dialog::default(),
             scroll: Scroll::default(),
-            layer: Layer::shut(now),
             menu: Menu::default(),
-            search: None,
             select: Select::default(),
             notices: Vec::new(),
             block: None,
             pinned: BTreeSet::new(),
             activity_hidden: false,
-            focus: None,
+            focus: Focus::Composer,
             panel: 0,
             pending: None,
             folds: Folds::new(),
@@ -467,7 +455,6 @@ impl Ui {
             linked: Linked::default(),
             update: None,
             measure: None,
-            intro: None,
             files: Files::default(),
         }
     }
@@ -534,12 +521,7 @@ impl Ui {
         {
             next.shown = Some(now.instant);
         }
-        if self.layer.closing && self.layer.reveal(now).gone() {
-            self.layer = Layer::shut(now.instant);
-        }
-        if self.intro.as_ref().is_some_and(|intro| intro.over(now)) {
-            self.intro = None;
-        }
+        self.focus.expire(now);
     }
 
     /// How far the light along the box's border has come since a line was
@@ -576,9 +558,7 @@ impl Ui {
             .select
             .dragging
             .map(|held| held.stepped + select::EDGE_PACE);
-        let intro = self
-            .intro
-            .as_ref()
+        let intro = self.focus.intro()
             .filter(|intro| !intro.over(now))
             .map(|_| now.instant + FRAME);
         [exit, send, crossfade, drag, intro]
@@ -648,7 +628,7 @@ impl Ui {
     /// being written (M58). What is typed there names a session, so no `/` or
     /// `@` dropdown answers it and none is drawn over it.
     pub fn listing(&self) -> bool {
-        self.layer.captures() && matches!(self.layer.open, Open::Switcher(_))
+        self.focus.captures() && matches!(*self.focus.open(), Open::Switcher(_))
     }
 
     /// The composer changed: the dropdown reopens and the history walk ends.
@@ -702,7 +682,7 @@ impl Ui {
         let (height, rows) = self.transcript();
         self.scroll.by(edge.lines(), height, rows, now.instant);
         let line = edge.line(self.scroll.target(height, rows), rows, height);
-        self.select.extend(Cell { line, column });
+        self.extend_selection(Cell { line, column });
         self.select.dragging = edge.beyond(line, height).then_some(Dragging {
             edge,
             stepped: now.instant,
@@ -725,7 +705,7 @@ impl Ui {
     /// The column the run's far end is at: a drag walking past an edge keeps
     /// the column the pointer left the region at.
     fn head_column(&self) -> usize {
-        self.select.run.map_or(0, |run| run.head.column)
+        self.focus.selection().map_or(0, |run| run.head.column)
     }
 }
 

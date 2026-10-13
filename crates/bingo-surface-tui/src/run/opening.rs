@@ -31,7 +31,7 @@ pub(super) fn plays(run: &Run, screen: (u16, u16), asked: bool, now: Now) -> boo
 /// Start it, where this run is one that opens with it.
 pub(super) fn begin(run: &mut Run, screen: (u16, u16), asked: bool, now: Now) {
     if plays(run, screen, asked, now) {
-        run.ui.intro = Some(crate::opening::Playing::from(now.instant));
+        run.ui.focus = crate::focus::Focus::Intro(crate::opening::Playing::from(now.instant));
     }
 }
 
@@ -99,7 +99,7 @@ mod tests {
             crate::theme::with(look, || {
                 let mut run = idle(now.instant);
                 begin(&mut run, SCREEN, false, now);
-                assert!(run.ui.intro.is_none());
+                assert!(run.ui.focus.intro().is_none());
             });
         }
     }
@@ -110,7 +110,7 @@ mod tests {
     fn the_frame_of_the_piece_is_what_the_box_draws() {
         let (_, now) = scene();
         let mut run = idle(now.instant);
-        run.ui.intro = Some(Playing::from(now.instant));
+        run.ui.focus = crate::focus::Focus::Intro(Playing::from(now.instant));
         let mut recorder = Recorder::default();
         run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
         assert!(
@@ -119,7 +119,7 @@ mod tests {
             recorder.last()
         );
 
-        run.ui.intro = Some(Playing::from(
+        run.ui.focus = crate::focus::Focus::Intro(Playing::from(
             now.instant
                 .checked_sub(std::time::Duration::from_millis(2_000))
                 .expect("a clock with two seconds behind it"),
@@ -138,10 +138,10 @@ mod tests {
     #[test]
     fn the_box_comes_back_when_the_piece_has_run_out() {
         let (mut ui, now) = scene();
-        ui.intro = Some(Playing::from(now.instant));
+        ui.focus = crate::focus::Focus::Intro(Playing::from(now.instant));
         ui.expire(later(now, 2_300));
-        assert!(ui.intro.is_some(), "it is still playing");
+        assert!(ui.focus.intro().is_some(), "it is still playing");
         ui.expire(later(now, 2_400));
-        assert!(ui.intro.is_none(), "and then it is over");
+        assert!(ui.focus.intro().is_none(), "and then it is over");
     }
 }
