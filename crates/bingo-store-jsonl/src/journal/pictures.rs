@@ -91,5 +91,8 @@ fn the_planned_v2_picture_line_length_is_independent_of_picture_size() {
     let record = realistic_picture_record();
     let small = picture_record_line(record.clone(), b"x");
     let large = picture_record_line(record, &vec![0; 3_000_000]);
-    assert_eq!(large.len() - small.len(), 3_000_000usize.to_string().len() - 1usize.to_string().len());
+    assert_eq!(
+        large.len() - small.len(),
+        3_000_000usize.to_string().len() - 1usize.to_string().len()
+    );
 }

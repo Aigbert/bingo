@@ -31,7 +31,9 @@ fn oversized_image() -> Image {
     let base64_len = (Image::MAX_BYTES / 3 + 1) * 4;
     Image {
         media_type: "image/png".into(),
-        data: "A".repeat(base64_len),
+        data: ("A".repeat(base64_len)).into(),
+        width: None,
+        height: None,
         path: None,
     }
 }
@@ -90,6 +92,8 @@ async fn an_unknown_media_type_is_invalid_input() {
     let bogus = Image {
         media_type: "image/tiff".into(),
         data: "AAAA".into(),
+        width: None,
+        height: None,
         path: None,
     };
     mailbox.submit(

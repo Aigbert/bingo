@@ -286,7 +286,7 @@ fn said(parts: &[ContentPart], images: bool) -> Vec<ContentBlock> {
         .filter_map(|part| match part {
             ContentPart::Text { text } => Some(ContentBlock::Text(TextContent::new(text.clone()))),
             ContentPart::Image(image) if images => Some(ContentBlock::Image(ImageContent::new(
-                image.data.clone(),
+                image.data.to_string(),
                 image.media_type.clone(),
             ))),
             ContentPart::Image(image) => Some(ContentBlock::Text(TextContent::new(format!(

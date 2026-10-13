@@ -210,6 +210,8 @@ mod tests {
         Image {
             media_type: "image/png".into(),
             data: data.into(),
+            width: None,
+            height: None,
             path: None,
         }
     }

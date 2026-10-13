@@ -89,6 +89,8 @@ mod tests {
         let image = ContentPart::Image(Image {
             media_type: "image/png".into(),
             data: "aaaa".into(),
+            width: None,
+            height: None,
             path: None,
         });
         assert_eq!(parts(std::slice::from_ref(&image)), IMAGE_TOKENS);

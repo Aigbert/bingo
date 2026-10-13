@@ -1749,6 +1749,22 @@
           "type": "string",
           "description": "Base64 payload."
         },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
         "path": {
           "type": [
             "string",

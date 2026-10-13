@@ -158,7 +158,9 @@ async fn part(block: &ContentBlock) -> ContentPart {
 async fn pictured(image: &rmcp::model::ImageContent) -> ContentPart {
     let handed = Image {
         media_type: image.mime_type.clone(),
-        data: image.data.clone(),
+        data: (image.data.clone()).into(),
+        width: None,
+        height: None,
         path: None,
     };
     match bingo_pictures::taken(handed).await {
@@ -264,7 +266,7 @@ mod tests {
         let data = Image::from_bytes("image/png", &bytes)
             .expect("a picture within the cap")
             .data;
-        ImageContent::new(data, "image/png")
+        ImageContent::new(data.to_string(), "image/png")
     }
 
     #[tokio::test]
@@ -289,7 +291,9 @@ mod tests {
             output.parts[1],
             ContentPart::Image(Image {
                 media_type: "image/png".into(),
-                data: picture.data.clone(),
+                data: (picture.data.clone()).into(),
+                width: None,
+                height: None,
                 path: None,
             }),
             "a picture inside the bound is the server's own bytes"

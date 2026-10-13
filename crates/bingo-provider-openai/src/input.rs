@@ -238,6 +238,8 @@ mod tests {
             parts: vec![ContentPart::Image(Image {
                 media_type: "image/png".into(),
                 data: "iVBORw0KGgo=".into(),
+                width: None,
+                height: None,
                 path: None,
             })],
             is_error: false,

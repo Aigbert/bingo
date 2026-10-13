@@ -88,7 +88,11 @@ const MEDIA_TYPES: &[(&str, &str)] = &[
 pub struct Image {
     pub media_type: String,
     /// Base64 payload.
-    pub data: String,
+    pub data: std::sync::Arc<str>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
     /// Where the same bytes are on this machine, when they are anywhere: a
     /// picture read off a disk, or one a surface wrote before handing it on
     /// (ADR-0052). A location, not a second copy — absent from the wire and
@@ -147,7 +151,9 @@ impl Image {
         }
         Ok(Image {
             media_type,
-            data: base64::engine::general_purpose::STANDARD.encode(bytes),
+            data: (base64::engine::general_purpose::STANDARD.encode(bytes)).into(),
+            width: None,
+            height: None,
             path: None,
         })
     }
@@ -670,6 +676,8 @@ mod tests {
         let part = ContentPart::Image(Image {
             media_type: "image/png".into(),
             data: "iVBORw0KGgo=".into(),
+            width: None,
+            height: None,
             path: None,
         });
         let json = serde_json::to_value(&part).unwrap();
@@ -714,6 +722,8 @@ mod tests {
         let image = Image {
             media_type: "image/png".into(),
             data: "==".into(),
+            width: None,
+            height: None,
             path: None,
         };
         assert_eq!(image.decoded_len(), 0);
@@ -747,7 +757,7 @@ mod tests {
     fn from_bytes_encodes_a_known_type_within_the_cap() {
         let image = Image::from_bytes("image/png", b"abc").unwrap();
         assert_eq!(image.media_type, "image/png");
-        assert_eq!(image.data, "YWJj");
+        assert_eq!(&*image.data, "YWJj");
         assert_eq!(image.decoded_len(), 3);
     }
 

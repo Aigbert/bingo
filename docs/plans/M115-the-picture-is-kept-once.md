@@ -66,7 +66,7 @@ This is the first use of M113's version line.
 - `crates/bingo-store-jsonl/src/**` and its journal/blob fixtures
 - `crates/bingo-sdk/src/store/checkpoint.rs` and checkpoint fixtures/tests
 - `crates/bingo-sdk/Cargo.toml` (`serde/rc` for Arc), store Cargo.toml and Cargo.lock
-- `schema/rpc.json` (mechanical optional Image dimension fields)
+- `schema/{rpc,plugin}.json` (mechanical optional Image dimension fields)
 - `crates/bingo-sdk/fixtures/record/` and record contract tests
 - Mechanical Image/schema fixtures in provider, core, print, TUI, MCP and RPC tests
 - `crates/bingo/tests/cli/images.rs`: resolve stored pictures through journal replay
