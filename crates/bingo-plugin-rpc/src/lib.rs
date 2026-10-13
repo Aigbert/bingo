@@ -30,6 +30,7 @@ pub mod discovery;
 pub mod doors;
 pub mod hook;
 pub mod host;
+pub mod intercept;
 pub mod manager;
 pub mod manifest;
 pub mod notice;
