@@ -104,7 +104,7 @@ these holds only where a `select!` was remembered.
 ## Files
 
 - `crates/bingo-core/src/session.rs`, `session/{running,commands,inputs,
-  mailbox,spawn,tests}.rs`, `session/gate.rs` (new),
+  mailbox,queue,spawn,tests}.rs`, `session/gate.rs` (new),
   `session/tests/{owned,storage}.rs`, `test_support/**`
 - `crates/bingo-sdk/src/{error.rs,command.rs,tool.rs,store.rs,
   transcript.rs}`, `transcript/tests.rs`, `schema/{rpc,plugin}.json`
