@@ -476,6 +476,16 @@ mod tests {
         assert_eq!(reply["error"]["code"], crate::codec::METHOD_NOT_FOUND);
     }
 
+    #[tokio::test]
+    async fn notifications_after_handshake_are_not_overwritten_by_initial_lists() {
+        let connection = crate::testing::unanswering();
+        connection.router.notification("stub", Notification::new(name::TOOLS_CHANGED, json!({"tools":[]}))).await;
+        let tool = serde_json::from_value(json!({"name":"echo","description":"Echo","inputSchema":{}})).unwrap();
+        connection.initialize_lists(vec![tool], vec![]);
+        assert!(connection.tools().is_empty(), "the later notification wins");
+        connection.stop().await;
+    }
+
     fn entry(command: &str, args: &[&str]) -> Entry {
         Entry {
             command: command.to_string(),
