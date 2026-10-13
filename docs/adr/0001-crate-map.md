@@ -35,3 +35,5 @@ The bin composes `Vec<Box<dyn Plugin>>` explicitly. No self-registration crate u
 - Touching a tool crate never relinks the TUI; `touch crates/bingo-surface-tui/src/lib.rs && cargo check -p bingo-core` is a no-op (budget script asserts it).
 - The sdk is what an external plugin author downloads; it cannot pull ratatui or reqwest.
 - The TUI cannot reach the engine, so the four walls of the old D149–D152 migration cannot recur.
+
+Amended 2026-10-13 by ADR-0063 (M110): `bingo-process` joins the library tier and owns shell resolution for `bingo-tool-bash` and `bingo-hooks-shell`.

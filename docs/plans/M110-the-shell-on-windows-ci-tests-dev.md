@@ -48,14 +48,11 @@ Windows binary the release ships can run the model's commands.
    - the windows job: drop `continue-on-error` and its comment; run
      `cargo test --workspace --locked -- --test-threads=2`. Git Bash is
      on the hosted runner; set nothing.
-7. **Make Windows green honestly.** Run the windows job (push the
-   branch only if the person allows it — otherwise use
-   `cargo test --no-run --target x86_64-pc-windows-msvc` locally for
-   what compiles, and record that CI is the first real run). Each test
-   that cannot run on Windows gets
-   `#[cfg_attr(windows, ignore = "<why>")]`; each real failure is fixed
-   or, if outside this plan's Files, written in Risks and the run stops
-   (protocol step 6).
+7. **Make Windows green honestly.** Cross-check each touched crate with
+   `cargo check --all-targets --target x86_64-pc-windows-msvc`. Actual
+   Windows tests await the first CI run after a person pushes `dev`.
+   Each test that cannot run there gets a reasoned Windows ignore; each
+   real failure is fixed or, if outside Files, reported under step 6.
 8. ADR-0063 accepted; dated note on ADR-0001 naming the new library.
 
 ## Files
@@ -80,9 +77,8 @@ Windows binary the release ships can run the model's commands.
       bingo-hooks-shell --all-targets --target x86_64-pc-windows-msvc`
       exit 0.
 - [x] `ci.yml` has no `continue-on-error`; `dev` is a push trigger.
-- [ ] The windows job's result is recorded: green, or the run stopped
-      with each failure listed.
-- [ ] All gates: stopped before the workspace host gates (see below).
+- [ ] Windows job: pending the first CI run after a person pushes dev.
+- [x] All gates: host gates and touched-crate Windows cross-check passed.
 
 ## Non-goals
 
@@ -91,29 +87,22 @@ Windows binary the release ships can run the model's commands.
 
 ## Risks
 
-- **Stopped 2026-10-13, protocol step 6:** brick 7's workspace Windows
-  test build exits 101 in `aws-lc-sys`: the cross C toolchain lacks
-  `stdlib.h` and `windows.h`. Supplying a Windows SDK/toolchain changes
-  the host outside Files; no toolchain or external crate was changed.
-  Options: resume on a prepared Windows host/cross toolchain, or explicitly
-  defer this build and finish host gates with Windows execution pending.
-  No push is authorized; ADR acceptance and the ADR-0001 note are pending.
-
+- **User decision, 2026-10-13:** defer the workspace Windows test build;
+  it is not a local gate. Its `aws-lc-sys` failure needs Windows SDK
+  headers (`stdlib.h`, `windows.h`) absent on this Mac. Do not install
+  toolchains. Protocol step 7 requires only touched-crate Windows checks,
+  which passed. Finish host gates and accept the ADR if they pass; keep
+  Windows CI pending. Never push.
 - A Windows CI test checks the resolved Git Bash path; WSL is skipped.
-- Process-heavy suites may be slow on Windows; `--test-threads=2` and the
-  timeout bound it. A suite that needs more is a finding, not a reason
-  to keep the step soft.
-- Pushing to run CI is the person's decision (protocol step 9).
+- Windows process suites use two threads and a timeout; failures stay blocking.
 - Re-verified at `82e78d22`: both resolvers and description call exist;
   registration uses `Registrar` contributions. A session-start hook can
   publish the missing-shell notice through `HostApi::notice`.
-- Local Windows execution is unavailable; cross-compilation checks types,
-  and CI will be the first real Windows run (no push authorized).
 
 ## Verified (2026-10-13)
 
-Partial evidence only; M110 is **not verified**. No Windows CI run occurred.
-Contract tests were committed before implementation; expected red output:
+Local gates passed; Windows CI remains pending by the decision above.
+Contract tests were committed before implementation; red then green:
 ```text
 $ cargo test -p bingo-process
 shell resolved: ShellMissing { tried: [] }
@@ -130,20 +119,30 @@ tests::a_missing_shell_withholds_tools_and_warns_the_session ... ok
 test result: ok. 145 passed; 0 failed; 0 ignored
 $ cargo check -p bingo-process -p bingo-tool-bash -p bingo-hooks-shell --all-targets --target x86_64-pc-windows-msvc
 Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.86s
-$ scripts/budget.sh  # after adding the library member
+$ cargo fmt --all -- --check
+exit 0
+$ cargo check --workspace --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.54s
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.37s
+$ cargo test --workspace --locked -- --test-threads=2 --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing
+# Exit 0; summed results: 4958 passed, 0 failed, 3 ignored, 1 filtered out.
+$ cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1
+test a_proxy_with_a_token_this_run_never_minted_gets_nothing ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out
+$ scripts/check_discipline.sh
+dependency direction ok
+discipline ok
+$ scripts/budget.sh
 dependencies (unique, normal): 343 (max  343)
 warm cargo check -p bingo-core: 1s (max  20s)
 relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 3 GB (soft max  5)
 budget ok
-$ cargo test --workspace --locked --no-run --target x86_64-pc-windows-msvc
-fatal error: 'stdlib.h' file not found
-fatal error: 'windows.h' file not found
-error: failed to run custom build command for `aws-lc-sys v0.44.0`
-# exit 101; protocol step 6 stop
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
 ```
 
-`rg -n 'fn shell\(' crates/bingo-tool-bash crates/bingo-hooks-shell`
-returned no matches. CI diff has `[main, dev]`, concurrency, all job timeouts,
-and blocking Windows tests with two threads. `cargo fmt --all` ran; the
-format check, workspace check/clippy/test (including the isolated ACP bridge
-token test), discipline, final budget and deny gates have not run.
+Existing ignores: 100MiB pinned-event stress, opening storyboard play/preview.
+No failure reruns needed. Discipline and deny emitted non-blocking warnings.
+Both old `fn shell` definitions are gone; CI configuration criteria checked.

@@ -1,6 +1,6 @@
 # ADR-0063 — The shell on Windows is Git Bash
 
-Status: proposed · 2026-10-13 · Plan: M110
+Status: accepted · 2026-10-13 · Plan: M110
 
 ## Context
 
