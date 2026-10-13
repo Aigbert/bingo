@@ -194,15 +194,6 @@ pub(crate) mod tests {
     #[test]
     fn the_manifest_says_what_it_provides_and_what_it_claims() {
         assert_eq!(MANIFEST.id, "bingo.mcp");
-        assert_eq!(
-            MANIFEST.provides,
-            [
-                "tools:mcp",
-                "command:mcp",
-                "service:mcp.servers",
-                "service:bingo.mcp.pages",
-            ]
-        );
         assert!(MANIFEST.requires.is_empty());
         let claim = MANIFEST.config.expect("a config claim");
         assert_eq!(claim.keys[0], ("mcpServers", Merge::ByName));

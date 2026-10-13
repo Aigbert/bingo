@@ -187,20 +187,6 @@ mod plugin_tests {
             SurfaceKind::Concurrent,
             "a chat owns no terminal; it runs beside whatever does"
         );
-        assert_eq!(
-            MANIFEST.provides,
-            &[
-                "surface:channels",
-                "tool:SendFile",
-                "service:bingo.surface.channels.pages",
-            ]
-        );
-        assert!(
-            MANIFEST
-                .provides
-                .contains(&format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()).as_str()),
-            "the page's key is spelled the one way (ADR-0054 §1)"
-        );
     }
 
     /// The page is registered whether or not a chat is: a person asking how

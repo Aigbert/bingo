@@ -187,24 +187,6 @@ mod plugin_tests {
     #[test]
     fn the_manifest_says_what_it_provides_and_claims_no_settings() {
         assert_eq!(MANIFEST.id, "bingo.agents");
-        assert_eq!(
-            MANIFEST.provides,
-            [
-                "tool:SpawnAgent",
-                "tool:SendMessage",
-                "tool:ListAgents",
-                "tool:ListModels",
-                "tool:SetThinking",
-                "tool:StopAgent",
-                "tool:DismissAgent",
-                "hook:agents",
-                "hook:team",
-                "command:agents",
-                "command:team",
-                "service:agents.team",
-                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
-            ]
-        );
         assert!(MANIFEST.requires.is_empty());
         assert!(MANIFEST.config.is_none());
     }

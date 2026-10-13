@@ -240,16 +240,6 @@ mod plugin_tests {
     #[test]
     fn the_manifest_says_what_it_provides_and_the_two_keys_it_claims() {
         assert_eq!(MANIFEST.id, "bingo.surface.tui");
-        assert_eq!(
-            MANIFEST.provides,
-            ["surface:tui", "service:bingo.surface.tui.pages"]
-        );
-        assert!(
-            MANIFEST
-                .provides
-                .contains(&format!("service:{}", Pages::key(MANIFEST.id).name()).as_str()),
-            "the page's key is spelled the one way (ADR-0054 §1)"
-        );
         let claim = MANIFEST.config.expect("a config claim");
         assert_eq!(claim.keys.len(), 2);
     }

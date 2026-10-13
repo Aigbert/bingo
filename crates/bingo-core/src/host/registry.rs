@@ -63,6 +63,19 @@ pub struct Registry {
     pub notices: Vec<(String, String)>,
 }
 
+fn declared_service(manifest: &PluginManifest, contribution: &Contribution) -> Result<(), HostError> {
+    if let Contribution::Service { key, .. } = contribution {
+        let capability = format!("service:{key}");
+        if !manifest.provides.contains(&capability.as_str()) {
+            return Err(HostError::Conflict {
+                plugin: manifest.id.to_string(),
+                what: format!("service {key} is not declared in provides"),
+            });
+        }
+    }
+    Ok(())
+}
+
 impl Registry {
     /// Load plugins in the order given, standing or disabled by
     /// [`standing`]'s verdict. A disabled plugin is a warning and a status,
@@ -115,6 +128,7 @@ impl Registry {
                 source,
             })?;
         for contribution in registrar.into_contributions() {
+            declared_service(manifest, &contribution)?;
             self.add(manifest.id, contribution)?;
         }
         Ok(())

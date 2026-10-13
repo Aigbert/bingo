@@ -11,20 +11,20 @@ use super::*;
 /// from another process at all.
 #[tokio::test]
 async fn a_service_is_a_typed_value_under_a_key_and_crosses_only_if_it_opened_a_face() {
+    static COUNTER: PluginManifest = PluginManifest {
+        provides: &["service:test.counter"],
+        ..PROVIDER
+    };
     let plugins = vec![TestPlugin::boxed(
-        &PROVIDER,
-        vec![Contribution::Service {
-            key: "test.counter".into(),
-            value: Arc::new(7u32),
-            wire: None,
-        }],
+        &COUNTER,
+        vec![Contribution::service(&ServiceKey::new("test.counter"), Arc::new(7u32), None)],
     )];
     let host = Host::build(plugins, HostConfig::new(env())).await.unwrap();
     let handle = host.handle();
-    assert_eq!(handle.service::<u32>("test.counter").as_deref(), Some(&7));
-    assert!(handle.service::<String>("test.counter").is_none());
+    assert_eq!(handle.service::<u32>(&bingo_sdk::ServiceKey::new("test.counter")).as_deref(), Some(&7));
+    assert!(handle.service::<String>(&bingo_sdk::ServiceKey::new("test.counter")).is_none());
     assert!(handle.service_wire("test.counter").is_none());
-    assert!(handle.service::<u32>("test.absent").is_none());
+    assert!(handle.service::<u32>(&bingo_sdk::ServiceKey::new("test.absent")).is_none());
 }
 
 /// A service an external process declares cannot be there when the plugins
@@ -45,7 +45,7 @@ async fn a_service_opened_late_answers_by_key_and_by_wire() {
     let handle = host.handle();
     handle.open_service("test.kv", Arc::new(Echo)).unwrap();
     let service = handle
-        .service::<ServiceHandle>("test.kv")
+        .service::<ServiceHandle>(&bingo_sdk::ServiceKey::new("test.kv"))
         .expect("the one lookup finds an external service");
     assert_eq!(
         service.call("get", json!({ "key": "k" })).await.unwrap(),

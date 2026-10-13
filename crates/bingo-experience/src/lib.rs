@@ -166,8 +166,6 @@ mod plugin_tests {
     #[test]
     fn the_manifest_says_what_it_provides_and_claims_one_setting() {
         assert_eq!(MANIFEST.id, "bingo.experience");
-        let page = format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name());
-        assert_eq!(MANIFEST.provides.last().copied(), Some(page.as_str()));
         assert!(MANIFEST.requires.is_empty());
         assert_eq!(
             MANIFEST.config.map(|claim| claim.keys),

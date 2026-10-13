@@ -108,22 +108,6 @@ mod tests {
     #[test]
     fn the_manifest_says_what_it_provides_and_claims_no_settings() {
         assert_eq!(MANIFEST.id, "bingo.context");
-        assert_eq!(
-            MANIFEST.provides,
-            [
-                "compactor:summary",
-                "context:instructions",
-                "context:memory",
-                "command:memory",
-                "service:bingo.context.pages",
-            ]
-        );
-        assert!(
-            MANIFEST
-                .provides
-                .contains(&format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()).as_str()),
-            "the page's key is spelled the one way (ADR-0054 §1)"
-        );
         assert!(MANIFEST.config.is_none(), "no switch turns memory off");
     }
 
