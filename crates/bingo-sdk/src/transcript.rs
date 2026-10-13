@@ -1,5 +1,7 @@
 //! The client and model orders over shared transcript items.
 
+pub(crate) mod checkpoint;
+
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -21,15 +23,43 @@ pub struct Transcript {
     model_order: Vec<ItemId>,
     #[schemars(skip)]
     model_ids: HashSet<ItemId>,
+    #[schemars(skip)]
+    hidden: usize,
+    #[schemars(skip)]
+    cut: Option<ItemId>,
+    #[schemars(skip)]
+    has_more: bool,
 }
 
 impl Transcript {
-    pub fn drop_before_cut(&mut self) {}
+    /// Release only items that neither view needs; retained prefix items
+    /// remain addressable by the model but are not client history.
+    pub fn drop_before_cut(&mut self) {
+        let cut = self
+            .cut
+            .as_ref()
+            .and_then(|id| self.positions.get(id))
+            .copied()
+            .unwrap_or(self.hidden)
+            .max(self.hidden);
+        self.has_more |= cut > self.hidden;
+        let mut at = 0;
+        let mut hidden = 0;
+        self.items.retain(|item| {
+            let prefix = at < cut;
+            at += 1;
+            let keep = !prefix || self.model_ids.contains(&item.id);
+            hidden += usize::from(prefix && keep);
+            keep
+        });
+        self.hidden = hidden;
+        self.positions = positions(&self.items);
+    }
 
     pub fn history(&self) -> crate::OpenHistory {
         crate::OpenHistory {
             before: self.items().first().map(|item| item.id.clone()),
-            has_more: false,
+            has_more: self.has_more,
             generation: self.generation,
         }
     }
@@ -39,7 +69,7 @@ impl Transcript {
     }
 
     pub fn items(&self) -> &[Arc<Item>] {
-        &self.items
+        &self.items[self.hidden..]
     }
 
     pub fn get(&self, id: &ItemId) -> Option<&Item> {
@@ -91,6 +121,7 @@ impl Transcript {
             } => {
                 self.generation = *generation;
                 if let Some(cut) = self.model_order.iter().position(|id| id == boundary) {
+                    self.cut = Some(boundary.clone());
                     splice_compaction(&mut self.model_order, cut, kept, summary);
                     self.model_ids = self.model_order.iter().cloned().collect();
                 }
@@ -102,7 +133,7 @@ impl Transcript {
 
     /// A bounded client snapshot shares its retained bodies with the full one.
     pub fn window(&self, start: usize) -> Self {
-        let items = self.items[start..].to_vec();
+        let items = self.items()[start..].to_vec();
         let positions = positions(&items);
         let model_order: Vec<_> = self
             .model_order
@@ -117,6 +148,9 @@ impl Transcript {
             positions,
             model_order,
             model_ids,
+            hidden: 0,
+            cut: None,
+            has_more: self.has_more || start > 0,
         }
     }
 
@@ -137,6 +171,10 @@ impl Transcript {
 
     fn remove(&mut self, dropped: &[ItemId]) {
         let dropped: HashSet<_> = dropped.iter().collect();
+        self.hidden -= self.items[..self.hidden]
+            .iter()
+            .filter(|item| dropped.contains(&item.id))
+            .count();
         self.items.retain(|item| !dropped.contains(&item.id));
         self.positions = positions(&self.items);
         self.model_order.retain(|id| !dropped.contains(id));
@@ -204,7 +242,7 @@ impl Serialize for Transcript {
         wire.serialize_field("historyGeneration", &self.generation)?;
         wire.serialize_field(
             "items",
-            &self.items.iter().map(AsRef::as_ref).collect::<Vec<_>>(),
+            &self.items().iter().map(AsRef::as_ref).collect::<Vec<_>>(),
         )?;
         wire.end()
     }

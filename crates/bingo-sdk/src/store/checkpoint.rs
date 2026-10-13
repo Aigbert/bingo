@@ -14,6 +14,7 @@ pub struct Checkpoint {
     pub seq: Seq,
     pub offset: u64,
     pub line_hash: String,
+    #[serde(with = "state")]
     pub state: SessionState,
 }
 
@@ -36,6 +37,8 @@ pub struct Resumed {
     pub state: Option<SessionState>,
     pub tail: Vec<crate::Frame>,
 }
+
+mod state;
 
 #[cfg(test)]
 mod tests;
