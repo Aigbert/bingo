@@ -97,3 +97,25 @@ mod tests {
         assert!(refused.to_string().contains("servers"), "{refused}");
     }
 }
+
+#[cfg(test)]
+mod world_contract {
+    use super::*;
+    #[tokio::test]
+    async fn unknown_servers_are_refused_without_dialling() {
+        let manager = Arc::new(Manager::new(
+            bingo_http::client(bingo_http::Bounds::CALL).unwrap(),
+            Default::default(),
+            &[],
+            std::env::temp_dir(),
+        ));
+        let rows = Rows::new(manager);
+        assert!(
+            rows.connect("unconfigured")
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("not configured")
+        );
+    }
+}
