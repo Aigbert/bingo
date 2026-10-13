@@ -2,110 +2,140 @@
 
 ## Goal
 
-Twenty-three files implement `HostApi` (`rg -l "impl HostApi for"
-crates`); most are test fakes that each answer the same ten verbs their
-own way, so a new verb or a changed default is a 20-file edit and the
-fakes drift from the kernel's behaviour. `bingo_sdk::testing` already
-has `NoHost` and `ServiceHost`. Grow it into one scriptable, recording
-test host and move the plugin fakes onto it. Then remove the tests that
-assert a machine's speed. This is the floor M119's typed services and
-every later milestone's tests stand on.
+Grow `bingo_sdk::testing` into one scriptable, recording test host, migrate
+plugin fakes, and remove machine-speed assertions. Keep `HostApi` defaults.
+This is the floor for M119's typed services and later milestone tests.
 
 ## Bricks, in build order
 
-1. **`bingo_sdk::testing::TestHost`** (behind the existing `testing`
-   feature):
-   - records every call (`calls() -> Vec<HostCall>`, an enum with one
-     variant per verb and its arguments);
-   - answers from scripted responses per verb (`on_open(|spec| ...)`,
-     `on_deliver(...)`, …) and otherwise as `NoHost` does;
-   - keeps an in-memory session table (`sessions`, `open`, `close`,
-     `delete`) with `SessionSummary`s a test seeds, and a services map
-     like `ServiceHost`;
-   - `gateway_events()` returns a stream the test drives.
-   Its own tests pin the defaults; the doc comment says which verbs are
-   recorded and which have state.
-2. **Migrate the plugin fakes,** one crate per commit, deleting the local
-   impl: `bingo-agents`, `bingo-rooms`, `bingo-tasks`, `bingo-schedule`,
-   `bingo-skills`, `bingo-checkpoints`, `bingo-permissions`,
-   `bingo-tool-bash`, `bingo-context`, `bingo-demo-ui`, the channels'
-   `host/tests/kernel.rs`, the TUI's `doubles.rs`, `bingo-surface-print`'s
-   test host; also MCP's `tests/server.rs` and plugin-RPC's
-   `tests/plugin/harness.rs` (found on re-verification). Migrate agents
-   and channels last, in separate commits touching only the fake and uses.
-   A fake whose behaviour `TestHost` cannot express without a
-   feature noun stays, with one line saying why.
-3. **Leave the real ones.** `bingo-core/src/host.rs`, `host/unavailable.rs`,
-   `session/commands.rs`, `bingo-surface-rpc/src/client.rs` are
-   implementations, not fakes. `bingo-core/src/test_support*` and the
-   RPC wire test host stay (they drive the real kernel); note in each
-   why it is not `TestHost`.
-4. **No test measures the machine.** Replace speed assertions with
-   behaviour assertions:
-   - `bingo-surface-tui/src/blocks.rs` (`warm < 200 ms`) and
-     `highlight.rs` (`delta < 1 ms`): assert the cache was hit (a counter
-     or `Arc::ptr_eq` on the cached value), not how long it took;
-   - `view.rs`'s per-draw average, if it asserts a bound: same;
-   - liveness checks of the form `started.elapsed() < N s, "it hung"`
-     become `tokio::time::timeout(N, fut)` with the same message, so a
-     slow machine fails only by hanging; list each in the commit body.
-   - Under `tokio::time::pause()` where a test waits on a timer the code
-     owns (chase, wakes, retry backoff), instead of real sleeps.
-5. **The discipline check holds it.** `scripts/check_discipline.sh`
-   warns on a new `impl HostApi for` outside the allowed files and on
-   `elapsed() <` in a test assertion; warnings, not failures, so history
-   is not rewritten (AGENTS.md, Records).
+1. Add `TestHost` behind the existing `testing` feature. Record every verb
+   and argument in `HostCall`; provide per-verb scripts, otherwise `NoHost`
+   defaults. Support a seeded in-memory session table (sessions/open/close/
+   delete), services map and driven gateway stream. Contract tests come first;
+   document recorded verbs and state. No new dependency.
+2. Migrate plugin fakes, one crate per commit: agents, rooms, tasks, schedule,
+   skills, checkpoints, permissions, tool-bash, context, demo-ui, channels,
+   TUI, print, MCP and plugin-RPC. Agents and channels go last, separately,
+   touching only the fake and its uses. Keep a fake only if expressing its
+   behaviour needs a feature noun; add a reason line.
+3. Keep production implementations in core host, unavailable, session commands
+   and RPC client. Retain core test support and RPC wire host with reason
+   comments: they drive kernel/port behaviour. Leave core session/context
+   test bodies alone beyond replacing a fake.
+4. Replace TUI warm/delta/per-draw speed bounds with cache behaviour counters.
+   Replace `elapsed() < N` liveness assertions with `tokio::time::timeout`
+   and the same message; list each in its commit body. Pause Tokio time for
+   owned timers (chase, wakes, retry), preserving already-paused tests.
+5. Add warning-only discipline scans for new qualified/unqualified `HostApi`
+   implementations outside allowed files and elapsed-time test assertions.
 
 ## Files
 
-- `crates/bingo-sdk/src/testing.rs` (or `testing/` if it splits)
-- `crates/bingo-checkpoints/src/lib.rs` qualified `OneSession` test fake
-- the test modules named in brick 2 and their `Cargo.toml`
-  dev-dependencies
-- `crates/bingo-surface-tui/src/{blocks.rs,highlight.rs,view.rs}` tests
-- `crates/bingo-{mcp,plugin-rpc}/tests/` host fakes
-- `crates/bingo-core/src/test_support{.rs,/peers.rs}` and RPC wire
-  host: reason comments only; leave core session/context test bodies alone
-- tests with `elapsed() <` assertions across the workspace, including
-  shell-hook tests and CLI/RPC integration tests
+- `crates/bingo-sdk/src/testing.rs` and `testing/`
+- Test modules/fakes in brick 2 and their `Cargo.toml` dev-dependencies,
+  including checkpoints `src/lib.rs`, MCP `tests/server.rs` and
+  plugin-RPC `tests/plugin/harness.rs`
+- TUI `src/{blocks.rs,highlight.rs,view.rs}` cache tests
+- Core `src/test_support{.rs,/peers.rs}` and RPC wire host: reason comments only
+- Workspace tests with elapsed bounds, including shell hooks and CLI/RPC
 - `crates/bingo-schedule/src/wakes.rs` timer tests
 - `scripts/check_discipline.sh`
 
 ## Exit criteria
 
-- [ ] `rg -l "impl HostApi for" crates` lists only the real
-      implementations, `bingo_sdk::testing`, and fakes each carrying a
-      reason line (list pasted).
-- [ ] `rg -n "elapsed\(\) ?<" crates --glob '**/test*'` and in
-      `#[cfg(test)]` modules: none left that bounds speed (pasted).
-- [ ] Test count does not drop: `cargo test --workspace` totals before
-      and after pasted.
-- [ ] All gates.
+- [x] Host implementations are production, SDK utilities or reasoned exceptions.
+- [x] No remaining test assertion bounds machine speed.
+- [x] Workspace test count does not drop: 4,968 → 4,974; three ignored both times.
+- [ ] All gates: six touched crates' Windows check is blocked by missing SDK headers.
 
 ## Non-goals
 
-- Typed services (M119); changing any `HostApi` verb or default.
-- Rewriting the kernel's own test support or the PTY smoke.
+Typed services (M119), changing HostApi verbs/defaults, rewriting kernel test
+support or PTY smoke. No TUI-visible behaviour changes; smoke is not required.
 
 ## Risks
 
-- A fake may encode behaviour a test relies on that `TestHost` answers
-  differently; port the test's expectation, never loosen the assertion.
-- Migrating 13 crates is wide; one commit per crate keeps each
-  revertible. Run that crate's tests per commit, the full gates at the
-  end.
-- Re-verify at start: recount the impls and the wall-clock assertions.
+- Preserve each fake's assertions; do not loosen behaviour while migrating.
+- Wide migration: separate crate commits, targeted tests, then full gates.
+- **Stop, 2026-10-13 (protocol step 6):** the Windows check for permissions,
+  print, TUI, MCP, channels and bin fails in `aws-lc-sys` because this Mac
+  lacks Windows SDK C headers (`stdlib.h`, `windows.h`). Installing a target
+  SDK or changing native dependencies is outside Files. No workaround applied.
+  Options: run the remaining gate on a provisioned Windows/cross-build runner,
+  or explicitly defer this local gate to Windows CI. M110's deferral does not
+  authorize one for M111. Await the user's decision; M111 is not fully verified.
 
 ## Re-verification (2026-10-13, `3d53863d`)
 
-- All named paths and host symbols exist. `rg -l "impl HostApi for"
-  crates` still finds 23 files; MCP and plugin-RPC fakes were absent from
-  the original migration list. No new dependency is needed.
-- The three TUI speed bounds remain (`warm`, `delta`, per-draw `each`).
-  Liveness bounds also remain in Bash, shell hooks and CLI/RPC tests.
-- Chase/deadline and core retry tests already use paused Tokio time;
-  schedule wakes still poll real time. Preserve existing paused tests.
-- Baseline and final workspace runs run the ACP token reconnect test
-  separately; all cargo commands are sequential.
-- The new advisory scan also finds qualified impls: checkpoints has one
-  `impl bingo_sdk::HostApi for OneSession` in `src/lib.rs`; migrate it too.
+All named paths/symbols exist; unqualified host scan found 23 files. Add MCP
+and plugin-RPC fakes to Files before code. The qualified scan also found
+checkpoints' `OneSession`; include it in the checkpoints migration. Three TUI
+speed bounds and Bash/hooks/CLI/RPC liveness bounds remain. Chase/deadline and
+core retry already pause time; schedule wakes did not. No ADR is named.
+
+## Verified (2026-10-13; incomplete Windows gate)
+
+Commands ran sequentially. Full logs are in ignored `target/m111/`.
+Contracts were committed first (`726c6739`), then the implementation (`f9fc41a5`).
+```text
+$ cargo test -p bingo-sdk --features testing --locked
+error[E0432]: unresolved imports `super::HostCall`, `super::TestHost`
+error: could not compile `bingo-sdk` (lib test) due to 1 previous error
+$ rg -l 'impl (bingo_sdk::)?HostApi for' crates
+crates/bingo-surface-rpc/src/client.rs
+crates/bingo-surface-rpc/tests/wire/host.rs
+crates/bingo-sdk/src/testing.rs
+crates/bingo-sdk/src/testing/api.rs
+crates/bingo-core/src/session/commands.rs
+crates/bingo-core/src/test_support/peers.rs
+crates/bingo-core/src/host.rs
+crates/bingo-core/src/test_support.rs
+crates/bingo-core/src/host/unavailable.rs
+$ rg -n 'elapsed\(\) ?<' crates --glob '**/test*'
+(no matches; exit 1)
+```
+The advisory also scans `#[cfg(test)]` modules: no speed warnings. A synthetic
+fixture proved both advisory warnings. Retained core/RPC fixtures have reasons.
+
+Baseline/final commands (ACP token test explicitly isolated in both):
+```text
+$ cargo test --workspace --locked -- --skip a_token_may_be_dialled_again_once_its_stream_has_closed
+$ cargo test -p bingo-provider-acp --test bridge --locked a_token_may_be_dialled_again_once_its_stream_has_closed -- --exact --test-threads=1
+baseline: 4968 passed; 3 ignored; 1 initial failures
+final: 4974 passed; 3 ignored; 0 initial failures
+```
+Totals sum Cargo result lines. Baseline PTY `look::a_terminal_whose_ground_turns_light_is_followed_within_one_focus`
+failed under load, then passed alone (`--exact --test-threads=1`): `1 passed; 0 failed`.
+Baseline resumed with `--workspace --exclude bingo` and the same ACP skip,
+then `-p bingo --test rooms --test rpc --test thinking --test views` (all locked).
+An earlier final run's rewind PTY failure also passed alone; the last complete
+run (`test-final.log` plus `test-token-final.log`) passed without failures.
+The qualified checkpoints correction also passed all 42 crate tests.
+```text
+$ cargo fmt --all -- --check
+(exit 0; no output)
+$ cargo check --workspace --all-targets --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.25s
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.85s
+$ scripts/check_discipline.sh
+test host and wall-clock advisory checks complete
+discipline ok
+$ scripts/budget.sh
+dependencies (unique, normal): 343 (max  343)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 7 GB (soft max  5)
+warn: target/debug exceeds the soft limit
+test binaries: 91
+budget ok
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+$ cargo check -p bingo-sdk -p bingo-core -p bingo-agents -p bingo-rooms -p bingo-tasks -p bingo-schedule -p bingo-skills -p bingo-checkpoints -p bingo-context -p bingo-demo-ui -p bingo-tool-bash -p bingo-hooks-shell -p bingo-plugin-rpc -p bingo-surface-rpc --all-targets --locked --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.99s
+$ cargo check -p bingo-permissions -p bingo-surface-print -p bingo-surface-tui -p bingo-mcp -p bingo-channels -p bingo --all-targets --locked --target x86_64-pc-windows-msvc
+fatal error: 'stdlib.h' file not found
+fatal error: 'windows.h' file not found
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+(exit 101; stopped under protocol step 6)
+```
