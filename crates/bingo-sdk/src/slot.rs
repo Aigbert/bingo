@@ -221,3 +221,21 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod pull_contract {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn pulled_panes_and_toasts_round_trip() {
+        for wire in [
+            json!({"kind":"pane","id":"counter","title":"Count","focus":true,"closeOnEscape":true,
+                "holdToasts":true,"asked":true,"rows":8,"view":{"request":{"component":"Pane",
+                "requestId":"counter","surface":"terminal","props":{},"viewport":{"columns":80,"rows":8}}}}),
+            json!({"kind":"toast","text":"Saved","until":"2026-10-14T12:00:00Z","alert":false}),
+        ] {
+            let slot: Slot = serde_json::from_value(wire.clone()).unwrap();
+            assert_eq!(serde_json::to_value(slot).unwrap(), wire);
+        }
+    }
+}
