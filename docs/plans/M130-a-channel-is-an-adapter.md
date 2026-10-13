@@ -77,7 +77,7 @@ setting, a flag, the wire or a card.
   `scripts/budget.toml`, `Cargo.lock`
 - `crates/bingo-channels/{Cargo.toml,src/**}`
 - `crates/bingo/{Cargo.toml,src/{main,channels}.rs}`
-- `crates/bingo/tests/{channels.rs,cli/gateway.rs}`
+- `crates/bingo/tests/{channels.rs,channel_claim.rs,cli/gateway.rs,support/mod.rs}`
 - `crates/bingo-gateway/{Cargo.toml,src/{doctor,lib}.rs,tests/claim.rs}`
 - `scripts/feishu-smoke.md`, `docs/adr/0016-*.md`
 
@@ -112,6 +112,7 @@ setting, a flag, the wire or a card.
   or fixtures outside Files may be updated mechanically when they only
   construct or name a changed type; record those paths here. Changes to
   behavior or assertions outside Files still require a protocol stop.
+  `tests/channel_claim.rs` and `tests/support/mod.rs` only gain the loopback switch.
 
 - Re-verified at `eddd0ebc`: M109 claim and M112 transcript folds remain;
   M129 gateway dispatch still constructs `Patient` in `src/lib.rs`, so

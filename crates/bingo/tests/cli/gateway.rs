@@ -83,6 +83,7 @@ impl Gateway {
     fn cmd(&self) -> Command {
         let mut cmd = bingo();
         cmd.envs(home_env(self.path()))
+            .env(bingo_channel_adapter::loopback::ENABLE_ENV, "1")
             .env("BINGO_FAKE_SCRIPT", &self.script)
             .arg("--cwd")
             .arg(self.path())
