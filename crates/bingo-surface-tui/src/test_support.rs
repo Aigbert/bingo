@@ -329,6 +329,7 @@ pub fn delivered(id: &str, surface: &str, principal: Option<&str>, text: &str) -
         ItemBody::User {
             parts: vec![ContentPart::text(text)],
             origin: Origin {
+                voice: None,
                 surface: surface.into(),
                 principal: principal.map(str::to_owned),
                 conversation: None,
@@ -346,6 +347,7 @@ pub fn post(id: &str, principal: &str, text: &str) -> Item {
         ItemBody::User {
             parts: vec![ContentPart::text(text)],
             origin: Origin {
+                voice: None,
                 surface: "room".into(),
                 principal: Some(principal.into()),
                 conversation: Some("#design".into()),
@@ -986,3 +988,7 @@ pub fn busy_child(title: &str) -> Vec<Frame> {
     }
     frames
 }
+
+pub use crate::transcript::slots::fixtures::{
+    with_promotions, with_row, with_skill_row, with_skill_tool_rows,
+};

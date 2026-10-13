@@ -101,7 +101,7 @@ pub async fn publish(host: &HostHandle, session: &SessionId, pending: Option<&Wa
 /// Who a woken turn's input is from: an earlier turn of this same
 /// conversation, and nobody at the keyboard.
 pub fn origin() -> Origin {
-    Origin::surface(SURFACE)
+    Origin::surface(SURFACE).voiced(bingo_sdk::Voice::Note)
 }
 
 #[cfg(test)]
@@ -206,5 +206,13 @@ mod tests {
             crate::runner::SURFACE,
             "a wake is not a scheduled turn: one is read, the other is marked"
         );
+    }
+}
+
+#[cfg(test)]
+mod voice_tests {
+    #[test]
+    fn producer_stamps_its_voice() {
+        assert_eq!(super::origin().voice, Some(bingo_sdk::Voice::Note));
     }
 }

@@ -56,6 +56,7 @@ mod contributor;
 mod expand;
 mod frontmatter;
 mod guide;
+mod hook;
 mod layers;
 mod library;
 mod listing;
@@ -122,6 +123,9 @@ impl Plugin for SkillsPlugin {
         // This plugin's own page reaches the gathering the way every other
         // plugin's does, through the catalogue and the key (ADR-0054 §2).
         registrar.add(guide::contribution(registrar));
+        registrar.add(Contribution::Hook(Arc::new(hook::SkillRows(
+            library.clone(),
+        ))));
         self.library
             .set(library)
             .map_err(|_| PluginError::Failed("the skills plugin registered twice".into()))
@@ -174,7 +178,7 @@ mod plugin_tests {
             .register(&mut registrar)
             .expect("register");
         let contributions = registrar.into_contributions();
-        assert_eq!(contributions.len(), MANIFEST.provides.len());
+        assert_eq!(contributions.len(), MANIFEST.provides.len() + 1);
         assert!(matches!(contributions[0], Contribution::Commands(_)));
         assert!(matches!(contributions[1], Contribution::Tool(_)));
         assert!(matches!(contributions[2], Contribution::Context(_)));

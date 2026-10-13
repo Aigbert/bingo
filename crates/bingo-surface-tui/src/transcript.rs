@@ -17,16 +17,15 @@ use unicode_width::UnicodeWidthStr;
 use crate::clock::{self, Anim, Now};
 use crate::fold::{self, Fold, Folds};
 use crate::graphics::{Decoded, Linked, Picture};
-use crate::skill::{self, Run};
 use crate::tree::{self, Agents};
-use crate::{acp, markdown, memory, paths, theme, thoughts, worked, wrap};
+use crate::{acp, markdown, paths, theme, thoughts, worked, wrap};
 
 /// What was said into a session: a person's line, a subsystem's notice, a
 /// room's conversation.
 mod said;
 
 /// Producer replacements for individual transcript rows.
-mod slots;
+pub(crate) mod slots;
 
 /// What is under a tool row: its output, folded to what a row can spare.
 mod output;
@@ -42,7 +41,7 @@ use output::{folded, kept, plain, tail};
 pub use ran::whole as shell_whole;
 pub use thinking::thought;
 
-pub(crate) use said::quiet;
+pub(crate) use said::voice;
 
 /// How long the comet tail of a block still arriving takes to cool (§6).
 pub const COMET: Duration = Duration::from_millis(180);
@@ -89,11 +88,6 @@ pub struct Rows<'a> {
     /// How much of each block a person opened or shut; everything else wears
     /// its kind's own start ([`crate::fold`]).
     pub folds: &'a Folds,
-    /// The commands catalogue the surface read from the host, which is where a
-    /// `/name` says what family it belongs to — the one way a row can tell a
-    /// skill from another command that answers with a prompt
-    /// ([`crate::skill`]).
-    pub commands: &'a [CommandSpec],
     /// The frame being drawn: what every cue below is a function of.
     pub now: Now,
     /// The pictures already turned into pixels. A row that draws one has to
@@ -106,9 +100,6 @@ pub struct Rows<'a> {
     pub linked: &'a Linked,
     /// Plugin placements read from this frame's folded session.
     pub slots: Vec<bingo_sdk::slot::Placed>,
-    /// Where the session's memories are (M84), read from what the memory
-    /// plugin publishes: a call on one of them is drawn as remembering.
-    pub memory: memory::Directories,
     /// What the session in view is called. A post says which room it came
     /// from, and the room's own transcript is the one place that says nothing.
     pub title: Option<&'a str>,
@@ -139,7 +130,7 @@ impl<'a> Rows<'a> {
         state: &'a SessionState,
         width: usize,
         folds: &'a Folds,
-        commands: &'a [CommandSpec],
+        _commands: &'a [CommandSpec],
         pictures: &'a Decoded,
         linked: &'a Linked,
         now: Now,
@@ -148,12 +139,10 @@ impl<'a> Rows<'a> {
             cwd: &state.summary.cwd,
             width,
             folds,
-            commands,
             now,
             pictures,
             linked,
             slots: bingo_sdk::slot::placed(state),
-            memory: memory::of(state),
             title: state.summary.title.as_deref(),
             driver: state.summary.driver,
             update: None,
@@ -355,7 +344,7 @@ fn item_lines(
 ) -> Block {
     let block = default_item_lines(item, place, agents, rows, cue, fold);
     match rows.placed_on(&item.id).next_back() {
-        Some(slot) => slots::placed_row(item, slot, rows, block),
+        Some(slot) => slots::placed_row(item, slot, rows, cue, block),
         None => block,
     }
 }
@@ -470,8 +459,7 @@ fn called(
             })
             .unwrap_or_default();
     }
-    let (name, about) = memory::call(name, input, rows.cwd, &rows.memory)
-        .unwrap_or_else(|| (name.as_str(), summarize(input)));
+    let about = summarize(input);
     match agents.get(&item.id) {
         Some(child) => child_row(child, input, rows),
         None => tool_call(
@@ -482,7 +470,6 @@ fn called(
                 output: output.as_ref(),
                 progress: progress.as_deref(),
                 fold,
-                run: skill::of(item, rows.commands),
             },
             rows,
             cue,
@@ -513,7 +500,6 @@ fn agent_call(call: acp::Call, fold: Fold, rows: &Rows<'_>, cue: Cue) -> Vec<Lin
             output: output.as_ref(),
             progress: None,
             fold,
-            run: None,
         },
         rows,
         cue,
@@ -673,46 +659,17 @@ struct Call<'a> {
     progress: Option<&'a str>,
     /// How much of what came back is shown.
     fold: Fold,
-    /// The skill this call is, when it is one: the row is the run's, not the
-    /// tool's, and what came back still hangs under it.
-    run: Option<Run<'a>>,
-}
-
-/// The row one skill run wears, whichever door it came through: the model's
-/// `Skill(guide)` call and a person's own `/guide` are the same thing
-/// happening, so this is the only place either is drawn (design §4).
-///
-/// The mark is the skill's own glyph in the bullet's place, in the colour the
-/// bullet would have worn: what kind of row it is and what state it is in are
-/// two facts, and each keeps its own carrier.
-fn skill_row(run: Run<'_>, style: Style, rows: &Rows<'_>, landing: Landing) -> Vec<Line<'static>> {
-    marked(theme::skill(), style, vec![asked(run, rows, landing)], rows)
-}
-
-/// `Skill(guide) the wire format`: the call as any tool row spells one, then
-/// the free text the skill was given — outside the parentheses, because it is
-/// what the skill reads and not what it is.
-fn asked(run: Run<'_>, rows: &Rows<'_>, landing: Landing) -> Line<'static> {
-    let mut line = signature(skill::TOOL, run.name, rows, landing);
-    if !run.args.is_empty() {
-        line.spans
-            .push(Span::styled(format!(" {}", run.args), landing.about()));
-    }
-    line
 }
 
 fn tool_call(call: Call<'_>, rows: &Rows<'_>, cue: Cue) -> Vec<Line<'static>> {
     let failed = call.status.failed(call.output);
     let style = live_bullet(call.status, failed, rows);
     let landing = Landing::of(cue, failed, rows);
-    let mut out = match call.run {
-        Some(run) => skill_row(run, style, rows, landing),
-        None => speaks(
-            style,
-            vec![signature(call.name, &call.about, rows, landing)],
-            rows,
-        ),
-    };
+    let mut out = speaks(
+        style,
+        vec![signature(call.name, &call.about, rows, landing)],
+        rows,
+    );
     out.extend(result(&call, rows));
     out
 }
@@ -1016,17 +973,26 @@ mod tests {
     /// The same items in a surface whose catalogue files `guide` under the
     /// skills, which is how a `/guide` line is known to be one.
     fn drawn_knowing_the_skill(items: Vec<Item>) -> Vec<String> {
-        rendered_with(&stated(items), &Folds::new(), &catalogue())
+        rendered_with(
+            &crate::test_support::with_skill_row(
+                stated(items),
+                "itm_1",
+                "guide",
+                "the wire format",
+            ),
+            &Folds::new(),
+            &catalogue(),
+        )
     }
 
     fn stated(items: Vec<Item>) -> SessionState {
-        folded(
+        crate::test_support::with_skill_tool_rows(folded(
             items
                 .into_iter()
                 .enumerate()
                 .map(|(i, item)| frame(i as u64 + 1, Event::ItemCompleted { item }))
                 .collect(),
-        )
+        ))
     }
 
     fn catalogue() -> Vec<CommandSpec> {
@@ -1091,7 +1057,25 @@ mod tests {
                 .enumerate()
                 .map(|(i, item)| frame(i as u64 + 2, Event::ItemCompleted { item })),
         );
-        let lines = rendered(&folded(frames));
+        let mut state = folded(frames);
+        for (item, title, badge) in [
+            ("itm_1", "Recall from memory", "the-build"),
+            ("itm_2", "Write memory", "MEMORY.md"),
+        ] {
+            state = crate::test_support::with_row(
+                state,
+                bingo_sdk::slot::Slot::Row {
+                    item: ItemId::from_raw(item),
+                    mark: None,
+                    title: Some(title.into()),
+                    badge: Some(badge.into()),
+                    caption: None,
+                    body: None,
+                    actions: vec![],
+                },
+            );
+        }
+        let lines = rendered(&state);
         assert!(
             lines
                 .iter()
@@ -1325,10 +1309,7 @@ mod tests {
     /// else — so it is the one member of the set that draws no row here.
     #[test]
     fn every_quiet_surface_is_a_marked_line_and_nothing_else_is() {
-        for surface in said::QUIET_SURFACES
-            .iter()
-            .filter(|surface| **surface != said::ROOMS)
-        {
+        for surface in ["agent", "bash", "command", "schedule"] {
             assert_eq!(
                 drawn(vec![delivered("itm_1", surface, None, "it ended")]),
                 vec!["⏺ it ended".to_string()],
@@ -1336,7 +1317,7 @@ mod tests {
             );
         }
         assert!(
-            drawn(vec![delivered("itm_1", said::ROOMS, None, "it ended")]).is_empty(),
+            drawn(vec![delivered("itm_1", "room", None, "it ended")]).is_empty(),
             "and the room's own is not drawn in a member at all"
         );
         for loud in ["tui", "print", "rpc", "acp", "channels", "brand-new"] {
@@ -1356,7 +1337,7 @@ mod tests {
         assert_eq!(
             drawn(vec![delivered(
                 "itm_1",
-                said::WAKE,
+                "wake",
                 None,
                 "check the build again\nand say what you find",
             )]),

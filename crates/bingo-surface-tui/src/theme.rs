@@ -93,9 +93,6 @@ pub enum Colors {
 pub struct Glyphs {
     /// What the model says and does, and what a session is.
     pub bullet: &'static str,
-    /// A skill run, in the bullet's place — one cell, so nothing under the row
-    /// shifts.
-    pub skill: &'static str,
     /// What came back.
     pub connector: &'static str,
     /// What you said.
@@ -131,7 +128,6 @@ pub struct Glyphs {
 
 pub const UNICODE: Glyphs = Glyphs {
     bullet: "⏺",
-    skill: "❖",
     connector: "⎿",
     user: ">",
     cursor: "❯",
@@ -156,7 +152,6 @@ pub const UNICODE: Glyphs = Glyphs {
 /// so the glyph is what a glance finds and never the only place the fact is.
 pub const ASCII: Glyphs = Glyphs {
     bullet: "*",
-    skill: "*",
     connector: "-",
     user: ">",
     cursor: ">",
@@ -946,11 +941,14 @@ pub fn bullet() -> &'static str {
     glyphs().bullet
 }
 
-/// A skill run, in the bullet's place: `❖ Skill(guide) …` (design §4). The
-/// diamond is not one of the sparkle's four — those are bingo working — and
-/// not a circle, so a skill is found by shape before it is read.
-pub fn skill() -> &'static str {
-    glyphs().skill
+/// A producer's one-cell mark follows the terminal's glyph capabilities.
+pub fn row_mark(mark: char) -> String {
+    use unicode_width::UnicodeWidthChar;
+    if mark.width() != Some(1) || (bullet().is_ascii() && !mark.is_ascii()) {
+        bullet().to_string()
+    } else {
+        mark.to_string()
+    }
 }
 
 /// What came back: `⎿` at column 2, its text at 5.
@@ -1631,7 +1629,7 @@ mod tests {
             assert_eq!(sparkle(std::time::Duration::ZERO), "+");
             assert_eq!(border().top_left, "+");
             assert_eq!(ellipsis(), "...");
-            assert_eq!(skill(), "*", "and a skill says so in words instead");
+            assert_eq!(row_mark('❖'), "*", "and a skill says so in words instead");
             assert_eq!(caret(), "|");
             assert_eq!(rule(), "-", "the rule is the box's own stroke");
         });
@@ -1649,7 +1647,7 @@ mod tests {
             },
             ascii(),
         ] {
-            with(look, || assert_eq!(skill().width(), bullet().width()));
+            with(look, || assert_eq!(row_mark('❖').width(), bullet().width()));
         }
     }
 

@@ -12,6 +12,7 @@ description = "Full-screen terminal surface plugin for bingo"
 workspace = true
 
 [dependencies]
+bingo-collab.workspace = true
 bingo-sdk.workspace = true
 tokio.workspace = true
 futures.workspace = true

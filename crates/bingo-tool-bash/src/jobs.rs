@@ -205,6 +205,7 @@ enum Named {
 /// read after it ends as often as while it runs.
 #[derive(Debug, Default)]
 pub struct Jobs {
+    pub promotions: Arc<crate::promote::Promotions>,
     table: Mutex<BTreeMap<String, Arc<Job>>>,
 }
 
@@ -317,7 +318,8 @@ impl Jobs {
             .iter()
             .map(|job| vec![job.id.clone(), head(&job.command), job.since.clone()])
             .collect();
-        if rows.is_empty() {
+        let foreground = self.promotions.rows(session);
+        if rows.is_empty() && foreground.is_empty() {
             return Value::Null;
         }
         let view = View::Table {
@@ -337,15 +339,18 @@ impl Jobs {
             tone: bingo_sdk::Tone::Neutral,
             until: None,
         };
-        let slots =
-            std::iter::once(status).chain(running.iter().map(|job| bingo_sdk::slot::Slot::Row {
+        let slots = std::iter::once(status)
+            .filter(|_| !running.is_empty())
+            .chain(running.iter().map(|job| bingo_sdk::slot::Slot::Row {
+                caption: None,
                 item: job.item.clone(),
                 mark: None,
                 title: None,
                 badge: None,
                 body: Some(View::text("Running in the background")),
                 actions: vec![],
-            }));
+            }))
+            .chain(foreground);
         bingo_sdk::slot::with(serde_json::to_value(view).unwrap_or(Value::Null), slots)
     }
 

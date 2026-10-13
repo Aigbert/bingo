@@ -235,10 +235,22 @@ pub enum CloseReason {
     Error { message: String },
 }
 
+/// How a producer intends an utterance to be drawn.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Voice {
+    Said,
+    Note,
+    Quiet,
+    Aside,
+}
+
 /// Who submitted the input, as every surface records it.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Origin {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voice: Option<Voice>,
     pub surface: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub principal: Option<String>,
@@ -247,6 +259,11 @@ pub struct Origin {
 }
 
 impl Origin {
+    pub fn voiced(mut self, voice: Voice) -> Self {
+        self.voice = Some(voice);
+        self
+    }
+
     /// Model context, not a person's utterance or an agent's reply.
     pub fn is_context(&self) -> bool {
         self.surface.starts_with(CONTRIBUTOR_PREFIX)
@@ -254,6 +271,7 @@ impl Origin {
 
     pub fn surface(name: impl Into<String>) -> Self {
         Self {
+            voice: None,
             surface: name.into(),
             principal: None,
             conversation: None,

@@ -23,7 +23,6 @@ use ratatui::text::Line;
 use crate::clock::Now;
 use crate::fold::{self, Fold};
 use crate::graphics::Picture;
-use crate::skill;
 use crate::transcript::{self, Cue, Place, Rows};
 use crate::tree::Agents;
 use crate::welcome;
@@ -42,11 +41,6 @@ struct Revision {
     /// How much of the block is shown: what `ctrl+o` and a click both set, and
     /// the start its kind has until they do.
     fold: Fold,
-    /// Whether the catalogue calls this run a skill, which decides the row's
-    /// mark and its signature ([`crate::skill`]). The catalogue is fetched
-    /// after the first frames are drawn and read again whenever the host
-    /// rebuilds it, so a block drawn before it landed has to be drawn again.
-    skill: bool,
     /// How many pictures the words named have been read in so far (M51). A
     /// block that drew a chip for one is a different block once it has
     /// arrived, and the arrival is the only thing that says so — it is not in
@@ -84,7 +78,6 @@ fn revision(
         fold,
         run: place.run.len(),
         last: !place.joined,
-        skill: skill::of(item, rows.commands).is_some(),
         linked: rows.linked.answers(),
         slots: rows.placed_on(&item.id).cloned().collect(),
         look: crate::theme::current(),

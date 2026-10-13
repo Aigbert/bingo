@@ -28,18 +28,33 @@ pub const ACTION: &str = "bash.promote";
 /// The foreground calls that can still be taken into the background.
 #[derive(Debug, Default)]
 pub struct Promotions {
-    open: Mutex<BTreeMap<String, CancellationToken>>,
+    open: Mutex<BTreeMap<String, Foreground>>,
+}
+
+#[derive(Debug, Clone)]
+struct Foreground {
+    token: CancellationToken,
+    session: bingo_sdk::SessionId,
+    item: bingo_sdk::ItemId,
 }
 
 impl Promotions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Listen for a promotion of `call` until the guard is dropped.
-    pub fn listen(self: &Arc<Self>, call: &str) -> Listener {
+    pub fn listen(
+        self: &Arc<Self>,
+        call: &str,
+        session: &bingo_sdk::SessionId,
+        item: &bingo_sdk::ItemId,
+    ) -> Listener {
         let token = CancellationToken::new();
-        self.locked().insert(call.to_string(), token.clone());
+        self.locked().insert(
+            call.to_string(),
+            Foreground {
+                token: token.clone(),
+                session: session.clone(),
+                item: item.clone(),
+            },
+        );
         Listener {
             promotions: self.clone(),
             call: call.to_string(),
@@ -52,7 +67,7 @@ impl Promotions {
         let Some(token) = self.locked().get(call.trim()).cloned() else {
             return false;
         };
-        token.cancel();
+        token.token.cancel();
         true
     }
 
@@ -61,7 +76,30 @@ impl Promotions {
         self.locked().keys().cloned().collect()
     }
 
-    fn locked(&self) -> std::sync::MutexGuard<'_, BTreeMap<String, CancellationToken>> {
+    pub fn rows(&self, session: &bingo_sdk::SessionId) -> Vec<bingo_sdk::slot::Slot> {
+        self.locked()
+            .iter()
+            .filter(|(_, call)| &call.session == session && !call.token.is_cancelled())
+            .map(|(id, call)| bingo_sdk::slot::Slot::Row {
+                caption: None,
+                item: call.item.clone(),
+                mark: None,
+                title: None,
+                badge: None,
+                body: None,
+                actions: vec![bingo_sdk::ActionItem {
+                    label: "background".into(),
+                    action: bingo_sdk::Action {
+                        name: ACTION.into(),
+                        args: serde_json::Value::String(id.clone()),
+                    },
+                    key: Some('b'),
+                }],
+            })
+            .collect()
+    }
+
+    fn locked(&self) -> std::sync::MutexGuard<'_, BTreeMap<String, Foreground>> {
         self.open.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
@@ -139,9 +177,38 @@ mod tests {
 
     #[test]
     fn a_listening_call_is_promoted_by_name() {
-        let promotions = Arc::new(Promotions::new());
-        let listener = promotions.listen("call_1");
+        let promotions = Arc::new(Promotions::default());
+        let listener = promotions.listen(
+            "call_1",
+            &bingo_sdk::SessionId::from_raw("ses_1"),
+            &bingo_sdk::ItemId::from_raw("call_1"),
+        );
         assert_eq!(promotions.open(), ["call_1"]);
+        let rows = promotions.rows(&bingo_sdk::SessionId::from_raw("ses_1"));
+        assert_eq!(
+            rows,
+            [bingo_sdk::slot::Slot::Row {
+                item: bingo_sdk::ItemId::from_raw("call_1"),
+                mark: None,
+                title: None,
+                badge: None,
+                caption: None,
+                body: None,
+                actions: vec![bingo_sdk::ActionItem {
+                    label: "background".into(),
+                    action: bingo_sdk::Action {
+                        name: "bash.promote".into(),
+                        args: serde_json::json!("call_1"),
+                    },
+                    key: Some('b'),
+                }],
+            }]
+        );
+        assert!(
+            promotions
+                .rows(&bingo_sdk::SessionId::from_raw("other"))
+                .is_empty()
+        );
         assert!(!listener.token().is_cancelled());
         assert!(promotions.promote("call_1"));
         assert!(listener.token().is_cancelled());
@@ -149,24 +216,36 @@ mod tests {
 
     #[test]
     fn a_call_nobody_is_running_is_not_promoted() {
-        let promotions = Arc::new(Promotions::new());
+        let promotions = Arc::new(Promotions::default());
         assert!(!promotions.promote("call_1"));
         assert!(promotions.open().is_empty());
     }
 
     #[test]
     fn a_call_that_has_ended_can_no_longer_be_promoted() {
-        let promotions = Arc::new(Promotions::new());
-        drop(promotions.listen("call_1"));
+        let promotions = Arc::new(Promotions::default());
+        drop(promotions.listen(
+            "call_1",
+            &bingo_sdk::SessionId::from_raw("ses_1"),
+            &bingo_sdk::ItemId::from_raw("call_1"),
+        ));
         assert!(!promotions.promote("call_1"));
         assert!(promotions.open().is_empty());
     }
 
     #[test]
     fn two_calls_are_promoted_apart() {
-        let promotions = Arc::new(Promotions::new());
-        let one = promotions.listen("call_1");
-        let two = promotions.listen("call_2");
+        let promotions = Arc::new(Promotions::default());
+        let one = promotions.listen(
+            "call_1",
+            &bingo_sdk::SessionId::from_raw("ses_1"),
+            &bingo_sdk::ItemId::from_raw("call_1"),
+        );
+        let two = promotions.listen(
+            "call_2",
+            &bingo_sdk::SessionId::from_raw("ses_1"),
+            &bingo_sdk::ItemId::from_raw("call_2"),
+        );
         assert!(promotions.promote(" call_2 "), "a name is trimmed");
         assert!(!one.token().is_cancelled());
         assert!(two.token().is_cancelled());
@@ -187,20 +266,28 @@ mod tests {
 
     #[tokio::test]
     async fn the_command_flips_the_call_it_names() {
-        let promotions = Arc::new(Promotions::new());
-        let listener = promotions.listen("call_1");
+        let promotions = Arc::new(Promotions::default());
+        let listener = promotions.listen(
+            "call_1",
+            &bingo_sdk::SessionId::from_raw("ses_1"),
+            &bingo_sdk::ItemId::from_raw("call_1"),
+        );
         assert_eq!(fired(&promotions, "call_1").await, "backgrounding it");
         assert!(listener.token().is_cancelled());
     }
 
     #[tokio::test]
     async fn the_command_says_why_it_promoted_nothing() {
-        let promotions = Arc::new(Promotions::new());
+        let promotions = Arc::new(Promotions::default());
         assert_eq!(
             fired(&promotions, "call_1").await,
             "no shell command is running"
         );
-        let _listening = promotions.listen("call_1");
+        let _listening = promotions.listen(
+            "call_1",
+            &bingo_sdk::SessionId::from_raw("ses_1"),
+            &bingo_sdk::ItemId::from_raw("call_1"),
+        );
         assert_eq!(
             fired(&promotions, "call_2").await,
             "no shell command is running as `call_2`"
@@ -213,7 +300,7 @@ mod tests {
 
     #[test]
     fn the_command_runs_during_a_turn_and_takes_the_call_id() {
-        let spec = PromoteCommand::new(Arc::new(Promotions::new())).spec();
+        let spec = PromoteCommand::new(Arc::new(Promotions::default())).spec();
         assert_eq!(spec.name, ACTION);
         assert!(spec.instant, "there is only anything to promote mid-turn");
         assert_eq!(spec.family, "shell");

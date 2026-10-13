@@ -192,6 +192,7 @@ pub(crate) async fn say(
     let input = Input::text(
         text,
         Origin {
+            voice: Some(bingo_sdk::Voice::Said),
             surface: SURFACE.into(),
             principal: Some(author.to_string()),
             conversation: None,
@@ -209,6 +210,7 @@ pub(crate) async fn nudge(host: &HostHandle, seat: &SessionId, title: &str, said
     let input = Input::text(
         said,
         Origin {
+            voice: Some(bingo_sdk::Voice::Aside),
             surface: SURFACE.into(),
             principal: None,
             conversation: Some(title.to_string()),
@@ -463,6 +465,7 @@ mod tests {
         assert_eq!(text, unread("#design"));
         assert!(!text.contains("look again"), "{text}");
         assert_eq!(origin.surface, SURFACE);
+        assert_eq!(origin.voice, Some(bingo_sdk::Voice::Aside));
         assert_eq!(origin.principal, None, "a nudge is nobody's post");
         assert_eq!(origin.conversation.as_deref(), Some("#design"));
     }
@@ -628,6 +631,7 @@ pub(crate) async fn write(
         bingo_sdk::Input::text(
             text,
             bingo_sdk::Origin {
+                voice: None,
                 surface: "agent".into(),
                 principal: Some(author.into()),
                 conversation: None,

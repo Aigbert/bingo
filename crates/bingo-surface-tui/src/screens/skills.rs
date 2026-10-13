@@ -36,29 +36,39 @@ const ANSWER: &str = "One `Event` enum, one ordered stream per session.";
 /// The person's door: the `/guide` line the kernel put at the head of the
 /// prompt, with the page it expanded to under it.
 fn typed() -> bingo_sdk::SessionState {
-    folded(vec![
-        item(1, delivered("itm_1", "command", None, SKILL_PROMPT)),
-        item(2, assistant("itm_2", ANSWER, ItemStatus::Completed)),
-    ])
+    with_skill_row(
+        folded(vec![
+            item(1, delivered("itm_1", "command", None, SKILL_PROMPT)),
+            item(2, assistant("itm_2", ANSWER, ItemStatus::Completed)),
+        ]),
+        "itm_1",
+        "guide",
+        "the wire format",
+    )
 }
 
 /// The model's door: the `Skill` call names the skill and hands it the same
 /// words, and the body comes back as the call's output.
 fn called() -> bingo_sdk::SessionState {
-    folded(vec![
-        item(1, user("itm_1", "read the guide on the wire format")),
-        item(
-            2,
-            tool(
-                "itm_2",
-                "Skill",
-                json!({"name": "guide", "arguments": "the wire format"}),
-                Some(ToolOutput::text(body())),
-                ItemStatus::Completed,
+    with_skill_row(
+        folded(vec![
+            item(1, user("itm_1", "read the guide on the wire format")),
+            item(
+                2,
+                tool(
+                    "itm_2",
+                    "Skill",
+                    json!({"name": "guide", "arguments": "the wire format"}),
+                    Some(ToolOutput::text(body())),
+                    ItemStatus::Completed,
+                ),
             ),
-        ),
-        item(3, assistant("itm_3", ANSWER, ItemStatus::Completed)),
-    ])
+            item(3, assistant("itm_3", ANSWER, ItemStatus::Completed)),
+        ]),
+        "itm_2",
+        "guide",
+        "the wire format",
+    )
 }
 
 /// The skill's page without the line that asked for it: what the command's

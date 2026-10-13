@@ -50,6 +50,7 @@ pub fn query() -> (SessionSummary, TurnId, HostHandle) {
 /// one session, one turn, one directory, and nothing that answers.
 pub fn hook_context() -> bingo_sdk::HookContext {
     bingo_sdk::HookContext {
+        item: None,
         session: bingo_sdk::SessionId::from_raw("ses_1"),
         turn: Some(TurnId::from_raw("trn_1")),
         cwd: "/work".into(),

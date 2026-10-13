@@ -2,119 +2,69 @@
 
 ## Goal
 
-ADR-0070 §4, §5 and §7, and ADR-0071 §4. After M121 the TUI still
-reads four producers by name: the memory directories
-(`_bingo.context`/`memory`), the `Skill` tool and the `skill` command
-family, the rooms records (`seats.rs`, `roster.rs`, `mentions.rs`),
-and the Bash call it promotes (`input.rs`). It also decides how a line
-was said from a closed list of producers' surface words
-(`transcript/said.rs`). Each producer now stamps a voice or places a
-`Row`, the room records are read through `bingo-collab`, and a
-discipline check keeps plugin ids and tool names out of TUI production
-code. No `HostApi` verb, no new external dependency.
+Implement ADR-0070 §§4–5,7 and ADR-0071 §4: producers stamp voices and place rows;
+the TUI reads navigation through `bingo-collab` and names no plugin or tool.
+No new host verb or external dependency.
 
 ## Bricks, in build order
 
-1. **Contract tests first**, failing:
-   - sdk: `Voice` round-trips to golden JSON; an `Origin` without
-     `voice` reads as before (M113's origin fixture, unchanged);
-   - TUI `said.rs`: a stamped voice wins over the surface; a voiceless
-     origin with a legacy surface word reads as it did; any other
-     voiceless origin is `Said`;
-   - a `Row` with `title`, `badge` and `actions` draws in one rendering
-     test, with a fake plugin named nowhere in the TUI;
-   - collab readers over M122's room fixtures give the seat columns,
-     the unread counts and the `@` targets the TUI shows today.
-2. **`Origin.voice: Option<Voice>`** (`bingo-sdk/src/event.rs`),
-   omitted when `None`, with `Origin::voiced(Voice)`. Variants `Said`,
-   `Note`, `Quiet`, `Aside`, as ADR-0070 §4 defines them.
-3. **Producers stamp.** Each sets the voice it means, with a test beside
-   its origin:
-   - `Quiet`: agents `message::origin`; bash `notify.rs`; schedule
-     `runner.rs`; core's command prompt (`session/commands.rs`,
-     `Invocation::of`).
-   - `Note`: schedule `wake.rs` `origin()`.
-   - `Aside`: rooms' nudge and the serial bounce (`post.rs`, `serial.rs`
-     after M122).
-   - `Said`: channels `runner.rs` and agents `hook.rs`, explicitly.
-   - Contributor pieces carry none: `Origin::is_context` already omits
-     them, so `ContextPiece` is unchanged.
-4. **The TUI reads the voice.** `said::voice(origin)` replaces `quiet`.
-   `QUIET_SURFACES`, `ROOMS` and `WAKE` become one private table for
-   voiceless records, frozen; `ROOMS_READING` goes, since
-   `transcript.rs` already drops context. The pending area
-   (`activity.rs`) asks `voice` too.
-5. **`HookContext.item: Option<ItemId>`.** The gate sets it for
-   `before_tool` from `GateInput.item`, and `after_tool_hooks` from the
-   outcome's item. Every other construction says `None`.
-6. **Memory places.** `bingo-context` gains a `before_tool` hook
-   (matcher `Read|Write|Edit`). When the path's parent is a memory
-   directory, it extends `row:<item>` with
-   `Row { item, title: verb, badge: memory name }`. The verbs and the
-   name rule move from `memory.rs` with its tests. The `memory`
-   directories record stays for the model's prompt and the guide.
-7. **Skill places.** Both doors place the same `Row { mark: '❖',
-   title: "Skill", badge: name, body: args }` under `row:<item>`: the
-   `Skill` tool on `ToolContext.item` when it runs, and a new skills
-   hook at `on_turn(Start)` on the prompt item when its first line is
-   one of the plugin's own `/name`s. Both doors keep today's `❖`; the
-   TUI draws the mark ADR-0070 §1 gives `Row`, and names no skill.
-8. **Promote is a placed action.** Bash's jobs signal gains one `Row`
-   per foreground call in flight, with the action
-   `{ label: "background", action: Action { name: "bash.promote",
-   args: call_id }, key: Some('b') }`. ctrl+b fires the newest
-   unfinished item's placed action keyed `b`. `PROMOTE` and
-   `running_shell` go; `NOTHING_RUNNING` stays the TUI's word.
-9. **Rooms through `bingo-collab`.** The TUI depends on `bingo-collab`
-   (a plugin may depend on a library). `seats.rs` keeps `Seat`,
-   `Counts` and their drawing, and loses `PLUGIN`, the kind and column
-   constants and the parsing, which become collab readers beside the
-   types M122 moved. `roster.rs` and `mentions.rs` read through them;
-   `HOLDER` is `bingo_collab::room::HOLDER`.
-10. **The check.** `check_discipline.sh` gains 4f: in
-    `crates/bingo-surface-tui/src`, cut at `#[cfg(test)]` and skipping
-    the modules `lib.rs` declares under `#[cfg(test)]` (`doubles`,
-    `motion`, `painted`, `screens`, `test_lanes`, `test_support`), it
-    fails on a `"bingo.`/`"_bingo.` literal and on a quoted 4c tool
-    name. It allows the TUI's own manifest id and `acp.rs` (ADR-0076).
-    Seed a violation by hand to watch it fail.
-11. **Records.** `docs/design/tui.md` §4 and §8 say who places the
-    memory row, the skill row and the promote key. ADR-0070 is accepted
-    for §4, §5 and §7, ADR-0071 for §4; ADR-0034 §3 and ADR-0044 get
-    dated notes.
+1. Contract first: golden `Voice`, unchanged legacy `Origin`, optional
+   `Row.caption` wire/schema tests, stranger rendering and collab room fixtures.
+2. Add optional `Origin.voice`, omitted when absent, and `Origin::voiced`.
+3. Stamp producers beside their records: agents message, bash notification,
+   schedule runner and command prompt are `Quiet`; wake is `Note`; room
+   nudge is `Aside`; channels and agents' submit hook are explicitly `Said`.
+   Context pieces remain unstamped; M122's serial bounce is a tool result.
+4. TUI `said::voice` reads the stamp, then the frozen `LEGACY_VOICES` table,
+   else `Said`; pending activity uses the same reader. Remove old constants.
+5. `HookContext.item` is populated for before/after tool hooks from the
+   gated/outcome item (including M131 `chain/tool.rs`); otherwise `None`.
+6. Memory's before-tool hook filters `Read`/`Write`/`Edit`, reads its own
+   directories, and extends `row:<item>` with its verb/title and memory badge.
+   Keep directories for the prompt/guide; move naming rules and tests here.
+7. Both skill doors publish `Row { mark: '❖', title: "Skill", badge: name,
+   caption: args, body: None }`: tool execution and the turn-start hook for
+   its own `/name` prompt. Caption defaults to absent and is omitted when
+   absent on wire. `Row.body` keeps replacement semantics (user, 2026-10-13).
+8. Bash jobs place foreground rows with `background`, `bash.promote`, the
+   call id and key `b`. Ctrl+B fires the newest unfinished item's placed
+   action; remove the TUI's promote/tool-name lookup, keep `NOTHING_RUNNING`.
+9. Move room record parsing into `bingo-collab` readers. TUI seats, roster
+   and mentions consume library types/constants, retaining their drawing.
+10. Discipline 4f rejects quoted plugin ids and 4c tool names in production
+    TUI code; exclude cfg(test) modules, its manifest id and ADR-0076 `acp.rs`.
+    Seed violations to prove failure. Keep all screen snapshots unchanged.
+11. Record ownership in design/tui.md §§4,8; accept ADR-0070 §§4–5,7 and
+    ADR-0071 §4, with dated amendments to ADR-0034 §3 and ADR-0044.
 
 ## Files
 
-- `crates/bingo-sdk/src/{event.rs,hook.rs,slot.rs}`, `fixtures/`
-- `crates/bingo-core/src/{gate.rs,turn.rs,session.rs,session/commands.rs,session/invoke.rs}`
+- `crates/bingo-sdk/src/{event.rs,hook.rs,slot.rs}`, `fixtures/`; generated `schema/{plugin,rpc}.json`
+- `crates/bingo-core/src/{gate.rs,turn.rs,chain/tool.rs,session.rs,session/commands.rs,session/invoke.rs}`
 - `crates/bingo-context/src/{lib.rs,memory/mod.rs}`, a new `memory/row.rs`
 - `crates/bingo-skills/src/{lib.rs,tool.rs}`, a new `hook.rs`
-- `crates/bingo-tool-bash/src/{jobs,notify,lib}.rs`
+- `crates/bingo-tool-bash/src/{jobs,promote,notify,lib}.rs`
 - `crates/bingo-agents/src/{message,hook}.rs`, `crates/bingo-rooms/src/{post,serial}.rs`,
   `crates/bingo-schedule/src/{wake,runner}.rs`, `crates/bingo-channels/src/runner.rs`
-- `crates/bingo-collab/src/room.rs` (readers)
-- `crates/bingo-surface-tui/{Cargo.toml,src/{transcript,transcript/said,pager,blocks,input,seats,roster,mentions,activity}.rs}`;
-  `{memory,skill}.rs` deleted; `screens.rs`, `test_support.rs`
+- `crates/bingo-collab/src/room.rs` and `room/readers.rs` (readers)
+- `crates/bingo-surface-tui/{Cargo.toml,src/{transcript,transcript/said,transcript/slots,pager,blocks,input,seats,roster,mentions,activity,theme}.rs}`;
+  `{memory,skill}.rs` deleted; `screens.rs`, `screens/skills.rs`, `screens/colours.rs`, `test_support.rs`, `lib.rs`
+- `Cargo.lock` (TUI library dependency); mechanical `Origin`/`HookContext`
+  constructors in core, checkpoints, provider-acp, hooks-shell, plugin-rpc,
+  agents, rooms, context, schedule and bin tests; `test_lanes.rs` adds only absent captions.
 - `scripts/check_discipline.sh`, `docs/design/tui.md`,
   `docs/adr/{0034,0044,0070,0071}-*.md`
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-sdk voice` passes; the failing first run is pasted.
-- [ ] `rg '"_?bingo\.' crates/bingo-surface-tui/src --glob '!**/tests/**'`
-      finds nothing outside `#[cfg(test)]` code but the TUI's own
-      manifest id, and check 4f fails on a seeded literal (output pasted).
-- [ ] `rg 'QUIET_SURFACES|ROOMS_READING|PROMOTE|fn running_shell' crates/bingo-surface-tui/src`
-      finds only the frozen voiceless table.
-- [ ] Each producer asserts its voice or its `Row` beside the record;
-      the stranger test draws a `Row`'s title, badge and action.
-- [ ] `screens/` snapshots are unchanged except the model's skill row
-      bullet; the diff is pasted.
-- [ ] `scripts/tui-smoke.sh` passes, and a tmux drive shows a memory
-      row, `/guide` and a model `Skill` call, ctrl+b on a running Bash
-      call, a room's switcher columns and `@` completion.
-- [ ] All gates of the upgrade protocol, plus the Windows cross-check
-      for the TUI and every producer crate touched.
+- [x] `cargo test -p bingo-sdk voice` passes; the failing first run is pasted.
+- [x] `rg '"_?bingo\.' crates/bingo-surface-tui/src --glob '!**/tests/**'` finds nothing in production except the manifest id and the ADR-0076 ACP exception; check 4f rejects seeded plugin/tool literals (output pasted).
+- [x] `rg 'QUIET_SURFACES|ROOMS_READING|PROMOTE|fn running_shell' crates/bingo-surface-tui/src` finds nothing; only `LEGACY_VOICES` retains old surface words.
+- [x] Each producer asserts its voice or its `Row` beside the record; the stranger test draws a `Row`'s title, badge and action.
+- [x] All `screens/` snapshots are unchanged; the diff is empty.
+- [x] `scripts/tui-smoke.sh` passes, and a tmux drive shows a memory row, `/guide` and a model `Skill` call, ctrl+b on a running Bash call, a room's switcher columns and `@` completion.
+- [x] All gates and Windows cross-checks attempted; C-header-only exceptions remain for Windows CI under protocol step 7 (listed below).
+
 
 ## Non-goals
 
@@ -124,17 +74,77 @@ code. No `HostApi` verb, no new external dependency.
 
 ## Risks
 
-- A `Row` placed by a hook lands a frame after its item opens, so a
-  memory call can draw as `Read(…)` for one frame. The snapshot tests
-  fold whole frames; the tmux drive is the check.
-- One extension kind per placed row grows `extensions` by one small
-  entry per memory or skill call. Rewind and compaction keep them, as
-  they keep any extension; a long session pays bytes, not frames.
-- Decided 2026-10-13: the skill row keeps `❖` on both doors through
-  `Row.mark` (ADR-0070 §1), rather than falling back to the tool bullet.
-- `on_turn(Start)` must see the prompt item in `items`. If it does not,
-  the skills hook reads it at `on_event` for the item instead.
-- Re-verify at start: M121's `slot` module and `Row` fields, M122's
-  collab readers and `HOLDER`, the producer origins named above by
-  symbol, the gate's `GateInput.item`, and the test-only module list in
-  `lib.rs`.
+- Resolved 2026-10-13 by the user: add optional `Row.caption`, defaulted
+  and omitted when absent. Draw it after the badge on the heading;
+  `Row.body` keeps replacement semantics. Keep `test_lanes.rs:201` unchanged.
+- Contract first: pin rows with/without caption and its optional schema;
+  regenerate plugin/RPC schemas only through the repository generator.
+- Resumed at `dde18848`; preserved the prior exit-criterion ticks. No further Decision change.
+- Re-verified at `e415e97e`: M131 dispatch is in `chain/tool.rs`; M122's
+  bounce is a tool result and its holder constant is `name::PARENT`.
+
+## Verified (2026-10-13)
+
+Earlier contract-first output, retained from the interrupted run:
+```text
+cargo test -p bingo-sdk voice                         # first run
+E0432: unresolved import bingo_sdk::Voice
+E0599: no method named voiced; E0609: no field voice
+cargo test -p bingo-sdk voice                         # implemented
+2 passed; 0 failed (origin fixture unchanged)
+cargo test -p bingo-core before_deny_ends_the_run      # first: E0609 cx.item
+1 passed; 0 failed (implemented)
+cargo test -p bingo-collab room_readers                # first: missing readers
+1 passed; 0 failed (implemented)
+cargo test -p bingo-surface-tui a_stranger_places      # pre-caption experiment
+FAILED: !screen.contains("old body") at test_lanes.rs:201
+cargo test -p bingo-surface-tui a_stranger_places --locked # final renderer
+2 passed; 0 failed (original body-replacement assertion retained)
+```
+- Producer run: `cargo test -p bingo-context -p bingo-skills -p bingo-tool-bash -p bingo-agents -p bingo-rooms -p bingo-schedule -p bingo-channels -p bingo-core --locked`.
+  Agents `155 passed`, channels `104`, context `99`, core `463`, rooms `230`, schedule `115` (+1 integration).
+  Skills first: `83 passed; 3 failed` (`this double extends nothing`); its tool-test host now accepts rows.
+  `cargo test -p bingo-skills -p bingo-tool-bash --locked`: `86 passed` / `147 passed; 0 failed`.
+  Explicit complete memory/skill/promotion rows and every origin voice are asserted beside their producers.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc -p bingo-surface-rpc the_committed_schema_is_this_document --locked`:
+  each `1 passed; 0 failed`; schemas regenerated, never hand-edited. M132's merger may regenerate conflicts.
+- Discipline 4f, extracted unchanged: `Unseeded: 0 TUI names no plugin or tool`;
+  each seed (`bingo.stranger`, `_bingo.stranger`, `Bash`): `exit 1; TUI names a plugin or tool`.
+  Seeds removed. Removed-symbol `rg`: exit 1, no matches. Snapshot diff against dev: `0` lines.
+- `PATH=/tmp/m123-verification/bin:$PATH scripts/tui-smoke.sh`: `tui-smoke ok` (private socket shim).
+  `python3 /tmp/m123-verification/drive.py`: `M123 tmux drive ok`; captured output:
+```text
+⏺ Recall from memory(the-build)
+❖ Skill(guide) the interface                # /guide
+❖ Skill(guide) the wire                     # model Skill call
+⏺ Bash(sleep 45; echo promotion-complete)    # [ b background ] before Ctrl+B
+  ⎿  Running in the background              # 1 shell after Ctrl+B
+~ scout     idle · in #design · live
+⏺ reviewer idle · in #design · listening · 600s
+#design  2 seats
+❯ @all
+  @scout
+  @reviewer
+m123-exit:0
+```
+  The drive corrected its Bash-description expectation and created standby agents for seat columns;
+  no TUI change. Owned tmux only; temporary homes/journals removed. Logs/captures: `/tmp/m123-verification/`.
+- Sequential gates (logs in that directory):
+  `cargo fmt --all -- --check`: `fmt exit: 0`;
+  `cargo check --workspace --all-targets --locked`: ``Finished `dev` profile ... in 5.75s``;
+  `cargo clippy --workspace --all-targets --locked -- -D warnings`: ``Finished `dev` profile ... in 4.18s``.
+- `cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_may_be_dialled_again_once_its_stream_has_closed`:
+  summed `5133 passed; 0 failed; 4 ignored` (existing measurement, stress and two storyboard tests); PTY `16 passed`, no retry.
+  `cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1`:
+  `1 passed; 0 failed`; `cargo test -p bingo-provider-acp --test bridge --locked a_token_may_be_dialled_again_once_its_stream_has_closed -- --exact --test-threads=1`:
+  `1 passed; 0 failed`. Neither known parallel-hang test was silently skipped.
+- `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `dependencies: 352 (max 352)`,
+  `warm cargo check: 0s`, `relink isolation: 0`, `target/debug: 7 GB (soft max 5)`, `budget ok`.
+  `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
+- Windows, one crate at a time: `cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc`.
+  sdk/core/collab/context/skills/tool-bash/agents/rooms/schedule/checkpoints/hooks-shell/provider-acp/surface-rpc:
+  each ``Finished `dev` profile``, exit 0. Names above have the `bingo-` prefix.
+  channels/plugin-rpc/surface-tui: `failed to run custom build command for aws-lc-sys v0.44.0`;
+  bingo: same plus `tree-sitter v0.26.13` / `tree-sitter-bash v0.25.1`.
+  `fatal error: 'stdlib.h' file not found` (also `stdio.h`/`windows.h`): protocol step 7 leaves these four
+  checks to Windows CI. No Rust compile error was reported; no toolchain installed. No other criterion remains open.

@@ -11,7 +11,8 @@ impl Hook for Before {
     fn matcher(&self) -> HookMatcher {
         HookMatcher::default()
     }
-    async fn before_tool(&self, _: &mut ToolCall, _: &HookContext) -> HookOutcome {
+    async fn before_tool(&self, _: &mut ToolCall, cx: &HookContext) -> HookOutcome {
+        assert_eq!(cx.item, Some(ItemId::from_raw("i")));
         self.1.lock().unwrap().push(self.2.into());
         self.0.clone()
     }
@@ -30,6 +31,7 @@ impl PermissionPolicy for Deny {
 }
 fn cx() -> HookContext {
     HookContext {
+        item: None,
         session: SessionId::from_raw("s"),
         turn: None,
         cwd: "/tmp".into(),

@@ -601,6 +601,7 @@ pub(crate) fn command_context(session: &SessionId, fleet: &Fleet) -> CommandCont
 
 pub(crate) fn hook_context(session: &SessionId, host: HostHandle) -> HookContext {
     HookContext {
+        item: None,
         host,
         session: session.clone(),
         turn: None,
@@ -698,6 +699,7 @@ pub(crate) fn posted(text: &str, who: Option<&str>) -> Event {
             body: ItemBody::User {
                 parts: vec![bingo_sdk::ContentPart::text(text)],
                 origin: bingo_sdk::Origin {
+                    voice: None,
                     surface: "room".into(),
                     principal: who.map(str::to_string),
                     conversation: None,

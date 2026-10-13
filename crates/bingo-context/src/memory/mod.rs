@@ -5,6 +5,7 @@
 mod command;
 pub(crate) mod dir;
 pub(crate) mod file;
+pub(crate) mod row;
 pub(crate) mod store;
 mod teach;
 

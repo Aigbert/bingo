@@ -84,6 +84,14 @@ impl Tool for SkillTool {
     async fn call(&self, input: Value, cx: &ToolContext) -> Result<ToolOutput, ToolError> {
         let args: SkillArgs =
             serde_json::from_value(input).map_err(|e| ToolError::InvalidInput(e.to_string()))?;
+        crate::hook::place(
+            &cx.host,
+            &cx.session,
+            &cx.item,
+            &args.name,
+            args.arguments.as_deref().unwrap_or_default(),
+        )
+        .await;
         Ok(self.load(&args, &cx.cwd))
     }
 }
@@ -96,8 +104,10 @@ mod tests {
 
     async fn call(tree: &Tree, input: Value) -> ToolOutput {
         let library = Arc::new(Library::new(bingo_sdk::Env::rooted(tree.root())));
+        let mut cx = tool_context(&tree.cwd());
+        cx.host = bingo_sdk::testing::TestHost::default().handle();
         SkillTool::new(library)
-            .call(input, &tool_context(&tree.cwd()))
+            .call(input, &cx)
             .await
             .expect("a named skill is not a failure")
     }

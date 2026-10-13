@@ -295,7 +295,10 @@ pub async fn wake(host: &HostHandle, to: &SessionId, text: String) -> Result<(),
     host.deliver(
         to,
         IntentId::mint(),
-        Input::text(text, Origin::surface(SURFACE)),
+        Input::text(
+            text,
+            Origin::surface(SURFACE).voiced(bingo_sdk::Voice::Quiet),
+        ),
         Delivery::Wake,
     )
     .await
@@ -305,6 +308,19 @@ pub async fn wake(host: &HostHandle, to: &SessionId, text: String) -> Result<(),
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    #[tokio::test]
+    async fn a_completion_is_delivered_quietly() {
+        let host = bingo_sdk::testing::TestHost::default();
+        let session = SessionId::from_raw("ses_test");
+        host.on_deliver(|_, _, _, _| async { Ok(()) });
+        wake(&host.handle(), &session, "finished".into())
+            .await
+            .unwrap();
+        assert!(host.calls().iter().any(|call| matches!(call,
+            bingo_sdk::testing::HostCall::Deliver { input: Input::Text { origin, .. }, .. }
+            if origin.voice == Some(bingo_sdk::Voice::Quiet))));
+    }
 
     fn job() -> Job {
         Job::new(

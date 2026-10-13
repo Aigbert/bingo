@@ -13,59 +13,26 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{OUTPUT_ROWS, Rows, bullet_style, kept, plain, returns, speaks, under};
 use crate::fold::Fold;
-use crate::skill;
-use crate::{commands, seats, theme};
+use crate::{seats, theme};
 
-/// The surfaces whose input is the machinery reporting in rather than
-/// somebody speaking: a background job that ended, a message from another
-/// session, a room's nudge, a scheduled turn, a command's own prompt. What they
-/// deliver reads as a tool row does, because that is what it is — something
-/// that happened, not something anyone said to you.
-///
-/// The room's own is in the set and drawn by nobody: a member does not see it
-/// ([`lines`]), and in the room it is the conversation ([`post`]). It stays
-/// here because the composer's pending area reads the same set, and a nudge in
-/// flight is machinery there too.
-///
-/// `command` is the one a person did set in motion, and it is here anyway: a
-/// `/guide` puts a page of skill body in the journal under a line nobody
-/// typed, and drawn as prose it is a wall of somebody else's words on the
-/// person's own bar. It reads as the machinery it is, and where the command
-/// was a skill the row is the run itself — `❖ Skill(guide) …`, the same row
-/// the model's own way to that body draws ([`skill_row`]).
-///
-/// The set is closed: a visible surface outside this list is loud. A new subsystem chooses its side by
-/// being added or left out, deliberately, and the cost of each mistake says
-/// which way to lean — a person's own words drawn as machinery is a wrong
-/// nobody can undo by reading harder.
-pub(super) const QUIET_SURFACES: &[&str] = &["agent", "bash", commands::SURFACE, ROOMS, "schedule"];
+/// Frozen compatibility for origins recorded before producers stamped voices.
+const LEGACY_VOICES: &[(&str, bingo_sdk::Voice)] = &[
+    ("agent", bingo_sdk::Voice::Quiet),
+    ("bash", bingo_sdk::Voice::Quiet),
+    (crate::commands::SURFACE, bingo_sdk::Voice::Quiet),
+    ("schedule", bingo_sdk::Voice::Quiet),
+    ("room", bingo_sdk::Voice::Aside),
+    ("wake", bingo_sdk::Voice::Note),
+];
 
-/// The surface everything a room sends wears: a post it fanned out before
-/// ADR-0034 stopped copying them, and the nudge that wakes a seat with nothing
-/// in it (`bingo-rooms`' own `room`). A surface may not import a plugin
-/// (ADR-0001), so the word is the whole of the contract.
-pub(super) const ROOMS: &str = "room";
-
-/// The origin the kernel stamps on what a context contributor folded into the
-/// head of a turn (`contributor:<id>`), for the one that reads a member's rooms
-/// there — `[#design, since you last read]` and the posts under it (ADR-0034
-/// §4).
-const ROOMS_READING: &str = "contributor:rooms";
-
-/// The wake a model set itself (ADR-0019 §8). Deliberately outside
-/// [`QUIET_SURFACES`]: a scheduled turn is the machinery reporting in, and
-/// this is the model's own words to itself, written in a turn a person
-/// watched and read in the turn that follows. It is a line somebody said, so
-/// it is drawn as one — on the same bar, under the word `wake` where the `>`
-/// would be, because the one thing a person must not have to guess is which
-/// of those two lines they wrote.
-pub(super) const WAKE: &str = "wake";
-
-/// Whether a delivery is the machinery reporting in. The composer's pending
-/// area asks the same question of what is still queued (ADR-0028), so the set
-/// stays one list read from two places rather than two lists to keep in step.
-pub(crate) fn quiet(origin: &Origin) -> bool {
-    QUIET_SURFACES.contains(&origin.surface.as_str())
+pub(crate) fn voice(origin: &Origin) -> bingo_sdk::Voice {
+    origin.voice.unwrap_or_else(|| {
+        LEGACY_VOICES
+            .iter()
+            .find(|(surface, _)| *surface == origin.surface)
+            .map(|(_, voice)| *voice)
+            .unwrap_or(bingo_sdk::Voice::Said)
+    })
 }
 
 /// What a `User` item draws, which is a different thing in each of the two
@@ -91,12 +58,10 @@ pub fn lines(
     if rows.driver == Driver::Log {
         return post(item, parts, origin.principal.as_deref(), rows);
     }
-    if rooms_machinery(origin) {
-        return Vec::new();
-    }
-    match quiet(origin) {
-        true => notice(item, parts, origin, fold, rows),
-        false => user(parts, origin, rows),
+    match voice(origin) {
+        bingo_sdk::Voice::Aside => Vec::new(),
+        bingo_sdk::Voice::Quiet => notice(item, parts, origin, fold, rows),
+        bingo_sdk::Voice::Said | bingo_sdk::Voice::Note => user(parts, origin, rows),
     }
 }
 
@@ -142,11 +107,6 @@ fn name(principal: &str) -> Span<'static> {
     Span::styled(format!("{principal}: "), theme::text().patch(theme::bold()))
 }
 
-/// Whether this is the rooms plugin talking rather than somebody in the room.
-fn rooms_machinery(origin: &Origin) -> bool {
-    origin.surface == ROOMS || origin.surface == ROOMS_READING
-}
-
 /// What a `User` item says, as its parts spell it.
 fn said(parts: &[ContentPart]) -> String {
     parts
@@ -177,24 +137,15 @@ fn notice(
     // text — a command's prompt puts one there — and under a `⎿` it would be
     // a row spent on nothing.
     let rest = rest.trim_start_matches('\n');
-    // A skill is one row however it was asked for, so the typed line gives the
-    // headline up to the run's own signature. The line itself stays in the
-    // item, which is where a rewind reads it back.
-    let style = bullet_style(item.status, false);
-    let mut out = match skill::of(item, rows.commands) {
-        // A person's own `/skill` line is not a call coming back, so its
-        // words are at rest.
-        Some(run) => super::skill_row(run, style, rows, super::Landing::Settled),
-        None => speaks(
-            style,
-            vec![headline(
-                head,
-                origin.principal.as_deref(),
-                elsewhere(origin, rows),
-            )],
-            rows,
-        ),
-    };
+    let mut out = speaks(
+        bullet_style(item.status, false),
+        vec![headline(
+            head,
+            origin.principal.as_deref(),
+            elsewhere(origin, rows),
+        )],
+        rows,
+    );
     if !rest.trim().is_empty() {
         out.extend(returns(kept(plain(rest), fold, OUTPUT_ROWS, None), rows));
     }
@@ -268,8 +219,8 @@ pub(super) fn barred(lines: Vec<Line<'static>>, width: usize) -> Vec<Line<'stati
 /// what a person typed, the word `wake` for the note a turn left itself. Its
 /// width is the indent every line under it takes, so the two forms wrap alike.
 fn mark(origin: &Origin) -> Span<'static> {
-    let word = match origin.surface == WAKE {
-        true => WAKE,
+    let word = match voice(origin) == bingo_sdk::Voice::Note {
+        true => &origin.surface,
         false => theme::user(),
     };
     Span::styled(format!("{word} "), theme::dim())
@@ -287,43 +238,26 @@ fn bar(line: Line<'static>, width: usize) -> Line<'static> {
 }
 
 #[cfg(test)]
-mod tests {
+mod voice_contract {
     use super::*;
+    use bingo_sdk::Voice;
 
-    fn from(surface: &str) -> Origin {
-        Origin {
-            surface: surface.into(),
-            principal: None,
-            conversation: Some("#design".into()),
-        }
-    }
-
-    /// The gutter tells the two lines on the bar apart, in both glyph tables:
-    /// what a person typed, and what a turn left for the next one.
     #[test]
-    fn a_wake_wears_its_own_word_where_the_person_s_mark_would_be() {
-        assert_eq!(mark(&from(WAKE)).content, "wake ");
-        assert_eq!(mark(&from("tui")).content, "> ");
-        assert!(!quiet(&from(WAKE)), "a wake is read, not reported");
-    }
-
-    /// The two origins a room writes into a member, and the neighbours each of
-    /// them is one character from. What every one of these *draws* is asserted
-    /// where the transcript is rendered whole; this is the boundary itself.
-    #[test]
-    fn only_the_rooms_two_origins_are_its_machinery() {
-        assert!(rooms_machinery(&from(ROOMS)));
-        assert!(rooms_machinery(&from(ROOMS_READING)));
-        for other in [
-            "agent",
-            "bash",
-            "schedule",
-            "tui",
-            "rooms",
-            "contributor:experience:recall",
-            "contributor:rooms:owed",
+    fn stamped_voice_wins_and_legacy_words_are_frozen() {
+        for (surface, legacy) in [
+            ("agent", Voice::Quiet),
+            ("bash", Voice::Quiet),
+            ("command", Voice::Quiet),
+            ("schedule", Voice::Quiet),
+            ("room", Voice::Aside),
+            ("wake", Voice::Note),
+            ("stranger", Voice::Said),
         ] {
-            assert!(!rooms_machinery(&from(other)), "{other} is not a room's");
+            let origin = Origin::surface(surface);
+            assert_eq!(voice(&origin), legacy);
+            for stamped in [Voice::Said, Voice::Note, Voice::Quiet, Voice::Aside] {
+                assert_eq!(voice(&origin.clone().voiced(stamped)), stamped);
+            }
         }
     }
 }

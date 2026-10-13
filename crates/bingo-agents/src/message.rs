@@ -32,6 +32,7 @@ pub const SEND_MESSAGE: &str = "SendMessage";
 /// text itself.
 pub fn origin(principal: Option<String>) -> Origin {
     Origin {
+        voice: Some(bingo_sdk::Voice::Quiet),
         surface: SURFACE.into(),
         principal,
         conversation: None,
@@ -193,5 +194,13 @@ impl Tool for MessageTool {
         let mut out = ToolOutput::text(receipt(addressed, to.driver));
         out.display = Some(card(addressed, &from, to.driver));
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod voice_tests {
+    #[test]
+    fn producer_stamps_its_voice() {
+        assert_eq!(super::origin(None).voice, Some(bingo_sdk::Voice::Quiet));
     }
 }

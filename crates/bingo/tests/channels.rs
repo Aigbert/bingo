@@ -487,6 +487,7 @@ async fn a_prompt_from_a_chat_carries_its_principal_and_its_conversation() {
     assert_eq!(
         origin,
         Origin {
+            voice: Some(bingo_sdk::Voice::Said),
             surface: "channels".into(),
             principal: Some("ou_wei".into()),
             conversation: Some("loopback/oc_1".into()),

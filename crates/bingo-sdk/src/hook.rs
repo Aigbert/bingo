@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::event::{Frame, Item, ToolOutput};
 use crate::host::{HostHandle, Input};
-use crate::ids::{SessionId, TurnId};
+use crate::ids::{ItemId, SessionId, TurnId};
 use crate::provider::Provider;
 use crate::tool::ToolCall;
 
@@ -75,6 +75,8 @@ pub enum Phase {
 
 #[derive(Clone)]
 pub struct HookContext {
+    /// The transcript item being checked or observed by a tool hook.
+    pub item: Option<ItemId>,
     pub session: SessionId,
     pub turn: Option<TurnId>,
     pub cwd: PathBuf,
@@ -92,6 +94,7 @@ impl std::fmt::Debug for HookContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HookContext")
             .field("session", &self.session)
+            .field("item", &self.item)
             .field("turn", &self.turn)
             .field("cwd", &self.cwd)
             .field("model", &self.model)

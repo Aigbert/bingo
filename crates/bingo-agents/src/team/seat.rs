@@ -219,6 +219,7 @@ mod tests {
 
         async fn opens(&self, session: &SessionId) {
             let cx = HookContext {
+                item: None,
                 cwd: self.cwd.clone(),
                 ..hook_context(session, self.fleet.handle())
             };
@@ -350,6 +351,7 @@ mod tests {
         let project = Project::new(TWO);
         let root = project.fleet.root();
         let cx = HookContext {
+            item: None,
             cwd: project.cwd.clone(),
             ..hook_context(&root, project.fleet.handle())
         };

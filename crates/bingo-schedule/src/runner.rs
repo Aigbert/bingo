@@ -240,6 +240,7 @@ fn who() -> ClientIdentity {
 /// transcript says so.
 fn origin() -> Origin {
     Origin {
+        voice: Some(bingo_sdk::Voice::Quiet),
         surface: SURFACE.into(),
         principal: None,
         conversation: None,
@@ -385,5 +386,13 @@ mod tests {
         assert_eq!(spec.provider, None, "a schedule runs on the host's model");
         assert_eq!(origin().surface, "schedule");
         assert_eq!(origin().principal, None, "nobody is at the keyboard");
+    }
+}
+
+#[cfg(test)]
+mod voice_tests {
+    #[test]
+    fn producer_stamps_its_voice() {
+        assert_eq!(super::origin().voice, Some(bingo_sdk::Voice::Quiet));
     }
 }

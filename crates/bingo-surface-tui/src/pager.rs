@@ -18,7 +18,7 @@ use crate::effect::Effect;
 use crate::search::Search;
 use crate::tree::Tree;
 use crate::ui::{Open, Ui};
-use crate::{acp, markdown, memory, search, theme, thoughts, transcript, wrap};
+use crate::{acp, markdown, search, theme, thoughts, transcript, wrap};
 
 /// The rows the sheet spends on itself: what it is, and the air under it.
 pub const HEAD: usize = 2;
@@ -134,6 +134,25 @@ fn reasoning(state: &SessionState, item: &Item, width: usize) -> Vec<Line<'stati
 /// What the sheet is of, on its first row: the row's own signature, a call
 /// on a memory file included (M84).
 pub fn title(item: &Item, state: &SessionState) -> String {
+    if let Some((title, badge)) =
+        bingo_sdk::slot::placed(state)
+            .into_iter()
+            .rev()
+            .find_map(|placed| match placed.slot {
+                bingo_sdk::slot::Slot::Row {
+                    item: id,
+                    title: Some(title),
+                    badge,
+                    ..
+                } if id == item.id => Some((title, badge)),
+                _ => None,
+            })
+    {
+        return match badge {
+            Some(badge) => format!("{title}({badge})"),
+            None => title,
+        };
+    }
     match &item.body {
         ItemBody::Reasoning { .. } => match acp::call(item) {
             Some(call) => format!("{}({})", call.name, call.about),
@@ -141,8 +160,7 @@ pub fn title(item: &Item, state: &SessionState) -> String {
         },
         ItemBody::Assistant { .. } => "Answer".to_string(),
         ItemBody::ToolCall { name, input, .. } => {
-            let (name, about) = memory::call(name, input, &state.summary.cwd, &memory::of(state))
-                .unwrap_or_else(|| (name.as_str(), transcript::summarize(input)));
+            let about = transcript::summarize(input);
             format!("{name}({about})")
         }
         ItemBody::Shell { command, .. } => format!("$ {command}"),

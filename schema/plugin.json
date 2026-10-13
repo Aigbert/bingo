@@ -3754,6 +3754,16 @@
     "Origin": {
       "type": "object",
       "properties": {
+        "voice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Voice"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "surface": {
           "type": "string"
         },
@@ -5132,6 +5142,16 @@
           "description": "A word this sdk does not have (ADR-0038 §1): `kind` is the emitter's\nown name for the element, namespaced by its plugin (`demo.sparkline`),\n`data` is whatever shape that plugin documents, and `fold` is the text\nevery surface that has not learned the kind shows instead.\n\nIt is also where an unknown `kind` off the wire lands, and then `data`\nis the whole node as it arrived — nothing said is lost, whether or not\nthis sdk has the word for it."
         }
       ]
+    },
+    "Voice": {
+      "type": "string",
+      "enum": [
+        "said",
+        "note",
+        "quiet",
+        "aside"
+      ],
+      "description": "How a producer intends an utterance to be drawn."
     }
   },
   "manifest": {

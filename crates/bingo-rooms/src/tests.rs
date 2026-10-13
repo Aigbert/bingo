@@ -471,6 +471,7 @@ pub(crate) fn command_context(session: &SessionId, fleet: &Fleet) -> CommandCont
 
 pub(crate) fn hook_context(session: &SessionId, fleet: &Fleet, cwd: &Path) -> HookContext {
     HookContext {
+        item: None,
         session: session.clone(),
         turn: None,
         cwd: cwd.to_path_buf(),
@@ -556,6 +557,7 @@ pub(crate) fn posted_item(text: &str, principal: Option<&str>) -> Item {
     item(ItemBody::User {
         parts: vec![ContentPart::text(text)],
         origin: Origin {
+            voice: None,
             surface: "test".into(),
             principal: principal.map(str::to_string),
             conversation: None,
