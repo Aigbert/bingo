@@ -36,16 +36,16 @@ it: natives in process, and M133's `dollar.ts` under node.
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-mods dollar::`: every row answers on M111's test host, and a link at each name sees exactly one call. A row raised twice fails the test (shown once, pasted).
-- [ ] Drift tests fail on a hand edit of `dollar.json` or `dollar-types.ts`.
-- [ ] Every `read` answer equals the field of the same `SessionState`.
-- [ ] A mod's `$.session.send` is seen once at `session.send` and once at `session.receive`. `$.plugin` names the fixture and its root under both transports, and assigning to it throws.
+- [x] `cargo test -p bingo-mods dollar::`: every row answers on M111's test host, and a link at each name sees exactly one call. A row raised twice fails the test (shown once, pasted).
+- [x] Drift tests fail on a hand edit of `dollar.json` or `dollar-types.ts`.
+- [x] Every `read` answer equals the field of the same `SessionState`.
+- [x] A mod's `$.session.send` is seen once at `session.send` and once at `session.receive`. `$.plugin` names the fixture and its root under both transports, and assigning to it throws.
 - [ ] A registered mod tool is offered to the fake model as `plugin__<mod>__<name>` and runs. When the mod is stale, it reloads first.
 - [ ] A stale `ifVersion` gets the held version; a foreign key's write is refused; the read log names each key a hook read.
-- [ ] Clock: under paused time, `every` fires once per period, and no timer survives a reload.
+- [x] Clock: under paused time, `every` fires once per period, and no timer survives a reload.
 - [ ] `model.classify` and `model.fork` show as `UsageCharged` in the turn's usage; called from a timer, in the session's. Without the `model` grant, each is refused in words.
-- [ ] `cargo test -p bingo --test plugin_kit`: the nouns fixture gives the same output in process and under node.
-- [ ] All gates pass, including `cargo check --target x86_64-pc-windows-msvc` for core and plugin-rpc.
+- [x] `cargo test -p bingo --test plugin_kit`: the nouns fixture gives the same output in process and under node.
+- [ ] All gates pass, including Windows checks — stopped at the workspace test gate below; later gates were not rerun for the runtime changes.
 
 ## Non-goals
 
@@ -54,9 +54,7 @@ it: natives in process, and M133's `dollar.ts` under node.
 
 ## Risks
 
-- `model.fork` lacks contributor pieces; document the different context.
-- Timer model calls require the model grant and charge the session without a turn.
-- With mods off, process state falls back to the library without noun chains.
+- Fork omits contributor pieces (documented); timer completions charge session usage; with mods off, process state has no noun chains.
 - Re-verified at `c1d95e8c` on 2026-10-14 (M108–M137, M147–M150 landed).
 - Reload lives in `mods/src/manager/reload.rs`; shared faces live in `plugin-host/src/ops.rs`. Remove its `model.complete` face when the kernel claims the name. `initialize.plugin_name` already exists; preserve its shape.
 - Preserve grants: processes=tighten, user/explicit modules=rewrite, project=tighten.
@@ -68,83 +66,76 @@ it: natives in process, and M133's `dollar.ts` under node.
 - The Node re-entry prerequisite was repaired here as the authorized first brick; ADR-0078 §4 remains unchanged.
 - Prerequisite Windows checks: plugin-host and core pass; mods (rquickjs-sys), plugin-rpc and bingo (aws-lc-sys) await Windows CI because this Mac lacks Windows SDK C headers.
 
+- The empty-stdin gate exposed a close/observer read cycle. `265e5cf1` releases unanswered actor mail before joining observers; the unchanged isolated CLI test passes.
+- Negative probes temporarily doubled `session.version`, then edited each generated dollar artifact; all failed as intended and were restored.
+
+- **Stopped at protocol step 6:** the workspace gate fails `bingo/tests/views.rs:204`, `a_second_run_reads_the_board_back_and_not_the_bar` (`pending`, expected `running`). The likely race is `bingo-demo-ui/src/journal.rs::place`: it reads a board, then asynchronously writes that snapshot after a newer command may have advanced it. The repair is behavioral and outside Files; neither the demo nor its assertion was changed.
+- Options: authorize a separate demo-UI prerequisite fix before resuming M138 (recommended), or explicitly expand M138 to include that repair. Do not weaken the persistence assertion. Remaining unchecked criteria await the resumed verification; ADR-0078 §6 stays proposed until M138 verifies.
+
 ## Verified (2026-10-14)
 
 ```text
 node --test sdk/typescript/src/dollar.test.ts
 Error: the calling hook re-entered through its own dollar call
-2 !== 1
-ℹ tests 1
-ℹ pass 0
-ℹ fail 1
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-plugin-rpc --lib --locked
-test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-test result: ok. 136 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.00s
-node --test sdk/typescript/src/*.test.ts
-ℹ tests 15
-ℹ pass 15
-ℹ fail 0
-cargo test -p bingo --test plugin_kit --locked node_reentry -- --nocapture
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.09s
-cargo test -p bingo-mods --test contracts --locked a_reentrant_call -- --nocapture
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.02s
-cargo fmt --all -- --check
-exit 0 (no output)
-cargo check --workspace --all-targets --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.59s
-cargo clippy --workspace --all-targets --locked -- -D warnings
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.93s
-cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing
-exit 0
-cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
-scripts/check_discipline.sh
-discipline ok
-scripts/budget.sh
-dependencies (unique, normal): 410 (max  410)
-budget ok
-cargo deny check
-advisories ok, bans ok, licenses ok, sources ok
-cargo check -p bingo-plugin-host --all-targets --target x86_64-pc-windows-msvc --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.66s
-CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc --locked
-rquickjs-sys: fatal error: 'stdlib.h' file not found
-CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc --locked
-aws-lc-sys: fatal error: 'windows.h' file not found
-CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc --locked
-aws-lc-sys: fatal error: 'stdlib.h' file not found
-cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.12s
 cargo test -p bingo-core --lib --offline a_completion_crosses_its_kernel_chain_once
-left: 0; right: 1
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 498 filtered out; finished in 0.04s
 cargo test -p bingo-core --lib --locked a_denied_setting_changes_neither_the_session_nor_the_file
 direct reconfigure bypassed config.set
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 498 filtered out; finished in 0.05s
 cargo test -p bingo-mods --lib --locked dollar::read
 unknown folded read: session.id
-cargo test -p bingo-mods --locked
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
 cargo test -p bingo-mods --test plugin --locked an_append_keeps
 the calling hook re-entered across the actor mailbox; left: Number(2); right: 1
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.06s
 cargo test -p bingo-mods --test plugin --locked a_registered_tool
 left: Null; right: "plugin__fixture__hello"
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.06s
 node --test sdk/typescript/src/nouns.test.ts
 Error: unknown method callback/start
-ℹ pass 0
-ℹ fail 1
 cargo test -p bingo-plugin-host --lib --locked the_four_mib_limit
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.12s
 cargo test -p bingo-plugin-host --lib --locked a_hook_read_log
 left: []; right: [Read { plugin: "owner", scope: "global", key: "key", version: Some(1) }]
 cargo test -p bingo-mods --lib --locked dollar::clock
 timer did not fire: Elapsed(())
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s
 cargo test -p bingo-mods --lib --locked dollar::model
 test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.04s
 cargo test -p bingo-sdk --lib --features testing --locked completion_is_scripted
 KernelError { code: Unsupported, message: "this host does not complete model requests" }
+cargo test -p bingo-mods --lib --locked every_row_raises
+assertion `left == right` failed: session.version was raised twice
+cargo test -p bingo-mods --lib --locked schema_and_types_are_generated
+assertion `left == right` failed: dollar contract drift
+cargo test -p bingo-mods --lib --locked schema_and_types_are_generated
+assertion `left == right` failed: dollar contract drift
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --features testing --locked
+test result: ok. 137 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.28s
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods --lib --locked dollar::
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.13s
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked the_committed_schema_is_this_document
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out; finished in 0.02s
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked wire_ts::
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out; finished in 0.02s
+cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing
+test result: FAILED. 258 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 43.49s
+cargo test -p bingo --test cli --locked stream_json::stdin_closing_with_nothing_to_do_is_a_clean_exit -- --exact --test-threads=1
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 258 filtered out; finished in 30.10s
+cargo test -p bingo --test cli --locked stream_json::stdin_closing_with_nothing_to_do_is_a_clean_exit -- --exact --test-threads=1
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 258 filtered out; finished in 0.28s
+cargo fmt --all -- --check
+exit 0 (no output)
+cargo check --workspace --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.47s
+cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.46s
+cargo test -p bingo-mods --test plugin --locked surfaces_fold
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.03s
+cargo test -p bingo --test plugin_kit --locked the_host_nouns_fixture
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.14s
+cargo test -p bingo --test plugin_kit --locked node_registered_commands
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.19s
+cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing
+test result: ok. 259 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.40s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+test a_second_run_reads_the_board_back_and_not_the_bar ... FAILED
+  left: "pending"
+ right: "running"
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.82s
 ```
