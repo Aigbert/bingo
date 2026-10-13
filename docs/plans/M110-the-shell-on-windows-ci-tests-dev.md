@@ -70,19 +70,19 @@ Windows binary the release ships can run the model's commands.
 
 ## Exit criteria
 
-- [ ] `rg -n 'fn shell\(' crates/bingo-{tool-bash,hooks-shell}` finds
+- [x] `rg -n 'fn shell\(' crates/bingo-{tool-bash,hooks-shell}` finds
       no definitions; both callers use `bingo_process::shell::resolve`.
-- [ ] Resolution unit tests cover every case in brick 1 and pass on
+- [x] Resolution unit tests cover every case in brick 1 and pass on
       the host platform (output pasted).
-- [ ] With `BINGO_SHELL=/nonexistent`, a session offers no Bash tool and
+- [x] With `BINGO_SHELL=/nonexistent`, a session offers no Bash tool and
       shows the notice (test output pasted).
-- [ ] `cargo check -p bingo-process -p bingo-tool-bash -p
+- [x] `cargo check -p bingo-process -p bingo-tool-bash -p
       bingo-hooks-shell --all-targets --target x86_64-pc-windows-msvc`
       exit 0.
-- [ ] `ci.yml` has no `continue-on-error`; `dev` is a push trigger.
+- [x] `ci.yml` has no `continue-on-error`; `dev` is a push trigger.
 - [ ] The windows job's result is recorded: green, or the run stopped
       with each failure listed.
-- [ ] All gates.
+- [ ] All gates: stopped before the workspace host gates (see below).
 
 ## Non-goals
 
@@ -91,10 +91,15 @@ Windows binary the release ships can run the model's commands.
 
 ## Risks
 
-- The hosted runner's `bash.exe` on `PATH` may be Git's or WSL's
-  depending on image order; the skip rule covers WSL, and a test asserts
-  the resolved path ends in `Git\bin\bash.exe` or `usr\bin\bash.exe`
-  when running on Windows CI.
+- **Stopped 2026-10-13, protocol step 6:** brick 7's workspace Windows
+  test build exits 101 in `aws-lc-sys`: the cross C toolchain lacks
+  `stdlib.h` and `windows.h`. Supplying a Windows SDK/toolchain changes
+  the host outside Files; no toolchain or external crate was changed.
+  Options: resume on a prepared Windows host/cross toolchain, or explicitly
+  defer this build and finish host gates with Windows execution pending.
+  No push is authorized; ADR acceptance and the ADR-0001 note are pending.
+
+- A Windows CI test checks the resolved Git Bash path; WSL is skipped.
 - Process-heavy suites may be slow on Windows; `--test-threads=2` and the
   timeout bound it. A suite that needs more is a finding, not a reason
   to keep the step soft.
@@ -104,3 +109,41 @@ Windows binary the release ships can run the model's commands.
   publish the missing-shell notice through `HostApi::notice`.
 - Local Windows execution is unavailable; cross-compilation checks types,
   and CI will be the first real Windows run (no push authorized).
+
+## Verified (2026-10-13)
+
+Partial evidence only; M110 is **not verified**. No Windows CI run occurred.
+Contract tests were committed before implementation; expected red output:
+```text
+$ cargo test -p bingo-process
+shell resolved: ShellMissing { tried: [] }
+test result: FAILED. 2 passed; 6 failed; 0 ignored
+$ cargo test -p bingo-hooks-shell a_missing_shell --locked
+run::tests::a_missing_shell_is_a_hook_error_with_the_remedy ... FAILED
+$ cargo test -p bingo-tool-bash a_missing_shell --locked
+tests::a_missing_shell_withholds_tools_and_warns_the_session ... FAILED
+$ cargo test -p bingo-process -p bingo-tool-bash -p bingo-hooks-shell --locked
+run::tests::a_missing_shell_is_a_hook_error_with_the_remedy ... ok
+test result: ok. 104 passed; 0 failed; 0 ignored
+test result: ok. 9 passed; 0 failed; 0 ignored
+tests::a_missing_shell_withholds_tools_and_warns_the_session ... ok
+test result: ok. 145 passed; 0 failed; 0 ignored
+$ cargo check -p bingo-process -p bingo-tool-bash -p bingo-hooks-shell --all-targets --target x86_64-pc-windows-msvc
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.86s
+$ scripts/budget.sh  # after adding the library member
+dependencies (unique, normal): 343 (max  343)
+warm cargo check -p bingo-core: 1s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+budget ok
+$ cargo test --workspace --locked --no-run --target x86_64-pc-windows-msvc
+fatal error: 'stdlib.h' file not found
+fatal error: 'windows.h' file not found
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+# exit 101; protocol step 6 stop
+```
+
+`rg -n 'fn shell\(' crates/bingo-tool-bash crates/bingo-hooks-shell`
+returned no matches. CI diff has `[main, dev]`, concurrency, all job timeouts,
+and blocking Windows tests with two threads. `cargo fmt --all` ran; the
+format check, workspace check/clippy/test (including the isolated ACP bridge
+token test), discipline, final budget and deny gates have not run.
