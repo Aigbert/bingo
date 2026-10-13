@@ -318,6 +318,7 @@ dependencies = [
  "async-trait",
  "base64 0.23.1",
  "bingo-auth-oauth",
+ "bingo-claim",
  "bingo-pictures",
  "bingo-sdk",
  "futures",
@@ -347,6 +348,14 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "bingo-claim"
+version = "0.6.6"
+dependencies = [
+ "tempfile",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -427,6 +436,7 @@ name = "bingo-gateway"
 version = "0.6.6"
 dependencies = [
  "bingo-channels",
+ "bingo-claim",
  "bingo-core",
  "bingo-schedule",
  "bingo-sdk",
@@ -545,6 +555,7 @@ name = "bingo-plugin-rpc"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-pictures",
  "bingo-sdk",
  "futures",
  "schemars 1.2.2",
@@ -663,6 +674,7 @@ name = "bingo-schedule"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-claim",
  "bingo-sdk",
  "insta",
  "jiff",

@@ -92,6 +92,7 @@
 # a second copy of the same parser and was not taken. `winnow` resolves at two
 # majors, which deny.toml warns on and does not refuse.
 # M110 (ADR-0063): bingo-process adds one member and no external crate.
-max_dependencies = 343
+# M109 (ADR-0072 §5): bingo-claim adds one member, no external crate.
+max_dependencies = 344
 max_core_check_seconds = 20
 max_target_gb = 5

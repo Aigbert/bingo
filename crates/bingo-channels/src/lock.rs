@@ -7,8 +7,7 @@
 //! adapter starts, and a claim that cannot be taken is a refusal with the
 //! remedy in it, never a degraded start.
 
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::error::ChannelError;
 
@@ -17,31 +16,38 @@ pub(crate) const DIRECTORY: &str = "channels";
 
 /// A credential this process holds for as long as the value lives.
 #[derive(Debug)]
-pub struct Claim {
-    path: PathBuf,
-}
+pub struct Claim(bingo_claim::Claim);
+
+/// Identifies a permanent channel claim, never evidence of a live holder.
+pub const MARKER: &str = "bingo-channel-claim-v1\n";
 
 impl Claim {
     pub fn take(data_dir: &Path, adapter: &str, credential: &str) -> Result<Self, ChannelError> {
         let directory = data_dir.join(DIRECTORY);
-        std::fs::create_dir_all(&directory)
-            .map_err(|e| ChannelError::Refused(format!("{}: {e}", directory.display())))?;
-        let path = directory.join(format!("{}.lock", slug(&format!("{adapter}-{credential}"))));
-        let mut file = std::fs::File::create_new(&path).map_err(|_| taken(adapter, &path))?;
-        // The pid is not read back — a lock file is proof of a claim, not of a
-        // process — but it is what a person needs to check before removing it.
-        let _ = write!(file, "{}", std::process::id());
-        Ok(Self { path })
+        let file = format!("{}.lock", slug(&format!("{adapter}-{credential}")));
+        let protocol = bingo_claim::Protocol {
+            file: &file,
+            marker: MARKER,
+        };
+        bingo_claim::Claim::take(&directory, protocol)
+            .map(Self)
+            .map_err(|error| refusal(adapter, error))
     }
 
     pub fn path(&self) -> &Path {
-        &self.path
+        self.0.path()
     }
 }
 
-impl Drop for Claim {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+fn refusal(adapter: &str, error: bingo_claim::ClaimError) -> ChannelError {
+    match error {
+        bingo_claim::ClaimError::WouldBlock { path } => taken(adapter, &path),
+        bingo_claim::ClaimError::Legacy { path } => ChannelError::Refused(format!(
+            "legacy or unrecognized channel claim ({}); stop every bingo using this data dir, \
+             inspect and remove that file, then restart",
+            path.display()
+        )),
+        error => ChannelError::Refused(error.to_string()),
     }
 }
 
@@ -52,8 +58,8 @@ const TAKEN: &str = "another bingo already runs the ";
 fn taken(adapter: &str, path: &Path) -> ChannelError {
     ChannelError::Refused(format!(
         "{TAKEN}{adapter} channel for this app: a second one \
-         would take half of its events and neither would know. {} says so — remove it \
-         if no bingo is running.",
+         would take half of its events and neither would know. The OS lock on {} is held; \
+         stop the other listener before retrying. Never remove this permanent file.",
         path.display()
     ))
 }
@@ -97,6 +103,23 @@ mod tests {
     }
 
     #[test]
+    fn legacy_files_are_refused_with_a_remedy_and_never_changed() {
+        for bytes in [b"4242".as_slice(), b""] {
+            let home = tempfile::tempdir().unwrap();
+            let dir = home.path().join(DIRECTORY);
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("feishu-cli_a1.lock");
+            std::fs::write(&path, bytes).unwrap();
+            let error = Claim::take(home.path(), "feishu", "cli_a1").unwrap_err();
+            let text = error.to_string();
+            assert!(text.contains("legacy"), "{text}");
+            assert!(text.contains("stop every bingo"), "{text}");
+            assert!(text.contains(&path.display().to_string()), "{text}");
+            assert_eq!(std::fs::read(path).unwrap(), bytes);
+        }
+    }
+
+    #[test]
     fn a_different_credential_is_a_different_claim() {
         let home = tempfile::tempdir().expect("a temporary directory");
         let _a = Claim::take(home.path(), "feishu", "cli_a1").expect("a");
@@ -111,7 +134,7 @@ mod tests {
             let claim = Claim::take(home.path(), "feishu", "cli_a1").expect("a claim");
             claim.path().to_path_buf()
         };
-        assert!(!path.exists());
+        assert!(path.exists(), "release keeps the permanent claim inode");
         Claim::take(home.path(), "feishu", "cli_a1").expect("the next process may have it");
     }
 

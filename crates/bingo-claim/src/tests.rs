@@ -1,4 +1,26 @@
 use super::*;
+use std::fs::TryLockError;
+
+const LOCK: &str = "runner.lock";
+const MARKER: &str = "bingo-schedule-runner-v1\n";
+const PROTOCOL: Protocol<'_> = Protocol {
+    file: LOCK,
+    marker: MARKER,
+};
+
+// Keep the scheduler's original contract tests unchanged below this adapter.
+struct Claim;
+impl Claim {
+    fn take(dir: &Path) -> Result<super::Claim, ClaimError> {
+        super::Claim::take(dir, PROTOCOL)
+    }
+}
+fn probe(dir: &Path) -> Result<bool, ClaimError> {
+    super::probe(dir, PROTOCOL)
+}
+fn holder(dir: &Path, held: bool) -> String {
+    super::holder(dir, PROTOCOL, held)
+}
 
 #[test]
 fn the_second_claim_is_refused_until_the_first_drops() {

@@ -248,7 +248,9 @@ fn lock_checks(patient: &Patient<'_>, probe: &dyn Probe) -> Vec<Row> {
 
 fn lock_check(root: &Path, path: PathBuf, probe: &dyn Probe) -> Option<Row> {
     let name = relative(&path, root);
-    if let Some(row) = schedule_lock(root, &path, &name) {
+    if let Some(row) =
+        schedule_lock(root, &path, &name).or_else(|| channel_lock(root, &path, &name))
+    {
         return Some(row);
     }
     let text = std::fs::read_to_string(&path).ok()?;
@@ -296,6 +298,30 @@ fn schedule_lock(root: &Path, path: &Path, name: &str) -> Option<Row> {
             "scheduler OS lock is free; this permanent file is not a stale claim".into(),
         ),
         Err(bingo_schedule::lock::ClaimError::Legacy { .. }) => return None,
+        Err(error) => (Verdict::Bad, error.to_string()),
+    };
+    Some(Row::new(name, verdict, say))
+}
+
+fn channel_lock(root: &Path, path: &Path, name: &str) -> Option<Row> {
+    let directory = root.join("channels");
+    if path.parent() != Some(directory.as_path()) {
+        return None;
+    }
+    let protocol = bingo_claim::Protocol {
+        file: path.file_name()?.to_str()?,
+        marker: bingo_channels::lock::MARKER,
+    };
+    let (verdict, say) = match bingo_claim::probe(&directory, protocol) {
+        Ok(true) => (
+            Verdict::Ok,
+            "channel OS lock is held; never remove this file".into(),
+        ),
+        Ok(false) => (
+            Verdict::Ok,
+            "channel OS lock is free; this permanent file is not a stale claim".into(),
+        ),
+        Err(bingo_claim::ClaimError::Legacy { .. }) => return None,
         Err(error) => (Verdict::Bad, error.to_string()),
     };
     Some(Row::new(name, verdict, say))
@@ -508,6 +534,28 @@ mod tests {
             )
             .expect("a report")
         }
+    }
+
+    #[test]
+    fn modern_channel_claims_are_probed_and_never_removed() {
+        let case = Case::new();
+        let path = case.lock("channels", "feishu-cli_a1.lock", 4242);
+        let marker = b"bingo-channel-claim-v1\n";
+        std::fs::write(&path, marker).unwrap();
+        let file = std::fs::File::options()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        file.try_lock().unwrap();
+        let held = case.report(&Fake::empty(), true);
+        assert!(held.contains("channel OS lock is held"), "{held}");
+        assert!(path.exists(), "doctor keeps the held claim file");
+        drop(file);
+        assert_eq!(std::fs::read(&path).unwrap(), marker);
+        let free = case.report(&Fake::empty(), true);
+        assert!(free.contains("channel OS lock is free"), "{free}");
+        assert_eq!(std::fs::read(path).unwrap(), marker);
     }
 
     #[test]

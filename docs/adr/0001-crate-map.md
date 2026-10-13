@@ -37,3 +37,23 @@ The bin composes `Vec<Box<dyn Plugin>>` explicitly. No self-registration crate u
 - The TUI cannot reach the engine, so the four walls of the old D149–D152 migration cannot recur.
 
 Amended 2026-10-13 by ADR-0063 (M110): `bingo-process` joins the library tier and owns shell resolution for `bingo-tool-bash` and `bingo-hooks-shell`.
+
+## Tree note · 2026-10-13 · M109
+
+The naming examples above are historical; `bingo-teams`, `bingo-acp` and
+`bingo-services` do not exist at this milestone. The current crates are:
+
+- binary: `bingo`.
+- plugin/surface: `bingo-agents`, `bingo-channels`, `bingo-checkpoints`, `bingo-context`,
+  `bingo-demo-ui`, `bingo-experience`, `bingo-hooks-shell`, `bingo-mcp`, `bingo-permissions`,
+  `bingo-persona`, `bingo-plugin-rpc`, `bingo-provider-acp`, `bingo-provider-anthropic`,
+  `bingo-provider-fake`, `bingo-provider-openai`, `bingo-rooms`, `bingo-schedule`,
+  `bingo-skills`, `bingo-store-jsonl`, `bingo-surface-print`, `bingo-surface-rpc`,
+  `bingo-surface-tui`, `bingo-tasks`, `bingo-tool-bash`, `bingo-tool-fs`, `bingo-tool-web`.
+- library: `bingo-auth-oauth`, `bingo-claim`, `bingo-loopback`, `bingo-pictures`,
+  `bingo-process`, `bingo-update`.
+- kernel/sdk: `bingo-core`, `bingo-sdk`.
+- composition: `bingo-gateway`.
+
+`bingo-claim` shares the scheduler/channel OS claim (ADR-0072 §5); it
+registers nothing and depends only on std and `thiserror`.

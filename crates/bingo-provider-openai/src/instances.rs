@@ -17,11 +17,11 @@ use crate::settings::{OpenAiEndpoint, Settings};
 use crate::variant::Variant;
 use crate::{API_KEY_ENV, BASE_URL_ENV, DEFAULT_BASE_URL, OpenAiProvider};
 
-/// The ids this build answers to before any instance is read. A plugin sees
+/// The ids this plugin answers to before any instance is read. A plugin sees
 /// its own settings only, so a name that collides with *another* plugin's
 /// instance is caught one layer up, where the registry refuses the second
 /// provider of a name and the boot fails with it.
-const BUILT_IN: [&str; 4] = ["anthropic", "codex", "fake", "openai"];
+const BUILT_IN: [&str; 2] = ["codex", "openai"];
 
 /// Every provider the `openai` and `codex` keys name, defaults first.
 pub fn providers(settings: Settings, env: &Env) -> Result<Vec<Arc<dyn Provider>>, PluginError> {
@@ -234,8 +234,10 @@ mod tests {
         assert!(names(&["proxy1", "proxy2", "work"]).is_ok());
         assert!(refusal(&["codex"]).contains("`codex`"));
         assert!(refusal(&["openai"]).contains("built-in"));
-        assert!(refusal(&["fake"]).contains("`fake`"));
-        assert!(refusal(&["anthropic"]).contains("`anthropic`"));
+        assert!(
+            names(&["fake", "anthropic"]).is_ok(),
+            "the registry owns other plugins' names"
+        );
         assert!(refusal(&["proxy1", "proxy1"]).contains("named twice"));
     }
 

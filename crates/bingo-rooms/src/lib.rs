@@ -49,6 +49,8 @@ mod hook;
 mod listen;
 mod mentions;
 mod name;
+
+pub use name::same as same_name;
 mod owed;
 mod placement;
 mod post;

@@ -43,6 +43,8 @@ mod list;
 mod message;
 mod models;
 mod names;
+
+pub use names::same as same_name;
 mod note;
 mod rooms;
 mod serial;

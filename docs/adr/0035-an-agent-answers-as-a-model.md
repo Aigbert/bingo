@@ -101,3 +101,6 @@ tokio, `Send`).
 - `cargo deny` already admits Apache-2.0; the budget line moves once.
 
 Refs: docs/design/horizons.md §2, docs/design/research/acp-provider.md
+
+*2026-10-13, M109: §7 describes a future surface. The tree has only
+`bingo-provider-acp` and its tool bridge; there is no `bingo-acp` surface.*

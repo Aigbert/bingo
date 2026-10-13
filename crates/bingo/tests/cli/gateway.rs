@@ -326,15 +326,9 @@ fn stopping_gives_back_the_schedule_runner_claim_and_the_pidfile() {
             Err(error) => panic!("cannot probe the runner lock: {error}"),
         }
     });
-    let channel_claims: Vec<_> = std::fs::read_dir(gateway.data().join("channels"))
-        .unwrap()
-        .map(|entry| entry.unwrap().path())
-        .filter(|path| path.extension().is_some_and(|ext| ext == "lock"))
-        .collect();
-    assert!(
-        !channel_claims.is_empty(),
-        "the loopback channel has a claim"
-    );
+    let channel_claims = until("the gateway took the channel claim", || {
+        held_channel_claims(&gateway)
+    });
 
     let stopped = stdout(&gateway.verb(&["stop"]));
     assert!(
@@ -348,8 +342,38 @@ fn stopping_gives_back_the_schedule_runner_claim_and_the_pidfile() {
         .expect("the permanent schedule lease remains");
     file.try_lock()
         .expect("shutdown released the schedule lease");
-    assert!(channel_claims.iter().all(|path| !path.exists()));
+    for path in channel_claims {
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            bingo_channels::lock::MARKER.as_bytes()
+        );
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)
+            .expect("the permanent channel claim remains");
+        file.try_lock()
+            .expect("shutdown released the channel claim");
+    }
     assert!(!gateway.pidfile().exists());
+}
+
+fn held_channel_claims(gateway: &Gateway) -> Option<Vec<std::path::PathBuf>> {
+    let paths: Vec<_> = std::fs::read_dir(gateway.data().join("channels"))
+        .ok()?
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "lock"))
+        .collect();
+    let held = !paths.is_empty()
+        && paths.iter().all(|path| {
+            let file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(path)
+                .unwrap();
+            matches!(file.try_lock(), Err(std::fs::TryLockError::WouldBlock))
+        });
+    held.then_some(paths)
 }
 
 /// The point of the whole milestone: a schedule fires with nothing attached to

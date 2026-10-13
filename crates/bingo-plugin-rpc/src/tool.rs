@@ -8,7 +8,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bingo_sdk::{Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits};
+use bingo_sdk::{ContentPart, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits};
 use serde_json::{Value, json};
 
 use crate::codec::{INTERNAL_ERROR, RpcError};
@@ -94,18 +94,6 @@ impl PluginTool {
         }
     }
 
-    fn output(&self, reply: Reply) -> Result<ToolOutput, ToolError> {
-        match reply {
-            Ok(value) => serde_json::from_value::<ToolCallResult>(value)
-                .map(|result| result.output)
-                .map_err(|e| ToolError::Failed(format!("{}: {e}", self.plugin))),
-            Err(error) => Err(ToolError::Failed(format!(
-                "{}: {}",
-                self.plugin, error.message
-            ))),
-        }
-    }
-
     /// A call is where a death is usually first noticed: the reply that never
     /// came is what the pipe closing looks like from here. Saying it is not
     /// this call's job — the notice goes on the crate's one channel, and the
@@ -117,6 +105,31 @@ impl PluginTool {
                 format!("the {} plugin process ended; restarting it", self.plugin),
             ));
         }
+    }
+}
+
+async fn output(plugin: &str, reply: Reply) -> Result<ToolOutput, ToolError> {
+    let value = reply.map_err(|error| ToolError::Failed(format!("{plugin}: {}", error.message)))?;
+    let result: ToolCallResult = serde_json::from_value(value)
+        .map_err(|error| ToolError::Failed(format!("{plugin}: {error}")))?;
+    let mut parts = Vec::with_capacity(result.output.parts.len());
+    for part in result.output.parts {
+        parts.push(bounded_part(part).await);
+    }
+    Ok(ToolOutput {
+        parts,
+        ..result.output
+    })
+}
+
+async fn bounded_part(part: ContentPart) -> ContentPart {
+    let ContentPart::Image(image) = part else {
+        return part;
+    };
+    let media_type = image.media_type.clone();
+    match bingo_pictures::taken(image).await {
+        Ok(image) => ContentPart::Image(image),
+        Err(why) => ContentPart::text(format!("[{media_type} is not a picture: {why}]")),
     }
 }
 
@@ -188,13 +201,61 @@ impl Tool for PluginTool {
     async fn call(&self, input: Value, cx: &ToolContext) -> Result<ToolOutput, ToolError> {
         let reply = self.exchange(self.params(input, cx), cx).await;
         self.announce();
-        self.output(reply)
+        output(&self.plugin, reply).await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn received(parts: Vec<bingo_sdk::ContentPart>) -> ToolOutput {
+        let result = ToolCallResult {
+            output: ToolOutput {
+                parts,
+                is_error: false,
+                display: None,
+            },
+        };
+        output("pictures", Ok(serde_json::to_value(result).unwrap()))
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_three_megabyte_plugin_picture_is_bounded_before_the_model_sees_it() {
+        use bingo_sdk::ContentPart;
+        let image = bingo_pictures::testing::noisy(1024, 1024).at("original.png");
+        assert!(image.decoded_len() >= 3 * 1024 * 1024);
+        let output = received(vec![
+            ContentPart::text("before"),
+            ContentPart::Image(image),
+            ContentPart::text("after"),
+        ])
+        .await;
+        assert_eq!(output.parts[0].as_text(), Some("before"));
+        assert_eq!(output.parts[2].as_text(), Some("after"));
+        let ContentPart::Image(seen) = &output.parts[1] else {
+            panic!("a bounded picture")
+        };
+        assert!(seen.decoded_len() <= bingo_pictures::MODEL_BUDGET);
+        assert_eq!(seen.path.as_deref(), Some(Path::new("original.png")));
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_plugin_picture_becomes_a_reasoned_text_part() {
+        let output = received(vec![bingo_sdk::ContentPart::Image(
+            bingo_pictures::testing::unreadable(),
+        )])
+        .await;
+        let text = output.parts[0]
+            .as_text()
+            .expect("a refusal instead of a corrupt image");
+        assert!(
+            text.contains("image/png") && text.contains("not a picture"),
+            "{text}"
+        );
+    }
 
     #[test]
     fn a_tool_is_named_for_its_plugin_and_itself() {
