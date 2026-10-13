@@ -84,3 +84,14 @@ async fn releasing_the_claim_forgets_the_prepared_version() {
     let error = store.append(&summary.id, &frame).await.unwrap_err();
     assert!(error.message.contains("newer bingo"), "{error}");
 }
+
+#[test]
+fn historical_agent_calls_upgrade_to_external_tool_items() {
+    let lines = include_str!("../../fixtures/agent/979a6d27.jsonl").lines().map(str::to_owned).collect::<Vec<_>>();
+    let dir = planted(&lines);
+    let frames = replay(dir.path(), Seq::ZERO).unwrap();
+    let bingo_sdk::Event::ItemCompleted { item } = &frames[0].event else { panic!("completed") };
+    assert!(item.external());
+    assert!(matches!(&item.body, bingo_sdk::ItemBody::ToolCall { name, input, .. }
+        if name == "acp:read" && input["title"] == "Read note.md"));
+}
