@@ -11,3 +11,4 @@ mod plugin;
 pub use plugin::ModsPlugin;
 mod manager;
 mod module;
+mod link;

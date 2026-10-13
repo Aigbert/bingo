@@ -53,6 +53,8 @@ impl PluginSource for Manager {
 impl InterceptorSource for Manager {
     fn id(&self) -> &str { "bingo.mods" }
     async fn interceptors(&self) -> Vec<ExternalInterceptor> {
-        Vec::new()
+        self.modules().iter().filter(|module| module.admission.allowed()).map(|module| ExternalInterceptor {
+            plugin: module.found.name.clone(), link: Arc::new(crate::link::Link(module.clone()))
+        }).collect()
     }
 }
