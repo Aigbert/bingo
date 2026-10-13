@@ -98,6 +98,18 @@ become data. No new dependency.
   is approved; list every such test here. No other outside-scope change is
   authorized. Currently identified: context
   `session_start_invalidates_both_keys_without_opening_the_session`.
+- **Stopped during brick 1 (2026-10-14), protocol step 6 and the user's
+  scope restriction.** The re-verification omitted `bingo-surface-tui/src/blocks.rs`:
+  `Blocks::live`, the `sync(..., live)` argument and `segments()` implement
+  the under-the-running-rows lane that brick 3 explicitly removes. Passing
+  an empty vector forever would retain the obsolete lane, contrary to the plan.
+  Recommended: approve this file for removing that field, argument and segment,
+  plus mechanical `sync` caller edits in `src/motion.rs`, `src/transcript.rs`
+  and `src/transcript/pictured.rs` (tests; unchanged assertions). `view.rs`
+  and the callers inside `blocks.rs` complete the call-site list.
+  Alternative: explicitly revise brick 3 to retain the empty lane API.
+  None of these outside-scope files was changed. The ten new contract tests
+  compile and fail for the expected missing behavior; implementation has not begun.
 
 ## Re-verified (2026-10-14, `23810b23`)
 
@@ -135,3 +147,71 @@ $ git rev-parse --short HEAD
 $ git status --porcelain=v1
 (no output before the plan edit)
 ```
+
+Brick 1: an initial test-fixture compile failed with `E0308` (`round: None`,
+expected `u32`) and `E0560` (`ended_at`; the field is `completed_at`). The
+fixture was corrected before the red run below; these were not behavioral failures.
+Screen operands are omitted below; the equality failures show the legacy cards
+still drawing. The journal fixture was generated with `BINGO_UPDATE_SCHEMA=1`.
+
+```text
+$ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-surface-tui -p bingo-collab -p bingo-demo-ui -p bingo-schedule m148 --locked --no-fail-fast
+test room::m148::m148_members_are_unplaced_and_readable ... FAILED
+test owed::m148::m148_owed_is_unplaced_data ... FAILED
+assertion `left == right` failed
+  left: Null
+ right: Array []
+assertion `left == right` failed
+  left: Null
+ right: Array []
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+test progress::m148::m148_progress_places_an_activity ... FAILED
+test tests::m148_a_fresh_board_records_a_transcript_anchor ... FAILED
+test tests::m148_board_places_its_table_and_buttons_on_its_recorded_row ... FAILED
+assertion `left == right` failed
+  left: Null
+ right: "activity"
+assertion failed: matches!(outcome, CommandOutcome::Record
+    { body: ItemBody::Notice { ref code, .. } } if code == "DEMO_BOARD")
+board row
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.01s
+test wake::m148::m148_wake_is_unplaced_data ... FAILED
+assertion `left == right` failed
+  left: Array [Object {"kind": String("status"), "text": String("wake"), "tone": String("neutral"), "until": String("1970-01-01T00:00:00Z")}]
+ right: Array []
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 115 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+test state::tests::m148_null_extension_journal_removes_only_its_kind ... FAILED
+assertion failed: !state.extensions["fixture"].contains_key("board")
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 135 filtered out; finished in 0.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+test keys::m148::m148_control_p_is_unbound_and_absent_from_help ... FAILED
+test frame::m148::m148_room_and_wake_data_draw_nothing_at_every_width ... FAILED
+test frame::m148::m148_unplaced_payloads_leave_the_screen_unchanged_at_every_width ... FAILED
+assertion failed: !ui.focus.showing()
+assertion `left == right` failed
+assertion `left == right` failed
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 1137 filtered out; finished in 0.03s
+error: 5 targets failed:
+    `-p bingo-collab --lib`
+    `-p bingo-demo-ui --lib`
+    `-p bingo-schedule --lib`
+    `-p bingo-sdk --lib`
+    `-p bingo-surface-tui --lib`
+```
+
+```text
+$ cargo fmt --all -- --check
+(exit 0; no output)
+$ git diff --check
+(exit 0; no output)
+```
+
+Stopped before implementation: workspace check, clippy, workspace tests,
+discipline, budget, deny, MSVC and PTY gates were not run. No live or credential
+tests ran; no tmux server was touched. All completion criteria remain unticked.
