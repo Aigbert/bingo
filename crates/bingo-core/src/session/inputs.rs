@@ -51,7 +51,7 @@ impl Actor {
         queued: bool,
     ) -> Result<(), KernelError> {
         let instant = command.spec().instant;
-        if !instant && !queued && self.busy() {
+        if !instant && !queued && (self.busy() || self.queue.ready()) {
             return self.enqueue(intent, input).await;
         }
         let invocation = commands::Invocation::of(&input, &parsed);
@@ -134,7 +134,7 @@ impl Actor {
         if !self.answers() {
             return self.log_input(intent, input).await;
         }
-        if self.busy() {
+        if self.busy() || self.queue.ready() {
             return self.enqueue(intent, input).await;
         }
         let inputs = self.held_then(intent, input).await?;
@@ -202,7 +202,7 @@ impl Actor {
         if !self.answers() {
             return self.log_input(intent, input).await;
         }
-        if self.busy() || input.is_held() {
+        if self.busy() || self.queue.ready() || input.is_held() {
             return self.enqueue(intent, input).await;
         }
         let inputs = self.held_then(intent, input).await?;
