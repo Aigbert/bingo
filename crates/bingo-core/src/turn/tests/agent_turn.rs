@@ -179,7 +179,7 @@ async fn agent_gets_exactly_the_turns_resolved_offer() {
 
 #[tokio::test]
 async fn an_agents_reported_window_can_grow_for_the_next_session() {
-    let provider = ScriptedProvider::new(vec![vec![
+    let provider = ScriptedProvider::new(vec![Script::Events(vec![
         Ok(ModelEvent::Context {
             used: 10,
             window: 100_000,
@@ -188,7 +188,7 @@ async fn an_agents_reported_window_can_grow_for_the_next_session() {
             usage: Usage::default(),
             finish_reason: FinishReason::unified(UnifiedFinish::Stop),
         }),
-    ]]);
+    ])]);
     let mut cfg = config(provider.clone(), vec![]);
     let model = cfg.model.as_mut().unwrap();
     model.learned.reported("scripted", &model.id, 50_000);
@@ -205,11 +205,11 @@ async fn an_agents_reported_window_can_grow_for_the_next_session() {
 
 #[tokio::test]
 async fn an_agent_cannot_send_a_model_tool_request() {
-    let provider = ScriptedProvider::new(vec![vec![Ok(ModelEvent::ToolCall {
-        call_id: "bad".into(),
+    let provider = ScriptedProvider::new(vec![Script::Events(vec![Ok(ModelEvent::ToolCall {
+        id: "bad".into(),
         name: "Echo".into(),
-        input: json!({}),
-    })]]);
+        input: "{}".into(),
+    })])]);
     let mut cfg = config(provider.clone(), vec![]);
     cfg.model.as_mut().unwrap().endpoint = Endpoint::Agent(provider);
     let out = run(&cfg, &RecordingHost::new(), CancellationToken::new()).await;
