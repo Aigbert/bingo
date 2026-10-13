@@ -12,7 +12,7 @@ use std::path::Path;
 use crate::error::ChannelError;
 
 /// Everything this surface keeps on disk lives under it.
-pub(crate) const DIRECTORY: &str = "channels";
+pub(crate) use bingo_channel_adapter::DIRECTORY;
 
 /// A credential this process holds for as long as the value lives.
 #[derive(Debug)]

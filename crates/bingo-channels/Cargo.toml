@@ -12,6 +12,7 @@ description = "IM channels surface for bingo: one deliverer, adapters that hand 
 workspace = true
 
 [dependencies]
+bingo-channel-adapter.workspace = true
 bingo-claim.workspace = true
 bingo-sdk.workspace = true
 # M17 (ADR-0020 §8): a gateway started at boot has no exported environment, so
@@ -48,6 +49,7 @@ tokio-tungstenite = { version = "0.30", default-features = false, features = [
 ] }
 
 [dev-dependencies]
+bingo-channel-adapter = { workspace = true, features = ["testing"] }
 bingo-sdk = { workspace = true, features = ["testing"] }
 # Frame fixtures carry timestamps; the surface mints none.
 jiff.workspace = true

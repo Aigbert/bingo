@@ -21,26 +21,26 @@
 //! and deriving what to say from the fold.
 
 pub mod access;
-pub mod adapter;
-pub mod conversation;
+pub use bingo_channel_adapter::adapter;
+pub use bingo_channel_adapter::conversation;
 pub mod deliver;
 pub mod directory;
-pub mod error;
+pub use bingo_channel_adapter::error;
 pub mod feishu;
 pub mod gate;
 pub mod guide;
 pub mod host;
-pub mod limits;
+pub use bingo_channel_adapter::limits;
 pub mod lock;
 pub mod loopback;
-pub mod question;
+pub use bingo_channel_adapter::question;
 pub mod runner;
 pub mod secret;
 pub mod settings;
 pub mod tool;
 
 #[cfg(test)]
-mod fixtures;
+use bingo_channel_adapter::fixtures;
 
 use std::sync::Arc;
 
