@@ -1159,6 +1159,7 @@ mod tests {
                     // What was said into a session, and who by: the name a
                     // post carries and the words after it.
                     "transcript/said.rs",
+                    "transcript/slots.rs",
                     "view.rs",
                     "views/actions.rs",
                     "views/keyvalue.rs",
@@ -1206,6 +1207,7 @@ mod tests {
                     // The `$` a shell line the person ran is written under.
                     "transcript/ran.rs",
                     "transcript/said.rs",
+                    "transcript/slots.rs",
                     // The `✻` of a thinking row and everything under it: a
                     // thought is working, and working is read past (§4).
                     "transcript/thinking.rs",
