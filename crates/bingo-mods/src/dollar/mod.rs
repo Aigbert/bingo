@@ -20,3 +20,5 @@ mod contract;
 mod chain_contract;
 
 mod scope;
+
+pub mod world;

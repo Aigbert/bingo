@@ -31,7 +31,9 @@ impl Fixture {
         )
         .unwrap();
         std::fs::write(root.join("main.ts"), source).unwrap();
-        let plugin = ModsPlugin::default().with_dirs(vec![root.clone()]);
+        let plugin = ModsPlugin::default()
+            .with_dirs(vec![root.clone()])
+            .with_project(home.path().into());
         let config = HostConfig::new(Env::rooted(home.path()))
             .with_layer("test", options)
             .with_layer("offline", json!({"provider":"offline","model":"offline"}));
