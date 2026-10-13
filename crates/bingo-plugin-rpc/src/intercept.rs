@@ -209,3 +209,15 @@ mod tests {
         assert_eq!(result["result"]["isError"], true);
     }
 }
+
+#[cfg(test)]
+mod catalogue_contract {
+    #[test]
+    fn initialization_retains_open_catalogue_subscriptions() {
+        let value = serde_json::json!({"protocol":2,"name":"watch","version":"1",
+            "subscriptions":[{"patterns":["mcp.*"],"prefilter":null}]});
+        let result: crate::wire::InitializeResult = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(serde_json::to_value(result).unwrap()["subscriptions"], value["subscriptions"]);
+        assert!(crate::wire::capabilities().contains("intercept/*"));
+    }
+}
