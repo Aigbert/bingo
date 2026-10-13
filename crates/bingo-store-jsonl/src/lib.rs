@@ -543,3 +543,37 @@ pub(crate) mod tests {
         );
     }
 }
+
+#[cfg(test)]
+async fn off_runtime<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> T {
+    work()
+}
+
+#[cfg(test)]
+mod runtime_contract {
+    use super::*;
+    use std::sync::Barrier;
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn blocking_io_leaves_current_thread_responsive() {
+        let runtime = std::thread::current().id();
+        let worker = off_runtime(|| std::thread::current().id()).await;
+        assert_ne!(runtime, worker, "journal I/O must leave the runtime thread");
+        let barrier = Arc::new(Barrier::new(2));
+        let held = barrier.clone();
+        let (entered, started) = tokio::sync::oneshot::channel();
+        let write = tokio::spawn(off_runtime(move || {
+            let _ = entered.send(());
+            held.wait();
+        }));
+        started.await.unwrap();
+        assert_eq!(
+            tokio::spawn(async { "responsive" }).await.unwrap(),
+            "responsive"
+        );
+        tokio::task::spawn_blocking(move || barrier.wait())
+            .await
+            .unwrap();
+        write.await.unwrap();
+    }
+}

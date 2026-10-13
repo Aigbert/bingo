@@ -36,6 +36,11 @@ impl Transcript {
         self.positions.get(id).map(|&at| self.items[at].as_ref())
     }
 
+    /// Open items owned by a turn, in transcript order.
+    pub fn open_items<'a>(&'a self, _turn: &'a crate::TurnId) -> impl Iterator<Item = &'a Item> {
+        std::iter::empty()
+    }
+
     pub fn generation(&self) -> u64 {
         self.generation
     }

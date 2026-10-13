@@ -90,6 +90,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn interrupted_is_a_stable_wire_code() {
+        let code: ErrorCode = serde_json::from_str("\"INTERRUPTED\"").expect("interruption code");
+        assert_eq!(code.as_str(), "INTERRUPTED");
+        assert_eq!(serde_json::to_string(&code).unwrap(), "\"INTERRUPTED\"");
+    }
+
+    #[test]
     fn the_wire_form_and_the_str_form_agree() {
         for code in [
             ErrorCode::SessionNotFound,

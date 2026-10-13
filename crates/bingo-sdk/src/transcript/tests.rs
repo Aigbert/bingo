@@ -164,3 +164,45 @@ fn client_snapshot_deserialization_rebuilds_the_lookup() {
     );
     assert_eq!(serde_json::to_vec(&restored).unwrap(), bytes);
 }
+
+#[test]
+fn open_items_belong_to_the_turn_and_exclude_terminal_or_removed_items() {
+    let turn = TurnId::from_raw("owned");
+    let mut transcript = Transcript::new();
+    for (id, status) in [
+        ItemStatus::Pending,
+        ItemStatus::Running,
+        ItemStatus::Completed,
+        ItemStatus::Interrupted,
+        ItemStatus::Failed,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut row = item(id as u8, String::new());
+        row.turn = Some(turn.clone());
+        row.status = status;
+        transcript.apply(&Event::ItemStarted { item: row });
+    }
+    let mut other = item(9, String::new());
+    other.status = ItemStatus::Running;
+    transcript.apply(&Event::ItemStarted { item: other });
+    let ids = |t: &Transcript| {
+        t.open_items(&turn)
+            .map(|i| i.id.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        ids(&transcript),
+        [ItemId::from_raw("i0"), ItemId::from_raw("i1")]
+    );
+    transcript.apply(&Event::TurnRetrying {
+        turn: turn.clone(),
+        attempt: 1,
+        max: 2,
+        delay_ms: 0,
+        reason: "retry".into(),
+        dropped: vec![ItemId::from_raw("i0")],
+    });
+    assert_eq!(ids(&transcript), [ItemId::from_raw("i1")]);
+}
