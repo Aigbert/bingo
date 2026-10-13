@@ -181,3 +181,14 @@ fn every_item_variant_has_a_golden_fixture() {
         assert_eq!(serde_json::to_string(&value).unwrap(), wire.trim_end());
     }
 }
+
+#[test]
+fn quiet_tool_calls_keep_their_flag_and_old_calls_keep_their_shape() {
+    for wire in [
+        include_str!("../fixtures/record/item/toolCall.json"),
+        include_str!("../fixtures/record/compat/quietToolCall.json"),
+    ] {
+        let body: ItemBody = serde_json::from_str(wire).unwrap();
+        assert_eq!(serde_json::to_string(&body).unwrap(), wire.trim_end());
+    }
+}
