@@ -153,8 +153,18 @@ pub(super) async fn gated(
     } else {
         verdict
     };
+    let held_delivery = matches!(
+        verdict,
+        Verdict::Delivered {
+            delivery: Delivery::Hold,
+            ..
+        }
+    );
     apply_gate(actor, intent, verdict).await?;
     start_gate(actor);
+    if held_delivery && !actor.queue.ready() {
+        return Ok(());
+    }
     actor.drain_queue().await
 }
 

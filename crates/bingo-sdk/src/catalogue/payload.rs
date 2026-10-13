@@ -17,8 +17,17 @@ pub struct ToolCall {
 impl TryFrom<crate::ToolCall> for ToolCall {
     type Error = KernelError;
     fn try_from(call: crate::ToolCall) -> Result<Self, Self::Error> {
-        let input = serde_json::from_value(call.input)
+        let input: BTreeMap<String, Value> = serde_json::from_value(call.input)
             .map_err(|error| KernelError::new(ErrorCode::InvalidInput, error.to_string()))?;
+        if let Some(field) = ["tool", "tool_use_id"]
+            .into_iter()
+            .find(|field| input.contains_key(*field))
+        {
+            return Err(KernelError::new(
+                ErrorCode::InvalidInput,
+                format!("tool input contains reserved field {field}"),
+            ));
+        }
         Ok(Self {
             tool: call.name,
             tool_use_id: call.call_id,
@@ -93,4 +102,24 @@ pub struct Measure {
     pub turn: TurnId,
     pub usage: Usage,
     pub context: ContextUsage,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn arguments_cannot_replace_the_envelope_identity() {
+        for field in ["tool", "tool_use_id"] {
+            let mut input = serde_json::Map::new();
+            input.insert(field.into(), Value::String("spoofed".into()));
+            let error = ToolCall::try_from(crate::ToolCall {
+                name: "Read".into(),
+                call_id: "c1".into(),
+                input: Value::Object(input),
+            })
+            .unwrap_err();
+            assert_eq!(error.code, ErrorCode::InvalidInput);
+            assert!(error.message.contains(field));
+        }
+    }
 }
