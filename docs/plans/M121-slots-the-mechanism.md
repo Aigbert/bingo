@@ -127,6 +127,8 @@ no new dependency.
   `transcript/pictured.rs`. All paths are under `crates/`.
 - Producer fixtures: `bingo-tasks/fixtures/pre-m121.json`; bash job test
   constructors in `src/{kill,read,notify}.rs` mechanically gain an item id.
+- Step 6 fixture update: `crates/bingo/tests/cli/board.rs` reads the task array
+  from the new payload's `tasks` member; all owner/board assertions stay unchanged.
 
 ## Verified (2026-10-13; in progress)
 - `cargo test -p bingo-sdk slot`: first `FAILED. 1 passed; 3 failed`;
