@@ -1,6 +1,6 @@
 # ADR-0067 — The picture is kept once
 
-Status: proposed · 2026-10-13 · Plan: M115 · Amends: ADR-0005 §8,
+Status: accepted · 2026-10-13 · Plan: M115 · Amends: ADR-0005 §8,
 ADR-0040 §3, ADR-0061 §1, ADR-0062 §1
 
 ## Context
@@ -63,6 +63,9 @@ unchanged (§5).
    not a record; the threshold lives beside `IMAGE_ROUNDS_KEPT`.
 
 ## Consequences
+
+- The checkpoint codec advances to version 2 as well: an old checkpoint
+  cannot hide the journal bump from either reader.
 
 - A session with many screenshots stops growing its journal by the
   picture each time it is quoted; resume and checkpoint read

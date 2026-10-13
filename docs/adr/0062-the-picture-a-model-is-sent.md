@@ -80,3 +80,5 @@ a person hands in and every fetched one passes through `sniffed`,
   count those words and ADR-0061's elision note both write.
 
 Refs: ADR-0040, ADR-0041, ADR-0052, ADR-0061; Plans: M104, M105
+
+2026-10-13 — [ADR-0067](0067-the-picture-is-kept-once.md) amends §1: bounded pictures retain their produced width and height, including unchanged pictures; the estimate uses ceil(width × height / 750), with the flat fallback when dimensions are absent.
