@@ -285,6 +285,14 @@ fn promoted(job: &Job) -> String {
 /// The tool names the shell it actually runs, because `Bash` on its own primes
 /// the model for a dialect the host may not have.
 fn description() -> String {
+    let shell = bingo_process::shell::resolve()
+        .map(|shell| shell.path().display().to_string())
+        .unwrap_or_else(|error| error.to_string());
+    let dialect = if cfg!(windows) {
+        " This is Git Bash: use /c/Users/... paths; Windows programs are on PATH."
+    } else {
+        ""
+    };
     format!(
         "Execute a command in the local shell ({shell}) and return what it wrote together with \
          its exit code. stdout and stderr come back interleaved, under a `$ <command>` header \
@@ -292,7 +300,7 @@ fn description() -> String {
          and says how much was dropped between them. Reading, listing and searching files is the \
          file tools' job, not this one's: a shell `cat`, `ls`, `find` or `grep` costs a permission \
          and answers with less than they do. Use this for building, testing and running \
-         programs.\n\n\
+         programs.{dialect}\n\n\
          Choose by dependency: omit `background` or set it to `false` when your next action \
          needs the output or exit status. Small probes, prerequisite builds, and validation \
          required before claiming success should wait in the foreground with a suitable \
@@ -322,7 +330,7 @@ fn description() -> String {
          stdin is closed, so nothing can prompt: a command that needs a terminal (a full-screen \
          monitor, an editor, a pager, `sudo` without `-n`, `ssh` without a remote command, a bare \
          REPL) is refused with the reason and the way round it.",
-        shell = run::shell(),
+        shell = shell,
         default = DEFAULT_TIMEOUT_MS,
         max = MAX_TIMEOUT_MS,
     )
@@ -415,6 +423,10 @@ impl Plugin for BashPlugin {
     }
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+        if let Err(error) = bingo_process::shell::resolve() {
+            registrar.add(Contribution::Hook(Arc::new(MissingShell(error))));
+            return Ok(());
+        }
         let promotions = Arc::new(Promotions::new());
         registrar
             .tool(Arc::new(BashTool::new(self.jobs.clone(), promotions.clone())) as Arc<dyn Tool>);
@@ -436,6 +448,32 @@ impl Plugin for BashPlugin {
     async fn stop(&self) -> Result<(), PluginError> {
         self.jobs.end_all(kill::WAIT).await;
         Ok(())
+    }
+}
+
+/// A missing shell is a session notice, not a tool the model can call.
+struct MissingShell(bingo_process::shell::ShellMissing);
+
+#[async_trait]
+impl bingo_sdk::Hook for MissingShell {
+    fn id(&self) -> &str {
+        "bingo.tools.bash.missing"
+    }
+
+    fn matcher(&self) -> bingo_sdk::HookMatcher {
+        bingo_sdk::HookMatcher {
+            points: vec![bingo_sdk::HookPoint::Session],
+            tool: None,
+        }
+    }
+
+    async fn on_session(&self, phase: bingo_sdk::Phase, cx: &bingo_sdk::HookContext) {
+        if phase == bingo_sdk::Phase::Start {
+            let _ = cx
+                .host
+                .notice(bingo_sdk::Level::Warn, "SHELL_MISSING", &self.0.to_string())
+                .await;
+        }
     }
 }
 
@@ -841,7 +879,13 @@ pub(crate) mod tests {
         let spec = tool.spec();
         assert_eq!(spec.name, "Bash");
         assert!(
-            spec.description.contains(run::shell()),
+            spec.description.contains(
+                &bingo_process::shell::resolve()
+                    .expect("shell")
+                    .path()
+                    .display()
+                    .to_string()
+            ),
             "{}",
             spec.description
         );
@@ -1314,8 +1358,7 @@ pub(crate) mod tests {
     /// `KillShell` does — asked, then made to — and waits for it, instead of
     /// leaving the group to a drop nobody observes.
     ///
-    /// Unix only, as every test here that spawns is: `run::shell` resolves
-    /// `/bin/bash` or `/bin/sh`, so on Windows there is nothing to end.
+    /// Unix process-group coverage; Windows uses a job object.
     #[cfg(unix)]
     #[tokio::test]
     async fn stopping_the_plugin_ends_every_job_it_had_running() {

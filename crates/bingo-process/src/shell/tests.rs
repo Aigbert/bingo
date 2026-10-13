@@ -166,3 +166,21 @@ fn deriving_a_shell_requires_git_to_exist() {
     env.paths = vec![PathBuf::from("D:/Portable/cmd")];
     assert!(resolve_with(&env, Platform::Windows).is_err());
 }
+
+#[test]
+fn the_real_shell_exists_and_the_memoized_answer_agrees() {
+    let shell = resolve().expect("the test host has a POSIX shell");
+    assert!(shell.path().is_file());
+    assert_eq!(resolve(), Ok(shell.clone()));
+    if cfg!(windows) && std::env::var_os("GITHUB_ACTIONS").is_some() {
+        let path = shell
+            .path()
+            .to_string_lossy()
+            .replace('\\', "/")
+            .to_ascii_lowercase();
+        assert!(
+            path.ends_with("git/bin/bash.exe") || path.ends_with("usr/bin/bash.exe"),
+            "{path}"
+        );
+    }
+}

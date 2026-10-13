@@ -10,7 +10,6 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::OnceLock;
 use std::time::Duration;
 
 #[cfg(windows)]
@@ -29,22 +28,6 @@ const MAX_PIPE_BYTES: usize = 1024 * 1024;
 
 /// How long the pipes are given once the process is gone.
 const DRAIN: Duration = Duration::from_secs(2);
-
-/// The shell a hook command runs under. `bash` is what hook commands are written
-/// for; `sh` is the fallback where there is no bash. Settled once: the shell does
-/// not change while the process lives. (`bingo-tool-bash` resolves the same two
-/// paths for the same reason; a plugin may not import another plugin, so the four
-/// lines are spelt twice rather than shared.)
-fn shell() -> &'static str {
-    static SHELL: OnceLock<&'static str> = OnceLock::new();
-    SHELL.get_or_init(|| {
-        if Path::new("/bin/bash").exists() {
-            "/bin/bash"
-        } else {
-            "/bin/sh"
-        }
-    })
-}
 
 /// One hook, and everything it needs to run.
 pub struct Request<'a> {
@@ -66,9 +49,11 @@ pub struct Completed {
 
 #[derive(Debug, thiserror::Error)]
 pub enum RunError {
-    #[error("could not run {shell}: {source}")]
+    #[error(transparent)]
+    Shell(#[from] bingo_process::shell::ShellMissing),
+    #[error("could not run {}: {source}", shell.display())]
     Spawn {
-        shell: &'static str,
+        shell: std::path::PathBuf,
         #[source]
         source: std::io::Error,
     },
@@ -95,7 +80,8 @@ pub async fn run(request: Request<'_>) -> Result<Completed, RunError> {
 }
 
 fn spawn(request: &Request<'_>) -> Result<Box<dyn ChildWrapper>, RunError> {
-    let mut command = Command::new(shell());
+    let shell = bingo_process::shell::resolve()?;
+    let mut command = Command::new(shell.path());
     command
         .arg("-c")
         .arg(request.command)
@@ -113,7 +99,7 @@ fn spawn(request: &Request<'_>) -> Result<Box<dyn ChildWrapper>, RunError> {
     wrapped.wrap(JobObject);
     wrapped.wrap(KillOnDrop);
     wrapped.spawn().map_err(|source| RunError::Spawn {
-        shell: shell(),
+        shell: shell.path().to_path_buf(),
         source,
     })
 }
