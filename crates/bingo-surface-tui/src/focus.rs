@@ -271,12 +271,10 @@ mod dispatch_tests {
             assert!(crate::pointer::on_mouse(&mut ui, &tree, mouse, now).is_empty());
             assert!(ui.focus.selection().is_none());
         }
-        for open in [crate::ui::Open::Help] {
-            ui.focus.show(open, now.instant);
-            assert_eq!(owner(&ui, &tree), Owner::Layer);
-            assert!(crate::pointer::on_mouse(&mut ui, &tree, mouse, now).is_empty());
-            assert_eq!(owner(&ui, &tree), Owner::Layer);
-        }
+        ui.focus.show(crate::ui::Open::Help, now.instant);
+        assert_eq!(owner(&ui, &tree), Owner::Layer);
+        assert!(crate::pointer::on_mouse(&mut ui, &tree, mouse, now).is_empty());
+        assert_eq!(owner(&ui, &tree), Owner::Layer);
         ui.focus.close(now.instant);
         assert_eq!(owner(&ui, &tree), Owner::Interaction);
     }

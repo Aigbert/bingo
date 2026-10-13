@@ -42,16 +42,6 @@ pub fn of(len: usize, selected: usize, rows: usize) -> Window {
     window(len, selected, rows)
 }
 
-/// The rows that fit from the one the cursor is on, for a list whose rows
-/// carry their own under them: what the cursor names is read with what belongs
-/// to it, so the view starts there rather than around there. The row before it
-/// is what a mark for the list above takes.
-pub fn onward(lines: Vec<Line<'static>>, at: usize, rows: usize) -> Vec<Line<'static>> {
-    let len = lines.len();
-    let window = placed(len, at.saturating_sub(1), at, rows);
-    framed(lines, window)
-}
-
 /// The brick: which rows of `len` a cursor on `selected` keeps in view in
 /// `rows` of room. Half the room goes above the cursor, so the list flows both
 /// ways under it.
@@ -196,21 +186,5 @@ mod tests {
                 }
             }
         }
-    }
-
-    /// A list whose rows carry their own under them starts at the cursor, so
-    /// what it names is read with what belongs to it.
-    #[test]
-    fn onward_starts_at_the_row_the_cursor_is_on() {
-        let drawn = |at, room| {
-            onward(rows(20), at, room)
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(drawn(0, 4), vec!["0", "1", "2", "  …"]);
-        assert_eq!(drawn(10, 4), vec!["  …", "10", "11", "  …"]);
-        assert_eq!(drawn(19, 4), vec!["  …", "17", "18", "19"]);
-        assert_eq!(drawn(10, 1), vec!["10"]);
     }
 }

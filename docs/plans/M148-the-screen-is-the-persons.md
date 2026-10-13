@@ -120,6 +120,7 @@ become data. No new dependency.
   - `ui/controls.rs`.
   - `view.rs`.
   - `views/mod.rs`.
+  - `views/tests.rs`: delete the removed legacy action traversal test.
   - `window.rs`.
 - Deleted snapshots: `panel_end`, `panel_middle`, `custom_panel_{80x24,120x40}`, `panel_sheet_{80x24,120x40}`, `owed_{80x24,120x40}`, `ctrl_p_shows_what_the_plugins_wrote_into_the_session`, `the_rail_holds_the_pinned_board_and_the_live_progress_card`, `without_a_rail_the_same_cards_draw_under_the_running_rows`: removed sheet/rail/lane only.
 - `bingo-rooms/src/room.rs`: approved default `slots: []` in two complete-payload expectations.
@@ -135,7 +136,8 @@ become data. No new dependency.
 - Extension readers inspected: tasks, demo-ui, collab room/ear/cursor/readers,
   context baseline/memory, agents report-back. Only the approved baseline
   assertion requires present-as-null to absent so far.
-- Smoke must use a unique owned tmux socket, replacing its fixed `bingo` socket.
+- Smoke uses a unique owned tmux socket; three widths replace the pinned-board steps.
+- Known ACP token tests run alone, per protocol; no live/credential tests run.
 
 ## Verified (2026-10-14)
 
@@ -286,4 +288,45 @@ test result: ok. 41 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; fin
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+```text
+$ cargo fmt --all -- --check
+(exit 0; no output)
+$ cargo check --workspace --all-targets --locked
+warning: unused import: `SessionId`
+warning: method `marks` is never used
+warning: function `actions_of` is never used
+warning: function `onward` is never used
+warning: `bingo-surface-tui` (lib) generated 4 warnings (run `cargo fix --lib -p bingo-surface-tui` to apply 1 suggestion)
+warning: function `action_of` is never used
+warning: method `marks` is never used
+warning: `bingo-surface-tui` (lib test) generated 3 warnings (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.78s
+```
+
+```text
+$ cargo fmt --all -- --check
+(exit 0; no output)
+$ cargo check --workspace --all-targets --locked
+warning: unused import: `SessionState`
+warning: `bingo-surface-tui` (lib) generated 1 warning (run `cargo fix --lib -p bingo-surface-tui` to apply 1 suggestion)
+warning: `bingo-surface-tui` (lib test) generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.16s
+```
+
+```text
+$ cargo check --workspace --all-targets --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.85s
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+error: for loop over a single element
+   --> crates/bingo-surface-tui/src/focus.rs:274:9
+error: could not compile `bingo-surface-tui` (lib test) due to 1 previous error
+```
+
+```text
+$ cargo fmt --all -- --check
+(exit 0; no output)
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.54s
 ```

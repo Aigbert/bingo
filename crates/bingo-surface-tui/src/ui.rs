@@ -7,7 +7,7 @@
 
 use std::time::{Duration, Instant};
 
-use bingo_sdk::{Action, CommandSpec, Level, Seq, SessionId, SessionState, SessionSummary, View};
+use bingo_sdk::{CommandSpec, Level, SessionId, SessionSummary, View};
 
 use crate::clock::{Anim, FRAME, Now};
 use crate::commands::{self, Suggestion};
@@ -22,7 +22,6 @@ use crate::roster;
 use crate::scroll::Scroll;
 use crate::select::{self, Cell, Dragging, Edge};
 use crate::tree::{self, Row, Tree};
-use crate::views::Marks;
 
 mod controls;
 
@@ -228,15 +227,6 @@ pub enum Open {
     Switcher(Switcher),
 }
 
-/// An action a person fired, and where the session's stream was when they
-/// did. The mark on the button stays until the stream moves, which is the
-/// ack: nothing here is a second copy of what the reducer already knows.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Pending {
-    pub action: Action,
-    pub seq: Seq,
-}
-
 impl Open {
     /// Whether the keyboard belongs to it while it is open. The lists and the
     /// panel answer keys; help is read while a person goes on typing.
@@ -395,21 +385,6 @@ impl Ui {
             update: None,
             measure: None,
             files: Files::default(),
-        }
-    }
-
-    /// What the frame marks on a view it is about to draw: the action a
-    /// person fired, while the session's stream has not moved since. The next
-    /// frame from the session — the ack, or what the action changed — is the
-    /// answer, so nothing has to be remembered to put the mark away.
-    pub fn marks(&self, state: &SessionState, now: Now) -> Marks {
-        Marks {
-            pending: self
-                .pending
-                .as_ref()
-                .filter(|pending| pending.seq == state.seq)
-                .map(|pending| pending.action.clone()),
-            ..Marks::at(now)
         }
     }
 

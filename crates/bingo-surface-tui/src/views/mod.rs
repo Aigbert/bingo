@@ -25,7 +25,7 @@ pub mod table;
 mod text;
 mod tree;
 
-use bingo_sdk::{Action, ActionItem, View};
+use bingo_sdk::{Action, View};
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
@@ -105,19 +105,6 @@ pub fn marked(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
         // for exactly this (ADR-0038 §1). Learning a kind richly is a
         // surface's own affair, and no kind is learned here yet.
         View::Custom { fold, .. } => text::lines(fold),
-    }
-}
-
-/// Every action a view offers, in the order it draws them: what a digit key
-/// on a focused card fires.
-pub fn actions_of(view: &View) -> Vec<&ActionItem> {
-    match view {
-        View::Actions { items } => items.iter().collect(),
-        View::Stack { children } | View::Columns { children } => {
-            children.iter().flat_map(actions_of).collect()
-        }
-        View::Panel { child, .. } => actions_of(child),
-        _ => Vec::new(),
     }
 }
 

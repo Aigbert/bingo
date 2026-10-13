@@ -291,22 +291,6 @@ fn a_fired_button_wears_the_mark_until_the_answer_comes_back() {
 }
 
 #[test]
-fn the_actions_of_a_view_are_found_however_deep_they_sit() {
-    let nested = View::Panel {
-        title: "Board".into(),
-        child: Box::new(View::Stack {
-            children: vec![table(), actions()],
-        }),
-    };
-    let found: Vec<&str> = actions_of(&nested)
-        .iter()
-        .map(|item| item.action.name.as_str())
-        .collect();
-    assert_eq!(found, ["board.tick", "board.next", "board.skip"]);
-    assert!(actions_of(&table()).is_empty());
-}
-
-#[test]
 fn buttons_that_do_not_fit_the_width_go_on_the_next_row() {
     let drawn = render(&actions(), 24);
     assert_eq!(drawn.len(), 2, "{drawn:?}");

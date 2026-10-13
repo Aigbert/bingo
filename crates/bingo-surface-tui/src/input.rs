@@ -8,7 +8,7 @@
 use std::path::PathBuf;
 
 use bingo_sdk::{
-    Delivery, Input, IntentId, Level, Origin, SessionId, SessionSelector, SessionSpec, SessionState,
+    Delivery, Input, IntentId, Level, Origin, SessionSelector, SessionSpec, SessionState,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
@@ -23,7 +23,7 @@ use crate::pager;
 use crate::rewind::{self, Rewind};
 use crate::search::Search;
 use crate::tree::Tree;
-use crate::ui::{Menu, Open, Pending, Ui};
+use crate::ui::{Menu, Open, Ui};
 use crate::views;
 
 mod switcher;
@@ -327,10 +327,6 @@ fn fire(ui: &mut Ui, tree: &Tree, key: char) -> Option<Vec<Effect>> {
     let action = views::actions::fired(&actions.iter().collect::<Vec<_>>(), key)?
         .action
         .clone();
-    ui.pending = Some(Pending {
-        action: action.clone(),
-        seq: state.seq,
-    });
     Some(vec![Effect::Submit(Input::Action { action })])
 }
 
@@ -3541,14 +3537,6 @@ mod tests {
         let (mut ui, now) = scene();
         write(&mut ui, &state, "x", now);
         assert_eq!(ui.composer.text(), "x");
-    }
-
-    /// The action a press fired, when it fired one.
-    fn action_of(effects: &[Effect]) -> Option<&bingo_sdk::Action> {
-        effects.iter().find_map(|effect| match effect {
-            Effect::Submit(Input::Action { action }) => Some(action),
-            _ => None,
-        })
     }
 
     #[test]
