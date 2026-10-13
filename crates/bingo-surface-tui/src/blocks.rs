@@ -219,9 +219,6 @@ pub struct Blocks {
     /// What closes the last turn — its failure, its cost — which belongs to
     /// no item.
     tail: Vec<Line<'static>>,
-    /// The live cards, where there is no rail to put them in (ADR-0013 §2):
-    /// they belong to no item either, and they sit under the running rows.
-    live: Vec<Line<'static>>,
     /// How many blocks have been drawn since this cache was made. A test
     /// watches it: scrolling must not move it.
     renders: usize,
@@ -233,13 +230,7 @@ pub struct Blocks {
 impl Blocks {
     /// Bring the cache up to date with the state and answer with the height of
     /// the whole transcript, in wrapped lines.
-    pub fn sync(
-        &mut self,
-        state: &SessionState,
-        agents: &Agents<'_>,
-        rows: &Rows<'_>,
-        live: Vec<Line<'static>>,
-    ) -> usize {
+    pub fn sync(&mut self, state: &SessionState, agents: &Agents<'_>, rows: &Rows<'_>) -> usize {
         self.relaid(rows);
         let boxed = welcome::lines(state, rows.width, rows.update);
         // The opening plays in the welcome box's place and lands on it, so while
@@ -256,7 +247,6 @@ impl Blocks {
         // Whatever is left behind the last item was rewound away.
         self.blocks.truncate(kept);
         self.tail = transcript::closing(state, rows);
-        self.live = live;
         self.moving = self.still_moving(rows.now);
         self.height = self.measure();
         self.height
@@ -506,12 +496,7 @@ impl Blocks {
             id: None,
             lines: self.tail.as_slice(),
         });
-        let live = (!self.live.is_empty()).then_some(Segment {
-            gap: opened || !self.tail.is_empty(),
-            id: None,
-            lines: self.live.as_slice(),
-        });
-        head.into_iter().chain(blocks).chain(tail).chain(live)
+        head.into_iter().chain(blocks).chain(tail)
     }
 }
 
@@ -558,7 +543,7 @@ mod tests {
         let pictures = crate::graphics::Decoded::default();
         let linked = crate::graphics::Linked::default();
         let rows = Rows::of(state, width, &folds, &[], &pictures, &linked, now);
-        blocks.sync(state, &Agents::new(), &rows, Vec::new())
+        blocks.sync(state, &Agents::new(), &rows)
     }
 
     /// The rows the welcome box takes at the top, plus the blank under it.
@@ -662,7 +647,7 @@ mod tests {
         let now = scene().1;
         let sync = |blocks: &mut Blocks, linked: &crate::graphics::Linked| {
             let rows = Rows::of(&state, 80, &folds, &[], &pictures, linked, now);
-            blocks.sync(&state, &Agents::new(), &rows, Vec::new());
+            blocks.sync(&state, &Agents::new(), &rows);
         };
         sync(&mut blocks, &linked);
         sync(&mut blocks, &linked);

@@ -28,7 +28,7 @@ pub const HINT: &str = keys::FOOTER_HINT;
 
 /// The status line at this width.
 pub fn line(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Line<'static> {
-    crate::layout::count::band(4);
+    crate::layout::count::band(3);
     place(
         left(tree.viewed()),
         middle(tree, ui, now),

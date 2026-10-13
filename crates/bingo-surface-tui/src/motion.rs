@@ -64,7 +64,7 @@ fn transcript_style(tree: &Tree, now: Now, needle: &str) -> Style {
     let pictures = crate::graphics::Decoded::default();
     let linked = crate::graphics::Linked::default();
     let rows = crate::transcript::Rows::of(state, 80, &folds, &[], &pictures, &linked, now);
-    let height = blocks.sync(state, &tree.agents(), &rows, Vec::new());
+    let height = blocks.sync(state, &tree.agents(), &rows);
     blocks
         .window(0, height)
         .iter()

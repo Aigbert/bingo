@@ -410,7 +410,7 @@ pub fn dim() -> Style {
     Style::new().add_modifier(Modifier::DIM)
 }
 
-/// The bar behind a `>` line, a card's surface, a rail card. Never text.
+/// The bar behind a `>` line, a card's surface, a placed view. Never text.
 pub fn raised() -> Style {
     match current().colors {
         Colors::True(palette) => Style::new().bg(palette.raised),
@@ -999,9 +999,7 @@ mod tests {
                     "form.rs",
                     "markdown.rs",
                     "pager.rs",
-                    "panel.rs",
                     "preview.rs",
-                    "rail.rs",
                     "rewind.rs",
                     // The row a person is on in the one list of sessions:
                     // weight rather than hue, so `NO_COLOR` still says which
@@ -1047,9 +1045,7 @@ mod tests {
                     "layers.rs",
                     "markdown.rs",
                     "pager.rs",
-                    "panel.rs",
                     "preview.rs",
-                    "rail.rs",
                     "rewind.rs",
                     "roster.rs",
                     "search.rs",
@@ -1089,7 +1085,6 @@ mod tests {
                     // The bar the way back to the foot rides on (M95).
                     "foot.rs",
                     "layers.rs",
-                    "rail.rs",
                     "search.rs",
                     "select.rs",
                     // The bar a person's own line is a band on.
@@ -1104,7 +1099,6 @@ mod tests {
                     // Which session asked, named after a card's own title —
                     // every card's head is written in one place (ADR-0010 §3).
                     "form.rs",
-                    "panel.rs",
                     "search.rs",
                     "select.rs",
                     "transcript.rs",

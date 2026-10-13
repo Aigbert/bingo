@@ -1,6 +1,6 @@
 # ADR-0081 — The screen is the person's
 
-Status: proposed · 2026-10-13 · Plans: M148, M151 (§7) · Amends: ADR-0013
+Status: accepted §§1–6 · 2026-10-14 · Plan: M148; §7 proposed, M151 · Amends: ADR-0013
 §2 §4, ADR-0070 §1, ADR-0079 §3 §5
 
 ## Context

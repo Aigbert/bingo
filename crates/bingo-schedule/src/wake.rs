@@ -78,14 +78,9 @@ pub fn set(now: Timestamp, after: SignedDuration, note: String) -> Wake {
 /// which is how a kind is taken back (ADR-0011 §2).
 pub fn payload(pending: Option<&Wake>) -> Value {
     match pending {
-        Some(wake) => bingo_sdk::slot::with(
-            json!({ AT: wake.at.to_string(), NOTE: wake.note }),
-            [bingo_sdk::slot::Slot::Status {
-                text: "wake".into(),
-                tone: bingo_sdk::Tone::Neutral,
-                until: Some(wake.at),
-            }],
-        ),
+        Some(wake) => {
+            bingo_sdk::slot::with(json!({ AT: wake.at.to_string(), NOTE: wake.note }), [])
+        }
         None => Value::Null,
     }
 }
@@ -109,7 +104,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn slots_place_the_wake_countdown_with_its_record() {
+    fn slots_leave_the_wake_record_unplaced() {
         let wake = set(
             Timestamp::UNIX_EPOCH,
             SignedDuration::from_mins(5),
@@ -118,14 +113,7 @@ mod tests {
         let payload = payload(Some(&wake));
         let slots: Vec<bingo_sdk::slot::Slot> =
             serde_json::from_value(payload["slots"].clone()).unwrap();
-        assert_eq!(
-            slots,
-            vec![bingo_sdk::slot::Slot::Status {
-                text: "wake".into(),
-                tone: bingo_sdk::Tone::Neutral,
-                until: Some(wake.at),
-            }]
-        );
+        assert!(slots.is_empty());
         assert_eq!(payload[AT], wake.at.to_string());
         assert_eq!(payload[NOTE], "check");
     }
@@ -183,11 +171,7 @@ mod tests {
             payload(Some(&wake)),
             bingo_sdk::slot::with(
                 json!({ "at": "1970-01-01T00:05:00Z", "note": "look at the build again" }),
-                [bingo_sdk::slot::Slot::Status {
-                    text: "wake".into(),
-                    tone: bingo_sdk::Tone::Neutral,
-                    until: Some(wake.at)
-                }]
+                []
             )
         );
         assert_eq!(
@@ -214,5 +198,20 @@ mod voice_tests {
     #[test]
     fn producer_stamps_its_voice() {
         assert_eq!(super::origin().voice, Some(bingo_sdk::Voice::Note));
+    }
+}
+
+#[cfg(test)]
+mod m148 {
+    use super::*;
+    #[test]
+    fn m148_wake_is_unplaced_data() {
+        assert_eq!(
+            payload(Some(&Wake {
+                at: Timestamp::UNIX_EPOCH,
+                note: "check".into()
+            }))["slots"],
+            json!([])
+        );
     }
 }

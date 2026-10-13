@@ -196,41 +196,6 @@ fn what_the_message_tools_answer() {
     both("message_tools", &tree, &mut ui, now);
 }
 
-/// What a room is owed, on the session it hangs under (ADR-0022 §4): a live
-/// card in the rail past 120 columns, and the same card under the running
-/// rows below it.
-#[test]
-fn what_a_room_is_owed() {
-    let state = folded(vec![
-        item(1, user("itm_1", "ask the room whether the plan is thin")),
-        item(
-            2,
-            assistant("itm_2", "Asked in #design.", ItemStatus::Completed),
-        ),
-        frame(
-            3,
-            signalled(
-                "bingo.rooms",
-                "owed",
-                owed_payload(&[("#design", "reviewer", 22), ("#design", "@all", 15)]),
-            ),
-        ),
-    ]);
-    let tree = solo(&state);
-    let (mut ui, now) = scene();
-    let wide = draw_tree(120, 40, &tree, &mut ui, now);
-    assert!(
-        wide.contains("owed"),
-        "the card is titled by its kind: {wide}"
-    );
-    assert!(
-        wide.contains("#design  reviewer"),
-        "two columns fit the rail whole, where three folded the clock \
-         (2026-09-02): {wide}"
-    );
-    both("owed", &tree, &mut ui, now);
-}
-
 // ---- the one list of sessions (M36) -------------------------------------
 
 /// A root with three sub-agents, a room two of them sit in — one on the live

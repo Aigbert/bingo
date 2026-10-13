@@ -118,7 +118,14 @@ async fn session_start_invalidates_both_keys_without_opening_the_session() {
     assert_eq!(fixture.capture().await, first);
     fixture.session(Phase::Start).await;
     for id in CONTRIBUTORS {
-        assert!(fixture.journal.state().extensions[PLUGIN][id].is_null());
+        assert!(
+            fixture
+                .journal
+                .state()
+                .extensions
+                .get(PLUGIN)
+                .is_none_or(|kinds| !kinds.contains_key(id))
+        );
     }
     let refreshed = fixture.capture().await;
     assert_ne!(refreshed, first);

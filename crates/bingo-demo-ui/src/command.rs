@@ -40,7 +40,7 @@ pub const TICK_COMMAND: BoardCommand = BoardCommand {
     change: Change::Tick,
 };
 
-/// What the `Reset` button fires; it also takes the progress bar off the rail.
+/// What the `Reset` button fires; it also takes the progress bar off the activity band.
 pub const RESET_COMMAND: BoardCommand = BoardCommand {
     name: RESET,
     hint: "start the board over",
@@ -63,7 +63,14 @@ impl Command for BoardCommand {
 
     async fn run(&self, _args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
         let board = self.changed(cx).await?;
-        journal::write(&cx.host, &cx.session, &board).await?;
+        if journal::write(&cx.host, &cx.session, &board)
+            .await?
+            .is_none()
+        {
+            return Ok(CommandOutcome::Record {
+                body: journal::anchor_body(),
+            });
+        }
         Ok(CommandOutcome::Applied {
             message: Some(self.said()),
         })
@@ -94,7 +101,7 @@ impl BoardCommand {
 
     fn said(&self) -> String {
         match self.change {
-            Change::Show => "board published (ctrl+t to pin it)".into(),
+            Change::Show => "board published".into(),
             Change::Tick => "board moved on".into(),
             Change::Reset => "board reset".into(),
         }
@@ -116,8 +123,8 @@ mod tests {
         let said = SHOW.run("", &cx).await.expect("published");
         assert_eq!(
             said,
-            CommandOutcome::Applied {
-                message: Some("board published (ctrl+t to pin it)".into())
+            CommandOutcome::Record {
+                body: journal::anchor_body()
             }
         );
         let board = journal::read(&journals.handle(), &session)

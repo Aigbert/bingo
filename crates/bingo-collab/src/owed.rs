@@ -69,7 +69,7 @@ pub fn view(debts: Vec<Debt>) -> Value {
     }
     let mut payload = drawn(&debts);
     payload[DEBTS] = json!(debts);
-    payload
+    bingo_sdk::slot::with(payload, [])
 }
 
 /// The two columns a person reads on the card: which room, and who has not
@@ -100,5 +100,20 @@ pub fn age(at: Timestamp, now: Timestamp) -> String {
         0..=59 => format!("{seconds}s"),
         60..=3599 => format!("{}m", seconds / 60),
         _ => format!("{}h", seconds / 3600),
+    }
+}
+
+#[cfg(test)]
+mod m148 {
+    use super::*;
+    #[test]
+    fn m148_owed_is_unplaced_data() {
+        let value = view(vec![Debt {
+            room: "#design".into(),
+            who: "scout".into(),
+            at: Timestamp::UNIX_EPOCH,
+        }]);
+        assert_eq!(value["slots"], json!([]));
+        assert_eq!(value["debts"][0]["who"], "scout");
     }
 }

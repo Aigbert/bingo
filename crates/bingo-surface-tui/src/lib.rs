@@ -22,8 +22,6 @@
 //!   carries — the root and its sub-sessions (ADR-0010 §3) — and which of
 //!   them is on screen.
 //! - [`views`] is one renderer per node of the `View` vocabulary (ADR-0013);
-//!   [`rail`] derives the cards a plugin's panels and signals become, and
-//!   [`panel`] is the sheet they are pinned from.
 //! - [`transcript`], [`markdown`], [`dialog`], [`composer`], [`commands`],
 //!   [`keys`], [`paths`], [`welcome`] and [`wrap`] are the
 //!   bricks those stand on, and [`theme`] is the one table of tokens and
@@ -82,12 +80,10 @@ mod mentions;
 /// product already has.
 mod opening;
 mod pager;
-mod panel;
 mod paths;
 mod pictures;
 mod pointer;
 mod preview;
-mod rail;
 mod render;
 mod rewind;
 mod roster;

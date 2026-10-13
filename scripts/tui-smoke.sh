@@ -10,7 +10,6 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 BIN="${CARGO_TARGET_DIR:-$ROOT/target}/debug/bingo"
-SOCKET=bingo
 SESSION=smoke
 # 200 polls of 50 ms: ten seconds is far more than any step needs.
 TRIES=200
@@ -19,6 +18,7 @@ command -v tmux >/dev/null || { echo "tui-smoke: tmux is required"; exit 1; }
 [ -x "$BIN" ] || { echo "tui-smoke: build first (cargo build): $BIN"; exit 1; }
 
 WORK=$(mktemp -d)
+SOCKET="bingo-smoke-${WORK##*/}"
 cleanup() {
   tmux -L "$SOCKET" kill-server 2>/dev/null || true
   rm -rf "$WORK"
@@ -149,7 +149,6 @@ finish() {
   await "left $LEFT with: 0"
 }
 
-tmux -L "$SOCKET" kill-server 2>/dev/null || true
 tmux -L "$SOCKET" -f /dev/null new-session -d -s "$SESSION" -x 120 -y 40 \
   "PS1='smoke\$ ' /bin/sh -i"
 keys 'echo "shell: $((1 + 1))"' Enter
@@ -354,35 +353,33 @@ if pane | grep -q '⏺'; then
 fi
 finish
 
-step 'a live signal moves in the rail and leaves nothing behind'
-start '{"responses":[
-  {"steps":[{"toolCall":{"name":"DemoProgress","input":{"label":"cargo test"}}}]},
-  {"steps":[{"text":"The bar has run."}]}]}' '' '--demo-ui'
-keys 'run the bar' Enter
-# The pane is 120 columns, so the card is in the rail; the bar is published
-# every 200 ms for three seconds, and these are its two ends.
-await '0 %'
-await '100 %'
-await 'The bar has run.'
-finish
-
-step 'a button on a pinned board fires its command and the table changes'
-start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}' '' '--demo-ui'
-keys '/board' Enter
-await 'board published'
-# ctrl+p opens the panel sheet, ⏎ pins the board into the rail, esc closes it.
-keys C-p
-await 'bingo.demo.ui'
-keys Enter
-await 'pinned'
-keys Escape
-await 'Board'
-# tab takes the focus, and the key the board's first button carries fires it.
-keys Tab
-await '❯ Board'
-keys '1'
-keys C-p
-await 'running'
-finish
+for size in '80 24' '120 40' '200 50'; do
+  read -r width height <<<"$size"
+  tmux -L "$SOCKET" resize-window -t "$SESSION" -x "$width" -y "$height"
+  step "placed board and activity at ${width}x${height} with a room open"
+  start '{"responses":[
+    {"steps":[{"toolCall":{"name":"DemoProgress","input":{"label":"cargo test"}}}]},
+    {"steps":[{"text":"The bar has run."}]}]}' 'BINGO_MOTION=off' '--demo-ui'
+  keys '/room design' Enter
+  await '#design'
+  keys '/board' Enter
+  await '[ 1 Tick ]'
+  keys Tab
+  await '❯ Board'
+  keys '1'
+  await 'running'
+  # The removed shortcut neither opens a sheet nor takes focus from the row.
+  keys C-p
+  keys '2'
+  await 'board reset'
+  await '❯ Board'
+  keys Tab
+  keys 'run the bar' Enter
+  await '0 %'
+  await '100 %'
+  await 'The bar has run.'
+  finish
+  step "${width}x${height}: board Tick/Reset and Activity ok; ctrl+p unbound"
+done
 
 echo 'tui-smoke ok'

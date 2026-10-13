@@ -15,7 +15,6 @@ use crate::clock::Now;
 use crate::effect::Effect;
 use crate::fold;
 use crate::input::{self, item_of, scroll, walk_to};
-use crate::rail::CardId;
 use crate::roster;
 use crate::select::{Cell, Edge};
 use crate::tree::Tree;
@@ -77,10 +76,6 @@ fn layer_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent) -> Vec<Effect> {
 /// A press lands on whatever is under it: a card's option answers, a block
 /// takes the focus, opens what is folded under it and starts a run.
 fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent) -> Vec<Effect> {
-    if let Some(card) = rail_card(ui, mouse) {
-        ui.focus = crate::focus::Focus::Card(card);
-        return Vec::new();
-    }
     // The way back to the foot answers a click as `end` answers a key.
     if on_foot(ui, mouse) {
         ui.scroll.end();
@@ -186,7 +181,7 @@ fn taken(lines: usize) -> String {
 
 /// Which side of the transcript the pointer is pulling the view towards, if
 /// either. Only the rows count: a row of the composer, of the status line or
-/// of a rail card is a row below the transcript, whatever column it is in.
+/// of a placed view is a row below the transcript, whatever column it is in.
 ///
 /// **The transcript's own first row is the top edge.** Nothing sits above it
 /// (`frame`), so a hand that has gone past the top of the window is reported
@@ -282,24 +277,6 @@ fn under(ui: &Ui, tree: &Tree, cursor: roster::Cursor) -> Option<SessionId> {
         return None;
     };
     open.session(tree, ui.composer.text(), cursor)
-}
-
-/// The rail card under the pointer, when it is over the rail.
-fn rail_card(ui: &Ui, mouse: MouseEvent) -> Option<CardId> {
-    let painted = &ui.shown;
-    let area = painted.regions.rail?;
-    if !area.contains(Position {
-        x: mouse.column,
-        y: mouse.row,
-    }) {
-        return None;
-    }
-    let row = usize::from(mouse.row - area.y);
-    painted
-        .rail
-        .iter()
-        .find(|(_, rows)| rows.contains(&row))
-        .map(|(id, _)| id.clone())
 }
 
 /// The transcript cell under the pointer, when it is over the transcript.

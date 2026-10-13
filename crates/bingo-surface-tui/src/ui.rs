@@ -7,9 +7,7 @@
 
 use std::time::{Duration, Instant};
 
-use std::collections::BTreeSet;
-
-use bingo_sdk::{Action, CommandSpec, Level, Seq, SessionId, SessionState, SessionSummary, View};
+use bingo_sdk::{CommandSpec, Level, SessionId, SessionSummary, View};
 
 use crate::clock::{Anim, FRAME, Now};
 use crate::commands::{self, Suggestion};
@@ -19,13 +17,11 @@ use crate::graphics::{Decoded, Linked};
 use crate::layers::{self, Reveal};
 use crate::layout::Layout;
 use crate::pager::Pager;
-use crate::rail::Pin;
 use crate::rewind::Rewind;
 use crate::roster;
 use crate::scroll::Scroll;
 use crate::select::{self, Cell, Dragging, Edge};
 use crate::tree::{self, Row, Tree};
-use crate::views::Marks;
 
 mod controls;
 
@@ -221,8 +217,6 @@ pub enum Open {
     Nothing,
     /// The binding table and the commands, as a sheet.
     Help,
-    /// What the plugins wrote into the session in view, as a sheet.
-    Panel,
     /// The `/resume` list, as a sheet.
     Picker(Picker),
     /// One block, whole, as a sheet.
@@ -233,22 +227,13 @@ pub enum Open {
     Switcher(Switcher),
 }
 
-/// An action a person fired, and where the session's stream was when they
-/// did. The mark on the button stays until the stream moves, which is the
-/// ack: nothing here is a second copy of what the reducer already knows.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Pending {
-    pub action: Action,
-    pub seq: Seq,
-}
-
 impl Open {
     /// Whether the keyboard belongs to it while it is open. The lists and the
     /// panel answer keys; help is read while a person goes on typing.
     pub fn captures(&self) -> bool {
         matches!(
             self,
-            Open::Picker(_) | Open::Pager(_) | Open::Switcher(_) | Open::Rewind(_) | Open::Panel
+            Open::Picker(_) | Open::Pager(_) | Open::Switcher(_) | Open::Rewind(_)
         )
     }
 
@@ -335,9 +320,6 @@ pub struct Ui {
     pub notices: Vec<Notice>,
     /// A command's `View`, shown until the next key.
     pub block: Option<View>,
-    /// The panels a person pinned into the rail, per session (ADR-0013 §4:
-    /// where a panel sits is the surface's answer, not the plugin's).
-    pub pinned: BTreeSet<Pin>,
     /// `ctrl+t` took the task list off the band (M74). The verb row keeps
     /// the task being done either way: hiding the list is about rows, not
     /// about what the turn is doing.
@@ -392,7 +374,6 @@ impl Ui {
             scroll: Scroll::default(),
             notices: Vec::new(),
             block: None,
-            pinned: BTreeSet::new(),
             activity_hidden: false,
             folds: Folds::new(),
             focused: true,
@@ -404,21 +385,6 @@ impl Ui {
             update: None,
             measure: None,
             files: Files::default(),
-        }
-    }
-
-    /// What the frame marks on a view it is about to draw: the action a
-    /// person fired, while the session's stream has not moved since. The next
-    /// frame from the session — the ack, or what the action changed — is the
-    /// answer, so nothing has to be remembered to put the mark away.
-    pub fn marks(&self, state: &SessionState, now: Now) -> Marks {
-        Marks {
-            pending: self
-                .pending
-                .as_ref()
-                .filter(|pending| pending.seq == state.seq)
-                .map(|pending| pending.action.clone()),
-            ..Marks::at(now)
         }
     }
 

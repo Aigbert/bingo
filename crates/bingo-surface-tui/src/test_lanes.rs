@@ -3,11 +3,10 @@
 //! beside [`crate::test_support`] and re-exported from it, so a test still
 //! reaches every fixture through one import.
 
-use bingo_sdk::{Event, SessionId, SessionState, View};
+use bingo_sdk::{Event, SessionState, View};
 use serde_json::Value;
 
 use crate::test_support::{extended, folded, frame, user};
-use crate::ui::Ui;
 
 /// A plugin publishing live state onto the stream: never journaled, gone on
 /// a resume, replaced in place by the next one (ADR-0013 §2).
@@ -93,23 +92,6 @@ pub fn boarded() -> SessionState {
     ])
 }
 
-/// One of the demo plugin's cards, by the kind it published under.
-pub fn demo_card(kind: &str) -> crate::rail::CardId {
-    crate::rail::CardId {
-        plugin: "bingo.demo.ui".into(),
-        kind: kind.into(),
-        slot: None,
-    }
-}
-
-/// A person who pinned the board into the root session's rail.
-pub fn pin_board(ui: &mut Ui) {
-    ui.pinned.insert(crate::rail::Pin {
-        session: SessionId::from_raw("ses_1"),
-        card: demo_card("board"),
-    });
-}
-
 fn stranger_payload() -> Value {
     use bingo_sdk::{
         Action, ActionItem, ItemId, Tone,
@@ -166,7 +148,7 @@ fn stranger_payload() -> Value {
 
 #[test]
 fn a_stranger_places_every_slot_without_a_surface_registration() {
-    use crate::{effect::Effect, input, panel, rail, test_support::*};
+    use crate::{effect::Effect, input, test_support::*};
     use bingo_sdk::{ItemStatus, ToolOutput};
     let (mut ui, now) = scene();
     let payload = stranger_payload();
@@ -190,8 +172,6 @@ fn a_stranger_places_every_slot_without_a_surface_registration() {
         "stranger status",
         "stranger activity",
         "activity body",
-        "stranger rail",
-        "rail body",
         "awake",
         "stranger row",
         "badge",
@@ -200,17 +180,6 @@ fn a_stranger_places_every_slot_without_a_surface_registration() {
         assert!(screen.contains(text), "missing {text}:\n{screen}");
     }
     assert!(!screen.contains("old body"));
-    assert_eq!(rail::cards(&state, &state.summary.id, &ui.pinned).len(), 1);
-    let sheet = panel::lines(&state, &state.summary.id, 0, &ui.pinned, 80, 30, now);
-    let sheet = sheet
-        .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>()
-        .join("\n");
-    assert!(
-        sheet.contains("stranger panel") && sheet.contains("panel body"),
-        "{sheet}"
-    );
     let effects = input::on_key(
         &mut ui,
         &solo(&state),
@@ -323,46 +292,6 @@ pub fn shell_payload(table: Value, item: &str) -> Value {
             },
         ],
     )
-}
-
-#[test]
-fn an_unrelated_placement_does_not_move_a_pinned_panel() {
-    use crate::{rail, test_support::*};
-    use bingo_sdk::slot::{self, Slot};
-    let mut state = folded(vec![frame(
-        1,
-        extended(
-            "stranger",
-            "board",
-            slot::with(
-                serde_json::json!({}),
-                [Slot::Panel {
-                    title: "Pinned".into(),
-                    view: View::text("kept"),
-                }],
-            ),
-        ),
-    )]);
-    let card = rail::placed_cards(&state, true).next().unwrap();
-    let pins = std::collections::BTreeSet::from([rail::Pin {
-        session: state.summary.id.clone(),
-        card: card.id.clone(),
-    }]);
-    state.apply(&frame(
-        2,
-        signalled(
-            "ahead",
-            "live",
-            slot::with(
-                serde_json::json!({}),
-                [Slot::Rail {
-                    title: "New".into(),
-                    view: View::text("live"),
-                }],
-            ),
-        ),
-    ));
-    assert!(rail::cards(&state, &state.summary.id, &pins).contains(&card));
 }
 
 #[test]

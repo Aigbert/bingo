@@ -213,10 +213,19 @@ impl SessionState {
     }
 
     fn extended(&mut self, plugin: &str, kind: &str, payload: &Value) -> Applied {
-        self.extensions
-            .entry(plugin.to_string())
-            .or_default()
-            .insert(kind.to_string(), payload.clone());
+        if payload.is_null() {
+            if let Some(kinds) = self.extensions.get_mut(plugin) {
+                kinds.remove(kind);
+                if kinds.is_empty() {
+                    self.extensions.remove(plugin);
+                }
+            }
+        } else {
+            self.extensions
+                .entry(plugin.to_string())
+                .or_default()
+                .insert(kind.to_string(), payload.clone());
+        }
         Applied::Extension
     }
 
@@ -381,6 +390,57 @@ mod tests {
             asking: false,
             messages: None,
         }
+    }
+
+    #[test]
+    fn m148_null_extension_journal_removes_only_its_kind() {
+        let events = [
+            Event::Extension {
+                plugin: "fixture".into(),
+                kind: "board".into(),
+                payload: serde_json::json!({"n": 1}),
+            },
+            Event::Extension {
+                plugin: "fixture".into(),
+                kind: "kept".into(),
+                payload: serde_json::json!({"n": 2}),
+            },
+            Event::Extension {
+                plugin: "fixture".into(),
+                kind: "board".into(),
+                payload: Value::Null,
+            },
+        ];
+        let expected = serde_json::to_string_pretty(&events).unwrap() + "\n";
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/extensions-null.json");
+        if std::env::var_os("BINGO_UPDATE_SCHEMA").is_some() {
+            std::fs::write(&path, &expected).unwrap();
+        }
+        let fixture = std::fs::read_to_string(path).unwrap();
+        assert_eq!(fixture, expected);
+        let mut state = SessionState::new(summary());
+        for (at, event) in serde_json::from_str::<Vec<Event>>(&fixture)
+            .unwrap()
+            .into_iter()
+            .enumerate()
+        {
+            state.apply(&frame(at as u64 + 1, event));
+        }
+        assert!(!state.extensions["fixture"].contains_key("board"));
+        assert_eq!(
+            state.extensions["fixture"]["kept"],
+            serde_json::json!({"n": 2})
+        );
+        state.apply(&frame(
+            4,
+            Event::Extension {
+                plugin: "fixture".into(),
+                kind: "kept".into(),
+                payload: Value::Null,
+            },
+        ));
+        assert!(state.extensions.is_empty());
     }
 
     #[test]

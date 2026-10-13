@@ -45,7 +45,7 @@ pub struct Run {
 /// How far past the rows of the transcript a screen row is, and on which
 /// side. A pointer that has left the region is still pointing at the
 /// transcript: above it are the lines that have scrolled off the top, below
-/// it — over the composer, the status line, a rail card — the ones under its
+/// it — over the composer, the status line, a placed view — the ones under its
 /// foot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Edge {

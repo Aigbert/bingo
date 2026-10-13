@@ -1,5 +1,7 @@
 # 0013 — UI as data: one view vocabulary, three lanes, actions
 
+**2026-10-14:** §2’s legacy panel/live drawing and §4’s rail and pins are removed by M148 (ADR-0081 §§1–6). Extensions and signals remain data; the TUI draws their explicit slots.
+
 ## Context
 
 A command answers `View::{Text, List, Table}` and the TUI's `ctrl+t` panel draws an `Extension` payload generically (ADR-0011 §2). That is the whole of what a plugin can show today. M11 wants the terminal to be rich — progress, diffs, boards, forms, images — and the user wants it extensible: a plugin, or the agent through a plugin's tool, should be able to put a live, interactive thing on the screen ("a TUI artifact") without the TUI crate knowing it. Three rules bound the answer: only the surface crate may depend on ratatui (ADR-0001), no surface defines a private mirror of kernel types (ADR-0002), and the kernel knows no plugin by name. The plan sketched a `Widget` extension point and per-plugin `*-tui` crates; that would put a second rendering path in every plugin and leave the RPC, print and IM surfaces with nothing.

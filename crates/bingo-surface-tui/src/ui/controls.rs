@@ -1,6 +1,6 @@
 //! Input state and gestures, owned by the surface's one focus.
 
-use super::{Catalogs, Menu, Pending};
+use super::{Catalogs, Menu};
 use crate::composer::Composer;
 use crate::dialog::Dialog;
 use crate::focus::Focus;
@@ -22,10 +22,6 @@ pub struct Controls {
     pub select: Select,
     /// The one owner of keys and pointer events.
     pub focus: Focus,
-    /// The panel sheet's cursor: the row `⏎` would pin.
-    pub panel: usize,
-    /// An action fired and not yet answered.
-    pub pending: Option<Pending>,
     /// When ctrl+c was pressed on an empty composer.
     pub armed: Option<Instant>,
     /// The turn this surface has asked to stop, so the activity row answers
@@ -59,8 +55,6 @@ impl Controls {
             menu: Menu::default(),
             select: Select::default(),
             focus: Focus::Composer,
-            panel: 0,
-            pending: None,
             armed: None,
             stop_asked: None,
             esc_armed: false,

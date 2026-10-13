@@ -98,16 +98,11 @@ pub const BINDINGS: &[Binding] = &[
         description: "show/hide tasks",
     },
     Binding {
-        keys: "ctrl+p",
-        group: "sessions",
-        description: "plugin panels · pin state",
-    },
-    Binding {
         // The stack of [`TABS`], in the order it is obeyed; a test holds the
         // two together.
         keys: "tab",
         group: "turn",
-        description: "complete → queue → next card",
+        description: "complete → queue → next row",
     },
     Binding {
         keys: "shift+tab",
@@ -163,7 +158,7 @@ pub const BUSY_PLACEHOLDER: &str = "ask anything · ⏎ steers · tab queues";
 /// help exactly as it is obeyed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Escape {
-    /// A sheet over the whole frame: help, the panel, the resume picker.
+    /// A sheet over the whole frame: help, the resume picker.
     Sheet,
     /// The card that is asking: leaving it is its own cancel or denial.
     Card,
@@ -211,7 +206,7 @@ pub fn escape(open: Open) -> Option<Escape> {
 }
 
 /// What `tab` does, innermost first (§7). A layer that captures never reaches
-/// this table — the switcher, the panel and a form answer their own keys while
+/// this table — the switcher and a form answer their own keys while
 /// they are up — so every rung here is about the composer and the cards
 /// beneath it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -221,7 +216,7 @@ pub enum Tab {
     /// A turn is running and there are words in the box: the line waits for
     /// that turn to end instead of steering it (ADR-0008 §2, amended M68).
     Queue,
-    /// Move the ring to the next card that answers keys.
+    /// Move the ring to the next row that answers keys.
     Focus,
 }
 
@@ -229,7 +224,7 @@ pub enum Tab {
 pub const TABS: &[(Tab, &str)] = &[
     (Tab::Complete, "complete"),
     (Tab::Queue, "queue"),
-    (Tab::Focus, "next card"),
+    (Tab::Focus, "next row"),
 ];
 
 /// What is true when `tab` is pressed.
@@ -573,5 +568,23 @@ mod tests {
                 assert!(line.to_string().width() <= width, "width {width}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod m148 {
+    use crate::test_support::*;
+    #[test]
+    fn m148_control_p_is_unbound_and_absent_from_help() {
+        let (mut ui, now) = scene();
+        let state = state();
+        assert!(crate::input::on_key(&mut ui, &solo(&state), ctrl('p'), now).is_empty());
+        assert!(!ui.focus.showing());
+        let help = super::help_lines(200)
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(!help.contains(concat!("ctrl", "+p")));
     }
 }

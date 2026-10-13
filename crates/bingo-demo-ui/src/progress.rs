@@ -80,12 +80,16 @@ impl Tool for DemoProgressTool {
 /// One frame of the bar. The reducer keeps the latest per kind, so publishing
 /// the whole of it every step costs one value, not a history.
 async fn publish(cx: &ToolContext, step: u64, label: &str) -> Result<(), ToolError> {
-    let payload = serde_json::to_value(View::Progress {
+    let view = View::Progress {
         value: step,
         total: Some(STEPS),
-        label: Some(label.to_string()),
-    })
-    .map_err(|e| ToolError::Failed(e.to_string()))?;
+        label: Some(label.into()),
+    };
+    let payload = serde_json::to_value(&view).map_err(|e| ToolError::Failed(e.to_string()))?;
+    let payload = bingo_sdk::slot::with(
+        payload,
+        [bingo_sdk::slot::Slot::Activity { verb: None, view }],
+    );
     cx.host
         .signal(&cx.session, PLUGIN, PROGRESS, payload)
         .await
@@ -138,7 +142,8 @@ mod tests {
         assert_eq!(
             signals[0].1,
             serde_json::json!({
-                "kind": "progress", "value": 0, "total": STEPS, "label": "cargo test"
+                "kind": "progress", "value": 0, "total": STEPS, "label": "cargo test",
+                "slots": [{"kind":"activity", "verb":null, "view": {"kind":"progress", "value":0, "total":STEPS, "label":"cargo test"}}]
             })
         );
         assert_eq!(
@@ -173,5 +178,21 @@ mod tests {
         let traits = DemoProgressTool.traits(&serde_json::Value::Null);
         assert!(traits.read_only && traits.trusted);
         assert!(!traits.concurrency_safe);
+    }
+}
+
+#[cfg(test)]
+mod m148 {
+    use super::*;
+    #[tokio::test]
+    async fn m148_progress_places_an_activity() {
+        let journals = crate::tests::Journals::new();
+        let session = journals.session();
+        publish(&crate::tests::tool_context(&session, &journals), 3, "check")
+            .await
+            .unwrap();
+        let payload = &journals.signals()[0].1;
+        assert_eq!(payload["slots"][0]["kind"], "activity");
+        assert_eq!(payload["slots"][0]["view"]["value"], 3);
     }
 }

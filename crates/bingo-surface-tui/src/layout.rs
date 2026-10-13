@@ -4,7 +4,6 @@ use crate::blocks::Blocks;
 use crate::clock::Now;
 use crate::frame::Regions;
 use crate::graphics::Placed;
-use crate::rail::CardId;
 use crate::tree::Tree;
 use crate::ui::{Card, Listed, Ui};
 use ratatui::layout::Rect;
@@ -23,7 +22,7 @@ pub struct Layout {
     pub canvas: Canvas,
     pub next_frame: Option<Instant>,
     #[cfg(test)]
-    pub renders: [usize; 5],
+    pub renders: [usize; 4],
     pub regions: Regions,
     /// The transcript's height in wrapped lines.
     pub height: usize,
@@ -33,9 +32,6 @@ pub struct Layout {
     pub card: Option<Card>,
     /// The list of sessions on the screen, when it is open.
     pub list: Option<Listed>,
-    /// Where each rail card landed, in the rail's own rows: what a click on
-    /// the rail is answered against.
-    pub rail: Vec<(CardId, std::ops::Range<usize>)>,
     /// The thumbnails the composer's strip drew, in the line's own order.
     pub strip: Vec<crate::graphics::Picture>,
     /// Where this frame drew each picture's cells, in the terminal's own rows

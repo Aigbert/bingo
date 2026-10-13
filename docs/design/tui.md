@@ -6,7 +6,7 @@
 
 bingo in a terminal is a counterpart you work beside for hours, and it should feel **alive**: it breathes while it thinks, its work arrives with a pulse, what it wants from you comes forward and the rest recedes. Alive is not busy — every motion says something true about state (thinking, arriving, waiting, done), nothing moves for decoration, and stillness is the default when nothing is happening. Three rules hold the energy: **hierarchy first** (the eye is led, never searched), **content over furniture** (chrome is thin and dim; colour and motion are spent on what matters), and **full control** (the surface owns the whole screen, so nothing is left to the terminal's mercy — scrolling, selection, layout and every transition are ours to make good).
 
-The **grammar is Claude Code's**, taken whole because a person who knows it should feel at home: `⏺` for what the model says and does, `⎿` for what came back, `>` for what you said, a rounded box around the input, `✻` that sparkles through a verb while it works (`✻ Simmering… (esc to interrupt · 8s · ↓ 1.2k tokens)`), `… +12 lines (ctrl+o to expand)`, a bordered card asking `Do you want to…?` with numbered answers, a mode line `⏵⏵ accept edits on (shift+tab to cycle)`, a welcome box. On top of that grammar, what Claude Code does not do: warm truecolor, an input box that glows while the model works, bullets that pulse while live and flip when done, a comet tail on streaming text, translucent diff backgrounds, child sessions as rows you can step into, a rail, and a full screen we own. And one thing Claude Code does not do that we keep not doing: a header — nothing sits above the transcript; the one line of furniture is under the input box. Other references, one trait each: `btop` — live meters that never flicker; Charm's `gum` — motion with wit and restraint. Density is middle-high: 80 columns must be good, 120 earns a rail.
+The **grammar is Claude Code's**, taken whole because a person who knows it should feel at home: `⏺` for what the model says and does, `⎿` for what came back, `>` for what you said, a rounded box around the input, `✻` that sparkles through a verb while it works (`✻ Simmering… (esc to interrupt · 8s · ↓ 1.2k tokens)`), `… +12 lines (ctrl+o to expand)`, a bordered card asking `Do you want to…?` with numbered answers, a mode line `⏵⏵ accept edits on (shift+tab to cycle)`, a welcome box. On top of that grammar, what Claude Code does not do: warm truecolor, an input box that glows while the model works, bullets that pulse while live and flip when done, a comet tail on streaming text, translucent diff backgrounds, child sessions as rows you can step into, and a full screen we own. And one thing Claude Code does not do that we keep not doing: a header — nothing sits above the transcript; the one line of furniture is under the input box. Other references, one trait each: `btop` — live meters that never flicker; Charm's `gum` — motion with wit and restraint. Density is middle-high: 80 columns must be good; the transcript keeps the width at every size.
 
 ## 2. Three glances
 
@@ -26,13 +26,11 @@ terminal. The loop publishes it as `Ui.shown` after painting; keys, clicks,
 drags and graphics delivery read the same layout. Directory completion is
 prepared before the pass. No row or rail threshold changes with this split.
 
-The surface owns the alternate screen for the whole run. Regions, top to bottom — nothing above the transcript — with a rail past 120 columns:
+The surface owns the alternate screen for the whole run. Regions, top to bottom — nothing above the transcript — with the transcript taking the width at every size (M148):
 
 ```text
-                                                       ┌ rail ─────────────┐
-  > what is in this workspace?                         │ cargo test        │
-                                                       │ ▬▬▬▬▬▬▬▬░░ 24/33  │
-  ⏺ I'll read the manifest first.                      └───────────────────┘
+  > what is in this workspace?
+  ⏺ I'll read the manifest first.
 
   ⏺ Read(Cargo.toml)
     ⎿  Read 3 lines
@@ -61,9 +59,8 @@ The surface owns the alternate screen for the whole run. Regions, top to bottom 
 
 - **Transcript**: a virtualised list of blocks (one per item), scrolled by us — smooth, by line, with the mouse wheel and `pgup/pgdn`; `ctrl+f` searches it; `v` or a mouse drag selects and `y`/`ctrl+c` copies through OSC 52, and **the selection follows the hand** (2026-09-10, M92): its cells are lines of the whole transcript rather than of the screenful on it, so the view makes the smallest move that keeps the far end in front of the reader, a drag held past an edge walks it a line every 50 ms until the hand comes back or the transcript runs out, and letting the button up copies what was drawn and says how many lines it took; a long block folds to its tail and opens in place on `⏎` when focused. The frame around it is a hairline in the raised tint, not a bright box.
 - **Sessions**: a child or peer is a row in the transcript where it began — `⏺ reviewer(review the manifest)` with `⎿  Running… 3 tools · 1.2k tokens` while it works, `⎿  Done (4 tools · 8.1k tokens · 40s)` after, `⎿  Needs you` pulsing — and `⏎` on that row steps into its transcript; the status line's right slot then reads `in reviewer`. A room's messages are `> reviewer: …` lines. **One list, two doors** (user-directed, 2026-09-02): `↓` on an empty composer and `ctrl+g` open the same list of sessions, a dropdown above the input box like the `/` menu — the Teams list below. It appears only on the gesture, so the one-line-of-furniture rule holds; there is still no tab strip: a session that is doing nothing is not on screen until you ask to walk them.
-- **Rail** (≥ 120 columns): pinned panels and live signals (ADR-0013), each a small card, from the top row down — the task list and the shells' running set excepted, which have places of their own (§4 `tasks`, `shell`); below 120 columns the same cards draw in the transcript under the running rows; without them the rail is not drawn.
 - **Cards** are the dialog form: a permission, a question, a sign-in, the switcher, the rewind picker. A card is a bordered box under the `⎿` of the row that asked — Claude Code's `Do you want to…?` — with the only bright border on screen; what is behind it dims, it reveals top-down over three frames, and `esc` closes it in reverse. Focus moves into a card and back out — never anywhere else.
-- **Sheets** take the whole frame for a moment — help, the pager for a long output or diff, an image, the full panel list — and slide up from the composer over four frames; `esc` slides them down.
+- **Sheets** take the whole frame for a moment — help, the pager for a long output or diff, an image — and slide up from the composer over four frames; `esc` slides them down.
 - **Status line**: the one line of furniture, under the input box, three slots. Left, the mode: `⏵⏵ accept edits on (shift+tab to cycle)`. Middle, notices — only what is true now: `1 needs you (ctrl+g)` pulsing, `2 running`, the latest notice for 4 s; `? for shortcuts` while the box is empty and nothing else is true. Right, place: `in reviewer · 168k/200k · gpt-5.4` — where you are, how much of the window the next request carries, and the model (`41k/200k · gpt-5.4` alone at the root; the count warms toward `bad` across the last fifth of the compaction trigger and past 90 % says ` · /compact`). It is vim's line — status and message in one row.
 - **Notices** are toasts without a corner: a notice fades into the status line's middle slot over two frames, holds 4 s, fades to dim and goes; the next waits its turn.
 - **Nothing jumps.** The input box never moves; the transcript grows upward from a fixed baseline; a card's reveal never shifts what is behind it. Resize re-lays the frame in one draw. The **activity band is reserved**: its two rows (air + the verb row) are held even while idle, so a turn starting or ending never reflows the transcript — the verb appears and leaves in place. **The way back to the foot rides the band's air (2026-09-14, M95)**: while the transcript is held, that first row carries `↓ 37 lines below · end or click to follow`, centred on the raised bar; a click on it follows the tail as `end` does, and at the foot the row is air again. It takes a row the frame already holds, so a scroll moves nothing.
@@ -71,7 +68,7 @@ The surface owns the alternate screen for the whole run. Regions, top to bottom 
 
 ### Teams
 
-A room is not a region of the frame. It is a session, so it is already every part of §3 at once: a row in the transcript where it was opened, a view `⏎` steps into, a chip on the quick cycle, a card in the rail. What is on screen for one today, after M34:
+A room is not a region of the frame. It is a session, so it is already every part of §3 at once: a row in the transcript where it was opened, a view `⏎` steps into, a chip on the quick cycle. What is on screen for one today, after M34:
 
 ```text
   ⏺ reviewer in #design: the plan is thin on tests     ← in a member's own transcript: who, where, what
@@ -98,7 +95,7 @@ In the room's own view the name stands alone — `⏺ reviewer: the plan is thin
 
 **2026-09-03 (user-directed)**: a room reads as a conversation does. Every user item in a room's journal is a post and draws as one — the author's name in `text` bold, then the *whole* of the message in `text`, every line of it wrapped as prose under the bullet. Nothing of a post hangs dim under a `⎿` and nothing folds away: that is the shape a subsystem reporting in wears (§4's marked line), and under it the body of a message reads as collapsed metadata rather than as what somebody wrote. A post nobody signed came from the session the room hangs under — a person at that composer, or the model that holds it — and is drawn under the roster's own word for that seat, `parent`, exactly as every member reads it. There is no `>` bar in a room: what you type there is a post like any other.
 
-And the other way round: a **member's** transcript, the holder's included, draws none of the room's machinery (ADR-0034). The wake that opens its turn (`origin.surface == "room"`) and the reading its turn's head folded in (`contributor:rooms`) are dropped at render time, as is a post an older journal copied before the fan-out stopped copying. The room's own view is one keystroke away and is where all of it is read. It is those two origins and nothing wider: a peer's message names a conversation of its own and still draws, and every other contributor still speaks. `ctrl+t` on the room draws the roster the room publishes, and `⏎` on that row pins it into the rail:
+And the other way round: a **member's** transcript, the holder's included, draws none of the room's machinery (ADR-0034). The wake that opens its turn (`origin.surface == "room"`) and the reading its turn's head folded in (`contributor:rooms`) are dropped at render time, as is a post an older journal copied before the fan-out stopped copying. The room's own view is one keystroke away and is where all of it is read. It is those two origins and nothing wider: a peer's message names a conversation of its own and still draws, and every other contributor still speaks. `ctrl+t` on the room draws the roster the room publishes, and it remains there as data (M148 removes pinning):
 
 ```text
   ❯ bingo.rooms · members                                  owed
@@ -157,7 +154,7 @@ What is left is the **accent palette**. Truecolor is the native look, chosen aft
 |---|---|---|---|
 | `text` | default | default | answers, what you type, option labels — the terminal's own foreground, spelled `Reset` rather than left unsaid so it can be patched over a colour.; and what a row of the opening settles into behind its beam (§11) |
 | `dim` | DIM | DIM | results under `⎿`, thinking, hints, the status line, everything behind a card — and every hairline: a box's border, a band's rule, a table's rule, a tree's guides, a mockup's frame, a diff's hunk header, an idle bullet. A weight and not a hue, so one stroke reads on either ground; the hairline a border rests as is where the opening's light begins and ends (§11) |
-| `raised` | none | `#211d17` (bg + one step) | the bar behind a `>` line, rail cards, the surface of a sheet; never text |
+| `raised` | none | `#211d17` (bg + one step) | the bar behind a `>` line, the surface of a sheet; never text |
 | `presence` | yellow | `#d97757`, glow `#f2a07c` | bingo's own colour: the `✻` sparkle, a live `⏺`, the glowing input border, the welcome mark, progress fills, **and the one light that draws the welcome box at the start of a session (§11)** — the one warm colour, and the only one that moves |
 | `good` / `bad` | green / red | `#8fcf8a` / `#e0655a` | a finished `⏺` and a failed one; a failed turn's line; diff tints; activity nodes and status slots with the corresponding tone |
 | `mode` | blue | `#8fb4de` | the `⏵⏵` on the status line and links — the one cool colour |
@@ -239,7 +236,7 @@ Each kind has a degrade so `--print` and an IM channel never lose information:
 | image | **kitty landed 2026-09-04 (M46, M48)**: the terminal is asked at start-up and a picture it can draw is drawn, whatever format it arrived in (`bingo-pictures` decodes; kitty takes PNG), scaled first to the pixels its cells hold. Drawn only on **kitty ≥ 0.28.0, Ghostty ≥ 1.0.0, iTerm2 ≥ 3.5.6 and Rio ≥ 0.5.27**, named by XTVERSION — the list exists because the protocol cannot be asked: `a=q` answers `OK` with no feature bit for the `U=1` placeholder cell, and WezTerm, Konsole, Warp and xterm.js all answer `OK` and draw tofu (two of them a stray picture at the cursor besides). They get the chip, and so does a terminal that will not name itself (research of 2026-09-04, M48 Verified). **Through tmux, landed 2026-09-04 (M49)**: the probe and every APC chunk travel in tmux's `DCS tmux; … ST` passthrough, so it is the terminal *behind* tmux that answers and draws, while the placeholder cells stay ordinary text tmux scrolls and repaints. It wants `set -g allow-passthrough on`, tmux ≥ 3.4 (which rewrites the cells' combining characters), an outer terminal on the list above, and bingo started in the focused pane — tmux delivers the outer terminal's answers to whichever pane is active. **Its own pane is raised to `all` (2026-09-15)**: `on` carries the envelope only while the pane is on screen, so a picture sent while a person was in another window was dropped, never re-sent, and held as delivered by the store; `tmux set -p allow-passthrough all` dies with the pane and touches no other, and an `off` is left alone. tmux answers DA1, XTVERSION and `CSI 16 t` itself, so only XTVERSION is asked of it bare and everything else goes wrapped; when tmux answers and nothing behind it does, one `Info` notice at the run's opening says which setting. GNU screen has no passthrough of this shape and zellij's was not researched: both keep the chip. **A picture the words name, landed 2026-09-04 (M51)**: `![what it is](path or URL)` in an answer draws where it was written — the alt becomes a `[image: what it is]` chip on a line of its own and the picture hangs under it, from the same `ctrl+o` fold as any other. The destination is read in once per session, off the loop's thread: a bare path from the session's directory, `~` for home, `http(s)` fetched by this machine and no other scheme followed. One that is not there or is not a picture wears a dim `(not found)` / `(not a picture)` after its name and is never tried again; at most 32 destinations a session are read at all. The chip is the degrade and stays on the line whatever the terminal can do — and a terminal that draws no picture reads nothing in at all, so an answer's words never send this surface to a disk or an address it could do nothing with. **Where it stands, and a click on it, landed 2026-09-04 (M56)**: a picture an answer's words named stands in the column of the words it was written among — a bullet's text column, a nested item's, past a quote's bar — read off its own chip line and fitted to the room left of the right margin, so it is placed rather than dumped at the block's edge; one under a `⎿` keeps the returns indent. And a picture is a thing to click: a left click inside its cells opens it in whatever this system shows pictures with (`click a picture · open it` in the `?` sheet), ahead of the block's own fold, and the composer's thumbnails answer the same way. What the opener is handed is always a **file on this machine**, never an address — a path an answer named is opened where it is, and every other kind, a fetched URL included, has its bytes written once to `<data_dir>/pictures/<id>.png` under the number the picture is already known by (one file per picture, overwritten) and that is opened. A notice says what was opened, and a `Warn` names what nothing would open. Where the cells are is read back out of the drawn lines rather than remembered beside them: each carries the picture's number in its colour already. **A late answer, landed 2026-09-04 (M60)**: under tmux the answers have three legs to travel, so the probe waits three times as long there (`theme::PROBE_THROUGH`) and — before that — asks tmux itself with `display-message -p '#{allow-passthrough}'`: `off` sends no envelope, spends no window and says so at once, `on`/`all` gets the long window, and a tmux that will not answer is probed as before. Whatever still arrives after the window is **heard out of the key stream** (`crate::late`), where crossterm reads a reply's `ESC` as an `alt` chord and its body as typed characters: nothing of `ESC _ Gi=31;OK ESC \` or `ESC P >|ghostty 1.3.1 ESC \` reaches the composer, and what it says joins the answer — a late `OK` and a late name turn the pictures on for the next frame and take the notice back off the status line. The **cell** cannot come late: crossterm's parser drops `CSI 6;h;w t` without an event, so an answer whose cell missed the window draws the chip and keeps it. **Mouse reporting has to reach us**: inside tmux that wants `set -g mouse on`, and without it a click never arrives — which is tmux's, not ours. **The band above the words, landed 2026-09-04 (M62)**: pictures a person handed over are one band of thumbnails **above** their own `>` line — three rows, each thumbnail at most twelve columns and one column apart, four shown and `+N` for the rest — which is the shape the composer's strip had them in before `⏎`, so the record and its preview read alike. They used to stack one under the other at twelve rows each, which read as a wall. The rows are one brick (`graphics::band`) the strip and the block both call, so the two cannot drift. A thumbnail has no taller form: `ctrl+o` shuts the band away with the rest of the block and opens it back to the same three rows, and the whole picture is one click away in the viewer. The band stands in the block's own column and never moves the `>` mark off the row of the first words, so a terminal that draws no picture keeps exactly the block it had — which is the `--print` shape and a chat channel's. A picture a tool answered with is untouched: it *is* the result, so it is read at its size under the `⎿`; and so is a picture an answer's words named. iTerm2's own protocol, sixel, half-block cells and the full-size sheet are still owed. Everywhere else `[image: <media type>]` | `[image: name]` |
 | shell line | **landed 2026-09-04 (M65)**: a `!<command>` a person ran themselves. The line sits on their own raised bar under a `$`, where a message's `>` stands — it is a thing they typed, not a thing that happened to them — and what it wrote hangs under a `⎿`, folded to a result's five rows, `ctrl+o` opening the rest and the sheet past that. A code that is not zero is a row of its own in `bad`, under whatever the fold left and never cut away with it, because the code is the point of a line that failed; a clean exit says nothing at all, and a command killed before it could exit has no code — what stopped it is the last line of its own output. It opens no turn, so a rewind offers the prose that opened one and never this | `$ <command>`, then the output, then `[exit N]` when it was not zero |
 | meter | `▁▂▃▅▇` sparkline; the context meter in the `/status` sheet | `42 %` |
-| view (plugin) | ADR-0013's vocabulary, any nesting, in a block, a rail card or a signal | `View::text()` |
+| view (plugin) | ADR-0013's vocabulary, any nesting, in a block or an explicit slot | `View::text()` |
 | custom | the fold, as text: a word this surface has not learned draws nothing of its own (ADR-0038) | the fold |
 
 ## 6. Motion
@@ -281,7 +278,7 @@ Budget: an animation tick of 33 ms while continuous motion runs, none otherwise;
 ## 7. Ergonomics
 
 Keys and pointer events resolve one `Ui.focus` owner (M125): composer,
-opening, selection, search, layer or rail card. An open interaction and the
+opening, selection, search, layer or placed row. An open interaction and the
 composer's menu are derived only when no explicit owner captures input; the
 interaction wins over the menu. A closing layer still draws but has given
 input back. Help allows typing through its own handler. Exit and escape
@@ -289,7 +286,7 @@ gestures remain gestures. A pointer cannot activate transcript targets behind
 an opening, search, layer or interaction; the switcher keeps its row clicks.
 
 
-- **Hands on the keys, the mouse welcome.** Every card answers to one key (`1-9`, `y/a/n`, `⏎`, `esc`); every sheet closes with `esc`; `?` shows the whole table; `ctrl+o` opens the latest fold one rung further — a result, a thought, an action's receipt, whichever is newest or focused — until it is whole and the next press takes the sheet; `ctrl+g` — or `↓` on an empty box — opens the one list of sessions; `ctrl+t` hides and shows the task list, `ctrl+p` opens the plugin-state sheet (M74); `shift+tab` cycles the mode. The mouse scrolls, clicks a child's row, a card row or a row of the list, opens a fold, drags a selection; it is never required.
+- **Hands on the keys, the mouse welcome.** Every card answers to one key (`1-9`, `y/a/n`, `⏎`, `esc`); every sheet closes with `esc`; `?` shows the whole table; `ctrl+o` opens the latest fold one rung further — a result, a thought, an action's receipt, whichever is newest or focused — until it is whole and the next press takes the sheet; `ctrl+g` — or `↓` on an empty box — opens the one list of sessions; `ctrl+t` hides and shows the task list and activity views; `tab` focuses a placed row’s actions; `shift+tab` cycles the mode. The mouse scrolls, clicks a child's row, a card row or a row of the list, opens a fold, drags a selection; it is never required.
 - **Questions asked together are answered together** (landed 2026-09-04, M53; aligned with Claude Code's own card the same day, M57). A form is the same card, not a second one: `tab` / `←` / `→` walk the headers, `↑` `↓` and the digits move the cursor, `space` toggles in a multi-select, `⏎` fixes an answer and steps to the next question still unanswered. **The walk ends at a `Submit` tab**: `⏎` there sends every answer at once, and with a question still open it says how many are left and walks to the first of them rather than sending — nothing leaves the card until a person has been past every question. **Every question's last two rows are the ways out of it**: `Type something.` answers in the person's own words where the question takes them, and `Chat about this`, under the band's rule, cancels the form and gives the caret back to the composer — the outcome `esc` already had, named as a choice so it is not a key to know. One `esc` still cancels the whole set. Nothing to learn that one question did not teach.
 - **A key means one direction; a click goes round.** `ctrl+o` only ever opens further (a shut block back to its peek, a peek to the whole, the whole to the sheet) and `esc` comes back, because a key pressed twice must not undo itself. A **click on a block is one gesture on one row**: it advances the fold one step and comes back round to the peek every kind starts at. **Every kind starts at its peek** — a thought holding the two rows it ended on, a result at its five-row cut — so nothing a block wears changes at the moment it ends. What the kinds differ by is the far side of the ring: **a thought that is over cycles three states** — its two rows, all of it, then the row alone — **and everything else cycles two**, because only a thought is worth putting away, and putting it away is asked for rather than met on arrival. It is the same fold either way — one map, written from the keyboard or from the pointer — so a quiet notice, whose cut promises no key, still opens to a click.
 - **One focus, always visible.** `❯` marks what the keyboard talks to: the composer, a card row, a sheet, a focused block. Focus moves only by opening and closing, never by ambient events; a child that asks pulses until you go to it.
@@ -304,19 +301,19 @@ an opening, search, layer or interaction; the switcher keeps its row clicks.
 
 ## 8. Extension by plugins (ADR-0013)
 
-A plugin never sees the TUI. It describes what to show as a `View` and chooses a lane by how long it should last:
+A plugin never sees the TUI. It describes what to show as a `View` and chooses a publication lifetime, then an explicit slot (M148, ADR-0081):
 
 | lane | call | lifetime | drawn |
 |---|---|---|---|
 | block | `ToolOutput.display = Some(view)` | with the item, in the transcript | under the tool row, folded like any output |
-| panel | `host.extend(session, plugin, kind, view.into())` | journaled; back after `--continue` | a rail card, or the panel sheet |
-| live | `host.signal(session, plugin, kind, view.into())` | until replaced or `Null`; gone on resume | a rail card that updates in place; under the running rows below 120 columns |
+| extension | `host.extend(session, plugin, kind, payload)` | journaled; Null removes the kind | only its explicit slots |
+| live | `host.signal(session, plugin, kind, payload)` | until replaced or `Null`; gone on resume | only its explicit slots |
 
-Interaction: a `View::Actions` row (`[ 1 Approve ] [ 2 Next hunk ]`) fires `Input::Action{name, args}` into the plugin's command; a question that must stop the turn is `ToolHost::ask` as always. A live `Progress` gets the gradient and the sheen for free; a `Table` in a rail card gets the hairlines; a `Badge` with tone `attention` pulses like everything that wants you. The TUI renders each node exactly once, tested once; a plugin's UI is a value asserted with `assert_eq!`.
+Interaction: a `View::Actions` row (`[ 1 Approve ] [ 2 Next hunk ]`) fires `Input::Action{name, args}` into the plugin's command; a question that must stop the turn is `ToolHost::ask` as always. A live `Progress` gets the gradient and the sheen for free; a `Table` gets the hairlines; a `Badge` with tone `attention` pulses like everything that wants you. The TUI renders each node exactly once, tested once; a plugin's UI is a value asserted with `assert_eq!`.
 
 Plugins choose places with `bingo_sdk::slot::Slot`, carried in the `slots` member of an existing signal, extension or policy description. `Status` draws in the middle of the status line, counting down when `until` is present; `Mode` draws on the left unless its first choice is current, and shift+tab fires the next choice as `Input::Action`. `Activity` draws under the working verb or under its panel title between turns; ctrl+t hides the activity views. Flat trees draw a mark per node by tone. Producers own their words and row limits.
 
-`Rail` places a card directly; `Panel` places an entry in the ctrl+p sheet, pinnable into the rail with enter. `Row` replaces the fields it supplies on one transcript item; absent fields retain the ordinary drawing. A wide mark falls back to the item's bullet. A quiet tool call draws no heading unless it failed, but its display still draws. Removing a live row restores the original display: an ended background shell therefore reads `Started in the background as …`.
+`Rail` and `Panel` remain on the wire but draw nothing in the TUI. A payload without `slots`, or with `slots: []`, is data for readers. `Row` replaces the fields it supplies on one transcript item; absent fields retain the ordinary drawing. A wide mark falls back to the item's bullet. A quiet tool call draws no heading unless it failed, but its display still draws. Removing a live row restores the original display: an ended background shell therefore reads `Started in the background as …`.
 
 M123 (2026-10-13): a `Row` heading draws `title(badge) caption`, with the
 producer's one-cell `mark` in the bullet's place. `caption` is optional;
@@ -326,15 +323,16 @@ actions keyed `b`. Room navigation reads collaboration library records.
 `Origin.voice` chooses said, note, quiet or aside; only voiceless historical
 records use the frozen surface-word table.
 
-A payload carrying `slots` is drawn only in those places. Payloads without that member keep the legacy panel and live lanes in the table above. There are no task-list or running-shell exceptions. Within slots, publisher id then kind determines order, so a wake precedes the shell count. The surface still owns focus, keys and folding: tab walks cards; actions fire their existing commands; a card gets eight rows before folding, and below 120 columns cards draw under the running rows.
+A payload carrying `slots` is drawn only in those places. Payloads without that member are not drawn by the TUI. Publisher id then kind determines slot order. Tab walks placed rows with actions in transcript order; their numbered or hinted keys submit the existing commands. A live row removed from the fold restores the item’s ordinary drawing.
 
 A word the vocabulary does not have is `View::Custom{kind, data, fold}` (ADR-0038): the plugin names the element, ships the data it owns and writes the fold, and this surface draws the fold — the same text it draws for a `kind` off the wire that is newer than the binary reading it.
 
-The worked example is `crates/bingo-demo-ui` — read it whole; this is its middle, and `cargo test --doc -p bingo-demo-ui` compiles it:
+The worked example is `crates/bingo-demo-ui` — read it whole; this is a minimal placement example (the plugin also supplies Tick/Reset actions), and `cargo test --doc -p bingo-demo-ui` compiles it:
 
 ```rust
 use bingo_demo_ui::Board;
-use bingo_sdk::{ContentPart, HostHandle, KernelError, SessionId, ToolOutput, View};
+use bingo_sdk::{ContentPart, HostHandle, ItemId, KernelError, SessionId, ToolOutput, View};
+use bingo_sdk::slot::{self, Slot};
 
 /// The block lane: a person reads the board, the model reads the text.
 fn block() -> ToolOutput {
@@ -345,16 +343,23 @@ fn block() -> ToolOutput {
     }
 }
 
-/// The panel lane: journaled, and back after `--continue`.
-async fn panel(host: &HostHandle, session: &SessionId) -> Result<(), KernelError> {
-    let view = serde_json::to_value(Board::default().view()).unwrap_or_default();
-    host.extend(session, "bingo.demo.ui", "board", view).await
+/// A journaled row, attached to the item recorded by the command.
+async fn row(host: &HostHandle, session: &SessionId, item: ItemId) -> Result<(), KernelError> {
+    let board = Board::default();
+    let payload = serde_json::to_value(board.view()).unwrap_or_default();
+    host.extend(session, "bingo.demo.ui", "board",
+        slot::with(payload, [Slot::Row {
+            item, mark: None, title: Some("Board".into()), badge: None, caption: None,
+            body: Some(board.view()), actions: vec![],
+        }])).await
 }
 
 /// The live lane: never journaled, gone on a resume, `Null` removes it.
 async fn live(host: &HostHandle, session: &SessionId, step: u64) -> Result<(), KernelError> {
     let bar = View::Progress { value: step, total: Some(15), label: Some("cargo test".into()) };
-    let payload = serde_json::to_value(bar).unwrap_or_default();
+    let payload = slot::with(serde_json::json!({}), [Slot::Activity {
+        verb: None, view: bar,
+    }]);
     host.signal(session, "bingo.demo.ui", "progress", payload).await
 }
 ```
@@ -364,6 +369,8 @@ async fn live(host: &HostHandle, session: &SessionId, step: u64) -> Result<(), K
 What a change is checked against, in this order: `TestBackend` snapshots for every region and layer in §3 and every node in §5, at 80×24 and 120×40; `assert_row_styled` proving colour lands only where §4 says; a frame-by-frame test with an injected clock for every row of §6 (the reveal at frames 1, 2, 3; the tail at 0, 75 and 150 ms); the tmux drives (`scripts/tui-smoke.sh` plus card, sheet, toast, signal, action, mouse); a 5 000-block transcript scrolling at 30 fps with a draw under 4 ms; an idle frame count of 0 over 2 s.
 
 ## 10. Decisions
+
+- **2026-10-14 — M148 (ADR-0081 §§1–6).** The rail, pins, panel sheet and legacy inline lane are removed. The transcript uses the full width; ctrl+p is unbound. `/board` records a row with Tick/Reset actions, progress uses Activity, and rooms’ owed/members and schedule wake carry empty slots. Null removes an extension kind. Pane placement remains M151.
 
 - **2026-10-14 — M147, R1–R10.** Search results display relative paths within the cwd and home paths with `~`; model text stays absolute. Shell displays omit the repeated command and a clean exit, while failures keep their reason. Plain allow receipts disappear; command permissions show a sentence, description and preview. Counts share one formatter, session rows count output, and `/status` groups digits. Slow drawing is silent in debug builds and an informational notice once per release run. Command hints describe their purpose, `/quit` aliases `/exit`, and `?` groups keys under write, move, turn and sessions, ending with the command/shell hint. Absolute paths retain their first segment when middle-elided.
 

@@ -149,6 +149,7 @@ async fn a_post_in_a_room_wakes_its_member_and_is_not_fanned_back() {
         after.snapshot.extensions["bingo.rooms"]["members"],
         serde_json::json!({
             "members": ["reviewer"],
+            "slots": [],
             "listeners": [{"name": "reviewer", "patience_s": 0}],
             "kind": "tree",
             "nodes": [{"label": "reviewer", "badge": "live", "tone": "neutral"}],

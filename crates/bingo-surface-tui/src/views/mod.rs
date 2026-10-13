@@ -1,8 +1,7 @@
 //! One node of the `View` vocabulary, one renderer (ADR-0013 §1).
 //!
 //! [`render`] walks the tree and hands each node to the module that owns it,
-//! so a `Table` looks the same under a tool row, in the `ctrl+p` sheet and in
-//! a rail card — the TUI draws every node exactly once, and it is tested once.
+//! so a `Table` looks the same under a tool row and in a placed view — the TUI draws every node exactly once, and it is tested once.
 //! Nothing here knows which lane the view came from or where it will be put:
 //! a renderer is a pure function of a node and a width.
 
@@ -26,7 +25,7 @@ pub mod table;
 mod text;
 mod tree;
 
-use bingo_sdk::{Action, ActionItem, View};
+use bingo_sdk::{Action, View};
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
@@ -109,19 +108,6 @@ pub fn marked(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
     }
 }
 
-/// Every action a view offers, in the order it draws them: what a digit key
-/// on a focused card fires.
-pub fn actions_of(view: &View) -> Vec<&ActionItem> {
-    match view {
-        View::Actions { items } => items.iter().collect(),
-        View::Stack { children } | View::Columns { children } => {
-            children.iter().flat_map(actions_of).collect()
-        }
-        View::Panel { child, .. } => actions_of(child),
-        _ => Vec::new(),
-    }
-}
-
 /// Whether a column of values reads as numbers, which is what right-aligning
 /// one is for. The mark for a missing value is not one.
 pub fn numeric(value: &str) -> bool {
@@ -159,7 +145,7 @@ pub fn indent(line: Line<'static>, by: usize) -> Line<'static> {
 }
 
 /// One line cut and padded to exactly `width` cells: what a column of
-/// [`columns`] and a rail card are laid out on.
+/// [`columns`] and a placed view are laid out on.
 pub fn fit(line: Line<'static>, width: usize) -> Line<'static> {
     let mut spans: Vec<Span<'static>> = Vec::new();
     let mut used = 0usize;
