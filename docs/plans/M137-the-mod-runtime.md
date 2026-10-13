@@ -88,6 +88,8 @@ Current paths and required adapters replace the original plan's stale paths.
   tests/plugin_registration.rs;
   `crates/bingo-core/src/{plugins,host}.rs`, turn/late.rs, chain/*,
   host/{registry,catalog,interception}.rs: registration and granted catalogue.
+  session/running.rs and session/tests/owned.rs: bounded diagnosis; change
+  only if supervision adds a real extra hop (authorized 2026-10-14).
 - `crates/bingo/{Cargo.toml,src/main.rs,src/composition.rs,src/plugins/*,tests/plugin_kit.rs}`:
   runtime selection, isolated scenario host and runtime listing column.
 - `sdk/typescript/src/{on,cross,plugin,index,events,wire}.ts`, on.test.ts;
@@ -137,16 +139,9 @@ file-watcher dependencies, watching non-explicit directories; no live tests.
   catalogue and declared uses. Keep every assertion, including default
   model refusal; no new dev dependency. Do not merge or rebase dev.
 
-- Stop 2026-10-14, step 6: two interrupt timing attempts still report
-  `Interrupted` at 2.001 s of paused Tokio time against M116's ≤2 s bound.
-  Starting at a timer tick did not change it; that experiment is removed.
-  Whether this is host supervision or the JS-thread/test-clock interaction
-  remains unresolved. Do not weaken the bound or call M137 complete.
-  Option A (recommended): continue diagnosis with a clock harness that
-  controls the JS-thread handoff, retaining the exact bound and outcome.
-  Option B: include core session/running.rs and its owned-task tests in Files
-  to investigate and repair supervision if the actor causes the delay.
-  Pending: interrupt, reload, binary/listing, ts-status, RSS and final gates.
+- Resolved 2026-10-14: Option B authorizes a ten-minute comparison of M116
+  and the mod interrupt path. Keep the 2 s grace; allow one named timer tick
+  only if rounding alone explains the delay, otherwise repair the real hop.
 
 ## Verified (2026-10-14)
 
