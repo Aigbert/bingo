@@ -229,6 +229,17 @@ mod plugin_tests {
     use bingo_sdk::{Contribution, Env, Pages};
 
     #[test]
+    fn registration_validates_the_claimed_settings() {
+        let mut registrar = Registrar::new(
+            MANIFEST.id,
+            serde_json::json!({"tui": {"measure": "wide"}}),
+            Env::rooted(std::env::temp_dir()),
+            Default::default(),
+        );
+        assert!(TuiPlugin.register(&mut registrar).is_err());
+    }
+
+    #[test]
     fn the_manifest_says_what_it_provides_and_the_two_keys_it_claims() {
         assert_eq!(MANIFEST.id, "bingo.surface.tui");
         let claim = MANIFEST.config.expect("a config claim");

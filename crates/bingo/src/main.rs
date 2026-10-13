@@ -972,6 +972,50 @@ mod tests {
         )
     }
 
+    #[test]
+    fn composition_matches_the_merged_settings_table() {
+        let cli = Cli::parse_from(["bingo"]);
+        let platforms = platforms(&Env::rooted(std::env::temp_dir()));
+        let claims: Vec<_> = plugins(true, &platforms)
+            .unwrap()
+            .iter()
+            .filter_map(|plugin| settings::Claim::from_manifest(plugin.manifest()))
+            .collect();
+        for (lower, higher, demo, chat) in [
+            (json!({}), json!({}), false, false),
+            (
+                json!({}),
+                json!({"enabledPlugins": {"bingo.demo.ui": true}}),
+                true,
+                false,
+            ),
+            (json!({"demoUi": true}), json!({}), true, false),
+            (
+                json!({"channels": {"feishu": {"appId": "test"}}}),
+                json!({"channels": null}),
+                false,
+                false,
+            ),
+            (
+                json!({"channels": {"feishu": {"appId": "test"}}}),
+                json!({"channels": {"coalesce": {"minChars": 12}}}),
+                false,
+                true,
+            ),
+        ] {
+            let layers = [layer("user", lower), layer("project", higher)];
+            let merged = settings::merge(&layers, &claims).unwrap();
+            let slice = &merged.plugins[ChannelsPlugin::new(platforms.clone()).manifest().id];
+            assert_eq!(bingo_channels::wanted(slice, &platforms).unwrap(), chat);
+            assert_eq!(demo_ui(&cli, &layers), demo, "demo: {layers:?}");
+            assert_eq!(
+                channels_wanted(&cli, &layers, &platforms).unwrap(),
+                chat,
+                "chat: {layers:?}"
+            );
+        }
+    }
+
     /// The measure is read the way `update.check` is: one key, one reading,
     /// and the highest layer that names it decides (ADR-0003 §2).
     #[test]

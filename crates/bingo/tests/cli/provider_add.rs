@@ -247,3 +247,41 @@ fn a_protocol_that_is_neither_is_refused_by_name() {
     );
     assert!(!settings_file(home.path()).exists());
 }
+
+#[test]
+fn added_endpoints_are_read_by_the_provider_types() {
+    let home = tempfile::tempdir().unwrap();
+    for protocol in ["openai", "anthropic"] {
+        let out = typed(
+            &mut add(home.path()),
+            &[
+                protocol_alias(protocol),
+                protocol,
+                "http://127.0.0.1:9999",
+                "",
+            ],
+        );
+        assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    }
+    let openai: bingo_provider_openai::Settings =
+        serde_json::from_value(settings(home.path())).unwrap();
+    let anthropic: bingo_provider_anthropic::Settings =
+        serde_json::from_value(settings(home.path())).unwrap();
+    assert_eq!(
+        openai.openai.instances["proxy-openai"].base_url.as_deref(),
+        Some("http://127.0.0.1:9999")
+    );
+    assert_eq!(
+        anthropic.anthropic.instances["proxy-anthropic"]
+            .base_url
+            .as_deref(),
+        Some("http://127.0.0.1:9999")
+    );
+}
+
+fn protocol_alias(protocol: &str) -> &str {
+    match protocol {
+        "openai" => "proxy-openai",
+        _ => "proxy-anthropic",
+    }
+}

@@ -36,6 +36,9 @@ fn a_server_is_added_read_back_listed_and_removed() {
     assert!(stdout(&added).starts_with("Added the mcp server `remote`"));
     assert_eq!(stderr(&added), "");
 
+    let parsed: bingo_mcp::Settings = serde_json::from_value(user_layer(home.path())).unwrap();
+    assert!(parsed.mcp_servers.contains_key("remote"));
+
     // The user layer, and only the user layer.
     assert_eq!(
         user_layer(home.path())["mcpServers"]["remote"],
