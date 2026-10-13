@@ -17,10 +17,15 @@ mod tests {
     }
 
     fn rendered() -> String {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../schema/events.json");
-        let document: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-        assert_eq!(document, catalogue::document(), "events.json must be regenerated first");
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schema/events.json");
+        let document: Value =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        assert_eq!(
+            document,
+            catalogue::document(),
+            "events.json must be regenerated first"
+        );
         let mut output = String::from("// Generated from schema/events.json. Do not edit.\n");
         for entry in catalogue::ALL {
             let name = title(&entry.name);

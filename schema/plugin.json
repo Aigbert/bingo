@@ -14,6 +14,8 @@
     "host/place",
     "host/state/get",
     "host/state/set",
+    "intercept/*",
+    "intercept/*/after",
     "intercept/cancel",
     "intercept/command.describe",
     "intercept/command.describe/after",
@@ -240,6 +242,19 @@
         "result": {
           "$ref": "#/$defs/ConfigView"
         }
+      },
+      "required": [
+        "chain",
+        "result"
+      ]
+    },
+    "After18": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": true
       },
       "required": [
         "chain",
@@ -793,6 +808,27 @@
         "input": {
           "$ref": "#/$defs/ConfigView"
         }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
+    },
+    "Before15": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": true
       },
       "required": [
         "chain",
@@ -3187,6 +3223,13 @@
           },
           "default": []
         },
+        "subscriptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LinkMatcher"
+          },
+          "default": []
+        },
         "services": {
           "type": "object",
           "additionalProperties": {
@@ -3975,6 +4018,21 @@
         "error"
       ]
     },
+    "LinkMatcher": {
+      "type": "object",
+      "properties": {
+        "patterns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Pattern"
+          },
+          "default": []
+        },
+        "prefilter": {
+          "default": null
+        }
+      }
+    },
     "LinkPoint": {
       "type": "string",
       "enum": [
@@ -4644,6 +4702,9 @@
       ],
       "description": "Where a child hangs in the tree: its parent, and the tool call that\nspawned it when one did (ADR-0011 §3)."
     },
+    "Pattern": {
+      "type": "string"
+    },
     "Phase": {
       "type": "string",
       "enum": [
@@ -5039,6 +5100,30 @@
             "answer": {
               "$ref": "#/$defs/ConfigView"
             }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Proceed18": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": true
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": true
           },
           "required": [
             "answer"
@@ -5907,6 +5992,15 @@
         "result": {
           "$ref": "#/$defs/ConfigView"
         }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "ResultValue18": {
+      "type": "object",
+      "properties": {
+        "result": true
       },
       "required": [
         "result"
@@ -7681,6 +7775,22 @@
       },
       "result": {
         "$ref": "#/$defs/ResultValue17"
+      }
+    },
+    "intercept/*": {
+      "params": {
+        "$ref": "#/$defs/Before15"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed18"
+      }
+    },
+    "intercept/*/after": {
+      "params": {
+        "$ref": "#/$defs/After18"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue18"
       }
     }
   },

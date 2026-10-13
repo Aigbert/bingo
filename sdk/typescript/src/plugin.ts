@@ -5,7 +5,7 @@ import { dollar } from './dollar.ts';
 import { Peer, stdio } from './rpc.ts';
 import type { InitializeParams, InitializeResult, ToolSpec } from './wire.ts';
 
-// The transport knows method names; M136 supplies the richer catalogue.
+// Older protocol-2 hosts advertise only their finite set of points.
 function points(capabilities: readonly string[]): string[] {
   return capabilities.filter(name => name.startsWith('intercept/') && name !== 'intercept/cancel'
     && !name.endsWith('/after')).map(name => name.slice('intercept/'.length));
@@ -29,7 +29,8 @@ export function runtime(peer: Peer, register: Register) {
     await register(hooks.on, params.config);
     const observed = hooks.names(params.capabilities.filter(name => name.startsWith('observe/')).map(name => name.slice(8)));
     const hooked = hooks.names(points(params.capabilities));
-    const capabilities = ['host/place', 'host/extend', 'host/deliver', 'host/state/get',
+    const catalogue = params.capabilities.includes('intercept/*');
+    const capabilities = ['intercept/*', 'intercept/*/after', 'host/place', 'host/extend', 'host/deliver', 'host/state/get',
       'host/state/set', 'host/model/complete', 'service/call', 'tools/changed', 'intercept/cancel', 'hook/observe',
       ...observed.map(name => `observe/${name}`),
       ...hooked.flatMap(name => [`intercept/${name}`, `intercept/${name}/after`])]
@@ -39,8 +40,15 @@ export function runtime(peer: Peer, register: Register) {
       peer.handlers.set(`intercept/${name}`, request => hooks.before(name, request, dollar(rpc, request.site)));
       peer.handlers.set(`intercept/${name}/after`, request => hooks.after(request));
     }
+    if (catalogue) peer.fallback = method => {
+      if (!method.startsWith('intercept/') || method === 'intercept/cancel') return undefined;
+      if (method.endsWith('/after')) return request => hooks.after(request);
+      const event = method.slice('intercept/'.length);
+      return request => hooks.before(event, request, dollar(rpc, request.site));
+    };
     return { protocol: 2, name: params.pluginName, version: '0.1.0', capabilities,
-      links: [...hooked, ...observed].map(point => ({ point, after: true })) } as InitializeResult;
+      links: catalogue ? [] : [...hooked, ...observed].map(point => ({ point, after: true })),
+      subscriptions: catalogue && hooks.entries.length ? [{ patterns: [...new Set(hooks.entries.map(entry => entry.pattern))], prefilter: null }] : [] } as InitializeResult;
   });
   peer.handlers.set('hook/observe', request => hooks.observe(request.event, request.payload, dollar(rpc, request.site)));
   peer.handlers.set('intercept/cancel', params => hooks.cancel(params.chain));

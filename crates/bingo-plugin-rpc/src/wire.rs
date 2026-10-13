@@ -172,6 +172,8 @@ pub struct InitializeResult {
     pub hooks: Vec<HookSpec>,
     #[serde(default)]
     pub links: Vec<crate::intercept::LinkSpec>,
+    #[serde(default)]
+    pub subscriptions: Vec<bingo_sdk::LinkMatcher>,
     /// The services this process serves, by the key another plugin calls them
     /// by. A key is global — it is what a consumer writes in `requires` — so
     /// the declaration is a map and not a list: one answer per key.
@@ -823,6 +825,16 @@ pub static METHODS: &[Method] = &[
         "intercept/config.describe/after",
         schema_of::<crate::intercept::After<bingo_sdk::ConfigView>>,
         schema_of::<crate::intercept::ResultValue<bingo_sdk::ConfigView>>,
+    ),
+    (
+        "intercept/*",
+        schema_of::<crate::intercept::Before<Value>>,
+        schema_of::<crate::intercept::Proceed<Value, Value>>,
+    ),
+    (
+        "intercept/*/after",
+        schema_of::<crate::intercept::After<Value>>,
+        schema_of::<crate::intercept::ResultValue<Value>>,
     ),
 ];
 

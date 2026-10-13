@@ -104,15 +104,13 @@ impl Server {
     }
 
     pub fn permits(&self, method: &str) -> Result<(), RpcError> {
-        if !crate::wire::capabilities().contains(method) {
+        let catalogue = catalogue_capability(method);
+        if !crate::wire::capabilities().contains(method) && catalogue.is_none() {
             return Err(unknown(method));
         }
-        if self
-            .capabilities
-            .borrow()
-            .as_ref()
-            .is_some_and(|caps| caps.contains(method))
-        {
+        if self.capabilities.borrow().as_ref().is_some_and(|caps| {
+            caps.contains(method) || catalogue.is_some_and(|cap| caps.contains(cap))
+        }) {
             return Ok(());
         }
         Err(RpcError::new(
@@ -236,4 +234,16 @@ fn parse<T: serde::de::DeserializeOwned>(params: Value) -> Result<T, RpcError> {
 }
 fn failed(error: impl std::fmt::Display) -> RpcError {
     RpcError::new(INTERNAL_ERROR, error.to_string())
+}
+
+fn catalogue_capability(method: &str) -> Option<&'static str> {
+    let event = method.strip_prefix("intercept/")?;
+    let (event, capability) = match event.strip_suffix("/after") {
+        Some(event) => (event, "intercept/*/after"),
+        None => (event, "intercept/*"),
+    };
+    (event.contains('.')
+        && !event.contains(['*', '!'])
+        && bingo_sdk::catalogue::Pattern::parse(event).is_ok())
+    .then_some(capability)
 }

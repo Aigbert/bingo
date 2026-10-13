@@ -56,14 +56,28 @@ pub fn point_name(point: LinkPoint) -> &'static str {
 
 pub struct Remote {
     id: String,
-    spec: LinkSpec,
+    matcher: LinkMatcher,
+    tool: Option<String>,
+    after: bool,
     connection: Arc<Connection>,
 }
 impl Remote {
     pub fn new(plugin: &str, spec: LinkSpec, connection: Arc<Connection>) -> Self {
         Self {
             id: format!("{plugin}:{}", point_name(spec.point)),
-            spec,
+            matcher: LinkMatcher::at(spec.point),
+            tool: spec.tool,
+            after: spec.after,
+            connection,
+        }
+    }
+
+    pub fn subscription(plugin: &str, matcher: LinkMatcher, connection: Arc<Connection>) -> Self {
+        Self {
+            id: format!("{plugin}:catalogue"),
+            matcher,
+            tool: None,
+            after: true,
             connection,
         }
     }
@@ -86,6 +100,7 @@ impl Remote {
 
     async fn cross<I, O>(
         &self,
+        entry: &catalogue::Entry,
         cx: &HookContext,
         input: I,
         next: Next<'_, I, O>,
@@ -99,7 +114,7 @@ impl Remote {
             connection: self.connection.clone(),
             chain: Some(chain.clone()),
         };
-        let method = format!("intercept/{}", point_name(self.spec.point));
+        let method = format!("intercept/{}", entry.name);
         let answer: Proceed<I, O> = self
             .phase(
                 &method,
@@ -115,7 +130,7 @@ impl Remote {
             Proceed::Answer(output) => output,
             Proceed::Next(input) => {
                 let result = next.run(input).await?;
-                if self.spec.after {
+                if self.after {
                     self.phase::<_, ResultValue<O>>(
                         &format!("{method}/after"),
                         After { chain, result },
@@ -154,7 +169,7 @@ impl Interceptor for Remote {
         &self.id
     }
     fn matcher(&self) -> LinkMatcher {
-        LinkMatcher::at(self.spec.point)
+        self.matcher.clone()
     }
     async fn observe(&self, entry: &catalogue::Entry, cx: &HookContext, input: &Value) {
         self.connection.notify("hook/observe", serde_json::json!({
@@ -163,12 +178,12 @@ impl Interceptor for Remote {
     }
     async fn chain(
         &self,
-        _entry: &catalogue::Entry,
+        entry: &catalogue::Entry,
         cx: &HookContext,
         input: Value,
         next: Next<'_, Value, Value>,
     ) -> Result<Value, KernelError> {
-        if let Some(pattern) = &self.spec.tool {
+        if let Some(pattern) = &self.tool {
             let tool = input
                 .get("tool")
                 .and_then(Value::as_str)
@@ -180,7 +195,7 @@ impl Interceptor for Remote {
                 return next.run(input).await;
             }
         }
-        self.cross(cx, input, next).await
+        self.cross(entry, cx, input, next).await
     }
 }
 
@@ -217,7 +232,10 @@ mod catalogue_contract {
         let value = serde_json::json!({"protocol":2,"name":"watch","version":"1",
             "subscriptions":[{"patterns":["mcp.*"],"prefilter":null}]});
         let result: crate::wire::InitializeResult = serde_json::from_value(value.clone()).unwrap();
-        assert_eq!(serde_json::to_value(result).unwrap()["subscriptions"], value["subscriptions"]);
+        assert_eq!(
+            serde_json::to_value(result).unwrap()["subscriptions"],
+            value["subscriptions"]
+        );
         assert!(crate::wire::capabilities().contains("intercept/*"));
     }
 }

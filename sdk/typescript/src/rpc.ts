@@ -6,6 +6,7 @@ export type Rpc = Pick<Peer, 'request' | 'notify'>;
 
 export class Peer {
   handlers = new Map<string, Handler>();
+  fallback?: (method: string) => Handler | undefined;
   pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void }>();
   private serial = 0;
   private send: (message: unknown) => void;
@@ -37,7 +38,7 @@ export class Peer {
       else pending.resolve(message.result);
       return;
     }
-    const handler = this.handlers.get(message.method);
+    const handler = this.handlers.get(message.method) ?? this.fallback?.(message.method);
     if (!Object.hasOwn(message, 'id')) {
       try { await handler?.(message.params); }
       catch (error) { stderr.write(`${String(error)}\n`); }

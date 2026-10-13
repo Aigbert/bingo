@@ -66,6 +66,7 @@ struct Live {
     providers: Vec<ProviderSpec>,
     hooks: Vec<HookSpec>,
     links: Vec<crate::intercept::LinkSpec>,
+    subscriptions: Vec<bingo_sdk::LinkMatcher>,
     services: BTreeMap<String, ServiceSpec>,
 }
 
@@ -229,6 +230,18 @@ impl Bridge {
                     live.connection.clone(),
                 )),
             })
+            .chain(
+                live.subscriptions
+                    .iter()
+                    .map(|matcher| bingo_sdk::ExternalInterceptor {
+                        plugin: self.name.clone(),
+                        link: Arc::new(crate::intercept::Remote::subscription(
+                            &self.name,
+                            matcher.clone(),
+                            live.connection.clone(),
+                        )),
+                    }),
+            )
             .collect()
     }
 
@@ -527,6 +540,7 @@ impl Bridge {
                 providers: result.providers,
                 hooks: result.hooks,
                 links: result.links,
+                subscriptions: result.subscriptions,
                 services: result.services,
             }),
             Ok(Err(why)) => {
@@ -597,6 +611,7 @@ impl Bridge {
                 providers: Vec::new(),
                 hooks: Vec::new(),
                 links: Vec::new(),
+                subscriptions: Vec::new(),
                 services: BTreeMap::new(),
             }));
         }
@@ -634,6 +649,7 @@ mod tests {
             providers: Vec::new(),
             hooks: Vec::new(),
             links: Vec::new(),
+            subscriptions: Vec::new(),
             services: Default::default(),
         }
     }

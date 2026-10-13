@@ -222,6 +222,7 @@ fn handshake(options: &Options) -> Value {
         }],
         hooks: hooks::hooks(),
         links: hooks::links(),
+        subscriptions: Vec::new(),
         services: declared(options),
     };
     let mut declared = serde_json::to_value(result).unwrap_or(Value::Null);
