@@ -11,6 +11,7 @@ repository = "https://github.com/yexrob/bingo"
 publish = false
 
 [workspace.dependencies]
+bingo-plugin-host = { path = "crates/bingo-plugin-host" }
 bingo-schema-ts = { path = "crates/bingo-schema-ts" }
 bingo-http = { path = "crates/bingo-http" }
 bingo-collab = { path = "crates/bingo-collab" }

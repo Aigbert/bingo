@@ -46,11 +46,7 @@ pub struct StateSet {
     pub if_version: Option<u64>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct StateValue {
-    pub version: u64,
-    pub value: Value,
-}
+pub use bingo_plugin_host::state::StateValue;
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Complete {

@@ -651,16 +651,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "bingo-plugin-host"
+version = "0.6.6"
+dependencies = [
+ "bingo-jsonrpc",
+ "bingo-sdk",
+ "bingo-shelf",
+ "futures",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "bingo-plugin-rpc"
 version = "0.6.6"
 dependencies = [
  "async-trait",
  "bingo-jsonrpc",
  "bingo-pictures",
+ "bingo-plugin-host",
  "bingo-process",
  "bingo-schema-ts",
  "bingo-sdk",
- "bingo-shelf",
  "futures",
  "schemars 1.2.2",
  "serde",

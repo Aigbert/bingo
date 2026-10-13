@@ -102,6 +102,7 @@
 # M127 (ADR-0072 §2): bingo-http adds one member, no external crate.
 # M133 (ADR-0075): schema-ts adds one member; existing tempfile moves
 # from dev to normal for disposable author-kit homes (+2, no new resolution).
-max_dependencies = 355
+# M137 (ADR-0078): plugin-host adds one shared library member.
+max_dependencies = 356
 max_core_check_seconds = 20
 max_target_gb = 5
