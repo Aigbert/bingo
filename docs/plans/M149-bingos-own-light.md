@@ -128,3 +128,22 @@ ADRs checked: 0001, 0002, 0070 and 0081; no acceptance change is due here.
   `storyboard`; replacing the box removes the perimeter lap. Keep `Playing`
   and the 2.4 s deadline. The compact mark needs viewport height passed
   through the layout/rows path; welcome currently receives width only.
+- **Stopped at protocol step 6 (2026-10-14), before tests or code.** L7
+  cannot be implemented within the stated TUI-only/no-sdk-change boundary
+  without violating ADR-0070 §§2,5,7 or ADR-0001's dependency direction.
+  `bingo-tasks/src/journal.rs:58–106` publishes only an Activity view:
+  counts are prose in its Panel title, completed nodes may be omitted,
+  and no field identifies a completion in the last turn. `task.rs:15`
+  has no completion turn/time. `bingo-sdk/src/slot.rs:19` has only `verb`
+  and `view`; `state.rs:76`'s LastTurn has no plugin completion fact.
+  `transcript.rs:909` renders the worked row from LastTurn alone. No
+  task-completion contract exists in `bingo-services` or `bingo-collab`.
+  Reading private payloads/tool names or inferring completion from view
+  prose would restore the coupling M121/M123 removed; importing the
+  tasks plugin is forbidden. Retaining task state in Ui is not a remedy.
+  **Options:** (A, recommended) expand M149 with a producer-owned,
+  turn-scoped completion contract and its consumer, documented boundary,
+  contract-first tests and any schema/fixture generation; coordinate
+  shared schema work with M137. (B) explicitly defer the earned Bingo
+  row and retain the generic worked row. Neither option is applied.
+  All exit criteria remain unticked; no gates or live tests were run.
