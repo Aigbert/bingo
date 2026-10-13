@@ -11,8 +11,7 @@ and none opens a new one. One table defines `$`, and both transports read
 it: natives in process, and M133's `dollar.ts` under node.
 
 ## Bricks, in build order
-
-1. **The table, as a contract.** `bingo-mods/src/dollar/table.rs` has one
+1. **The table, as a contract.** `crates/bingo-mods/src/dollar/table.rs` has one
    row per method: `(noun, method, door, unsafe, input, result)`. A door
    is `Kernel(&'static Entry)`, whose door already raises a chain of this
    meaning, so `$` calls it and raises nothing more; or `Face`, a method
@@ -41,7 +40,6 @@ it: natives in process, and M133's `dollar.ts` under node.
      and the last turn's usage);
    - `config.list` and `config.read` (`ConfigView`);
    - `prompt.read` (the queue and the last submitted text).
-
    `session.messages` pages through `history`. `session.surfaces` folds
    `session.attach` and `session.detach`. `session.root` is discovery's
    project directory. `session.version` is the workspace version. Nothing
@@ -53,7 +51,7 @@ it: natives in process, and M133's `dollar.ts` under node.
 5. **`$.plugin`.** `{ name, root }`, from the mod's manifest, frozen and
    set at load. It is a property, not a method: it has no row and raises
    nothing. Under node, `dollar.ts` builds it from `initialize`, whose
-   params gain `plugin_name` beside `plugin_root`, additively.
+   params already carry `plugin_name` beside `plugin_root` (M137).
 6. **`tool.register` and `command.register`.** The runtime's `ToolSource`
    names each tool with `bingo-plugin-host`'s `tool_name`
    (`plugin__<mod>__<name>`); an undeclared property fails closed (not
@@ -90,13 +88,13 @@ it: natives in process, and M133's `dollar.ts` under node.
 
 ## Files
 
-- `crates/bingo-mods/src/dollar/{mod,table,read,session,tool,command,config,model,state,clock,plugin}.rs`
-- `crates/bingo-mods/src/{link.rs,reload.rs}`, `tests/mods/nouns/*` (new)
-- `crates/bingo-sdk/src/catalogue.rs` (`model.complete`); `crates/bingo-core/src/{host.rs,config.rs}`
-- `crates/bingo-plugin-host/src/state.rs` (scope sizes, the read log)
-- `crates/bingo-plugin-rpc/src/{host.rs,service.rs,bridge.rs}` (`host/state` onto the face; bind `plugin`; `plugin_name`)
-- `schema/dollar.json` (new), `schema/plugin.json`, `sdk/typescript/src/{dollar.ts,dollar-types.ts (generated)}`
-- `crates/bingo/tests/plugin_kit.rs`
+- `crates/bingo-mods/src/dollar/*.rs` (new), `src/{lib,link,chain,engine,thread,module,manager,plugin,load,config}.rs`, `src/{thread.js,manager/reload.rs}`, `tests/{contracts,plugin}.rs`, `tests/mods/nouns/*` (new), `guide.md`, `Cargo.toml`
+- `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/tests/complete.rs,host/tests/catalogue.rs}`
+- `crates/bingo-plugin-host/src/{state,ops,host}.rs`
+- `crates/bingo-plugin-rpc/src/{host,service,bridge,schema,wire_ts}.rs`
+- `schema/{dollar,plugin,events}.json`, `sdk/typescript/src/{dollar,dollar-types,plugin,wire,events}.ts`, SDK noun tests
+- `crates/bingo/tests/plugin_kit.rs`, noun fixture modules and mechanical schema/fixture consumers
+- Existing workspace dependencies only: `jiff` for the specified timestamp, and `bingo-schema-ts` as a dev dependency for the generated dollar types; measure with `scripts/budget.sh`.
 
 ## Exit criteria
 
@@ -135,16 +133,18 @@ it: natives in process, and M133's `dollar.ts` under node.
 
 ## Risks
 
-- `model.fork` lacks the session's contributor pieces (no door hands them
-  out), so its answer can differ from the session's; the guide says so.
-- A timer may spend on the model with no turn to show it: the `model`
-  grant gates it, and the session's usage and `bingo plugins list` show it.
-- The runtime opens one stream per session it serves, lazily on the first
-  read; its `session.attach` names it, so a link tells it from a person.
-- While `bingo-mods` is off, plugin-rpc reaches the library's store
-  directly and `state.*` is not raised: nobody in process could hook it.
-- Re-verify at start: M137's link, budget, reload check and `admits`;
-  M136's face wrapper, one-namespace rule and `session.send`; M132's
-  `complete`, `UsageCharged` and `host/state`; M133's `dollar.ts`; M131's
-  `invoke` with `AfterTool`; M118's `SessionChange`, if `reconfigure`
-  moved; M111's test host and paused time.
+- `model.fork` lacks contributor pieces; document the different context.
+- Timer model calls require the model grant and charge the session without a turn.
+- With mods off, process state falls back to the library without noun chains.
+- Re-verified at `c1d95e8c` on 2026-10-14 (M108–M137, M147–M150 landed).
+- Reload lives in `mods/src/manager/reload.rs`; shared faces live in
+  `plugin-host/src/ops.rs`. Remove its `model.complete` face when the kernel
+  claims the name. `initialize.plugin_name` already exists; preserve its shape.
+- Preserve grants: processes=tighten, user/explicit modules=rewrite, project=tighten.
+- `core/src/chain/service.rs` wraps faces; SDK `service.rs` checks unique names.
+  `HostApi::complete` only grants and mails. Move the model/think command's
+  `config::set` calls into `reconfigure` to avoid duplicate chains.
+- The fold has config, queue, transcript and usage. Attach/detach are observations,
+  not frames; project surfaces through the existing plugin signal door.
+- Use M111's `TestHost` for door answers, and the real offline kernel for chain
+  counts: the test host does not dispatch interception chains.
