@@ -10,6 +10,7 @@ pub(super) fn next(tree: &Tree, ui: &Ui, layout: &Layout, now: Now) -> Option<In
     [
         crate::activity::next_change(tree, ui, now),
         ui.scroll.next_change(now),
+        ui.toasts.next(tree.viewed(), now),
         ui.focus.next_change(now),
         ui.notice().and_then(|notice| notice.next_change(now)),
         ui.next_change(now),

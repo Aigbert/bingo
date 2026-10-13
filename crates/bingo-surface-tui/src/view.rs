@@ -38,7 +38,44 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let draft = ui.composer.layout(inner_width(state, area.width as usize));
     let strip = strip(state, ui, &frame.measurements, area.width);
     let activity = activity::lines(tree, ui, area.width as usize, now);
-    let regions = frame::regions(area, demand(&draft, &strip, &activity));
+    let toasts = ui.toasts.lines(state, now, usize::from(area.width));
+    let toast_rows = (toasts.len() as u16).min(area.height / 3);
+    let pane_rows = crate::pane::height(ui, state, area.height);
+    let reduced = Rect::new(
+        area.x,
+        area.y,
+        area.width,
+        area.height.saturating_sub(toast_rows + pane_rows),
+    );
+    let mut regions = frame::regions(reduced, demand(&draft, &strip, &activity));
+    let pane_area = Rect::new(area.x, regions.strip.y, area.width, pane_rows);
+    regions.strip.y += pane_rows;
+    regions.composer.y += pane_rows;
+    regions.status.y += pane_rows + toast_rows;
+    let toast_area = Rect::new(
+        area.x,
+        regions.status.y.saturating_sub(toast_rows),
+        area.width,
+        toast_rows,
+    );
+    frame.render_widget(Paragraph::new(toasts), toast_area);
+    crate::pane::draw(ui, state, frame, pane_area, now);
+    if !ui.activity_hidden {
+        for placed in bingo_sdk::slot::placed(state) {
+            if let bingo_sdk::slot::Slot::Activity {
+                view: bingo_sdk::slot::Shown::Pull { request },
+                ..
+            } = placed.slot
+            {
+                frame.pulls.push(crate::pulled::Key::new(
+                    state,
+                    &request,
+                    area.width,
+                    regions.activity.height,
+                ));
+            }
+        }
+    }
     frame.regions = regions;
     render_transcript(tree, ui, frame, regions.transcript, now);
     render_activity(ui, frame, regions.activity, activity);
@@ -90,6 +127,25 @@ fn render_status(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now)
         return;
     }
     let width = area.width as usize;
+    let waiting = crate::pane::waiting(ui, tree.viewed());
+    if !waiting.is_empty() && ui.focus.search().is_none() {
+        let mut x = area.x;
+        let mut spans = Vec::new();
+        for pane in waiting {
+            let text = views::clip(
+                &format!("{} (waiting)  ", pane.title),
+                usize::from(area.right().saturating_sub(x)),
+            );
+            let cells = text.width() as u16;
+            frame
+                .waiting
+                .push((pane.key, Rect::new(x, area.y, cells, 1)));
+            spans.push(Span::styled(text, theme::presence()));
+            x += cells;
+        }
+        frame.render_widget(Paragraph::new(Line::from(spans)), area);
+        return;
+    }
     let line = match ui.focus.search() {
         Some(search) => search::row(search),
         None => {

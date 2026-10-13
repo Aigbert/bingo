@@ -30,6 +30,13 @@ export class Handlers {
     return visit(view);
   }
   async fire(session: string, input: any, port: Port, dispatch: (event: string, input: any, next: () => Promise<unknown>) => Promise<unknown>): Promise<any> {
+    if (input?.event === 'close') {
+      const call = async (method: string, params: unknown) => (await port.request<{result:any}>('service/call', {key:'bingo.plugin.ui',method,params})).result;
+      const panes = await call('panes', {session});
+      if (!panes.some((pane: any) => pane.kind === 'pane' && pane.id === input.handler && pane.closeOnEscape)) return {stale:true};
+      await dispatch('ui.press', input, () => call('close', {session,id:input.handler}));
+      return {stale:false};
+    }
     const handler = this.tokens.get(input?.handler);
     if (!handler || handler.session !== session || handler.event !== input.event) return {stale:true};
     const previous = this.pending.get(handler.port) ?? Promise.resolve();

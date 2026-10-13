@@ -70,6 +70,7 @@ pub(crate) type Keys = Pin<Box<dyn Stream<Item = Term> + Send>>;
 
 /// The results of the host calls the loop spawns.
 enum Reply {
+    Rendered(crate::pulled::Key, bingo_sdk::View),
     Attached(Box<Attachment>),
     /// A child's mailbox, so a line typed in its view reaches it. The
     /// attachment's own stream is dropped: the tree's carries the child.
@@ -438,6 +439,12 @@ impl Run {
         screen.title(&title).map_err(stdio)?;
         let began = Instant::now();
         let (width, height) = screen.size();
+        let state = self.session.tree.viewed();
+        self.ui.sync_panes(state);
+        let holding = self.ui.panes.holding(state);
+        if self.ui.toasts.sync(state, holding, now) && !self.ui.focused {
+            screen.bell().map_err(stdio)?;
+        }
         self.ui.prepare(&self.session.tree.viewed().summary.cwd);
         let previous = std::mem::take(&mut self.ui.shown);
         let layout = crate::layout::layout(
@@ -451,6 +458,20 @@ impl Run {
         screen
             .draw(&layout, &self.detection.render())
             .map_err(stdio)?;
+        self.ui.pulled.retain(&layout.pulls);
+        for key in &layout.pulls {
+            if self.ui.pulled.request(key) {
+                let key = key.clone();
+                let host = self.host.clone();
+                self.spawn(async move {
+                    let view = host
+                        .render(&key.session, key.request.clone())
+                        .await
+                        .unwrap_or_else(|_| key.request.engine());
+                    Ok(Reply::Rendered(key, view))
+                });
+            }
+        }
         self.ui.shown = layout;
         self.grumble(began.elapsed());
         showing::hand(self, screen)?;
@@ -606,6 +627,14 @@ impl Run {
 
     /// Only this client's intents have a line to restore on refusal.
     fn ack(&mut self, intent: &IntentId, outcome: &IntentOutcome) {
+        if self
+            .ui
+            .pending_ui
+            .as_ref()
+            .is_some_and(|(pending, _)| pending == intent)
+        {
+            self.ui.pending_ui = None;
+        }
         let Some(about) = self.mine.remove(intent) else {
             return;
         };
@@ -906,6 +935,7 @@ impl Run {
 
     fn reply(&mut self, reply: Reply, events: &mut Option<FrameStream>) {
         match reply {
+            Reply::Rendered(key, view) => self.ui.pulled.answer(key, view),
             Reply::Attached(attachment) => self.attach(*attachment, events),
             Reply::Handle(session, handle) => {
                 self.session.handles.insert(session, handle);

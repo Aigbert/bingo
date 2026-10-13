@@ -108,11 +108,11 @@ fn band(
     let mut out: Vec<_> = row.into_iter().collect();
     if !ui.activity_hidden {
         for placed in slots {
-            if let bingo_sdk::slot::Slot::Activity {
-                view: bingo_sdk::slot::Shown::View(view),
-                ..
-            } = &placed.slot
-            {
+            if let bingo_sdk::slot::Slot::Activity { view, .. } = &placed.slot {
+                let Some(view) = ui.pulled.view(view, tree.viewed(), width as u16) else {
+                    out.push(Line::from(theme::ellipsis()));
+                    continue;
+                };
                 let view = match (running, view) {
                     (true, bingo_sdk::View::Panel { child, .. }) => child,
                     _ => view,

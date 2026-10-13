@@ -5,7 +5,7 @@ use bingo_sdk::{
     view::{TextChild, TextStyle},
 };
 use ratatui::{
-    style::{Style, Stylize},
+    style::Style,
     text::{Line, Span},
 };
 

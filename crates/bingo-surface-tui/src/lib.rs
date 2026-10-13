@@ -82,13 +82,12 @@ mod mentions;
 /// product already has.
 mod opening;
 mod pager;
+mod pane;
 mod paths;
 mod pictures;
 mod pointer;
-mod pulled;
-mod pane;
-mod toast;
 mod preview;
+mod pulled;
 mod render;
 mod rewind;
 mod roster;
@@ -110,6 +109,7 @@ mod theme;
 /// What a run of thoughts is (M79): consecutive reasoning items, which the
 /// transcript draws as one thought.
 mod thoughts;
+mod toast;
 mod transcript;
 mod tree;
 mod ui;

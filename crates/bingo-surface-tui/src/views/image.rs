@@ -17,6 +17,9 @@ pub fn lines(
     if columns == 0 || rows == 0 {
         return Vec::new();
     }
+    if theme::current().colors == theme::Colors::Plain {
+        return super::text::lines(&format!("[image: {alt}]"));
+    }
     let Some(pixels) = decode(source, columns, rows) else {
         return super::text::lines(&format!("[image: {alt}]"));
     };

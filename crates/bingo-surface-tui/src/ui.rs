@@ -315,6 +315,10 @@ impl Layer {
 
 #[derive(Debug)]
 pub struct Ui {
+    pub panes: crate::pane::State,
+    pub pending_ui: Option<(bingo_sdk::IntentId, bingo_sdk::Action)>,
+    pub pulled: crate::pulled::Memo,
+    pub toasts: crate::toast::State,
     controls: controls::Controls,
     pub scroll: Scroll,
     pub notices: Vec<Notice>,
@@ -369,9 +373,17 @@ struct Files {
 }
 
 impl Ui {
+    pub fn sync_panes(&mut self, state: &bingo_sdk::SessionState) {
+        self.panes.sync(state, &mut self.controls.focus);
+    }
+
     pub fn new(history: Vec<String>, _now: Instant) -> Self {
         Self {
             controls: controls::Controls::new(history),
+            panes: Default::default(),
+            pending_ui: None,
+            pulled: Default::default(),
+            toasts: Default::default(),
             scroll: Scroll::default(),
             notices: Vec::new(),
             block: None,

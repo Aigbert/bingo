@@ -48,6 +48,9 @@ impl Run {
             } => self.submit_text(handle, text, images, origin, delivery),
             action => {
                 let intent = self.mint(None);
+                if let Input::Action { action: ref value } = action {
+                    self.ui.pending_ui = Some((intent.clone(), value.clone()));
+                }
                 handle.submit(intent, action);
             }
         }

@@ -53,6 +53,7 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
         return effects;
     }
     match owner {
+        crate::focus::Owner::Pane => crate::pane::key(ui, tree.viewed(), key),
         crate::focus::Owner::Select => selecting(ui, tree, key, now),
         crate::focus::Owner::Search => searching(ui, key, now),
         crate::focus::Owner::Layer => {

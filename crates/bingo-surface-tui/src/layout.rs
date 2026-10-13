@@ -16,6 +16,9 @@ pub use canvas::Canvas;
 
 #[derive(Debug, Default)]
 pub struct Layout {
+    pub panes: Vec<(String, Rect)>,
+    pub waiting: Vec<(String, Rect)>,
+    pub pulls: Vec<crate::pulled::Key>,
     pub blocks: Blocks,
     /// Header measurements move with the block memo, never through a shared UI borrow.
     pub measurements: crate::graphics::Decoded,
