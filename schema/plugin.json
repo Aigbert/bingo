@@ -4032,6 +4032,7 @@
     "LinkPoint": {
       "type": "string",
       "enum": [
+        "plugin.register",
         "prompt.submit",
         "tool.check",
         "tool.call",

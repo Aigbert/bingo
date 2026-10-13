@@ -1,5 +1,118 @@
 {
   "events": {
+    "plugin.register": {
+      "kind": "chain",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "PluginRegistration",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "origin": {
+            "$ref": "#/$defs/PluginOrigin"
+          },
+          "runtime": {
+            "$ref": "#/$defs/PluginRuntime"
+          },
+          "tier": {
+            "$ref": "#/$defs/Tier"
+          },
+          "uses": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "origin",
+          "runtime",
+          "tier",
+          "uses"
+        ],
+        "$defs": {
+          "PluginOrigin": {
+            "description": "The directory that supplied an external plugin.",
+            "type": "string",
+            "enum": [
+              "user",
+              "project",
+              "explicit"
+            ]
+          },
+          "PluginRuntime": {
+            "type": "string",
+            "enum": [
+              "process",
+              "module"
+            ]
+          },
+          "Tier": {
+            "type": "string",
+            "enum": [
+              "tighten",
+              "rewrite",
+              "full"
+            ]
+          }
+        }
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "PluginGrant",
+        "type": "object",
+        "properties": {
+          "tier": {
+            "$ref": "#/$defs/Tier"
+          },
+          "uses": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "tier",
+          "uses"
+        ],
+        "$defs": {
+          "Tier": {
+            "type": "string",
+            "enum": [
+              "tighten",
+              "rewrite",
+              "full"
+            ]
+          }
+        }
+      },
+      "matcher": [
+        "name",
+        "origin",
+        "runtime"
+      ],
+      "pinned": [
+        "/name",
+        "/version",
+        "/origin",
+        "/runtime"
+      ],
+      "acts": {
+        "deny": true,
+        "rewrite": true,
+        "answer": true
+      }
+    },
     "prompt.submit": {
       "kind": "chain",
       "input": {

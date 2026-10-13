@@ -1,28 +1,28 @@
 //! A directory and the person's explicit trust bound the requested nouns.
 use bingo_sdk::{PluginTrust, Tier};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+pub use bingo_sdk::{PluginOrigin as Origin, PluginGrant as Grant};
 use std::collections::BTreeSet;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum Origin {
-    User,
-    Project,
-    Explicit,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Grant {
-    pub tier: Tier,
-    pub uses: BTreeSet<String>,
-}
 
 pub const UNSAFE: &[&str] = &["process", "http", "env", "model"];
 
 pub fn grant(origin: Origin, trust: Option<&PluginTrust>, uses: &[String]) -> Grant {
-    let _ = (origin, trust, uses);
-    Grant { tier: Tier::Tighten, uses: BTreeSet::new() }
+    let tier = trust.map_or(
+        if origin == Origin::Project {
+            Tier::Tighten
+        } else {
+            Tier::Rewrite
+        },
+        |trust| trust.tier,
+    );
+    let mut uses: BTreeSet<String> = uses
+        .iter()
+        .filter(|noun| origin != Origin::Project || !UNSAFE.contains(&noun.as_str()))
+        .cloned()
+        .collect();
+    if let Some(trust) = trust {
+        uses.extend(trust.uses.iter().cloned());
+    }
+    Grant { tier, uses }
 }
 
 #[derive(Debug, thiserror::Error)]

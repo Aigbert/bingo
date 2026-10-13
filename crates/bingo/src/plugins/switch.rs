@@ -133,6 +133,7 @@ fn installed(found: Found, switched_off: &BTreeSet<String>) -> PluginStatus {
         version: found.manifest.version,
         enabled: !off,
         reason: off.then(|| SWITCHED_OFF.to_string()),
+        execution: None,
         from: bingo_plugin_rpc::ID.to_string(),
     }
 }
@@ -264,6 +265,7 @@ mod tests {
             version: "0.1.0".into(),
             enabled,
             reason: reason.map(str::to_string),
+            execution: None,
             from: bingo_sdk::BUILT_IN.into(),
         }
     }

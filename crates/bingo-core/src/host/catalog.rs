@@ -423,6 +423,7 @@ mod tests {
                 version: "0.2.0".into(),
                 enabled: false,
                 reason: Some("switched off in the settings".into()),
+                execution: None,
                 from: "bridge".into(),
             }]
         }
@@ -434,6 +435,7 @@ mod tests {
             version: "1.0.0".into(),
             enabled: true,
             reason: None,
+            execution: None,
             from: BUILT_IN.into(),
         }
     }

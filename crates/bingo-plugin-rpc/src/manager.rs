@@ -46,6 +46,7 @@ impl Installed {
             version: self.version.clone(),
             enabled,
             reason,
+            execution: None,
             from: ID.to_string(),
         }
     }
