@@ -12,6 +12,9 @@
 //! its typed handle, and one with no wire face does not exist to a process at
 //! all (ADR-0031 §3).
 
+mod face;
+pub use face::{Face, Method};
+
 use std::any::Any;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -73,6 +76,8 @@ pub struct ServiceError(pub String);
 /// that lives in another process. A caller cannot tell which.
 #[async_trait]
 pub trait WireService: Send + Sync {
+    fn face(&self) -> Option<Face> { None }
+
     /// A method this service does not speak is refused with the set it does
     /// (ADR-0031 §5); the params and the answer are whatever the service's
     /// declared schema says they are.
@@ -224,6 +229,22 @@ mod tests {
         let host = crate::testing::ServiceHost::holding(&key, Arc::new(crate::Pages(&[])));
         let computed = ServiceKey::<crate::Pages>::named("test.plugin.pages".to_string());
         assert_eq!(host.service(&computed).as_deref(), Some(&crate::Pages(&[])));
+    }
+
+    struct Named(&'static str);
+    #[async_trait]
+    impl WireService for Named {
+        fn face(&self) -> Option<Face> {
+            Some(Face::new(self.0).method::<(), String>("servers", false))
+        }
+        async fn call(&self, _: &str, _: Value) -> Result<Value, ServiceError> { Ok(Value::Null) }
+    }
+    #[test]
+    fn face_names_cannot_be_claimed_twice() {
+        let services = Services::default();
+        services.open("first", Arc::new(Named("mcp"))).unwrap();
+        let why = services.open("second", Arc::new(Named("mcp"))).unwrap_err();
+        assert!(why.contains("mcp.servers") && why.contains("first") && why.contains("second"));
     }
 
     struct Kv;
