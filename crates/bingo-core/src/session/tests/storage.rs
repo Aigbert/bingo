@@ -3,7 +3,7 @@ use crate::journal::MemoryStore;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Default)]
-struct FailingStore {
+pub(super) struct FailingStore {
     inner: MemoryStore,
     appends: AtomicUsize,
     fail_at: AtomicUsize,
@@ -32,7 +32,7 @@ impl SessionStore for FailingStore {
     }
 }
 
-async fn failing_actor() -> (Actor, Arc<FailingStore>) {
+pub(super) async fn failing_actor() -> (Actor, Arc<FailingStore>) {
     let store = Arc::new(FailingStore::default());
     let head = summary("ses_1");
     store.create(&head).await.unwrap();
