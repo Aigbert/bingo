@@ -3,6 +3,8 @@
 Status: accepted · 2026-10-13 · Plans: M121, M123.
 Amends: ADR-0013 §2, §4, ADR-0019 §8
 
+**2026-10-14:** §1 amended by M148 (ADR-0081 §§1–6): Rail and Panel remain wire variants but the TUI draws neither. Unplaced payloads draw nothing; an extension of Null removes its kind.
+
 ## Context
 
 ADR-0013 gave plugins three lanes and a vocabulary, and kept placement

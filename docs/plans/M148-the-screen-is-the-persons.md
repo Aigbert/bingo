@@ -53,7 +53,7 @@ become data. No new dependency.
 - TUI removal callers: `src/{lib,ui,focus,input,layers,test_lanes,window}.rs`,
   `src/layout/tests.rs`, `src/screens{,/teams,/windows}.rs`, and their snapshots
 - `crates/bingo-demo-ui/src/{board,command,journal,progress,lib,tests}.rs`
-- `crates/bingo-rooms/src/{owed,roster}.rs`, `crates/bingo-collab/src/{room,owed}.rs`
+- `crates/bingo-rooms/src/{owed,roster,room}.rs`, `crates/bingo-collab/src/{room,owed}.rs`
 - `crates/bingo-schedule/src/wake.rs`
 - `crates/bingo-context/src/baseline/lifecycle.rs` (approved Null-absence assertion)
 - `scripts/tui-smoke.sh`, the guide pages naming `ctrl+p` or the rail
@@ -71,7 +71,8 @@ become data. No new dependency.
       shows the board row and its Tick button changes the table; the
       progress bar runs in the activity band; `ctrl+p` does nothing.
 - [ ] The removed snapshots (rail, sheet, pins, `owed_*`, the rail cases
-      of `roster_*`) are listed with the reason; the rest unchanged.
+      of `roster_*`) are listed with the reason; retained help/roster snapshots change only
+      the removed shortcut/cards and reflow, keeping their assertions.
 - [ ] `scripts/tui-smoke.sh` passes; its `❯ Board` and pinned-board steps
       now go through `/board` (edit the steps, say so).
 - [ ] All gates of the upgrade protocol, plus the Windows cross-check
@@ -93,20 +94,38 @@ become data. No new dependency.
   itself, and its data stays in the fold.
 - `Null` removing an extension changes a journaled fold. Old journals
   fold to fewer entries, never more; the fixture pins it.
-- Scope approval (2026-10-14): the baseline lifecycle assertion may change
-  from present-as-null to absent. The same sole assertion change elsewhere
-  is approved; list every such test here. No other outside-scope change is
-  authorized. Currently identified: context
-  `session_start_invalidates_both_keys_without_opening_the_session`.
-- Approved TUI removal files (relative to `src/`): `blocks.rs`, `focus.rs`, `frame.rs`, `input.rs`, `keys.rs`, `layout.rs`, `layout/tests.rs`, `lib.rs`, `motion.rs`, `panel.rs`, `pointer.rs`, `rail.rs`, `screens.rs`, `screens/teams.rs`, `screens/windows.rs`, `select.rs`, `test_lanes.rs`, `theme.rs`, `transcript.rs`, `transcript/pictured.rs`, `ui.rs`, `ui/controls.rs`, `view.rs`, `views/mod.rs`, `window.rs`.
+- `bingo-context/src/baseline/lifecycle.rs`: approved Null-absence expectation.
+- Approved TUI removal scope (relative to `src/`; each is removal/caller-only):
+  - `blocks.rs`.
+  - `focus.rs`.
+  - `frame.rs`.
+  - `input.rs`.
+  - `keys.rs`.
+  - `layout.rs`.
+  - `layout/tests.rs`.
+  - `lib.rs`.
+  - `motion.rs`.
+  - `panel.rs`.
+  - `pointer.rs`.
+  - `rail.rs`.
+  - `screens.rs`.
+  - `screens/teams.rs`.
+  - `screens/windows.rs`.
+  - `select.rs`.
+  - `test_lanes.rs`.
+  - `theme.rs`.
+  - `transcript.rs`.
+  - `transcript/pictured.rs`.
+  - `ui.rs`.
+  - `ui/controls.rs`.
+  - `view.rs`.
+  - `views/mod.rs`.
+  - `window.rs`.
 - Deleted snapshots: `panel_end`, `panel_middle`, `custom_panel_{80x24,120x40}`, `panel_sheet_{80x24,120x40}`, `owed_{80x24,120x40}`, `ctrl_p_shows_what_the_plugins_wrote_into_the_session`, `the_rail_holds_the_pinned_board_and_the_live_progress_card`, `without_a_rail_the_same_cards_draw_under_the_running_rows`: removed sheet/rail/lane only.
-- **Stopped (2026-10-14):** `bingo-rooms/src/room.rs:219`, outside Files,
-  `the_payload_carries_the_names_the_listeners_and_the_tree_it_draws_as`
-  fails on added `slots: []`. Proposed fix: add this file to scope and add
-  `"slots": []` to its two complete-payload expectations; keep all other
-  assertions. This is not a Null-absence change. The file is untouched.
-- Pending: eight TUI failures (band instrumentation and removal-affected
-  snapshots/token-site lists), remaining gates, row-action drive, docs and smoke.
+- `bingo-rooms/src/room.rs`: approved default `slots: []` in two complete-payload expectations.
+- Standing approval (2026-10-14): any crate's expectation may add default `slots: []` or assert absence after Null removal; other outside-scope changes still stop.
+- `bingo-surface-tui/src/screens/shells.rs`: remove stale rail comments.
+- `bingo-surface-tui/src/layout/count.rs`: remove the deleted rail's test counter; four remaining bands still render exactly once.
 
 ## Re-verified (2026-10-14, `23810b23`)
 
@@ -233,4 +252,38 @@ error: 1 target failed:
 
 $ cargo fmt --all -- --check
 (exit 0; no output)
+```
+
+```text
+$ INSTA_UPDATE=always cargo test -p bingo-surface-tui --lib --locked
+test theme::tests::every_token_is_spent_where_the_design_says ... FAILED
+assertion `left == right` failed: where `presence` is spent
+test result: FAILED. 1098 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.96s
+
+$ cargo test -p bingo-surface-tui --lib --locked
+error[E0425]: cannot find function `press` in this scope
+error: could not compile `bingo-surface-tui` (lib test) due to 5 previous errors; 1 warning emitted
+
+$ cargo test -p bingo-surface-tui --lib --locked
+test result: ok. 1101 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.94s
+
+$ cargo test -p bingo-rooms --lib --locked
+test result: ok. 230 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+```text
+$ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-plugin-rpc -p bingo-surface-rpc --locked
+test result: ok. 146 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.28s
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+test result: ok. 136 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.08s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 41 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 8.46s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 ```

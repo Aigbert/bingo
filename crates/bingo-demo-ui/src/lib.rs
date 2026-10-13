@@ -17,7 +17,7 @@
 //! to show and which command a button runs, and every surface decides the
 //! rest (ADR-0013 §4).
 //!
-//! The three lanes side by side are `docs/design/tui.md` §8, which this crate
+//! The three publication lifetimes are `docs/design/tui.md` §8, which this crate
 //! compiles as a doc test so the example a plugin author reads is one that
 //! builds ([`DesignDoc`]).
 
