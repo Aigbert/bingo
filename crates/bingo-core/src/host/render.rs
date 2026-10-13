@@ -31,8 +31,10 @@ pub(super) async fn invalidate(
     session: &SessionId,
     requests: Vec<String>,
 ) -> Result<(), KernelError> {
-    let mailbox = host.mailbox_of(session).await?;
-    let live = host.live(session)?;
+    let Some(live) = host.lock().get(session).cloned() else {
+        return Ok(());
+    };
+    let mailbox = live.mailbox.clone();
     let mut pending: Vec<_> = requests
         .into_iter()
         .collect::<std::collections::BTreeSet<_>>()
@@ -72,9 +74,13 @@ mod tests {
     use super::*;
     #[tokio::test]
     async fn invalidation_never_opens_a_session_that_is_not_live() {
-        let dir=tempfile::tempdir().unwrap();
-        let host=Host::build(vec![],HostConfig::new(Env::rooted(dir.path()))).await.unwrap();
-        host.invalidate(&SessionId::from_raw("closed"),vec!["pane".into()]).await.unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let host = Host::build(vec![], HostConfig::new(Env::rooted(dir.path())))
+            .await
+            .unwrap();
+        host.invalidate(&SessionId::from_raw("closed"), vec!["pane".into()])
+            .await
+            .unwrap();
         assert!(host.lock().is_empty());
     }
 }
