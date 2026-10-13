@@ -12,6 +12,7 @@ use crate::{Applied, DeltaKind, Event, Item, ItemBody, ItemId};
 pub struct Transcript {
     #[schemars(rename = "historyGeneration", default)]
     generation: u64,
+    /// Items in transcript order, including every non-terminal one.
     #[schemars(with = "Vec<Item>")]
     items: Vec<Arc<Item>>,
     #[schemars(skip)]

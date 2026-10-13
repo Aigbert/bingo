@@ -475,7 +475,8 @@ async fn a_prompt_from_a_chat_carries_its_principal_and_its_conversation() {
         .unwrap();
     let origin = attachment
         .snapshot
-        .items
+        .transcript
+        .items()
         .iter()
         .find_map(|item| match &item.body {
             bingo_sdk::ItemBody::User { origin, .. } => Some(origin.clone()),

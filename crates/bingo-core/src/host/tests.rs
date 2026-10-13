@@ -377,7 +377,11 @@ async fn open_create_runs_a_turn_and_the_session_is_findable_afterwards() {
             .await
             .unwrap();
         assert_eq!(again.session, session);
-        assert_eq!(again.snapshot.items.len(), 2, "reopening sees the history");
+        assert_eq!(
+            again.snapshot.transcript.items().len(),
+            2,
+            "reopening sees the history"
+        );
     }
     assert_eq!(
         host.open(

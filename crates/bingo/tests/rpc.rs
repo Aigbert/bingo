@@ -123,7 +123,7 @@ async fn open_submit_and_the_events_arrive_in_seq_order_with_the_clients_intent(
             .any(|f| matches!(&f.event, Event::IntentAck { intent: i, .. } if i == &intent))
     );
     let state: &SessionState = &attachment.snapshot;
-    assert!(state.items.iter().any(|i| matches!(&i.body, bingo_sdk::ItemBody::Assistant { text } if text == "Hello over the wire.")));
+    assert!(state.transcript.items().iter().any(|i| matches!(&i.body, bingo_sdk::ItemBody::Assistant { text } if text == "Hello over the wire.")));
     assert_eq!(state.last_status(), Some(&TurnStatus::Completed));
     kernel.shutdown().await.unwrap();
 }
@@ -398,7 +398,7 @@ async fn a_session_written_by_a_print_run_reopens_by_id_with_its_items() {
         .await
         .unwrap();
     assert_eq!(attachment.session, id);
-    assert!(attachment.snapshot.items.iter().any(|i| matches!(&i.body, bingo_sdk::ItemBody::Assistant { text } if text == "Hello over the wire.")));
+    assert!(attachment.snapshot.transcript.items().iter().any(|i| matches!(&i.body, bingo_sdk::ItemBody::Assistant { text } if text == "Hello over the wire.")));
     let page = attachment
         .handle
         .history(HistoryPage {
@@ -638,7 +638,8 @@ async fn an_mcp_server_from_mcp_config_offers_its_tool_through_the_gate() {
     );
     let echoed = attachment
         .snapshot
-        .items
+        .transcript
+        .items()
         .iter()
         .find_map(|item| match &item.body {
             bingo_sdk::ItemBody::ToolCall {
@@ -901,7 +902,8 @@ async fn a_background_agent_wakes_the_root_and_says_who_it_is() {
         .expect("a second turn on the root");
     let (turn, origin, text) = attachment
         .snapshot
-        .items
+        .transcript
+        .items()
         .iter()
         .find_map(|item| match &item.body {
             bingo_sdk::ItemBody::User { parts, origin } if origin.principal.is_some() => Some((

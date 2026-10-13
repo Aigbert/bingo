@@ -229,7 +229,7 @@ impl Actor {
             .summary
             .title
             .clone()
-            .or_else(|| title::first_ask(&self.state.items).and_then(title::mint))
+            .or_else(|| title::first_ask(self.state.transcript.items()).and_then(title::mint))
     }
 
     /// The mint's own `SessionUpdated`, sent once when the first prose lands
@@ -420,7 +420,7 @@ impl Actor {
 
     /// Undo a turn and everything after it (ADR-0045 §1): the item that says
     /// so is appended, and `Event::Rewound` takes the items out of every
-    /// fold — the model's (`ContextView::items`) and every client's
+    /// fold — the shared transcript and every client's
     /// (`SessionState::apply`). The journal itself is never rewritten.
     ///
     /// Refused while a turn runs, whatever the turn is doing: an item the
@@ -430,12 +430,13 @@ impl Actor {
         if self.running.is_some() {
             return Err(KernelError::new(ErrorCode::NotReady, "a turn is running"));
         }
-        let dropped = crate::rewind::dropped(&self.state.items, to_turn).ok_or_else(|| {
-            KernelError::new(
-                ErrorCode::InvalidInput,
-                format!("this session has no turn {to_turn}"),
-            )
-        })?;
+        let dropped =
+            crate::rewind::dropped(self.state.transcript.items(), to_turn).ok_or_else(|| {
+                KernelError::new(
+                    ErrorCode::InvalidInput,
+                    format!("this session has no turn {to_turn}"),
+                )
+            })?;
         let count = dropped.len() as u32;
         self.record(ItemBody::Rewind {
             to_turn: to_turn.clone(),
@@ -444,7 +445,7 @@ impl Actor {
         .await?;
         self.publish(
             Event::Rewound {
-                generation: self.state.history_generation + 1,
+                generation: self.state.transcript.generation() + 1,
                 to_turn: to_turn.clone(),
                 dropped,
                 // The kernel restores no file, so it names none; whoever put
@@ -645,7 +646,10 @@ impl Actor {
         let mut snapshot = SessionState::new(self.state.summary.clone());
         snapshot.seq = self.state.seq;
         snapshot.config = self.state.config.clone();
-        snapshot.history_generation = self.state.history_generation;
+        snapshot.transcript = self
+            .state
+            .transcript
+            .window(self.state.transcript.items().len());
         snapshot.turn = self.state.turn.clone();
         snapshot.queue = self.state.queue.clone();
         snapshot.interactions = self.state.interactions.clone();
@@ -659,9 +663,9 @@ impl Actor {
         // room for those and let the server make the final whole-line decision.
         let available = budget.saturating_sub(4096);
         let mut used = serde_json::to_vec(&snapshot).map_or(available, |bytes| bytes.len());
-        let mut start = self.state.items.len();
+        let mut start = self.state.transcript.items().len();
         while start > 0 {
-            let size = serde_json::to_vec(&self.state.items[start - 1])
+            let size = serde_json::to_vec(&self.state.transcript.items()[start - 1])
                 .map_or(available, |bytes| bytes.len());
             if used.saturating_add(size).saturating_add(1) > available {
                 break;
@@ -669,11 +673,15 @@ impl Actor {
             used += size + 1;
             start -= 1;
         }
-        snapshot.items = self.state.items[start..].to_vec();
+        snapshot.transcript = self.state.transcript.window(start);
         let history = OpenHistory {
-            before: snapshot.items.first().map(|item| item.id.clone()),
+            before: snapshot
+                .transcript
+                .items()
+                .first()
+                .map(|item| item.id.clone()),
             has_more: start > 0,
-            generation: self.state.history_generation,
+            generation: self.state.transcript.generation(),
         };
         (snapshot, Some(history))
     }
@@ -744,7 +752,7 @@ impl Actor {
 
     fn history(&self, page: &HistoryPage) -> Result<HistoryChunk, KernelError> {
         self.check_generation(page.generation)?;
-        let items = &self.state.items;
+        let items = self.state.transcript.items();
         let end = match page.before.as_ref() {
             Some(before) => match items.iter().position(|item| &item.id == before) {
                 Some(index) => index,
@@ -762,9 +770,12 @@ impl Actor {
         let Some(max_bytes) = page.max_bytes else {
             let start = end.saturating_sub(limit);
             return Ok(HistoryChunk {
-                items: items[start..end].to_vec(),
+                items: items[start..end]
+                    .iter()
+                    .map(|item| item.as_ref().clone())
+                    .collect(),
                 next: (start > 0).then(|| items[start].id.clone()),
-                generation: self.state.history_generation,
+                generation: self.state.transcript.generation(),
                 oversized: None,
             });
         };
@@ -773,7 +784,7 @@ impl Actor {
 
     fn bounded_history(
         &self,
-        items: &[Item],
+        items: &[Arc<Item>],
         end: usize,
         limit: usize,
         max_bytes: usize,
@@ -813,7 +824,7 @@ impl Actor {
             None
         };
         Ok(HistoryChunk {
-            items: slice.to_vec(),
+            items: slice.iter().map(|item| item.as_ref().clone()).collect(),
             next: (start > 0)
                 .then(|| {
                     slice
@@ -823,13 +834,13 @@ impl Actor {
                 })
                 .flatten()
                 .cloned(),
-            generation: self.state.history_generation,
+            generation: self.state.transcript.generation(),
             oversized,
         })
     }
 
     fn check_generation(&self, generation: Option<u64>) -> Result<(), KernelError> {
-        if generation.is_some_and(|generation| generation != self.state.history_generation) {
+        if generation.is_some_and(|generation| generation != self.state.transcript.generation()) {
             return Err(KernelError::new(
                 ErrorCode::StaleGeneration,
                 "history changed",
@@ -841,10 +852,11 @@ impl Actor {
     fn item_for_pin(&self, id: &ItemId, generation: u64) -> Result<Item, KernelError> {
         self.check_generation(Some(generation))?;
         self.state
-            .items
+            .transcript
+            .items()
             .iter()
             .find(|item| &item.id == id)
-            .cloned()
+            .map(|item| item.as_ref().clone())
             .ok_or_else(|| {
                 KernelError::new(
                     ErrorCode::StaleGeneration,

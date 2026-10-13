@@ -243,7 +243,13 @@ fn paged(
     open: &crate::pager::Pager,
     reveal: layers::Reveal,
 ) {
-    let Some(item) = tree.viewed().items.iter().find(|item| item.id == open.item) else {
+    let Some(item) = tree
+        .viewed()
+        .transcript
+        .items()
+        .iter()
+        .find(|item| item.id == open.item)
+    else {
         return;
     };
     let content = pager::lines(tree.viewed(), item, above.width as usize);

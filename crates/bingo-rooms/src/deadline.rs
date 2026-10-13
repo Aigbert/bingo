@@ -231,7 +231,8 @@ mod tests {
         let head = room::read(&fleet.handle(), id)
             .await
             .expect("the room")
-            .items
+            .transcript
+            .items()
             .last()
             .expect("a post")
             .id

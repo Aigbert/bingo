@@ -15,13 +15,16 @@ const LIMIT: usize = 48;
 
 /// What was said first in the session, if a person has said anything. Prose
 /// only — an ask that carried nothing but an image names nothing.
-pub fn first_ask(items: &[Item]) -> Option<&str> {
-    items.iter().find_map(|item| match &item.body {
-        ItemBody::User { parts, origin } if !provided_context(origin) => {
-            parts.iter().find_map(prose)
-        }
-        _ => None,
-    })
+pub fn first_ask(items: &[impl std::borrow::Borrow<Item>]) -> Option<&str> {
+    items
+        .iter()
+        .map(std::borrow::Borrow::borrow)
+        .find_map(|item| match &item.body {
+            ItemBody::User { parts, origin } if !provided_context(origin) => {
+                parts.iter().find_map(prose)
+            }
+            _ => None,
+        })
 }
 
 /// Command prompts and contributor snapshots are context, not the ask that
@@ -181,7 +184,7 @@ mod tests {
             asked(vec![ContentPart::text("and the lexer")]),
         ];
         assert_eq!(first_ask(&items), Some("fix the parser"));
-        assert_eq!(first_ask(&[]), None);
+        assert_eq!(first_ask(&[] as &[Item]), None);
         assert_eq!(first_ask(&[answered("hello")]), None);
     }
 }

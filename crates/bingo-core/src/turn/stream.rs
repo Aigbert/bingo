@@ -7,7 +7,7 @@ use std::time::Duration;
 use bingo_sdk::*;
 use futures::StreamExt;
 
-use super::{Step, Turn};
+use super::{Step, Turn, emit_and_fold};
 use crate::accumulator::{Accumulator, Emit, Finished};
 use crate::models::window_from_overflow;
 
@@ -81,45 +81,44 @@ impl Turn<'_> {
 
     /// One fold result: into the turn's own transcript and out to the clients.
     fn publish(&mut self, emit: Emit) {
-        match emit {
-            Emit::Started(item) => {
-                self.upsert(&item);
-                self.host.emit(Event::ItemStarted { item });
-            }
+        let event = match emit {
+            Emit::Started(item) => Event::ItemStarted { item },
             Emit::Delta {
                 item,
                 n,
                 kind,
                 data,
-            } => self.host.emit(Event::ItemDelta {
+            } => Event::ItemDelta {
                 item,
                 n,
                 kind,
                 data,
-            }),
-            Emit::Completed(item) => {
-                self.upsert(&item);
-                self.host.emit(Event::ItemCompleted { item });
-            }
-        }
+            },
+            Emit::Completed(item) => Event::ItemCompleted { item },
+        };
+        emit_and_fold(&mut self.transcript, self.host, event);
     }
 
     /// The server named its real window; later sessions on this model
     /// measure against it (ADR-0004).
-    fn learn_window(&self, message: &str) {
+    fn learn_window(&mut self, message: &str) {
         let Some(window) = window_from_overflow(message) else {
             return;
         };
         let provider = self.model.provider.id();
         if self.model.learned.record(provider, &self.model.id, window) {
-            self.host.emit(Event::Notice {
-                level: Level::Info,
-                code: "WINDOW_LEARNED".into(),
-                text: format!(
-                    "{provider}/{} takes {window} tokens of context; later sessions measure against it",
-                    self.model.id
-                ),
-            });
+            emit_and_fold(
+                &mut self.transcript,
+                self.host,
+                Event::Notice {
+                    level: Level::Info,
+                    code: "WINDOW_LEARNED".into(),
+                    text: format!(
+                        "{provider}/{} takes {window} tokens of context; later sessions measure against it",
+                        self.model.id
+                    ),
+                },
+            );
         }
     }
 
@@ -132,7 +131,6 @@ impl Turn<'_> {
         usage: ContextUsage,
         request: &ModelRequest,
     ) -> Step {
-        self.items.retain(|i| !dropped.contains(&i.id));
         // The ladder is the kernel's own: it learns a window, cuts the fold
         // and sends it again. None of that is answerable where the endpoint
         // holds the context, so an overflow there fails the turn as any other
@@ -184,15 +182,19 @@ impl Turn<'_> {
         })
     }
 
-    fn announce_retry(&self, error: &ProviderError, dropped: Vec<ItemId>, delay_ms: u64) {
-        self.host.emit(Event::TurnRetrying {
-            turn: self.id.clone(),
-            attempt: self.retries,
-            max: self.cfg.budget.max_retries,
-            delay_ms,
-            dropped,
-            reason: error.to_string(),
-        });
+    fn announce_retry(&mut self, error: &ProviderError, dropped: Vec<ItemId>, delay_ms: u64) {
+        emit_and_fold(
+            &mut self.transcript,
+            self.host,
+            Event::TurnRetrying {
+                turn: self.id.clone(),
+                attempt: self.retries,
+                max: self.cfg.budget.max_retries,
+                delay_ms,
+                dropped,
+                reason: error.to_string(),
+            },
+        );
     }
 }
 

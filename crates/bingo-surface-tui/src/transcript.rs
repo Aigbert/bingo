@@ -282,7 +282,7 @@ pub struct Place<'a> {
     pub previous: Option<&'a Item>,
     /// The thoughts adjacent before it ([`crate::thoughts`]), which the last
     /// of a run draws as its own. Empty for everything that is not a thought.
-    pub run: &'a [Item],
+    pub run: Vec<&'a Item>,
     /// Whether a newer thought has joined this one: then the run's block hangs
     /// on that one and this draws nothing at all.
     pub joined: bool,
@@ -290,13 +290,21 @@ pub struct Place<'a> {
 
 impl<'a> Place<'a> {
     /// Where the item at `at` sits.
-    pub fn of(items: &'a [Item], at: usize) -> Self {
-        let thought = items.get(at).is_some_and(thoughts::is_thought);
+    pub fn of<T: std::borrow::Borrow<Item>>(items: &'a [T], at: usize) -> Self {
+        let thought = items
+            .get(at)
+            .is_some_and(|item| thoughts::is_thought(item.borrow()));
         Self {
-            previous: at.checked_sub(1).and_then(|before| items.get(before)),
+            previous: at
+                .checked_sub(1)
+                .and_then(|before| items.get(before))
+                .map(std::borrow::Borrow::borrow),
             run: match thought {
-                true => thoughts::run_before(items, at),
-                false => &[],
+                true => thoughts::run_before(items, at)
+                    .iter()
+                    .map(std::borrow::Borrow::borrow)
+                    .collect(),
+                false => Vec::new(),
             },
             joined: thought && thoughts::next_is_thought(items, at),
         }
@@ -304,7 +312,7 @@ impl<'a> Place<'a> {
 
     /// The run this item ends, itself last: the thoughts one block draws.
     fn thoughts<'b>(&'b self, item: &'b Item) -> Vec<&'b Item> {
-        self.run.iter().chain([item]).collect()
+        self.run.iter().copied().chain([item]).collect()
     }
 }
 
@@ -1225,7 +1233,7 @@ mod tests {
         assert!(!screen.contains("Memory index"), "{screen}");
         assert!(!screen.contains("fact-"), "{screen}");
         assert_eq!(
-            state.items.len(),
+            state.transcript.items().len(),
             4,
             "presentation must not erase the journal"
         );
@@ -1964,7 +1972,7 @@ mod tests {
                 "  ⎿  no such file".to_string(),
             ],
         );
-        let item = state.items.first().expect("the call");
+        let item = state.transcript.items().first().expect("the call");
         assert_eq!(fold::fold_of(&Folds::new(), item), Fold::Peek);
     }
 

@@ -71,12 +71,14 @@ fn assistant(text: &str) -> ItemBody {
 /// Two turns, each an ask and an answer.
 pub(crate) fn transcript() -> SessionState {
     let mut state = SessionState::new(summary());
-    state.items = vec![
+    state.transcript = vec![
         item("itm_1", "trn_1", user("write the note")),
         item("itm_2", "trn_1", assistant("Written.")),
         item("itm_3", "trn_2", user("and rename it")),
         item("itm_4", "trn_2", assistant("Renamed.")),
-    ];
+    ]
+    .into_iter()
+    .collect();
     state
 }
 
@@ -114,7 +116,8 @@ impl Journal {
     pub(crate) fn items(&self) -> Vec<String> {
         match self.state().as_ref() {
             Some(state) => state
-                .items
+                .transcript
+                .items()
                 .iter()
                 .map(|item| item.id.as_str().to_string())
                 .collect(),
@@ -171,11 +174,15 @@ impl HostApi for Journal {
             .as_mut()
             .ok_or_else(|| KernelError::new(ErrorCode::SessionNotFound, "no such session"))?;
         let at = state
-            .items
+            .transcript
+            .items()
             .iter()
             .position(|item| item.turn.as_ref() == Some(to_turn))
             .ok_or_else(|| KernelError::new(ErrorCode::InvalidInput, "no such turn"))?;
-        let dropped: Vec<ItemId> = state.items[at..].iter().map(|i| i.id.clone()).collect();
+        let dropped: Vec<ItemId> = state.transcript.items()[at..]
+            .iter()
+            .map(|i| i.id.clone())
+            .collect();
         let count = dropped.len() as u32;
         state.apply(&Frame {
             seq,
@@ -183,7 +190,7 @@ impl HostApi for Journal {
             session: session.clone(),
             cause: None,
             event: Event::Rewound {
-                generation: state.history_generation + 1,
+                generation: state.transcript.generation() + 1,
                 to_turn: to_turn.clone(),
                 dropped,
                 files_restored: Vec::new(),

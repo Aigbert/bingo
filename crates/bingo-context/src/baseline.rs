@@ -46,7 +46,7 @@ pub(crate) async fn contribute(
         .snapshot;
     let blocks = match retained(&state, id) {
         Some(blocks) => blocks,
-        None => capture(id, query, state.history_generation, render.await).await?,
+        None => capture(id, query, state.transcript.generation(), render.await).await?,
     };
     Ok(blocks.into_iter().map(ContextPiece::System).collect())
 }
@@ -74,7 +74,7 @@ async fn capture(
 fn retained(state: &SessionState, id: &str) -> Option<Vec<SystemBlock>> {
     let payload = state.extensions.get(PLUGIN)?.get(id)?;
     let baseline: Baseline = serde_json::from_value(payload.clone()).ok()?;
-    (baseline.history_generation == state.history_generation).then_some(baseline.blocks)
+    (baseline.history_generation == state.transcript.generation()).then_some(baseline.blocks)
 }
 
 /// Invalidates the baselines when a session starts, and publishes where the

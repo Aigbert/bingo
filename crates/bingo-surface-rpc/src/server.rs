@@ -307,7 +307,7 @@ impl Server {
             handle,
         } = self.host.open(params.selector, who, params.options).await?;
         self.pins.remove_session(&session);
-        let generation = snapshot.history_generation;
+        let generation = snapshot.transcript.generation();
         let result = OpenResult {
             session: session.clone(),
             snapshot,

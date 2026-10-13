@@ -63,6 +63,16 @@ fn reference(items: &mut Vec<Item>, event: &Event) {
     }
 }
 
+fn state() -> SessionState {
+    let summary = serde_json::from_value(serde_json::json!({
+        "id": "s", "cwd": "/tmp", "driver": "model",
+        "createdAt": "1970-01-01T00:00:00Z", "updatedAt": "1970-01-01T00:00:00Z",
+        "usage": Usage::default(), "busy": false,
+    }))
+    .unwrap();
+    SessionState::new(summary)
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
     #[test]
@@ -70,9 +80,13 @@ proptest! {
         let events: Vec<_> = codes.into_iter().map(event).collect();
         let mut transcript = Transcript::new();
         let mut expected = Vec::new();
+        let mut state = state();
         for (at, event) in events.iter().enumerate() {
             transcript.apply(event);
             reference(&mut expected, event);
+            state.apply(&Frame { seq: Seq(at as u64 + 1), ts: Timestamp::UNIX_EPOCH,
+                session: SessionId::from_raw("s"), cause: None, event: event.clone() });
+            prop_assert_eq!(state.transcript.items(), transcript.items());
             prop_assert_eq!(transcript.items().iter().map(|i| i.as_ref()).collect::<Vec<_>>(), expected.iter().collect::<Vec<_>>());
             let mut replay = Transcript::new();
             for event in &events[..=at] { replay.apply(event); }
@@ -99,4 +113,54 @@ fn ten_thousand_items_share_bodies_in_a_snapshot() {
         assert!(Arc::ptr_eq(original, shared));
         assert_eq!(Arc::strong_count(original), 2);
     }
+}
+
+#[test]
+fn a_delta_does_not_mutate_an_existing_snapshot() {
+    let mut transcript = Transcript::new();
+    let mut started = item(1, "hello".into());
+    started.status = ItemStatus::Running;
+    transcript.apply(&Event::ItemStarted { item: started });
+    let snapshot = transcript.clone();
+    let id = ItemId::from_raw("i1");
+    transcript.apply(&Event::ItemDelta {
+        item: id.clone(),
+        n: 1,
+        kind: DeltaKind::Text,
+        data: " world".into(),
+    });
+    assert_eq!(
+        snapshot.get(&id).unwrap().body,
+        ItemBody::Assistant {
+            text: "hello".into()
+        }
+    );
+    assert_eq!(
+        transcript.get(&id).unwrap().body,
+        ItemBody::Assistant {
+            text: "hello world".into()
+        }
+    );
+    assert!(!Arc::ptr_eq(&snapshot.items()[0], &transcript.items()[0]));
+}
+
+#[test]
+fn client_snapshot_deserialization_rebuilds_the_lookup() {
+    let mut transcript: Transcript = [item(1, "one".into()), item(2, "two".into())]
+        .into_iter()
+        .collect();
+    transcript.apply(&Event::Rewound {
+        generation: 4,
+        to_turn: TurnId::from_raw("t"),
+        dropped: vec![ItemId::from_raw("i1")],
+        files_restored: vec![],
+    });
+    let bytes = serde_json::to_vec(&transcript).unwrap();
+    let restored: Transcript = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(restored.generation(), 4);
+    assert_eq!(
+        restored.get(&ItemId::from_raw("i2")),
+        transcript.get(&ItemId::from_raw("i2"))
+    );
+    assert_eq!(serde_json::to_vec(&restored).unwrap(), bytes);
 }

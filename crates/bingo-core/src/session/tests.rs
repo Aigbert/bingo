@@ -91,7 +91,8 @@ fn turn_origin(frames: &[Frame]) -> Option<TurnOrigin> {
 
 fn user_texts(state: &SessionState) -> Vec<String> {
     state
-        .items
+        .transcript
+        .items()
         .iter()
         .filter_map(|i| match &i.body {
             ItemBody::User { parts, .. } => parts[0].as_text().map(str::to_string),
@@ -132,14 +133,15 @@ async fn submit_starts_a_turn_and_streams_it_to_the_end() {
     );
     assert!(!state.busy());
     assert_eq!(state.last_status(), Some(&TurnStatus::Completed));
-    let user = &state.items[0];
+    let user = &state.transcript.items()[0];
     assert_eq!(user.intent.as_ref(), Some(&intent));
     assert_eq!(
-        user.turn, state.items[1].turn,
+        user.turn,
+        state.transcript.items()[1].turn,
         "inputs belong to the turn they opened"
     );
     assert_eq!(
-        state.items[1].body,
+        state.transcript.items()[1].body,
         ItemBody::Assistant {
             text: "hello".into()
         }
@@ -155,7 +157,8 @@ async fn submit_starts_a_turn_and_streams_it_to_the_end() {
         folded.apply(frame);
     }
     assert_eq!(
-        folded.items, state.items,
+        folded.transcript.items(),
+        state.transcript.items(),
         "the same reducer over the journal gives the same view"
     );
 }
@@ -217,13 +220,14 @@ async fn a_busy_session_queues_and_the_queue_opens_the_next_turn() {
         Some("turnCompleted:Completed")
     );
     let started = state
-        .items
+        .transcript
+        .items()
         .iter()
         .find(|i| i.intent.as_ref() == Some(&queued))
         .unwrap();
     assert!(started.turn.is_some());
     assert_eq!(
-        state.items.last().unwrap().body,
+        state.transcript.items().last().unwrap().body,
         ItemBody::Assistant {
             text: "second".into()
         }
@@ -283,7 +287,8 @@ async fn a_permission_is_answered_once_and_late_answers_are_rejected() {
     assert!(state.interactions.is_empty());
     assert_eq!(state.last_status(), Some(&TurnStatus::Completed));
     let tool = state
-        .items
+        .transcript
+        .items()
         .iter()
         .find(|i| matches!(i.body, ItemBody::ToolCall { .. }))
         .unwrap();
@@ -400,7 +405,7 @@ async fn an_unknown_command_an_unknown_action_and_empty_text_are_rejected() {
         assert_eq!(labels, vec!["ack:Rejected"]);
     }
     assert!(!state.busy());
-    assert!(state.items.is_empty());
+    assert!(state.transcript.items().is_empty());
 }
 
 #[tokio::test]
@@ -431,20 +436,21 @@ async fn a_lagging_subscriber_is_told_and_can_resync() {
         unreachable!()
     };
     assert!(from > state.seq && to > from);
-    assert!(state.items.len() < total);
+    assert!(state.transcript.items().len() < total);
     assert!(
         events.next().await.is_none(),
         "a lagged stream ends at its marker"
     );
 
     let mut resync = mailbox.events_since(state.seq).await.unwrap();
-    while state.items.len() < total {
+    while state.transcript.items().len() < total {
         let frame = resync.next().await.unwrap();
         assert_ne!(state.apply(&frame), Applied::Stale);
     }
-    assert_eq!(state.items.len(), total);
+    assert_eq!(state.transcript.items().len(), total);
     let texts: Vec<String> = state
-        .items
+        .transcript
+        .items()
         .iter()
         .map(|i| match &i.body {
             ItemBody::Notice { text, .. } => text.clone(),

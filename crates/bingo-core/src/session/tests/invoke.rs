@@ -53,10 +53,12 @@ fn start_with(
 
 fn item_of(state: &SessionState, id: &ItemId) -> Item {
     state
-        .items
+        .transcript
+        .items()
         .iter()
         .find(|item| &item.id == id)
-        .unwrap_or_else(|| panic!("no {id} in {:?}", state.items))
+        .unwrap_or_else(|| panic!("no {id} in {:?}", state.transcript.items()))
+        .as_ref()
         .clone()
 }
 
@@ -145,10 +147,11 @@ async fn a_call_the_turn_was_not_offered_is_refused_and_never_runs() {
     .await;
     assert_eq!(
         state
-            .items
+            .transcript
+            .items()
             .iter()
             .filter(|item| item.external())
-            .map(kind)
+            .map(|item| kind(item))
             .collect::<Vec<_>>(),
         ["tool/completed"],
         "one bridged item, the one that was served"

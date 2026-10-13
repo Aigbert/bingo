@@ -222,7 +222,8 @@ fn content_of(ui: &Ui, tree: &Tree) -> Vec<Line<'static>> {
     let width = width_of(ui);
     let state = tree.viewed();
     state
-        .items
+        .transcript
+        .items()
         .iter()
         .find(|item| item.id == open.item)
         .map(|item| lines(state, item, width))
@@ -359,7 +360,8 @@ mod tests {
                 .collect(),
         );
         state
-            .items
+            .transcript
+            .items()
             .iter()
             .find(|item| &item.id == id)
             .map(|item| lines(&state, item, width))

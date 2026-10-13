@@ -344,7 +344,8 @@ impl Hosted {
 /// carries it is not the one it was queued at.
 fn carried(state: &SessionState, turn: &TurnId, intent: &IntentId) -> bool {
     state
-        .items
+        .transcript
+        .items()
         .iter()
         .any(|item| item.turn.as_ref() == Some(turn) && item.intent.as_ref() == Some(intent))
 }

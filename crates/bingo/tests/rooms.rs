@@ -158,7 +158,8 @@ async fn a_post_in_a_room_wakes_its_member_and_is_not_fanned_back() {
     );
     let posts = after
         .snapshot
-        .items
+        .transcript
+        .items()
         .iter()
         .filter(|item| matches!(item.body, ItemBody::User { .. }))
         .count();
@@ -374,7 +375,7 @@ async fn until_reported(tree: &mut Attachment, root: &SessionId) {
 
 /// Whether the agent has written into this session.
 fn reported(state: &SessionState) -> bool {
-    state.items.iter().any(|item| {
+    state.transcript.items().iter().any(|item| {
         matches!(&item.body, ItemBody::User { origin, .. }
             if origin.principal.as_deref() == Some(MEMBER))
     })

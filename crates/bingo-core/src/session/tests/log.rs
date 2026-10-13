@@ -64,7 +64,7 @@ async fn a_delivery_of_either_kind_is_recorded_the_same_way() {
     .await;
     assert_eq!(user_texts(&state), ["held", "woken"]);
     assert!(state.queue.is_empty() && state.turn.is_none());
-    let ItemBody::User { origin, .. } = &state.items[0].body else {
+    let ItemBody::User { origin, .. } = &state.transcript.items()[0].body else {
         panic!("a user item first");
     };
     assert_eq!(origin.principal.as_deref(), Some("a"), "who spoke is kept");

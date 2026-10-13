@@ -1,9 +1,10 @@
-//! The second reducer: journal → provider messages. Also the one ruler for
+//! The model view of the transcript. Also the one ruler for
 //! context size, used by the compaction trigger and by every display.
 
 pub mod budget;
 pub mod elide;
 
+#[cfg(test)]
 use std::collections::{HashMap, HashSet};
 
 use bingo_sdk::*;
@@ -15,12 +16,22 @@ use serde_json::Value;
 pub struct ContextView;
 
 impl ContextView {
+    pub fn model_view(transcript: &Transcript) -> Vec<Message> {
+        let mut out = Folder::default();
+        for item in transcript.model_items() {
+            out.item(item);
+        }
+        out.finish()
+    }
+
     /// Apply `Compacted` and `Rewound` to the items in a journal, then fold.
+    #[cfg(test)]
     pub fn fold(frames: &[Frame]) -> Vec<Message> {
         Self::fold_items(&Self::items(frames))
     }
 
     /// The transcript after compaction and rewind, in order.
+    #[cfg(test)]
     pub fn items(frames: &[Frame]) -> Vec<Item> {
         let mut items: Vec<Item> = Vec::new();
         let mut positions: HashMap<ItemId, usize> = HashMap::new();
@@ -58,6 +69,7 @@ impl ContextView {
         items
     }
 
+    #[cfg(test)]
     pub fn fold_items(items: &[Item]) -> Vec<Message> {
         let mut out = Folder::default();
         for item in items {
@@ -67,6 +79,7 @@ impl ContextView {
     }
 }
 
+#[cfg(test)]
 fn item_positions(items: &[Item]) -> HashMap<ItemId, usize> {
     items
         .iter()
@@ -77,12 +90,8 @@ fn item_positions(items: &[Item]) -> HashMap<ItemId, usize> {
 
 /// The one splice a compaction performs: before `cut` only `kept` survives, the
 /// summary item takes the seam, the tail is untouched.
-pub(crate) fn splice_compaction(
-    items: &mut Vec<Item>,
-    cut: usize,
-    kept: &[ItemId],
-    summary: &ItemId,
-) {
+#[cfg(test)]
+fn splice_compaction(items: &mut Vec<Item>, cut: usize, kept: &[ItemId], summary: &ItemId) {
     let summary_item = items
         .iter()
         .position(|i| &i.id == summary)

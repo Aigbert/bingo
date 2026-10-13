@@ -216,7 +216,8 @@ fn background(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 /// The call id of the shell command in flight, the newest first.
 fn running_shell(state: &SessionState) -> Option<String> {
     state
-        .items
+        .transcript
+        .items()
         .iter()
         .rev()
         .filter(|item| !item.is_terminal())
@@ -236,7 +237,8 @@ pub fn latest(
     what: impl Fn(&bingo_sdk::Item) -> bool,
 ) -> Option<bingo_sdk::ItemId> {
     state
-        .items
+        .transcript
+        .items()
         .iter()
         .rev()
         .filter(|item| focused.is_none_or(|id| id == &item.id))
@@ -250,7 +252,7 @@ pub(crate) fn item_of<'a>(
     state: &'a SessionState,
     id: &bingo_sdk::ItemId,
 ) -> Option<&'a bingo_sdk::Item> {
-    state.items.iter().find(|item| &item.id == id)
+    state.transcript.get(id)
 }
 
 /// What `ctrl+o` opens further: a block that is keeping something back — a
@@ -1020,14 +1022,16 @@ mod tests {
     /// A transcript of two turns, and a session that can rewind to one.
     fn rewindable() -> (SessionState, Vec<bingo_sdk::CommandSpec>) {
         let mut state = state();
-        state.items = vec![
+        state.transcript = vec![
             in_turn(
                 "itm_1",
                 "trn_1",
                 user("itm_1", "what is in this workspace?"),
             ),
             in_turn("itm_2", "trn_2", user("itm_2", "write me a note")),
-        ];
+        ]
+        .into_iter()
+        .collect();
         (
             state,
             // The spec `bingo-checkpoints` registers (ADR-0045 §3): a

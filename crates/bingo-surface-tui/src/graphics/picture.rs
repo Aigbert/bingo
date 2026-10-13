@@ -68,7 +68,11 @@ impl Source {
     ) -> Option<&'a Image> {
         match self {
             Source::Journal { item, part } => {
-                let found = state.items.iter().find(|kept| kept.id == *item)?;
+                let found = state
+                    .transcript
+                    .items()
+                    .iter()
+                    .find(|kept| kept.id == *item)?;
                 pictures_of(&found.body).get(*part).copied()
             }
             Source::Draft { token } => linked.image(&dest(held.under(*token)?)),
@@ -351,14 +355,16 @@ mod tests {
     #[test]
     fn a_picture_finds_itself_in_the_session_it_was_drawn_from() {
         let mut state = crate::test_support::folded(Vec::new());
-        state.items.push(crate::test_support::item(
-            "itm_9",
-            ItemStatus::Completed,
-            ItemBody::User {
-                parts: vec![ContentPart::text("look"), ContentPart::Image(image("one"))],
-                origin: Origin::surface("tui"),
-            },
-        ));
+        state.transcript.apply(&bingo_sdk::Event::ItemCompleted {
+            item: crate::test_support::item(
+                "itm_9",
+                ItemStatus::Completed,
+                ItemBody::User {
+                    parts: vec![ContentPart::text("look"), ContentPart::Image(image("one"))],
+                    origin: Origin::surface("tui"),
+                },
+            ),
+        });
         let held = Held::default();
         assert_eq!(
             picture("itm_9", 0)

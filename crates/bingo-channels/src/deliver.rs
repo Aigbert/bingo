@@ -425,7 +425,8 @@ impl Deliverer {
 /// are not what a chat came for; a failure reaches it as a `Status`.
 fn answer(state: &SessionState, turn: &TurnId) -> String {
     state
-        .items
+        .transcript
+        .items()
         .iter()
         .filter(|item| item.turn.as_ref() == Some(turn))
         .filter_map(|item| match &item.body {

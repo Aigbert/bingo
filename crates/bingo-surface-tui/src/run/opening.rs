@@ -19,7 +19,7 @@ pub(super) fn plays(run: &Run, screen: (u16, u16), asked: bool, now: Now) -> boo
     let state = run.session.tree.root();
     welcome::opens(welcome::Opens {
         ours: welcome::wanted(state),
-        fresh: state.items.is_empty(),
+        fresh: state.transcript.items().is_empty(),
         asked,
         screen,
         colour: crate::theme::full_colour(),

@@ -26,7 +26,7 @@ impl Turn {
 /// The turns of this transcript, oldest first.
 pub fn of(state: &SessionState) -> Vec<Turn> {
     let mut out: Vec<Turn> = Vec::new();
-    for item in &state.items {
+    for item in state.transcript.items() {
         let Some(id) = item.turn.clone() else {
             continue;
         };
@@ -77,9 +77,13 @@ mod tests {
     #[test]
     fn a_turn_nobody_opened_by_typing_is_named_by_its_own_id() {
         let mut state = transcript();
-        state.items[0].body = ItemBody::Assistant {
+        let mut item = state.transcript.items()[0].as_ref().clone();
+        item.body = ItemBody::Assistant {
             text: "on my own".into(),
         };
+        state
+            .transcript
+            .apply(&bingo_sdk::Event::ItemUpdated { item });
         assert_eq!(of(&state)[0].label(), "trn_1");
     }
 

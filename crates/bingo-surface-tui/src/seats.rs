@@ -155,7 +155,8 @@ fn read_to<'a>(room: &'a SessionState, name: &str) -> Option<&'a str> {
 /// somebody said into the room, which is a user item — the same thing the
 /// rooms plugin folds its own ledgers out of.
 fn posts(room: &SessionState) -> Vec<&str> {
-    room.items
+    room.transcript
+        .items()
         .iter()
         .filter(|item| matches!(item.body, ItemBody::User { .. }))
         .map(|item| item.id.as_str())

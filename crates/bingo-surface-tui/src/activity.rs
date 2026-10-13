@@ -315,10 +315,10 @@ fn breathing_at(period: std::time::Duration, now: Now) -> ratatui::style::Style 
 /// step is the state change itself, which is the one moment §6 allows a cue
 /// to move — and it happens at most twice in a turn.
 pub(crate) fn breath_of(state: &SessionState) -> std::time::Duration {
-    if state.items.iter().any(arriving) {
+    if state.transcript.items().iter().any(|item| arriving(item)) {
         return BREATH_ARRIVING;
     }
-    if state.items.iter().any(blocking) {
+    if state.transcript.items().iter().any(|item| blocking(item)) {
         return BREATH_BLOCKED;
     }
     BREATH
