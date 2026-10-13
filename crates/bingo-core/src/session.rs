@@ -607,7 +607,7 @@ impl Actor {
             if let Some(store) = &self.store
                 && let Err(e) = store.append(&self.id, &frame).await
             {
-                self.storage_failed(&e);
+                storage::storage_failed(self, &e);
                 return Err(e);
             }
             self.journal.push(frame.clone());
