@@ -1,5 +1,5 @@
 //! The cheap token estimate every measuring site shares (ADR-0006): ~4 ASCII
-//! chars or one non-ASCII char per token, a flat 1 600 per image, tool
+//! chars or one non-ASCII char per token, pixels / 750 per measured image, tool
 //! schemas as their JSON. The kernel anchors it on the server's count; a
 //! plugin that cuts uses the same rule so its `before` and `after` mean what
 //! the kernel's numbers mean.
@@ -21,7 +21,10 @@ pub fn parts(parts: &[ContentPart]) -> u64 {
         .iter()
         .map(|p| match p {
             ContentPart::Text { text: t } | ContentPart::Reasoning { text: t, .. } => text(t),
-            ContentPart::Image(_) => IMAGE_TOKENS,
+            ContentPart::Image(image) => match (image.width, image.height) {
+                (Some(width), Some(height)) => (u64::from(width) * u64::from(height)).div_ceil(750),
+                _ => IMAGE_TOKENS,
+            },
             ContentPart::ToolUse { name, input, .. } => text(name) + text(&input.to_string()),
             ContentPart::ToolResult { parts: inner, .. } => self::parts(inner),
         })
