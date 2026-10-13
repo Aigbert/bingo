@@ -148,3 +148,56 @@ fn damage_checkpoint(damage: &str, dir: &std::path::Path, path: &std::path::Path
         }
     }
 }
+
+#[tokio::test]
+async fn checkpoint_resume_seeks_past_the_prefix_and_reads_versioned_tail() {
+    let (_root, store) = root_with();
+    let mut state = journal_with_cut(&store).await;
+    state.transcript.drop_before_cut();
+    store
+        .checkpoint(&session(), &Checkpoint::new(state.clone()))
+        .await
+        .unwrap();
+    let dir = layout::session_dir(store.root(), &session());
+    journal::append_version(&dir).unwrap();
+    let tail = frame(
+        7,
+        Event::SessionClosed {
+            reason: bingo_sdk::CloseReason::Client,
+        },
+    );
+    store.append(&session(), &tail).await.unwrap();
+    // Preserve offsets and the anchor; a prefix parse would now fail.
+    let mut bytes = std::fs::read(layout::journal(&dir)).unwrap();
+    let first_frame = bytes.iter().position(|b| *b == b'\n').unwrap() + 1;
+    bytes[first_frame] = b'!';
+    std::fs::write(layout::journal(&dir), bytes).unwrap();
+    assert!(store.replay(&session(), Seq::ZERO).await.is_err());
+    let resumed = store.resume(&session()).await.unwrap();
+    assert_eq!(resumed.state, Some(state));
+    assert_eq!(resumed.tail, [tail]);
+}
+
+#[tokio::test]
+async fn checkpoint_writes_cannot_regress_to_an_older_sequence() {
+    let (_root, store) = root_with();
+    let mut state = journal_with_cut(&store).await;
+    let old = Checkpoint::new(state.clone());
+    let tail = frame(
+        7,
+        Event::SessionClosed {
+            reason: bingo_sdk::CloseReason::Client,
+        },
+    );
+    store.append(&session(), &tail).await.unwrap();
+    state.apply(&tail);
+    store
+        .checkpoint(&session(), &Checkpoint::new(state))
+        .await
+        .unwrap();
+    store.checkpoint(&session(), &old).await.unwrap();
+    assert_eq!(
+        store.resume(&session()).await.unwrap().state.unwrap().seq,
+        Seq(7)
+    );
+}

@@ -40,8 +40,8 @@ kernel holds.
    by the store, and in `finish_close` for `Client`/`Shutdown` reasons,
    the actor sends the store a checkpoint of its state (the store does
    the I/O; the actor does not wait for it). The byte `offset` comes
-   back from `append` — extend the store's internal append to return
-   the offset after the line, or compute it in the store's writer.
+   from the store writer, which seeks backward to the requested durable
+   seq and hashes that complete line; the public append verb is unchanged.
 6. **Resume uses it.** `host/resume.rs` `resume_frames` calls
    `store.resume`; with a state, the fold starts from it and applies the
    tail; without, as today. `session::replayed`, `report_lost_turns` and
@@ -56,11 +56,11 @@ kernel holds.
 8. **The past is read from storage.**
    - `subscribe(since)` with `since` older than the actor's first frame:
      the actor fixes the cut (current seq) and returns a stream whose
-     first part is `store.replay(since)` filtered to `< cut`, read on a
+     first part is `store.replay(since)` filtered to `< cut` (current seq + 1), on a
      blocking task, then the live tail. Test: a client catching up from
      seq 0 after a checkpoint gets every frame once, in order.
    - `HostApi::history` for a page before the window reads the journal
-     up to the checkpoint offset through the store, folds the items, and
+     through the store, filters to the fixed seq cut, folds the items, and
      answers the page; generation checks as M107 defined. Test with
      M107's paging tests extended past the window.
 9. ADR-0066 accepted; dated notes on ADR-0005 §5/§7 and on M107's
@@ -70,7 +70,7 @@ kernel holds.
 
 - `crates/bingo-digest/**` (new), `crates/bingo-update/src/{sha256.rs,lib.rs,checksums.rs}`
 - `crates/bingo-sdk/src/{store,transcript}/**`, `{store.rs,transcript.rs,host.rs,lib.rs}`
-- `crates/bingo-store-jsonl/src/{lib.rs,journal.rs,checkpoint.rs}` (new)
+- `crates/bingo-store-jsonl/src/{lib.rs,journal.rs,checkpoint.rs,checkpoint/**}`
 - `crates/bingo-core/src/{session.rs,session/*.rs,host/resume.rs}`
 - Workspace/crate `Cargo.toml`, `Cargo.lock`, `scripts/budget.toml` (+1 member)
 - tests/fixtures beside each, core host tests; `docs/adr/{0066,0005}*.md`, `docs/plans/M107-*.md`

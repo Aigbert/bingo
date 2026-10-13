@@ -61,14 +61,15 @@ fn read(dir: &Path, session: &SessionId) -> Result<Checkpoint, KernelError> {
 }
 
 pub(crate) fn resume(dir: &Path, session: &SessionId) -> Result<Resumed, KernelError> {
-    match read(dir, session) {
-        Ok(checkpoint) => {
-            let tail = journal::tail(dir, checkpoint.offset)?;
-            Ok(Resumed {
-                state: Some(checkpoint.state),
-                tail,
-            })
-        }
+    let checked = read(dir, session).and_then(|checkpoint| {
+        let tail = journal::tail(dir, checkpoint.offset)?;
+        Ok(Resumed {
+            state: Some(checkpoint.state),
+            tail,
+        })
+    });
+    match checked {
+        Ok(resumed) => Ok(resumed),
         Err(error) => {
             tracing::warn!(%session, %error, "checkpoint rejected; replaying journal");
             let tail = journal::replay(dir, Seq::ZERO)?;
