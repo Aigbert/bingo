@@ -871,7 +871,7 @@ mod tests {
                 text: "kept".into(),
             },
         );
-        let mut frames = frames_of(&[lost.clone()]);
+        let mut frames = frames_of(std::slice::from_ref(&lost));
         frames[1].event = Event::ItemUpdated { item: lost.clone() };
         let mut retry = frames[1].clone();
         retry.event = Event::TurnRetrying {
@@ -883,7 +883,7 @@ mod tests {
             reason: "overloaded".into(),
         };
         frames.push(retry);
-        frames.extend(frames_of(&[answer.clone()]));
+        frames.extend(frames_of(std::slice::from_ref(&answer)));
         assert_eq!(ContextView::items(&frames), vec![answer]);
     }
 
