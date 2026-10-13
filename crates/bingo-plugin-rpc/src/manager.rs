@@ -238,6 +238,29 @@ impl Manager {
         *self.cleanup.lock().unwrap_or_else(|e| e.into_inner()) = Some(task);
     }
 
+    /// Explicit reload has no clock and shares the watcher's bridge operation.
+    pub async fn reload(&self, root: &Path) -> Result<(), bingo_sdk::KernelError> {
+        let manifest = crate::validate::read(root)?;
+        let bridge = self
+            .bridges()
+            .find(|bridge| bridge.name() == manifest.name)
+            .ok_or_else(|| {
+                bingo_sdk::KernelError::new(
+                    bingo_sdk::ErrorCode::InvalidInput,
+                    "plugin is not installed",
+                )
+            })?;
+        bridge.reload(manifest).await;
+        let (ready, reason) = bridge.standing().await;
+        if !ready {
+            return Err(bingo_sdk::KernelError::new(
+                bingo_sdk::ErrorCode::Internal,
+                reason.unwrap_or_else(|| "reload failed".into()),
+            ));
+        }
+        Ok(())
+    }
+
     pub async fn shutdown(&self) {
         self.stop.cancel();
         let watchers =

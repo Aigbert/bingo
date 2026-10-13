@@ -1,6 +1,3 @@
-#[path = "plugins/schema.rs"]
-mod schema;
-
 // `bingo plugins list | enable | disable <name>`: the headless twin of
 // `/plugins` (ADR-0057 §6).
 //
@@ -27,6 +24,10 @@ use clap::Subcommand;
 /// What one `bingo plugins` line asks for, in clap's own shape.
 #[derive(Clone, Debug, Subcommand)]
 pub enum Action {
+    /// Parse a plugin and report its protocol-2 contributions.
+    Validate { dir: std::path::PathBuf },
+    /// Run isolated fake-model scenarios against a plugin.
+    Test { dir: std::path::PathBuf },
     /// Every plugin the next start will consider, and whether it will run.
     List,
     /// Turn one on in the user settings layer.
@@ -56,6 +57,11 @@ pub fn run(
     }
     let listed = listing(&composed, env, cwd, &switched_off);
     let said = match action {
+        Action::Validate { .. } | Action::Test { .. } => {
+            return Err(invalid(
+                "author kit action reached the switch command".into(),
+            ));
+        }
         Action::List => list_with_uses(&listed, &composed, &settings.kernel.plugin_trust),
         Action::Enable { name } => switched(env, &composed, &listed, name, true)?,
         Action::Disable { name } => switched(env, &composed, &listed, name, false)?,

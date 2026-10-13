@@ -41,6 +41,7 @@ pub mod service;
 pub mod source;
 pub mod state;
 pub mod tool;
+pub mod validate;
 pub mod wire;
 #[cfg(test)]
 mod wire_ts;
@@ -103,11 +104,31 @@ fn schema() -> schemars::Schema {
 }
 
 /// Registers one source per kind, and spawns the discovered plugins on `start`.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct PluginRpcPlugin {
     /// Built in `register`, where the settings are, and used by `start` and
     /// `stop`, which are handed nothing but the host.
-    manager: OnceLock<Arc<Manager>>,
+    manager: Arc<OnceLock<Arc<Manager>>>,
+    project: Option<std::path::PathBuf>,
+}
+
+impl PluginRpcPlugin {
+    /// Use an isolated project directory for an author-kit host.
+    pub fn with_project(mut self, project: std::path::PathBuf) -> Self {
+        self.project = Some(project);
+        self
+    }
+
+    /// Reload one installed directory through the same path as the watcher.
+    pub async fn reload(&self, root: &std::path::Path) -> Result<(), bingo_sdk::KernelError> {
+        let manager = self.manager.get().ok_or_else(|| {
+            bingo_sdk::KernelError::new(
+                bingo_sdk::ErrorCode::NotReady,
+                "plugin host is not registered",
+            )
+        })?;
+        manager.reload(root).await
+    }
 }
 
 #[async_trait]
@@ -165,7 +186,9 @@ impl Plugin for PluginRpcPlugin {
         let Some(manager) = self.manager.get() else {
             return Ok(());
         };
-        manager.start(&project_dir(), host).await;
+        manager
+            .start(&self.project.clone().unwrap_or_else(project_dir), host)
+            .await;
         Ok(())
     }
 
