@@ -5413,6 +5413,12 @@
                 "null"
               ]
             },
+            "caption": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "body": {
               "anyOf": [
                 {
