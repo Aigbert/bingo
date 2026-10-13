@@ -23,7 +23,21 @@ pub fn merge(layers: &[Layer], claims: &[Claim]) -> Result<Merged, SettingsError
     let merged = fold_objects("", &objects, &modes)?;
     let kernel = kernel_settings(&merged, layers)?;
     let plugins = slices(&merged, claims);
+    let notices = layers
+        .iter()
+        .filter(|layer| !layer.user && layer.value.contains_key("pluginTrust"))
+        .map(|layer| {
+            (
+                "PLUGIN_TRUST_IGNORED".into(),
+                format!(
+                    "pluginTrust in {} is ignored; grants belong in user settings",
+                    layer.source
+                ),
+            )
+        })
+        .collect();
     Ok(Merged {
+        notices,
         kernel,
         plugins,
         unknown,
@@ -230,8 +244,21 @@ fn kernel_settings(
         thinking: typed(merged, layers, "thinking")?,
         max_tokens: typed(merged, layers, "maxTokens")?,
         models: typed(merged, layers, "models")?.unwrap_or_default(),
+        plugin_trust: user_grants(layers)?,
         enabled_plugins: typed(merged, layers, crate::plugins::KEY)?.unwrap_or_default(),
     })
+}
+
+fn user_grants(
+    layers: &[Layer],
+) -> Result<BTreeMap<String, bingo_sdk::PluginTrust>, SettingsError> {
+    let user: Vec<Layer> = layers.iter().filter(|layer| layer.user).cloned().collect();
+    let objects: Vec<_> = user
+        .iter()
+        .map(|layer| (layer.source.as_str(), &layer.value))
+        .collect();
+    let merged = fold_objects("", &objects, &HashMap::new())?;
+    Ok(typed(&merged, &user, "pluginTrust")?.unwrap_or_default())
 }
 
 fn slices(merged: &Map<String, Value>, claims: &[Claim]) -> BTreeMap<String, Value> {

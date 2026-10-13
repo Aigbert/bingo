@@ -10,7 +10,7 @@
 //! Stdout carries the answer and nothing else; a directory that would not read
 //! is a diagnostic on stderr, as every diagnostic is.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use bingo_core::plugins::{ignored, needed, state};
@@ -46,10 +46,14 @@ pub fn run(
     layers: &[Layer],
     composed: Vec<Box<dyn Plugin>>,
 ) -> Result<i32, KernelError> {
-    let switched_off = switches(&composed, layers)?;
+    let settings = configuration(&composed, layers)?;
+    let switched_off = settings.kernel.switched_off();
+    for (_, text) in &settings.notices {
+        eprintln!("{text}");
+    }
     let listed = listing(&composed, env, cwd, &switched_off);
     let said = match action {
-        Action::List => list_with_uses(&listed, &composed),
+        Action::List => list_with_uses(&listed, &composed, &settings.kernel.plugin_trust),
         Action::Enable { name } => switched(env, &composed, &listed, name, true)?,
         Action::Disable { name } => switched(env, &composed, &listed, name, false)?,
     };
@@ -59,16 +63,16 @@ pub fn run(
 
 /// The names the layers turned off. The claims come from the composition, so
 /// the merge is the one a run would do and a wrong type is refused here too.
-fn switches(
+fn configuration(
     composed: &[Box<dyn Plugin>],
     layers: &[Layer],
-) -> Result<BTreeSet<String>, KernelError> {
+) -> Result<settings::Merged, KernelError> {
     let claims: Vec<Claim> = composed
         .iter()
         .filter_map(|plugin| Claim::from_manifest(plugin.manifest()))
         .collect();
     let merged = settings::merge(layers, &claims).map_err(|e| invalid(e.to_string()))?;
-    Ok(merged.kernel.switched_off())
+    Ok(merged)
 }
 
 /// What the next start will do: the build's own plugins first, then what this
@@ -125,7 +129,11 @@ fn installed(found: Found, switched_off: &BTreeSet<String>) -> PluginStatus {
 }
 
 /// One line per plugin, with unavailable optional services in the reason column.
-fn list_with_uses(listed: &[PluginStatus], composed: &[Box<dyn Plugin>]) -> String {
+fn list_with_uses(
+    listed: &[PluginStatus],
+    composed: &[Box<dyn Plugin>],
+    trust: &BTreeMap<String, bingo_sdk::PluginTrust>,
+) -> String {
     let provided: BTreeSet<&str> = composed
         .iter()
         .filter(|plugin| {
@@ -149,6 +157,21 @@ fn list_with_uses(listed: &[PluginStatus], composed: &[Box<dyn Plugin>]) -> Stri
             if !missing.is_empty() {
                 line.push_str(&format!("missing used services: {}", missing.join(", ")));
             }
+            let tier = if status.from == bingo_sdk::BUILT_IN {
+                bingo_sdk::Tier::Full
+            } else {
+                trust
+                    .get(&status.id)
+                    .map_or(bingo_sdk::Tier::Tighten, |grant| grant.tier)
+            };
+            line.push_str(&format!(
+                "\t{}",
+                match tier {
+                    bingo_sdk::Tier::Tighten => "tighten",
+                    bingo_sdk::Tier::Rewrite => "rewrite",
+                    bingo_sdk::Tier::Full => "full",
+                }
+            ));
             line
         })
         .collect::<Vec<_>>()
@@ -246,10 +269,13 @@ mod tests {
                 status("wordcount", false, Some(SWITCHED_OFF)),
             ],
             &[],
+            &BTreeMap::new(),
         );
         assert_eq!(
             said,
-            format!("bingo.tools.web\t0.1.0\ton\t\nwordcount\t0.1.0\toff\t{SWITCHED_OFF}")
+            format!(
+                "bingo.tools.web\t0.1.0\ton\t\tfull\nwordcount\t0.1.0\toff\t{SWITCHED_OFF}\tfull"
+            )
         );
     }
 
