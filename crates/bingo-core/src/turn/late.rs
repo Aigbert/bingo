@@ -106,6 +106,7 @@ impl ContributorSet {
 /// looked up by name.
 #[derive(Clone, Default)]
 pub struct HookSet {
+    pub links: Vec<crate::chain::Link>,
     pub fixed: Vec<Arc<dyn Hook>>,
     pub sources: Vec<Arc<dyn HookSource>>,
 }
@@ -113,6 +114,7 @@ pub struct HookSet {
 impl HookSet {
     pub fn fixed(hooks: Vec<Arc<dyn Hook>>) -> Self {
         Self {
+            links: Vec::new(),
             fixed: hooks,
             sources: Vec::new(),
         }
@@ -369,6 +371,7 @@ mod tests {
     #[tokio::test]
     async fn a_source_s_hooks_join_the_registered_ones_in_order() {
         let set = HookSet {
+            links: Vec::new(),
             fixed: vec![claims("early", vec![])],
             sources: vec![crate::test_support::ScriptedHookSource::new(vec![claims(
                 "late",

@@ -268,3 +268,81 @@ async fn a_call_the_gate_denies_reports_the_denial_to_the_caller() {
     .await;
     assert_eq!(item_of(&state, &outcome.item).status, ItemStatus::Failed);
 }
+
+struct Observing(Arc<std::sync::Mutex<Vec<String>>>);
+
+#[async_trait::async_trait]
+impl Hook for Observing {
+    fn id(&self) -> &str {
+        "observer"
+    }
+    fn matcher(&self) -> HookMatcher {
+        HookMatcher {
+            points: vec![HookPoint::AfterTool],
+            tool: None,
+        }
+    }
+    async fn after_tool(&self, call: &ToolCall, _: &ToolOutput, _: &HookContext) -> HookOutcome {
+        self.0.lock().unwrap().push(call.call_id.clone());
+        HookOutcome::Continue
+    }
+}
+
+#[tokio::test]
+async fn an_invoked_call_is_seen_by_after_tool() {
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let hook = Arc::new(Observing(seen.clone()));
+    let mailbox = start_with(
+        streaming(),
+        vec![Arc::new(EchoTool { read_only: true })],
+        move |cfg| {
+            cfg.hooks = crate::turn::HookSet::fixed(vec![hook.clone()]);
+        },
+    );
+    let _ = mid_turn(&mailbox).await;
+    mailbox.invoke(call("Echo", 7)).await.expect("served");
+    assert_eq!(*seen.lock().unwrap(), ["bridged-7"]);
+}
+
+struct Answering;
+#[async_trait::async_trait]
+impl Interceptor for Answering {
+    fn id(&self) -> &str {
+        "answering"
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher {
+            points: vec![LinkPoint::ToolCall],
+            tool: None,
+        }
+    }
+    async fn tool_call(
+        &self,
+        _: &HookContext,
+        _: ToolCall,
+        _: Next<'_, ToolCall, ToolOutput>,
+    ) -> Result<ToolOutput, KernelError> {
+        Ok(ToolOutput::text("answered by the link"))
+    }
+}
+
+#[tokio::test]
+async fn a_full_link_answers_a_call_without_running_the_tool() {
+    let mailbox = start_with(
+        streaming(),
+        vec![Arc::new(EchoTool { read_only: true })],
+        |cfg| {
+            cfg.hooks.links.push(crate::chain::Link {
+                external: None,
+                interceptor: Arc::new(Answering),
+                tier: Tier::Full,
+            });
+        },
+    );
+    let _ = mid_turn(&mailbox).await;
+    let result = mailbox.invoke(call("Echo", 8)).await.expect("served");
+    assert_eq!(
+        result.output.parts[0].as_text(),
+        Some("answered by the link")
+    );
+}

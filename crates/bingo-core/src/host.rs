@@ -533,6 +533,7 @@ impl Host {
             },
             policy: self.policy(),
             hooks: HookSet {
+                links: self.registry.links.clone(),
                 fixed: self.registry.hooks.clone(),
                 sources: self.registry.sources.hooks.clone(),
             },

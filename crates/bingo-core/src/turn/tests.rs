@@ -881,6 +881,7 @@ async fn a_source_s_hook_composes_where_a_second_registered_hook_would() {
 
     let mixed = Arc::new(Mutex::new(Vec::new()));
     gate_one_call(HookSet {
+        links: Vec::new(),
         fixed: vec![OrderingHook::new("first", &mixed)],
         sources: vec![ScriptedHookSource::new(vec![OrderingHook::new(
             "second", &mixed,

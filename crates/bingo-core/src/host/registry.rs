@@ -44,6 +44,7 @@ pub struct Registry {
     pub providers: Vec<Arc<dyn Provider>>,
     pub policy: Option<Arc<dyn PermissionPolicy>>,
     pub hooks: Vec<Arc<dyn Hook>>,
+    pub links: Vec<crate::chain::Link>,
     pub contributors: Vec<Arc<dyn ContextContributor>>,
     pub commands: Vec<Arc<dyn Command>>,
     pub surfaces: Vec<Arc<dyn Surface>>,
@@ -158,6 +159,19 @@ impl Registry {
                 Ok(())
             }
             Contribution::Policy(policy) => self.set_policy(policy),
+            Contribution::Interceptor { external, link } => {
+                let tier = if external.is_some() {
+                    Tier::Tighten
+                } else {
+                    Tier::Full
+                };
+                self.links.push(crate::chain::Link {
+                    external,
+                    interceptor: link,
+                    tier,
+                });
+                Ok(())
+            }
             Contribution::Hook(hook) => {
                 self.hooks.push(hook);
                 Ok(())
