@@ -178,7 +178,7 @@ async fn plugins(registry: &Registry) -> Vec<CatalogEntry> {
 
 /// One plugin as a client reads it: whether it runs, why not, and which
 /// listing it came from — the row `/plugins` draws, in a catalogue's shape.
-fn plugin_entry(status: &PluginStatus) -> CatalogEntry {
+pub(super) fn plugin_entry(status: &PluginStatus) -> CatalogEntry {
     let mut meta =
         json!({ "enabled": status.enabled, "reason": status.reason, "from": status.from });
     if let (Some(execution), Some(meta)) = (&status.execution, meta.as_object_mut())

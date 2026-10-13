@@ -40,6 +40,7 @@ impl Fault {
 }
 
 pub struct Operation {
+    pub hook: usize,
     pub method: String,
     pub params: Value,
     pub reply: oneshot::Sender<Result<Value, String>>,

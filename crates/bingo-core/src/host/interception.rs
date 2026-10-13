@@ -58,13 +58,18 @@ pub(super) async fn catalogue_answer(
         .await,
     };
     let report = crate::chain::Report::default();
-    let result = crate::chain::autocomplete::catalog(
+    let mut result = crate::chain::autocomplete::catalog(
         catalog,
         &host.hook_set().links().await,
         &host.catalogue_context(None),
         report.clone(),
     )
     .await;
+    if kind == CatalogKind::Plugins
+        && let Ok(catalog) = &mut result
+    {
+        protect_grants(host, catalog).await;
+    }
     for notice in report.take() {
         if let ItemBody::Notice { level, code, text } = notice {
             let _ = host.notice(level, &code, &text).await;
@@ -146,4 +151,15 @@ async fn registration_links(host: &Host) -> Vec<crate::chain::Link> {
         }
     }
     links
+}
+
+async fn protect_grants(host: &Host, catalog: &mut Catalog) {
+    let statuses = crate::plugins::listing(&host.registry).await;
+    for entry in &mut catalog.entries {
+        let Some(status) = statuses.iter().find(|status| status.id == entry.id) else {
+            entry.meta = serde_json::json!({"enabled":false, "reason":"unknown plugin"});
+            continue;
+        };
+        entry.meta = super::catalog::plugin_entry(status).meta;
+    }
 }

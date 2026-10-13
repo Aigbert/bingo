@@ -68,27 +68,27 @@ export class Hooks {
   }
 
   async dispatch(entries: Entry[], index: number, input: any, dollar: unknown,
-    origin: unknown, signal: AbortSignal, terminal: (input: any) => Promise<any>): Promise<any> {
+    origin: unknown, signal: AbortSignal, terminal: (input: any) => Promise<any>, dollarFor?: (entry: Entry) => unknown): Promise<any> {
     if (signal.aborted) throw new Error('intercept cancelled');
     const entry = entries[index];
     if (!entry) return terminal(input);
-    if (entry.matcher !== undefined && !matches(entry.matcher, input)) return this.dispatch(entries, index + 1, input, dollar, origin, signal, terminal);
+    if (entry.matcher !== undefined && !matches(entry.matcher, input)) return this.dispatch(entries, index + 1, input, dollar, origin, signal, terminal, dollarFor);
     let called = false;
     let continuation: Promise<any> | undefined;
     const next = Object.assign(async (changed: unknown) => {
       if (called) throw new Error('next may be called only once');
       if (signal.aborted) throw new Error('intercept cancelled');
       called = true;
-      continuation = this.dispatch(entries, index + 1, changed, dollar, origin, signal, terminal);
+      continuation = this.dispatch(entries, index + 1, changed, dollar, origin, signal, terminal, dollarFor);
       return continuation;
     }, { signal, origin }) as Next;
     Object.defineProperty(next, 'called', { get: () => called });
     let answer;
-    try { answer = await entry.hook(dollar as Dollar, frozen(input), next); }
+    try { answer = await entry.hook((dollarFor?.(entry) ?? dollar) as Dollar, frozen(input), next); }
     catch (error) {
       if (!entry.recover) throw error;
       Object.defineProperty(next, 'error', { value: { kind: 'throw', message: String(error) } });
-      answer = await entry.recover(dollar as Dollar, frozen(input), next);
+      answer = await entry.recover((dollarFor?.(entry) ?? dollar) as Dollar, frozen(input), next);
     }
     // A fire-and-forget next still owns the downstream result and its lifetime.
     return answer === undefined && continuation ? await continuation : answer;

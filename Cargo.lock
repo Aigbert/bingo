@@ -703,6 +703,7 @@ dependencies = [
 name = "bingo-plugin-host"
 version = "0.6.6"
 dependencies = [
+ "async-trait",
  "bingo-jsonrpc",
  "bingo-sdk",
  "bingo-shelf",

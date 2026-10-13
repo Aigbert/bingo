@@ -49,6 +49,35 @@ pub fn admits(grant: &Grant, noun: &str, method: &str, unsafe_call: bool) -> Res
     Ok(())
 }
 
+/// Read the kernel-adjudicated grant; display hooks cannot replace this metadata.
+pub async fn granted(host: &bingo_sdk::HostHandle, plugin: &str) -> Result<Grant, String> {
+    let catalog = host
+        .catalog(bingo_sdk::CatalogKind::Plugins)
+        .await
+        .map_err(|error| error.message)?;
+    let entry = catalog
+        .entries
+        .into_iter()
+        .find(|entry| entry.id == plugin)
+        .ok_or_else(|| format!("{plugin}: plugin is not registered"))?;
+    if entry
+        .meta
+        .get("enabled")
+        .and_then(serde_json::Value::as_bool)
+        != Some(true)
+    {
+        return Err(format!(
+            "{plugin}: {}",
+            entry
+                .meta
+                .get("reason")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("plugin is not enabled")
+        ));
+    }
+    serde_json::from_value(entry.meta).map_err(|_| format!("{plugin}: plugin has no granted nouns"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,3 +110,4 @@ mod tests {
         assert!(admits(&trusted, "undeclared", "read", false).is_err());
     }
 }
+

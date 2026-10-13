@@ -693,12 +693,25 @@ impl HostApi for Host {
         turn: Option<&TurnId>,
         request: Completion,
     ) -> Result<Vec<ModelEvent>, KernelError> {
-        let granted = self
-            .settings
-            .kernel
-            .plugin_trust
-            .get(&request.plugin)
-            .is_some_and(|grant| grant.uses.iter().any(|noun| noun == "model"));
+        let status = crate::plugins::listing(&self.registry)
+            .await
+            .into_iter()
+            .find(|status| status.id == request.plugin);
+        let granted = match status.and_then(|status| {
+            status
+                .execution
+                .map(|execution| (status.enabled, execution.grant))
+        }) {
+            Some((enabled, grant)) => {
+                enabled && grant.tier != Tier::Tighten && grant.uses.contains("model")
+            }
+            None => self
+                .settings
+                .kernel
+                .plugin_trust
+                .get(&request.plugin)
+                .is_some_and(|grant| grant.uses.iter().any(|noun| noun == "model")),
+        };
         if !granted {
             return Err(KernelError::new(
                 ErrorCode::PermissionDenied,

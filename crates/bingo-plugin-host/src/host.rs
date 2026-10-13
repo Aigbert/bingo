@@ -60,8 +60,7 @@ pub struct Completed {
     pub events: Vec<ModelEvent>,
 }
 
-
-use bingo_jsonrpc::codec::{RpcError, INVALID_PARAMS, METHOD_NOT_FOUND};
+use bingo_jsonrpc::codec::{INVALID_PARAMS, METHOD_NOT_FOUND, RpcError};
 use bingo_sdk::{Delivery, HostHandle, IntentId, Origin, SessionFilter};
 const INTERNAL_ERROR: i64 = -32603;
 
@@ -79,7 +78,10 @@ impl Operations<'_> {
             "host/state/get" => self.get(parse(params)?).await,
             "host/state/set" => self.set(parse(params)?).await,
             "host/model/complete" => self.complete(parse(params)?).await,
-            _ => Err(RpcError::new(METHOD_NOT_FOUND, format!("the host does not serve {method}"))),
+            _ => Err(RpcError::new(
+                METHOD_NOT_FOUND,
+                format!("the host does not serve {method}"),
+            )),
         }
     }
     async fn complete(&self, params: Complete) -> Result<Value, RpcError> {
@@ -162,7 +164,6 @@ impl Operations<'_> {
             .map_err(failed)?;
         Ok(Value::Null)
     }
-
 }
 fn parse<T: serde::de::DeserializeOwned>(params: Value) -> Result<T, RpcError> {
     serde_json::from_value(params).map_err(|error| RpcError::new(INVALID_PARAMS, error.to_string()))

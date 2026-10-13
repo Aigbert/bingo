@@ -28,7 +28,8 @@ Current paths and required adapters replace the original plan's stale paths.
    cross channels, so JS never occupies the worker handling esc. Explain
    the C-engine exception by the onig ban in deny.toml. Measure budget
    before/after; increase dependencies by measured families; cargo deny.
-   Core is a dev dependency only, for offline source-registration contracts.
+   Core is a dev dependency only, for offline source-registration contracts;
+   the shared host uses existing async-trait for operation faces.
 4. **Strip/load.** Pure `strip(path, source)` uses oxc parser, semantic,
    transformer and codegen; strip TS and compile JSX to h/Fragment.
    Refuse import(), require and specifiers other than bingo or relative
@@ -494,4 +495,63 @@ assertion `left == right` failed
   left: Object {"value": Number(1)}
  right: Object {"value": Number(1), "wrapped": Bool(true)}
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.04s
+```
+
+`cargo test -p bingo-mods --test plugin --locked`:
+```text
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+`cargo test -p bingo-mods --test plugin a_catalogue_hook`:
+```text
+test a_catalogue_hook_cannot_mint_grants ... FAILED
+thread 'a_catalogue_hook_cannot_mint_grants' (7779761) panicked at crates/bingo-mods/tests/plugin.rs:54:5:
+assertion `left == right` failed
+  left: String("full")
+ right: "rewrite"
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
+```
+
+`cargo test -p bingo-mods --test plugin --locked`:
+```text
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+```
+
+`cargo test -p bingo-mods --test plugin`:
+```text
+test an_undeclared_state_call_is_refused_in_words ... FAILED
+test dollar_state_is_granted_and_each_operation_is_raised_once ... FAILED
+thread 'an_undeclared_state_call_is_refused_in_words' (7816666) panicked at crates/bingo-mods/tests/plugin.rs:92:5:
+{"error":"not refused"}
+thread 'dollar_state_is_granted_and_each_operation_is_raised_once' (7816667) panicked at crates/bingo-mods/tests/plugin.rs:78:5:
+assertion `left == right` failed
+  left: Object {"version": Number(1), "value": Object {"value": Number(1)}, "writes": Number(0)}
+ right: Object {"version": Number(1), "value": Object {"value": Number(1), "seen": Bool(true)}, "writes": Number(1)}
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+```
+
+`cargo test -p bingo-mods --test plugin --locked`:
+```text
+test dollar_state_is_granted_and_each_operation_is_raised_once ... FAILED
+thread 'dollar_state_is_granted_and_each_operation_is_raised_once' (7859390) panicked at crates/bingo-mods/tests/plugin.rs:78:5:
+assertion `left == right` failed
+  left: Object {"value": Number(1)}
+ right: Object {"version": Number(1), "value": Object {"value": Number(1), "seen": Bool(true)}, "writes": Number(1)}
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.05s
+```
+
+`cargo test -p bingo-mods --test plugin dollar_state --locked`:
+```text
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.02s
+```
+
+`cargo clippy -p bingo-mods -p bingo-plugin-host -p bingo-core --all-targets --locked -- -D warnings`:
+```text
+error: items after a test module
+error: could not compile `bingo-plugin-host` (lib test) due to 1 previous error
+```
+
+`cargo clippy -p bingo-mods -p bingo-plugin-host -p bingo-core --all-targets --locked -- -D warnings`:
+```text
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.13s
 ```

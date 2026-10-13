@@ -56,6 +56,7 @@ async fn serve(
     if ready.send(Ok(patterns)).is_err() {
         return;
     }
+    let drive = tokio::spawn(runtime.drive());
     let mut jobs = FuturesUnordered::new();
     loop {
         tokio::select! {
@@ -66,6 +67,8 @@ async fn serve(
             else => break,
         }
     }
+    drive.abort();
+    let _ = drive.await;
     drop(jobs);
     drop(context);
     runtime.run_gc().await;
@@ -149,8 +152,9 @@ async fn execute(context: AsyncContext, active: Active, request: Request) {
         let current = active.clone();
         let ask = Function::new(
             ctx.clone(),
-            Async(move |method: String, params: String| {
+            Async(move |method: String, params: String, hook: usize| {
                 ask(
+                    hook,
                     method,
                     params,
                     operations.clone(),
@@ -182,6 +186,7 @@ async fn execute(context: AsyncContext, active: Active, request: Request) {
 }
 
 async fn ask(
+    hook: usize,
     method: String,
     params: String,
     operations: mpsc::UnboundedSender<Operation>,
@@ -194,6 +199,7 @@ async fn ask(
         Ok(params) => {
             if operations
                 .send(Operation {
+                    hook,
                     method,
                     params,
                     reply,
