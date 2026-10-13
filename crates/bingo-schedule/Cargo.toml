@@ -12,6 +12,7 @@ description = "Schedules plugin for bingo: deferred and recurring turns on a ses
 workspace = true
 
 [dependencies]
+bingo-alarm.workspace = true
 bingo-shelf.workspace = true
 bingo-claim.workspace = true
 bingo-sdk.workspace = true
