@@ -1389,18 +1389,16 @@ pub(crate) mod tests {
             }
         });
 
-        let started = std::time::Instant::now();
-        let out = tool
-            .call(
+        let out = tokio::time::timeout(
+            Duration::from_secs(10),
+            tool.call(
                 serde_json::json!({"command": "echo before; sleep 30", "timeout": 30000}),
                 &cx,
-            )
-            .await
-            .expect("the call answered early");
-        assert!(
-            started.elapsed() < Duration::from_secs(10),
-            "the call waited for the command anyway"
-        );
+            ),
+        )
+        .await
+        .expect("the call waited for the command anyway")
+        .expect("the call answered early");
         assert!(!out.is_error, "{}", text(&out));
         let job = only_job(&jobs);
         assert!(text(&out).contains(&job.id), "{}", text(&out));

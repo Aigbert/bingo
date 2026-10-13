@@ -366,7 +366,6 @@ mod tests {
     use crate::tests::{context, context_in};
 
     use std::path::PathBuf;
-    use std::time::Instant;
 
     const NO_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -450,14 +449,15 @@ mod tests {
             ticks.display()
         );
 
-        let started = Instant::now();
-        let out = run(&command, Duration::from_millis(200), &watched(&cx))
-            .await
-            .expect("the command ran");
-        let elapsed = started.elapsed();
+        let out = tokio::time::timeout(
+            Duration::from_secs(5),
+            run(&command, Duration::from_millis(200), &watched(&cx)),
+        )
+        .await
+        .expect("the shell timeout did not finish")
+        .expect("the command ran");
 
         assert_eq!(out.ended, Ended::Timeout { after_ms: 200 });
-        assert!(elapsed < Duration::from_secs(5), "took {elapsed:?}");
 
         // The grandchild was in the group, so it stopped writing with the shell.
         let after_kill = std::fs::metadata(&ticks).map(|m| m.len()).unwrap_or(0);
