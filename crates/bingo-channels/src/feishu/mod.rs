@@ -11,6 +11,9 @@
 //! The credentials never come from the settings file: the app id is public and
 //! lives there, the secret comes from the environment.
 
+pub mod platform;
+pub use platform::{APP_ID, APP_SECRET, FeishuChannel, Platform};
+
 pub mod api;
 pub mod attachments;
 pub mod bootstrap;
@@ -447,8 +450,7 @@ impl ChannelAdapter for Feishu {
         if self.api.app_id().is_empty() || self.app_secret.is_empty() {
             return Err(ChannelError::Refused(format!(
                 "the feishu channel needs an app: set {} and {}",
-                crate::settings::APP_ID,
-                crate::settings::APP_SECRET
+                APP_ID, APP_SECRET
             )));
         }
         let me = self.whoami().await?;

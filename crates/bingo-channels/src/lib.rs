@@ -35,7 +35,7 @@ pub mod lock;
 pub use bingo_channel_adapter::loopback;
 pub use bingo_channel_adapter::question;
 pub mod runner;
-pub mod secret;
+pub use bingo_channel_adapter::secret;
 pub mod settings;
 pub mod tool;
 
@@ -91,8 +91,16 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
 /// and the tool that posts a file into one of its chats. With none named the
 /// surface still registers and refuses when run, so `bingo channels` says
 /// what is missing rather than doing nothing.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct ChannelsPlugin;
+#[derive(Clone)]
+pub struct ChannelsPlugin {
+    platforms: bingo_channel_adapter::Platforms,
+}
+
+impl ChannelsPlugin {
+    pub fn new(platforms: bingo_channel_adapter::Platforms) -> Self {
+        Self { platforms }
+    }
+}
 
 #[async_trait]
 impl Plugin for ChannelsPlugin {
@@ -102,11 +110,20 @@ impl Plugin for ChannelsPlugin {
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
         let settings: Settings = registrar.config()?;
-        let adapters = settings.channels.adapters(registrar.env());
+        let adapters = settings
+            .channels
+            .adapters(registrar.env(), &self.platforms)
+            .map_err(PluginError::Config)?;
         let surface = ChannelsSurface::new(
             adapters,
-            settings.channels.gate(),
-            settings.channels.access(),
+            settings
+                .channels
+                .gate(&self.platforms)
+                .map_err(PluginError::Config)?,
+            settings
+                .channels
+                .access(&self.platforms)
+                .map_err(PluginError::Config)?,
         );
         // The same directory on both sides: the surface fills it as its
         // conversations open, and the tool reads it to find the chat a
@@ -129,7 +146,9 @@ mod plugin_tests {
     fn contributions(config: serde_json::Value) -> Vec<bingo_sdk::Contribution> {
         let mut registrar =
             Registrar::new(MANIFEST.id, config, Env::rooted("/tmp"), Default::default());
-        ChannelsPlugin.register(&mut registrar).expect("register");
+        ChannelsPlugin::new(vec![Arc::new(loopback::Platform)])
+            .register(&mut registrar)
+            .expect("register");
         registrar.into_contributions()
     }
 

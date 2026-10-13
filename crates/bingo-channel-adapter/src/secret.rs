@@ -97,6 +97,26 @@ pub struct Requirement {
     pub variable: Option<&'static str>,
 }
 
+/// The platforms for which a secret can be stored.
+pub fn signing(platforms: &crate::Platforms) -> Vec<Requirement> {
+    platforms
+        .iter()
+        .filter_map(|platform| platform.secret())
+        .collect()
+}
+
+/// Validate every named platform before reporting its credentials.
+pub fn configured(
+    settings: &serde_json::Value,
+    platforms: &crate::Platforms,
+) -> Result<Vec<Requirement>, String> {
+    match settings.get("channels") {
+        None => Ok(Vec::new()),
+        Some(serde_json::Value::Object(slices)) => crate::platform::configured(slices, platforms),
+        Some(_) => Err("channels must be an object".into()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
