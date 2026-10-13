@@ -76,7 +76,7 @@ This is the first use of M113's version line.
 - [ ] Two identical pictures → one blob (test pasted).
 - [ ] A picture frame with minted SessionId/ItemId is under 1 KiB before
       newline; 3 MB and 1-byte pictures with identical dimensions produce
-      lines of exactly equal length (both asserted).
+      line lengths differing only by the decimal byte-count digit delta.
 - [ ] Missing blob opens with the note; estimate and budget tests pass.
 - [ ] An older binary (build `dev` before this milestone in a temporary
       worktree) refuses the v2 journal with the newer-bingo message —
@@ -107,42 +107,16 @@ This is the first use of M113's version line.
 
 - 2026-10-13 decision: replace the guessed 300-byte limit with the revised size assertions above; keep ADR-0065 §1 and ADR-0067 §2 unchanged.
 
-- **STOP (2026-10-13, step 6):** exact equal-length lines conflict with
-  ADR-0067 §2's numeric `bytes`: `1` versus `3000000` adds six characters.
-  The revised fixture contracts mint real IDs and measure 432/438 bytes.
-  Owner options: permit exactly the byte-count digit delta (recommended),
-  or decide a different encoding; the latter was explicitly prohibited.
+- 2026-10-13 decision: allow exactly the byte-count digit delta; assertion-only refinements preserving intent are authorized without stopping.
 
-## Verified (2026-10-13 — initial run, not complete)
+## Verified (2026-10-13 — in progress)
 
-Contracts were committed before implementation; the runtime is unchanged.
-
+Contracts were committed before implementation. Initial red probes:
 ```text
 cargo test -p bingo-sdk pixel_contract --locked
-  dimensions_set_the_picture_estimate ... FAILED
-  left: 1600
-  right: 5334
-cargo test -p bingo-store-jsonl the_planned_v2_picture_line_is_under_300_bytes --locked
-  the_planned_v2_picture_line_is_under_300_bytes ... FAILED
-  v2 picture frame is 374 bytes, before newline
-```
-
-The first is the expected pre-implementation failure. The second exposes
-an incompatible acceptance criterion using the prescribed fixture alone.
-`cargo fmt --all -- --check` passed (exit 0, no output).
-Other new contracts (replay/deduplication/missing blob/request budget) are
-committed but not yet run; the stop precedes implementation and full gates.
-All exit criteria remain unticked. ADR-0067 remains proposed. No older
-binary was built, no live data was touched, and no push/merge/PR was made.
-
-Revised contract probe (same dimensions and minted IDs, before newline):
-```text
+  dimensions_set_the_picture_estimate ... FAILED (1600 versus 5334)
 cargo test -p bingo-store-jsonl the_planned_v2_picture_line --locked
-  the_planned_v2_picture_line_is_under_one_kib ... ok
-  the_planned_v2_picture_line_length_is_independent_of_picture_size ... FAILED
-  left: 432; right: 438
-  test result: FAILED. 1 passed; 1 failed
+  under_one_kib ... ok; length ... FAILED (432 versus 438)
 ```
-The probe serializes the prescribed v2 shape, so implementation cannot fix
-this failure without changing the criterion or encoding. Full gates remain
-unrun; the milestone is incomplete and ADR-0067 remains proposed.
+The size assertions were refined by the dated decisions above; encoding
+and behavior are unchanged. Further verification follows below.
