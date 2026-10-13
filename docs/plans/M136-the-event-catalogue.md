@@ -33,7 +33,7 @@ JSON Schema and TypeScript, and raises chains and observations at existing doors
 - SDK: `catalogue.rs`, `catalogue/*`, `intercept.rs`, `intercept/json.rs`, `service.rs`, `service/face.rs`, `lib.rs`.
 - Core: `chain/*`, `host.rs`, `host/interception.rs`, `session.rs`, `session/{catalogue,mailbox,gate,inputs,commands}.rs`, `config.rs`, `commands/{model,think,plugins}.rs`, `plugins.rs`, `turn.rs`, `turn/late.rs`, `lib.rs`.
 - Services: `team.rs`, `mcp.rs`, Cargo.toml/lock. Existing workspace `schemars` derives adapter face schemas; no new external crate.
-- Plugin RPC: `intercept`, `wire`, `bridge`, `host`, `hook`, `service`, `schema`, `events_ts`, `lib`; stub plugin fixtures.
+- Plugin RPC: `intercept`, `wire`, `bridge`, `host`, `hook`, `service`, `schema`, `events_ts`, `validate` (including its unit tests), `lib`; stub plugin fixtures.
 - Tests: SDK intercept fixtures; core chain/host/session fixtures and new catalogue tests; RPC hook/reload fixtures; `crates/bingo/tests/catalogue.rs`.
 - Generated: `schema/{events,plugin,plugin-2}.json`, `sdk/typescript/src/{events,wire}.ts`.
 - TypeScript: `on`, `on.test`, `plugin`, `rpc`, `rpc.test`, `index`; shared `test/cases.json`; `scripts/check_discipline.sh`; named ADR notes.
@@ -148,3 +148,14 @@ All intentional corruptions were restored; current schemas/types were generated 
 BINGO_UPDATE_SCHEMA=1. Final workspace completion, SDK guard/collision reruns, discipline,
 budget, deny, MSVC and private-tmux smoke remain pending. The prepared smoke was not run.
 ADR-0078 remains proposed pending completion. Only local fixtures were used; no live services/user credentials, push, merge or PR.
+
+
+## Scope addition (2026-10-14)
+
+The user approved `crates/bingo-plugin-rpc/src/validate.rs` and its unit test.
+Validation will report subscriptions, derive named matches from `catalogue::ALL`,
+and retain dynamic noun patterns without a second event list. Keep the existing
+TypeScript acceptance assertion. The previous step-6 stop is resolved.
+Do not rebase onto moved dev; the user owns merging and conflict resolution.
+Per the user's explicit request, append full gate output in Verified; this takes
+precedence over the plan's usual 150-line limit. No push, merge or PR.
