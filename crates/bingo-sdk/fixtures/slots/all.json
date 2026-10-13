@@ -4,5 +4,6 @@
   {"kind":"rail","title":"Live","view":{"kind":"text","text":"Live body"}},
   {"kind":"panel","title":"Saved","view":{"kind":"text","text":"Saved body"}},
   {"kind":"mode","current":"careful","modes":[{"label":"careful","action":{"name":"choose","args":"careful"}},{"label":"fast","action":{"name":"choose","args":"fast"},"key":"f"}]},
-  {"kind":"row","item":"itm_1","mark":"!","title":"Running","badge":"local","body":{"kind":"text","text":"Row body"},"actions":[]}
+  {"kind":"row","item":"itm_1","mark":"!","title":"Running","badge":"local","body":{"kind":"text","text":"Row body"},"actions":[]},
+  {"kind":"row","item":"itm_2","mark":"❖","title":"Skill","badge":"guide","caption":"the wire format","body":null,"actions":[]}
 ]

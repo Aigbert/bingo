@@ -129,7 +129,19 @@ mod tests {
     fn slot_variants_round_trip_the_golden_json() {
         let json: Value = serde_json::from_str(include_str!("../fixtures/slots/all.json")).unwrap();
         assert_eq!(serde_json::to_value(slots()).unwrap(), json);
-        assert_eq!(slots().len(), 6);
+        assert_eq!(slots().len(), 7);
+    }
+
+    #[test]
+    fn row_caption_is_optional_in_the_schema_and_wire() {
+        let schema = serde_json::to_value(schemars::schema_for!(Slot)).unwrap();
+        let row = schema["oneOf"].as_array().unwrap().iter()
+            .find(|variant| variant["properties"]["kind"]["const"] == "row").unwrap();
+        assert!(row["properties"].get("caption").is_some());
+        assert!(!row["required"].as_array().unwrap().contains(&json!("caption")));
+        let rows = serde_json::to_value(slots()).unwrap();
+        assert!(rows[5].get("caption").is_none());
+        assert_eq!(rows[6]["caption"], "the wire format");
     }
 
     #[test]
