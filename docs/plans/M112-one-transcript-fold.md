@@ -89,3 +89,47 @@ there is only one fold to agree.
   `gate`); use `Arc::make_mut` on the turn's own copy.
 - Re-verify at start: M108 has landed; `ContextView`, `TurnRun`,
   `Running::spawn` by name.
+
+- **STOP (2026-10-13, protocol step 6):** re-verification at `72036be6`
+  found that ADR-0064 §1–2's full client item list plus only the latest
+  `(boundary, kept, summary)` cut cannot preserve the existing model view.
+  `ContextView::items` applies cuts sequentially; `splice_compaction`
+  moves each summary before the boundary, while `SessionState` keeps
+  summaries in insertion order. Applying just the latest cut resurrects
+  an earlier summary. This contradicts the Non-goal of changing model input.
+- Reproduction using the current fold and splice in `context.rs`:
+  complete `a`, `b`, `s1`; compact at `b`, keep nothing, summary `s1`;
+  complete `s2`; compact at `b`, keep nothing, summary `s2`.
+  The client list is `[a, b, s1, s2]`; sequential model replay is
+  `[s2, b]`; applying only the latest cut to the client list is
+  `[s2, b, s1]`. Omitting the first cut leaves the same client items
+  and latest cut but changes the required model result to `[s2, b, s1]`:
+  the proposed stored facts do not distinguish these histories.
+- Options requiring a decision: (A) let `Transcript` retain cumulative
+  model visibility and ordering metadata, folded alongside client items,
+  instead of only the latest cut (recommended; item bodies can stay shared);
+  (B) retain ordered cuts and enough event ordering to replay their effects
+  (must address growth and request cost); (C) explicitly change model
+  semantics to latest-cut-only (would allow the demonstrated resurrection).
+  Do not implement any option or accept ADR-0064 until this is resolved.
+
+## Verified (2026-10-13 — blocked, not complete)
+
+- Worktree clean at entry; branch `m112-one-transcript-fold`, HEAD
+  `72036be6`. M108's indexed retry removal is present. No branch switch.
+- A temporary diagnostic test was added inside `context.rs` to replay
+  the sequence above and compare it with the proposed latest-only splice.
+  Command (exit 101; expected assertion failure, not a timing failure):
+  `cargo test -p bingo-core --locked m112_latest_cut_preserves_repeated_compaction -- --exact context::tests::m112_latest_cut_preserves_repeated_compaction --nocapture`
+  ```text
+  running 1 test
+  assertion `left == right` failed
+    left: ["s2", "b", "s1"]
+   right: ["s2", "b"]
+  test context::tests::m112_latest_cut_preserves_repeated_compaction ... FAILED
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 410 filtered out; finished in 0.02s
+  ```
+- Removed the temporary diagnostic after recording its result; production
+  code, dependencies, and ADR decisions are unchanged. Exit criteria remain
+  unticked. Implementation and all gates are deferred because step 6
+  requires stopping on a Decision conflict. No push, merge, or PR.
