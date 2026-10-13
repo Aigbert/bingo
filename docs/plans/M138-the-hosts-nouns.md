@@ -12,6 +12,8 @@ it: natives in process, and M133's `dollar.ts` under node.
 
 ## Bricks, in build order
 
+0. **Node re-entry prerequisite (authorized 2026-10-14).** Preserve the shared fixture and bounded assertion; carry per-invocation hook identity across reverse RPC. Bind it at the bridge, isolate concurrent calls, and land a separate fix before runtime features.
+
 1. **The table, as a contract.** `crates/bingo-mods/src/dollar/table.rs` has one row per method: `(noun, method, door, unsafe, input,
    result)`. A door is `Kernel(&'static Entry)`, whose door already raises a chain of this meaning, so `$` calls it and raises nothing more;
    or `Face`, a method of a face the runtime registers, raised through the service-wire door by M136's wrapper (ADR-0078 §1). M136's
@@ -54,10 +56,10 @@ it: natives in process, and M133's `dollar.ts` under node.
 
 - `crates/bingo-mods/src/dollar/*.rs` (new), `src/{lib,link,chain,engine,thread,module,manager,plugin,load,config}.rs`, `src/{thread.js,manager/reload.rs}`, `tests/{contracts,plugin}.rs`, `tests/mods/nouns/*` (new), `guide.md`, `Cargo.toml`
 - `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/tests/complete.rs,host/tests/catalogue.rs}`
-- `crates/bingo-plugin-host/src/{state,ops,host}.rs`
-- `crates/bingo-plugin-rpc/src/{host,service,bridge,schema,wire_ts}.rs`
-- `schema/{dollar,plugin,events}.json`, `sdk/typescript/src/{dollar,dollar-types,plugin,wire,events}.ts`, SDK noun tests
-- `crates/bingo/tests/plugin_kit.rs`, noun fixture modules and mechanical schema/fixture consumers
+- `crates/bingo-plugin-host/src/{state,ops,host,invocation,lib}.rs`
+- `crates/bingo-plugin-rpc/src/{host,service,bridge,schema,wire_ts,context,connection,intercept,lib}.rs`
+- `schema/{dollar,plugin,events}.json`, `sdk/typescript/src/{cross,rpc,dollar,dollar-types,plugin,wire,events}.ts`, SDK noun tests
+- `crates/bingo/tests/{plugin_kit.rs,support/reentry.rs}`, noun fixture modules and mechanical schema/fixture consumers
 - Existing workspace dependencies only: `jiff` for the specified timestamp, and `bingo-schema-ts` as a dev dependency for the generated dollar types; measure with `scripts/budget.sh`.
 
 ## Exit criteria
@@ -112,35 +114,26 @@ it: natives in process, and M133's `dollar.ts` under node.
   not frames; project surfaces through the existing plugin signal door.
 - Use M111's `TestHost` for door answers, and the real offline kernel for chain
   counts: the test host does not dispatch interception chains.
-- **STOP — 2026-10-14, protocol steps 2 and 6.** The accepted ADR-0078 §2/§4 prerequisite is false under Node:
-  the existing M137 `tests/mods/reentrant.ts` fixture re-enters its calling hook; QuickJS skips it.
-  `sdk/typescript/src/dollar.test.ts` imports that same fixture and routes real SDK Peers through an offline echo face;
-  the bounded assertion sees two reverse calls where one is required. No external service or credentials are involved.
-- `mods/src/link.rs` tracks calling hooks only inside QuickJS dispatch. Node's `cross.ts::before` selects all matching hooks,
-  and `plugin.ts` supplies one dollar object without hook identity. This needs behavior changes beyond stale paths or fixtures.
-- Options: explicitly include the prerequisite Node re-entry repair (`cross.ts` and transport context as needed) in M138,
-  preserving ADR-0078; or repair M137 separately before resuming. No ADR decision was changed. All exit criteria remain unticked.
-- Discipline, budget, deny, Windows and smoke gates were not run after the stop. Runtime implementation has not started.
+- The Node re-entry prerequisite was repaired here as the authorized first brick; ADR-0078 §4 remains unchanged.
 
 ## Verified (2026-10-14)
 
 ```text
-cargo fmt --all -- --check
-exit 0 (no output)
-cargo check --workspace --all-targets --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 24.38s
-cargo clippy --workspace --all-targets --locked -- -D warnings
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.50s
-cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing
-exit 0
-test a_reentrant_call_skips_only_its_calling_hook_and_says_why_once ... ok
-test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.92s
-cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
 node --test sdk/typescript/src/dollar.test.ts
 Error: the calling hook re-entered through its own dollar call
 2 !== 1
 ℹ tests 1
 ℹ pass 0
 ℹ fail 1
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-plugin-rpc --lib --locked
+test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+test result: ok. 136 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.00s
+node --test sdk/typescript/src/*.test.ts
+ℹ tests 15
+ℹ pass 15
+ℹ fail 0
+cargo test -p bingo --test plugin_kit --locked node_reentry -- --nocapture
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.09s
+cargo test -p bingo-mods --test contracts --locked a_reentrant_call -- --nocapture
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.02s
 ```

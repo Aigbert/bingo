@@ -5,7 +5,7 @@ use bingo_sdk::*;
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
 
-tokio::task_local! { static CALLING: Vec<(String, usize)>; }
+use bingo_plugin_host::invocation;
 
 pub(crate) struct Link(pub Arc<Module>);
 #[async_trait]
@@ -46,13 +46,9 @@ impl Interceptor for Link {
             {
                 continue;
             }
-            let skipped = CALLING
-                .try_with(|calling| {
-                    calling
-                        .iter()
-                        .any(|(name, hook)| name == self.id() && *hook == index)
-                })
-                .unwrap_or(false);
+            let skipped = invocation::current()
+                .iter()
+                .any(|calling| calling.plugin == self.id() && calling.hook == index);
             if skipped {
                 let _ = cx
                     .host
@@ -117,24 +113,21 @@ pub(crate) async fn operation(
     method: &str,
     params: Value,
 ) -> Result<Value, String> {
-    let mut calling = CALLING.try_with(Clone::clone).unwrap_or_default();
-    calling.push((module.found.name.clone(), hook));
-    CALLING
-        .scope(calling, async {
-            tokio::time::timeout(
-                HOOK_DEADLINE,
-                bingo_plugin_host::ops::call(
-                    &cx.host,
-                    &module.found.name,
-                    &module.store,
-                    method,
-                    params,
-                ),
-            )
-            .await
-            .map_err(|_| format!("{method}: host operation deadline exceeded"))?
-        })
+    invocation::from(&module.found.name, hook, async {
+        tokio::time::timeout(
+            HOOK_DEADLINE,
+            bingo_plugin_host::ops::call(
+                &cx.host,
+                &module.found.name,
+                &module.store,
+                method,
+                params,
+            ),
+        )
         .await
+        .map_err(|_| format!("{method}: host operation deadline exceeded"))?
+    })
+    .await
 }
 pub(crate) fn failed(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::Internal, error.to_string())

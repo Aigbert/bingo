@@ -351,6 +351,13 @@ impl Connection {
         !self.is_alive() && !self.router.announced.swap(true, Ordering::AcqRel)
     }
 
+    pub(crate) fn hold_chain(&self, chain: &str) -> Option<crate::context::Held> {
+        self.router
+            .serving
+            .as_ref()
+            .map(|serving| serving.calls.contexts.hold(chain))
+    }
+
     /// Ask, and wait for the answer or for the process to end.
     pub async fn request(&self, method: &str, params: Value) -> Reply {
         if method != name::INITIALIZE
@@ -359,7 +366,7 @@ impl Connection {
             serving.calls.permits(method)?;
         }
         self.peer
-            .request(method, params)
+            .request(method, crate::context::outgoing(params))
             .await
             .map_err(|error| match error {
                 PeerError::Remote(error) => error,
@@ -378,7 +385,7 @@ impl Connection {
         {
             return;
         }
-        if let Err(why) = self.peer.notify(method, params) {
+        if let Err(why) = self.peer.notify(method, crate::context::outgoing(params)) {
             tracing::debug!(plugin = %self.plugin, method, %why, "a notification went nowhere");
         }
     }

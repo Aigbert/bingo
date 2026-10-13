@@ -1021,6 +1021,23 @@
         "input"
       ]
     },
+    "CallingHook": {
+      "type": "object",
+      "properties": {
+        "plugin": {
+          "type": "string"
+        },
+        "hook": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "plugin",
+        "hook"
+      ]
+    },
     "Cancel": {
       "type": "object",
       "properties": {
@@ -3047,6 +3064,31 @@
         "id"
       ],
       "description": "A hook a process says it has, and the matcher it is claimed with.\n\nThe matcher is the sdk's own, declared once: the kernel's cheap skip runs\non this side, so an event this matcher rules out never crosses the pipe at\nall (ADR-0032 §1). A declaration that names no point wants every point, as\nan in-process hook's empty matcher does."
+    },
+    "HostCallContext": {
+      "type": "object",
+      "properties": {
+        "parent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hook": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "callers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CallingHook"
+          }
+        }
+      }
     },
     "HostEnv": {
       "type": "object",
@@ -7441,6 +7483,12 @@
         "aside"
       ],
       "description": "How a producer intends an utterance to be drawn."
+    }
+  },
+  "requestContext": {
+    "field": "_bingo",
+    "schema": {
+      "$ref": "#/$defs/HostCallContext"
     }
   },
   "manifest": {

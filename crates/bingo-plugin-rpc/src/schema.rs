@@ -19,6 +19,7 @@ use crate::wire::{METHODS, NOTIFICATIONS, PROTOCOL, Ref, schema_of};
 /// plugin author writes and the last thing the wire mentions.
 static UNNAMED: &[Ref] = &[
     schema_of::<Manifest>,
+    schema_of::<crate::context::Context>,
     schema_of::<crate::wire::ServiceMethod>,
 ];
 
@@ -36,6 +37,7 @@ pub fn document() -> Value {
         "protocol": PROTOCOL,
         "capabilities": crate::wire::capabilities(),
         "$defs": sorted(generator.take_definitions(true)),
+        "requestContext": { "field": "_bingo", "schema": { "$ref": "#/$defs/HostCallContext" } },
         "manifest": { "$ref": "#/$defs/Manifest" },
         "methods": methods,
         "notifications": notifications,

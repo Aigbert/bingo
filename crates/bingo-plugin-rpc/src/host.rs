@@ -12,6 +12,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 pub struct Server {
+    pub(crate) contexts: crate::context::Chains,
     plugin: String,
     host: HostHandle,
     service: Arc<dyn ServiceCalls>,
@@ -27,6 +28,7 @@ impl Server {
         state: crate::state::Store,
     ) -> Self {
         Self {
+            contexts: Default::default(),
             plugin: plugin.into(),
             host,
             service,
@@ -58,7 +60,20 @@ impl Server {
         ))
     }
 
-    pub async fn answer(&self, method: &str, params: Value) -> Result<Value, RpcError> {
+    pub async fn answer(&self, method: &str, mut params: Value) -> Result<Value, RpcError> {
+        let context = params
+            .as_object_mut()
+            .and_then(|params| params.remove("_bingo"));
+        let context = context
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(failed)?
+            .unwrap_or_default();
+        let calling = self.contexts.bind(&self.plugin, context).map_err(failed)?;
+        bingo_plugin_host::invocation::scope(calling, self.answer_bound(method, params)).await
+    }
+
+    async fn answer_bound(&self, method: &str, params: Value) -> Result<Value, RpcError> {
         if !crate::wire::capabilities().contains(method) {
             return Err(unknown(method));
         }

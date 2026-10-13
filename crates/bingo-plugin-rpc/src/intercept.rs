@@ -110,6 +110,7 @@ impl Remote {
         O: Serialize + DeserializeOwned + Send,
     {
         let chain = self.connection.next_call();
+        let _context = self.connection.hold_chain(&chain);
         let mut cancel = CancelOnDrop {
             connection: self.connection.clone(),
             chain: Some(chain.clone()),

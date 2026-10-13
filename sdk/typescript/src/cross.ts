@@ -1,3 +1,4 @@
+import type { Entry } from './on.ts';
 import { Hooks as Registry, patternMatches } from './on.ts';
 type Before = { chain: string; input: any; site?: any; tier?: string };
 type Pending = {
@@ -16,7 +17,7 @@ function deferred<T>() {
 
 export class Hooks extends Registry {
   pending = new Map<string, Pending>();
-  async before(name: string, request: Before, dollar: unknown): Promise<unknown> {
+  async before(name: string, request: Before, dollar: unknown, dollarFor?: (entry: Entry) => unknown, skip: readonly number[] = []): Promise<unknown> {
     if (this.pending.has(request.chain)) throw new Error('duplicate chain');
     const first = deferred<unknown>();
     const downstream = deferred<any>();
@@ -25,14 +26,14 @@ export class Hooks extends Registry {
     // Cancellation can arrive before any hook has called next.
     void downstream.promise.catch(() => {});
     let crossed = false;
-    const entries = this.entries.filter(entry => patternMatches(entry.pattern, name));
+    const entries = this.entries.filter((entry, index) => patternMatches(entry.pattern, name) && !skip.includes(index));
     const terminal = (input: unknown) => {
       crossed = true;
       first.resolve({ next: input });
       return downstream.promise;
     };
     const result = Promise.race([
-      Promise.resolve().then(() => this.dispatch(entries, 0, request.input, dollar, request.site, controller.signal, terminal)),
+      Promise.resolve().then(() => this.dispatch(entries, 0, request.input, dollar, request.site, controller.signal, terminal, dollarFor)),
       stopped.promise,
     ]);
     const reject = (error: Error) => {
@@ -49,9 +50,9 @@ export class Hooks extends Registry {
     return first.promise;
   }
 
-  async observe(name: string, payload: unknown, dollar: unknown): Promise<void> {
-    const entries = this.entries.filter(entry => patternMatches(entry.pattern, name));
-    await this.dispatch(entries, 0, payload, dollar, undefined, new AbortController().signal, async () => null);
+  async observe(name: string, payload: unknown, dollar: unknown, dollarFor?: (entry: Entry) => unknown, skip: readonly number[] = []): Promise<void> {
+    const entries = this.entries.filter((entry, index) => patternMatches(entry.pattern, name) && !skip.includes(index));
+    await this.dispatch(entries, 0, payload, dollar, undefined, new AbortController().signal, async () => null, dollarFor);
   }
 
   async after(request: { chain: string; result: unknown }): Promise<unknown> {

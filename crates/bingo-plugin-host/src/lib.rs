@@ -4,6 +4,7 @@ pub mod config;
 pub mod discovery;
 pub mod grant;
 pub mod host;
+pub mod invocation;
 pub mod manifest;
 pub mod notice;
 pub mod ops;
