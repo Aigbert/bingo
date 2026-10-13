@@ -57,6 +57,9 @@ mod reader;
 mod room;
 mod roster;
 mod seat;
+mod serial;
+mod service;
+pub use service::RoomWriter;
 mod team;
 mod tool;
 
@@ -98,6 +101,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "tool:CloseRoom",
         "tool:Listen",
         "context:rooms",
+        bingo_services::room_post::CAPABILITY,
         "service:bingo.rooms.pages",
     ],
     requires: &[],
@@ -117,7 +121,9 @@ pub(crate) fn identity() -> ClientIdentity {
 /// seats and fans out. Each is handed the host by the kernel at the call, so
 /// this plugin keeps none.
 #[derive(Debug, Default)]
-pub struct RoomsPlugin;
+pub struct RoomsPlugin {
+    writer: Arc<RoomWriter>,
+}
 
 #[async_trait]
 impl Plugin for RoomsPlugin {
@@ -140,7 +146,13 @@ impl Plugin for RoomsPlugin {
         registrar.add(Contribution::Context(
             Arc::new(Reader) as Arc<dyn ContextContributor>
         ));
+        let writer: Arc<dyn bingo_services::room_post::RoomPost> = self.writer.clone();
+        registrar.add(Contribution::service(&bingo_services::room_post::KEY, writer.clone(), Some(bingo_services::room_post::wire(writer))));
         registrar.add(guide::contribution(registrar));
+        Ok(())
+    }
+    async fn start(&self, host: bingo_sdk::HostHandle) -> Result<(), PluginError> {
+        self.writer.start(host);
         Ok(())
     }
 }
@@ -167,6 +179,7 @@ mod plugin_tests {
                 "tool:CloseRoom",
                 "tool:Listen",
                 "context:rooms",
+        bingo_services::room_post::CAPABILITY,
                 &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
             ]
         );
@@ -182,7 +195,7 @@ mod plugin_tests {
             Env::rooted("/nowhere"),
             Default::default(),
         );
-        RoomsPlugin
+        RoomsPlugin::default()
             .register(&mut registrar)
             .expect("registration does no I/O");
         let contributions = registrar.into_contributions();
@@ -195,7 +208,7 @@ mod plugin_tests {
         assert!(matches!(&contributions[5], Contribution::Tool(t) if t.spec().name == "CloseRoom"));
         assert!(matches!(&contributions[6], Contribution::Tool(t) if t.spec().name == "Listen"));
         assert!(matches!(&contributions[7], Contribution::Context(c) if c.id() == "rooms"));
-        match &contributions[8] {
+        match &contributions[9] {
             Contribution::Service { key, wire, .. } => {
                 assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");

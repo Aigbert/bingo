@@ -7,3 +7,4 @@ pub mod mentions;
 pub mod owed;
 pub use name::Name;
 pub use room::PLUGIN;
+pub mod seen;

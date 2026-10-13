@@ -28,6 +28,37 @@ pub trait RoomPost: Send + Sync {
     async fn post(&self, request: Request) -> Result<Posted, ServiceError>;
 }
 
+pub fn wire(service: std::sync::Arc<dyn RoomPost>) -> std::sync::Arc<dyn bingo_sdk::WireService> {
+    std::sync::Arc::new(ToWire(service))
+}
+
+pub fn find(host: &bingo_sdk::HostHandle) -> Option<std::sync::Arc<dyn RoomPost>> {
+    host.service(&KEY).or_else(|| host.service_wire(KEY.name()).map(|wire| {
+        std::sync::Arc::new(FromWire(wire)) as std::sync::Arc<dyn RoomPost>
+    }))
+}
+struct ToWire(std::sync::Arc<dyn RoomPost>);
+#[async_trait]
+impl bingo_sdk::WireService for ToWire {
+    async fn call(&self, method: &str, params: serde_json::Value) -> Result<serde_json::Value, ServiceError> {
+        if method != "post" {
+            return Err(ServiceError(format!("{} speaks `post`, not `{method}`", KEY.name())));
+        }
+        let request = serde_json::from_value(params).map_err(|error| ServiceError(error.to_string()))?;
+        let posted = self.0.post(request).await?;
+        serde_json::to_value(posted).map_err(|error| ServiceError(error.to_string()))
+    }
+}
+struct FromWire(std::sync::Arc<dyn bingo_sdk::WireService>);
+#[async_trait]
+impl RoomPost for FromWire {
+    async fn post(&self, request: Request) -> Result<Posted, ServiceError> {
+        let params = serde_json::to_value(request).map_err(|error| ServiceError(error.to_string()))?;
+        let answer = self.0.call("post", params).await?;
+        serde_json::from_value(answer).map_err(|error| ServiceError(error.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

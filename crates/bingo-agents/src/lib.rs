@@ -45,8 +45,6 @@ mod models;
 mod names;
 
 mod note;
-mod rooms;
-mod serial;
 mod spawn;
 mod stop;
 mod team;
@@ -77,7 +75,7 @@ pub use thinking::SetThinkingTool;
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.agents",
     version: env!("CARGO_PKG_VERSION"),
-    uses: &[],
+    uses: &[bingo_services::room_post::KEY.name()],
     provides: &[
         "tool:SpawnAgent",
         "tool:SendMessage",
