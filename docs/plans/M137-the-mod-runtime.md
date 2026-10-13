@@ -57,9 +57,9 @@ Current paths and required adapters replace the original plan's stale paths.
    next result; one notice names plugin/event/reason. Re-entry leaves out
    only the calling hook. Dollar awaits have wall bounds, tested with
    paused tokio; dropped chains interrupt JS and abort signal.
-9. **Grants.** Pure library grant(origin,trust,uses) and admits(grant,noun,
-   method). User/explicit directories default rewrite with declared uses;
-   project defaults tighten/safe nouns; user-only pluginTrust lifts grants
+9. **Grants.** Pure library grant(runtime,origin,trust,uses) and admits(grant,noun,
+   method). Processes default tighten; user/explicit modules default rewrite
+   with declared uses; project modules tighten/safe nouns. pluginTrust lifts grants
    and alone gives full. Refuse unsafe process/http/env/model, external fs
    writes and unsafe face methods without grants. Uses includes host and
    service nouns. Core raises plugin.register on first source report and
@@ -92,6 +92,8 @@ Current paths and required adapters replace the original plan's stale paths.
   only if supervision adds a real extra hop (authorized 2026-10-14).
 - `crates/bingo/{Cargo.toml,src/main.rs,src/composition.rs,src/plugins/*,tests/plugin_kit.rs}`:
   runtime selection, isolated scenario host and runtime listing column.
+  `tests/plugin_rpc.rs`: declare only the side fixture's session use;
+  preserve every assertion. `tests/cli/plugins.rs` stays unchanged.
 - `sdk/typescript/src/{on,cross,plugin,index,events,wire}.ts`, on.test.ts;
   `examples/plugins/ts-status/{plugin.json,hooks/register.ts}`.
 - Cargo.toml, Cargo.lock, deny.toml, scripts/budget.toml; generated schema/*.
@@ -103,12 +105,12 @@ Current paths and required adapters replace the original plan's stale paths.
 - [x] Mod tests cover strip file:line, all six fixtures and one notice each;
       thrower's catch sees kind=throw.
 - [x] Esc during loop at tool.check ends Interrupted within M116's bound.
-- [ ] Project/model and registration-denial contracts pass; CLI listing
-      gate is blocked by the older process-tier assertion below.
+- [ ] Project/model, registration denial and runtime-specific grant tests;
+      the existing process CLI default remains tighten.
 - [x] Mid-turn edit reloads after turn.complete; store survives; no sleeps.
 - [x] plugin_kit runs ts-status in process and node (M133's node skip rule).
-- [ ] Final gates: test stopped outside Files; discipline, budget, deny and
-      MSVC checks remain pending. C-header failures defer per step 7.
+- [ ] Final serial gates, before/after budget and each touched crate's MSVC
+      check. C-header-only failures defer per step 7.
 
 ## Non-goals
 
@@ -136,14 +138,13 @@ file-watcher dependencies, watching non-explicit directories; no live tests.
   Do not merge or rebase dev.
 - Root cause (2026-10-14): pausing after JS startup exposes Tokio's ≤1 ms deadline rounding; the actor adds no hop and the grace remains 2 s.
 
-- Stop 2026-10-14, step 6: tests/cli/plugins.rs:247 expects a user process
-  plugin's default tier to be tighten; the shared M137 grant returns rewrite.
-  This assertion is outside Files. Static review also finds bin
-  tests/plugin_rpc.rs side_home omits session uses for its host/extend calls.
-  Option A: include both bin test files; change only that default to rewrite
-  and declare the side fixture's session use; preserve all other assertions.
-  Option B: retain legacy process grants, requiring a shared-grant decision
-  change. Recommend A; neither out-of-scope edit has been made.
+- Resolved 2026-10-14 by the person: runtime is an input to the one grant
+  function. ADR-0074 process defaults remain tighten; ADR-0078's rewrite
+  default applies only to user/explicit modules. Table-test runtime × origin
+  × trust. Safe declared session calls need no tier lift. The RPC harness
+  supplies explicit fixture trust where its model/service tests need it.
+  Include only bin tests/plugin_rpc.rs for the session-use declaration;
+  leave the CLI default-tier assertion and all other assertions unchanged.
 
 ## Verified (2026-10-14)
 
