@@ -40,8 +40,8 @@ took the host's default model, not the parent's live one), 79107b13
      the resolved spec. This pins today's behaviour; each of the three
      past fixes would have failed it.
    - Lost update: run `/model` and `/think` on one live session at once
-     (`tokio::join!`), using a provider fake whose catalog lookup awaits
-     a `Notify`. Both changes must hold afterwards, in `Live.spec` and
+     (`tokio::join!`), using a provider-source fake whose lookup awaits
+     a `Notify` (named models bypass the catalog in this tree). Both changes must hold afterwards, in `Live.spec` and
      in the next published summary. Fails today.
    - Resume: a session whose level was set by `/think`, under a
      different settings default, resumes at the `/think` level; one whose
@@ -60,7 +60,7 @@ took the host's default model, not the parent's live one), 79107b13
      the summary, and the level from `state.config` (today's
      `thinking_of`, moved here). A level the fold never carried stays
      absent; the caller fills the settings default.
-   Both destructure `SessionSpec` with no `..`, so a new spec field does
+   `stated` destructures and `spec_of` constructs `SessionSpec` with no `..`, so a new spec field does
    not compile until both say where it goes. The title rule ("a name
    the session already earned is never taken back") lives in `stated`
    only. These sites become calls to the pair:
@@ -99,7 +99,9 @@ took the host's default model, not the parent's live one), 79107b13
 ## Files
 
 - `crates/bingo-core/src/{spec.rs (new),host.rs,host/resume.rs,
-  session.rs,turn/config.rs}`, `host/tests/**`
+  session.rs,turn/config.rs,lib.rs,turn.rs}`, `host/tests/**`
+- Mechanical `TurnConfig.spec` fixtures: `src/test_support.rs`,
+  `src/turn/tests.rs` in `bingo-core` (protocol step 6).
 - `docs/adr/{0008,0047}*.md`
 
 ## Exit criteria
@@ -123,6 +125,19 @@ took the host's default model, not the parent's live one), 79107b13
 - Changing what `/model` and `/think` write to the settings' user layer
   (79107b13's remembered default stays).
 - The tree's copy of summaries (M120).
+
+## Re-verified at `2c5c44ec` (2026-10-13)
+
+- `Live`/`turn_config`/`reconfigure`: `host.rs:115/523/850`;
+  `restated`: `session.rs:307`; `runs_on`: `turn/config.rs:66`.
+- M114: `resume_frames` folds `store.resume` at `host/resume.rs:76`;
+  `thinking_of`/`spec_of` remain at 105/183. Keep checkpoint replay.
+- M116: `session/commands.rs:260` spawns owned command tasks. M131
+  chains and M119 services need no changes; M115 storage is unchanged.
+- All three cited fixes remain: `inherited`, resume config-view effort,
+  and summary `system_extra`/`tools`; their regression tests still exist.
+- Module wiring (`lib.rs`, `turn.rs`) and two config fixtures were missing
+  from Files. No SDK contract, dependency or ADR Decision changes.
 
 ## Risks
 
