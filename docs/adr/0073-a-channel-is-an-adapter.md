@@ -1,6 +1,6 @@
 # ADR-0073 — A channel is an adapter
 
-Status: proposed · 2026-10-13 · Plan: M130 · Amends: ADR-0016 §1, §7
+Status: accepted · 2026-10-13 · Plan: M130 · Amends: ADR-0016 §1, §7
 
 ## Context
 

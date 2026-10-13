@@ -1,5 +1,7 @@
 # 0016 — IM channels: one deliverer, adapters that hand over their mechanism
 
+Amended 2026-10-13 by [ADR-0073](0073-a-channel-is-an-adapter.md) (M130): §§1, 7 move the adapter contract and loopback to a library, extract platforms, and gate loopback explicitly.
+
 ## Context
 
 M13 puts a session in an IM thread: messages in, streamed replies out, approvals answered by button or keyword. The kernel side is already decided: a channel is a `Surface` (`SurfaceKind::Concurrent`) and the sdk grows no `Channel` trait (ADR-0001); `Origin{surface, principal, conversation}` carries who spoke; `Interaction` + `AnswerSpec` is the question object with a single winner; `View::text()` is the degrade; session keys follow `feishu/<chat>[/<thread>]` with first-segment ownership. The research (2026-08-31, four platforms verified) reframed the rest. Streaming is four different mechanisms: Feishu edits a *card* via CardKit (full cumulative text, QPS-exempt, 10-minute auto-close) while its plain-text edit is capped at **20 edits per message, lifetime** — works in testing, dies in production; Slack has a native token stream; Telegram and Discord only debounced edits. "Length" is characters on one platform, UTF-8 bytes on another, UTF-16 units on a third. And capability *declarations* drift — OpenClaw's Matrix adapter advertises buttons its renderer never draws — while Satori's derived capabilities cannot. The old project has no IM code to port: its `channels.rs` is the agent-room bus, re-solved in `bingo-rooms`.
