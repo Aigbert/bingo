@@ -132,11 +132,21 @@ file-watcher dependencies, watching non-explicit directories; no live tests.
   baseline in the same commit as generated plugin.json/plugin-2.json.
   Process reload fixture constructors change mechanically with Launch.
   Core commands/plugins.rs status constructors gain empty execution metadata.
-
 - Resolved 2026-10-14 by the person's delegate: Option A includes the
   RPC integration harness and its fixtures, with registration, granted
   catalogue and declared uses. Keep every assertion, including default
   model refusal; no new dev dependency. Do not merge or rebase dev.
+
+- Stop 2026-10-14, step 6: two interrupt timing attempts still report
+  `Interrupted` at 2.001 s of paused Tokio time against M116's ≤2 s bound.
+  Starting at a timer tick did not change it; that experiment is removed.
+  Whether this is host supervision or the JS-thread/test-clock interaction
+  remains unresolved. Do not weaken the bound or call M137 complete.
+  Option A (recommended): continue diagnosis with a clock harness that
+  controls the JS-thread handoff, retaining the exact bound and outcome.
+  Option B: include core session/running.rs and its owned-task tests in Files
+  to investigate and repair supervision if the actor causes the delay.
+  Pending: interrupt, reload, binary/listing, ts-status, RSS and final gates.
 
 ## Verified (2026-10-14)
 
@@ -706,4 +716,36 @@ test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; 
 cargo test -p bingo-mods --test grants --locked
 registration_can_deny_a_module_with_a_named_reason ... FAILED
 assertion `left == right` failed: target enabled; left: Bool(true), right: false
+```
+
+```text
+cargo test -p bingo-mods --test grants -p bingo-sdk --test plugin_registration --locked
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk catalogue --locked
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 130 filtered out; finished in 0.02s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked
+test result: ok. 126 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.29s
+cargo test -p bingo-plugin-rpc --lib service::tests::an_undeclared_service_noun_is_refused_before_the_call --locked
+service::tests::an_undeclared_service_noun_is_refused_before_the_call ... FAILED
+undeclared service ran: Ok(Object {"result": String("must not run")})
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 126 filtered out; finished in 0.04s
+cargo test -p bingo-plugin-rpc --lib service:: --test plugin --locked
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 117 filtered out; finished in 0.01s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.02s
+cargo test -p bingo-mods --test contracts --locked
+test a_reentrant_call_skips_only_its_calling_hook_and_says_why_once ... ok
+test an_escaper_load_failure_is_visible_once ... ok
+test throw_loop_and_hog_fail_open_with_one_named_notice ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+cargo test -p bingo-mods --test interrupt --locked
+esc_during_a_tool_check_loop_ends_interrupted_within_the_grace ... FAILED
+interrupt elapsed: 2.001s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
 ```
