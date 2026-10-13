@@ -1,0 +1,83 @@
+{
+  "format": "bingo-checkpoint",
+  "version": 1,
+  "seq": 6,
+  "offset": 1234,
+  "lineHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "state": {
+    "session": {
+      "seq": 6,
+      "summary": {
+        "id": "ses_1",
+        "title": "hello",
+        "cwd": "/tmp/p",
+        "driver": "model",
+        "model": "fake-1",
+        "provider": "fake",
+        "createdAt": "2023-11-14T22:13:20Z",
+        "updatedAt": "2023-11-14T22:13:20Z",
+        "usage": {
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "reasoningTokens": 0
+        },
+        "busy": false
+      },
+      "config": {
+        "kernel": {},
+        "plugins": {}
+      },
+      "historyGeneration": 0,
+      "items": [],
+      "queue": [],
+      "interactions": [],
+      "unread": false,
+      "closed": false
+    },
+    "transcript": {
+      "historyGeneration": 1,
+      "items": [
+        {
+          "id": "i1",
+          "round": 0,
+          "status": "completed",
+          "startedAt": "1970-01-01T00:00:00Z",
+          "body": {
+            "kind": "assistant",
+            "text": "1"
+          }
+        },
+        {
+          "id": "i3",
+          "round": 0,
+          "status": "completed",
+          "startedAt": "1970-01-01T00:00:00Z",
+          "body": {
+            "kind": "assistant",
+            "text": "3"
+          }
+        },
+        {
+          "id": "i4",
+          "round": 0,
+          "status": "completed",
+          "startedAt": "1970-01-01T00:00:00Z",
+          "body": {
+            "kind": "assistant",
+            "text": "4"
+          }
+        }
+      ],
+      "modelOrder": [
+        "i1",
+        "i4",
+        "i3"
+      ],
+      "hidden": 1,
+      "cut": "i3",
+      "hasMore": true
+    }
+  }
+}

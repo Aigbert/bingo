@@ -1,6 +1,6 @@
 # ADR-0066 — Resume starts at a checkpoint
 
-Status: proposed · 2026-10-13 · Plan: M114 · Amends: ADR-0005 §5, §7
+Status: accepted · 2026-10-13 · Plan: M114 · Amends: ADR-0005 §5, §7
 
 ## Context
 
@@ -49,6 +49,16 @@ opens.
    durable frames since the checkpoint. The transcript records that
    older items exist (`OpenHistory`'s `before`/`has_more`, ADR-0064)
    without holding them; the model view never needed them.
+   2026-10-13 clarification (ADR-0064 §1's kept items): after
+   `drop_before_cut()`, (a) `model_items()` is unchanged, item for item
+   and in order, including kept pre-boundary items; (b) `items()` and
+   `OpenHistory` start at the compaction boundary in client order, with
+   pre-boundary kept items held for the model only; (c) no held item is
+   outside both model order and the client tail at/after the boundary;
+   (d) storage history before the window includes kept items in full
+   client order, exactly once across pages plus the window. Each item
+   has one representation. The checkpoint uses its own state codec to
+   preserve model order and window metadata; the client wire is unchanged.
 5. **Older history is read from storage, off the actor.**
    `HostApi::history` for a page before the window, and a
    `subscribe(since)` older than the in-memory frames, are answered by
@@ -61,6 +71,8 @@ opens.
    still correct.
 
 ## Consequences
+
+- 2026-10-13: A checkpoint verifies only the line at its offset; a hand edit to an earlier journal line is not detected. Deleting checkpoint.json forces a full replay.
 
 - Resume of a long session reads one sidecar and the frames since the
   last compaction; memory is bounded by the context window, not the

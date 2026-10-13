@@ -77,17 +77,18 @@ impl Host {
         store: Arc<dyn SessionStore>,
         id: &SessionId,
     ) -> Result<Mailbox, KernelError> {
-        let frames = store.replay(id, Seq::ZERO).await?;
-        let replayed = session::replayed(&frames)?;
+        let resumed = store.resume(id).await?;
+        let replayed = session::fold_resumed(&resumed)?;
         let mut spec = spec_of(&replayed.summary);
         self.check_key_free(spec.key.as_deref())?;
         spec.thinking = Some(thinking_of(&replayed).unwrap_or(self.settings.kernel.thinking));
         let last = replayed.summary;
         let choice = self.model_for(&spec).await?;
         let summary = crate::turn::runs_on(last, choice.as_ref());
-        let mailbox = session::resume(frames, Some(store.clone()), self.services(), |mailbox| {
-            Arc::new(self.turn_config(&spec, &summary, choice, mailbox))
-        })?;
+        let mailbox =
+            session::resume_checkpoint(resumed, Some(store.clone()), self.services(), |mailbox| {
+                Arc::new(self.turn_config(&spec, &summary, choice, mailbox))
+            })?;
         let live = Live::new(mailbox, &summary, spec);
         self.lock().insert(summary.id.clone(), live.clone());
         let _ = self.gateway.send(GatewayEvent::SessionCreated {
@@ -153,8 +154,8 @@ async fn lost_children(store: &dyn SessionStore, parent: &SessionId) -> Vec<Sess
 /// Whether the stored journal ends inside a turn, asked of the fold and of
 /// nothing else: there is no second record of a journal's tail.
 async fn mid_turn(store: &dyn SessionStore, id: &SessionId) -> bool {
-    match store.replay(id, Seq::ZERO).await {
-        Ok(frames) => session::replayed(&frames).is_ok_and(|state| state.busy()),
+    match store.resume(id).await {
+        Ok(resumed) => session::fold_resumed(&resumed).is_ok_and(|state| state.busy()),
         Err(error) => {
             tracing::debug!(%error, session = %id, "a stored child would not replay");
             false

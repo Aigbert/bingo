@@ -35,7 +35,7 @@ pub mod checksums;
 pub mod install;
 pub mod release;
 mod settings;
-pub mod sha256;
+pub use bingo_digest as sha256;
 pub mod stamp;
 pub mod version;
 

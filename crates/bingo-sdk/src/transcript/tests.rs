@@ -206,3 +206,63 @@ fn open_items_belong_to_the_turn_and_exclude_terminal_or_removed_items() {
     });
     assert_eq!(ids(&transcript), [ItemId::from_raw("i1")]);
 }
+
+#[test]
+fn checkpoint_window_keeps_model_only_items_out_of_client_history() {
+    let mut transcript: Transcript = (1..=4).map(|id| item(id, id.to_string())).collect();
+    transcript.apply(&Event::Compacted {
+        generation: 1,
+        boundary: ItemId::from_raw("i3"),
+        kept: vec![ItemId::from_raw("i1")],
+        summary: ItemId::from_raw("i4"),
+    });
+    let before: Vec<_> = transcript.model_items().cloned().collect();
+    transcript.drop_before_cut();
+    assert_eq!(
+        transcript.model_items().cloned().collect::<Vec<_>>(),
+        before
+    );
+    assert_eq!(
+        transcript
+            .items()
+            .iter()
+            .map(|i| i.id.as_str())
+            .collect::<Vec<_>>(),
+        ["i3", "i4"]
+    );
+    assert!(transcript.get(&ItemId::from_raw("i1")).is_some());
+    assert!(transcript.get(&ItemId::from_raw("i2")).is_none());
+    assert_eq!(
+        transcript.history(),
+        OpenHistory {
+            before: Some(ItemId::from_raw("i3")),
+            has_more: true,
+            generation: 1
+        }
+    );
+}
+
+#[test]
+fn checkpoint_window_can_restore_full_client_order_without_losing_live_bodies() {
+    let mut full: Transcript = (1..=4).map(|id| item(id, id.to_string())).collect();
+    full.apply(&Event::Compacted {
+        generation: 1,
+        boundary: ItemId::from_raw("i3"),
+        kept: vec![ItemId::from_raw("i1")],
+        summary: ItemId::from_raw("i4"),
+    });
+    let mut window = full.clone();
+    window.drop_before_cut();
+    let restored = window.with_history(full.clone());
+    assert_eq!(restored, full);
+    let mut cut_again = restored;
+    cut_again.drop_before_cut();
+    assert_eq!(cut_again, window);
+    let bytes = serde_json::to_value(&window).unwrap();
+    assert_eq!(
+        bytes.as_object().unwrap().len(),
+        2,
+        "client wire remains unchanged"
+    );
+    assert_eq!(bytes["items"].as_array().unwrap().len(), 2);
+}

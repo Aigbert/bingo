@@ -8,6 +8,7 @@ use crate::test_support::*;
 
 mod bounded;
 mod busy;
+mod checkpoint;
 mod commands;
 mod completion;
 mod images;

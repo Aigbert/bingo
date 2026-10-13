@@ -449,6 +449,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "bingo-digest"
+version = "0.6.6"
+
+[[package]]
 name = "bingo-experience"
 version = "0.6.6"
 dependencies = [
@@ -794,6 +798,7 @@ version = "0.6.6"
 dependencies = [
  "async-trait",
  "bingo-claim",
+ "bingo-digest",
  "bingo-sdk",
  "jiff",
  "serde",
@@ -952,6 +957,7 @@ dependencies = [
 name = "bingo-update"
 version = "0.6.6"
 dependencies = [
+ "bingo-digest",
  "jiff",
  "schemars 1.2.2",
  "serde",

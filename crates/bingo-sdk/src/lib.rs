@@ -55,7 +55,7 @@ pub use provider::{AuthStatus, LoginMethod, ModelInfo, Provider};
 /// of its own by that name, and a glob import must not make either ambiguous.
 pub use service::{ServiceError, ServiceHandle, ServiceKey, WireService};
 pub use state::{Applied, LastTurn, LiveTurn, Retry, SessionState};
-pub use store::SessionStore;
+pub use store::{Checkpoint, Resumed, SessionStore};
 pub use surface::{Exit, Surface, SurfaceKind, SurfaceOptions};
 pub use tool::{
     Env, ResultLimit, Subject, Tool, ToolCall, ToolContext, ToolError, ToolHost, ToolOutcome,

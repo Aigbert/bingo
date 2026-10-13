@@ -3,12 +3,15 @@
 //! actor mints `seq`, persists durable frames, folds them with the one reducer
 //! and fans them out to bounded subscriber channels. It never awaits a client.
 
+mod checkpoint;
 mod commands;
 mod gate;
+mod history;
 mod inputs;
 mod interactions;
 mod invoke;
 mod mailbox;
+mod past;
 mod queue;
 mod running;
 mod spawn;
@@ -35,6 +38,7 @@ pub use mailbox::Mailbox;
 use mailbox::Msg;
 use queue::Queue;
 use running::{Ended, Running};
+pub(crate) use spawn::{fold_resumed, resume_checkpoint};
 pub use spawn::{head_summary, replayed, resume, spawn};
 pub use subscribers::SUBSCRIBER_CAPACITY;
 use subscribers::Subscribers;
@@ -65,6 +69,7 @@ struct Actor {
     state: SessionState,
     /// Durable frames, in seq order.
     journal: Vec<Frame>,
+    checkpoint_seq: Seq,
     seq: Seq,
     store: Option<Arc<dyn SessionStore>>,
     config: Arc<TurnConfig>,
@@ -89,6 +94,9 @@ struct Actor {
 
 impl Actor {
     async fn run(mut self) {
+        if self.seq > Seq::ZERO && self.checkpoint_seq == Seq::ZERO {
+            checkpoint::write(&self);
+        }
         let (held, mut flow) = match self.open().await {
             Ok(starting) => (self.serve_start(starting).await, Flow::Continue),
             Err(_) => (Vec::new(), Flow::Stop),
@@ -150,18 +158,25 @@ impl Actor {
                 reply,
             } => drop(reply.send(self.withdraw(intent, surface).await)),
             Msg::Answer(answered) => self.answer(answered).await?,
-            Msg::Attach { max_bytes, reply } => drop(reply.send(self.attached(max_bytes))),
+            Msg::Checkpointed { seq, result } => checkpoint::acknowledge(self, seq, result),
+            Msg::PastLoaded {
+                cut,
+                generation,
+                transcript,
+                request,
+            } => past::past_loaded(self, cut, generation, transcript, *request).await,
+            Msg::Attach { max_bytes, reply } => past::attach_read(self, max_bytes, reply),
             Msg::TailEvents { reply } => {
                 let seq = self.state.seq;
                 drop(reply.send((seq, self.subscribe(seq))));
             }
             Msg::EventsSince { since, reply } => drop(reply.send(self.subscribe(since))),
-            Msg::History { page, reply } => drop(reply.send(self.history(&page))),
+            Msg::History { page, reply } => past::history_read(self, page, reply),
             Msg::ItemForPin {
                 id,
                 generation,
                 reply,
-            } => drop(reply.send(self.item_for_pin(&id, generation))),
+            } => past::pin_read(self, id, generation, reply),
             Msg::Summary { reply } => drop(reply.send(self.stamped(self.state.summary.clone()))),
             Msg::Emit { turn, event } => self.emit(turn, *event).await?,
             Msg::Ask {
@@ -182,7 +197,7 @@ impl Actor {
             Msg::Invoke { call, reply } => self.invoke(call, reply).await?,
             Msg::CallAllowed { item, input } => self.call_allowed(&item, input).await?,
             Msg::CallFinished { outcome } => self.call_finished(outcome).await?,
-            Msg::Rewind { to_turn, reply } => drop(reply.send(self.rewind(&to_turn).await)),
+            Msg::Rewind { to_turn, reply } => past::rewind_read(self, to_turn, reply).await,
             Msg::Compact {
                 instructions,
                 reply,
@@ -434,17 +449,20 @@ impl Actor {
     /// Refused while a turn runs, whatever the turn is doing: an item the
     /// running turn is still writing is not one this can take back, and a
     /// child agent runs inside its parent's turn.
-    async fn rewind(&mut self, to_turn: &TurnId) -> Result<u32, KernelError> {
+    async fn rewind(
+        &mut self,
+        transcript: &Transcript,
+        to_turn: &TurnId,
+    ) -> Result<u32, KernelError> {
         if self.running.is_some() {
             return Err(KernelError::new(ErrorCode::NotReady, "a turn is running"));
         }
-        let dropped =
-            crate::rewind::dropped(self.state.transcript.items(), to_turn).ok_or_else(|| {
-                KernelError::new(
-                    ErrorCode::InvalidInput,
-                    format!("this session has no turn {to_turn}"),
-                )
-            })?;
+        let dropped = crate::rewind::dropped(transcript.items(), to_turn).ok_or_else(|| {
+            KernelError::new(
+                ErrorCode::InvalidInput,
+                format!("this session has no turn {to_turn}"),
+            )
+        })?;
         let count = dropped.len() as u32;
         self.record(ItemBody::Rewind {
             to_turn: to_turn.clone(),
@@ -621,7 +639,11 @@ impl Actor {
             }
             self.journal.push(frame.clone());
         }
+        let checkpoint = matches!(frame.event, Event::Compacted { .. });
         self.broadcast(frame);
+        if checkpoint {
+            checkpoint::write(self);
+        }
         Ok(self.seq)
     }
 
@@ -688,13 +710,19 @@ impl Actor {
                 .items()
                 .first()
                 .map(|item| item.id.clone()),
-            has_more: start > 0,
+            has_more: start > 0 || self.state.transcript.history().has_more,
             generation: self.state.transcript.generation(),
         };
         (snapshot, Some(history))
     }
 
     fn subscribe(&mut self, since: Seq) -> FrameStream {
+        if since < self.checkpoint_seq
+            && let Some(store) = self.store.clone()
+        {
+            let live = self.subscribers.add(self.id.clone(), Vec::new());
+            return past::catch_up(store, self.id.clone(), since, self.seq.next(), live);
+        }
         let replay: Vec<Frame> = self
             .journal
             .iter()
@@ -756,121 +784,6 @@ impl Actor {
         let id = item.id.clone();
         self.publish(Event::ItemCompleted { item }, None).await?;
         Ok(id)
-    }
-
-    fn history(&self, page: &HistoryPage) -> Result<HistoryChunk, KernelError> {
-        self.check_generation(page.generation)?;
-        let items = self.state.transcript.items();
-        let end = match page.before.as_ref() {
-            Some(before) => match items.iter().position(|item| &item.id == before) {
-                Some(index) => index,
-                None if page.max_bytes.is_some() => {
-                    return Err(KernelError::new(
-                        ErrorCode::StaleGeneration,
-                        "the history cursor is no longer present",
-                    ));
-                }
-                None => items.len(), // Legacy unbounded callers keep their old behavior.
-            },
-            None => items.len(),
-        };
-        let limit = if page.limit == 0 { end } else { page.limit };
-        let Some(max_bytes) = page.max_bytes else {
-            let start = end.saturating_sub(limit);
-            return Ok(HistoryChunk {
-                items: items[start..end]
-                    .iter()
-                    .map(|item| item.as_ref().clone())
-                    .collect(),
-                next: (start > 0).then(|| items[start].id.clone()),
-                generation: self.state.transcript.generation(),
-                oversized: None,
-            });
-        };
-        self.bounded_history(items, end, limit, max_bytes)
-    }
-
-    fn bounded_history(
-        &self,
-        items: &[Arc<Item>],
-        end: usize,
-        limit: usize,
-        max_bytes: usize,
-    ) -> Result<HistoryChunk, KernelError> {
-        let mut start = end;
-        let mut used = 256usize; // JSON-RPC envelope, generation and cursor.
-        while start > 0 && end - start < limit {
-            let size = serde_json::to_vec(items[start - 1].as_ref())
-                .map_err(|error| {
-                    KernelError::new(
-                        ErrorCode::Internal,
-                        format!("item cannot serialize: {error}"),
-                    )
-                })?
-                .len();
-            if used.saturating_add(size + 1) > max_bytes {
-                break;
-            }
-            used += size + 1;
-            start -= 1;
-        }
-        let slice = &items[start..end];
-        let oversized = if slice.is_empty() && start > 0 {
-            let item = &items[start - 1];
-            let raw = serde_json::to_vec(item.as_ref()).map_err(|error| {
-                KernelError::new(
-                    ErrorCode::Internal,
-                    format!("item cannot serialize: {error}"),
-                )
-            })?;
-            Some(OversizedItem {
-                id: item.id.clone(),
-                total_bytes: raw.len(),
-                checksum: fnv1a64(&raw),
-            })
-        } else {
-            None
-        };
-        Ok(HistoryChunk {
-            items: slice.iter().map(|item| item.as_ref().clone()).collect(),
-            next: (start > 0)
-                .then(|| {
-                    slice
-                        .first()
-                        .map(|item| &item.id)
-                        .or_else(|| oversized.as_ref().map(|item| &item.id))
-                })
-                .flatten()
-                .cloned(),
-            generation: self.state.transcript.generation(),
-            oversized,
-        })
-    }
-
-    fn check_generation(&self, generation: Option<u64>) -> Result<(), KernelError> {
-        if generation.is_some_and(|generation| generation != self.state.transcript.generation()) {
-            return Err(KernelError::new(
-                ErrorCode::StaleGeneration,
-                "history changed",
-            ));
-        }
-        Ok(())
-    }
-
-    fn item_for_pin(&self, id: &ItemId, generation: u64) -> Result<Item, KernelError> {
-        self.check_generation(Some(generation))?;
-        self.state
-            .transcript
-            .items()
-            .iter()
-            .find(|item| &item.id == id)
-            .map(|item| item.as_ref().clone())
-            .ok_or_else(|| {
-                KernelError::new(
-                    ErrorCode::StaleGeneration,
-                    format!("item {id} is no longer present"),
-                )
-            })
     }
 
     async fn turn_finished(&mut self, turn: TurnId, outcome: Ended) -> Result<Flow, KernelError> {
@@ -958,7 +871,11 @@ impl Actor {
             self.reject(intent, ErrorCode::SessionClosed, "the session is closed")
                 .await?;
         }
+        let checkpoint = matches!(reason, CloseReason::Client | CloseReason::Shutdown);
         self.publish(Event::SessionClosed { reason }, None).await?;
+        if checkpoint {
+            checkpoint::write(self);
+        }
         self.subscribers.clear();
         self.session_hooks(Phase::End);
         Ok(Flow::Stop)
