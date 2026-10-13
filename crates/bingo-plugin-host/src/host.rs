@@ -101,7 +101,17 @@ impl Operations<'_> {
     }
 
     async fn get(&self, params: StateGet) -> Result<Value, RpcError> {
-        serde_json::to_value(self.state.get(params.scope, params.key).await?).map_err(failed)
+        let value = self
+            .state
+            .get(params.scope.clone(), params.key.clone())
+            .await?;
+        crate::state::ReadLog::record(crate::state::Read {
+            plugin: self.plugin.into(),
+            scope: params.scope,
+            key: params.key,
+            version: value.as_ref().map(|value| value.version),
+        });
+        serde_json::to_value(value).map_err(failed)
     }
     async fn set(&self, params: StateSet) -> Result<Value, RpcError> {
         serde_json::to_value(
@@ -170,4 +180,14 @@ fn parse<T: serde::de::DeserializeOwned>(params: Value) -> Result<T, RpcError> {
 }
 fn failed(error: impl std::fmt::Display) -> RpcError {
     RpcError::new(INTERNAL_ERROR, error.to_string())
+}
+
+/// Wire faces report conflicts in words while the protocol door keeps its data.
+pub fn error_message(error: RpcError) -> String {
+    match error.data {
+        Some(data) if data.get("version").is_some() => {
+            format!("{}; held version: {}", error.message, data["version"])
+        }
+        _ => error.message,
+    }
 }

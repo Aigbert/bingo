@@ -94,6 +94,7 @@ impl std::fmt::Debug for Running {
 /// to send either, and who answers the one thing it may ask.
 #[derive(Debug, Default)]
 struct Router {
+    stopped: bingo_sdk::CancellationToken,
     #[cfg(test)]
     alive: AtomicBool,
     /// Set by whoever first reports the death, so it is reported once.
@@ -222,6 +223,7 @@ impl Router {
     /// The pipe closed: nothing more will ever arrive, so everything waiting
     /// fails now rather than never.
     fn closed(&self) {
+        self.stopped.cancel();
         #[cfg(test)]
         self.alive.store(false, Ordering::Release);
         self.running().clear();
@@ -341,6 +343,10 @@ impl Connection {
     }
 
     /// Whether the process is still on the other end of the pipe.
+    pub(crate) fn permits(&self, method: &str) -> bool {
+        self.router.permits(method)
+    }
+
     pub fn is_alive(&self) -> bool {
         self.peer.is_alive()
     }
@@ -351,6 +357,13 @@ impl Connection {
         !self.is_alive() && !self.router.announced.swap(true, Ordering::AcqRel)
     }
 
+    pub(crate) fn hold_chain(&self, chain: &str) -> Option<crate::context::Held> {
+        self.router
+            .serving
+            .as_ref()
+            .map(|serving| serving.calls.contexts.hold(chain))
+    }
+
     /// Ask, and wait for the answer or for the process to end.
     pub async fn request(&self, method: &str, params: Value) -> Reply {
         if method != name::INITIALIZE
@@ -359,7 +372,7 @@ impl Connection {
             serving.calls.permits(method)?;
         }
         self.peer
-            .request(method, params)
+            .request(method, crate::context::outgoing(params))
             .await
             .map_err(|error| match error {
                 PeerError::Remote(error) => error,
@@ -378,7 +391,7 @@ impl Connection {
         {
             return;
         }
-        if let Err(why) = self.peer.notify(method, params) {
+        if let Err(why) = self.peer.notify(method, crate::context::outgoing(params)) {
             tracing::debug!(plugin = %self.plugin, method, %why, "a notification went nowhere");
         }
     }
@@ -429,7 +442,12 @@ impl Connection {
 
     /// End the process. The host is closing, or the plugin refused the
     /// handshake and will never be spoken to again.
+    pub(crate) fn stopped(&self) -> bingo_sdk::CancellationToken {
+        self.router.stopped.clone()
+    }
+
     pub async fn stop(&self) {
+        self.router.stopped.cancel();
         self.peer.close();
         let mut child = self.child.lock().await;
         if let Err(error) = child.start_kill() {

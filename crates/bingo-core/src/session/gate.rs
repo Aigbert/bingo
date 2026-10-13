@@ -19,6 +19,7 @@ pub(super) enum Kind {
 }
 
 struct Waiting {
+    calling: Vec<invocation::CallingHook>,
     intent: IntentId,
     input: Input,
     kind: Kind,
@@ -91,6 +92,7 @@ pub(crate) enum Verdict {
 
 pub(super) fn gate_input(actor: &mut Actor, intent: IntentId, input: Input, kind: Kind) {
     let waiting = Waiting {
+        calling: invocation::current(),
         intent,
         input,
         kind,
@@ -119,7 +121,8 @@ fn start_gate(actor: &mut Actor) {
     let hooks = actor.config.hooks.clone();
     let cx = actor.hook_context();
     let mailbox = actor.mailbox.clone();
-    actor.tracker.spawn(async move {
+    let calling = waiting.calling.clone();
+    actor.tracker.spawn(invocation::scope(calling, async move {
         let intent = waiting.intent.clone();
         let report = crate::chain::Report::default();
         let work =
@@ -137,7 +140,7 @@ fn start_gate(actor: &mut Actor) {
             let _ = mailbox.record(notice).await;
         }
         mailbox.send(Msg::Gated { intent, verdict });
-    });
+    }));
 }
 
 pub(super) async fn gated(

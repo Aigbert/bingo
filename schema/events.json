@@ -1460,6 +1460,723 @@
         "answer": true
       }
     },
+    "model.complete": {
+      "kind": "chain",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Complete",
+        "type": "object",
+        "properties": {
+          "plugin": {
+            "type": "string"
+          },
+          "request": {
+            "$ref": "#/$defs/ModelRequest"
+          }
+        },
+        "required": [
+          "plugin",
+          "request"
+        ],
+        "$defs": {
+          "ModelRequest": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string"
+              },
+              "maxTokens": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0
+              },
+              "system": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/SystemBlock"
+                }
+              },
+              "messages": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/Message"
+                }
+              },
+              "tools": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ToolSpec"
+                }
+              },
+              "reasoning": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Effort"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "session": {
+                "description": "Whose turn this is. A stateless provider ignores it; one that keeps a\nconversation of its own per session — an ACP adapter holding one agent\nsession per bingo session (ADR-0035 §3), a stateful wire like the\nResponses API — has no other way to know which conversation it is\nanswering. `None` is a request built by hand or a side question, which\nbelongs to no session.",
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/SessionId"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "providerOptions": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            },
+            "required": [
+              "model",
+              "maxTokens",
+              "system",
+              "messages",
+              "tools"
+            ]
+          },
+          "SystemBlock": {
+            "description": "One cacheable segment of the system prompt.",
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "cache": {
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "required": [
+              "text"
+            ]
+          },
+          "Message": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "$ref": "#/$defs/Role"
+              },
+              "parts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ContentPart"
+                }
+              },
+              "providerOptions": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            },
+            "required": [
+              "role",
+              "parts"
+            ]
+          },
+          "Role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "ContentPart": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "text"
+                  }
+                },
+                "required": [
+                  "type",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "image"
+                  }
+                },
+                "$ref": "#/$defs/Image",
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "input": true,
+                  "type": {
+                    "type": "string",
+                    "const": "toolUse"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id",
+                  "name",
+                  "input"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "toolUseId": {
+                    "type": "string"
+                  },
+                  "parts": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/ContentPart"
+                    }
+                  },
+                  "isError": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "toolResult"
+                  }
+                },
+                "required": [
+                  "type",
+                  "toolUseId",
+                  "parts"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "providerMetadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "reasoning"
+                  }
+                },
+                "required": [
+                  "type",
+                  "text"
+                ]
+              }
+            ]
+          },
+          "Image": {
+            "description": "A picture handed to the model, already the shape the journal keeps and a\nprovider's request encodes: one struct, so a surface that reads a picture\noff disk, a wire client that already holds the bytes, and a tool result\nthat returns one all produce the same thing.",
+            "type": "object",
+            "properties": {
+              "mediaType": {
+                "type": "string"
+              },
+              "data": {
+                "description": "Base64 payload.",
+                "type": "string"
+              },
+              "width": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0
+              },
+              "height": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0
+              },
+              "path": {
+                "description": "Where the same bytes are on this machine, when they are anywhere: a\npicture read off a disk, or one a surface wrote before handing it on\n(ADR-0052). A location, not a second copy — absent from the wire and\nthe journal when there is none, so a picture without one is the\nbytes it always was.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "mediaType",
+              "data"
+            ]
+          },
+          "ToolSpec": {
+            "description": "A tool as the model sees it.",
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "inputSchema": true,
+              "meta": {
+                "description": "What a catalogue may show beside the tool (an MCP tool's `server`);\nnever sent to a model.",
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "name",
+              "description",
+              "inputSchema"
+            ]
+          },
+          "Effort": {
+            "description": "Reasoning effort, in the vocabulary providers converge on.",
+            "type": "string",
+            "enum": [
+              "minimal",
+              "low",
+              "medium",
+              "high",
+              "xHigh",
+              "max"
+            ]
+          },
+          "SessionId": {
+            "description": "One persisted context: one journal, one actor.",
+            "type": "string"
+          }
+        }
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Array_of_ModelEvent",
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ModelEvent"
+        },
+        "$defs": {
+          "ModelEvent": {
+            "description": "Provider stream events. Never published; the accumulator folds them into items.",
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "warnings": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "streamStart"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "model": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "responseMetadata"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "textStart"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "delta": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "textDelta"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id",
+                  "delta"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "textEnd"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "reasoningStart"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "delta": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "reasoningDelta"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id",
+                  "delta"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "providerMetadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "reasoningEnd"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "toolInputStart"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id",
+                  "name"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "delta": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "toolInputDelta"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id",
+                  "delta"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "toolInputEnd"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ]
+              },
+              {
+                "description": "The complete call. `input` is the raw JSON text; the loop parses it once.",
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "input": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "toolCall"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id",
+                  "name",
+                  "input"
+                ]
+              },
+              {
+                "description": "What the endpoint says it is holding for this session: its own count,\nagainst its own window (ADR-0055 §2). Sent as often as it likes; the\nlast one of a round is what that round reports.",
+                "type": "object",
+                "properties": {
+                  "used": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "window": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "context"
+                  }
+                },
+                "required": [
+                  "type",
+                  "used",
+                  "window"
+                ]
+              },
+              {
+                "description": "A cut the endpoint made in the context it holds (ADR-0055 §3). The\njournal lost nothing by it: it is a row, not a rewrite.",
+                "type": "object",
+                "properties": {
+                  "before": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "after": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "compacted"
+                  }
+                },
+                "required": [
+                  "type",
+                  "before",
+                  "after"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "usage": {
+                    "$ref": "#/$defs/Usage"
+                  },
+                  "finishReason": {
+                    "$ref": "#/$defs/FinishReason"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "finish"
+                  }
+                },
+                "required": [
+                  "type",
+                  "usage",
+                  "finishReason"
+                ]
+              }
+            ]
+          },
+          "Usage": {
+            "description": "Token counts as the provider reports them, the three input counts kept\napart: `input_tokens` is what the model read fresh, the cache counts are\nwhat it read from or wrote to a cached prefix. The whole input side is\n`input_total()`.",
+            "type": "object",
+            "properties": {
+              "inputTokens": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0
+              },
+              "outputTokens": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0
+              },
+              "cacheReadTokens": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0,
+                "default": 0
+              },
+              "cacheWriteTokens": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0,
+                "default": 0
+              },
+              "reasoningTokens": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0,
+                "default": 0
+              }
+            },
+            "required": [
+              "inputTokens",
+              "outputTokens"
+            ]
+          },
+          "FinishReason": {
+            "type": "object",
+            "properties": {
+              "unified": {
+                "$ref": "#/$defs/UnifiedFinish"
+              },
+              "raw": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "unified"
+            ]
+          },
+          "UnifiedFinish": {
+            "type": "string",
+            "enum": [
+              "stop",
+              "length",
+              "toolCalls",
+              "contentFilter",
+              "error",
+              "other"
+            ]
+          }
+        }
+      },
+      "matcher": [
+        "plugin"
+      ],
+      "pinned": [
+        "/plugin"
+      ],
+      "acts": {
+        "deny": true,
+        "rewrite": true,
+        "answer": true
+      }
+    },
     "turn.step": {
       "kind": "chain",
       "input": {

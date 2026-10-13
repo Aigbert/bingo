@@ -302,3 +302,9 @@ fn listing_includes_explicit_modules_without_starting_them() {
         "{text}"
     );
 }
+
+#[path = "support/reentry.rs"]
+mod reentry;
+
+#[path = "support/nouns.rs"]
+mod nouns;

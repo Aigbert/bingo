@@ -11,15 +11,38 @@ use std::sync::Arc;
 
 tokio::task_local! { static CALLER: Caller; }
 #[derive(Clone)]
-struct Caller {
-    plugin: String,
-    host: HostHandle,
-    state: Store,
+pub struct Caller {
+    pub plugin: String,
+    pub host: HostHandle,
+    pub state: Store,
 }
+pub fn caller() -> Result<Caller, String> {
+    CALLER
+        .try_with(Clone::clone)
+        .map_err(|_| "plugin operation has no caller".into())
+}
+pub async fn scope<T>(
+    host: &HostHandle,
+    plugin: &str,
+    state: &Store,
+    future: impl std::future::Future<Output = T>,
+) -> T {
+    CALLER
+        .scope(
+            Caller {
+                plugin: plugin.into(),
+                host: host.clone(),
+                state: state.clone(),
+            },
+            future,
+        )
+        .await
+}
+
 struct Ops(&'static str);
 
 pub fn install(host: &HostHandle) -> Result<(), KernelError> {
-    for noun in ["state", "store", "ui", "model", "session"] {
+    for noun in ["state", "store", "ui", "session"] {
         let key = key(noun);
         if host.service_wire(&key).is_none() {
             host.open_service(&key, Arc::new(Ops(noun)))?;
@@ -47,6 +70,16 @@ pub async fn call(
         return CALLER.scope(caller, service(host, plugin, params)).await;
     }
     let (noun, verb) = admit(host, plugin, method, &params).await?;
+    if method == "host/model/complete" {
+        return Operations {
+            plugin,
+            host,
+            state,
+        }
+        .answer(method, params)
+        .await
+        .map_err(crate::host::error_message);
+    }
     let wire = host
         .service_wire(&key(noun))
         .ok_or_else(|| format!("{noun}: host face is unavailable"))?;
@@ -55,18 +88,19 @@ pub async fn call(
         host: host.clone(),
         state: state.clone(),
     };
+    let params = bind(plugin, &key(noun), params)?;
     CALLER
         .scope(caller, wire.call(verb, params))
         .await
         .map_err(|error| error.to_string())
 }
 /// Both transports consult the same catalogue grant before a host operation.
-pub async fn admit(
+pub async fn admit<'a>(
     host: &HostHandle,
     plugin: &str,
-    method: &str,
+    method: &'a str,
     params: &Value,
-) -> Result<(&'static str, &'static str), String> {
+) -> Result<(&'a str, &'a str), String> {
     let (noun, verb) =
         route(method, params).ok_or_else(|| format!("the host does not serve {method}"))?;
     let grant = granted(host, plugin).await?;
@@ -87,13 +121,18 @@ async fn service(host: &HostHandle, plugin: &str, params: Value) -> Result<Value
         .service_wire(key)
         .ok_or_else(|| format!("service {key} is unavailable"))?;
     crate::grant::admit_service(host, plugin, key, method, wire.as_ref()).await?;
+    let input = bind(
+        plugin,
+        key,
+        params.get("params").cloned().unwrap_or(Value::Null),
+    )?;
     let result = wire
-        .call(method, params.get("params").cloned().unwrap_or(Value::Null))
+        .call(method, input)
         .await
         .map_err(|error| error.to_string())?;
     Ok(json!({"result":result}))
 }
-fn route(method: &str, params: &Value) -> Option<(&'static str, &'static str)> {
+fn route<'a>(method: &'a str, params: &Value) -> Option<(&'a str, &'a str)> {
     let state = if params.get("scope").and_then(Value::as_str) == Some("global") {
         "store"
     } else {
@@ -106,7 +145,7 @@ fn route(method: &str, params: &Value) -> Option<(&'static str, &'static str)> {
         "host/model/complete" => Some(("model", "complete")),
         "host/extend" => Some(("session", "extend")),
         "host/deliver" => Some(("session", "deliver")),
-        _ => None,
+        _ => method.strip_prefix("host/")?.split_once('/'),
     }
 }
 fn wire_method(noun: &str, verb: &str) -> Option<&'static str> {
@@ -114,7 +153,6 @@ fn wire_method(noun: &str, verb: &str) -> Option<&'static str> {
         ("state" | "store", "get") => Some("host/state/get"),
         ("state" | "store", "set") => Some("host/state/set"),
         ("ui", "status") => Some("host/place"),
-        ("model", "complete") => Some("host/model/complete"),
         ("session", "extend") => Some("host/extend"),
         ("session", "deliver") => Some("host/deliver"),
         _ => None,
@@ -129,7 +167,6 @@ impl WireService for Ops {
                 .method::<StateGet, Option<StateValue>>("get", false)
                 .method::<StateSet, StateValue>("set", false),
             "ui" => face.method::<Place, ()>("status", false),
-            "model" => face.method::<Complete, Completed>("complete", true),
             "session" => face
                 .method::<Extend, ()>("extend", false)
                 .method::<Deliver, ()>("deliver", false),
@@ -154,6 +191,20 @@ impl WireService for Ops {
         }
         .answer(method, params)
         .await
-        .map_err(|error| ServiceError(error.message))
+        .map_err(|error| ServiceError(crate::host::error_message(error)))
     }
+}
+
+/// The adapter binds identity before the chain may rewrite an operation.
+pub fn bind(plugin: &str, key: &str, mut input: Value) -> Result<Value, String> {
+    if !key.starts_with("bingo.plugin.") {
+        return Ok(input);
+    }
+    if let Some(object) = input.as_object_mut() {
+        if object.get("plugin").is_some_and(|owner| owner != plugin) {
+            return Err("a plugin may not operate on another plugin's state".into());
+        }
+        object.insert("plugin".into(), Value::String(plugin.into()));
+    }
+    Ok(input)
 }

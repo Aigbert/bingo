@@ -64,6 +64,28 @@ export type View = ({ "kind": "text"; "text": string; [key: string]: unknown; } 
 export type Payload = { "display"?: (View | null); "isError"?: boolean; "parts": Array<ContentPart>; [key: string]: unknown; };
 }
 export type ToolCall = ToolCallInput.Payload;
+export namespace ModelCompleteInput {
+// Generated from JSON Schema. Do not edit.
+export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
+export type Effort = ("minimal" | "low" | "medium" | "high" | "xHigh" | "max");
+export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
+export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
+export type ModelRequest = { "maxTokens": number; "messages": Array<Message>; "model": string; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "reasoning"?: (Effort | null); "session"?: (SessionId | null); "system": Array<SystemBlock>; "tools": Array<ToolSpec>; [key: string]: unknown; };
+export type Role = ("user" | "assistant");
+export type SessionId = string;
+export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
+export type ToolSpec = { "description": string; "inputSchema": unknown; "meta"?: { [key: string]: unknown; }; "name": string; [key: string]: unknown; };
+export type Payload = { "plugin": string; "request": ModelRequest; [key: string]: unknown; };
+}
+export namespace ModelCompleteResult {
+// Generated from JSON Schema. Do not edit.
+export type FinishReason = { "raw"?: (string | null); "unified": UnifiedFinish; [key: string]: unknown; };
+export type ModelEvent = ({ "type": "streamStart"; "warnings"?: Array<string>; [key: string]: unknown; } | { "id"?: (string | null); "model"?: (string | null); "type": "responseMetadata"; [key: string]: unknown; } | { "id": string; "type": "textStart"; [key: string]: unknown; } | { "delta": string; "id": string; "type": "textDelta"; [key: string]: unknown; } | { "id": string; "type": "textEnd"; [key: string]: unknown; } | { "id": string; "type": "reasoningStart"; [key: string]: unknown; } | { "delta": string; "id": string; "type": "reasoningDelta"; [key: string]: unknown; } | { "id": string; "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "type": "reasoningEnd"; [key: string]: unknown; } | { "id": string; "name": string; "type": "toolInputStart"; [key: string]: unknown; } | { "delta": string; "id": string; "type": "toolInputDelta"; [key: string]: unknown; } | { "id": string; "type": "toolInputEnd"; [key: string]: unknown; } | { "id": string; "input": string; "name": string; "type": "toolCall"; [key: string]: unknown; } | { "type": "context"; "used": number; "window": number; [key: string]: unknown; } | { "after": number; "before": number; "type": "compacted"; [key: string]: unknown; } | { "finishReason": FinishReason; "type": "finish"; "usage": Usage; [key: string]: unknown; });
+export type UnifiedFinish = ("stop" | "length" | "toolCalls" | "contentFilter" | "error" | "other");
+export type Usage = { "cacheReadTokens"?: number; "cacheWriteTokens"?: number; "inputTokens": number; "outputTokens": number; "reasoningTokens"?: number; [key: string]: unknown; };
+export type Payload = Array<ModelEvent>;
+}
+export type ModelComplete = ModelCompleteInput.Payload;
 export namespace TurnStepInput {
 // Generated from JSON Schema. Do not edit.
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
@@ -371,6 +393,7 @@ export interface EventInputs {
   "prompt.submit": PromptSubmitInput.Payload;
   "tool.check": ToolCheckInput.Payload;
   "tool.call": ToolCallInput.Payload;
+  "model.complete": ModelCompleteInput.Payload;
   "turn.step": TurnStepInput.Payload;
   "prompt.compose": PromptComposeInput.Payload;
   "session.compact": SessionCompactInput.Payload;
@@ -397,6 +420,7 @@ export interface EventResults {
   "prompt.submit": PromptSubmitResult.Payload;
   "tool.check": ToolCheckResult.Payload;
   "tool.call": ToolCallResult.Payload;
+  "model.complete": ModelCompleteResult.Payload;
   "turn.step": TurnStepResult.Payload;
   "prompt.compose": PromptComposeResult.Payload;
   "session.compact": SessionCompactResult.Payload;

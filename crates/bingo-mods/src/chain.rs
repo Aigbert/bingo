@@ -106,6 +106,7 @@ impl Chain<'_> {
             self.engine.hook_time().as_millis()
         };
         let site = json!({"session":self.cx.session, "turn":self.cx.turn, "item":self.cx.item, "cwd":self.cx.cwd,
+            "plugin":{"name":self.module.found.name,"root":self.module.found.root},
             "hook":hook, "recover":error.is_some(), "called":pending.is_some(), "budget":{"ms":ms,"remainingMs":ms},
             "error":error.map(|error| json!({"kind":error.kind,"message":error.message})),
             "origin":{"plugin":self.module.found.name,"tier":self.tier}});
@@ -117,7 +118,7 @@ impl Chain<'_> {
                     let result = if operation.method == "next" {
                         self.continue_with(position, input, operation.params, pending).await
                     } else {
-                        link::operation(&self.module, &self.cx, hook, &operation.method, operation.params).await
+                        call.reads.scope(link::operation(&self.module, &self.cx, hook, &operation.method, operation.params)).await
                     };
                     let _ = operation.reply.send(result);
                 }

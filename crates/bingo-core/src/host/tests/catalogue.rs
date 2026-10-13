@@ -146,6 +146,16 @@ async fn a_denied_setting_changes_neither_the_session_nor_the_file() {
     let mut client = super::commands::Client::open(&host).await;
     let session = client.state.summary.id.clone();
     let before = host.session_model(&session).await.unwrap().unwrap().id;
+    let refused = host
+        .reconfigure(
+            &session,
+            SessionChange::Model {
+                provider: None,
+                model: "changed".into(),
+            },
+        )
+        .await;
+    assert!(refused.is_err(), "direct reconfigure bypassed config.set");
     let (outcome, _) = client.ack("/model changed").await;
     assert!(matches!(outcome, IntentOutcome::Rejected { .. }));
     assert_eq!(

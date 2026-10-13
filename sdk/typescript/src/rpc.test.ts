@@ -67,3 +67,25 @@ test('catalogue subscriptions wrap a service event added after initialization', 
   assert.equal(observed, 1);
   app.close();
 });
+
+test('invocation context follows concurrent reverse calls without entering payloads', async () => {
+  const messages: any[] = [];
+  const peer = new Peer(message => messages.push(message));
+  const release: (() => void)[] = [];
+  peer.handlers.set('hook', async params => {
+    assert.deepEqual(params, { value: 1 });
+    await new Promise<void>(resolve => release.push(resolve));
+    peer.notify('reverse', { value: 2 });
+  });
+  const first = peer.receive({ method: 'hook', params: { value: 1, _bingo: { hook: 1 } } });
+  const second = peer.receive({ method: 'hook', params: { value: 1, _bingo: { hook: 2 } } });
+  release[1]();
+  await second;
+  release[0]();
+  await first;
+  assert.deepEqual(messages.map(message => message.params._bingo), [{ hook: 2 }, { hook: 1 }]);
+  peer.notify('outside', { value: 3 });
+  assert.deepEqual(messages.at(-1).params, { value: 3 });
+  peer.handlers.set('plain', params => assert.equal(params, null));
+  await peer.receive({ method: 'plain', params: null });
+});

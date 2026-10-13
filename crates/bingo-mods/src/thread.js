@@ -8,9 +8,13 @@ export async function run(event, input, site, ask, cancelled, remaining) {
     return answer.value;
   };
   const location = JSON.parse(site);
+  if (location.callback !== undefined) {
+    const api = dollar({request:(method, params) => request(method, params, 4294967295)}, location, location.plugin, callbacks);
+    return JSON.stringify(await callbacks.run(location.callback, api, JSON.parse(input)));
+  }
   if (location.hook !== undefined) {
     const entry = hooks.entries[location.hook];
-    const api = dollar({request:(method, params) => request(method, params, location.hook)}, location);
+    const api = dollar({request:(method, params) => request(method, params, location.hook)}, location, location.plugin, callbacks);
     let called = !!location.called;
     let continuation;
     const next = Object.assign(async value => {
@@ -29,7 +33,7 @@ export async function run(event, input, site, ask, cancelled, remaining) {
     return JSON.stringify({answered:result !== undefined, value:result ?? null});
   }
   const entries = hooks.entries.filter((entry, index) => patternMatches(entry.pattern, event) && !(location.skip ?? []).includes(index));
-  const result = await hooks.dispatch(entries, 0, JSON.parse(input), dollar({ request }, location),
-    location.origin, controller.signal, value => request('next', value), entry => dollar({request: (method, params) => request(method, params, hooks.entries.indexOf(entry))}, location));
+  const result = await hooks.dispatch(entries, 0, JSON.parse(input), dollar({ request }, location, location.plugin, callbacks),
+    location.origin, controller.signal, value => request('next', value), entry => dollar({request: (method, params) => request(method, params, hooks.entries.indexOf(entry))}, location, location.plugin, callbacks));
   return JSON.stringify(result ?? null);
 }

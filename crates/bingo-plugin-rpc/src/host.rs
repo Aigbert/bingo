@@ -12,6 +12,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 pub struct Server {
+    pub(crate) contexts: crate::context::Chains,
     plugin: String,
     host: HostHandle,
     service: Arc<dyn ServiceCalls>,
@@ -27,6 +28,7 @@ impl Server {
         state: crate::state::Store,
     ) -> Self {
         Self {
+            contexts: Default::default(),
             plugin: plugin.into(),
             host,
             service,
@@ -58,7 +60,26 @@ impl Server {
         ))
     }
 
-    pub async fn answer(&self, method: &str, params: Value) -> Result<Value, RpcError> {
+    pub async fn answer(&self, method: &str, mut params: Value) -> Result<Value, RpcError> {
+        let context = params
+            .as_object_mut()
+            .and_then(|params| params.remove("_bingo"));
+        let context = context
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(failed)?
+            .unwrap_or_default();
+        let reads = self.contexts.reads(&context);
+        let calling = self.contexts.bind(&self.plugin, context).map_err(failed)?;
+        reads
+            .scope(bingo_plugin_host::invocation::scope(
+                calling,
+                self.answer_bound(method, params),
+            ))
+            .await
+    }
+
+    async fn answer_bound(&self, method: &str, params: Value) -> Result<Value, RpcError> {
         if !crate::wire::capabilities().contains(method) {
             return Err(unknown(method));
         }
@@ -69,11 +90,32 @@ impl Server {
             .map_err(failed)?;
         self.permits(method)?;
         if method == name::SERVICE_CALL {
-            return self.service.call(params).await;
+            return bingo_plugin_host::ops::scope(
+                &self.host,
+                &self.plugin,
+                &self.state,
+                self.service.call(params),
+            )
+            .await;
         }
-        bingo_plugin_host::ops::admit(&self.host, &self.plugin, method, &params)
+        let (noun, _) = bingo_plugin_host::ops::admit(&self.host, &self.plugin, method, &params)
             .await
             .map_err(failed)?;
+        if self
+            .host
+            .service_wire(&format!("bingo.plugin.{noun}"))
+            .is_some()
+        {
+            return bingo_plugin_host::ops::call(
+                &self.host,
+                &self.plugin,
+                &self.state,
+                method,
+                params,
+            )
+            .await
+            .map_err(failed);
+        }
         bingo_plugin_host::host::Operations {
             plugin: &self.plugin,
             host: &self.host,

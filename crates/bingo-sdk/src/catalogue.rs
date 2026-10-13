@@ -127,6 +127,7 @@ catalogue! {
     PROMPT_SUBMIT: "prompt.submit", Chain, crate::Input => crate::SubmitResult, &[], &[], PASS;
     TOOL_CHECK: "tool.check", Chain, ToolCall => crate::CheckResult, &["tool"], &["/tool", "/tool_use_id"], PASS;
     TOOL_CALL: "tool.call", Chain, ToolCall => crate::ToolOutput, &["tool"], &["/tool", "/tool_use_id"], WRAP;
+    MODEL_COMPLETE: "model.complete", Chain, Complete => Vec<crate::ModelEvent>, &["plugin"], &["/plugin"], WRAP;
     TURN_STEP: "turn.step", Chain, crate::ModelRequest => Result<Vec<crate::ModelEvent>, crate::ProviderError>, &[], &[], WRAP;
     PROMPT_COMPOSE: "prompt.compose", Chain, crate::ModelRequest => crate::ModelRequest, &[], &[], WRAP;
     SESSION_COMPACT: "session.compact", Chain, crate::CompactInput => Result<crate::Compaction, crate::CompactError>, &[], &[], WRAP;

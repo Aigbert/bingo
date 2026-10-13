@@ -8,6 +8,24 @@ use std::sync::Arc;
 
 #[async_trait]
 impl HostApi for TestHost {
+    async fn complete(
+        &self,
+        session: &SessionId,
+        turn: Option<&TurnId>,
+        request: Completion,
+    ) -> Result<Vec<ModelEvent>, KernelError> {
+        self.record(HostCall::Complete {
+            session: session.clone(),
+            turn: turn.cloned(),
+            request: request.clone(),
+        });
+        let script = locked(&self.inner.scripts).complete.clone();
+        if let Some(script) = script {
+            return script((session.clone(), turn.cloned(), request)).await;
+        }
+        NoHost.complete(session, turn, request).await
+    }
+
     async fn sessions(&self, filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
         self.record(HostCall::Sessions {
             filter: filter.clone(),

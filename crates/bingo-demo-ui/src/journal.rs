@@ -5,12 +5,31 @@
 //! the journal carries.
 
 use bingo_sdk::{
-    ClientIdentity, ErrorCode, Event, Frame, Hook, HookContext, HookMatcher, HookPoint, HostHandle,
-    ItemBody, ItemId, KernelError, Level, OpenOptions, SessionId, SessionSelector, SessionState,
-    View,
+    Attachment, ClientIdentity, ErrorCode, Event, Frame, FrameStream, Hook, HookContext,
+    HookMatcher, HookPoint, HostHandle, ItemBody, ItemId, KernelError, Level, OpenOptions,
+    SessionId, SessionSelector, SessionState, View,
 };
 
 use crate::board::Board;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, LazyLock, Mutex, Weak},
+};
+
+type Writers = BTreeMap<SessionId, Weak<tokio::sync::Mutex<()>>>;
+static WRITERS: LazyLock<Mutex<Writers>> = LazyLock::new(Mutex::default);
+
+// Ownership carries no board state: the journal remains the only board.
+fn writer(session: &SessionId) -> Arc<tokio::sync::Mutex<()>> {
+    let mut writers = WRITERS.lock().unwrap_or_else(|error| error.into_inner());
+    writers.retain(|_, writer| writer.strong_count() > 0);
+    if let Some(writer) = writers.get(session).and_then(Weak::upgrade) {
+        return writer;
+    }
+    let writer = Arc::new(tokio::sync::Mutex::new(()));
+    writers.insert(session.clone(), Arc::downgrade(&writer));
+    writer
+}
 
 /// The plugin this state belongs to, and the kinds within it.
 pub const PLUGIN: &str = "bingo.demo.ui";
@@ -27,19 +46,21 @@ pub async fn read(host: &HostHandle, session: &SessionId) -> Result<Board, Kerne
 }
 
 async fn snapshot(host: &HostHandle, session: &SessionId) -> Result<SessionState, KernelError> {
-    let attachment = host
-        .open(
-            SessionSelector::ById {
-                id: session.clone(),
-            },
-            ClientIdentity {
-                name: "demo-ui".into(),
-                surface: "demo-ui".into(),
-            },
-            OpenOptions::default(),
-        )
-        .await?;
-    Ok(attachment.snapshot)
+    Ok(attachment(host, session).await?.snapshot)
+}
+
+async fn attachment(host: &HostHandle, session: &SessionId) -> Result<Attachment, KernelError> {
+    host.open(
+        SessionSelector::ById {
+            id: session.clone(),
+        },
+        ClientIdentity {
+            name: "demo-ui".into(),
+            surface: "demo-ui".into(),
+        },
+        OpenOptions::default(),
+    )
+    .await
 }
 
 fn board_of(snapshot: &SessionState) -> Board {
@@ -59,12 +80,45 @@ pub async fn write(
     session: &SessionId,
     board: &Board,
 ) -> Result<Option<ItemId>, KernelError> {
-    let state = snapshot(host, session).await?;
-    let item = anchor(&state);
+    let _owner = writer(session).lock_owned().await;
+    publish(host, session, board).await
+}
+
+async fn publish(
+    host: &HostHandle,
+    session: &SessionId,
+    board: &Board,
+) -> Result<Option<ItemId>, KernelError> {
+    let mut attachment = attachment(host, session).await?;
+    let item = anchor(&attachment.snapshot);
     let payload =
         bingo_sdk::slot::with(view(board)?, item.clone().map(|item| board.placement(item)));
     host.extend(session, PLUGIN, BOARD, payload).await?;
+    tokio::time::timeout(bingo_sdk::HOOK_DEADLINE, published(&mut attachment.events))
+        .await
+        .map_err(|_| {
+            KernelError::new(
+                ErrorCode::Internal,
+                "board publication was not acknowledged",
+            )
+        })??;
     Ok(item)
+}
+
+async fn published(events: &mut FrameStream) -> Result<(), KernelError> {
+    while let Some(frame) = std::future::poll_fn(|cx| events.as_mut().poll_next(cx)).await {
+        match frame.event {
+            Event::Extension { plugin, kind, .. } if plugin == PLUGIN && kind == BOARD => {
+                return Ok(());
+            }
+            Event::SessionClosed { .. } => break,
+            _ => {}
+        }
+    }
+    Err(KernelError::new(
+        ErrorCode::SessionClosed,
+        "session closed before board publication",
+    ))
 }
 
 fn anchor(state: &SessionState) -> Option<ItemId> {
@@ -117,12 +171,121 @@ impl Hook for BoardRow {
 }
 
 async fn place(host: &HostHandle, session: &SessionId) -> Result<(), KernelError> {
+    let _owner = writer(session).lock_owned().await;
     let board = read(host, session).await?;
-    write(host, session, &board).await?;
+    publish(host, session, &board).await?;
     Ok(())
 }
 
 fn view(board: &Board) -> Result<serde_json::Value, KernelError> {
     serde_json::to_value(board.view())
         .map_err(|e| KernelError::new(ErrorCode::Internal, format!("a view is json: {e}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        board::State,
+        command::TICK_COMMAND,
+        tests::{Journals, command_context},
+    };
+    use bingo_sdk::Command;
+    use std::sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    #[tokio::test]
+    async fn a_placement_cannot_overwrite_a_command_after_its_read() {
+        let journals = Journals::new();
+        let session = journals.session();
+        write(&journals.handle(), &session, &Board::default())
+            .await
+            .unwrap();
+        let placement_host = journals.scripted();
+        let base = journals.handle();
+        let (resume, paused) = tokio::sync::oneshot::channel();
+        let paused = Arc::new(Mutex::new(Some(paused)));
+        let reads = Arc::new(AtomicUsize::new(0));
+        let observed = reads.clone();
+        placement_host.on_open(move |selector, who, options| {
+            let base = base.clone();
+            let read = observed.fetch_add(1, Ordering::SeqCst);
+            let pause = if read == 1 {
+                paused.lock().unwrap().take()
+            } else {
+                None
+            };
+            async move {
+                let attachment = base.open(selector, who, options).await?;
+                if let Some(pause) = pause {
+                    pause.await.unwrap();
+                }
+                Ok(attachment)
+            }
+        });
+        let handle = placement_host.handle();
+        let placement = place(&handle, &session);
+        tokio::pin!(placement);
+        assert!(futures::poll!(&mut placement).is_pending());
+        assert_eq!(
+            reads.load(Ordering::SeqCst),
+            2,
+            "placement read the old board before pausing at its write"
+        );
+        let cx = command_context(&session, &journals);
+        let command = TICK_COMMAND.run("", &cx);
+        tokio::pin!(command);
+        // Run the newer command while placement still holds its old snapshot.
+        // A serialized owner may hold its write until placement is released.
+        let completed = match futures::poll!(&mut command) {
+            std::task::Poll::Ready(result) => {
+                result.unwrap();
+                true
+            }
+            std::task::Poll::Pending => false,
+        };
+        resume.send(()).unwrap();
+        placement.await.unwrap();
+        if !completed {
+            command.await.unwrap();
+        }
+        assert_eq!(
+            read(&journals.handle(), &session).await.unwrap().rows[0].state,
+            State::Running
+        );
+    }
+    #[tokio::test]
+    async fn a_queued_write_keeps_the_owner_until_its_frame_is_published() {
+        let journals = Journals::new();
+        let session = journals.session();
+        let host = journals.scripted();
+        let (sent, mut received) = tokio::sync::mpsc::unbounded_channel();
+        host.on_extend(move |session, plugin, kind, value| {
+            sent.send((session, plugin, kind, value)).unwrap();
+            async { Ok(()) }
+        });
+        let mut board = Board::default();
+        board.tick();
+        let handle = host.handle();
+        let writing = write(&handle, &session, &board);
+        tokio::pin!(writing);
+        assert!(
+            futures::poll!(&mut writing).is_pending(),
+            "enqueueing is not publication"
+        );
+        let base = journals.handle();
+        let placement = place(&base, &session);
+        tokio::pin!(placement);
+        assert!(
+            futures::poll!(&mut placement).is_pending(),
+            "placement must wait for the preceding board write"
+        );
+        let (id, plugin, kind, value) = received.try_recv().unwrap();
+        base.extend(&id, &plugin, &kind, value).await.unwrap();
+        writing.await.unwrap();
+        placement.await.unwrap();
+        assert_eq!(read(&base, &session).await.unwrap(), board);
+    }
 }

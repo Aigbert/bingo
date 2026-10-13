@@ -7,6 +7,7 @@ mod ask;
 mod auth;
 mod catalog;
 mod choose;
+mod completion;
 mod interception;
 mod refresh;
 mod registry;
@@ -693,16 +694,7 @@ impl HostApi for Host {
         turn: Option<&TurnId>,
         request: Completion,
     ) -> Result<Vec<ModelEvent>, KernelError> {
-        if !catalog::model_granted(self, &request.plugin).await {
-            return Err(KernelError::new(
-                ErrorCode::PermissionDenied,
-                format!("{} needs the model grant", request.plugin),
-            ));
-        }
-        self.mailbox_of(session)
-            .await?
-            .complete(turn.cloned(), request)
-            .await
+        completion::complete(self, session, turn, request).await
     }
 
     async fn sessions(&self, filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
@@ -900,6 +892,7 @@ impl HostApi for Host {
         session: &SessionId,
         change: SessionChange,
     ) -> Result<(), KernelError> {
+        let change = crate::config::change(self, session, change).await?;
         let changing = self.live(session)?.changing;
         let _guard = changing.lock().await;
         let live = self.live(session)?;

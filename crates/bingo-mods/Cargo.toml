@@ -31,10 +31,14 @@ futures.workspace = true
 async-trait.workspace = true
 url.workspace = true
 getrandom.workspace = true
+# M138: the host clock uses the workspace timestamp type.
+jiff.workspace = true
 
 thiserror.workspace = true
 
 [dev-dependencies]
+# M138: render the dollar table into the author SDK.
+bingo-schema-ts.workspace = true
 # M137: exercise source registration against the real offline kernel.
 bingo-core.workspace = true
 bingo-sdk = { workspace = true, features = ["testing"] }

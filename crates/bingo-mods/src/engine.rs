@@ -14,6 +14,7 @@ pub struct Limits {
     pub memory_bytes: usize,
     pub stack_bytes: usize,
     pub hook_time: Duration,
+    pub every_time: Duration,
 }
 impl Default for Limits {
     fn default() -> Self {
@@ -21,6 +22,7 @@ impl Default for Limits {
             memory_bytes: 64 * 1024 * 1024,
             stack_bytes: 512 * 1024,
             hook_time: Duration::from_secs(10),
+            every_time: Duration::from_secs(1),
         }
     }
 }
@@ -52,6 +54,7 @@ pub struct Operation {
     pub reply: oneshot::Sender<Result<Value, String>>,
 }
 pub struct Call {
+    pub reads: bingo_plugin_host::state::ReadLog,
     pub operations: mpsc::UnboundedReceiver<Operation>,
     pub result: oneshot::Receiver<Result<Value, Fault>>,
     cancel: CancellationToken,
@@ -122,6 +125,9 @@ impl Engine {
             }
         }
     }
+    pub(crate) fn stopped(&self) -> CancellationToken {
+        self.stop.clone()
+    }
     pub fn hooks(&self) -> &[RegisteredHook] {
         &self.hooks
     }
@@ -151,6 +157,7 @@ impl Engine {
             })
             .map_err(Fault::load)?;
         Ok(Call {
+            reads: Default::default(),
             operations: incoming,
             result: answer,
             cancel,

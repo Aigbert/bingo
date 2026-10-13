@@ -40,7 +40,7 @@ static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.mods",
     version: env!("CARGO_PKG_VERSION"),
     uses: &[],
-    provides: &[],
+    provides: &["service:bingo.plugin-host.callbacks"],
     requires: &[],
     config: Some(ConfigClaim {
         keys: &[("mods", Merge::ByName)],
@@ -67,20 +67,34 @@ impl Plugin for ModsPlugin {
             .set(manager.clone())
             .map_err(|_| PluginError::Failed("module runtime already registered".into()))?;
         registrar.add(Contribution::Plugins(manager.clone()));
+        registrar.add(Contribution::service(
+            &bingo_plugin_host::callback::KEY,
+            manager.callbacks.clone(),
+            None,
+        ));
+        registrar.add(Contribution::Tools(manager.clone()));
+        registrar.add(Contribution::Commands(manager.clone()));
         registrar.add(Contribution::Interceptors(manager));
         Ok(())
     }
     async fn start(&self, host: HostHandle) -> Result<(), PluginError> {
-        bingo_plugin_host::ops::install(&host)
-            .map_err(|error| PluginError::Failed(error.message))?;
         let cwd = self
             .project
             .clone()
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|error| PluginError::Failed(error.to_string()))?;
+        let floor = self
+            .manager
+            .get()
+            .map(|manager| manager.every_floor())
+            .unwrap_or(std::time::Duration::from_secs(1));
+        let dollar = crate::dollar::Runtime::install(&host, cwd.clone(), floor)
+            .map_err(|error| PluginError::Failed(error.message))?;
+        bingo_plugin_host::ops::install(&host)
+            .map_err(|error| PluginError::Failed(error.message))?;
         if let Some(manager) = self.manager.get() {
-            manager.start(&cwd, host).await;
+            manager.start(&cwd, host, dollar).await;
         }
         Ok(())
     }

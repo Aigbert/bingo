@@ -9,6 +9,10 @@ pub(super) struct Watch {
     stale: bool,
 }
 impl Manager {
+    pub(crate) async fn prepare(&self) {
+        self.poll().await;
+        self.reload_stale().await;
+    }
     pub(super) fn watch(self: &Arc<Self>) {
         let watches = self
             .modules()
@@ -129,6 +133,7 @@ impl Manager {
         )
         .await;
         self.replace(&old, module.clone());
+        self.publish_callbacks(module.clone());
         let host = self
             .host
             .get()
@@ -213,18 +218,37 @@ impl Interceptor for Boundary {
     }
     fn matcher(&self) -> LinkMatcher {
         LinkMatcher {
-            patterns: ["turn.complete", "session.start", "session.end"]
-                .into_iter()
-                .filter_map(|pattern| catalogue::Pattern::parse(pattern).ok())
-                .collect(),
+            patterns: [
+                "turn.complete",
+                "session.start",
+                "session.end",
+                "session.attach",
+                "session.detach",
+            ]
+            .into_iter()
+            .filter_map(|pattern| catalogue::Pattern::parse(pattern).ok())
+            .collect(),
             prefilter: Value::Null,
         }
     }
     fn owns_deadline(&self) -> bool {
         true
     }
-    async fn observe(&self, entry: &catalogue::Entry, cx: &HookContext, _: &Value) {
+    async fn observe(&self, entry: &catalogue::Entry, cx: &HookContext, input: &Value) {
         if let Some(manager) = self.0.upgrade() {
+            if let Some(dollar) = manager.dollar.get() {
+                if entry == catalogue::SESSION_END {
+                    dollar.end(&cx.session).await;
+                }
+                if [catalogue::SESSION_ATTACH, catalogue::SESSION_DETACH].contains(&entry)
+                    && let Ok(input) = serde_json::from_value(input.clone())
+                    && let Err(reason) = dollar
+                        .surface(&cx.host, input, entry == catalogue::SESSION_ATTACH)
+                        .await
+                {
+                    manager.notices.push(Notice::warn("MODS_SURFACE", reason));
+                }
+            }
             let mut subscriptions = manager
                 .subscriptions
                 .lock()

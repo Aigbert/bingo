@@ -3,17 +3,26 @@
   "title": "bingo plugin",
   "protocol": 2,
   "capabilities": [
+    "callback/run",
+    "callback/start",
     "command/run",
     "commands/changed",
     "compactor/compact",
     "context/contribute",
     "hook/observe",
+    "host/command/run",
+    "host/config/set",
     "host/deliver",
     "host/extend",
     "host/model/complete",
     "host/place",
+    "host/prompt/submit",
+    "host/session/append",
+    "host/session/compact",
+    "host/session/send",
     "host/state/get",
     "host/state/set",
+    "host/tool/call",
     "intercept/*",
     "intercept/*/after",
     "intercept/cancel",
@@ -678,6 +687,28 @@
       ],
       "description": "What the person answered, as the sdk writes it — including the cancel that\nis an answer."
     },
+    "Authorize": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "kind": {
+          "$ref": "#/$defs/InteractionKind"
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AnswerSpec"
+          }
+        }
+      },
+      "required": [
+        "session",
+        "kind",
+        "answers"
+      ]
+    },
     "Before": {
       "type": "object",
       "properties": {
@@ -1021,6 +1052,44 @@
         "input"
       ]
     },
+    "CallbackParams": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "callback": {
+          "type": "string"
+        },
+        "input": true,
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        }
+      },
+      "required": [
+        "chain",
+        "callback",
+        "input",
+        "site"
+      ]
+    },
+    "CallingHook": {
+      "type": "object",
+      "properties": {
+        "plugin": {
+          "type": "string"
+        },
+        "hook": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "plugin",
+        "hook"
+      ]
+    },
     "Cancel": {
       "type": "object",
       "properties": {
@@ -1110,6 +1179,53 @@
       "required": [
         "call",
         "decision"
+      ]
+    },
+    "Classify": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "session",
+        "text",
+        "labels"
+      ]
+    },
+    "ClientIdentity": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "surface": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "surface"
       ]
     },
     "CloseReason": {
@@ -2791,6 +2907,31 @@
         "unified"
       ]
     },
+    "Fork": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "prompt"
+      ]
+    },
     "Frame": {
       "type": "object",
       "properties": {
@@ -2824,6 +2965,86 @@
         "session",
         "event"
       ]
+    },
+    "HistoryChunk": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Item"
+          }
+        },
+        "next": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ItemId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "generation": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "oversized": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OversizedItem"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "This item alone cannot fit the requested page. Fetch it explicitly in\nparts before following `next`, which excludes that item."
+        }
+      },
+      "required": [
+        "items",
+        "generation"
+      ]
+    },
+    "HistoryPage": {
+      "type": "object",
+      "properties": {
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ItemId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 0
+        },
+        "maxBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0,
+          "description": "Optional byte budget for the whole JSON-RPC response; absent preserves\n`limit == 0` meaning all, not an implicit bounded page."
+        },
+        "generation": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Reject a stale page after a rewind/compaction rather than mixing views."
+        }
+      }
     },
     "HookObserveParams": {
       "type": "object",
@@ -3047,6 +3268,31 @@
         "id"
       ],
       "description": "A hook a process says it has, and the matcher it is claimed with.\n\nThe matcher is the sdk's own, declared once: the kernel's cheap skip runs\non this side, so an event this matcher rules out never crosses the pipe at\nall (ADR-0032 §1). A declaration that names no point wants every point, as\nan in-process hook's empty matcher does."
+    },
+    "HostCallContext": {
+      "type": "object",
+      "properties": {
+        "parent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hook": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "callers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CallingHook"
+          }
+        }
+      }
     },
     "HostEnv": {
       "type": "object",
@@ -3565,6 +3811,21 @@
         "budget"
       ]
     },
+    "Invoke": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "call": {
+          "$ref": "#/$defs/ToolCall"
+        }
+      },
+      "required": [
+        "session",
+        "call"
+      ]
+    },
     "Item": {
       "type": "object",
       "properties": {
@@ -4036,6 +4297,7 @@
         "prompt.submit",
         "tool.check",
         "tool.call",
+        "model.complete",
         "turn.step",
         "prompt.compose",
         "session.compact",
@@ -4238,6 +4500,34 @@
       "required": [
         "role",
         "parts"
+      ]
+    },
+    "Messages": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "page": {
+          "$ref": "#/$defs/HistoryPage"
+        }
+      },
+      "required": [
+        "session",
+        "page"
+      ]
+    },
+    "Millis": {
+      "type": "object",
+      "properties": {
+        "ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "ms"
       ]
     },
     "ModelCapabilities": {
@@ -4722,6 +5012,29 @@
         "surface"
       ],
       "description": "Who submitted the input, as every surface records it."
+    },
+    "OversizedItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ItemId"
+        },
+        "totalBytes": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "checksum": {
+          "type": "string",
+          "description": "FNV-1a 64 of the exact serialized Item UTF-8, lowercase hex."
+        }
+      },
+      "required": [
+        "id",
+        "totalBytes",
+        "checksum"
+      ],
+      "description": "The actor's factual observation; only the RPC server can add a\nconnection-scoped availability token after pinning an immutable Item."
     },
     "ParentLink": {
       "type": "object",
@@ -5415,6 +5728,26 @@
         }
       ]
     },
+    "PromptView": {
+      "type": "object",
+      "properties": {
+        "queue": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QueueEntry"
+          }
+        },
+        "last": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "queue"
+      ]
+    },
     "ProviderCancelParams": {
       "type": "object",
       "properties": {
@@ -5786,6 +6119,21 @@
         "origin"
       ]
     },
+    "Read": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "key"
+      ]
+    },
     "Reason": {
       "oneOf": [
         {
@@ -5892,6 +6240,44 @@
             "kind"
           ]
         }
+      ]
+    },
+    "RegisterCommand": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "spec": {
+          "$ref": "#/$defs/CommandSpec"
+        },
+        "callback": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "spec",
+        "callback"
+      ]
+    },
+    "RegisterTool": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "spec": {
+          "$ref": "#/$defs/ToolSpec"
+        },
+        "callback": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "spec",
+        "callback"
       ]
     },
     "ResolvedBy": {
@@ -6208,6 +6594,23 @@
         "assistant"
       ]
     },
+    "Run": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "name": {
+          "type": "string"
+        },
+        "args": true
+      },
+      "required": [
+        "session",
+        "name",
+        "args"
+      ]
+    },
     "Send": {
       "type": "object",
       "properties": {
@@ -6297,6 +6700,17 @@
         }
       },
       "description": "What one service speaks: a name for every method it answers, and the JSON\nSchema of what that method takes.\n\nThe schema is for whoever writes the caller — nothing here validates\nagainst it, as nothing validates a manifest's `config` schema — and the\nnames are the host's: a method the declaration never named is refused\nbefore it crosses, with the set that is named (ADR-0031 §5). A service\nthat names no method speaks none."
+    },
+    "Session": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        }
+      },
+      "required": [
+        "session"
+      ]
     },
     "SessionId": {
       "type": "string",
@@ -6406,6 +6820,23 @@
         "cwd",
         "createdAt",
         "updatedAt"
+      ]
+    },
+    "Setting": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "key": {
+          "type": "string"
+        },
+        "value": true
+      },
+      "required": [
+        "session",
+        "key",
+        "value"
       ]
     },
     "Slot": {
@@ -6672,6 +7103,21 @@
         }
       ]
     },
+    "Submit": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "input": {
+          "$ref": "#/$defs/Input"
+        }
+      },
+      "required": [
+        "session",
+        "input"
+      ]
+    },
     "SubmitResult": {
       "oneOf": [
         {
@@ -6746,6 +7192,27 @@
         "tighten",
         "rewrite",
         "full"
+      ]
+    },
+    "Timer": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "callback": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "ms",
+        "callback"
       ]
     },
     "Tone": {
@@ -7109,6 +7576,37 @@
       ],
       "description": "Token counts as the provider reports them, the three input counts kept\napart: `input_tokens` is what the model read fresh, the cache counts are\nwhat it read from or wrote to a cached prefix. The whole input side is\n`input_total()`."
     },
+    "UsageView": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/Usage"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContextUsage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastTurn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Usage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
     "View": {
       "oneOf": [
         {
@@ -7443,10 +7941,94 @@
       "description": "How a producer intends an utterance to be drawn."
     }
   },
+  "requestContext": {
+    "field": "_bingo",
+    "schema": {
+      "$ref": "#/$defs/HostCallContext"
+    }
+  },
   "manifest": {
     "$ref": "#/$defs/Manifest"
   },
   "methods": {
+    "host/session/compact": {
+      "params": {
+        "$ref": "#/$defs/Session"
+      },
+      "result": {
+        "$ref": "#/$defs/IntentId"
+      }
+    },
+    "host/session/send": {
+      "params": {
+        "$ref": "#/$defs/Send"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "host/session/append": {
+      "params": {
+        "$ref": "#/$defs/Extend"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "host/prompt/submit": {
+      "params": {
+        "$ref": "#/$defs/Submit"
+      },
+      "result": {
+        "$ref": "#/$defs/IntentId"
+      }
+    },
+    "host/tool/call": {
+      "params": {
+        "$ref": "#/$defs/Invoke"
+      },
+      "result": {
+        "$ref": "#/$defs/ToolOutput"
+      }
+    },
+    "host/command/run": {
+      "params": {
+        "$ref": "#/$defs/Run"
+      },
+      "result": {
+        "$ref": "#/$defs/IntentId"
+      }
+    },
+    "host/config/set": {
+      "params": {
+        "$ref": "#/$defs/Setting"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "host/model/complete": {
+      "params": {
+        "$ref": "#/$defs/Complete"
+      },
+      "result": {
+        "$ref": "#/$defs/Completed"
+      }
+    },
+    "callback/start": {
+      "params": {
+        "$ref": "#/$defs/HookSite"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "callback/run": {
+      "params": {
+        "$ref": "#/$defs/CallbackParams"
+      },
+      "result": true
+    },
     "intercept/prompt.submit": {
       "params": {
         "$ref": "#/$defs/Before"
@@ -7604,14 +8186,6 @@
       },
       "result": {
         "$ref": "#/$defs/StateValue"
-      }
-    },
-    "host/model/complete": {
-      "params": {
-        "$ref": "#/$defs/Complete"
-      },
-      "result": {
-        "$ref": "#/$defs/Completed"
       }
     },
     "initialize": {

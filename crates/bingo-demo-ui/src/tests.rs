@@ -27,6 +27,7 @@ struct Inner {
     /// The kernel's frames arrive in one order; the reducer refuses a frame
     /// it has already seen, so a double must number them as it does.
     seq: Mutex<u64>,
+    streams: Mutex<Vec<(SessionId, tokio::sync::mpsc::UnboundedSender<Frame>)>>,
 }
 
 /// A host that keeps one folded state per session and nothing else.
@@ -93,12 +94,17 @@ impl Journals {
             .find(|state| &state.summary.id == session)
             .ok_or_else(|| KernelError::new(ErrorCode::SessionNotFound, "no such session"))?;
         state.apply(&frame);
+        self.0
+            .streams
+            .lock()
+            .unwrap()
+            .retain(|(id, stream)| id != session || stream.send(frame.clone()).is_ok());
         Ok(())
     }
 }
 
 impl Journals {
-    fn scripted(&self) -> bingo_sdk::testing::TestHost {
+    pub(crate) fn scripted(&self) -> bingo_sdk::testing::TestHost {
         let host = bingo_sdk::testing::TestHost::default();
         host.on_sessions(
             |_filter| async move { unreachable!("this plugin reads no session list") },
@@ -132,11 +138,15 @@ impl Journals {
                     .find(|state| state.summary.id == id)
                     .ok_or_else(|| KernelError::new(ErrorCode::SessionNotFound, "no such session"))?
                     .clone();
+                let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+                fixture.0.streams.lock().unwrap().push((id.clone(), sender));
                 Ok(Attachment {
                     session: id,
                     snapshot,
                     history: None,
-                    events: Box::pin(futures::stream::empty()),
+                    events: Box::pin(futures::stream::unfold(receiver, |mut receiver| async {
+                        receiver.recv().await.map(|frame| (frame, receiver))
+                    })),
                     handle: SessionHandle(Arc::new(Deaf)),
                 })
             }

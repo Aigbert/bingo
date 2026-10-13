@@ -1,5 +1,14 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createInterface } from 'node:readline';
 import { stdin, stdout, stderr } from 'node:process';
+import type { HostCallContext } from './wire.ts';
+
+const calling = new AsyncLocalStorage<HostCallContext>();
+
+function contextual(params: unknown): unknown {
+  const context = calling.getStore();
+  return context ? { ...(params as object), _bingo: context } : params;
+}
 
 export type Handler = (params: any) => unknown | Promise<unknown>;
 export type Rpc = Pick<Peer, 'request' | 'notify'>;
@@ -14,22 +23,37 @@ export class Peer {
 
   constructor(send: (message: unknown) => void) { this.send = send; }
 
+  context(): HostCallContext | undefined { return calling.getStore(); }
+
+  withContext<T>(context: HostCallContext, run: () => T): T { return calling.run(context, run); }
+
   request<T = unknown>(method: string, params: unknown): Promise<T> {
     if (this.closed) return Promise.reject(new Error('RPC connection closed'));
     const id = ++this.serial;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      try { this.send({ jsonrpc: '2.0', id, method, params }); }
+      try { this.send({ jsonrpc: '2.0', id, method, params: contextual(params) }); }
       catch (error) { this.pending.delete(id); reject(error); }
     });
   }
 
   notify(method: string, params: unknown): void {
     if (this.closed) throw new Error('RPC connection closed');
-    this.send({ jsonrpc: '2.0', method, params });
+    this.send({ jsonrpc: '2.0', method, params: contextual(params) });
   }
 
   async receive(message: any): Promise<void> {
+    if (typeof message?.method === 'string') {
+      if (message.params && typeof message.params === 'object' && Object.hasOwn(message.params, '_bingo')) {
+        const { _bingo, ...params } = message.params;
+        return calling.run(_bingo, () => this.dispatch({ ...message, params }));
+      }
+      return calling.run(undefined, () => this.dispatch(message));
+    }
+    return this.dispatch(message);
+  }
+
+  private async dispatch(message: any): Promise<void> {
     if (typeof message?.method !== 'string') {
       const pending = this.pending.get(message?.id);
       if (!pending) return;

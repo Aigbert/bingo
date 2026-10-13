@@ -24,6 +24,7 @@ pub mod command;
 pub mod compactor;
 pub mod config;
 pub mod connection;
+mod context;
 pub mod contributor;
 pub mod deadline;
 pub mod discovery;
@@ -296,3 +297,5 @@ mod tests {
 }
 
 mod events_ts;
+
+mod callback;

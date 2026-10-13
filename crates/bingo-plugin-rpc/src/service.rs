@@ -220,8 +220,10 @@ impl ServiceCalls for Hub {
             .await
             .map_err(|error| RpcError::new(INTERNAL_ERROR, error))?;
         }
+        let input = bingo_plugin_host::ops::bind(&self.plugin, &params.key, params.params)
+            .map_err(|error| RpcError::new(INVALID_PARAMS, error))?;
         let result = wire
-            .call(&params.method, params.params)
+            .call(&params.method, input)
             .await
             .map_err(|error| RpcError::new(INTERNAL_ERROR, error.to_string()))?;
         serde_json::to_value(ServiceCallResult { result })

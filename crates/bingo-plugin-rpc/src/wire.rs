@@ -60,6 +60,11 @@ pub fn capabilities() -> BTreeSet<Cap> {
         .filter(|method| *method != name::INITIALIZE)
         .map(str::to_owned)
         .chain(
+            crate::schema::kernel_methods()
+                .into_iter()
+                .map(|(name, _)| name),
+        )
+        .chain(
             bingo_sdk::catalogue::ALL
                 .iter()
                 .filter(|entry| entry.kind == bingo_sdk::catalogue::Kind::Observation)
@@ -578,7 +583,21 @@ pub type Method = (&'static str, Ref, Ref);
 /// A notification: its name and its params.
 pub type Notification = (&'static str, Ref);
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct CallbackParams {
+    pub chain: String,
+    pub callback: String,
+    pub input: Value,
+    pub site: HookSite,
+}
+
 pub static METHODS: &[Method] = &[
+    ("callback/start", schema_of::<HookSite>, schema_of::<()>),
+    (
+        "callback/run",
+        schema_of::<CallbackParams>,
+        schema_of::<Value>,
+    ),
     (
         "intercept/prompt.submit",
         schema_of::<crate::intercept::Before<Input>>,

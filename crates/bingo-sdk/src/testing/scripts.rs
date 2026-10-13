@@ -17,8 +17,11 @@ type WireLookup = Immediate<(String,), Option<Arc<dyn WireService>>>;
 
 type ServiceOpening = Immediate<(String, Arc<dyn WireService>), Result<(), KernelError>>;
 
+type CompletionScript = Script<(SessionId, Option<TurnId>, Completion), Vec<ModelEvent>>;
+
 #[derive(Default)]
 pub(super) struct Scripts {
+    pub complete: Option<CompletionScript>,
     pub sessions: Option<Script<(SessionFilter,), Vec<SessionSummary>>>,
     pub open: Option<Script<(SessionSelector, ClientIdentity, OpenOptions), Attachment>>,
     pub close: Option<Script<(SessionId, CloseReason), ()>>,
@@ -44,6 +47,17 @@ pub(super) struct ImmediateScripts {
 }
 
 impl TestHost {
+    /// Override `complete`; the call is recorded before this script runs.
+    pub fn on_complete<F, Fut>(&self, script: F)
+    where
+        F: Fn(SessionId, Option<TurnId>, Completion) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Vec<ModelEvent>, KernelError>> + Send + 'static,
+    {
+        locked(&self.inner.scripts).complete = Some(Arc::new(move |(session, turn, request)| {
+            Box::pin(script(session, turn, request))
+        }));
+    }
+
     /// Override `sessions`; the call is recorded before this script runs.
     pub fn on_sessions<F, Fut>(&self, script: F)
     where

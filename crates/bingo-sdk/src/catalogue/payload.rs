@@ -104,6 +104,12 @@ pub struct Measure {
     pub context: ContextUsage,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Complete {
+    pub plugin: String,
+    pub request: ModelRequest,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

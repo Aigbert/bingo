@@ -59,7 +59,7 @@ impl Store {
     }
 
     pub async fn get(&self, scope: String, key: String) -> Result<Option<StateValue>, RpcError> {
-        self.access(scope, move |_, values| Ok(values.get(&key).cloned()))
+        self.access(scope, move |_, values, _| Ok(values.get(&key).cloned()))
             .await
     }
 
@@ -70,7 +70,7 @@ impl Store {
         value: Value,
         expected: Option<Version>,
     ) -> Result<StateValue, RpcError> {
-        self.access(scope, move |(shelf, scope), values| {
+        self.access(scope, move |(shelf, scope), values, other_bytes| {
             let held = values.get(&key).map(|entry| entry.version);
             let version = swap(held, expected).map_err(|Conflict(version)| {
                 let mut error = RpcError::new(-32009, "plugin state version conflict");
@@ -79,6 +79,13 @@ impl Store {
             })?;
             let entry = StateValue { version, value };
             values.insert(key, entry.clone());
+            let bytes = serde_json::to_vec(values).map_err(failed)?.len();
+            if bytes.saturating_add(other_bytes) > 4 * 1024 * 1024 {
+                return Err(RpcError::new(
+                    -32010,
+                    "plugin state exceeds the 4 MiB per-plugin limit",
+                ));
+            }
             shelf
                 .save(scope, &(scope.into(), values.clone()))
                 .map_err(failed)?;
@@ -87,8 +94,25 @@ impl Store {
         .await
     }
 
+    pub async fn keys(&self, scope: String) -> Result<Vec<String>, RpcError> {
+        self.access(scope, |_, values, _| Ok(values.keys().cloned().collect()))
+            .await
+    }
+    pub async fn delete(&self, scope: String, key: String) -> Result<bool, RpcError> {
+        self.access(scope, move |(shelf, scope), values, _| {
+            let removed = values.remove(&key).is_some();
+            if removed {
+                shelf
+                    .save(scope, &(scope.into(), values.clone()))
+                    .map_err(failed)?;
+            }
+            Ok(removed)
+        })
+        .await
+    }
+
     pub async fn remove(&self, scope: String) -> Result<(), RpcError> {
-        self.access(scope, |(shelf, scope), _| {
+        self.access(scope, |(shelf, scope), _, _| {
             shelf.delete(scope).map_err(failed)
         })
         .await
@@ -100,6 +124,7 @@ impl Store {
         operation: impl FnOnce(
             (&Shelf<Json>, &str),
             &mut BTreeMap<String, StateValue>,
+            usize,
         ) -> Result<T, RpcError>
         + Send
         + 'static,
@@ -111,20 +136,25 @@ impl Store {
             let _guard = guard;
             let shelf = Shelf::<Json>::new(root);
             let loaded = shelf.load();
-            if let Some(error) = loaded
-                .unreadable
-                .iter()
-                .find(|error| error.file == format!("{scope}.json"))
-            {
+            if let Some(error) = loaded.unreadable.first() {
                 return Err(failed(&error.why));
             }
+            let other_bytes = loaded
+                .entries
+                .iter()
+                .filter(|(id, _)| id != &scope)
+                .try_fold(0usize, |total, (_, values)| {
+                    serde_json::to_vec(values)
+                        .map(|bytes| total.saturating_add(bytes.len()))
+                        .map_err(failed)
+                })?;
             let mut values = loaded
                 .entries
                 .into_iter()
                 .find(|(id, _)| id == &scope)
                 .map(|(_, values)| values)
                 .unwrap_or_default();
-            operation((&shelf, &scope), &mut values)
+            operation((&shelf, &scope), &mut values, other_bytes)
         })
         .await
         .map_err(failed)?
@@ -156,5 +186,103 @@ mod tests {
         assert_eq!(swap(None, Some(0)), Err(Conflict(None)));
         assert_eq!(swap(Some(2), Some(1)), Err(Conflict(Some(2))));
         assert_eq!(swap(Some(u64::MAX), None), Err(Conflict(Some(u64::MAX))));
+    }
+}
+
+#[cfg(test)]
+mod quota_contract {
+    use super::*;
+    #[tokio::test]
+    async fn the_four_mib_limit_counts_every_scope_and_preserves_the_old_value() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::new(root.path(), "owner");
+        let large = json!("x".repeat(2 * 1024 * 1024));
+        store
+            .set("global".into(), "large".into(), large.clone(), None)
+            .await
+            .unwrap();
+        store
+            .set("session".into(), "small".into(), json!(1), None)
+            .await
+            .unwrap();
+        let error = store
+            .set("session".into(), "small".into(), large, Some(1))
+            .await
+            .expect_err("4 MiB budget was not enforced");
+        assert!(error.message.contains("4 MiB"), "{}", error.message);
+        assert_eq!(
+            store.get("session".into(), "small".into()).await.unwrap(),
+            Some(StateValue {
+                version: 1,
+                value: json!(1)
+            })
+        );
+        let error = store
+            .set("session".into(), "small".into(), json!(2), Some(0))
+            .await
+            .unwrap_err();
+        assert_eq!(error.data, Some(json!({"version":1})));
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Read {
+    pub plugin: String,
+    pub scope: String,
+    pub key: String,
+    pub version: Option<Version>,
+}
+#[derive(Clone, Default)]
+pub struct ReadLog(Arc<std::sync::Mutex<Vec<Read>>>);
+tokio::task_local! { static READS: ReadLog; }
+impl ReadLog {
+    pub async fn scope<T>(&self, future: impl std::future::Future<Output = T>) -> T {
+        READS.scope(self.clone(), future).await
+    }
+    pub fn entries(&self) -> Vec<Read> {
+        self.0
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone()
+    }
+    pub fn record(read: Read) {
+        let _ = READS.try_with(|log| {
+            log.0
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .push(read)
+        });
+    }
+}
+#[cfg(test)]
+mod read_contract {
+    use super::*;
+    #[tokio::test]
+    async fn a_hook_read_log_names_the_owner_scope_key_and_held_version() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::new(root.path(), "owner");
+        store
+            .set("global".into(), "key".into(), json!(1), None)
+            .await
+            .unwrap();
+        let host = bingo_sdk::testing::NoHost::handle();
+        let ops = crate::host::Operations {
+            plugin: "owner",
+            host: &host,
+            state: &store,
+        };
+        let log = ReadLog::default();
+        log.scope(ops.answer("host/state/get", json!({"scope":"global","key":"key"})))
+            .await
+            .unwrap();
+        assert_eq!(
+            log.entries(),
+            vec![Read {
+                plugin: "owner".into(),
+                scope: "global".into(),
+                key: "key".into(),
+                version: Some(1)
+            }]
+        );
     }
 }

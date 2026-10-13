@@ -11,6 +11,7 @@ mod thread;
 pub use plugin::ModsPlugin;
 mod chain;
 mod config;
+pub mod dollar;
 mod link;
 mod manager;
 mod module;

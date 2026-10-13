@@ -15,6 +15,7 @@ use std::{
 
 mod reload;
 pub(crate) struct Manager {
+    pub(crate) callbacks: Arc<bingo_plugin_host::callback::Registry>,
     env: Env,
     directories: Vec<PathBuf>,
     settings: BTreeMap<String, Value>,
@@ -22,6 +23,7 @@ pub(crate) struct Manager {
     limits: Limits,
     modules: RwLock<Vec<Arc<Module>>>,
     host: OnceLock<HostHandle>,
+    dollar: OnceLock<Arc<crate::dollar::Runtime>>,
     this: OnceLock<Weak<Manager>>,
     watches: Mutex<BTreeMap<PathBuf, reload::Watch>>,
     reloading: tokio::sync::Mutex<()>,
@@ -39,6 +41,7 @@ impl Manager {
         limits: Limits,
     ) -> Self {
         Self {
+            callbacks: Arc::default(),
             env,
             directories,
             settings,
@@ -46,6 +49,7 @@ impl Manager {
             limits,
             modules: RwLock::new(Vec::new()),
             host: OnceLock::new(),
+            dollar: OnceLock::new(),
             this: OnceLock::new(),
             watches: Mutex::new(BTreeMap::new()),
             reloading: tokio::sync::Mutex::new(()),
@@ -55,7 +59,13 @@ impl Manager {
             tasks: Mutex::new(Vec::new()),
         }
     }
-    pub async fn start(self: &Arc<Self>, cwd: &Path, host: HostHandle) {
+    pub async fn start(
+        self: &Arc<Self>,
+        cwd: &Path,
+        host: HostHandle,
+        dollar: Arc<crate::dollar::Runtime>,
+    ) {
+        let _ = self.dollar.set(dollar);
         let _ = self.host.set(host.clone());
         let _ = self.this.set(Arc::downgrade(self));
         self.tasks
@@ -92,7 +102,22 @@ impl Manager {
             .modules
             .write()
             .unwrap_or_else(|error| error.into_inner()) = modules;
+        for module in self.modules() {
+            self.publish_callbacks(module);
+        }
         self.watch();
+    }
+    pub(crate) fn every_floor(&self) -> std::time::Duration {
+        self.limits.every_time
+    }
+    pub(crate) fn publish_callbacks(&self, module: Arc<Module>) {
+        self.callbacks.insert(
+            module.found.name.clone(),
+            Arc::new(crate::dollar::callback::Native {
+                module,
+                manager: self.this.get().cloned().unwrap_or_default(),
+            }),
+        );
     }
     fn modules(&self) -> Vec<Arc<Module>> {
         self.modules
@@ -109,6 +134,9 @@ impl Manager {
         }
         for module in self.modules() {
             module.close().await;
+        }
+        if let Some(dollar) = self.dollar.get() {
+            dollar.stop().await;
         }
     }
 }
@@ -178,5 +206,30 @@ impl InterceptorSource for Manager {
                 }),
         );
         links
+    }
+}
+
+#[async_trait]
+impl ToolSource for Manager {
+    fn id(&self) -> &str {
+        "bingo.mods"
+    }
+    async fn tools(&self) -> Vec<Arc<dyn Tool>> {
+        self.dollar
+            .get()
+            .map(|dollar| dollar.tools())
+            .unwrap_or_default()
+    }
+}
+#[async_trait]
+impl CommandSource for Manager {
+    fn id(&self) -> &str {
+        "bingo.mods"
+    }
+    async fn commands(&self, _: &Path) -> Vec<Arc<dyn Command>> {
+        self.dollar
+            .get()
+            .map(|dollar| dollar.commands())
+            .unwrap_or_default()
     }
 }

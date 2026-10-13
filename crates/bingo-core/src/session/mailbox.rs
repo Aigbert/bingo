@@ -12,6 +12,7 @@ use tokio::sync::{mpsc, oneshot, watch};
 use crate::turn::{TurnConfig, TurnHost};
 
 pub(crate) enum Msg {
+    Calling(Vec<invocation::CallingHook>, Box<Msg>),
     CatalogueEvent(Box<Event>),
     Observe(LinkPoint, Value),
     CompletionReady(Box<super::catalogue::Completed>),
@@ -178,7 +179,10 @@ impl Msg {
     /// hook may list the tree. Everything else — attachments included, so a
     /// snapshot never runs ahead of a write sent before it — waits.
     pub(crate) fn reads(&self) -> bool {
-        matches!(self, Msg::Summary { .. })
+        match self {
+            Msg::Calling(_, msg) => msg.reads(),
+            _ => matches!(self, Msg::Summary { .. }),
+        }
     }
 }
 
@@ -229,6 +233,12 @@ impl Mailbox {
     pub(super) fn send(&self, msg: Msg) {
         // A closed actor drops writes; the reply channel, where there is one,
         // reports it. Fire-and-forget writes have `IntentAck` for that.
+        let calling = invocation::current();
+        let msg = if calling.is_empty() {
+            msg
+        } else {
+            Msg::Calling(calling, Box::new(msg))
+        };
         let _ = self.tx.send(msg);
     }
 

@@ -149,7 +149,7 @@ pub(super) fn rewrite(actor: &Actor, event: Event) {
     let hooks = actor.config.hooks.clone();
     let cx = actor.hook_context();
     let mailbox = actor.mailbox.clone();
-    let work = Box::pin(async move {
+    let work = Box::pin(invocation::carry(async move {
         let links = hooks.links().await;
         let report = crate::chain::Report::default();
         let changed = match event {
@@ -186,7 +186,7 @@ pub(super) fn rewrite(actor: &Actor, event: Event) {
         if let Ok(event) = changed {
             mailbox.send(Msg::CatalogueEvent(Box::new(event)));
         }
-    });
+    }));
     if let Some(queue) = &actor.observed {
         let _ = queue.writes.send(work);
     }

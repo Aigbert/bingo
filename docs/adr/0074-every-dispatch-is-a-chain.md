@@ -110,3 +110,5 @@ authority rules. The seven typed points bridge through JSON chains; the stop
 hook is `turn.stop`, while `turn.complete` composes completion text.
 
 Verified 2026-10-14 (M137, ADR-0078): module links own their active-time budget; process links keep their deadline and tighten default. Only user/explicit modules default to rewrite; user-layer pluginTrust can lift either runtime.
+
+Verified 2026-10-14 (M138, ADR-0078 §4): completion and configuration cross their kernel chains once; reverse RPC and actor work carry the calling hook so only that hook is omitted.
