@@ -730,6 +730,7 @@ name = "bingo-store-jsonl"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-claim",
  "bingo-sdk",
  "jiff",
  "serde",

@@ -4,7 +4,7 @@
 //! copyable while a process owns it.
 
 use std::collections::BTreeMap;
-use std::fs::{File, TryLockError};
+use std::fs::File;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -49,18 +49,8 @@ impl Locks {
 /// Try the exclusive lock: `None` when another holder — in this process or
 /// another — has it. The caller owns the returned file and, with it, the lock.
 pub fn take(path: &Path) -> Result<Option<File>, KernelError> {
-    let file = File::options()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(path)
-        .map_err(|e| storage(format!("open {}: {e}", path.display())))?;
-    match file.try_lock() {
-        Ok(()) => Ok(Some(file)),
-        Err(TryLockError::WouldBlock) => Ok(None),
-        Err(TryLockError::Error(e)) => Err(storage(format!("lock {}: {e}", path.display()))),
-    }
+    bingo_claim::lock(path)
+        .map_err(|e| storage(format!("lock {}: {e}", path.display())))
 }
 
 fn taken(session: &SessionId) -> KernelError {
