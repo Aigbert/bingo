@@ -295,6 +295,39 @@ mod tests {
         assert!(why.contains("mcp.servers") && why.contains("first") && why.contains("second"));
     }
 
+    #[test]
+    fn noun_lookup_resolves_the_same_wire_and_face() {
+        let services = Services::default();
+        services
+            .open("test.owner", Arc::new(Named("sample")))
+            .unwrap();
+        assert!(Arc::ptr_eq(
+            &services.wire("test.owner").unwrap(),
+            &services.wire("sample").expect("noun lookup")
+        ));
+        assert_eq!(services.face("sample").unwrap().noun, "sample");
+    }
+
+    #[test]
+    fn noun_and_key_collisions_are_refused_in_both_orders() {
+        for reverse in [false, true] {
+            let services = Services::default();
+            let entries = if reverse {
+                [("sample", "other"), ("owner", "sample")]
+            } else {
+                [("owner", "sample"), ("sample", "other")]
+            };
+            services
+                .open(entries[0].0, Arc::new(Named(entries[0].1)))
+                .unwrap();
+            assert!(
+                services
+                    .open(entries[1].0, Arc::new(Named(entries[1].1)))
+                    .is_err()
+            );
+        }
+    }
+
     struct Kv;
 
     #[async_trait]

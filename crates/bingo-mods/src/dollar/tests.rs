@@ -75,3 +75,28 @@ fn schema_and_types_are_generated_from_the_same_rows() {
     ));
     committed("sdk/typescript/src/dollar-types.ts", rendered);
 }
+
+#[test]
+fn world_methods_have_one_declared_door() {
+    for (noun, methods) in [
+        (
+            "fs",
+            &["read", "write", "list", "exists", "stat", "ancestors"][..],
+        ),
+        ("http", &["fetch"][..]),
+        ("process", &["run", "spawn", "read", "write", "kill"][..]),
+        ("env", &["get", "set"][..]),
+        ("mcp", &["call", "connect"][..]),
+        ("agent", &["spawn", "list", "register"][..]),
+    ] {
+        for method in methods {
+            assert_eq!(
+                ROWS.iter()
+                    .filter(|row| row.noun == noun && row.method == *method)
+                    .count(),
+                1,
+                "{noun}.{method}"
+            );
+        }
+    }
+}
