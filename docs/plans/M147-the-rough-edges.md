@@ -955,7 +955,7 @@ All paths below are under `crates/bingo-surface-tui/src/`.
 
 ### Focused verification
 
-`INSTA_UPDATE=always cargo test -p bingo-surface-tui --lib`: 1134 passed; 2 pre-existing ignored. All changed snapshots were reviewed; `the_help_sheet` also checks every binding and the footer at 80×24.
+`INSTA_UPDATE=always cargo test -p bingo-surface-tui --lib`: 1134 passed; 2 pre-existing ignored. All changed snapshots were reviewed; `keys::tests::a_small_terminal_shows_every_binding_and_the_footer` checks every binding and the footer at 80×24.
 
 `cargo test -p bingo --test cli status_groups_token_counts_in_text_and_ndjson`: 1 passed (plain stdout, valid NDJSON, exit 0).
 

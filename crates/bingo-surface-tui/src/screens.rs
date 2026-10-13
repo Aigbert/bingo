@@ -660,18 +660,6 @@ fn the_help_sheet() {
     let state = folded(answered());
     let (mut ui, now) = scene();
     shown(&mut ui, Open::Help, now);
-    let small = draw_sized(80, 24, &state, &mut ui, now);
-    for binding in crate::keys::BINDINGS {
-        assert!(
-            small.contains(binding.keys),
-            "missing {}: {small}",
-            binding.keys
-        );
-    }
-    assert!(
-        small.contains("/ for commands · ! for a shell line"),
-        "{small}"
-    );
     insta::assert_snapshot!("help_80x30", draw_sized(80, 30, &state, &mut ui, now));
     insta::assert_snapshot!("help_100x30", draw_sized(100, 30, &state, &mut ui, now));
 }

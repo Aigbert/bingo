@@ -365,6 +365,26 @@ fn cell(binding: &Binding, key_column: usize) -> String {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn a_small_terminal_shows_every_binding_and_the_footer() {
+        use crate::test_support::*;
+        let state = state();
+        let (mut ui, now) = scene();
+        shown(&mut ui, crate::ui::Open::Help, now);
+        let small = draw_sized(80, 24, &state, &mut ui, now);
+        for binding in crate::keys::BINDINGS {
+            assert!(
+                small.contains(binding.keys),
+                "missing {}: {small}",
+                binding.keys
+            );
+        }
+        assert!(
+            small.contains("/ for commands · ! for a shell line"),
+            "{small}"
+        );
+    }
+
+    #[test]
     fn rough_edges_help_groups_keys_without_clipping_at_100() {
         let lines = help_lines(96);
         let text = lines
