@@ -74,13 +74,17 @@ change of taste:
 
 ## 3. The look: ember
 
-**L1. The caret is bingo's mark.** `▍` (U+258D) takes `✻`'s places: the
+2026-10-14: M149 implements L1–L6, L8 and L7’s verbs in the TUI, with the L3 animation estimate
+and L7 earned-row deferral recorded below; verification is in
+[M149](../plans/M149-bingos-own-light.md).
+
+**[x] L1. The caret is bingo's mark.** `▍` (U+258D) takes `✻`'s places: the
 activity row, the worked row, the welcome. It is a terminal's own glyph,
 the thing the mascot is looking at, and one cell wide. `▏` (U+258F), the
 caret before it speaks, marks thinking: `▏ Thinking…`, `▏ Thought for 2s`.
 ASCII: `|` for both. The sparkle cycle `✻ ✢ ✶ ✽` goes.
 
-**L2. The caret says what the turn is doing**, which the sparkle never did:
+**[x] L2. The caret says what the turn is doing**, which the sparkle never did:
 
 | state | caret |
 |---|---|
@@ -90,7 +94,7 @@ ASCII: `|` for both. The sparkle cycle `✻ ✢ ✶ ✽` goes.
 | stopping | dims, steady |
 | at rest (worked row) | `dim`, steady |
 
-**L3. Embers are tokens.** While words or thoughts arrive, an ember
+**[x] L3. Embers are tokens.** While words or thoughts arrive, an ember
 (`·` `∙` `˙`) leaves the caret into the band's reserved air row above it
 and fades over 0.6 s: one per 64 tokens received, at most four on the row.
 So the motion is a meter — a fast model throws sparks, a stalled one throws
@@ -100,12 +104,12 @@ already held for the activity band (§3, *nothing jumps*); the foot
 
 2026-10-14: M149 uses one token per four arriving characters for ember timing because usage is reported only after a round; billed token counters keep reported usage.
 
-**L4. bingo speaks with the caret.** The model's `⏺` becomes `▍`: bold
+**[x] L4. bingo speaks with the caret.** The model's `⏺` becomes `▍`: bold
 `text` at rest, `presence` while the block streams (the comet tail is
 unchanged). Tool rows keep `⏺` and its state colours — the work is the
 grammar a person already reads; the voice is bingo's own.
 
-**L5. The accent is ember amber**, a hue apart from Claude's terracotta and
+**[x] L5. The accent is ember amber**, a hue apart from Claude's terracotta and
 twice as far from `bad` (hue 25° against 5°, where `#d97757` stood at 15°):
 
 | token | dark | light | ANSI |
@@ -117,7 +121,7 @@ Grounds, tints, `good`, `bad` and `mode` are unchanged. The site's
 `tokens.ts` and the GUI follow in their own repositories; the person
 carries the two tokens over.
 
-**L6. The opening is the wordmark.** The site's grid, four rows of
+**[x] L6. The opening is the wordmark.** The site's grid, four rows of
 half-blocks, with the caret at its end:
 
 ```text
@@ -140,7 +144,7 @@ what is true: model, effort, mode, cwd elided from the middle; the resume
 row only when this cwd has an earlier session; `/login` only when no
 provider can serve a turn; the update row as M63 has it.
 
-**L7. Words of its own.** The working verbs come from the ember and the
+**[ ] L7. Words of its own.** The working verbs come from the ember and the
 fox, not Claude Code's list: Kindling, Stoking, Smouldering, Foraging,
 Tracking, Burrowing, Sniffing around, Pouncing, Sifting, Tinkering. When a
 turn ends with every task on its list done, the worked row says so in the
@@ -149,7 +153,7 @@ true state, said once, and never otherwise.
 
 2026-10-14: M149 defers the earned Bingo variant to a later milestone’s producer-owned completion contract; the worked row keeps `Worked for …` and takes the caret mark.
 
-**L8. A code block stands on the raised tint**, the bar a `>` line already
+**[x] L8. A code block stands on the raised tint**, the bar a `>` line already
 stands on, the width of the block; the fence's language rides dim at the
 band's right end instead of on a row of its own. Line numbers past eight
 lines are unchanged.
