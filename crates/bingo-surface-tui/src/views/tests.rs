@@ -304,3 +304,45 @@ fn buttons_that_do_not_fit_the_width_go_on_the_next_row() {
     let drawn = render(&actions(), 24);
     assert_eq!(drawn.len(), 2, "{drawn:?}");
 }
+
+#[test]
+fn canonical_elements_have_terminal_screens() {
+    use serde_json::json;
+    let cases = [
+        (json!({"kind":"Box","padding":1,"borderStyle":"single","children":[{"kind":"Text","children":["inside"]}]}), "inside"),
+        (json!({"kind":"Text","children":["styled"]}), "styled"),
+        (json!({"kind":"Button","hotkey":"g","label":"Go","onPress":{"name":"counter:ui","args":{}}}), "g Go"),
+        (json!({"kind":"Input","label":"Name","value":"Ada"}), "Name: Ada"),
+        (json!({"kind":"Select","label":"Mode","value":"fast","options":[{"value":"fast","label":"Fast"}]}), "Fast"),
+        (json!({"kind":"Link","href":"https://example.test","label":"Example"}), "Example"),
+        (json!({"kind":"Image","source":"blob:missing","alt":"A cat"}), "A cat"),
+        (json!({"kind":"Raster","columns":2,"rows":1,"cells":["ab"]}), "ab"),
+        (json!({"kind":"Svg","source":"<svg/>","alt":"A circle"}), "A circle"),
+        (json!({"kind":"Engine","component":"Pane","props":{}}), ""),
+        (json!({"kind":"Code","source":"let x = 1;","language":"rust"}), "let x = 1;"),
+        (json!({"kind":"Markdown","text":"**weight**","dimColor":true}), "weight"),
+    ];
+    for (wire, words) in cases {
+        let view: View = serde_json::from_value(wire).unwrap();
+        assert!(screen(&view,80).contains(words), "{}: {words}",named(&view));
+    }
+}
+
+#[test]
+fn text_children_keep_their_own_weight_in_the_backend() {
+    let view: View = serde_json::from_value(serde_json::json!({"kind":"Text","children":["a",{"kind":"Text","bold":true,"children":["b"]},"c"]})).unwrap();
+    let mut terminal = Terminal::new(TestBackend::new(3,1)).unwrap();
+    terminal.draw(|frame| frame.render_widget(Paragraph::new(render(&view,3)),frame.area())).unwrap();
+    let buffer = terminal.backend().buffer();
+    assert_eq!(buffer[(1,0)].style(), theme::as_drawn(theme::text().patch(theme::bold())));
+    assert_eq!(buffer[(0,0)].style(),buffer[(2,0)].style());
+}
+
+#[test]
+fn box_padding_and_hidden_children_affect_drawn_geometry() {
+    let view: View = serde_json::from_value(serde_json::json!({"kind":"Box","width":8,"padding":1,"children":[
+        {"kind":"Text","children":["body"]},{"kind":"Box","display":"none","children":[{"kind":"Text","children":["hidden"]}]}]})).unwrap();
+    let drawn = render(&view,80);
+    assert_eq!(drawn.len(),3);
+    assert_eq!(drawn[1].to_string()," body   ");
+}
