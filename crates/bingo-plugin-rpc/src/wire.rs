@@ -20,11 +20,8 @@
 //! whose owner opened a wire face — and the host, being the router, is how
 //! two processes pair with no pipe between them (ADR-0031 §4).
 //!
-//! One pair of names splits by whether anyone waits. `hook/decide` carries the
-//! four points whose answer the kernel reads; `hook/observe` carries the four
-//! it does not, as a notification, so watching a turn costs the turn nothing
-//! (ADR-0032 §2, §3). Both name the hook the handshake declared, and the
-//! matcher declared with it keeps an unmatched event off the pipe entirely.
+//! Decisions cross as two-phase `intercept/<point>` calls; observations
+//! remain notifications at `hook/observe`.
 //!
 //! `METHODS` and `NOTIFICATIONS` are the one table: the schema walks it, and
 //! the host and the example plugin both dispatch on the names in [`name`].
@@ -32,28 +29,49 @@
 //! here: it rides inside one `service/call`'s params, so it lives with the
 //! doors that read it ([`crate::doors`]).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use bingo_sdk::{
     CommandOutcome, CommandSpec, CompactContext, CompactReason, Compaction, ContextPiece,
-    ContextQuery, ContextUsage, EndpointCapabilities, Env, Frame, HookContext, HookMatcher,
-    HookOutcome, Input, Item, ModelCapabilities, ModelEvent, ModelInfo, ModelRequest, Phase,
-    Placement, ProviderError, SessionId, SessionSummary, ToolCall, ToolOutput, ToolSpec, TurnId,
+    ContextQuery, ContextUsage, EndpointCapabilities, Env, Frame, HookContext, HookMatcher, Input,
+    Item, ModelCapabilities, ModelEvent, ModelInfo, ModelRequest, Phase, Placement, ProviderError,
+    SessionId, SessionSummary, ToolOutput, ToolSpec, TurnId,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// The major the host speaks. A process that answers with another one is
-/// refused rather than guessed at (ADR-0015 §Consequences). It stays at one
-/// until a plugin outside this repository speaks it: until then the wire
-/// changes in place and `schema/plugin.json` is the record of what it is,
-/// and a number nobody is held to would only count our own edits.
-pub const PROTOCOL: u32 = 1;
+/// Protocol 2 is frozen by schema/plugin-2.json (ADR-0075).
+pub const PROTOCOL: u32 = 2;
+
+pub type Cap = String;
+
+/// Capabilities are method names; unknown additions can be negotiated unchanged.
+pub fn negotiated(host: &BTreeSet<Cap>, plugin: &BTreeSet<Cap>) -> BTreeSet<Cap> {
+    host.intersection(plugin).cloned().collect()
+}
+
+pub fn capabilities() -> BTreeSet<Cap> {
+    METHODS
+        .iter()
+        .map(|method| method.0)
+        .chain(NOTIFICATIONS.iter().map(|note| note.0))
+        .filter(|method| *method != name::INITIALIZE)
+        .map(str::to_owned)
+        .collect()
+}
 
 /// Every name that travels on the wire, in one place.
 pub mod name {
+    pub const HOST_PLACE: &str = "host/place";
+    pub const HOST_EXTEND: &str = "host/extend";
+    pub const HOST_DELIVER: &str = "host/deliver";
+    pub const STATE_GET: &str = "host/state/get";
+    pub const STATE_SET: &str = "host/state/set";
+    pub const MODEL_COMPLETE: &str = "host/model/complete";
+    pub const TOOLS_CHANGED: &str = "tools/changed";
+    pub const COMMANDS_CHANGED: &str = "commands/changed";
     /// Kernel → plugin, once, before anything else.
     pub const INITIALIZE: &str = "initialize";
     /// Kernel → plugin: run one tool call.
@@ -72,10 +90,6 @@ pub mod name {
     /// one thing a process may ask the host for, and the host routes it to
     /// whoever holds the key.
     pub const SERVICE_CALL: &str = "service/call";
-    /// Kernel → plugin: one of the four decision points, waiting on an
-    /// outcome (ADR-0032 §2). A hook that does not answer never decides.
-    pub const HOOK_DECIDE: &str = "hook/decide";
-
     /// Kernel → plugin: one of the four observation points happened
     /// (ADR-0032 §3). Nothing is awaited, so watching costs the turn nothing.
     pub const HOOK_OBSERVE: &str = "hook/observe";
@@ -118,6 +132,8 @@ pub struct InitializeParams {
     pub protocol: u32,
     /// The directory the manifest was read from, already resolved.
     pub plugin_root: PathBuf,
+    pub plugin_name: String,
+    pub capabilities: BTreeSet<Cap>,
     /// This plugin's settings slice (`plugins.<name>`); `null` when unset.
     #[serde(default)]
     pub config: Value,
@@ -135,6 +151,8 @@ pub struct InitializeResult {
     pub name: String,
     pub version: String,
     #[serde(default)]
+    pub capabilities: BTreeSet<Cap>,
+    #[serde(default)]
     pub tools: Vec<ToolSpec>,
     #[serde(default)]
     pub commands: Vec<CommandSpec>,
@@ -146,6 +164,8 @@ pub struct InitializeResult {
     pub providers: Vec<ProviderSpec>,
     #[serde(default)]
     pub hooks: Vec<HookSpec>,
+    #[serde(default)]
+    pub links: Vec<crate::intercept::LinkSpec>,
     /// The services this process serves, by the key another plugin calls them
     /// by. A key is global — it is what a consumer writes in `requires` — so
     /// the declaration is a map and not a list: one answer per key.
@@ -427,8 +447,7 @@ pub struct ServiceCallResult {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct HookSpec {
-    /// The name this process knows the hook by; `hook/decide` and
-    /// `hook/observe` carry it back. The kernel sees it prefixed by the
+    /// The name this process knows the hook by; `hook/observe` carry it back. The kernel sees it prefixed by the
     /// plugin's own name.
     pub id: String,
     #[serde(flatten)]
@@ -461,54 +480,6 @@ impl From<&HookContext> for HookSite {
             model: cx.model.clone(),
         }
     }
-}
-
-/// What one decision point hands over. The point is the tag and the payload is
-/// what that point owns — the two the trait mutates carry the value to rewrite,
-/// the two that only judge carry what they judge.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "point", content = "payload", rename_all = "camelCase")]
-pub enum HookDecision {
-    Submit { input: Input },
-    BeforeTool { call: ToolCall },
-    AfterTool { call: ToolCall, output: ToolOutput },
-    Stop,
-}
-
-/// One decision, asked for and waited on.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct HookDecideParams {
-    /// Which of the hooks the handshake declared is deciding.
-    pub id: String,
-    pub site: HookSite,
-    #[serde(flatten)]
-    pub decision: HookDecision,
-}
-
-/// The value a hook rewrote, in the one shape the point that owns it takes.
-/// A point that owns no mutable argument has no variant here, so a rewrite
-/// anywhere else is refused by the shape rather than by a check.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-pub enum HookValue {
-    /// `submit`'s input, as the hook would have it.
-    Input { input: Input },
-    /// `beforeTool`'s call, as the hook would have it.
-    Call { call: ToolCall },
-}
-
-/// What the hook decided, and what it rewrote if the point owned anything.
-///
-/// The outcome crosses as the sdk writes it: there is no `Allow` in the type,
-/// so the wire cannot say one (ADR-0032 §4). A hook that only watches this
-/// point answers `continue` and nothing else.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct HookDecideResult {
-    pub outcome: HookOutcome,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub value: Option<HookValue>,
 }
 
 /// What one observation point hands over. Nothing here is answered, so
@@ -577,6 +548,111 @@ pub type Notification = (&'static str, Ref);
 
 pub static METHODS: &[Method] = &[
     (
+        "intercept/prompt.submit",
+        schema_of::<crate::intercept::Before<Input>>,
+        schema_of::<crate::intercept::Proceed<Input, bingo_sdk::SubmitResult>>,
+    ),
+    (
+        "intercept/prompt.submit/after",
+        schema_of::<crate::intercept::After<bingo_sdk::SubmitResult>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::SubmitResult>>,
+    ),
+    (
+        "intercept/tool.check",
+        schema_of::<crate::intercept::Before<crate::intercept::ToolEvent>>,
+        schema_of::<crate::intercept::Proceed<crate::intercept::ToolEvent, bingo_sdk::CheckResult>>,
+    ),
+    (
+        "intercept/tool.check/after",
+        schema_of::<crate::intercept::After<bingo_sdk::CheckResult>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::CheckResult>>,
+    ),
+    (
+        "intercept/tool.call",
+        schema_of::<crate::intercept::Before<crate::intercept::ToolEvent>>,
+        schema_of::<crate::intercept::Proceed<crate::intercept::ToolEvent, ToolOutput>>,
+    ),
+    (
+        "intercept/tool.call/after",
+        schema_of::<crate::intercept::After<ToolOutput>>,
+        schema_of::<crate::intercept::ResultValue<ToolOutput>>,
+    ),
+    (
+        "intercept/turn.step",
+        schema_of::<crate::intercept::Before<ModelRequest>>,
+        schema_of::<crate::intercept::Proceed<ModelRequest, Result<Vec<ModelEvent>, ProviderError>>>,
+    ),
+    (
+        "intercept/turn.step/after",
+        schema_of::<crate::intercept::After<Result<Vec<ModelEvent>, ProviderError>>>,
+        schema_of::<crate::intercept::ResultValue<Result<Vec<ModelEvent>, ProviderError>>>,
+    ),
+    (
+        "intercept/prompt.compose",
+        schema_of::<crate::intercept::Before<ModelRequest>>,
+        schema_of::<crate::intercept::Proceed<ModelRequest, ModelRequest>>,
+    ),
+    (
+        "intercept/prompt.compose/after",
+        schema_of::<crate::intercept::After<ModelRequest>>,
+        schema_of::<crate::intercept::ResultValue<ModelRequest>>,
+    ),
+    (
+        "intercept/session.compact",
+        schema_of::<crate::intercept::Before<bingo_sdk::CompactInput>>,
+        schema_of::<
+            crate::intercept::Proceed<
+                bingo_sdk::CompactInput,
+                Result<Compaction, bingo_sdk::CompactError>,
+            >,
+        >,
+    ),
+    (
+        "intercept/session.compact/after",
+        schema_of::<crate::intercept::After<Result<Compaction, bingo_sdk::CompactError>>>,
+        schema_of::<crate::intercept::ResultValue<Result<Compaction, bingo_sdk::CompactError>>>,
+    ),
+    (
+        "intercept/turn.complete",
+        schema_of::<crate::intercept::Before<()>>,
+        schema_of::<crate::intercept::Proceed<(), bingo_sdk::StopResult>>,
+    ),
+    (
+        "intercept/turn.complete/after",
+        schema_of::<crate::intercept::After<bingo_sdk::StopResult>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::StopResult>>,
+    ),
+    (
+        name::HOST_PLACE,
+        schema_of::<crate::host::Place>,
+        schema_of::<()>,
+    ),
+    (
+        name::HOST_EXTEND,
+        schema_of::<crate::host::Extend>,
+        schema_of::<()>,
+    ),
+    (
+        name::HOST_DELIVER,
+        schema_of::<crate::host::Deliver>,
+        schema_of::<()>,
+    ),
+    (
+        name::STATE_GET,
+        schema_of::<crate::host::StateGet>,
+        schema_of::<Option<crate::host::StateValue>>,
+    ),
+    (
+        name::STATE_SET,
+        schema_of::<crate::host::StateSet>,
+        schema_of::<crate::host::StateValue>,
+    ),
+    (
+        name::MODEL_COMPLETE,
+        schema_of::<crate::host::Complete>,
+        schema_of::<crate::host::Completed>,
+    ),
+    (
         name::INITIALIZE,
         schema_of::<InitializeParams>,
         schema_of::<InitializeResult>,
@@ -611,14 +687,21 @@ pub static METHODS: &[Method] = &[
         schema_of::<ServiceCallParams>,
         schema_of::<ServiceCallResult>,
     ),
-    (
-        name::HOOK_DECIDE,
-        schema_of::<HookDecideParams>,
-        schema_of::<HookDecideResult>,
-    ),
 ];
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ToolsChanged {
+    pub tools: Vec<ToolSpec>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct CommandsChanged {
+    pub commands: Vec<CommandSpec>,
+}
+
 pub static NOTIFICATIONS: &[Notification] = &[
+    ("intercept/cancel", schema_of::<crate::intercept::Cancel>),
+    (name::TOOLS_CHANGED, schema_of::<ToolsChanged>),
+    (name::COMMANDS_CHANGED, schema_of::<CommandsChanged>),
     (name::TOOL_PROGRESS, schema_of::<ToolProgressParams>),
     (name::TOOL_CANCEL, schema_of::<ToolCancelParams>),
     (name::PROVIDER_DELTA, schema_of::<ProviderDeltaParams>),
@@ -630,6 +713,22 @@ pub static NOTIFICATIONS: &[Notification] = &[
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn capabilities_are_only_the_intersection() {
+        for (host, plugin, expected) in [
+            (vec![], vec!["host/place"], vec![]),
+            (vec!["host/place"], vec![], vec![]),
+            (
+                vec!["host/place", "future"],
+                vec!["host/place"],
+                vec!["host/place"],
+            ),
+        ] {
+            let set = |v: Vec<&str>| v.into_iter().map(str::to_owned).collect();
+            assert_eq!(negotiated(&set(host), &set(plugin)), set(expected));
+        }
+    }
 
     #[test]
     fn no_name_is_used_twice() {
@@ -649,6 +748,8 @@ mod tests {
         let params = InitializeParams {
             protocol: PROTOCOL,
             plugin_root: PathBuf::from("/plugins/wordcount"),
+            plugin_name: "wordcount".into(),
+            capabilities: super::capabilities(),
             config: json!({ "limit": 10 }),
             env: HostEnv::from(&Env::rooted("/home/u")),
         };
@@ -1107,14 +1208,6 @@ mod tests {
         }
     }
 
-    fn call() -> ToolCall {
-        ToolCall {
-            call_id: "c1".into(),
-            name: "Bash".into(),
-            input: json!({ "command": "ls" }),
-        }
-    }
-
     /// The declaration mirrors `HookMatcher`: the points and the tool pattern
     /// are the sdk's own fields, flat beside the id.
     #[test]
@@ -1181,116 +1274,6 @@ mod tests {
                 "cwd": "/work", "model": "stub-1"
             })
         );
-    }
-
-    /// One decision, tagged by the point that asked for it, with the payload
-    /// that point owns.
-    #[test]
-    fn a_decision_is_asked_for_by_the_point_that_owns_the_payload() {
-        let params = HookDecideParams {
-            id: "guard".into(),
-            site: site(),
-            decision: HookDecision::BeforeTool { call: call() },
-        };
-        let wire = serde_json::to_value(&params).expect("a decision serialises");
-        assert_eq!(wire["id"], json!("guard"));
-        assert_eq!(wire["point"], json!("beforeTool"));
-        assert_eq!(wire["payload"]["call"]["name"], json!("Bash"));
-        assert_eq!(
-            serde_json::from_value::<HookDecideParams>(wire).expect("and parses"),
-            params
-        );
-    }
-
-    /// `stop` judges nothing but the moment: the point is the whole message.
-    #[test]
-    fn a_stop_carries_the_point_and_no_payload_at_all() {
-        let params = HookDecideParams {
-            id: "again".into(),
-            site: site(),
-            decision: HookDecision::Stop,
-        };
-        let wire = serde_json::to_value(&params).expect("a stop serialises");
-        assert_eq!(wire["point"], json!("stop"));
-        assert!(wire.get("payload").is_none(), "{wire}");
-        assert_eq!(
-            serde_json::from_value::<HookDecideParams>(wire).expect("and parses"),
-            params
-        );
-    }
-
-    /// `afterTool` judges what happened and rewrites nothing, so the outcome
-    /// comes back alone.
-    #[test]
-    fn an_after_tool_carries_the_call_and_what_it_answered() {
-        let params = HookDecideParams {
-            id: "audit".into(),
-            site: site(),
-            decision: HookDecision::AfterTool {
-                call: call(),
-                output: ToolOutput::text("two files"),
-            },
-        };
-        let wire = serde_json::to_value(&params).expect("it serialises");
-        assert_eq!(
-            wire["payload"]["output"]["parts"][0]["text"],
-            json!("two files")
-        );
-        assert_eq!(
-            serde_json::from_value::<HookDecideParams>(wire).expect("and parses"),
-            params
-        );
-    }
-
-    /// The outcome crosses as the sdk writes it, and the rewritten value comes
-    /// back in the shape of the point that owns one.
-    #[test]
-    fn an_outcome_crosses_as_the_sdk_writes_it_and_the_rewrite_beside_it() {
-        let result = HookDecideResult {
-            outcome: HookOutcome::Continue,
-            value: Some(HookValue::Call {
-                call: ToolCall {
-                    input: json!({ "command": "ls -la" }),
-                    ..call()
-                },
-            }),
-        };
-        let wire = serde_json::to_value(&result).expect("a decision serialises");
-        assert_eq!(wire["outcome"], json!({ "kind": "continue" }));
-        assert_eq!(wire["value"]["kind"], json!("call"));
-        assert_eq!(wire["value"]["call"]["input"]["command"], json!("ls -la"));
-        assert_eq!(
-            serde_json::from_value::<HookDecideResult>(wire).expect("and parses"),
-            result
-        );
-    }
-
-    /// A hook that only judges answers with the outcome and nothing else.
-    #[test]
-    fn a_hook_that_rewrites_nothing_sends_no_value() {
-        let denied: HookDecideResult = serde_json::from_value(json!({
-            "outcome": { "kind": "deny", "reason": "not that one" }
-        }))
-        .expect("a refusal");
-        assert!(denied.value.is_none());
-        assert_eq!(
-            serde_json::to_value(&denied).expect("it serialises"),
-            json!({ "outcome": { "kind": "deny", "reason": "not that one" } })
-        );
-    }
-
-    /// The law the whole design rests on: nothing a process writes is an
-    /// `Allow`, in any spelling, at any point (ADR-0032 §4).
-    #[test]
-    fn no_answer_a_process_can_write_widens_anything() {
-        for word in ["allow", "Allow", "approve", "permit", "ALLOW"] {
-            let why = serde_json::from_value::<HookDecideResult>(json!({
-                "outcome": { "kind": word }
-            }))
-            .expect_err("there is no allow to say")
-            .to_string();
-            assert!(why.contains(word), "{why}");
-        }
     }
 
     /// An observation names its point the same way a decision does, and there

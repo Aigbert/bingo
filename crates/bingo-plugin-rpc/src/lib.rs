@@ -29,13 +29,17 @@ pub mod deadline;
 pub mod discovery;
 pub mod doors;
 pub mod hook;
+pub mod host;
+pub mod intercept;
 pub mod manager;
 pub mod manifest;
 pub mod notice;
 pub mod provider;
+pub mod reload;
 pub mod schema;
 pub mod service;
 pub mod source;
+pub mod state;
 pub mod tool;
 pub mod wire;
 
@@ -84,7 +88,10 @@ static MANIFEST: PluginManifest = PluginManifest {
     ],
     requires: &[],
     config: Some(ConfigClaim {
-        keys: &[("plugins", Merge::ByName)],
+        keys: &[
+            ("plugins", Merge::ByName),
+            ("pluginDirs", Merge::Accumulate),
+        ],
         schema,
     }),
 };
@@ -111,11 +118,14 @@ impl Plugin for PluginRpcPlugin {
         let settings: Settings = registrar.config()?;
         // The switches are the kernel's, read here because a plugin process
         // is this plugin's to spawn or not (ADR-0057 §4).
-        let manager = Arc::new(Manager::new(
-            registrar.env().clone(),
-            settings.plugins,
-            registrar.switched_off().clone(),
-        ));
+        let manager = Arc::new(
+            Manager::new(
+                registrar.env().clone(),
+                settings.plugins,
+                registrar.switched_off().clone(),
+            )
+            .with_dirs(settings.plugin_dirs),
+        );
         registrar.add(Contribution::Tools(
             Arc::new(PluginTools::new(Arc::clone(&manager))) as Arc<dyn ToolSource>,
         ));
@@ -131,6 +141,9 @@ impl Plugin for PluginRpcPlugin {
         registrar.add(Contribution::Providers(
             Arc::new(PluginProviders::new(Arc::clone(&manager))) as Arc<dyn ProviderSource>,
         ));
+        registrar.add(Contribution::Interceptors(Arc::new(
+            source::PluginInterceptors::new(manager.clone()),
+        )));
         registrar.add(Contribution::Hooks(
             Arc::new(PluginHooks::new(Arc::clone(&manager))) as Arc<dyn HookSource>,
         ));
@@ -200,7 +213,13 @@ mod tests {
         );
         assert!(MANIFEST.requires.is_empty());
         let claim = MANIFEST.config.expect("a config claim");
-        assert_eq!(claim.keys, [("plugins", Merge::ByName)]);
+        assert_eq!(
+            claim.keys,
+            [
+                ("plugins", Merge::ByName),
+                ("pluginDirs", Merge::Accumulate)
+            ]
+        );
     }
 
     /// One source per kind the bridge opens, all answering to the same id:
@@ -212,7 +231,7 @@ mod tests {
             .register(&mut registrar)
             .expect("register");
         let contributions = registrar.into_contributions();
-        assert_eq!(contributions.len(), 7);
+        assert_eq!(contributions.len(), 8);
         for contribution in &contributions {
             let id = match contribution {
                 Contribution::Tools(source) => source.id(),
@@ -222,6 +241,7 @@ mod tests {
                 Contribution::Providers(source) => source.id(),
                 Contribution::Hooks(source) => source.id(),
                 Contribution::Plugins(source) => source.id(),
+                Contribution::Interceptors(source) => source.id(),
                 other => panic!("expected a source, got {other:?}"),
             };
             assert_eq!(id, ID);

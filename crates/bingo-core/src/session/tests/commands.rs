@@ -324,6 +324,7 @@ async fn a_compaction_turn_compacts_and_closes_and_is_refused_while_a_turn_runs(
         labels,
         vec![
             "turnStarted",
+            "UsageCharged",
             "completed:compaction/completed",
             "compacted",
             "turnCompleted:Completed",

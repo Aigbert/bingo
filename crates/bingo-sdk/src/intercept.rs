@@ -26,7 +26,7 @@ pub enum LinkPoint {
     PromptCompose,
     #[serde(rename = "session.compact")]
     SessionCompact,
-    #[serde(rename = "turn.stop")]
+    #[serde(rename = "turn.complete")]
     TurnStop,
 }
 
@@ -57,6 +57,19 @@ pub struct PluginTrust {
     pub uses: Vec<String>,
 }
 
+/// A process identity accompanies every dynamically supplied link.
+#[derive(Clone)]
+pub struct ExternalInterceptor {
+    pub plugin: String,
+    pub link: std::sync::Arc<dyn Interceptor>,
+}
+
+#[async_trait]
+pub trait InterceptorSource: Send + Sync {
+    fn id(&self) -> &str;
+    async fn interceptors(&self) -> Vec<ExternalInterceptor>;
+}
+
 /// The continuation cannot be cloned or called twice.
 ///
 /// ```compile_fail
@@ -66,32 +79,81 @@ pub struct PluginTrust {
 ///     let _ = next.run(()).await;
 /// }
 /// ```
-pub struct Next<'a, I, O>(Box<dyn FnOnce(I) -> BoxFuture<'a, Result<O, KernelError>> + Send + 'a>);
+pub struct Next<'a, I, O> {
+    run: Box<dyn FnOnce(I) -> BoxFuture<'a, Result<O, KernelError>> + Send + 'a>,
+    tier: Tier,
+    phase: Option<tokio::sync::watch::Sender<bool>>,
+}
 
 impl<'a, I, O> Next<'a, I, O> {
     pub fn new(run: impl FnOnce(I) -> BoxFuture<'a, Result<O, KernelError>> + Send + 'a) -> Self {
-        Self(Box::new(run))
+        Self::at(Tier::Full, run)
+    }
+
+    pub fn at(
+        tier: Tier,
+        run: impl FnOnce(I) -> BoxFuture<'a, Result<O, KernelError>> + Send + 'a,
+    ) -> Self {
+        Self {
+            run: Box::new(run),
+            tier,
+            phase: None,
+        }
+    }
+
+    pub fn tracked(mut self, phase: tokio::sync::watch::Sender<bool>) -> Self {
+        self.phase = Some(phase);
+        self
+    }
+
+    pub fn tier(&self) -> Tier {
+        self.tier
     }
 
     pub async fn run(self, input: I) -> Result<O, KernelError> {
-        (self.0)(input).await
+        self.run_then(input, std::future::ready).await
+    }
+
+    /// Keep collecting a streaming continuation outside the caller's phase clock.
+    pub async fn run_then<R, F: std::future::Future<Output = R>>(
+        self,
+        input: I,
+        finish: impl FnOnce(O) -> F,
+    ) -> Result<R, KernelError> {
+        if let Some(phase) = &self.phase {
+            phase.send_replace(false);
+        }
+        let _resume = Resume(self.phase);
+        Ok(finish((self.run)(input).await?).await)
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+struct Resume(Option<tokio::sync::watch::Sender<bool>>);
+impl Drop for Resume {
+    fn drop(&mut self) {
+        if let Some(phase) = &self.0 {
+            phase.send_replace(true);
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub enum SubmitResult {
     Accepted(Input),
     Rejected(KernelError),
     Redirect { session: SessionId, input: Input },
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CheckResult {
     pub call: ToolCall,
     pub decision: Decision,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CompactInput {
     pub items: Vec<Item>,
     pub usage: ContextUsage,
@@ -101,7 +163,8 @@ pub struct CompactInput {
     pub keep_budget: u64,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub enum StopResult {
     Complete,
     Continue { origin: String, reason: String },

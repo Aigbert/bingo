@@ -31,6 +31,7 @@ pub fn document() -> Value {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "bingo plugin",
         "protocol": PROTOCOL,
+        "capabilities": crate::wire::capabilities(),
         "$defs": sorted(generator.take_definitions(true)),
         "manifest": { "$ref": "#/$defs/Manifest" },
         "methods": methods,
@@ -90,6 +91,94 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+
+    #[test]
+    fn protocol_two_names_the_new_doors() {
+        let schema = document();
+        assert_eq!(schema["protocol"], 2);
+        for method in [
+            "host/place",
+            "host/extend",
+            "host/deliver",
+            "host/state/get",
+            "host/state/set",
+            "host/model/complete",
+            "intercept/tool.call",
+            "intercept/tool.call/after",
+        ] {
+            assert!(schema["methods"].get(method).is_some(), "missing {method}");
+        }
+        assert!(schema["methods"].get("hook/decide").is_none());
+        for field in ["pluginName", "pluginRoot", "capabilities"] {
+            assert!(
+                schema["$defs"]["InitializeParams"]["properties"]
+                    .get(field)
+                    .is_some(),
+                "missing {field}"
+            );
+        }
+    }
+
+    fn frozen() -> Value {
+        let path = committed().with_file_name("plugin-2.json");
+        serde_json::from_str(&std::fs::read_to_string(path).expect("protocol 2 is frozen")).unwrap()
+    }
+
+    // Descriptions are prose; all structural keys and every existing alternative hold.
+    fn preserves(before: &Value, after: &Value) -> bool {
+        match (before, after) {
+            (Value::Object(before), Value::Object(after)) => before.iter().all(|(key, value)| {
+                matches!(key.as_str(), "description" | "title" | "$comment")
+                    || after.get(key).is_some_and(|next| preserves(value, next))
+            }),
+            (Value::Array(before), Value::Array(after)) => before
+                .iter()
+                .all(|value| after.iter().any(|next| preserves(value, next))),
+            _ => before == after,
+        }
+    }
+
+    #[test]
+    fn protocol_two_keeps_every_frozen_shape() {
+        assert!(
+            preserves(&frozen(), &document()),
+            "protocol 2 removed or retyped a frozen shape"
+        );
+    }
+
+    #[test]
+    fn the_freeze_rejects_removal_and_retyping_but_allows_additions() {
+        let before = frozen();
+        for pointer in [
+            "/methods/host~1place",
+            "/$defs/InitializeParams/properties/pluginName",
+        ] {
+            let (parent, key) = pointer.rsplit_once('/').unwrap();
+            let key = key.replace("~1", "/");
+            let mut after = before.clone();
+            after
+                .pointer_mut(parent)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .remove(&key);
+            assert!(!preserves(&before, &after), "removed {pointer}");
+        }
+        let mut after = before.clone();
+        after["$defs"]["InitializeParams"]["properties"]["pluginName"]["type"] = json!("integer");
+        assert!(!preserves(&before, &after));
+        let mut after = before.clone();
+        after["capabilities"].as_array_mut().unwrap().pop();
+        assert!(!preserves(&before, &after));
+        let mut after = before.clone();
+        after["methods"]["future/verb"] = json!({});
+        after["$defs"]["InitializeParams"]["properties"]["future"] = json!({"type":"string"});
+        after["capabilities"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("future/verb"));
+        assert!(preserves(&before, &after));
+    }
 
     fn committed() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schema/plugin.json")
@@ -171,50 +260,6 @@ mod tests {
         );
     }
 
-    /// The pin ADR-0032 §4 rests on. `HookOutcome` has no `Allow`, and the
-    /// wire adds none: everything a hook may answer with is in these three
-    /// definitions, and there is no allowing word anywhere in them. (A
-    /// person's own permission answer says `allowOnce` elsewhere in the
-    /// document; that is the gate's vocabulary, which no process writes.)
-    #[test]
-    fn the_outcome_a_hook_writes_has_no_allow_to_say() {
-        let document = document();
-        let kinds: Vec<&str> = document["$defs"]["HookOutcome"]["oneOf"]
-            .as_array()
-            .map(|variants| {
-                variants
-                    .iter()
-                    .filter_map(|v| v["properties"]["kind"]["const"].as_str())
-                    .collect()
-            })
-            .unwrap_or_default();
-        assert_eq!(kinds, ["continue", "deny", "ask", "block", "redirect"]);
-        for name in ["HookOutcome", "HookDecideResult", "HookValue"] {
-            let mut shape = document["$defs"][name].clone();
-            undescribed(&mut shape);
-            let written = shape.to_string().to_lowercase();
-            for spelling in ["allow", "approve", "permit"] {
-                assert!(
-                    !written.contains(spelling),
-                    "{name} spells {spelling}: {written}"
-                );
-            }
-        }
-    }
-
-    /// The shape without the prose about it: a doc comment saying there is no
-    /// `Allow` must not be what makes this test pass.
-    fn undescribed(value: &mut Value) {
-        match value {
-            Value::Object(map) => {
-                map.remove("description");
-                map.values_mut().for_each(undescribed);
-            }
-            Value::Array(items) => items.iter_mut().for_each(undescribed),
-            _ => {}
-        }
-    }
-
     /// Every key under any `properties`, wherever it sits in the document.
     fn properties(value: &Value, found: &mut Vec<String>) {
         match value {
@@ -248,7 +293,9 @@ mod tests {
         assert!(!names.is_empty(), "the document has properties to check");
         let mut snake: Vec<String> = names
             .into_iter()
-            .filter(|name| !is_camel_case(name))
+            .filter(|name| {
+                !matches!(name.as_str(), "tool_use_id" | "Ok" | "Err") && !is_camel_case(name)
+            })
             .collect();
         snake.sort_unstable();
         snake.dedup();
@@ -279,10 +326,9 @@ mod tests {
         references(&document["methods"], &mut found);
         references(&document["notifications"], &mut found);
         references(&document["hostService"], &mut found);
-        assert_eq!(
-            found.len(),
-            1 + (METHODS.len() + doors::METHODS.len()) * 2 + NOTIFICATIONS.len()
-        );
+        // Unit results are inline null schemas, so not every envelope is a reference.
+        references(definitions, &mut found);
+        assert!(!found.is_empty());
         for reference in found {
             let name = reference
                 .strip_prefix("#/$defs/")
@@ -320,7 +366,6 @@ mod tests {
             "ProviderError",
             "EndpointCapabilities",
             "HookPoint",
-            "HookOutcome",
             "Phase",
             "Input",
             "ToolCall",

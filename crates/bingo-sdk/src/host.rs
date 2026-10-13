@@ -417,8 +417,28 @@ impl Delivery {
     }
 }
 
+/// The calling plugin is bound by its host adapter, never supplied on the wire.
+#[derive(Clone, Debug)]
+pub struct Completion {
+    pub plugin: String,
+    pub request: crate::ModelRequest,
+}
+
 #[async_trait]
 pub trait HostApi: Send + Sync {
+    /// One side call, charged to the named turn or the session alone.
+    async fn complete(
+        &self,
+        _session: &SessionId,
+        _turn: Option<&TurnId>,
+        _request: Completion,
+    ) -> Result<Vec<crate::ModelEvent>, KernelError> {
+        Err(KernelError::new(
+            ErrorCode::Unsupported,
+            "this host does not complete model requests",
+        ))
+    }
+
     async fn sessions(&self, filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError>;
 
     async fn open(

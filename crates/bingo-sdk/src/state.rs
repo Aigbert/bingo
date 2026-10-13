@@ -178,6 +178,7 @@ impl SessionState {
             Event::TurnStarted { turn, origin, .. } => self.turn_started(turn, *origin, frame.ts),
             Event::TurnRetrying { attempt, max, .. } => self.turn_retrying(*attempt, *max),
             Event::TurnUsage { usage, context, .. } => self.turn_usage(*usage, *context),
+            Event::UsageCharged { turn, usage, .. } => self.usage_charged(turn.as_ref(), *usage),
             Event::TurnCompleted {
                 turn,
                 status,
@@ -284,6 +285,14 @@ impl SessionState {
         Applied::Turn
     }
 
+    fn usage_charged(&mut self, turn: Option<&TurnId>, usage: Usage) -> Applied {
+        if let Some(live) = self.turn.as_mut().filter(|live| Some(&live.id) == turn) {
+            live.usage.add(usage);
+        }
+        self.summary.usage.add(usage);
+        Applied::Turn
+    }
+
     fn turn_usage(&mut self, usage: Usage, context: ContextUsage) -> Applied {
         if let Some(t) = self.turn.as_mut() {
             t.usage.add(usage);
@@ -371,6 +380,35 @@ mod tests {
             busy: false,
             messages: None,
         }
+    }
+
+    #[test]
+    fn side_usage_adds_without_advancing_the_round_or_context() {
+        let mut state = SessionState::new(summary());
+        state.apply(&frame(
+            1,
+            Event::TurnStarted {
+                turn: TurnId::from_raw("trn_1"),
+                inputs: vec![],
+                origin: TurnOrigin::Submit,
+            },
+        ));
+        let charge: Event =
+            serde_json::from_str(include_str!("../fixtures/record/event/usageCharged.json"))
+                .unwrap();
+        state.apply(&frame(2, charge));
+        assert_eq!(state.summary.usage.input_tokens, 5);
+        let turn = state.turn.as_ref().unwrap();
+        assert_eq!(turn.usage.input_tokens, 5);
+        assert_eq!(turn.round, 0);
+        assert!(state.context.is_none());
+        let charge = serde_json::from_value(serde_json::json!({
+            "type":"usageCharged", "plugin":"stub", "usage":{"inputTokens":2,"outputTokens":1}
+        }))
+        .unwrap();
+        state.apply(&frame(3, charge));
+        assert_eq!(state.summary.usage.input_tokens, 7);
+        assert_eq!(state.turn.as_ref().unwrap().usage.input_tokens, 5);
     }
 
     #[test]

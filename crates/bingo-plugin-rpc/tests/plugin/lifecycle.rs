@@ -124,3 +124,13 @@ async fn a_plugin_whose_command_is_gone_is_reported_and_contributes_nothing() {
     assert!(manager.commands().await.is_empty());
     manager.shutdown().await;
 }
+
+#[tokio::test]
+async fn protocol_one_is_refused_with_both_numbers() {
+    let started = started_with(&[("stub", &["--protocol", "1"])]).await;
+    let (_, text) = started.heard("PLUGIN_UNAVAILABLE").await;
+    assert!(text.contains("protocol 1"), "{text}");
+    assert!(text.contains("host speaks 2"), "{text}");
+    assert!(started.manager.tools().await.is_empty());
+    started.manager.shutdown().await;
+}

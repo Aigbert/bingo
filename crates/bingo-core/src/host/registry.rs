@@ -22,6 +22,7 @@ use crate::plugins::{self, needed};
 /// is here.
 #[derive(Default)]
 pub struct Sources {
+    pub interceptors: Vec<Arc<dyn InterceptorSource>>,
     /// Read when a turn starts.
     pub tools: Vec<Arc<dyn ToolSource>>,
     /// Read when a name is not in `commands`.
@@ -170,6 +171,10 @@ impl Registry {
                     interceptor: link,
                     tier,
                 });
+                Ok(())
+            }
+            Contribution::Interceptors(source) => {
+                self.sources.interceptors.push(source);
                 Ok(())
             }
             Contribution::Hook(hook) => {

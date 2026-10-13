@@ -28,13 +28,14 @@ impl Turn<'_> {
         // carries only reaches the stream that does not exist yet.
         let provider = self.model.provider.clone();
         let cancel = self.cancel.child_token();
+        let links = self.cfg.hooks.links().await;
         let kernel = Next::new(|request| {
             Box::pin(async move { Ok(provider.stream(request, cancel).await.map(StepStream::new)) })
         });
         let report = crate::chain::Report::default();
         let established = self
             .racing(crate::chain::run::<crate::chain::model::Model>(
-                &self.cfg.hooks.links,
+                &links,
                 kernel,
                 &self.hook_cx,
                 request,
@@ -257,7 +258,6 @@ pub(super) fn stopped_early(
         status: TurnStatus::Interrupted {
             reason: InterruptReason::UserCancel,
         },
-        usage: Usage::default(),
         items: transcript.model_items().cloned().collect(),
     }
 }

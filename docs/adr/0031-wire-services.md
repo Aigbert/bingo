@@ -1,5 +1,7 @@
 # ADR-0031 — Wire services
 
+Amended 2026-10-13 · M132: [ADR-0075](0075-plugin-protocol-2.md) freezes protocol 2, negotiates host verbs and links, and adds state and explicit-directory reload.
+
 Status: accepted · 2026-09-01 · Plan: M28
 
 ## Context

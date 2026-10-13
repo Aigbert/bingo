@@ -1,6 +1,9 @@
 # ADR-0075 — Plugin protocol 2
 
-Status: proposed · 2026-10-13 · Plans: M132 (wire), M133 (author kit) · Amends: ADR-0015 §3 and Consequences, ADR-0030, ADR-0031 Consequences
+Status: accepted · 2026-10-13 · Plan: M132 (wire); M133 (author kit) remains separate · Amends: ADR-0015 §3 and Consequences, ADR-0030, ADR-0031 Consequences
+
+Implementation note (2026-10-13): M132 is locally verified; Windows runtime
+cleanup and C-header-blocked builds remain for Windows CI (protocol step 7).
 
 ## Context
 

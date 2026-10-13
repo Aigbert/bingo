@@ -79,7 +79,7 @@ impl Bridged {
             ..self.hook_context()
         };
         let dispatch = executor::Dispatch {
-            links: &self.config.hooks.links,
+            links: &self.config.hooks.links().await,
             cx: &cx,
             report: report.clone(),
         };
@@ -108,7 +108,7 @@ impl Bridged {
         };
         let gated = gate_call(
             GateInput {
-                links: &self.config.hooks.links,
+                links: &self.config.hooks.links().await,
                 session: &self.config.session.id,
                 cwd: &self.config.cwd,
                 item: &self.item,

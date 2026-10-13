@@ -123,12 +123,6 @@ pub(super) async fn close_dropped_turn(
         status: TurnStatus::Interrupted {
             reason: InterruptReason::UserCancel,
         },
-        usage: actor
-            .state
-            .turn
-            .as_ref()
-            .map(|live| live.usage)
-            .unwrap_or_default(),
         items: actor
             .state
             .transcript

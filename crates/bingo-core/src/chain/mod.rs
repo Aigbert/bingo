@@ -89,6 +89,7 @@ struct Continued<'a, O: Clone> {
     pending: Option<Pending<'a, O>>,
     invalid: bool,
     rewritten: bool,
+    phase: tokio::sync::watch::Sender<bool>,
 }
 impl<O: Clone> Default for Continued<'_, O> {
     fn default() -> Self {
@@ -96,6 +97,7 @@ impl<O: Clone> Default for Continued<'_, O> {
             pending: None,
             invalid: false,
             rewritten: false,
+            phase: tokio::sync::watch::channel(true).0,
         }
     }
 }
@@ -161,6 +163,11 @@ async fn invoke<'a, P: Point>(
     report: Report,
 ) -> Result<P::Output, KernelError> {
     let pending: Continuation<'a, P::Output> = Arc::new(Mutex::new(Continued::default()));
+    let phase = pending
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .phase
+        .subscribe();
     let next = continuation::<P>(
         link,
         rest,
@@ -172,14 +179,7 @@ async fn invoke<'a, P: Point>(
     );
     let future = P::dispatch(link.interceptor.as_ref(), cx, input.clone(), next);
     let answer = if link.external.is_some() {
-        tokio::time::timeout(HOOK_DEADLINE, future)
-            .await
-            .unwrap_or_else(|_| {
-                Err(KernelError::new(
-                    ErrorCode::Internal,
-                    "hook deadline exceeded",
-                ))
-            })
+        phase_deadline(future, phase).await
     } else {
         future.await
     };
@@ -187,6 +187,7 @@ async fn invoke<'a, P: Point>(
         pending: called,
         invalid,
         rewritten,
+        ..
     } = std::mem::take(&mut *pending.lock().unwrap_or_else(|e| e.into_inner()));
     let baseline = match called {
         Some(future) => Some(future.await),
@@ -234,7 +235,12 @@ fn continuation<'a, P: Point>(
     report: Report,
     pending: Continuation<'a, P::Output>,
 ) -> Next<'a, P::Input, P::Output> {
-    Next::new(move |mut input| {
+    let clock = pending
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .phase
+        .clone();
+    Next::at(link.tier, move |mut input| {
         let changed = input != original;
         let invalid = !P::pinned(&original, &input)
             || (changed && !admits(link.tier, P::POINT, Act::Rewrite));
@@ -242,14 +248,21 @@ fn continuation<'a, P: Point>(
             report.notice(link, P::POINT, "input rewrite exceeds its authority");
             input = original;
         }
+        let phase = pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .phase
+            .clone();
         let future = run_at::<P>(rest, kernel, cx, input, report).shared();
         *pending.lock().unwrap_or_else(|e| e.into_inner()) = Continued {
             pending: Some(future.clone()),
             invalid,
             rewritten: changed && !invalid,
+            phase,
         };
         Box::pin(future)
     })
+    .tracked(clock)
 }
 
 pub(crate) mod compact;
@@ -260,3 +273,24 @@ pub(crate) mod submit;
 #[cfg(test)]
 mod tests;
 pub(crate) mod tool;
+
+async fn phase_deadline<O>(
+    future: BoxFuture<'_, Result<O, KernelError>>,
+    mut phase: tokio::sync::watch::Receiver<bool>,
+) -> Result<O, KernelError> {
+    let timer = tokio::time::sleep(HOOK_DEADLINE);
+    tokio::pin!(timer);
+    tokio::pin!(future);
+    loop {
+        let active = *phase.borrow_and_update();
+        tokio::select! {
+            biased;
+            result = &mut future => return result,
+            changed = phase.changed() => {
+                if changed.is_err() { return future.await; }
+                timer.as_mut().reset(tokio::time::Instant::now() + HOOK_DEADLINE);
+            }
+            _ = &mut timer, if active => return Err(KernelError::new(ErrorCode::Internal, "hook deadline exceeded")),
+        }
+    }
+}

@@ -86,6 +86,13 @@ pub enum Event {
         usage: Usage,
         context: ContextUsage,
     },
+    /// Additive model spend, independent of context measurement and rounds.
+    UsageCharged {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        turn: Option<TurnId>,
+        plugin: String,
+        usage: Usage,
+    },
     TurnCompleted {
         turn: TurnId,
         status: TurnStatus,

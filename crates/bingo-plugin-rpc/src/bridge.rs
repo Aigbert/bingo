@@ -19,8 +19,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bingo_sdk::{
-    Command as SdkCommand, CommandSpec, Compactor, ContextContributor, Hook, HostHandle, Provider,
-    Tool, ToolSpec,
+    Command as SdkCommand, Compactor, ContextContributor, Hook, HostHandle, Provider, Tool,
 };
 use serde_json::Value;
 use tokio::sync::Mutex;
@@ -62,12 +61,11 @@ pub fn backoff(failures: u32) -> Duration {
 /// What one process answered `initialize` with, and the pipe it answered on.
 struct Live {
     connection: Arc<Connection>,
-    tools: Vec<ToolSpec>,
-    commands: Vec<CommandSpec>,
     contributors: Vec<ContributorSpec>,
     compactors: Vec<CompactorSpec>,
     providers: Vec<ProviderSpec>,
     hooks: Vec<HookSpec>,
+    links: Vec<crate::intercept::LinkSpec>,
     services: BTreeMap<String, ServiceSpec>,
 }
 
@@ -87,6 +85,7 @@ struct State {
     /// Why the last attempt failed, for a listing to show long after the
     /// notice that said it has been drained (ADR-0057 §5).
     failed: Option<String>,
+    stopped: bool,
 }
 
 /// The setting every bridge shares: where the host lives, where a process's
@@ -108,9 +107,9 @@ pub struct Bridge {
     root: PathBuf,
     /// Already resolved: `${PLUGIN_ROOT}` is a manifest's spelling, not a
     /// process's, so nothing past this point knows the placeholder exists.
-    entry: Entry,
+    launch: std::sync::RwLock<(Entry, Option<std::num::NonZeroU64>)>,
     config: Value,
-    call_timeout: Option<std::num::NonZeroU64>,
+    lifecycle: Mutex<()>,
     env: HostEnv,
     data_dir: PathBuf,
     notices: Arc<Notices>,
@@ -121,6 +120,7 @@ pub struct Bridge {
     /// services it declares are published (ADR-0031 §4).
     host: HostHandle,
     state: Mutex<State>,
+    pub(crate) store: crate::state::Store,
 }
 
 impl std::fmt::Debug for Bridge {
@@ -141,12 +141,14 @@ impl Bridge {
         call_timeout: Option<std::num::NonZeroU64>,
         setting: Setting,
     ) -> Self {
+        let name = name.into();
         Self {
-            name: name.into(),
+            store: crate::state::Store::new(&setting.data_dir, &name),
+            name,
             root,
-            entry,
+            launch: std::sync::RwLock::new((entry, call_timeout)),
             config,
-            call_timeout,
+            lifecycle: Mutex::new(()),
             env: setting.env,
             data_dir: setting.data_dir,
             notices: setting.notices,
@@ -167,6 +169,7 @@ impl Bridge {
     /// Whatever services the process declared are published after the process
     /// is filed, so a call that arrives at once finds a bridge that is ready.
     pub async fn connect(self: &Arc<Self>) {
+        let _guard = self.lifecycle.lock().await;
         if !self.claim().await {
             return;
         }
@@ -212,12 +215,30 @@ impl Bridge {
         self.ready().await.map(|live| Arc::clone(&live.connection))
     }
 
+    pub async fn interceptors(self: &Arc<Self>) -> Vec<bingo_sdk::ExternalInterceptor> {
+        let Some(live) = self.ready().await else {
+            return Vec::new();
+        };
+        live.links
+            .iter()
+            .map(|spec| bingo_sdk::ExternalInterceptor {
+                plugin: self.name.clone(),
+                link: Arc::new(crate::intercept::Remote::new(
+                    &self.name,
+                    spec.clone(),
+                    live.connection.clone(),
+                )),
+            })
+            .collect()
+    }
+
     /// The tools of a living process, and nothing when there is none.
     pub async fn tools(self: &Arc<Self>) -> Vec<Arc<dyn Tool>> {
         let Some(live) = self.ready().await else {
             return Vec::new();
         };
-        live.tools
+        live.connection
+            .tools()
             .iter()
             .map(|spec| {
                 Arc::new(PluginTool::new(
@@ -225,7 +246,10 @@ impl Bridge {
                     spec.clone(),
                     Arc::clone(&live.connection),
                     Arc::clone(&self.notices),
-                    self.call_timeout
+                    self.launch
+                        .read()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .1
                         .map(|seconds| Duration::from_secs(seconds.get()))
                         .unwrap_or(deadline::TOOL_CALL),
                 )) as Arc<dyn Tool>
@@ -238,14 +262,18 @@ impl Bridge {
         let Some(live) = self.ready().await else {
             return Vec::new();
         };
-        live.commands
+        live.connection
+            .commands()
             .iter()
             .map(|spec| {
                 Arc::new(PluginCommand::new(
                     &self.name,
                     spec.clone(),
                     Arc::clone(&live.connection),
-                    self.call_timeout
+                    self.launch
+                        .read()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .1
                         .map(|seconds| Duration::from_secs(seconds.get()))
                         .unwrap_or(deadline::COMMAND_RUN),
                 )) as Arc<dyn SdkCommand>
@@ -338,10 +366,47 @@ impl Bridge {
 
     /// End the process, and leave nothing that would respawn it.
     pub async fn stop(&self) {
+        let _guard = self.lifecycle.lock().await;
         let mut state = self.state.lock().await;
+        state.stopped = true;
         state.next_attempt = None;
         if let Some(live) = state.live.take() {
             live.connection.stop().await;
+        }
+    }
+
+    pub async fn reload(self: &Arc<Self>, manifest: crate::Manifest) {
+        let _guard = self.lifecycle.lock().await;
+        let old = {
+            let mut state = self.state.lock().await;
+            if state.stopped {
+                return;
+            }
+            state.starting = true;
+            state.live.take()
+        };
+        if let Some(live) = &old {
+            live.connection.stop().await;
+        }
+        *self.launch.write().unwrap_or_else(|e| e.into_inner()) =
+            (manifest.entry.rooted(&self.root), manifest.call_timeout);
+        let outcome = self.handshake().await;
+        let restart = match (&old, &outcome) {
+            (Some(old), Ok(new)) => old.providers != new.providers || old.services != new.services,
+            _ => false,
+        };
+        let succeeded = outcome.is_ok();
+        self.file(outcome).await;
+        if succeeded {
+            let suffix = if restart {
+                "; provider or service declarations changed; restart required"
+            } else {
+                ""
+            };
+            self.notices.push(Notice::warn(
+                "PLUGIN_RELOADED",
+                format!("the {} plugin reloaded{suffix}", self.name),
+            ));
         }
     }
 
@@ -391,7 +456,7 @@ impl Bridge {
     /// enough to say so: the spawn that follows holds nothing.
     async fn claim(&self) -> bool {
         let mut state = self.state.lock().await;
-        if state.starting || state.live.is_some() {
+        if state.stopped || state.starting || state.live.is_some() {
             return false;
         }
         if state.next_attempt.is_some_and(|at| Instant::now() < at) {
@@ -434,24 +499,34 @@ impl Bridge {
             self.host.clone(),
             self.doors.face(caller),
         ));
+        let entry = self
+            .launch
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .0
+            .clone();
         let connection = Arc::new(Connection::spawn(
             &self.name,
-            &self.entry,
+            &entry,
             &self.root,
             &self.data_dir,
-            Some(hub),
+            Some(Arc::new(crate::host::Server::new(
+                &self.name,
+                self.host.clone(),
+                hub,
+                self.store.clone(),
+            ))),
         )?);
         let answered =
             tokio::time::timeout(deadline::HANDSHAKE, self.initialize(&connection)).await;
         match answered {
             Ok(Ok(result)) => Ok(Live {
                 connection,
-                tools: result.tools,
-                commands: result.commands,
                 contributors: result.contributors,
                 compactors: result.compactors,
                 providers: result.providers,
                 hooks: result.hooks,
+                links: result.links,
                 services: result.services,
             }),
             Ok(Err(why)) => {
@@ -472,6 +547,8 @@ impl Bridge {
         let params = InitializeParams {
             protocol: PROTOCOL,
             plugin_root: self.root.clone(),
+            plugin_name: self.name.clone(),
+            capabilities: crate::wire::capabilities(),
             config: self.config.clone(),
             env: self.env.clone(),
         };
@@ -483,6 +560,8 @@ impl Bridge {
         let result: InitializeResult =
             serde_json::from_value(answer).map_err(|e| format!("initialize: {e}"))?;
         check_protocol(&result)?;
+        connection.negotiate(&result.capabilities);
+        connection.initialize_lists(result.tools.clone(), result.commands.clone());
         Ok(result)
     }
 }
@@ -513,12 +592,11 @@ impl Bridge {
         if let Ok(mut state) = bridge.state.try_lock() {
             state.live = Some(Arc::new(Live {
                 connection,
-                tools: Vec::new(),
-                commands: Vec::new(),
                 contributors: Vec::new(),
                 compactors: Vec::new(),
                 providers: Vec::new(),
                 hooks: Vec::new(),
+                links: Vec::new(),
                 services: BTreeMap::new(),
             }));
         }
@@ -548,14 +626,25 @@ mod tests {
             protocol,
             name: "wordcount".into(),
             version: "0.1.0".into(),
+            capabilities: crate::wire::capabilities(),
             tools: Vec::new(),
             commands: Vec::new(),
             contributors: Vec::new(),
             compactors: Vec::new(),
             providers: Vec::new(),
             hooks: Vec::new(),
+            links: Vec::new(),
             services: Default::default(),
         }
+    }
+
+    #[test]
+    fn protocol_one_is_refused_with_both_numbers() {
+        let why = check_protocol(&result(1)).expect_err("protocol 1 is retired");
+        assert!(
+            why.contains("protocol 1") && why.contains("speaks 2"),
+            "{why}"
+        );
     }
 
     #[test]

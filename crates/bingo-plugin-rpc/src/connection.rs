@@ -32,8 +32,8 @@ use tokio::process::{ChildStdin, ChildStdout, Command};
 use tokio::sync::mpsc::{Sender, UnboundedSender};
 
 use crate::codec::{Message, Notification, Request, Response, RpcError, TRANSPORT_ERROR};
+use crate::host::Server;
 use crate::manifest::Entry;
-use crate::service::ServiceCalls;
 use crate::wire::{ProviderDeltaParams, ToolProgressParams, name};
 
 /// What a request came back with.
@@ -49,7 +49,7 @@ pub fn log_path(data_dir: &Path, plugin: &str) -> std::path::PathBuf {
 /// a host that keeps no services — and then that request is refused like any
 /// other (ADR-0031 §4).
 struct Serving {
-    calls: Arc<dyn ServiceCalls>,
+    calls: Arc<Server>,
 }
 
 impl std::fmt::Debug for Serving {
@@ -63,7 +63,7 @@ impl Serving {
     /// reader, which is also carrying this process's replies and deltas.
     async fn answer(&self, request: Request, writer: bingo_jsonrpc::Sender) {
         let calls = &self.calls;
-        let answered = match calls.call(request.params).await {
+        let answered = match calls.answer(&request.method, request.params).await {
             Ok(result) => Response::ok(request.id, result),
             Err(error) => Response::failed(Some(request.id), error),
         };
@@ -71,12 +71,6 @@ impl Serving {
             tracing::debug!(%why, "an answer to a plugin went nowhere");
         }
     }
-}
-
-/// Whether the host answers a request a process sent at all. Exactly one
-/// method, by name (ADR-0031 §4).
-fn served(method: &str) -> bool {
-    method == name::SERVICE_CALL
 }
 
 /// One tool call this process is running: where its progress line goes, and
@@ -107,6 +101,14 @@ struct Router {
     running: Mutex<HashMap<String, Running>>,
     streaming: Mutex<HashMap<String, Sender<ModelEvent>>>,
     serving: Option<Serving>,
+    lists: Mutex<Lists>,
+}
+
+#[derive(Default, Debug)]
+struct Lists {
+    ready: bool,
+    tools: Option<Vec<bingo_sdk::ToolSpec>>,
+    commands: Option<Vec<bingo_sdk::CommandSpec>>,
 }
 
 impl Router {
@@ -130,18 +132,31 @@ impl Router {
     }
 
     async fn asked(&self, plugin: &str, request: Request, sender: Option<bingo_jsonrpc::Sender>) {
-        match (
-            self.serving.as_ref().filter(|_| served(&request.method)),
-            sender,
-        ) {
-            (Some(serving), Some(sender)) => serving.answer(request, sender).await,
-            _ => {
-                tracing::warn!(plugin, method = %request.method, "a plugin asked, which it may not")
-            }
+        let Some(sender) = sender else {
+            return;
+        };
+        if let Some(serving) = self.serving.as_ref() {
+            serving.answer(request, sender).await;
+        } else {
+            let error = RpcError::new(
+                crate::codec::METHOD_NOT_FOUND,
+                format!("the host does not serve {} for {plugin}", request.method),
+            );
+            let _ = sender.send(Message::Response(Response::failed(Some(request.id), error)));
         }
     }
 
     async fn notification(&self, plugin: &str, notification: Notification) {
+        if matches!(
+            notification.method.as_str(),
+            name::TOOLS_CHANGED | name::COMMANDS_CHANGED
+        ) {
+            self.changed(notification);
+            return;
+        }
+        if !self.permits(&notification.method) {
+            return;
+        }
         match notification.method.as_str() {
             name::TOOL_PROGRESS => match serde_json::from_value(notification.params) {
                 Ok(params) => self.progress(params),
@@ -152,6 +167,36 @@ impl Router {
                 Err(error) => tracing::warn!(plugin, %error, "a delta that is not an event"),
             },
             other => tracing::debug!(plugin, method = other, "an unknown notification"),
+        }
+    }
+
+    fn permits(&self, method: &str) -> bool {
+        self.serving
+            .as_ref()
+            .is_none_or(|serving| serving.calls.permits(method).is_ok())
+    }
+
+    fn changed(&self, notification: Notification) {
+        let mut lists = self.lists.lock().unwrap_or_else(|e| e.into_inner());
+        if lists.ready && !self.permits(&notification.method) {
+            return;
+        }
+        match notification.method.as_str() {
+            name::TOOLS_CHANGED => {
+                if let Ok(params) =
+                    serde_json::from_value::<crate::wire::ToolsChanged>(notification.params)
+                {
+                    lists.tools = Some(params.tools);
+                }
+            }
+            name::COMMANDS_CHANGED => {
+                if let Ok(params) =
+                    serde_json::from_value::<crate::wire::CommandsChanged>(notification.params)
+                {
+                    lists.commands = Some(params.commands);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -210,7 +255,7 @@ impl Connection {
         entry: &Entry,
         root: &Path,
         data_dir: &Path,
-        serving: Option<Arc<dyn ServiceCalls>>,
+        serving: Option<Arc<Server>>,
     ) -> Result<Self, String> {
         let mut command = Command::new(&entry.command);
         command
@@ -233,7 +278,7 @@ impl Connection {
         child: Tree,
         stdin: ChildStdin,
         stdout: ChildStdout,
-        serving: Option<Arc<dyn ServiceCalls>>,
+        serving: Option<Arc<Server>>,
     ) -> Self {
         let router = Arc::new(Router {
             #[cfg(test)]
@@ -254,6 +299,47 @@ impl Connection {
         }
     }
 
+    pub fn initialize_lists(
+        &self,
+        tools: Vec<bingo_sdk::ToolSpec>,
+        commands: Vec<bingo_sdk::CommandSpec>,
+    ) {
+        let mut lists = self.router.lists.lock().unwrap_or_else(|e| e.into_inner());
+        if !self.router.permits(name::TOOLS_CHANGED) {
+            lists.tools = None;
+        }
+        if !self.router.permits(name::COMMANDS_CHANGED) {
+            lists.commands = None;
+        }
+        lists.tools.get_or_insert(tools);
+        lists.commands.get_or_insert(commands);
+        lists.ready = true;
+    }
+    pub fn tools(&self) -> Vec<bingo_sdk::ToolSpec> {
+        self.router
+            .lists
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .tools
+            .clone()
+            .unwrap_or_default()
+    }
+    pub fn commands(&self) -> Vec<bingo_sdk::CommandSpec> {
+        self.router
+            .lists
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .commands
+            .clone()
+            .unwrap_or_default()
+    }
+
+    pub fn negotiate(&self, capabilities: &std::collections::BTreeSet<crate::wire::Cap>) {
+        if let Some(serving) = &self.router.serving {
+            serving.calls.initialize(capabilities);
+        }
+    }
+
     /// Whether the process is still on the other end of the pipe.
     pub fn is_alive(&self) -> bool {
         self.peer.is_alive()
@@ -267,6 +353,11 @@ impl Connection {
 
     /// Ask, and wait for the answer or for the process to end.
     pub async fn request(&self, method: &str, params: Value) -> Reply {
+        if method != name::INITIALIZE
+            && let Some(serving) = &self.router.serving
+        {
+            serving.calls.permits(method)?;
+        }
         self.peer
             .request(method, params)
             .await
@@ -278,6 +369,15 @@ impl Connection {
     }
 
     pub async fn notify(&self, method: &str, params: Value) {
+        self.notify_now(method, params);
+    }
+
+    pub fn notify_now(&self, method: &str, params: Value) {
+        if let Some(serving) = &self.router.serving
+            && serving.calls.permits(method).is_err()
+        {
+            return;
+        }
         if let Err(why) = self.peer.notify(method, params) {
             tracing::debug!(plugin = %self.plugin, method, %why, "a notification went nowhere");
         }
@@ -424,6 +524,53 @@ mod tests {
 
     use super::*;
     use serde_json::json;
+
+    #[tokio::test(start_paused = true)]
+    async fn an_unserved_request_gets_method_not_found() {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        let (host, plugin) = tokio::io::duplex(4096);
+        let (reader, writer) = tokio::io::split(host);
+        let _peer = Peer::spawn(
+            reader,
+            writer,
+            Arc::new(Inbound {
+                plugin: "stub".into(),
+                router: Arc::new(Router::default()),
+            }),
+        );
+        let (reader, mut writer) = tokio::io::split(plugin);
+        writer
+            .write_all(b"{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"future/verb\"}\n")
+            .await
+            .unwrap();
+        let mut lines = BufReader::new(reader).lines();
+        let line = tokio::time::timeout(std::time::Duration::from_secs(1), lines.next_line())
+            .await
+            .expect("every request must receive an answer")
+            .unwrap()
+            .unwrap();
+        let reply: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(reply["id"], 7);
+        assert_eq!(reply["error"]["code"], crate::codec::METHOD_NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn notifications_after_handshake_are_not_overwritten_by_initial_lists() {
+        let connection = crate::testing::unanswering();
+        connection
+            .router
+            .notification(
+                "stub",
+                Notification::new(name::TOOLS_CHANGED, json!({"tools":[]})),
+            )
+            .await;
+        let tool =
+            serde_json::from_value(json!({"name":"echo","description":"Echo","inputSchema":{}}))
+                .unwrap();
+        connection.initialize_lists(vec![tool], vec![]);
+        assert!(connection.tools().is_empty(), "the later notification wins");
+        connection.stop().await;
+    }
 
     fn entry(command: &str, args: &[&str]) -> Entry {
         Entry {
@@ -618,26 +765,6 @@ mod tests {
             Connection::spawn("quiet", &entry("cat", &[]), dir.path(), dir.path(), None)
                 .expect("`cat` exists on every unix");
         assert_ne!(connection.next_call(), connection.next_call());
-    }
-
-    /// The whole of the reverse lane's width (ADR-0031 §4): one method. What
-    /// else a process may ask the host for is a decision nobody has taken.
-    #[test]
-    fn exactly_one_method_travels_from_a_process_to_the_host() {
-        assert!(served(name::SERVICE_CALL));
-        for other in [
-            name::INITIALIZE,
-            name::TOOL_CALL,
-            name::COMMAND_RUN,
-            name::CONTEXT_CONTRIBUTE,
-            name::COMPACTOR_COMPACT,
-            name::PROVIDER_STREAM,
-        ] {
-            assert!(
-                !served(other),
-                "{other} is the host's to ask, not to answer"
-            );
-        }
     }
 
     /// A request nobody serves is refused where it arrives, and the reader

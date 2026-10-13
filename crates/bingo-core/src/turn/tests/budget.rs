@@ -131,7 +131,7 @@ async fn accepted_threshold_cuts_are_bounded_when_system_and_reissued_context_st
         "accepted cuts reset only the consecutive-failure breaker"
     );
     assert_eq!(provider.requests().len(), 1);
-    assert_eq!(outcome.usage.output_tokens, 2 * 7 + 3);
+    assert_eq!(host.usage().output_tokens, 2 * 7 + 3);
     let events = host.events();
     assert_eq!(
         events
@@ -192,7 +192,7 @@ async fn failed_and_cancelled_summary_usage_is_billed_once_without_cutting() {
             &host,
         )
         .await;
-        assert_eq!(out.usage.output_tokens, 17);
+        assert_eq!(host.usage().output_tokens, 17);
         assert_eq!(cfg.compaction.failures(), 1);
         // Nothing was cut; a turn a person stopped leaves its marker and
         // nothing else, as any other stopped turn does.
@@ -471,7 +471,7 @@ async fn a_summary_that_shrinks_nothing_is_discarded_billed_and_counted() {
     );
     assert!(!host.kinds().contains(&"compacted".to_string()));
     assert_eq!(
-        out.usage.output_tokens,
+        host.usage().output_tokens,
         3 + 20,
         "the summary request is billed"
     );

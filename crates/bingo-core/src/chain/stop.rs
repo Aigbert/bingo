@@ -37,7 +37,7 @@ pub(crate) async fn dispatch(
 ) -> Result<StopResult, KernelError> {
     let matched = hooks.at(HookPoint::Stop, None).await;
     run::<Stop>(
-        &hooks.links,
+        &hooks.links().await,
         Next::new(|()| Box::pin(kernel(&matched, cx))),
         cx,
         (),

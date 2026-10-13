@@ -13,7 +13,7 @@ import json
 import os
 import sys
 
-PROTOCOL = 1
+PROTOCOL = 2
 
 
 def send(message):
@@ -38,6 +38,7 @@ def handshake():
     """What this plugin is, and everything it contributes."""
     return {
         "protocol": PROTOCOL,
+        "capabilities": ["tool/call", "command/run"],
         "name": "wordcount",
         "version": "0.1.0",
         "tools": [

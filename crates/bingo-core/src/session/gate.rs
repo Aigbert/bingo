@@ -251,7 +251,7 @@ async fn submit_hooks(
 ) -> Verdict {
     let matched = hooks.at(HookPoint::Submit, None).await;
     let result = crate::chain::run::<crate::chain::submit::Submit>(
-        &hooks.links,
+        &hooks.links().await,
         Next::new(|input| Box::pin(crate::chain::submit::kernel(input, &matched, &cx))),
         &cx,
         input,

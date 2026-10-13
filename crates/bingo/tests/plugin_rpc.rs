@@ -17,9 +17,7 @@ use std::process::{Command, Output, Stdio};
 
 use bingo_sdk::{Event, Frame, InteractionKind, ItemBody};
 
-#[path = "support/home.rs"]
-mod home;
-use home::home_env;
+use support::home::home_env;
 
 #[path = "support/python.rs"]
 mod python;
@@ -206,4 +204,183 @@ fn a_host_with_no_plugins_installed_runs_as_it_always_did() {
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert_eq!(stdout(&out), "Hello from the fake provider.\n");
     assert_eq!(stderr(&out), "");
+}
+
+mod support;
+
+const SIDE_PLUGIN: &str = r#"
+import json, sys
+held = {}
+def send(value):
+    print(json.dumps(dict(jsonrpc='2.0', **value)), flush=True)
+def request(id, method, params):
+    send(dict(id=id, method=method, params=params))
+for line in sys.stdin:
+    message = json.loads(line)
+    method = message.get('method')
+    params = message.get('params', {})
+    if method == 'initialize':
+        send(dict(id=message['id'], result=dict(protocol=2, name='side', version='1',
+            capabilities=params['capabilities'], links=[dict(point='prompt.compose')])) )
+    elif method == 'intercept/prompt.compose':
+        held = message
+        site = params['site']
+        if sys.argv[1] == 'complete':
+            request('side', 'host/model/complete', dict(session=site['session'], turn=site['turn'], request=params['input']))
+        else:
+            request('entered', 'host/extend', dict(session=site['session'], key='entered', value=params['chain']))
+    elif method == 'intercept/cancel':
+        request('cancelled', 'host/extend', dict(session=held['params']['site']['session'], key='cancelled', value=params['chain']))
+    elif message.get('id') == 'side':
+        send(dict(id=held['id'], result=dict(next=held['params']['input'])))
+"#;
+
+fn side_home(mode: &str) -> tempfile::TempDir {
+    let home = tempfile::tempdir().unwrap();
+    let root = home.path().join(".bingo/plugins/side");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("main.py"), SIDE_PLUGIN).unwrap();
+    std::fs::write(root.join("plugin.json"), serde_json::json!({
+        "name":"side", "version":"1", "entry":{"command":"python3","args":["${PLUGIN_ROOT}/main.py",mode]}
+    }).to_string()).unwrap();
+    std::fs::write(
+        home.path().join(".bingo/settings.json"),
+        r#"{"pluginTrust":{"side":{"tier":"rewrite","uses":["model"]}}}"#,
+    )
+    .unwrap();
+    home
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_stub_completion_is_in_the_turns_terminal_bill() {
+    use bingo_sdk::{HostApi, Input, IntentId, OpenOptions, Origin, Usage};
+    if !python3() {
+        return;
+    }
+    let mut server = support::Server::spawn_at(
+        side_home("complete"),
+        r#"{"responses":[{"steps":[{"text":"side response"}]},{"steps":[{"text":"main response"}]}]}"#,
+        &[],
+    );
+    let kernel = support::ready(&mut server).await;
+    let mut attachment = kernel
+        .open(
+            support::create(server.cwd()),
+            support::who(),
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap();
+    attachment.handle.submit(
+        IntentId::mint(),
+        Input::text("hello", Origin::surface("test")),
+    );
+    let frames = support::until_completed(&mut attachment).await;
+    let mut sum = Usage::default();
+    let mut charged = false;
+    for frame in &frames {
+        match &frame.event {
+            Event::UsageCharged {
+                turn,
+                plugin,
+                usage,
+            } => {
+                assert_eq!(plugin, "side");
+                assert!(turn.is_some());
+                assert!(usage.output_tokens > 0);
+                charged = true;
+                sum.add(*usage);
+            }
+            Event::TurnUsage { usage, .. } => sum.add(*usage),
+            Event::TurnCompleted { usage, .. } => assert_eq!(usage, &sum),
+            _ => {}
+        }
+    }
+    assert!(charged, "the side call was billed: {frames:?}");
+    kernel.shutdown().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn interrupting_a_remote_first_phase_cancels_its_chain() {
+    use bingo_sdk::{HostApi, Input, IntentId, InterruptScope, OpenOptions, Origin, TurnStatus};
+    use futures::StreamExt;
+    if !python3() {
+        return;
+    }
+    let mut server = support::Server::spawn_at(
+        side_home("hold"),
+        r#"{"responses":[{"steps":[{"text":"unused"}]}]}"#,
+        &[],
+    );
+    let kernel = support::ready(&mut server).await;
+    let mut attachment = kernel
+        .open(
+            support::create(server.cwd()),
+            support::who(),
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap();
+    attachment.handle.submit(
+        IntentId::mint(),
+        Input::text("hello", Origin::surface("test")),
+    );
+    let mut chain = None;
+    tokio::time::timeout(support::LIMIT, async {
+        while let Some(frame) = attachment.events.next().await {
+            if let Event::Extension { kind, payload, .. } = frame.event
+                && kind == "entered"
+            {
+                chain = Some(payload);
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    attachment
+        .handle
+        .interrupt(IntentId::mint(), InterruptScope::Head);
+    let mut cancelled = false;
+    let mut interrupted = false;
+    tokio::time::timeout(support::LIMIT, async {
+        while !cancelled || !interrupted {
+            match attachment.events.next().await.unwrap().event {
+                Event::Extension { kind, payload, .. } if kind == "cancelled" => {
+                    assert_eq!(Some(payload), chain);
+                    cancelled = true;
+                }
+                Event::TurnCompleted { status, .. } => {
+                    assert!(matches!(status, TurnStatus::Interrupted { .. }));
+                    interrupted = true;
+                }
+                _ => {}
+            }
+        }
+    })
+    .await
+    .unwrap();
+    kernel.shutdown().await.unwrap();
+}
+
+#[test]
+fn an_explicit_plugin_directory_is_loaded_by_the_cli() {
+    if !python3() {
+        return;
+    }
+    let (home, project) = installed();
+    let external = tempfile::tempdir().unwrap();
+    let root = external.path().join("wordcount");
+    std::fs::rename(home.path().join(".bingo/plugins/wordcount"), &root).unwrap();
+    let script = script(home.path(), COUNT);
+    let out = run(bingo(home.path(), project.path())
+        .env("BINGO_FAKE_SCRIPT", &script)
+        .arg("--plugin-dir")
+        .arg(&root)
+        .args(["--output-format", "json", "--dangerously-skip-permissions"])
+        .arg("count the words in notes.txt"));
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(frames(&out).iter().any(|frame| matches!(&frame.event,
+        Event::ItemCompleted { item } if matches!(&item.body,
+            ItemBody::ToolCall { name, output: Some(_), .. } if name == "plugin__wordcount__count"))));
 }
