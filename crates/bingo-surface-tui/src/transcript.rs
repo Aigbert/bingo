@@ -849,6 +849,9 @@ fn receipt(
     previous: Option<&Item>,
     rows: &Rows<'_>,
 ) -> Vec<Line<'static>> {
+    if decision == DecisionKind::Allow && feedback.is_none() {
+        return Vec::new();
+    }
     let verdict = match decision {
         DecisionKind::Allow => "allowed",
         DecisionKind::AllowSession => "allowed for this session",
@@ -2078,10 +2081,10 @@ mod tests {
             drawn(vec![receipt_item(
                 "itm_1",
                 "Edit",
-                DecisionKind::Allow,
+                DecisionKind::AllowSession,
                 None
             )]),
-            vec!["  ⎿  Edit allowed".to_string()],
+            vec!["  ⎿  Edit allowed for this session".to_string()],
         );
     }
 
