@@ -101,16 +101,17 @@ Current paths and required adapters replace the original plan's stale paths.
 
 ## Exit criteria
 
-- [ ] Shared library final suite pending; all 49 existing RPC assertions pass.
+- [x] Shared library contracts and all 49 existing RPC assertions pass.
 - [x] Mod tests cover strip file:line, all six fixtures and one notice each;
       thrower's catch sees kind=throw.
 - [x] Esc during loop at tool.check ends Interrupted within M116's bound.
-- [ ] Project/model, registration denial and runtime-specific grant tests;
+- [x] Project/model, registration denial and runtime-specific grant tests;
       the existing process CLI default remains tighten.
 - [x] Mid-turn edit reloads after turn.complete; store survives; no sleeps.
 - [x] plugin_kit runs ts-status in process and node (M133's node skip rule).
-- [ ] Final serial gates, before/after budget and each touched crate's MSVC
-      check. C-header-only failures defer per step 7.
+- [x] Local serial gates, before/after budget and all six MSVC attempts.
+- [ ] Windows CI: RPC/bin await aws-lc-sys headers; mods awaits rquickjs-sys
+      headers. SDK/core/shared-host MSVC passed; deferred per step 7.
 
 ## Non-goals
 
@@ -121,9 +122,9 @@ file-watcher dependencies, watching non-explicit directories; no live tests.
 ## Risks
 
 - QuickJS parallel/exotic-class issue #764: natives are plain functions and
-  objects, host work is asynchronous and bounded. MSVC builds are checked
-  locally where possible and in Windows CI; never cfg-gate failures away.
-- Pin weekly oxc; measure 50 idle fixture mods' RSS without an assertion.
+  objects; host work is asynchronous and bounded. Windows C-header checks
+  defer to CI; installed Clang needs --driver-mode=cl for QuickJS's MSVC flags.
+- Pin weekly oxc; 50 idle mods measured 29,792 KiB RSS (3,232 KiB baseline).
 - rquickjs requires Eval internally for safe module compilation. Disable
   JavaScript evaluation entry points before loading; no unsafe bytecode API.
 - Core's current external deadline is 5 s: preserve it for process links
@@ -149,7 +150,7 @@ file-watcher dependencies, watching non-explicit directories; no live tests.
 ## Verified (2026-10-14)
 
 ```text
-scripts/budget.sh # baseline before extraction
+scripts/budget.sh # before extraction
 dependencies (unique, normal): 355 (max  355)
 warm cargo check -p bingo-core: 0s (max  20s)
 relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
@@ -157,39 +158,10 @@ budget ok
 ```
 
 ```text
-cargo test -p bingo-mods --locked
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.90s
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-```
-
-```text
 cargo test -p bingo-mods --test engine fifty_idle_modules_rss --locked -- --ignored --nocapture
 idle modules: 50; RSS KiB before=3232; after=29792
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.77s
+Finished `test` profile [unoptimized + debuginfo] target(s) in 0.77s
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.20s
-```
-
-```text
-cargo test -p bingo --test plugin_kit --locked
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.63s
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
-```
-
-```text
-cargo test -p bingo-plugin-rpc --locked
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.38s
-test result: ok. 128 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.29s
-test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 ```
 
 ```text
@@ -199,74 +171,289 @@ exit 0 (no output)
 
 ```text
 cargo check --workspace --all-targets --locked
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.54s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.85s
 ```
 
 ```text
 cargo clippy --workspace --all-targets --locked -- -D warnings
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.42s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.29s
 ```
 
 ```text
 cargo test --workspace --locked
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 03s
+Finished `test` profile [unoptimized + debuginfo] target(s) in 11.53s
 test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
-test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.07s
-test result: FAILED. 258 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.26s
-plugins::an_external_plugins_tier_is_listed_from_user_settings_only ... FAILED
-panicked at crates/bingo/tests/cli/plugins.rs:247:5:
-assertion `left == right` failed
-  left: "rewrite"
- right: "tighten"
-error: test failed, to rerun pass `-p bingo --test cli`
-exit 101
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
+test plugins::an_external_plugins_tier_is_listed_from_user_settings_only ... ok
+test schedule::ownership::doctor_fix_preserves_held_and_released_modern_lease_files ... ok
+test result: ok. 259 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.07s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+test module_acceptance_runs_outside_the_workspace ... ok
+test typescript_acceptance_runs_outside_the_workspace ... ok
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.34s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.89s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.59s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.86s
+test result: ok. 158 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 103 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.29s
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 120 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+test host::tests::controls::a_new_session_preserves_the_answer_without_editing ... ok
+test host::tests::controls::a_new_session_preserves_the_previous_streamed_answer ... ok
+test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test tests::releasing_preserves_the_published_marker_and_inode ... ok
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test a_bare_lock_excludes_until_drop_and_preserves_the_file ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test prompt::tests::overflow_shrinks_only_complete_exchanges_and_preserves_purpose ... ok
+test result: ok. 99 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+test settings::tests::an_empty_picture_object_preserves_the_lower_leaf ... ok
+test turn::tests::attribution::a_peer_at_the_barrier_preserves_the_previous_request_prefix ... ok
+test result: ok. 498 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.93s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 82 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.56s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test dial::tests::catalogue_order_preserves_duplicate_definitions_and_precedence ... ok
+test result: ok. 90 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.08s
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test an_escaper_load_failure_is_visible_once ... ok
+test a_reentrant_call_skips_only_its_calling_hook_and_says_why_once ... ok
+test throw_loop_and_hog_fail_open_with_one_named_notice ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+test result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test registration_can_deny_a_module_with_a_named_reason ... ok
+test a_project_model_call_requires_the_users_grant ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test esc_during_a_tool_check_loop_ends_interrupted_within_the_grace ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+test reload_keeps_store_and_restarts_every_open_session ... ok
+test a_mid_turn_edit_waits_for_turn_complete ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 103 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.79s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 68 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.29s
+test grant::tests::runtime_origin_and_user_trust_bound_grants ... ok
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test both_and_neither_name_the_plugin_and_launch_forms ... ok
+test entry_only_and_module_only_round_trip ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test host::tests::host_operations_require_the_catalogues_granted_nouns ... ok
+test wire::tests::a_declared_compaction_failure_preserves_native_usage_in_its_tagged_fixture ... ok
+test result: ok. 128 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.34s
+test context::a_remote_declared_compaction_failure_preserves_each_observed_usage_counter_once ... ok
+test host::model_completion_reaches_the_hosts_default_refusal ... ok
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 155 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 86 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+test result: ok. 230 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 115 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.03s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test compactor::tests::a_failed_summary_preserves_observed_usage_on_the_wire ... ok
+test store::checkpoint::tests::checkpoint_codec_preserves_opaque_item_bytes ... ok
+test store::checkpoint::tests::checkpoint_fixture_preserves_model_and_client_orders ... ok
+test tree::tests::gateway_removal_returns_the_subtree_and_preserves_the_root ... ok
+test result: ok. 135 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.22s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 86 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test checkpoint::tests::checkpoint_resume_reads_only_tail_and_preserves_the_fold ... ok
+test result: ok. 67 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.63s
+test result: ok. 102 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 41 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 8.65s
+test result: ok. 1135 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.02s
+test result: ok. 76 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 149 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+test grep::tests::rough_edges_grep_display_preserves_content_and_shortens_only_paths ... ok
+test result: ok. 83 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.64s
+test result: ok. 92 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+```text
+cargo test -p bingo-provider-acp --test bridge token --locked -- --test-threads=1
+Finished `test` profile [unoptimized + debuginfo] target(s) in 9.79s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
 ```
 
 ```text
 scripts/check_discipline.sh
-Not run: protocol step 6 stop.
+dependency direction ok
+shared service declarations ok
+cohesion ok
+test host and wall-clock advisory checks complete
+catalogue entry declarations ok
+discipline ok
 ```
 
 ```text
 scripts/budget.sh
-Not run: protocol step 6 stop.
+dependencies (unique, normal): 410 (max  410)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 11 GB (soft max  5)
+warn: target/debug exceeds the soft limit
+test binaries: 190
+budget ok
 ```
 
 ```text
 cargo deny check
-Not run: protocol step 6 stop.
+advisories ok, bans ok, licenses ok, sources ok
 ```
 
 ```text
 cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc
-Not run: protocol step 6 stop.
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.12s
 ```
 
 ```text
 cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc
-Not run: protocol step 6 stop.
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.12s
 ```
 
 ```text
 cargo check -p bingo-plugin-host --all-targets --target x86_64-pc-windows-msvc
-Not run: protocol step 6 stop.
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.79s
 ```
 
 ```text
 cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc
-Not run: protocol step 6 stop.
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/third_party/jitterentropy/jitterentropy-library/arch/jitterentropy-base-windows.h:49:10: fatal error: 'windows.h' file not found
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+exit 101; deferred to Windows CI (protocol step 7).
 ```
 
 ```text
 cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc
-Not run: protocol step 6 stop.
+warning: rquickjs-sys@0.14.0: clang: error: no such file or directory: '/DWIN32_LEAN_AND_MEAN'
+warning: rquickjs-sys@0.14.0: clang: error: no such file or directory: '/std:c11'
+warning: rquickjs-sys@0.14.0: clang: error: no such file or directory: '/experimental:c11atomics'
+error: failed to run custom build command for `rquickjs-sys v0.14.0`
+exit 101
 ```
 
 ```text
-cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc
-Not run: protocol step 6 stop.
+CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc
+warning: rquickjs-sys@0.14.0: /Users/yexrob/Episodes/Projects/bingo-inc/bingo-improve-worktrees/upgrade-m137/target/x86_64-pc-windows-msvc/debug/build/rquickjs-sys-5ef90e9da9c37e1f/out/libregexp.c(24,10): fatal error: 'stdlib.h' file not found
+error: failed to run custom build command for `rquickjs-sys v0.14.0`
+exit 101; deferred to Windows CI (protocol step 7).
+```
+
+```text
+CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/stdalign_check.c(10,10): fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/third_party/jitterentropy/jitterentropy-library/arch/jitterentropy-base-windows.h(49,10): fatal error: 'windows.h' file not found
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+exit 101; deferred to Windows CI (protocol step 7).
+```
+
+```text
+node --test --test-reporter=tap sdk/typescript/src/*.test.ts
+# tests 13
+# pass 13
+# fail 0
+# skipped 0
 ```
