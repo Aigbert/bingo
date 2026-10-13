@@ -106,6 +106,52 @@ mod tests {
         }
     }
 
+    fn frozen() -> Value {
+        let path = committed().with_file_name("plugin-2.json");
+        serde_json::from_str(&std::fs::read_to_string(path).expect("protocol 2 is frozen")).unwrap()
+    }
+
+    // Descriptions are prose; all structural keys and every existing alternative hold.
+    fn preserves(before: &Value, after: &Value) -> bool {
+        match (before, after) {
+            (Value::Object(before), Value::Object(after)) => before.iter().all(|(key, value)| {
+                matches!(key.as_str(), "description" | "title" | "$comment")
+                    || after.get(key).is_some_and(|next| preserves(value, next))
+            }),
+            (Value::Array(before), Value::Array(after)) => before.iter()
+                .all(|value| after.iter().any(|next| preserves(value, next))),
+            _ => before == after,
+        }
+    }
+
+    #[test]
+    fn protocol_two_keeps_every_frozen_shape() {
+        assert!(preserves(&frozen(), &document()), "protocol 2 removed or retyped a frozen shape");
+    }
+
+    #[test]
+    fn the_freeze_rejects_removal_and_retyping_but_allows_additions() {
+        let before = frozen();
+        for pointer in ["/methods/host~1place", "/$defs/InitializeParams/properties/pluginName"] {
+            let (parent, key) = pointer.rsplit_once('/').unwrap();
+            let key = key.replace("~1", "/");
+            let mut after = before.clone();
+            after.pointer_mut(parent).unwrap().as_object_mut().unwrap().remove(&key);
+            assert!(!preserves(&before, &after), "removed {pointer}");
+        }
+        let mut after = before.clone();
+        after["$defs"]["InitializeParams"]["properties"]["pluginName"]["type"] = json!("integer");
+        assert!(!preserves(&before, &after));
+        let mut after = before.clone();
+        after["capabilities"].as_array_mut().unwrap().pop();
+        assert!(!preserves(&before, &after));
+        let mut after = before.clone();
+        after["methods"]["future/verb"] = json!({});
+        after["$defs"]["InitializeParams"]["properties"]["future"] = json!({"type":"string"});
+        after["capabilities"].as_array_mut().unwrap().push(json!("future/verb"));
+        assert!(preserves(&before, &after));
+    }
+
     fn committed() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schema/plugin.json")
     }
