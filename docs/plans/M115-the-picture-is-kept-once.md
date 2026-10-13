@@ -74,7 +74,9 @@ This is the first use of M113's version line.
 - [ ] v1 and v2 fixtures read into equal `Image`s; a v1 journal appended
       to by this build carries a version line and still replays whole.
 - [ ] Two identical pictures → one blob (test pasted).
-- [ ] A journal line for a picture is under 300 bytes (test asserts).
+- [ ] A picture frame with minted SessionId/ItemId is under 1 KiB before
+      newline; 3 MB and 1-byte pictures with identical dimensions produce
+      lines of exactly equal length (both asserted).
 - [ ] Missing blob opens with the note; estimate and budget tests pass.
 - [ ] An older binary (build `dev` before this milestone in a temporary
       worktree) refuses the v2 journal with the newer-bingo message —
@@ -103,21 +105,9 @@ This is the first use of M113's version line.
   must advance too. M116 already runs store I/O on a blocking worker.
   Producers already pass bounded Images through; no bridge redesign needed.
 
-- **STOP (2026-10-13, protocol steps 2/6):** the literal under-300-byte
-  journal-line criterion conflicts with the prescribed record shape. The
-  compact v2 user fixture is 374 bytes before newline, with one-character
-  session/item IDs, a one-byte picture, no path/cause/turn/completedAt,
-  and the required frame/item envelope, SHA-256 reference and dimensions.
-  Even omitting optional dimensions leaves 353 bytes. Real IDs add more.
-  Meeting 300 would require changing the envelope/payload encoding beyond
-  ADR-0065 §1 and ADR-0067 §2's reference substitution, or changing the
-  criterion. No such decision was made during implementation.
-  Options for the owner: apply the 300-byte bound to the picture reference
-  itself and separately bound frame overhead; raise the full-line bound;
-  or explicitly decide a compact v2 envelope and its compatibility rules.
-  All implementation work stops here pending that decision.
+- 2026-10-13 decision: replace the guessed 300-byte limit with the revised size assertions above; keep ADR-0065 §1 and ADR-0067 §2 unchanged.
 
-## Verified (2026-10-13 — stopped, not complete)
+## Verified (2026-10-13 — initial run, not complete)
 
 Contracts were committed before implementation; the runtime is unchanged.
 
