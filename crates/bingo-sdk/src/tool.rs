@@ -161,7 +161,7 @@ pub struct ToolContext {
     pub turn: TurnId,
     pub item: ItemId,
     pub cwd: PathBuf,
-    /// Child of the turn's token; honoured per `ToolTraits::interrupt`.
+    /// Child of the turn's token. Esc drops every call in flight.
     pub cancel: CancellationToken,
     pub env: Arc<Env>,
     /// The whole host (ADR-0011 §3): sessions, delivery, services.
