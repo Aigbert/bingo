@@ -110,6 +110,7 @@ fn age_the_posts(home: &Path, key: &str) {
         .map(|line| aged_line(line, &long_ago))
         .collect();
     std::fs::write(&path, aged.join("\n") + "\n").unwrap();
+    std::fs::remove_file(dir.join("checkpoint.json")).unwrap();
 }
 
 fn aged_line(line: &str, at: &str) -> String {
