@@ -168,6 +168,8 @@ pub struct InitializeResult {
     pub providers: Vec<ProviderSpec>,
     #[serde(default)]
     pub hooks: Vec<HookSpec>,
+    #[serde(default)]
+    pub links: Vec<crate::intercept::LinkSpec>,
     /// The services this process serves, by the key another plugin calls them
     /// by. A key is global — it is what a consumer writes in `requires` — so
     /// the declaration is a map and not a list: one answer per key.
@@ -598,6 +600,21 @@ pub type Method = (&'static str, Ref, Ref);
 pub type Notification = (&'static str, Ref);
 
 pub static METHODS: &[Method] = &[
+    ("intercept/prompt.submit", schema_of::<crate::intercept::Before<Input>>, schema_of::<crate::intercept::Proceed<Input, bingo_sdk::SubmitResult>>),
+    ("intercept/prompt.submit/after", schema_of::<crate::intercept::After<bingo_sdk::SubmitResult>>, schema_of::<crate::intercept::ResultValue<bingo_sdk::SubmitResult>>),
+    ("intercept/tool.check", schema_of::<crate::intercept::Before<crate::intercept::ToolEvent>>, schema_of::<crate::intercept::Proceed<crate::intercept::ToolEvent, bingo_sdk::CheckResult>>),
+    ("intercept/tool.check/after", schema_of::<crate::intercept::After<bingo_sdk::CheckResult>>, schema_of::<crate::intercept::ResultValue<bingo_sdk::CheckResult>>),
+    ("intercept/tool.call", schema_of::<crate::intercept::Before<crate::intercept::ToolEvent>>, schema_of::<crate::intercept::Proceed<crate::intercept::ToolEvent, ToolOutput>>),
+    ("intercept/tool.call/after", schema_of::<crate::intercept::After<ToolOutput>>, schema_of::<crate::intercept::ResultValue<ToolOutput>>),
+    ("intercept/turn.step", schema_of::<crate::intercept::Before<ModelRequest>>, schema_of::<crate::intercept::Proceed<ModelRequest, Result<Vec<ModelEvent>, ProviderError>>>),
+    ("intercept/turn.step/after", schema_of::<crate::intercept::After<Result<Vec<ModelEvent>, ProviderError>>>, schema_of::<crate::intercept::ResultValue<Result<Vec<ModelEvent>, ProviderError>>>),
+    ("intercept/prompt.compose", schema_of::<crate::intercept::Before<ModelRequest>>, schema_of::<crate::intercept::Proceed<ModelRequest, ModelRequest>>),
+    ("intercept/prompt.compose/after", schema_of::<crate::intercept::After<ModelRequest>>, schema_of::<crate::intercept::ResultValue<ModelRequest>>),
+    ("intercept/session.compact", schema_of::<crate::intercept::Before<bingo_sdk::CompactInput>>, schema_of::<crate::intercept::Proceed<bingo_sdk::CompactInput, Result<Compaction, bingo_sdk::CompactError>>>),
+    ("intercept/session.compact/after", schema_of::<crate::intercept::After<Result<Compaction, bingo_sdk::CompactError>>>, schema_of::<crate::intercept::ResultValue<Result<Compaction, bingo_sdk::CompactError>>>),
+    ("intercept/turn.complete", schema_of::<crate::intercept::Before<()>>, schema_of::<crate::intercept::Proceed<(), bingo_sdk::StopResult>>),
+    ("intercept/turn.complete/after", schema_of::<crate::intercept::After<bingo_sdk::StopResult>>, schema_of::<crate::intercept::ResultValue<bingo_sdk::StopResult>>),
+
     (name::HOST_PLACE, schema_of::<crate::host::Place>, schema_of::<()>),
     (name::HOST_EXTEND, schema_of::<crate::host::Extend>, schema_of::<()>),
     (name::HOST_DELIVER, schema_of::<crate::host::Deliver>, schema_of::<()>),
@@ -639,11 +656,7 @@ pub static METHODS: &[Method] = &[
         schema_of::<ServiceCallParams>,
         schema_of::<ServiceCallResult>,
     ),
-    (
-        name::HOOK_DECIDE,
-        schema_of::<HookDecideParams>,
-        schema_of::<HookDecideResult>,
-    ),
+
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
@@ -652,6 +665,7 @@ pub struct ToolsChanged { pub tools: Vec<ToolSpec> }
 pub struct CommandsChanged { pub commands: Vec<CommandSpec> }
 
 pub static NOTIFICATIONS: &[Notification] = &[
+    ("intercept/cancel", schema_of::<crate::intercept::Cancel>),
     (name::TOOLS_CHANGED, schema_of::<ToolsChanged>),
     (name::COMMANDS_CHANGED, schema_of::<CommandsChanged>),
     (name::TOOL_PROGRESS, schema_of::<ToolProgressParams>),

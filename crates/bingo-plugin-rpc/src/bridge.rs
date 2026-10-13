@@ -65,6 +65,7 @@ struct Live {
     compactors: Vec<CompactorSpec>,
     providers: Vec<ProviderSpec>,
     hooks: Vec<HookSpec>,
+    links: Vec<crate::intercept::LinkSpec>,
     services: BTreeMap<String, ServiceSpec>,
 }
 
@@ -210,6 +211,14 @@ impl Bridge {
     /// there is none.
     pub async fn connection(self: &Arc<Self>) -> Option<Arc<Connection>> {
         self.ready().await.map(|live| Arc::clone(&live.connection))
+    }
+
+    pub async fn interceptors(self: &Arc<Self>) -> Vec<bingo_sdk::ExternalInterceptor> {
+        let Some(live) = self.ready().await else { return Vec::new(); };
+        live.links.iter().map(|spec| bingo_sdk::ExternalInterceptor {
+            plugin: self.name.clone(),
+            link: Arc::new(crate::intercept::Remote::new(&self.name, spec.clone(), live.connection.clone())),
+        }).collect()
     }
 
     /// The tools of a living process, and nothing when there is none.
@@ -450,6 +459,7 @@ impl Bridge {
                 compactors: result.compactors,
                 providers: result.providers,
                 hooks: result.hooks,
+                links: result.links,
                 services: result.services,
             }),
             Ok(Err(why)) => {
@@ -519,6 +529,7 @@ impl Bridge {
                 compactors: Vec::new(),
                 providers: Vec::new(),
                 hooks: Vec::new(),
+                links: Vec::new(),
                 services: BTreeMap::new(),
             }));
         }
@@ -555,6 +566,7 @@ mod tests {
             compactors: Vec::new(),
             providers: Vec::new(),
             hooks: Vec::new(),
+            links: Vec::new(),
             services: Default::default(),
         }
     }

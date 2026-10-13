@@ -144,6 +144,12 @@ impl Manager {
         while connecting.join_next().await.is_some() {}
     }
 
+    pub async fn interceptors(&self) -> Vec<bingo_sdk::ExternalInterceptor> {
+        let mut links = Vec::new();
+        for bridge in self.bridges() { links.extend(bridge.interceptors().await); }
+        links
+    }
+
     pub async fn tools(&self) -> Vec<Arc<dyn Tool>> {
         let mut tools = Vec::new();
         for bridge in self.bridges() {

@@ -306,6 +306,11 @@ impl Connection {
     }
 
     pub async fn notify(&self, method: &str, params: Value) {
+        self.notify_now(method, params);
+    }
+
+    pub fn notify_now(&self, method: &str, params: Value) {
+        if let Some(serving) = &self.router.serving && serving.calls.permits(method).is_err() { return; }
         if let Err(why) = self.peer.notify(method, params) {
             tracing::debug!(plugin = %self.plugin, method, %why, "a notification went nowhere");
         }

@@ -134,6 +134,7 @@ impl Plugin for PluginRpcPlugin {
         registrar.add(Contribution::Providers(
             Arc::new(PluginProviders::new(Arc::clone(&manager))) as Arc<dyn ProviderSource>,
         ));
+        registrar.add(Contribution::Interceptors(Arc::new(source::PluginInterceptors::new(manager.clone()))));
         registrar.add(Contribution::Hooks(
             Arc::new(PluginHooks::new(Arc::clone(&manager))) as Arc<dyn HookSource>,
         ));
