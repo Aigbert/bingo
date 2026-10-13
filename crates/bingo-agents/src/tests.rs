@@ -601,6 +601,7 @@ pub(crate) fn command_context(session: &SessionId, fleet: &Fleet) -> CommandCont
 
 pub(crate) fn hook_context(session: &SessionId, host: HostHandle) -> HookContext {
     HookContext {
+        item: None,
         host,
         session: session.clone(),
         turn: None,

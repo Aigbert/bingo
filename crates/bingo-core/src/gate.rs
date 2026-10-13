@@ -166,6 +166,8 @@ fn receipt_for(call: &ToolCall, decision: DecisionKind, feedback: Option<String>
 
 /// Decide one call: hooks, then the policy, then a person when the answer is `Ask`.
 pub async fn gate_call(input: GateInput<'_>, prompter: &dyn Prompter) -> Gated {
+    let hook_cx = HookContext { item: Some(input.item.clone()), ..input.hook_cx.clone() };
+    let input = GateInput { hook_cx: &hook_cx, ..input };
     let report = crate::chain::Report::default();
     let checked = crate::chain::run::<crate::chain::tool::Check>(
         input.links,

@@ -74,7 +74,7 @@ impl Bridged {
         let pending = self.gated().await;
         let call = pending.call.clone();
         let report = crate::chain::Report::default();
-        let cx = self.hook_context();
+        let cx = HookContext { item: Some(self.item.clone()), ..self.hook_context() };
         let dispatch = executor::Dispatch {
             links: &self.config.hooks.links,
             cx: &cx,
@@ -153,6 +153,7 @@ impl Bridged {
 
     fn hook_context(&self) -> HookContext {
         HookContext {
+            item: None,
             host: self.config.host.clone(),
             session: self.config.session.id.clone(),
             turn: Some(self.turn.clone()),

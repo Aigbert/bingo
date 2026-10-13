@@ -471,6 +471,7 @@ pub(crate) fn command_context(session: &SessionId, fleet: &Fleet) -> CommandCont
 
 pub(crate) fn hook_context(session: &SessionId, fleet: &Fleet, cwd: &Path) -> HookContext {
     HookContext {
+        item: None,
         session: session.clone(),
         turn: None,
         cwd: cwd.to_path_buf(),

@@ -257,6 +257,7 @@ impl ToolHost for Recorder {
 /// turn, a directory, and nothing that answers.
 pub fn hook_context() -> bingo_sdk::HookContext {
     bingo_sdk::HookContext {
+        item: None,
         session: SessionId::from_raw("ses_test"),
         turn: Some(TurnId::from_raw("trn_test")),
         cwd: PathBuf::from("/work"),

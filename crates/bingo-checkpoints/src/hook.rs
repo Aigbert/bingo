@@ -125,6 +125,7 @@ mod tests {
 
     fn context(dir: &Path) -> HookContext {
         HookContext {
+            item: None,
             session: bingo_sdk::SessionId::from_raw("ses_one"),
             turn: Some(bingo_sdk::TurnId::from_raw("trn_1")),
             cwd: dir.to_path_buf(),
@@ -185,6 +186,7 @@ mod tests {
         let store = Arc::new(Checkpoints::new(dir.path()));
         let hook = SnapshotHook::new(store.clone());
         let cx = HookContext {
+            item: None,
             session: bingo_sdk::SessionId::from_raw("ses_one"),
             turn: None,
             cwd: dir.path().to_path_buf(),

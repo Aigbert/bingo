@@ -52,6 +52,7 @@ impl Fixture {
 
     async fn session(&self, phase: Phase) {
         let cx = HookContext {
+            item: None,
             session: self.journal.state().summary.id.clone(),
             turn: None,
             cwd: self.cwd.path().into(),
@@ -178,6 +179,7 @@ async fn disk_changes_remain_hidden_when_compaction_does_not_advance_history() {
     // Actor tests must prove that acceptance rule; this tests its consumer.
     for phase in [Phase::Start, Phase::End] {
         let cx = HookContext {
+            item: None,
             session: fixture.journal.state().summary.id.clone(),
             turn: None,
             cwd: fixture.cwd.path().into(),

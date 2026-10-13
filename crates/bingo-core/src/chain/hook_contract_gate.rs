@@ -31,6 +31,7 @@ impl PermissionPolicy for Deny {
 }
 fn cx() -> HookContext {
     HookContext {
+        item: None,
         session: SessionId::from_raw("s"),
         turn: None,
         cwd: "/tmp".into(),

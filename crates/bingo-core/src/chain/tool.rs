@@ -180,7 +180,8 @@ pub(crate) async fn after_outcomes(
             name: name.clone(),
             input: input.clone(),
         };
-        stop |= after(&call, &outcome.output, &hooks, cx).await;
+        let cx = HookContext { item: Some(outcome.item.clone()), ..cx.clone() };
+        stop |= after(&call, &outcome.output, &hooks, &cx).await;
     }
     stop
 }

@@ -521,6 +521,7 @@ impl Actor {
 
     fn hook_context(&self) -> HookContext {
         HookContext {
+            item: None,
             host: self.config.host.clone(),
             session: self.id.clone(),
             turn: self.running.as_ref().map(|r| r.turn.clone()),
@@ -835,6 +836,7 @@ impl Actor {
         }
         let set = self.config.hooks.clone();
         let cx = HookContext {
+            item: None,
             turn: Some(turn.clone()),
             ..self.hook_context()
         };

@@ -531,6 +531,7 @@ pub(crate) mod tests {
         );
         let kernel = Arc::new(Kernel::default());
         let cx = bingo_sdk::HookContext {
+            item: None,
             session: SessionId::from_raw("session"),
             turn: None,
             cwd: std::env::temp_dir(),

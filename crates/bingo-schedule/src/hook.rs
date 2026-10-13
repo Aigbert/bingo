@@ -48,6 +48,7 @@ mod tests {
         drop(first);
         let second = ScheduleHook(Arc::default());
         let cx = HookContext {
+            item: None,
             host: fixture.handle(),
             session: session.clone(),
             turn: None,

@@ -78,6 +78,7 @@ mod tests {
 
     fn cx(session: &SessionId) -> HookContext {
         HookContext {
+            item: None,
             session: session.clone(),
             turn: None,
             cwd: std::env::temp_dir(),

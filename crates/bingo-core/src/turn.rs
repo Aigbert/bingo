@@ -192,6 +192,7 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
         return unanswered(transcript.model_items().cloned().collect());
     };
     let hook_cx = HookContext {
+        item: None,
         host: cfg.host.clone(),
         session: cfg.session.id.clone(),
         turn: Some(run.turn.clone()),
