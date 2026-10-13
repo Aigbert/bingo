@@ -78,7 +78,7 @@ setting, a flag, the wire or a card.
 - `crates/bingo-channels/{Cargo.toml,src/**}`
 - `crates/bingo/{Cargo.toml,src/{main,channels}.rs}`
 - `crates/bingo/tests/{channels.rs,cli/gateway.rs}`
-- `crates/bingo-gateway/{Cargo.toml,src/{doctor,lib}.rs}`
+- `crates/bingo-gateway/{Cargo.toml,src/{doctor,lib}.rs,tests/claim.rs}`
 - `scripts/feishu-smoke.md`, `docs/adr/0016-*.md`
 
 ## Exit criteria
@@ -107,12 +107,11 @@ setting, a flag, the wire or a card.
 
 ## Risks
 
-- **Stopped (2026-10-13), protocol step 6:** the targeted test gate fails
-  at `crates/bingo-gateway/tests/claim.rs:177`: M129 constructs `Patient`
-  without the new `platforms` field. This integration test is outside Files.
-  Options: authorize adding that test to Files and pass a test platform list
-  (recommended), or revise the doctor API within the existing scope.
-  Brick 6 edits remain uncommitted; loopback is not yet gated in the bin.
+- **Authorized (2026-10-13):** add the platform list to M129's gateway
+  claim test without changing its assertions. For the rest of M130, tests
+  or fixtures outside Files may be updated mechanically when they only
+  construct or name a changed type; record those paths here. Changes to
+  behavior or assertions outside Files still require a protocol stop.
 
 - Re-verified at `eddd0ebc`: M109 claim and M112 transcript folds remain;
   M129 gateway dispatch still constructs `Patient` in `src/lib.rs`, so
@@ -131,7 +130,7 @@ setting, a flag, the wire or a card.
 - The open slices rest on no runtime schema validation (only provider
   tests consume schemas today). Re-verify it.
 
-## Verified (2026-10-13, partial — stopped)
+## Verified (2026-10-13, in progress)
 
 - `cargo test -p bingo-channels -- --list`: `251 tests`; `120` start with `feishu::`.
 - Brick 1 `INSTA_UPDATE=no cargo test -p bingo-channel-adapter -p bingo-channels`:
