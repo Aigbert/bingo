@@ -697,3 +697,7 @@ mod tests {
         assert_eq!(view.fold(), "Board\nAAPL 1 2");
     }
 }
+
+#[cfg(test)]
+#[path = "view/contract.rs"]
+mod contract;

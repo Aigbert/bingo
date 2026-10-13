@@ -1,0 +1,14 @@
+[
+  [{"kind":"Box","children":[{"kind":"Text","children":["one"]},{"kind":"Text","children":["two"]}]}, "one\ntwo"],
+  [{"kind":"Text","children":["hello ",{"kind":"Text","children":["world"],"bold":true}]}, "hello world"],
+  [{"kind":"Button","children":["Go"],"onPress":{"name":"counter:ui","args":{"handler":"1:0","event":"press"}}}, "[Go]"],
+  [{"kind":"Input","label":"Name","value":"Ada"}, "Name: Ada"],
+  [{"kind":"Select","label":"Mode","options":[{"label":"Fast","value":"fast"}],"value":"fast"}, "Mode: Fast"],
+  [{"kind":"Link","href":"https://example.test","label":"Example"}, "Example (https://example.test)"],
+  [{"kind":"Image","source":"blob:fixture","alt":"A cat","columns":10,"rows":5}, "A cat"],
+  [{"kind":"Raster","columns":2,"rows":1,"cells":["ab"]}, "ab"],
+  [{"kind":"Svg","source":"<svg/>","alt":"A circle"}, "A circle"],
+  [{"kind":"Engine","component":"Pane","props":{}}, ""],
+  [{"kind":"Code","source":"let x = 1;","language":"rust"}, "let x = 1;"],
+  [{"kind":"Markdown","text":"**bold**","dimColor":true}, "**bold**"]
+]
