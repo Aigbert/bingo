@@ -9,6 +9,7 @@ use std::sync::{Arc, Weak};
 
 use bingo_sdk::*;
 use futures::FutureExt;
+use tokio_util::task::TaskTracker;
 
 use super::mailbox::{Mailbox, Msg};
 
@@ -189,43 +190,62 @@ pub(super) struct Run {
 }
 
 /// The table and the runs in flight.
-pub(super) struct Commands {
+#[derive(Clone)]
+pub(super) struct Lookup {
     table: Vec<Arc<dyn Command>>,
     sources: Vec<Arc<dyn CommandSource>>,
+    cwd: PathBuf,
+}
+
+struct InFlight {
+    invocation: Invocation,
+    cancel: CancellationToken,
+}
+
+pub(super) struct Commands {
+    lookup: Lookup,
     host: Weak<dyn HostApi>,
     mailbox: Mailbox,
     session: SessionId,
-    cwd: PathBuf,
-    inflight: HashMap<IntentId, Invocation>,
+    tracker: TaskTracker,
+    cancel: CancellationToken,
+    inflight: HashMap<IntentId, InFlight>,
     /// The non-instant command whose run holds the queue behind it.
     holding: Option<IntentId>,
 }
 
 impl Commands {
-    pub(super) fn new(services: Services, mailbox: Mailbox, cwd: PathBuf) -> Self {
+    pub(super) fn new(
+        services: Services,
+        mailbox: Mailbox,
+        cwd: PathBuf,
+        tracker: TaskTracker,
+        cancel: CancellationToken,
+    ) -> Self {
         Self {
-            table: services.commands,
-            sources: services.command_sources,
+            lookup: Lookup {
+                table: services.commands,
+                sources: services.command_sources,
+                cwd,
+            },
+            tracker,
+            cancel,
             host: services.host,
             session: mailbox.id().clone(),
             mailbox,
-            cwd,
             inflight: HashMap::new(),
             holding: None,
         }
     }
 
-    /// The table first, then each source in order (ADR-0009).
-    pub(super) async fn find(&self, name: &str) -> Option<Arc<dyn Command>> {
-        if let Some(found) = named(&self.table, name) {
-            return Some(found);
-        }
-        for source in &self.sources {
-            if let Some(found) = named(&source.commands(&self.cwd).await, name) {
-                return Some(found);
-            }
-        }
-        None
+    pub(super) fn lookup(&self) -> Lookup {
+        self.lookup.clone()
+    }
+
+    pub(super) fn interrupt(&self) -> Option<IntentId> {
+        let intent = self.holding.as_ref()?;
+        self.inflight.get(intent)?.cancel.cancel();
+        Some(intent.clone())
     }
 
     /// A non-instant command is running: the queue waits.
@@ -239,9 +259,11 @@ impl Commands {
             .host
             .upgrade()
             .ok_or_else(|| KernelError::new(ErrorCode::SessionClosed, "the host is gone"))?;
+        let cancel = self.cancel.child_token();
         let cx = CommandContext {
+            cancel: cancel.clone(),
             session: self.session.clone(),
-            cwd: self.cwd.clone(),
+            cwd: self.lookup.cwd.clone(),
             host: HostHandle(host),
         };
         let Run {
@@ -251,21 +273,29 @@ impl Commands {
             args,
             holds,
         } = run;
-        self.inflight.insert(intent.clone(), invocation);
+        self.inflight.insert(
+            intent.clone(),
+            InFlight {
+                invocation,
+                cancel: cancel.clone(),
+            },
+        );
         if holds {
             self.holding = Some(intent.clone());
         }
         let mailbox = self.mailbox.clone();
-        tokio::spawn(async move {
-            let outcome = AssertUnwindSafe(command.run(&args, &cx))
-                .catch_unwind()
-                .await
-                .unwrap_or_else(|panic| {
-                    Err(KernelError::new(
-                        ErrorCode::Internal,
-                        format!("the command panicked: {}", super::panic_message(panic)),
-                    ))
-                });
+        self.tracker.spawn(async move {
+            let future = AssertUnwindSafe(command.run(&args, &cx)).catch_unwind();
+            let returned = super::running::supervised(future, &cancel).await;
+            let outcome = match returned {
+                _ if cancel.is_cancelled() => Err(interrupted()),
+                Some(Ok(outcome)) => outcome,
+                Some(Err(panic)) => Err(KernelError::new(
+                    ErrorCode::Internal,
+                    format!("the command panicked: {}", super::panic_message(panic)),
+                )),
+                None => Err(interrupted()),
+            };
             mailbox.send(Msg::CommandFinished { intent, outcome });
         });
         Ok(())
@@ -280,8 +310,27 @@ impl Commands {
         }
         self.inflight
             .remove(intent)
-            .map(|invocation| (invocation, held))
+            .map(|run| (run.invocation, held))
     }
+}
+
+impl Lookup {
+    /// The table first, then each source in order (ADR-0009).
+    pub(super) async fn find(&self, name: &str) -> Option<Arc<dyn Command>> {
+        if let Some(found) = named(&self.table, name) {
+            return Some(found);
+        }
+        for source in &self.sources {
+            if let Some(found) = named(&source.commands(&self.cwd).await, name) {
+                return Some(found);
+            }
+        }
+        None
+    }
+}
+
+pub(super) fn interrupted() -> KernelError {
+    KernelError::new(ErrorCode::Interrupted, "stopped by the person")
 }
 
 fn named(table: &[Arc<dyn Command>], name: &str) -> Option<Arc<dyn Command>> {

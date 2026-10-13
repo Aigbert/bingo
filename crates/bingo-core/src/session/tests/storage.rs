@@ -44,6 +44,8 @@ async fn failing_actor() -> (Actor, Arc<FailingStore>) {
         vec![],
         Arc::new(NoHost),
     ));
+    let tracker = TaskTracker::new();
+    let cancel = CancellationToken::new();
     let actor = Actor {
         id: head.id.clone(),
         mailbox: mailbox.clone(),
@@ -56,8 +58,15 @@ async fn failing_actor() -> (Actor, Arc<FailingStore>) {
         subscribers: Subscribers::default(),
         running: None,
         queue: Queue::default(),
-        commands: Commands::new(Services::none(), mailbox, "/tmp".into()),
-        tracker: TaskTracker::new(),
+        commands: Commands::new(
+            Services::none(),
+            mailbox,
+            "/tmp".into(),
+            tracker.clone(),
+            cancel.clone(),
+        ),
+        tracker,
+        cancel,
         observed: None,
         done,
         pending: HashMap::new(),

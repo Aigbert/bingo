@@ -37,8 +37,11 @@ impl Transcript {
     }
 
     /// Open items owned by a turn, in transcript order.
-    pub fn open_items<'a>(&'a self, _turn: &'a crate::TurnId) -> impl Iterator<Item = &'a Item> {
-        std::iter::empty()
+    pub fn open_items<'a>(&'a self, turn: &'a crate::TurnId) -> impl Iterator<Item = &'a Item> {
+        self.items
+            .iter()
+            .map(AsRef::as_ref)
+            .filter(move |item| item.turn.as_ref() == Some(turn) && !item.status.is_terminal())
     }
 
     pub fn generation(&self) -> u64 {

@@ -9,7 +9,7 @@ use bingo_sdk::*;
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot, watch};
 
-use crate::turn::{TurnConfig, TurnHost, TurnOutcome};
+use crate::turn::{TurnConfig, TurnHost};
 
 pub(crate) enum Msg {
     Submit {
@@ -85,7 +85,7 @@ pub(crate) enum Msg {
     },
     TurnFinished {
         turn: TurnId,
-        outcome: Result<TurnOutcome, String>,
+        outcome: super::running::Ended,
     },
     Record {
         body: ItemBody,

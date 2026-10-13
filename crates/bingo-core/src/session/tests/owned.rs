@@ -25,7 +25,7 @@ fn input(text: &str) -> Input {
 
 fn tool_config() -> TurnConfig {
     config(
-        ScriptedProvider::new(vec![Script::Events(tool_call("echo", json!({"v": 1})))]),
+        ScriptedProvider::new(vec![Script::Events(tool_call("Echo", json!({"v": 1})))]),
         vec![Arc::new(EchoTool { read_only: true })],
         Arc::new(NoHost),
     )

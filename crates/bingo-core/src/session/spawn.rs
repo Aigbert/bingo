@@ -74,7 +74,15 @@ fn spawn_with(
     let (done, finished) = watch::channel(false);
     let mailbox = Mailbox::new(head.id.clone(), tx, finished);
     let config = config(&mailbox);
-    let commands = Commands::new(services, mailbox.clone(), config.cwd.clone());
+    let tracker = TaskTracker::new();
+    let cancel = CancellationToken::new();
+    let commands = Commands::new(
+        services,
+        mailbox.clone(),
+        config.cwd.clone(),
+        tracker.clone(),
+        cancel.clone(),
+    );
     // A `SessionClosed` in the journal ended the last process's segment, not
     // the session: the summary `open` publishes first is what opens it again,
     // for this fold and for every client's alike.
@@ -92,7 +100,8 @@ fn spawn_with(
         running: None,
         queue: Queue::default(),
         commands,
-        tracker: TaskTracker::new(),
+        tracker,
+        cancel,
         observed: None,
         done,
         pending: HashMap::new(),

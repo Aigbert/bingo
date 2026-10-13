@@ -33,16 +33,19 @@ use interactions::Pending;
 pub use mailbox::Mailbox;
 use mailbox::Msg;
 use queue::Queue;
-use running::Running;
+use running::{Ended, Running};
 pub use spawn::{head_summary, replayed, resume, spawn};
 pub use subscribers::SUBSCRIBER_CAPACITY;
 use subscribers::Subscribers;
 
-use crate::turn::{HookSet, TurnConfig, TurnKind, TurnOutcome};
+use crate::turn::{HookSet, TurnConfig, TurnKind};
 
 /// How long a stopping actor waits for the work it spawned after its turns
 /// (ADR-0008 §7) before it lets go.
 pub const AFTER_TURN_DEADLINE: Duration = Duration::from_secs(30);
+
+/// Time for cooperative cleanup after the person stops owned work.
+pub const INTERRUPT_GRACE: Duration = Duration::from_secs(2);
 
 /// The start hooks, still running.
 type Starting = std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>;
@@ -70,6 +73,7 @@ struct Actor {
     commands: Commands,
     /// Work that outlives a turn: the hooks that run after `TurnCompleted`.
     tracker: TaskTracker,
+    cancel: CancellationToken,
     /// Every frame but the deltas for the hooks that observe the session, in
     /// order, on a task of their own; `None` when no hook asked (ADR-0009 §4).
     observed: Option<mpsc::UnboundedSender<(Frame, HookContext)>>,
@@ -102,6 +106,7 @@ impl Actor {
         if let Some(running) = self.running.take() {
             running.abandon();
         }
+        self.cancel.cancel();
         drop(self.observed.take());
         self.tracker.close();
         if tokio::time::timeout(AFTER_TURN_DEADLINE, self.tracker.wait())
@@ -865,19 +870,19 @@ impl Actor {
             })
     }
 
-    async fn turn_finished(
-        &mut self,
-        turn: TurnId,
-        outcome: Result<TurnOutcome, String>,
-    ) -> Result<Flow, KernelError> {
+    async fn turn_finished(&mut self, turn: TurnId, outcome: Ended) -> Result<Flow, KernelError> {
         if !self.is_running(&turn) {
             tracing::warn!(session = %self.id, %turn, "completion from a turn that is not running");
             return Ok(Flow::Continue);
         }
         self.cancel_interactions(CancelReason::TurnEnded).await?;
         let (status, usage, items) = match outcome {
-            Ok(outcome) => (outcome.status, outcome.usage, outcome.items),
-            Err(panic) => (
+            Ended::Returned(outcome) => (outcome.status, outcome.usage, outcome.items),
+            Ended::Dropped => {
+                let outcome = self.close_dropped_turn(&turn).await?;
+                (outcome.status, outcome.usage, outcome.items)
+            }
+            Ended::Panicked(panic) => (
                 TurnStatus::Failed {
                     error: KernelError::new(
                         ErrorCode::TurnLost,
@@ -930,6 +935,7 @@ impl Actor {
         if self.state.closed {
             return Ok(Flow::Stop);
         }
+        self.cancel.cancel();
         // Before the turn is told to stop, and whether or not there is one: a
         // question opened between turns (ADR-0039 §1) is closed by the same
         // close as any other.

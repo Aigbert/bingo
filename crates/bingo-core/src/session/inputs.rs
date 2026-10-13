@@ -56,7 +56,7 @@ impl Actor {
                 )
                 .await;
         }
-        let Some(command) = self.commands.find(&parsed.name).await else {
+        let Some(command) = self.commands.lookup().find(&parsed.name).await else {
             return self
                 .reject(
                     intent,
@@ -275,6 +275,12 @@ impl Actor {
         scope: InterruptScope,
     ) -> Result<(), KernelError> {
         let Some(running) = &self.running else {
+            if matches!(scope, InterruptScope::Head)
+                && let Some(command) = self.commands.interrupt()
+            {
+                self.cancel_command_interactions().await?;
+                return self.applied(intent, json!({ "command": command })).await;
+            }
             return self
                 .reject(intent, ErrorCode::NotReady, "no turn is running")
                 .await;
@@ -520,7 +526,7 @@ impl Actor {
     async fn run_queued(&mut self, intent: IntentId, input: Input) -> Result<(), KernelError> {
         let parsed = commands::parse(&input);
         let command = match &parsed {
-            Some(p) => self.commands.find(&p.name).await,
+            Some(p) => self.commands.lookup().find(&p.name).await,
             None => None,
         };
         match (parsed, command) {
