@@ -8,7 +8,7 @@ impl Decode for Lines {
         if event == "error" {
             return Err(ProviderError::Stream { message: data.into() });
         }
-        Ok(vec![ModelEvent::TextDelta { text: data.into() }])
+        Ok(vec![ModelEvent::TextDelta { id: "line".into(), delta: data.into() }])
     }
 }
 
@@ -27,8 +27,8 @@ async fn chunked_equals_whole_and_keeps_events_before_an_error() {
     let whole = drain(body(bytes, bytes.len())).await;
     assert_eq!(whole, drain(body(bytes, 3)).await);
     assert_eq!(whole, vec![
-        Ok(ModelEvent::TextDelta { text: "first".into() }),
-        Ok(ModelEvent::TextDelta { text: "second".into() }),
+        Ok(ModelEvent::TextDelta { id: "line".into(), delta: "first".into() }),
+        Ok(ModelEvent::TextDelta { id: "line".into(), delta: "second".into() }),
         Err(ProviderError::Stream { message: "refused".into() }),
     ]);
 }
