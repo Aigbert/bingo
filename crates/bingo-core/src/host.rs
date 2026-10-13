@@ -9,6 +9,8 @@ mod catalog;
 mod choose;
 mod completion;
 mod interception;
+mod live;
+use live::Live;
 mod refresh;
 mod registry;
 mod render;
@@ -114,34 +116,6 @@ pub struct Host {
     /// this one's own refresh (ADR-0026 §4).
     served: Arc<ServedModels>,
     weak: Weak<Host>,
-}
-
-#[derive(Clone)]
-struct Live {
-    mailbox: Mailbox,
-    changing: Arc<tokio::sync::Mutex<()>>,
-    render: Arc<render_queue::Queue>,
-    render_started: tokio::time::Instant,
-    invalidations: Arc<Mutex<throttle::Throttle>>,
-    created_at: Timestamp,
-    /// What the session was opened with, resolved: `/model` and `/think`
-    /// rewrite it (ADR-0008 §4, ADR-0047 §1), and it is the one holder of
-    /// the provider, the model and the level the next turn runs on.
-    spec: SessionSpec,
-}
-
-impl Live {
-    fn new(mailbox: Mailbox, summary: &SessionSummary, spec: SessionSpec) -> Self {
-        Self {
-            mailbox,
-            changing: Arc::new(tokio::sync::Mutex::new(())),
-            render: Arc::default(),
-            render_started: tokio::time::Instant::now(),
-            invalidations: Arc::default(),
-            created_at: summary.created_at,
-            spec,
-        }
-    }
 }
 
 /// A knob moved, written into the spec that holds it.

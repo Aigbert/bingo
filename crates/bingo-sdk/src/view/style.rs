@@ -42,18 +42,8 @@ pub struct BoxStyle {
     pub width: Option<u16>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub height: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub margin: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub margin_x: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub margin_y: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub padding: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub padding_x: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub padding_y: Option<u16>,
+    #[serde(flatten)]
+    pub spacing: Spacing,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub border_style: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -149,4 +139,21 @@ pub enum Justify {
     SpaceBetween,
     SpaceAround,
     SpaceEvenly,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Spacing {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub margin: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub margin_x: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub margin_y: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub padding: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub padding_x: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub padding_y: Option<u16>,
 }

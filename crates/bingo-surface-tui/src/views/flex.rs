@@ -16,8 +16,8 @@ pub fn lines(
     if style.display.as_deref() == Some("none") || width == 0 {
         return Vec::new();
     }
-    let mx = space(style.margin_x.or(style.margin)).min(width / 2);
-    let my = space(style.margin_y.or(style.margin));
+    let mx = space(style.spacing.margin_x.or(style.spacing.margin)).min(width / 2);
+    let my = space(style.spacing.margin_y.or(style.spacing.margin));
     let available = width.saturating_sub(mx * 2);
     let width = if style.flex_grow.unwrap_or(0) > 0 {
         available
@@ -32,8 +32,8 @@ pub fn lines(
             .as_deref()
             .is_some_and(|border| border != "none"),
     );
-    let px = space(style.padding_x.or(style.padding)).min(width / 2);
-    let py = space(style.padding_y.or(style.padding));
+    let px = space(style.spacing.padding_x.or(style.spacing.padding)).min(width / 2);
+    let py = space(style.spacing.padding_y.or(style.spacing.padding));
     let inner = width.saturating_sub(2 * (px + border));
     let children: Vec<_> = children.iter().filter(|child| !hidden(child)).collect();
     let height = style.height.map(|height| {
