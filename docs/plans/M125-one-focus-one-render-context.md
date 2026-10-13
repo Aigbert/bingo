@@ -39,9 +39,10 @@ visible change, no new dependency, no sdk change.
    - two tests drawing in two looks on parallel threads do not see each
      other's.
 2. **`Focus`**: `Composer`, `Intro(Playing)`, `Select(Run)`,
-   `Search(Search)`, `Layer(Open)`, `Card(CardId)`. It replaces
-   `intro`, `select.run`, `search`, `layer.open` and the card `focus`,
-   so two owners cannot be set at once. Two owners stay derived, never
+   `Search(Search)`, `Layer(Layer)`, `Card(CardId)`. It replaces
+   `intro`, `select.run`, `search`, `layer` and the card `focus`,
+   so two owners cannot be set at once. `Layer` retains its reveal timing;
+   a closing layer is visual residue and derives the composer owner. Two owners stay derived, never
    stored: the session's open interaction (read from the tree) and the
    menu (read from the composer's line and `Menu.dismissed`), each the
    owner only while `Focus` is `Composer`. `esc_armed`, `block` and the
@@ -74,18 +75,19 @@ visible change, no new dependency, no sdk change.
 ## Files
 
 - `crates/bingo-surface-tui/src/{focus.rs,render.rs}` (new)
-- `crates/bingo-surface-tui/src/{ui,input,pointer,layers,composer}.rs`, `input/switcher.rs`
+- `crates/bingo-surface-tui/src/{ui,input,pointer,layers,composer,select,view,pager,clock}.rs`, `input/switcher.rs`
 - `crates/bingo-surface-tui/src/{theme,lib,terminal,run,blocks,highlight,layout}.rs`
-- `crates/bingo-surface-tui/src/graphics/mod.rs`, `run/{look,notices}.rs`
-- `crates/bingo-surface-tui/src/{test_support,screens,motion}.rs`, `screens/colours.rs`
+- `crates/bingo-surface-tui/src/graphics/mod.rs`, `run/{look,notices,opening}.rs`, `layout/{deadline,tests}.rs`
+- `crates/bingo-surface-tui/src/{test_support,screens,motion}.rs`, `screens/{colours,opening,windows}.rs`; mechanical fixture callers of changed types
 - `docs/design/tui.md`, `docs/adr/0002-*.md`
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-surface-tui focus render` passes; the failing
+- [ ] `cargo test -p bingo-surface-tui focus` and `cargo test -p bingo-surface-tui render` passes; the failing
       first run is pasted.
-- [ ] `rg 'cfg\(not\(test\)\)|static (ASK|GROUND|HEARD)|OVERRIDE|fn saying' crates/bingo-surface-tui/src`
-      finds nothing.
+- [ ] Theme/graphics detection has no `cfg(not(test))` twins or
+      `ASK`, `GROUND`, `HEARD`, `OVERRIDE`, `graphics::saying` globals.
+      M124's `layout/count.rs` test instrumentation is unrelated and stays.
 - [ ] `rg 'search\.is_some\(\)|select\.run\.is_some\(\)|layer\.captures\(\)' crates/bingo-surface-tui/src/{input,pointer}.rs`
       finds nothing; both dispatch on `focus::owner`.
 - [ ] The detection table runs the production path under `cargo test`,
@@ -112,7 +114,21 @@ visible change, no new dependency, no sdk change.
   inner one nests in its owner's variant rather than becoming a flag.
 - A click that went to the transcript while a card was open may now go
   to the card, or the reverse. Each change is named and tested.
-- A helper called outside a scope draws in the resting look instead of
-  failing. A debug assertion in the test build catches it.
+- A helper outside a scope uses the resting look in both builds; scope
+  restoration, nesting and parallel isolation must be tested.
 - Re-verify at start: `on_key`'s and `on_mouse`'s orders, `Ui`'s
   fields, the twin count by file, and M124's `layout()` signature.
+
+## Re-verified — 2026-10-13 at f3ed55b9
+
+- Clean `m125-one-focus`; M124 `layout(previous, tree, ui, size, now)`
+  returns `Layout`; `paint(layout, frame)` copies its canvas.
+- Keyboard precedence and mouse ordering still match the Goal. `Ui` still
+  owns all five independent owners; `Layer` also owns reveal/closing state.
+- Detection twins remain theme 10, graphics 8, lib 1. M124 adds three
+  unrelated instrumentation twins; `transcript::saying` is also unrelated.
+- Added actual consumers (selection, view, pager, opening, clock and layout
+  helpers) to Files. Shared M134 files receive only necessary local edits.
+- `Render` derives ASCII from its theme glyphs instead of duplicating it;
+  environment/probe inputs remain run-owned for late replies. No dependency.
+- Preserve the rail and panel until M148 (ADR-0081); no redesign here.
