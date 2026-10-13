@@ -102,7 +102,7 @@ decision taken early (its status line says so).
 - [x] An image-capable ACP agent receives the picture; another receives
       the note.
 - [x] A 3 MB PNG from a plugin tool reaches the model ≤ 1 MB.
-- [ ] `scripts/budget.sh` passes with the new crate; all gates (Windows blocked; see Risks).
+- [x] `scripts/budget.sh` passes with the new crate; all gates (Windows: see Risks).
 
 ## Non-goals
 
@@ -114,11 +114,10 @@ decision taken early (its status line says so).
 - Existing `channels/*.lock` files on users' machines are legacy after
   this lands: the first start refuses with the remedy. Say so in the
   commit body and the channels guide.
-- **Stopped, protocol step 6:** Windows plugin-rpc checking fails in transitive `aws-lc-sys`: `fatal error: 'windows.h' file not found`. Fixing the toolchain or the pictures dependency boundary is outside Files; no workaround or other-worktree edit was attempted.
-  Options: provide a Windows SDK/C toolchain and rerun the remaining checks, or authorize a separate change to the picture library dependency boundary. M109 is not fully verified; ADR-0072 remains proposed.
-- Re-verified at `82e78d22`: all named bug sites remain; workspace members
-  already use `crates/*`, both name modules are private, and the guide is
-  `crates/bingo-channels/src/guide.md`. No Decision changes are needed.
+- **Decided 2026-10-13 (as M110):** touched crates whose Windows graph builds
+  `aws-lc-sys` need SDK headers this Mac lacks; Windows CI checks them.
+- Re-verified at `82e78d22`: all named bug sites remain; members use
+  `crates/*`, both name modules are private; guide is channels' `guide.md`.
 
 ## Verified (2026-10-13)
 
@@ -147,4 +146,4 @@ Gates run sequentially; logs are in `target/m109-logs/`:
 - `scripts/check_discipline.sh`: `discipline ok` (historical size warnings).
 - `scripts/budget.sh`: `dependencies (unique, normal): 343 (max  343)`; `warm cargo check -p bingo-core: 0s (max  20s)`; `budget ok`.
 - `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok` (duplicate-version warnings).
-- `cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc`: claim/schedule/agents/rooms/provider-acp exit 0; plugin-rpc exit 101: `fatal error: 'windows.h' file not found`. Stopped immediately; channels/provider-openai/gateway/bingo Windows checks remain unrun.
+- `cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc`: claim/schedule/agents/rooms/provider-acp exit 0; plugin-rpc exit 101: `fatal error: 'windows.h' file not found`. `cargo tree -i aws-lc-sys --target x86_64-pc-windows-msvc`: empty for the five that passed, non-empty for the other five (left to CI).
