@@ -718,6 +718,7 @@
             "SESSION_CLOSED",
             "INTERACTION_CLOSED",
             "NOT_READY",
+        "INTERRUPTED",
             "STALE_GENERATION",
             "NOT_INITIALIZED",
             "INVALID_INPUT",

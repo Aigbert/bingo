@@ -12,6 +12,8 @@ pub enum ErrorCode {
     SessionClosed,
     InteractionClosed,
     NotReady,
+    /// The person stopped it; not a failure.
+    Interrupted,
     StaleGeneration,
     /// A negotiated RPC byte or pin budget cannot carry this value safely.
     ProtocolLimit,
@@ -45,6 +47,7 @@ impl ErrorCode {
             ErrorCode::SessionClosed => "SESSION_CLOSED",
             ErrorCode::InteractionClosed => "INTERACTION_CLOSED",
             ErrorCode::NotReady => "NOT_READY",
+            ErrorCode::Interrupted => "INTERRUPTED",
             ErrorCode::StaleGeneration => "STALE_GENERATION",
             ErrorCode::ProtocolLimit => "PROTOCOL_LIMIT",
             ErrorCode::NotInitialized => "NOT_INITIALIZED",
