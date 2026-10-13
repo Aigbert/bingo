@@ -19,6 +19,7 @@ tier = "composition"
 workspace = true
 
 [dependencies]
+bingo-claim.workspace = true
 bingo-sdk.workspace = true
 # `doctor` reads the settings this invocation would have loaded, through the
 # kernel's own loader: one layering rule, not a second one for a diagnosis.

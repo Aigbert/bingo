@@ -248,7 +248,9 @@ fn lock_checks(patient: &Patient<'_>, probe: &dyn Probe) -> Vec<Row> {
 
 fn lock_check(root: &Path, path: PathBuf, probe: &dyn Probe) -> Option<Row> {
     let name = relative(&path, root);
-    if let Some(row) = schedule_lock(root, &path, &name) {
+    if let Some(row) = schedule_lock(root, &path, &name)
+        .or_else(|| channel_lock(root, &path, &name))
+    {
         return Some(row);
     }
     let text = std::fs::read_to_string(&path).ok()?;
@@ -296,6 +298,27 @@ fn schedule_lock(root: &Path, path: &Path, name: &str) -> Option<Row> {
             "scheduler OS lock is free; this permanent file is not a stale claim".into(),
         ),
         Err(bingo_schedule::lock::ClaimError::Legacy { .. }) => return None,
+        Err(error) => (Verdict::Bad, error.to_string()),
+    };
+    Some(Row::new(name, verdict, say))
+}
+
+fn channel_lock(root: &Path, path: &Path, name: &str) -> Option<Row> {
+    let directory = root.join("channels");
+    if path.parent() != Some(directory.as_path()) {
+        return None;
+    }
+    let protocol = bingo_claim::Protocol {
+        file: path.file_name()?.to_str()?,
+        marker: bingo_channels::lock::MARKER,
+    };
+    let (verdict, say) = match bingo_claim::probe(&directory, protocol) {
+        Ok(true) => (Verdict::Ok, "channel OS lock is held; never remove this file".into()),
+        Ok(false) => (
+            Verdict::Ok,
+            "channel OS lock is free; this permanent file is not a stale claim".into(),
+        ),
+        Err(bingo_claim::ClaimError::Legacy { .. }) => return None,
         Err(error) => (Verdict::Bad, error.to_string()),
     };
     Some(Row::new(name, verdict, say))
