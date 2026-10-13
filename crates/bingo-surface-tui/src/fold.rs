@@ -41,9 +41,7 @@ pub fn fold_of(folds: &Folds, item: &Item) -> Fold {
 /// (ADR-0035 §4) and draws as a tool row. What came back from a call is read,
 /// so it has the two states every other result has.
 fn shuts(item: &Item) -> bool {
-    matches!(item.body, ItemBody::Reasoning { .. })
-        && item.completed_at.is_some()
-        && !crate::acp::is_call(item)
+    matches!(item.body, ItemBody::Reasoning { .. }) && item.completed_at.is_some()
 }
 
 /// A click is one gesture on one row (§7): it advances the fold one step, and

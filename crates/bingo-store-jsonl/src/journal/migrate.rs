@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 
-pub(super) const STEPS: &[fn(Value) -> Value] = &[std::convert::identity];
+pub(super) const STEPS: &[fn(Value) -> Value] = &[std::convert::identity, external_call];
 
 pub(super) fn upgrade(value: Value, version: u32, steps: &[fn(Value) -> Value]) -> Value {
     steps
@@ -59,4 +59,57 @@ mod tests {
         let current = json!({"wrapped": {"new": 42}});
         assert_eq!(upgrade(current.clone(), 3, steps), current);
     }
+}
+
+fn external_call(mut frame: Value) -> Value {
+    let Some(item) = frame.pointer_mut("/event/item") else {
+        return frame;
+    };
+    let Some(body) = item.get("body") else {
+        return frame;
+    };
+    if body.get("kind").and_then(Value::as_str) != Some("reasoning") {
+        return frame;
+    }
+    let Some(old) = body.pointer("/providerMetadata/acp") else {
+        return frame;
+    };
+    if old.get("external").and_then(Value::as_bool) != Some(true) {
+        return frame;
+    }
+    let Some(id) = old.get("toolCallId").and_then(Value::as_str) else {
+        return frame;
+    };
+    let kind = old.get("kind").and_then(Value::as_str).unwrap_or("other");
+    let kind = match kind {
+        "read" | "edit" | "delete" | "move" | "search" | "execute" | "think" | "fetch" => kind,
+        _ => "other",
+    };
+    let mut text = old
+        .get("content")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|c| c.pointer("/content/text").and_then(Value::as_str))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if text.is_empty() {
+        text = body
+            .get("text")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+    }
+    let output = serde_json::json!({"parts":[{"type":"text","text":text}],"isError":old.get("status").and_then(Value::as_str) == Some("failed")});
+    let body = serde_json::json!({"kind":"toolCall","callId":id,"name":format!("acp:{kind}"),
+        "input":{"title":old.get("title").and_then(Value::as_str).unwrap_or(id),
+            "locations":old.get("locations").cloned().unwrap_or_else(|| serde_json::json!([])),
+            "raw":old.get("rawInput").cloned().unwrap_or(Value::Null)},
+        "output":output});
+    item["body"] = body;
+    if !item.get("meta").is_some_and(Value::is_object) {
+        item["meta"] = serde_json::json!({});
+    }
+    item["meta"]["external"] = Value::Bool(true);
+    frame
 }

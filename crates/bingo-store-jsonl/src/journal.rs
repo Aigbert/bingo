@@ -18,7 +18,7 @@ use crate::layout;
 use crate::storage;
 
 pub const FORMAT: &str = "bingo-journal";
-pub const VERSION: u32 = 2;
+pub const VERSION: u32 = 3;
 
 /// Line 1. The version is in the header from the first byte so a reader knows
 /// what it is holding before it parses anything else.
@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn a_newer_version_is_refused() {
-        let err = replayed("version3.jsonl", Seq::ZERO).expect_err("version 3 is not readable");
+        let err = replayed("version4.jsonl", Seq::ZERO).expect_err("version 4 is not readable");
         assert_eq!(err.code, ErrorCode::Storage);
         assert!(err.message.contains("newer bingo"), "{err}");
     }
@@ -342,7 +342,7 @@ mod tests {
         let written = std::fs::read_to_string(layout::journal(&dir)).expect("read back");
         assert_eq!(
             written,
-            fixture("clean.jsonl").replacen("\"version\":1", "\"version\":2", 1),
+            fixture("clean.jsonl").replacen("\"version\":1", "\"version\":3", 1),
             "the format is a contract"
         );
     }

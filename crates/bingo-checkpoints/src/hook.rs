@@ -19,7 +19,22 @@ pub const WRITERS: &[(&str, &str)] = &[("Write", "file_path"), ("Edit", "file_pa
 /// The file this call is about to write, absolute. `None` for a call this
 /// table does not know, and for one whose field is missing or is not a string
 /// — a call the tool itself will refuse.
-pub fn written(call: &ToolCall, cwd: &Path) -> Option<PathBuf> {
+pub fn written(call: &ToolCall, cwd: &Path) -> Vec<PathBuf> {
+    if let Some(external) = bingo_sdk::ExternalCall::from_input(call) {
+        return if external.kind.writes() {
+            external
+                .locations
+                .iter()
+                .map(|l| resolve(&l.path.to_string_lossy(), cwd))
+                .collect()
+        } else {
+            Vec::new()
+        };
+    }
+    ordinary(call, cwd).into_iter().collect()
+}
+
+fn ordinary(call: &ToolCall, cwd: &Path) -> Option<PathBuf> {
     let (_, field) = WRITERS.iter().find(|(name, _)| *name == call.name)?;
     let named = call.input.get(field)?.as_str()?;
     Some(resolve(named, cwd))
@@ -69,11 +84,13 @@ impl Hook for SnapshotHook {
     /// is what makes an edit undoable, not what makes it allowed — refusing
     /// the write because the disk is full would be the worse failure.
     async fn before_tool(&self, call: &mut ToolCall, cx: &HookContext) -> HookOutcome {
-        let (Some(turn), Some(path)) = (cx.turn.as_ref(), written(call, &cx.cwd)) else {
+        let Some(turn) = cx.turn.as_ref() else {
             return HookOutcome::Continue;
         };
-        if let Err(error) = self.store.snapshot(&cx.session, turn, &path) {
-            tracing::warn!(%error, path = %path.display(), "no checkpoint for this file");
+        for path in written(call, &cx.cwd) {
+            if let Err(error) = self.store.snapshot(&cx.session, turn, &path) {
+                tracing::warn!(%error, path = %path.display(), "no checkpoint for this file");
+            }
         }
         HookOutcome::Continue
     }
@@ -97,11 +114,11 @@ mod tests {
         let cwd = Path::new("/work");
         assert_eq!(
             written(&call("Write", json!({"file_path": "src/lib.rs"})), cwd),
-            Some(PathBuf::from("/work/src/lib.rs"))
+            vec![PathBuf::from("/work/src/lib.rs")]
         );
         assert_eq!(
             written(&call("Edit", json!({"file_path": "/etc/hosts"})), cwd),
-            Some(PathBuf::from("/etc/hosts")),
+            vec![PathBuf::from("/etc/hosts")],
             "a path outside the tree is still a file"
         );
     }
@@ -111,16 +128,25 @@ mod tests {
         let cwd = Path::new("/work");
         assert_eq!(
             written(&call("Bash", json!({"command": "rm a"})), cwd),
-            None
+            Vec::<PathBuf>::new()
         );
-        assert_eq!(written(&call("Read", json!({"file_path": "a"})), cwd), None);
+        assert_eq!(
+            written(&call("Read", json!({"file_path": "a"})), cwd),
+            Vec::<PathBuf>::new()
+        );
     }
 
     #[test]
     fn a_call_whose_field_is_missing_or_is_not_a_string_names_no_file() {
         let cwd = Path::new("/work");
-        assert_eq!(written(&call("Write", json!({"content": "x"})), cwd), None);
-        assert_eq!(written(&call("Write", json!({"file_path": 7})), cwd), None);
+        assert_eq!(
+            written(&call("Write", json!({"content": "x"})), cwd),
+            Vec::<PathBuf>::new()
+        );
+        assert_eq!(
+            written(&call("Write", json!({"file_path": 7})), cwd),
+            Vec::<PathBuf>::new()
+        );
     }
 
     fn context(dir: &Path) -> HookContext {
@@ -178,6 +204,42 @@ mod tests {
             .await;
         let entries = store.entries(&cx.session, &bingo_sdk::TurnId::from_raw("trn_1"));
         assert_eq!(entries[0].state, crate::store::State::Absent);
+    }
+
+    #[tokio::test]
+    async fn an_asked_agent_edit_is_restored_by_the_rewind_plan() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(Checkpoints::new(&dir.path().join("data")));
+        let hook = SnapshotHook::new(store.clone());
+        let cx = context(dir.path());
+        std::fs::write(dir.path().join("note.md"), "before").unwrap();
+        let mut call = bingo_sdk::ExternalCall {
+            id: "edit-1".into(),
+            kind: bingo_sdk::CallKind::Edit,
+            title: "Edit two files".into(),
+            raw: json!({}),
+            locations: ["note.md", "new.md"]
+                .into_iter()
+                .map(|path| bingo_sdk::CallLocation {
+                    path: path.into(),
+                    line: None,
+                })
+                .collect(),
+        }
+        .tool_call("acp/claude");
+        assert_eq!(
+            hook.before_tool(&mut call, &cx).await,
+            HookOutcome::Continue
+        );
+        std::fs::write(dir.path().join("note.md"), "after").unwrap();
+        std::fs::write(dir.path().join("new.md"), "new").unwrap();
+        let plan = crate::restore::plan(&store, &cx.session, &[cx.turn.unwrap()]).unwrap();
+        crate::restore::apply(&plan).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("note.md")).unwrap(),
+            "before"
+        );
+        assert!(!dir.path().join("new.md").exists());
     }
 
     #[tokio::test]

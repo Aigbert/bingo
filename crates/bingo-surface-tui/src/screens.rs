@@ -20,7 +20,6 @@ use crate::ui::{Open, Switcher, Ui};
 
 /// The screens a call an ACP agent ran on its own side is read through
 /// (ADR-0035 §4).
-mod acp;
 /// Where the colour lands on these same scenes (§4).
 mod colours;
 /// The screens a set of questions asked together is read through (§2's band).

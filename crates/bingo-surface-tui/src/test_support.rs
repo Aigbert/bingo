@@ -435,26 +435,61 @@ pub fn running_command(id: &str, command: &str) -> Item {
     )
 }
 
-/// A call an ACP agent ran on its own side, as `bingo-provider-acp` journals
-/// one (ADR-0035 §4): a reasoning item whose text is the heading a person
-/// reads and whose `acp` provider metadata is the whole call. `acp` is that
-/// object, written out at each call site the way the wire spells it — the
-/// shape is the contract, and `Call::metadata` in that crate is where it is
-/// written and its fixtures are where it is pinned.
-pub fn agent_call(id: &str, text: &str, acp: Value) -> Item {
-    let Value::Object(map) = acp else {
-        panic!("an acp mark is an object");
+/// Build an external call fixture from its title, kind and reported text.
+pub fn agent_call(id: &str, text: &str, fields: Value) -> Item {
+    if fields.get("external") != Some(&Value::Bool(true)) {
+        let mut thought = item(
+            id,
+            ItemStatus::Completed,
+            ItemBody::Reasoning {
+                text: text.into(),
+                provider_metadata: Default::default(),
+            },
+        );
+        thought.completed_at = Some(ts() + jiff::SignedDuration::from_secs(1));
+        return thought;
+    }
+    let kind = serde_json::from_value(fields["kind"].clone()).unwrap_or(bingo_sdk::CallKind::Other);
+    let external = bingo_sdk::ExternalCall {
+        id: id.into(),
+        kind,
+        title: fields["title"].as_str().unwrap_or("Tool").into(),
+        locations: vec![],
+        raw: fields["rawInput"].clone(),
     };
-    let mut call = item(
+    let text = fields["content"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|c| c.pointer("/content/text").and_then(Value::as_str))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let failed = fields["status"] == "failed";
+    let call = external.tool_call("external");
+    let mut result = item(
         id,
-        ItemStatus::Completed,
-        ItemBody::Reasoning {
-            text: text.into(),
-            provider_metadata: [("acp".to_string(), map)].into_iter().collect(),
+        if failed {
+            ItemStatus::Failed
+        } else {
+            ItemStatus::Completed
+        },
+        ItemBody::ToolCall {
+            call_id: call.call_id,
+            name: call.name,
+            input: call.input,
+            output: Some(if failed {
+                ToolOutput::error(text)
+            } else {
+                ToolOutput::text(text)
+            }),
+            progress: None,
+            duration_ms: None,
+            quiet: false,
         },
     );
-    call.completed_at = Some(ts() + jiff::SignedDuration::from_secs(1));
-    call
+    result.mark_external();
+    result.completed_at = Some(ts() + jiff::SignedDuration::from_secs(1));
+    result
 }
 
 pub fn diff_output() -> ToolOutput {
