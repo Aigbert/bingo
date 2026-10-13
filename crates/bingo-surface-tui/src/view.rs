@@ -38,7 +38,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let draft = ui.composer.layout(inner_width(state, area.width as usize));
     let strip = strip(state, ui, &frame.measurements, area.width);
     let activity = activity::lines(tree, ui, area.width as usize, now);
-    let toasts = ui.toasts.lines(state, now, usize::from(area.width));
+    let toasts = ui.placed.toasts.lines(state, now, usize::from(area.width));
     let toast_rows = (toasts.len() as u16).min(area.height / 3);
     let pane_rows = crate::pane::height(ui, state, area.height);
     let reduced = Rect::new(

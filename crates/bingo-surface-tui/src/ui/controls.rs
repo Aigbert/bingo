@@ -12,6 +12,12 @@ use std::time::Instant;
 
 #[derive(Debug)]
 pub struct Controls {
+    /// `ctrl+t` took the task list off the band (M74). The verb row keeps
+    /// the task being done either way: hiding the list is about rows, not
+    /// about what the turn is doing.
+    pub activity_hidden: bool,
+
+    pub pending_ui: Option<(bingo_sdk::IntentId, bingo_sdk::Action)>,
     pub composer: Composer,
     /// The pasted pictures behind the composer's line, by their `[image N]`.
     pub pictures: Held,
@@ -48,6 +54,8 @@ impl Controls {
     }
     pub fn new(history: Vec<String>) -> Self {
         Self {
+            pending_ui: None,
+            activity_hidden: false,
             composer: Composer::default(),
             pictures: Held::default(),
             history: PromptHistory::new(history),

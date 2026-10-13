@@ -23,6 +23,8 @@ mod look;
 mod notices;
 /// The opening: whether it plays, and when it started (M70, M72).
 mod opening;
+#[path = "run/pulling.rs"]
+mod pulling;
 /// The pictures a frame drew, on their way to the terminal.
 mod showing;
 /// A line on its way out of the composer, and the pictures it named.
@@ -427,57 +429,7 @@ impl Run {
     /// then owes and [`tick`] wakes for. Neither the kernel's pace nor a
     /// trackpad's is the screen's, and nothing waits longer than a frame.
     fn paint(&mut self, screen: &mut dyn Screen, wake: Wake, now: Now) -> Result<(), KernelError> {
-        if wake == Wake::Event && now.since(self.painted) < TICK {
-            self.behind = true;
-            return Ok(());
-        }
-        self.behind = false;
-        self.painted = now.instant;
-        self.hand_over(screen)?;
-        look::pay(self, screen).map_err(stdio)?;
-        let title = self.detection.render().scope(|| title(&self.session.tree));
-        screen.title(&title).map_err(stdio)?;
-        let began = Instant::now();
-        let (width, height) = screen.size();
-        let state = self.session.tree.viewed();
-        self.ui.sync_panes(state);
-        let holding = self.ui.panes.holding(state);
-        if self.ui.toasts.sync(state, holding, now) && !self.ui.focused {
-            screen.bell().map_err(stdio)?;
-        }
-        self.ui.prepare(&self.session.tree.viewed().summary.cwd);
-        let previous = std::mem::take(&mut self.ui.shown);
-        let layout = crate::layout::layout(
-            previous,
-            &self.session.tree,
-            &self.ui,
-            ratatui::layout::Rect::new(0, 0, width, height),
-            now,
-            &self.detection.render(),
-        );
-        screen
-            .draw(&layout, &self.detection.render())
-            .map_err(stdio)?;
-        self.ui.pulled.retain(&layout.pulls);
-        for key in &layout.pulls {
-            if self.ui.pulled.request(key) {
-                let key = key.clone();
-                let host = self.host.clone();
-                self.spawn(async move {
-                    let view = host
-                        .render(&key.session, key.request.clone())
-                        .await
-                        .unwrap_or_else(|_| key.request.engine());
-                    Ok(Reply::Rendered(key, Box::new(view)))
-                });
-            }
-        }
-        self.ui.shown = layout;
-        self.grumble(began.elapsed());
-        showing::hand(self, screen)?;
-        showing::fit(self);
-        showing::read_linked(self);
-        Ok(())
+        pulling::paint(self, screen, wake, now)
     }
 
     /// Own up, once per run, when drawing itself is the latency a person
@@ -935,7 +887,7 @@ impl Run {
 
     fn reply(&mut self, reply: Reply, events: &mut Option<FrameStream>) {
         match reply {
-            Reply::Rendered(key, view) => self.ui.pulled.answer(key, *view),
+            Reply::Rendered(key, view) => self.ui.placed.pulled.answer(key, *view),
             Reply::Attached(attachment) => self.attach(*attachment, events),
             Reply::Handle(session, handle) => {
                 self.session.handles.insert(session, handle);

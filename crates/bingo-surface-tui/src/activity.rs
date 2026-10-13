@@ -109,7 +109,7 @@ fn band(
     if !ui.activity_hidden {
         for placed in slots {
             if let bingo_sdk::slot::Slot::Activity { view, .. } = &placed.slot {
-                let Some(view) = ui.pulled.view(view, tree.viewed(), width as u16) else {
+                let Some(view) = ui.placed.pulled.view(view, tree.viewed(), width as u16) else {
                     out.push(Line::from(theme::ellipsis()));
                     continue;
                 };

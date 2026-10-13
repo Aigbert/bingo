@@ -24,12 +24,11 @@ struct Toast {
 fn placed(state: &SessionState) -> Vec<Toast> {
     bingo_sdk::slot::placed(state)
         .into_iter()
-        .enumerate()
-        .filter_map(|(index, placed)| {
+        .filter_map(|placed| {
             if let Slot::Toast { text, until, alert } = placed.slot {
                 Some(Toast {
                     key: format!(
-                        "{}/{}/{}/{index}/{until}",
+                        "{}/{}/{}/{until}/{text}/{alert}",
                         state.summary.id, placed.plugin, placed.kind
                     ),
                     text,
@@ -148,23 +147,45 @@ mod tests {
                 view: bingo_sdk::View::text("hold").into(),
             },
         ];
-        slots.swap(0,1);
+        slots.swap(0, 1);
         state.signals.entry("counter".into()).or_default().insert(
             "held".into(),
             bingo_sdk::slot::with(serde_json::json!({}), slots),
         );
-        assert!(ui.panes.holding(&state));
-        assert!(ui.toasts.sync(&state, ui.panes.holding(&state), now));
-        assert!(!ui.toasts.sync(&state, true, later(now, 6000)));
-        assert!(ui.toasts.next(&state, later(now, 6000)).is_none());
-        assert_eq!(ui.toasts.lines(&state, later(now, 6000), 80).len(), 1);
-        state.signals.get_mut("counter").unwrap().get_mut("held").unwrap()["slots"].as_array_mut().unwrap().retain(|slot|slot["kind"]!="pane");
-        assert!(!ui.panes.holding(&state));
-        ui.toasts.sync(&state, ui.panes.holding(&state), later(now, 6000));
+        assert!(ui.placed.panes.holding(&state));
+        assert!(
+            ui.placed
+                .toasts
+                .sync(&state, ui.placed.panes.holding(&state), now)
+        );
+        assert!(!ui.placed.toasts.sync(&state, true, later(now, 6000)));
+        assert!(ui.placed.toasts.next(&state, later(now, 6000)).is_none());
         assert_eq!(
-            ui.toasts.next(&state, later(now, 6000)),
+            ui.placed.toasts.lines(&state, later(now, 6000), 80).len(),
+            1
+        );
+        state
+            .signals
+            .get_mut("counter")
+            .unwrap()
+            .get_mut("held")
+            .unwrap()["slots"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|slot| slot["kind"] != "pane");
+        assert!(!ui.placed.panes.holding(&state));
+        ui.placed
+            .toasts
+            .sync(&state, ui.placed.panes.holding(&state), later(now, 6000));
+        assert_eq!(
+            ui.placed.toasts.next(&state, later(now, 6000)),
             Some(now.instant + std::time::Duration::from_secs(10))
         );
-        assert!(ui.toasts.lines(&state, later(now, 10000), 80).is_empty());
+        assert!(
+            ui.placed
+                .toasts
+                .lines(&state, later(now, 10000), 80)
+                .is_empty()
+        );
     }
 }

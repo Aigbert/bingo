@@ -102,7 +102,7 @@ impl State {
 pub fn height(ui: &Ui, state: &SessionState, screen: u16) -> u16 {
     placed(state)
         .iter()
-        .filter(|pane| ui.panes.visible(pane))
+        .filter(|pane| ui.placed.panes.visible(pane))
         .map(|pane| pane.rows.max(2))
         .fold(0, u16::saturating_add)
         .min(screen / 3)
@@ -110,7 +110,7 @@ pub fn height(ui: &Ui, state: &SessionState, screen: u16) -> u16 {
 pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, now: Now) {
     let panes: Vec<_> = placed(state)
         .into_iter()
-        .filter(|pane| ui.panes.visible(pane))
+        .filter(|pane| ui.placed.panes.visible(pane))
         .collect();
     let mut y = area.y;
     let count = panes.len().max(1) as u16;
@@ -141,10 +141,11 @@ pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, now: 
                 rect.height.saturating_sub(1),
             ));
         }
-        match ui.pulled.view(&pane.view, state, rect.width) {
+        match ui.placed.pulled.view(&pane.view, state, rect.width) {
             Some(view) => {
                 let mut view = view.clone();
                 let index = ui
+                    .placed
                     .panes
                     .selected
                     .get(&pane.key)
@@ -153,7 +154,7 @@ pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, now: 
                 edited(
                     &mut view,
                     index,
-                    ui.panes.editors.get(&(pane.key.clone(), index)),
+                    ui.placed.panes.editors.get(&(pane.key.clone(), index)),
                     selected,
                     &mut 0,
                 );
@@ -174,7 +175,7 @@ pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, now: 
 pub fn waiting(ui: &Ui, state: &SessionState) -> Vec<Pane> {
     placed(state)
         .into_iter()
-        .filter(|pane| !ui.panes.visible(pane))
+        .filter(|pane| !ui.placed.panes.visible(pane))
         .collect()
 }
 pub fn click(ui: &mut Ui, at: ratatui::layout::Position) -> bool {
@@ -186,7 +187,7 @@ pub fn click(ui: &mut Ui, at: ratatui::layout::Position) -> bool {
         .find(|(_, area)| area.contains(at))
         .map(|(key, _)| key.clone());
     if let Some(key) = key {
-        ui.panes.opened.insert(key.clone());
+        ui.placed.panes.opened.insert(key.clone());
         ui.focus = Focus::Pane(key);
         true
     } else {
@@ -319,7 +320,7 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
         .iter()
         .find(|(id, _)| id == &focused)
         .map_or(0, |(_, area)| area.width);
-    let Some(view) = ui.pulled.view(&pane.view, state, width) else {
+    let Some(view) = ui.placed.pulled.view(&pane.view, state, width) else {
         return Vec::new();
     };
     let mut items = Vec::new();
@@ -327,7 +328,7 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
     if items.is_empty() {
         return Vec::new();
     }
-    let selected = ui.panes.selected.entry(focused.clone()).or_default();
+    let selected = ui.placed.panes.selected.entry(focused.clone()).or_default();
     *selected = (*selected).min(items.len() - 1);
     if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
         *selected = if key.code == KeyCode::BackTab {
@@ -350,11 +351,16 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
     match &items[index] {
         Control::Button(_, action) if key.code == KeyCode::Enter => submit(action.clone(), None),
         Control::Input(input) => {
-            let editor = ui.panes.editors.entry((focused, index)).or_insert_with(|| {
-                let mut editor = Composer::default();
-                editor.set(input.value.as_deref().unwrap_or_default());
-                editor
-            });
+            let editor = ui
+                .placed
+                .panes
+                .editors
+                .entry((focused, index))
+                .or_insert_with(|| {
+                    let mut editor = Composer::default();
+                    editor.set(input.value.as_deref().unwrap_or_default());
+                    editor
+                });
             input_key(editor, input, key)
         }
         Control::Select(select) => select_key(select, key),
