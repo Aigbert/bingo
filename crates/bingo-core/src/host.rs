@@ -684,13 +684,28 @@ impl Host {
 
 #[async_trait]
 impl HostApi for Host {
-    async fn complete(&self, session: &SessionId, turn: Option<&TurnId>, request: Completion) -> Result<Vec<ModelEvent>, KernelError> {
-        let granted = self.settings.kernel.plugin_trust.get(&request.plugin)
+    async fn complete(
+        &self,
+        session: &SessionId,
+        turn: Option<&TurnId>,
+        request: Completion,
+    ) -> Result<Vec<ModelEvent>, KernelError> {
+        let granted = self
+            .settings
+            .kernel
+            .plugin_trust
+            .get(&request.plugin)
             .is_some_and(|grant| grant.uses.iter().any(|noun| noun == "model"));
         if !granted {
-            return Err(KernelError::new(ErrorCode::PermissionDenied, format!("{} needs the model grant", request.plugin)));
+            return Err(KernelError::new(
+                ErrorCode::PermissionDenied,
+                format!("{} needs the model grant", request.plugin),
+            ));
         }
-        self.mailbox_of(session).await?.complete(turn.cloned(), request).await
+        self.mailbox_of(session)
+            .await?
+            .complete(turn.cloned(), request)
+            .await
     }
 
     async fn sessions(&self, filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {

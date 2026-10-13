@@ -168,12 +168,20 @@ impl ProviderSource for PluginProviders {
     }
 }
 
-pub struct PluginInterceptors { manager: Arc<Manager> }
+pub struct PluginInterceptors {
+    manager: Arc<Manager>,
+}
 impl PluginInterceptors {
-    pub fn new(manager: Arc<Manager>) -> Self { Self { manager } }
+    pub fn new(manager: Arc<Manager>) -> Self {
+        Self { manager }
+    }
 }
 #[async_trait]
 impl bingo_sdk::InterceptorSource for PluginInterceptors {
-    fn id(&self) -> &str { ID }
-    async fn interceptors(&self) -> Vec<bingo_sdk::ExternalInterceptor> { self.manager.interceptors().await }
+    fn id(&self) -> &str {
+        ID
+    }
+    async fn interceptors(&self) -> Vec<bingo_sdk::ExternalInterceptor> {
+        self.manager.interceptors().await
+    }
 }

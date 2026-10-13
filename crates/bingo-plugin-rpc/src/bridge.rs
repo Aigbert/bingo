@@ -216,11 +216,20 @@ impl Bridge {
     }
 
     pub async fn interceptors(self: &Arc<Self>) -> Vec<bingo_sdk::ExternalInterceptor> {
-        let Some(live) = self.ready().await else { return Vec::new(); };
-        live.links.iter().map(|spec| bingo_sdk::ExternalInterceptor {
-            plugin: self.name.clone(),
-            link: Arc::new(crate::intercept::Remote::new(&self.name, spec.clone(), live.connection.clone())),
-        }).collect()
+        let Some(live) = self.ready().await else {
+            return Vec::new();
+        };
+        live.links
+            .iter()
+            .map(|spec| bingo_sdk::ExternalInterceptor {
+                plugin: self.name.clone(),
+                link: Arc::new(crate::intercept::Remote::new(
+                    &self.name,
+                    spec.clone(),
+                    live.connection.clone(),
+                )),
+            })
+            .collect()
     }
 
     /// The tools of a living process, and nothing when there is none.
@@ -228,7 +237,8 @@ impl Bridge {
         let Some(live) = self.ready().await else {
             return Vec::new();
         };
-        live.connection.tools()
+        live.connection
+            .tools()
             .iter()
             .map(|spec| {
                 Arc::new(PluginTool::new(
@@ -236,7 +246,10 @@ impl Bridge {
                     spec.clone(),
                     Arc::clone(&live.connection),
                     Arc::clone(&self.notices),
-                    self.launch.read().unwrap_or_else(|e| e.into_inner()).1
+                    self.launch
+                        .read()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .1
                         .map(|seconds| Duration::from_secs(seconds.get()))
                         .unwrap_or(deadline::TOOL_CALL),
                 )) as Arc<dyn Tool>
@@ -249,14 +262,18 @@ impl Bridge {
         let Some(live) = self.ready().await else {
             return Vec::new();
         };
-        live.connection.commands()
+        live.connection
+            .commands()
             .iter()
             .map(|spec| {
                 Arc::new(PluginCommand::new(
                     &self.name,
                     spec.clone(),
                     Arc::clone(&live.connection),
-                    self.launch.read().unwrap_or_else(|e| e.into_inner()).1
+                    self.launch
+                        .read()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .1
                         .map(|seconds| Duration::from_secs(seconds.get()))
                         .unwrap_or(deadline::COMMAND_RUN),
                 )) as Arc<dyn SdkCommand>
@@ -362,11 +379,15 @@ impl Bridge {
         let _guard = self.lifecycle.lock().await;
         let old = {
             let mut state = self.state.lock().await;
-            if state.stopped { return; }
+            if state.stopped {
+                return;
+            }
             state.starting = true;
             state.live.take()
         };
-        if let Some(live) = &old { live.connection.stop().await; }
+        if let Some(live) = &old {
+            live.connection.stop().await;
+        }
         *self.launch.write().unwrap_or_else(|e| e.into_inner()) =
             (manifest.entry.rooted(&self.root), manifest.call_timeout);
         let outcome = self.handshake().await;
@@ -377,8 +398,15 @@ impl Bridge {
         let succeeded = outcome.is_ok();
         self.file(outcome).await;
         if succeeded {
-            let suffix = if restart { "; provider or service declarations changed; restart required" } else { "" };
-            self.notices.push(Notice::warn("PLUGIN_RELOADED", format!("the {} plugin reloaded{suffix}", self.name)));
+            let suffix = if restart {
+                "; provider or service declarations changed; restart required"
+            } else {
+                ""
+            };
+            self.notices.push(Notice::warn(
+                "PLUGIN_RELOADED",
+                format!("the {} plugin reloaded{suffix}", self.name),
+            ));
         }
     }
 
@@ -471,13 +499,23 @@ impl Bridge {
             self.host.clone(),
             self.doors.face(caller),
         ));
-        let entry = self.launch.read().unwrap_or_else(|e| e.into_inner()).0.clone();
+        let entry = self
+            .launch
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .0
+            .clone();
         let connection = Arc::new(Connection::spawn(
             &self.name,
             &entry,
             &self.root,
             &self.data_dir,
-            Some(Arc::new(crate::host::Server::new(&self.name, self.host.clone(), hub, self.store.clone()))),
+            Some(Arc::new(crate::host::Server::new(
+                &self.name,
+                self.host.clone(),
+                hub,
+                self.store.clone(),
+            ))),
         )?);
         let answered =
             tokio::time::timeout(deadline::HANDSHAKE, self.initialize(&connection)).await;
@@ -603,7 +641,10 @@ mod tests {
     #[test]
     fn protocol_one_is_refused_with_both_numbers() {
         let why = check_protocol(&result(1)).expect_err("protocol 1 is retired");
-        assert!(why.contains("protocol 1") && why.contains("speaks 2"), "{why}");
+        assert!(
+            why.contains("protocol 1") && why.contains("speaks 2"),
+            "{why}"
+        );
     }
 
     #[test]

@@ -56,8 +56,10 @@ pub fn discover(dirs: &[PathBuf], notices: &Notices) -> Vec<Found> {
 
 /// Explicit directories form the final layer, in argument order.
 pub fn with_explicit(dirs: &[PathBuf], explicit: &[PathBuf], notices: &Notices) -> Vec<Found> {
-    let mut found: BTreeMap<_, _> = discover(dirs, notices).into_iter()
-        .map(|plugin| (plugin.name.clone(), plugin)).collect();
+    let mut found: BTreeMap<_, _> = discover(dirs, notices)
+        .into_iter()
+        .map(|plugin| (plugin.name.clone(), plugin))
+        .collect();
     for root in explicit {
         if let Some(plugin) = read(root, notices) {
             found.insert(plugin.name.clone(), plugin);
@@ -130,6 +132,26 @@ mod tests {
         let root = dir.join(name);
         std::fs::create_dir_all(&root).expect("a plugin directory");
         std::fs::write(root.join(MANIFEST_FILE), body).expect("a manifest");
+    }
+
+    #[test]
+    fn explicit_directories_win_by_name_in_argument_order() {
+        let home = tempfile::tempdir().unwrap();
+        let first = tempfile::tempdir().unwrap();
+        let last = tempfile::tempdir().unwrap();
+        for dir in [&home, &first, &last] {
+            plugin(dir.path(), "wordcount", &manifest("wordcount"));
+        }
+        let found = with_explicit(
+            &[home.path().into()],
+            &[
+                first.path().join("wordcount"),
+                last.path().join("wordcount"),
+            ],
+            &Notices::default(),
+        );
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].root, last.path().join("wordcount"));
     }
 
     #[test]

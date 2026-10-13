@@ -3,10 +3,10 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use bingo_shelf::{Codec, CodecError, Shelf};
-use serde_json::{Value, json};
 use crate::codec::{INTERNAL_ERROR, INVALID_PARAMS, RpcError};
 use crate::host::StateValue;
+use bingo_shelf::{Codec, CodecError, Shelf};
+use serde_json::{Value, json};
 
 pub type Version = u64;
 
@@ -17,7 +17,9 @@ pub fn swap(held: Option<Version>, if_version: Option<Version>) -> Result<Versio
     if if_version.is_some() && if_version != held {
         return Err(Conflict(held));
     }
-    held.unwrap_or_default().checked_add(1).ok_or(Conflict(held))
+    held.unwrap_or_default()
+        .checked_add(1)
+        .ok_or(Conflict(held))
 }
 
 struct Json;
@@ -28,7 +30,9 @@ impl Codec for Json {
         serde_json::to_string(&record.1).map_err(|e| CodecError(e.to_string()))
     }
     fn decode(id: &str, text: &str) -> Result<Self::Record, CodecError> {
-        serde_json::from_str(text).map(|value| (id.into(), value)).map_err(|e| CodecError(e.to_string()))
+        serde_json::from_str(text)
+            .map(|value| (id.into(), value))
+            .map_err(|e| CodecError(e.to_string()))
     }
 }
 
@@ -39,14 +43,24 @@ pub struct Store {
 }
 impl Store {
     pub fn new(data_dir: &std::path::Path, plugin: &str) -> Self {
-        Self { root: data_dir.join("plugins").join(plugin).join("state"), lock: Arc::default() }
+        Self {
+            root: data_dir.join("plugins").join(plugin).join("state"),
+            lock: Arc::default(),
+        }
     }
 
     pub async fn get(&self, scope: String, key: String) -> Result<Option<StateValue>, RpcError> {
-        self.access(scope, move |_, values| Ok(values.get(&key).cloned())).await
+        self.access(scope, move |_, values| Ok(values.get(&key).cloned()))
+            .await
     }
 
-    pub async fn set(&self, scope: String, key: String, value: Value, expected: Option<Version>) -> Result<StateValue, RpcError> {
+    pub async fn set(
+        &self,
+        scope: String,
+        key: String,
+        value: Value,
+        expected: Option<Version>,
+    ) -> Result<StateValue, RpcError> {
         self.access(scope, move |(shelf, scope), values| {
             let held = values.get(&key).map(|entry| entry.version);
             let version = swap(held, expected).map_err(|Conflict(version)| {
@@ -56,17 +70,30 @@ impl Store {
             })?;
             let entry = StateValue { version, value };
             values.insert(key, entry.clone());
-            shelf.save(scope, &(scope.into(), values.clone())).map_err(failed)?;
+            shelf
+                .save(scope, &(scope.into(), values.clone()))
+                .map_err(failed)?;
             Ok(entry)
-        }).await
+        })
+        .await
     }
 
     pub async fn remove(&self, scope: String) -> Result<(), RpcError> {
-        self.access(scope, |(shelf, scope), _| shelf.delete(scope).map_err(failed)).await
+        self.access(scope, |(shelf, scope), _| {
+            shelf.delete(scope).map_err(failed)
+        })
+        .await
     }
 
-    async fn access<T: Send + 'static>(&self, scope: String,
-        operation: impl FnOnce((&Shelf<Json>, &str), &mut BTreeMap<String, StateValue>) -> Result<T, RpcError> + Send + 'static,
+    async fn access<T: Send + 'static>(
+        &self,
+        scope: String,
+        operation: impl FnOnce(
+            (&Shelf<Json>, &str),
+            &mut BTreeMap<String, StateValue>,
+        ) -> Result<T, RpcError>
+        + Send
+        + 'static,
     ) -> Result<T, RpcError> {
         validate(&scope)?;
         let guard = self.lock.clone().lock_owned().await;
@@ -75,17 +102,32 @@ impl Store {
             let _guard = guard;
             let shelf = Shelf::<Json>::new(root);
             let loaded = shelf.load();
-            if let Some(error) = loaded.unreadable.iter().find(|error| error.file == format!("{scope}.json")) {
+            if let Some(error) = loaded
+                .unreadable
+                .iter()
+                .find(|error| error.file == format!("{scope}.json"))
+            {
                 return Err(failed(&error.why));
             }
-            let mut values = loaded.entries.into_iter().find(|(id, _)| id == &scope)
-                .map(|(_, values)| values).unwrap_or_default();
+            let mut values = loaded
+                .entries
+                .into_iter()
+                .find(|(id, _)| id == &scope)
+                .map(|(_, values)| values)
+                .unwrap_or_default();
             operation((&shelf, &scope), &mut values)
-        }).await.map_err(failed)?
+        })
+        .await
+        .map_err(failed)?
     }
 }
 fn validate(scope: &str) -> Result<(), RpcError> {
-    if !scope.is_empty() && scope.len() <= 120 && scope.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-') {
+    if !scope.is_empty()
+        && scope.len() <= 120
+        && scope
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    {
         return Ok(());
     }
     Err(RpcError::new(INVALID_PARAMS, "invalid plugin state scope"))

@@ -195,8 +195,20 @@ impl Actor {
             }
             Msg::Reconfigure { config } => self.reconfigure(config).await?,
             Msg::Offered { turn, tools } => self.turn_offers(&turn, tools),
-            Msg::Complete { turn, request, reply } => self.complete(turn, *request, reply),
-            Msg::Charge { turn, plugin, usage, reply } => { let result = self.charge(turn, plugin, usage).await; let _ = reply.send(result); }
+            Msg::Complete {
+                turn,
+                request,
+                reply,
+            } => self.complete(turn, *request, reply),
+            Msg::Charge {
+                turn,
+                plugin,
+                usage,
+                reply,
+            } => {
+                let result = self.charge(turn, plugin, usage).await;
+                let _ = reply.send(result);
+            }
             Msg::Invoke { call, reply } => self.invoke(call, reply).await?,
             Msg::CallAllowed { item, input } => self.call_allowed(&item, input).await?,
             Msg::CallFinished { outcome } => self.call_finished(outcome).await?,
@@ -811,8 +823,15 @@ impl Actor {
                 Vec::new(),
             ),
         };
-        if let Some(running) = self.running.take() { running.cancel.cancel(); }
-        let usage = self.state.turn.as_ref().map(|turn| turn.usage).unwrap_or_default();
+        if let Some(running) = self.running.take() {
+            running.cancel.cancel();
+        }
+        let usage = self
+            .state
+            .turn
+            .as_ref()
+            .map(|turn| turn.usage)
+            .unwrap_or_default();
         self.publish(
             Event::TurnCompleted {
                 turn: turn.clone(),

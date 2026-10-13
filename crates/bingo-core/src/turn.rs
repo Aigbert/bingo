@@ -608,7 +608,11 @@ impl Turn<'_> {
     /// Bill the round to the turn, and say where the context stands after it.
     fn charge(&self, plugin: &str, usage: Usage) {
         if usage != Usage::default() {
-            self.host.emit(Event::UsageCharged { turn: Some(self.id.clone()), plugin: plugin.into(), usage });
+            self.host.emit(Event::UsageCharged {
+                turn: Some(self.id.clone()),
+                plugin: plugin.into(),
+                usage,
+            });
         }
     }
 

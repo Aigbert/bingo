@@ -25,9 +25,13 @@ pub fn stamps(root: &std::path::Path) -> std::io::Result<Stamps> {
                 directories.push(entry.path());
             } else if kind.is_file() {
                 let metadata = entry.metadata()?;
-                stamps.insert(entry.path(), Stamp {
-                    len: metadata.len(), modified: metadata.modified()?,
-                });
+                stamps.insert(
+                    entry.path(),
+                    Stamp {
+                        len: metadata.len(),
+                        modified: metadata.modified()?,
+                    },
+                );
             }
         }
     }
@@ -42,8 +46,17 @@ pub struct Watch {
 }
 
 impl Watch {
-    pub fn new(root: PathBuf, bridge: std::sync::Arc<crate::Bridge>, notices: std::sync::Arc<crate::notice::Notices>) -> std::io::Result<Self> {
-        Ok(Self { before: stamps(&root)?, root, bridge, notices })
+    pub fn new(
+        root: PathBuf,
+        bridge: std::sync::Arc<crate::Bridge>,
+        notices: std::sync::Arc<crate::notice::Notices>,
+    ) -> std::io::Result<Self> {
+        Ok(Self {
+            before: stamps(&root)?,
+            root,
+            bridge,
+            notices,
+        })
     }
 
     pub async fn run(mut self, stop: bingo_sdk::CancellationToken) {
@@ -66,7 +79,9 @@ impl Watch {
         let Ok(Ok(after)) = tokio::task::spawn_blocking(move || stamps(&root)).await else {
             return;
         };
-        if !changed(&self.before, &after) { return; }
+        if !changed(&self.before, &after) {
+            return;
+        }
         self.before = after;
         if let Some(found) = crate::discovery::read(&self.root, &self.notices) {
             self.bridge.reload(found.manifest).await;
@@ -79,16 +94,28 @@ mod tests {
     use super::*;
     #[test]
     fn every_stamp_dimension_and_deletion_are_changes() {
-        let before = Stamps::from([(PathBuf::from("plugin.json"), Stamp {len:1, modified:SystemTime::UNIX_EPOCH})]);
+        let before = Stamps::from([(
+            PathBuf::from("plugin.json"),
+            Stamp {
+                len: 1,
+                modified: SystemTime::UNIX_EPOCH,
+            },
+        )]);
         assert!(!changed(&before, &before));
         assert!(changed(&before, &Stamps::new()));
         let mut after = before.clone();
         after.get_mut(&PathBuf::from("plugin.json")).unwrap().len = 2;
         assert!(changed(&before, &after));
         let mut after = before.clone();
-        after.get_mut(&PathBuf::from("plugin.json")).unwrap().modified += std::time::Duration::from_secs(1);
+        after
+            .get_mut(&PathBuf::from("plugin.json"))
+            .unwrap()
+            .modified += std::time::Duration::from_secs(1);
         assert!(changed(&before, &after));
-        let after = Stamps::from([(PathBuf::from("main.py"), before.values().next().unwrap().clone())]);
+        let after = Stamps::from([(
+            PathBuf::from("main.py"),
+            before.values().next().unwrap().clone(),
+        )]);
         assert!(changed(&before, &after));
     }
 }

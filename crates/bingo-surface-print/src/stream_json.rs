@@ -464,11 +464,14 @@ mod tests {
 
     #[test]
     fn side_charges_are_events_and_never_model_rounds() {
-        let charge = frame(2, Event::UsageCharged {
-            turn: Some(TurnId::from_raw("trn_1")),
-            plugin: "stub".into(),
-            usage: counted(),
-        });
+        let charge = frame(
+            2,
+            Event::UsageCharged {
+                turn: Some(TurnId::from_raw("trn_1")),
+                plugin: "stub".into(),
+                usage: counted(),
+            },
+        );
         let text = play(Mode::Text, std::slice::from_ref(&charge));
         assert!(text.out().is_empty());
         assert!(text.err().is_empty());

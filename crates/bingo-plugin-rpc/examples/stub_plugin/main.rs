@@ -155,7 +155,9 @@ fn request_line(request: Request, options: &Options, state: &mut State) -> bool 
         name::COMPACTOR_COMPACT => answer(request.id, compact(request.params)),
         name::PROVIDER_STREAM => return stream(request.id, request.params, state),
         name::SERVICE_CALL => served(request.id, request.params, state),
-        method if method.starts_with("intercept/") => hooks::intercept(request.id, method, request.params, &mut state.store),
+        method if method.starts_with("intercept/") => {
+            hooks::intercept(request.id, method, request.params, &mut state.store)
+        }
         other => fail(
             request.id,
             RpcError::new(METHOD_NOT_FOUND, format!("no such method: {other}")),
@@ -439,9 +441,12 @@ fn call(id: bingo_plugin_rpc::codec::Id, params: Value, state: &mut State) -> bo
         return true;
     };
     if let Some(note) = params.input.get("announce") {
-        send(&Message::Notification(bingo_plugin_rpc::codec::Notification::new(
-            note["method"].as_str().unwrap_or("unknown"), note["params"].clone(),
-        )));
+        send(&Message::Notification(
+            bingo_plugin_rpc::codec::Notification::new(
+                note["method"].as_str().unwrap_or("unknown"),
+                note["params"].clone(),
+            ),
+        ));
     }
     if params.input.get("die").is_some() {
         return false;
@@ -462,7 +467,8 @@ fn call(id: bingo_plugin_rpc::codec::Id, params: Value, state: &mut State) -> bo
         state.pending.push((request, Some(id), true));
         send(&Message::Request(Request::new(
             bingo_plugin_rpc::codec::Id::Number(request),
-            asked["method"].as_str().unwrap_or("unknown"), asked["params"].clone(),
+            asked["method"].as_str().unwrap_or("unknown"),
+            asked["params"].clone(),
         )));
         return true;
     }

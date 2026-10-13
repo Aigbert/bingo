@@ -385,10 +385,17 @@ mod tests {
     #[test]
     fn side_usage_adds_without_advancing_the_round_or_context() {
         let mut state = SessionState::new(summary());
-        state.apply(&frame(1, Event::TurnStarted {
-            turn: TurnId::from_raw("trn_1"), inputs: vec![], origin: TurnOrigin::Submit,
-        }));
-        let charge: Event = serde_json::from_str(include_str!("../fixtures/record/event/usageCharged.json")).unwrap();
+        state.apply(&frame(
+            1,
+            Event::TurnStarted {
+                turn: TurnId::from_raw("trn_1"),
+                inputs: vec![],
+                origin: TurnOrigin::Submit,
+            },
+        ));
+        let charge: Event =
+            serde_json::from_str(include_str!("../fixtures/record/event/usageCharged.json"))
+                .unwrap();
         state.apply(&frame(2, charge));
         assert_eq!(state.summary.usage.input_tokens, 5);
         let turn = state.turn.as_ref().unwrap();
@@ -397,7 +404,8 @@ mod tests {
         assert!(state.context.is_none());
         let charge = serde_json::from_value(serde_json::json!({
             "type":"usageCharged", "plugin":"stub", "usage":{"inputTokens":2,"outputTokens":1}
-        })).unwrap();
+        }))
+        .unwrap();
         state.apply(&frame(3, charge));
         assert_eq!(state.summary.usage.input_tokens, 7);
         assert_eq!(state.turn.as_ref().unwrap().usage.input_tokens, 5);

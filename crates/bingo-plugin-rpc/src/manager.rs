@@ -14,8 +14,8 @@ use bingo_sdk::{
     CancellationToken, Command, Compactor, ContextContributor, Env, Hook, HostHandle, PluginStatus,
     Provider, SWITCHED_OFF, Tool,
 };
-use serde_json::Value;
 use futures::StreamExt;
+use serde_json::Value;
 
 use crate::bridge::{Bridge, Setting};
 use crate::discovery::{self, Found};
@@ -134,7 +134,11 @@ impl Manager {
     /// session has whatever they contribute; with nothing discovered it does
     /// nothing at all.
     pub async fn start(&self, cwd: &Path, host: HostHandle) {
-        let found = discovery::with_explicit(&discovery::dirs(&self.env, cwd), &self.directories, &self.notices);
+        let found = discovery::with_explicit(
+            &discovery::dirs(&self.env, cwd),
+            &self.directories,
+            &self.notices,
+        );
         let installed: Vec<Installed> = found
             .into_iter()
             .map(|f| self.install(f, host.clone()))
@@ -155,7 +159,9 @@ impl Manager {
 
     pub async fn interceptors(&self) -> Vec<bingo_sdk::ExternalInterceptor> {
         let mut links = Vec::new();
-        for bridge in self.bridges() { links.extend(bridge.interceptors().await); }
+        for bridge in self.bridges() {
+            links.extend(bridge.interceptors().await);
+        }
         links
     }
 
@@ -217,7 +223,9 @@ impl Manager {
                     _ = stop.cancelled() => return,
                     event = events.next() => event,
                 };
-                let Some(event) = event else { return; };
+                let Some(event) = event else {
+                    return;
+                };
                 if let bingo_sdk::GatewayEvent::SessionRemoved { session } = event {
                     for store in &stores {
                         if let Err(error) = store.remove(session.to_string()).await {
@@ -232,10 +240,19 @@ impl Manager {
 
     pub async fn shutdown(&self) {
         self.stop.cancel();
-        let watchers = std::mem::take(&mut *self.watchers.lock().unwrap_or_else(|e| e.into_inner()));
-        for watcher in watchers { let _ = watcher.await; }
-        let task = self.cleanup.lock().unwrap_or_else(|e| e.into_inner()).take();
-        if let Some(task) = task { let _ = task.await; }
+        let watchers =
+            std::mem::take(&mut *self.watchers.lock().unwrap_or_else(|e| e.into_inner()));
+        for watcher in watchers {
+            let _ = watcher.await;
+        }
+        let task = self
+            .cleanup
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take();
+        if let Some(task) = task {
+            let _ = task.await;
+        }
         for bridge in self.bridges() {
             bridge.stop().await;
         }
@@ -313,9 +330,14 @@ impl Manager {
         ));
         if watched {
             match crate::reload::Watch::new(root, bridge.clone(), self.notices.clone()) {
-                Ok(watch) => self.watchers.lock().unwrap_or_else(|e| e.into_inner())
+                Ok(watch) => self
+                    .watchers
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
                     .push(tokio::spawn(watch.run(self.stop.clone()))),
-                Err(error) => self.notices.push(notice::Notice::warn("PLUGIN_UNREADABLE", error.to_string())),
+                Err(error) => self
+                    .notices
+                    .push(notice::Notice::warn("PLUGIN_UNREADABLE", error.to_string())),
             }
         }
         bridge

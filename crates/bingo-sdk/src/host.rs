@@ -433,7 +433,10 @@ pub trait HostApi: Send + Sync {
         _turn: Option<&TurnId>,
         _request: Completion,
     ) -> Result<Vec<crate::ModelEvent>, KernelError> {
-        Err(KernelError::new(ErrorCode::Unsupported, "this host does not complete model requests"))
+        Err(KernelError::new(
+            ErrorCode::Unsupported,
+            "this host does not complete model requests",
+        ))
     }
 
     async fn sessions(&self, filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError>;

@@ -118,8 +118,15 @@ impl HookSet {
         let mut links = self.links.clone();
         for source in &self.interceptors {
             for external in source.interceptors().await {
-                let tier = self.grants.get(&external.plugin).map_or(Tier::Tighten, |grant| grant.tier);
-                links.push(crate::chain::Link { external: Some(external.plugin), interceptor: external.link, tier });
+                let tier = self
+                    .grants
+                    .get(&external.plugin)
+                    .map_or(Tier::Tighten, |grant| grant.tier);
+                links.push(crate::chain::Link {
+                    external: Some(external.plugin),
+                    interceptor: external.link,
+                    tier,
+                });
             }
         }
         links

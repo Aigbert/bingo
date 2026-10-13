@@ -2,16 +2,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bingo_sdk::{
-    Frame, Hook, HookContext, HookMatcher, Item, Phase,
-    TurnId,
-};
+use bingo_sdk::{Frame, Hook, HookContext, HookMatcher, Item, Phase, TurnId};
 
 use crate::connection::Connection;
 use crate::notice::Notices;
-use crate::wire::{
-    HookObservation, HookObserveParams, HookSite, HookSpec, name,
-};
+use crate::wire::{HookObservation, HookObserveParams, HookSite, HookSpec, name};
 
 /// The kernel-visible id of a plugin's hook: the plugin's name and the hook's
 /// own. Two plugins may both declare a `guard`, and a refusal still says which

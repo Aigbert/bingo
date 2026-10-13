@@ -26,7 +26,8 @@ fn fixture_name(value: &Event) -> (&'static str, &'static str) {
             include_str!("../fixtures/record/event/turnUsage.json"),
         ),
         Event::UsageCharged { .. } => (
-            "usageCharged", include_str!("../fixtures/record/event/usageCharged.json"),
+            "usageCharged",
+            include_str!("../fixtures/record/event/usageCharged.json"),
         ),
         Event::TurnCompleted { .. } => (
             "turnCompleted",

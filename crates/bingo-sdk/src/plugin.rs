@@ -285,12 +285,20 @@ pub struct Registrar {
     contributions: Vec<Contribution>,
 }
 
-struct OneInterceptor { plugin: String, link: Arc<dyn crate::Interceptor> }
+struct OneInterceptor {
+    plugin: String,
+    link: Arc<dyn crate::Interceptor>,
+}
 #[async_trait]
 impl crate::InterceptorSource for OneInterceptor {
-    fn id(&self) -> &str { &self.plugin }
+    fn id(&self) -> &str {
+        &self.plugin
+    }
     async fn interceptors(&self) -> Vec<crate::ExternalInterceptor> {
-        vec![crate::ExternalInterceptor { plugin: self.plugin.clone(), link: self.link.clone() }]
+        vec![crate::ExternalInterceptor {
+            plugin: self.plugin.clone(),
+            link: self.link.clone(),
+        }]
     }
 }
 
@@ -301,7 +309,8 @@ impl Registrar {
         link: Arc<dyn crate::Interceptor>,
     ) {
         self.add(Contribution::Interceptors(Arc::new(OneInterceptor {
-            plugin: name.into(), link,
+            plugin: name.into(),
+            link,
         })));
     }
 

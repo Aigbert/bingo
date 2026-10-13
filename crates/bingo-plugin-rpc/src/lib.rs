@@ -88,7 +88,10 @@ static MANIFEST: PluginManifest = PluginManifest {
     ],
     requires: &[],
     config: Some(ConfigClaim {
-        keys: &[("plugins", Merge::ByName), ("pluginDirs", Merge::Accumulate)],
+        keys: &[
+            ("plugins", Merge::ByName),
+            ("pluginDirs", Merge::Accumulate),
+        ],
         schema,
     }),
 };
@@ -115,11 +118,14 @@ impl Plugin for PluginRpcPlugin {
         let settings: Settings = registrar.config()?;
         // The switches are the kernel's, read here because a plugin process
         // is this plugin's to spawn or not (ADR-0057 §4).
-        let manager = Arc::new(Manager::new(
-            registrar.env().clone(),
-            settings.plugins,
-            registrar.switched_off().clone(),
-        ).with_dirs(settings.plugin_dirs));
+        let manager = Arc::new(
+            Manager::new(
+                registrar.env().clone(),
+                settings.plugins,
+                registrar.switched_off().clone(),
+            )
+            .with_dirs(settings.plugin_dirs),
+        );
         registrar.add(Contribution::Tools(
             Arc::new(PluginTools::new(Arc::clone(&manager))) as Arc<dyn ToolSource>,
         ));
@@ -135,7 +141,9 @@ impl Plugin for PluginRpcPlugin {
         registrar.add(Contribution::Providers(
             Arc::new(PluginProviders::new(Arc::clone(&manager))) as Arc<dyn ProviderSource>,
         ));
-        registrar.add(Contribution::Interceptors(Arc::new(source::PluginInterceptors::new(manager.clone()))));
+        registrar.add(Contribution::Interceptors(Arc::new(
+            source::PluginInterceptors::new(manager.clone()),
+        )));
         registrar.add(Contribution::Hooks(
             Arc::new(PluginHooks::new(Arc::clone(&manager))) as Arc<dyn HookSource>,
         ));
@@ -205,7 +213,13 @@ mod tests {
         );
         assert!(MANIFEST.requires.is_empty());
         let claim = MANIFEST.config.expect("a config claim");
-        assert_eq!(claim.keys, [("plugins", Merge::ByName), ("pluginDirs", Merge::Accumulate)]);
+        assert_eq!(
+            claim.keys,
+            [
+                ("plugins", Merge::ByName),
+                ("pluginDirs", Merge::Accumulate)
+            ]
+        );
     }
 
     /// One source per kind the bridge opens, all answering to the same id:

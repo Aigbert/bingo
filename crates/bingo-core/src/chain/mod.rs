@@ -163,7 +163,11 @@ async fn invoke<'a, P: Point>(
     report: Report,
 ) -> Result<P::Output, KernelError> {
     let pending: Continuation<'a, P::Output> = Arc::new(Mutex::new(Continued::default()));
-    let phase = pending.lock().unwrap_or_else(|e| e.into_inner()).phase.subscribe();
+    let phase = pending
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .phase
+        .subscribe();
     let next = continuation::<P>(
         link,
         rest,
@@ -231,7 +235,11 @@ fn continuation<'a, P: Point>(
     report: Report,
     pending: Continuation<'a, P::Output>,
 ) -> Next<'a, P::Input, P::Output> {
-    let clock = pending.lock().unwrap_or_else(|e| e.into_inner()).phase.clone();
+    let clock = pending
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .phase
+        .clone();
     Next::at(link.tier, move |mut input| {
         let changed = input != original;
         let invalid = !P::pinned(&original, &input)
@@ -240,13 +248,21 @@ fn continuation<'a, P: Point>(
             report.notice(link, P::POINT, "input rewrite exceeds its authority");
             input = original;
         }
-        let phase = pending.lock().unwrap_or_else(|e| e.into_inner()).phase.clone();
+        let phase = pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .phase
+            .clone();
         let future = run_at::<P>(rest, kernel, cx, input, report).shared();
         *pending.lock().unwrap_or_else(|e| e.into_inner()) = Continued {
-            pending: Some(future.clone()), invalid, rewritten: changed && !invalid, phase,
+            pending: Some(future.clone()),
+            invalid,
+            rewritten: changed && !invalid,
+            phase,
         };
         Box::pin(future)
-    }).tracked(clock)
+    })
+    .tracked(clock)
 }
 
 pub(crate) mod compact;
@@ -258,7 +274,10 @@ pub(crate) mod submit;
 mod tests;
 pub(crate) mod tool;
 
-async fn phase_deadline<O>(future: BoxFuture<'_, Result<O, KernelError>>, mut phase: tokio::sync::watch::Receiver<bool>) -> Result<O, KernelError> {
+async fn phase_deadline<O>(
+    future: BoxFuture<'_, Result<O, KernelError>>,
+    mut phase: tokio::sync::watch::Receiver<bool>,
+) -> Result<O, KernelError> {
     let timer = tokio::time::sleep(HOOK_DEADLINE);
     tokio::pin!(timer);
     tokio::pin!(future);

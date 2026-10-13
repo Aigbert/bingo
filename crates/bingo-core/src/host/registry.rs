@@ -173,7 +173,10 @@ impl Registry {
                 });
                 Ok(())
             }
-            Contribution::Interceptors(source) => { self.sources.interceptors.push(source); Ok(()) }
+            Contribution::Interceptors(source) => {
+                self.sources.interceptors.push(source);
+                Ok(())
+            }
             Contribution::Hook(hook) => {
                 self.hooks.push(hook);
                 Ok(())

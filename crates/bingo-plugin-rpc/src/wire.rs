@@ -34,9 +34,9 @@ use std::path::PathBuf;
 
 use bingo_sdk::{
     CommandOutcome, CommandSpec, CompactContext, CompactReason, Compaction, ContextPiece,
-    ContextQuery, ContextUsage, EndpointCapabilities, Env, Frame, HookContext, HookMatcher,
-    Input, Item, ModelCapabilities, ModelEvent, ModelInfo, ModelRequest, Phase,
-    Placement, ProviderError, SessionId, SessionSummary, ToolOutput, ToolSpec, TurnId,
+    ContextQuery, ContextUsage, EndpointCapabilities, Env, Frame, HookContext, HookMatcher, Input,
+    Item, ModelCapabilities, ModelEvent, ModelInfo, ModelRequest, Phase, Placement, ProviderError,
+    SessionId, SessionSummary, ToolOutput, ToolSpec, TurnId,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
@@ -53,10 +53,13 @@ pub fn negotiated(host: &BTreeSet<Cap>, plugin: &BTreeSet<Cap>) -> BTreeSet<Cap>
 }
 
 pub fn capabilities() -> BTreeSet<Cap> {
-    METHODS.iter().map(|method| method.0)
+    METHODS
+        .iter()
+        .map(|method| method.0)
         .chain(NOTIFICATIONS.iter().map(|note| note.0))
         .filter(|method| *method != name::INITIALIZE)
-        .map(str::to_owned).collect()
+        .map(str::to_owned)
+        .collect()
 }
 
 /// Every name that travels on the wire, in one place.
@@ -544,27 +547,111 @@ pub type Method = (&'static str, Ref, Ref);
 pub type Notification = (&'static str, Ref);
 
 pub static METHODS: &[Method] = &[
-    ("intercept/prompt.submit", schema_of::<crate::intercept::Before<Input>>, schema_of::<crate::intercept::Proceed<Input, bingo_sdk::SubmitResult>>),
-    ("intercept/prompt.submit/after", schema_of::<crate::intercept::After<bingo_sdk::SubmitResult>>, schema_of::<crate::intercept::ResultValue<bingo_sdk::SubmitResult>>),
-    ("intercept/tool.check", schema_of::<crate::intercept::Before<crate::intercept::ToolEvent>>, schema_of::<crate::intercept::Proceed<crate::intercept::ToolEvent, bingo_sdk::CheckResult>>),
-    ("intercept/tool.check/after", schema_of::<crate::intercept::After<bingo_sdk::CheckResult>>, schema_of::<crate::intercept::ResultValue<bingo_sdk::CheckResult>>),
-    ("intercept/tool.call", schema_of::<crate::intercept::Before<crate::intercept::ToolEvent>>, schema_of::<crate::intercept::Proceed<crate::intercept::ToolEvent, ToolOutput>>),
-    ("intercept/tool.call/after", schema_of::<crate::intercept::After<ToolOutput>>, schema_of::<crate::intercept::ResultValue<ToolOutput>>),
-    ("intercept/turn.step", schema_of::<crate::intercept::Before<ModelRequest>>, schema_of::<crate::intercept::Proceed<ModelRequest, Result<Vec<ModelEvent>, ProviderError>>>),
-    ("intercept/turn.step/after", schema_of::<crate::intercept::After<Result<Vec<ModelEvent>, ProviderError>>>, schema_of::<crate::intercept::ResultValue<Result<Vec<ModelEvent>, ProviderError>>>),
-    ("intercept/prompt.compose", schema_of::<crate::intercept::Before<ModelRequest>>, schema_of::<crate::intercept::Proceed<ModelRequest, ModelRequest>>),
-    ("intercept/prompt.compose/after", schema_of::<crate::intercept::After<ModelRequest>>, schema_of::<crate::intercept::ResultValue<ModelRequest>>),
-    ("intercept/session.compact", schema_of::<crate::intercept::Before<bingo_sdk::CompactInput>>, schema_of::<crate::intercept::Proceed<bingo_sdk::CompactInput, Result<Compaction, bingo_sdk::CompactError>>>),
-    ("intercept/session.compact/after", schema_of::<crate::intercept::After<Result<Compaction, bingo_sdk::CompactError>>>, schema_of::<crate::intercept::ResultValue<Result<Compaction, bingo_sdk::CompactError>>>),
-    ("intercept/turn.complete", schema_of::<crate::intercept::Before<()>>, schema_of::<crate::intercept::Proceed<(), bingo_sdk::StopResult>>),
-    ("intercept/turn.complete/after", schema_of::<crate::intercept::After<bingo_sdk::StopResult>>, schema_of::<crate::intercept::ResultValue<bingo_sdk::StopResult>>),
-
-    (name::HOST_PLACE, schema_of::<crate::host::Place>, schema_of::<()>),
-    (name::HOST_EXTEND, schema_of::<crate::host::Extend>, schema_of::<()>),
-    (name::HOST_DELIVER, schema_of::<crate::host::Deliver>, schema_of::<()>),
-    (name::STATE_GET, schema_of::<crate::host::StateGet>, schema_of::<Option<crate::host::StateValue>>),
-    (name::STATE_SET, schema_of::<crate::host::StateSet>, schema_of::<crate::host::StateValue>),
-    (name::MODEL_COMPLETE, schema_of::<crate::host::Complete>, schema_of::<crate::host::Completed>),
+    (
+        "intercept/prompt.submit",
+        schema_of::<crate::intercept::Before<Input>>,
+        schema_of::<crate::intercept::Proceed<Input, bingo_sdk::SubmitResult>>,
+    ),
+    (
+        "intercept/prompt.submit/after",
+        schema_of::<crate::intercept::After<bingo_sdk::SubmitResult>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::SubmitResult>>,
+    ),
+    (
+        "intercept/tool.check",
+        schema_of::<crate::intercept::Before<crate::intercept::ToolEvent>>,
+        schema_of::<crate::intercept::Proceed<crate::intercept::ToolEvent, bingo_sdk::CheckResult>>,
+    ),
+    (
+        "intercept/tool.check/after",
+        schema_of::<crate::intercept::After<bingo_sdk::CheckResult>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::CheckResult>>,
+    ),
+    (
+        "intercept/tool.call",
+        schema_of::<crate::intercept::Before<crate::intercept::ToolEvent>>,
+        schema_of::<crate::intercept::Proceed<crate::intercept::ToolEvent, ToolOutput>>,
+    ),
+    (
+        "intercept/tool.call/after",
+        schema_of::<crate::intercept::After<ToolOutput>>,
+        schema_of::<crate::intercept::ResultValue<ToolOutput>>,
+    ),
+    (
+        "intercept/turn.step",
+        schema_of::<crate::intercept::Before<ModelRequest>>,
+        schema_of::<crate::intercept::Proceed<ModelRequest, Result<Vec<ModelEvent>, ProviderError>>>,
+    ),
+    (
+        "intercept/turn.step/after",
+        schema_of::<crate::intercept::After<Result<Vec<ModelEvent>, ProviderError>>>,
+        schema_of::<crate::intercept::ResultValue<Result<Vec<ModelEvent>, ProviderError>>>,
+    ),
+    (
+        "intercept/prompt.compose",
+        schema_of::<crate::intercept::Before<ModelRequest>>,
+        schema_of::<crate::intercept::Proceed<ModelRequest, ModelRequest>>,
+    ),
+    (
+        "intercept/prompt.compose/after",
+        schema_of::<crate::intercept::After<ModelRequest>>,
+        schema_of::<crate::intercept::ResultValue<ModelRequest>>,
+    ),
+    (
+        "intercept/session.compact",
+        schema_of::<crate::intercept::Before<bingo_sdk::CompactInput>>,
+        schema_of::<
+            crate::intercept::Proceed<
+                bingo_sdk::CompactInput,
+                Result<Compaction, bingo_sdk::CompactError>,
+            >,
+        >,
+    ),
+    (
+        "intercept/session.compact/after",
+        schema_of::<crate::intercept::After<Result<Compaction, bingo_sdk::CompactError>>>,
+        schema_of::<crate::intercept::ResultValue<Result<Compaction, bingo_sdk::CompactError>>>,
+    ),
+    (
+        "intercept/turn.complete",
+        schema_of::<crate::intercept::Before<()>>,
+        schema_of::<crate::intercept::Proceed<(), bingo_sdk::StopResult>>,
+    ),
+    (
+        "intercept/turn.complete/after",
+        schema_of::<crate::intercept::After<bingo_sdk::StopResult>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::StopResult>>,
+    ),
+    (
+        name::HOST_PLACE,
+        schema_of::<crate::host::Place>,
+        schema_of::<()>,
+    ),
+    (
+        name::HOST_EXTEND,
+        schema_of::<crate::host::Extend>,
+        schema_of::<()>,
+    ),
+    (
+        name::HOST_DELIVER,
+        schema_of::<crate::host::Deliver>,
+        schema_of::<()>,
+    ),
+    (
+        name::STATE_GET,
+        schema_of::<crate::host::StateGet>,
+        schema_of::<Option<crate::host::StateValue>>,
+    ),
+    (
+        name::STATE_SET,
+        schema_of::<crate::host::StateSet>,
+        schema_of::<crate::host::StateValue>,
+    ),
+    (
+        name::MODEL_COMPLETE,
+        schema_of::<crate::host::Complete>,
+        schema_of::<crate::host::Completed>,
+    ),
     (
         name::INITIALIZE,
         schema_of::<InitializeParams>,
@@ -600,13 +687,16 @@ pub static METHODS: &[Method] = &[
         schema_of::<ServiceCallParams>,
         schema_of::<ServiceCallResult>,
     ),
-
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-pub struct ToolsChanged { pub tools: Vec<ToolSpec> }
+pub struct ToolsChanged {
+    pub tools: Vec<ToolSpec>,
+}
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-pub struct CommandsChanged { pub commands: Vec<CommandSpec> }
+pub struct CommandsChanged {
+    pub commands: Vec<CommandSpec>,
+}
 
 pub static NOTIFICATIONS: &[Notification] = &[
     ("intercept/cancel", schema_of::<crate::intercept::Cancel>),
@@ -629,7 +719,11 @@ mod tests {
         for (host, plugin, expected) in [
             (vec![], vec!["host/place"], vec![]),
             (vec!["host/place"], vec![], vec![]),
-            (vec!["host/place", "future"], vec!["host/place"], vec!["host/place"]),
+            (
+                vec!["host/place", "future"],
+                vec!["host/place"],
+                vec!["host/place"],
+            ),
         ] {
             let set = |v: Vec<&str>| v.into_iter().map(str::to_owned).collect();
             assert_eq!(negotiated(&set(host), &set(plugin)), set(expected));

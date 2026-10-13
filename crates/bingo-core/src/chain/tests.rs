@@ -18,10 +18,13 @@ impl Interceptor for Wrap {
         next: Next<'_, ToolCall, ToolOutput>,
     ) -> Result<ToolOutput, KernelError> {
         match self.0 {
-            "drain" => next.run_then(input, |output| async move {
-                tokio::time::sleep(HOOK_DEADLINE * 3).await;
-                output
-            }).await,
+            "drain" => {
+                next.run_then(input, |output| async move {
+                    tokio::time::sleep(HOOK_DEADLINE * 3).await;
+                    output
+                })
+                .await
+            }
             "answer" => Ok(ToolOutput::text("link")),
             "error-before" => Err(KernelError::new(ErrorCode::Internal, "before")),
             "hang-before" => std::future::pending().await,
@@ -165,23 +168,40 @@ async fn dynamic_links_are_read_again_and_receive_only_the_user_grant() {
     struct Observer;
     #[async_trait::async_trait]
     impl Interceptor for Observer {
-        fn id(&self) -> &str { "observer" }
-        fn matcher(&self) -> LinkMatcher { LinkMatcher::default() }
+        fn id(&self) -> &str {
+            "observer"
+        }
+        fn matcher(&self) -> LinkMatcher {
+            LinkMatcher::default()
+        }
     }
     #[async_trait::async_trait]
     impl InterceptorSource for Source {
-        fn id(&self) -> &str { "source" }
+        fn id(&self) -> &str {
+            "source"
+        }
         async fn interceptors(&self) -> Vec<ExternalInterceptor> {
             if self.0.load(std::sync::atomic::Ordering::Relaxed) {
-                vec![ExternalInterceptor { plugin: "outside".into(), link: Arc::new(Observer) }]
-            } else { vec![] }
+                vec![ExternalInterceptor {
+                    plugin: "outside".into(),
+                    link: Arc::new(Observer),
+                }]
+            } else {
+                vec![]
+            }
         }
     }
     let source = Arc::new(Source(std::sync::atomic::AtomicBool::new(true)));
     let mut hooks = crate::turn::HookSet::default();
     hooks.interceptors.push(source.clone());
     assert_eq!(hooks.links().await[0].tier, Tier::Tighten);
-    hooks.grants.insert("outside".into(), PluginTrust { tier: Tier::Rewrite, uses: vec![] });
+    hooks.grants.insert(
+        "outside".into(),
+        PluginTrust {
+            tier: Tier::Rewrite,
+            uses: vec![],
+        },
+    );
     assert_eq!(hooks.links().await[0].tier, Tier::Rewrite);
     source.0.store(false, std::sync::atomic::Ordering::Relaxed);
     assert!(hooks.links().await.is_empty());
@@ -189,21 +209,42 @@ async fn dynamic_links_are_read_again_and_receive_only_the_user_grant() {
 
 #[tokio::test(start_paused = true)]
 async fn an_external_links_deadline_excludes_its_continuation() {
-    let kernel = Next::new(|_| Box::pin(async {
-        tokio::time::sleep(HOOK_DEADLINE * 3).await;
-        Ok(ToolOutput::text("kernel"))
-    }));
+    let kernel = Next::new(|_| {
+        Box::pin(async {
+            tokio::time::sleep(HOOK_DEADLINE * 3).await;
+            Ok(ToolOutput::text("kernel"))
+        })
+    });
     let report = Report::default();
-    let result = run::<tool::Call>(&[link("observer", Tier::Tighten)], kernel, &cx(), call(), report.clone()).await.unwrap();
+    let result = run::<tool::Call>(
+        &[link("observer", Tier::Tighten)],
+        kernel,
+        &cx(),
+        call(),
+        report.clone(),
+    )
+    .await
+    .unwrap();
     assert_eq!(result, ToolOutput::text("kernel"));
-    assert!(report.take().is_empty(), "waiting for next is not plugin time");
+    assert!(
+        report.take().is_empty(),
+        "waiting for next is not plugin time"
+    );
 }
 
 #[tokio::test(start_paused = true)]
 async fn draining_a_continuation_is_not_plugin_phase_time() {
     let kernel = Next::new(|_| Box::pin(async { Ok(ToolOutput::text("kernel")) }));
     let report = Report::default();
-    let result = run::<tool::Call>(&[link("drain", Tier::Tighten)], kernel, &cx(), call(), report.clone()).await.unwrap();
+    let result = run::<tool::Call>(
+        &[link("drain", Tier::Tighten)],
+        kernel,
+        &cx(),
+        call(),
+        report.clone(),
+    )
+    .await
+    .unwrap();
     assert_eq!(result, ToolOutput::text("kernel"));
     assert!(report.take().is_empty());
 }

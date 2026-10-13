@@ -90,8 +90,15 @@ impl<'a, I, O> Next<'a, I, O> {
         Self::at(Tier::Full, run)
     }
 
-    pub fn at(tier: Tier, run: impl FnOnce(I) -> BoxFuture<'a, Result<O, KernelError>> + Send + 'a) -> Self {
-        Self { run: Box::new(run), tier, phase: None }
+    pub fn at(
+        tier: Tier,
+        run: impl FnOnce(I) -> BoxFuture<'a, Result<O, KernelError>> + Send + 'a,
+    ) -> Self {
+        Self {
+            run: Box::new(run),
+            tier,
+            phase: None,
+        }
     }
 
     pub fn tracked(mut self, phase: tokio::sync::watch::Sender<bool>) -> Self {
@@ -108,8 +115,14 @@ impl<'a, I, O> Next<'a, I, O> {
     }
 
     /// Keep collecting a streaming continuation outside the caller's phase clock.
-    pub async fn run_then<R, F: std::future::Future<Output = R>>(self, input: I, finish: impl FnOnce(O) -> F) -> Result<R, KernelError> {
-        if let Some(phase) = &self.phase { phase.send_replace(false); }
+    pub async fn run_then<R, F: std::future::Future<Output = R>>(
+        self,
+        input: I,
+        finish: impl FnOnce(O) -> F,
+    ) -> Result<R, KernelError> {
+        if let Some(phase) = &self.phase {
+            phase.send_replace(false);
+        }
         let _resume = Resume(self.phase);
         Ok(finish((self.run)(input).await?).await)
     }
@@ -118,7 +131,9 @@ impl<'a, I, O> Next<'a, I, O> {
 struct Resume(Option<tokio::sync::watch::Sender<bool>>);
 impl Drop for Resume {
     fn drop(&mut self) {
-        if let Some(phase) = &self.0 { phase.send_replace(true); }
+        if let Some(phase) = &self.0 {
+            phase.send_replace(true);
+        }
     }
 }
 
