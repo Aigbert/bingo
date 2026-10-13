@@ -72,7 +72,7 @@ test('an omitted matcher accepts null and scalar event inputs', async () => {
   }
 });
 
-test('cancel before next rejects before and clears the chain', async () => {
+test('cancel before next rejects before and clears the chain', { timeout: 5000 }, async () => {
   const hooks = new Hooks();
   let entered!: () => void;
   const started = new Promise<void>(resolve => { entered = resolve; });
@@ -93,7 +93,7 @@ test('cancel before next rejects before and clears the chain', async () => {
   assert.equal(hooks.pending.size, 0);
 });
 
-test('cancel while the after hook is waiting rejects after', async () => {
+test('cancel while the after hook is waiting rejects after', { timeout: 5000 }, async () => {
   const hooks = new Hooks();
   let entered!: () => void;
   const started = new Promise<void>(resolve => { entered = resolve; });

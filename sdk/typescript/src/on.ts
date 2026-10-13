@@ -61,7 +61,7 @@ export class Hooks {
   entries: Entry[] = [];
   pending = new Map<string, Pending>();
   on: On = (pattern: string, matcher: Matcher | Hook, hook?: Hook) => {
-    this.entries.push({ pattern, matcher: hook ? matcher : {}, hook: hook ?? matcher as Hook });
+    this.entries.push({ pattern, matcher: hook ? matcher : undefined, hook: hook ?? matcher as Hook });
   };
 
   names(catalogue: readonly string[]): string[] {
@@ -73,6 +73,9 @@ export class Hooks {
     const first = deferred<unknown>();
     const downstream = deferred<any>();
     const controller = new AbortController();
+    const stopped = deferred<never>();
+    // Cancellation can arrive before any hook has called next.
+    void downstream.promise.catch(() => {});
     let crossed = false;
     const entries = this.entries.filter(entry => patternMatches(entry.pattern, name));
     const terminal = (input: unknown) => {
@@ -80,8 +83,16 @@ export class Hooks {
       first.resolve({ next: input });
       return downstream.promise;
     };
-    const result = this.dispatch(entries, 0, request.input, dollar, request.site, controller.signal, terminal);
-    this.pending.set(request.chain, { controller, resume: downstream.resolve, reject: downstream.reject, result });
+    const result = Promise.race([
+      Promise.resolve().then(() => this.dispatch(entries, 0, request.input, dollar, request.site, controller.signal, terminal)),
+      stopped.promise,
+    ]);
+    const reject = (error: Error) => {
+      first.reject(error);
+      downstream.reject(error);
+      stopped.reject(error);
+    };
+    this.pending.set(request.chain, { controller, resume: downstream.resolve, reject, result });
     void result.then(answer => {
       if (!crossed) first.resolve({ answer: answer ?? null });
     }, error => { if (!crossed) first.reject(error); }).finally(() => {
@@ -92,9 +103,10 @@ export class Hooks {
 
   private async dispatch(entries: Entry[], index: number, input: any, dollar: unknown,
     origin: unknown, signal: AbortSignal, terminal: (input: any) => Promise<any>): Promise<any> {
+    if (signal.aborted) throw new Error('intercept cancelled');
     const entry = entries[index];
     if (!entry) return terminal(input);
-    if (!matches(entry.matcher, input)) return this.dispatch(entries, index + 1, input, dollar, origin, signal, terminal);
+    if (entry.matcher !== undefined && !matches(entry.matcher, input)) return this.dispatch(entries, index + 1, input, dollar, origin, signal, terminal);
     let called = false;
     let continuation: Promise<any> | undefined;
     const next = Object.assign(async (changed: unknown) => {
