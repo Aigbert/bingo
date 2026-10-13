@@ -82,8 +82,8 @@ M133's; this milestone makes every verb it needs answerable.
 - `crates/bingo-plugin-rpc/Cargo.toml`, `Cargo.lock`: existing workspace
   `bingo-shelf` dependency for state (ADR-0072); no external dependency.
 - `crates/bingo-sdk/src/lib.rs`: export the interceptor source contract.
-- Mechanical constructors, exhaustive Event/Contribution matches and generated
-  schema fixtures outside these files follow execution protocol step 6.
+- Mechanical test constructors and generated schema fixtures outside these
+  files follow execution protocol step 6; production match arms do not.
 
 ## Exit criteria
 
@@ -114,25 +114,43 @@ M133's; this milestone makes every verb it needs answerable.
 
 ## Risks
 
-- Billing a side call, decided 2026-10-13: an additive
-  `Event::UsageCharged { turn, plugin, usage }`, fixture first (M113).
-  `TurnUsage` is not reused, because its fold bumps `round` and replaces
-  `context`. The fold adds the charge to the live turn's and the
-  summary's usage and leaves both alone. A test pins that
-  `TurnCompleted.usage` equals the sum of the turn's `TurnUsage` and
-  `UsageCharged` frames; keep one tally to make it hold.
+- Billing, decided 2026-10-13: additive `UsageCharged { turn, plugin, usage }`,
+  fixture first (M113). It adds to live-turn/session usage without changing
+  round/context. `TurnCompleted.usage` uses the actor's single tally and equals
+  the turn's `TurnUsage` plus `UsageCharged`; never reuse `TurnUsage` for a side call.
 - `host/deliver` from inside a link of the same session's turn can queue
   input behind the turn that is waiting on the link: deliver never waits
   for the delivered turn; say so in the guide and test it.
 - A reload while a link holds a chain: the link fails in words and the
   chain skips it (ADR-0074 §4). The test pins this, not a race.
-- Re-verify at start: ADR-0070's slot placement as M121/M123 built it
-  (what `host/place` carries); M128's `bingo-process`/`bingo-jsonrpc`
-  APIs and whether `codec.rs` survived; M129's shelf path and API;
-  ADR-0068/M116 supervised turns (the link runs inside the turn's
-  future); M131's `Interceptor`/`Next` as built; M111's shared test host
-  and clock for the reload poll. Re-verified at `32dcbfb1`: slots use
-  `slot::with` over signals; shelf uses `Shelf<Codec>::save`; chain sources
-  belong in `host/registry.rs` and `turn/late.rs`. `UsageCharged` requires
-  the sdk fold and actor mailbox; completed usage must use the actor tally.
-  `ErrorCode` needs additive `Unsupported` for the default complete refusal.
+- Re-verified at `32dcbfb1`: slots use `slot::with`; shelf uses `save`;
+  dynamic sources belong in registry/late; side-call billing needs the actor
+  mailbox and its existing usage tally; the default refusal is `Unsupported`.
+- **Stopped 2026-10-13 (execution protocol step 6):** the binary acceptance
+  test cannot compile `bingo-surface-print`. Its production exhaustive matches
+  at `src/render.rs:168` and `src/stream_json.rs:149` lack `UsageCharged`.
+  These files are outside Files. The step 6 exception permits mechanical
+  tests/fixtures, not production matches; the earlier broad Files note above
+  has been corrected. Neither production file was edited.
+  Options: authorize adding both files to M132, handling the additive charge
+  without incrementing model rounds; or land their handling separately before
+  resuming. No full gate run, schema freeze, reload implementation or final
+  verification has completed. ADR-0075 remains proposed.
+
+## Verified (partial, 2026-10-13; stopped)
+
+- Earlier core run: `cargo test -p bingo-core --locked` →
+  `test result: ok. 464 passed; 0 failed` (before the later chain changes).
+- Current chain tests: `cargo test -p bingo-core chain::tests --locked` →
+  `test result: ok. 7 passed; 0 failed`.
+- Stub phases: `cargo test -p bingo-plugin-rpc --test plugin hooks:: --locked`
+  → `test result: ok. 3 passed; 0 failed`.
+- Handshake race: `cargo test -p bingo-plugin-rpc --lib notifications_after_handshake --locked`
+  → `test result: ok. 1 passed; 0 failed`.
+- Blocking command: `cargo test -p bingo --test plugin_rpc --locked` →
+  `error[E0004]: non-exhaustive patterns: &bingo_sdk::Event::UsageCharged { .. } not covered`
+  (both print files); `could not compile bingo-surface-print (lib)`.
+- Red-to-green evidence remains in `.m132-logs/`: protocol, unknown request,
+  state CAS, usage fixture/fold, completion, sources, phase clocks and notices.
+- Uncommitted work: binary acceptance tests in `crates/bingo/tests/plugin_rpc.rs`;
+  untracked `src/reload.rs` is only a contract/test draft, not wired into the crate.
