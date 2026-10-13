@@ -70,3 +70,5 @@ pub use view::{ActionItem, Tone, TreeNode, View};
 
 /// Re-exported so plugins share one cancellation type without naming tokio-util.
 pub use tokio_util::sync::CancellationToken;
+
+pub mod catalogue;
