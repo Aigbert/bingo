@@ -292,8 +292,8 @@ mod tests {
             ContentPart::Image(Image {
                 media_type: "image/png".into(),
                 data: (picture.data.clone()).into(),
-                width: None,
-                height: None,
+                width: Some(4),
+                height: Some(4),
                 path: None,
             }),
             "a picture inside the bound is the server's own bytes"

@@ -63,7 +63,11 @@ mod tests {
             assert_eq!(image.media_type, media_type);
             assert_eq!(
                 image,
-                Image::from_bytes(media_type, &bytes).expect("within the cap"),
+                Image {
+                    width: Some(4),
+                    height: Some(4),
+                    ..Image::from_bytes(media_type, &bytes).expect("within the cap")
+                },
                 "the bytes are the ones handed over"
             );
         }
@@ -95,7 +99,14 @@ mod tests {
     #[test]
     fn a_handed_over_picture_the_table_takes_passes_through_untouched() {
         let image = handed(3, 3, ImageFormat::Jpeg);
-        assert_eq!(accepted(image.clone()).expect("a picture"), image);
+        assert_eq!(
+            accepted(image.clone()).expect("a picture"),
+            Image {
+                width: Some(3),
+                height: Some(3),
+                ..image
+            }
+        );
     }
 
     #[test]

@@ -388,8 +388,8 @@ mod tests {
                 images: vec![Image {
                     media_type: "image/png".into(),
                     data: data.into(),
-                    width: None,
-                    height: None,
+                    width: Some(4),
+                    height: Some(2),
                     path: None,
                 }],
             },
