@@ -92,6 +92,7 @@ pub struct Job {
     pub log: PathBuf,
     /// The session that started it, and the one its completion wakes.
     pub session: SessionId,
+    pub item: bingo_sdk::ItemId,
     /// The clock time it started, as the rail shows it. A card holds the fact
     /// rather than an age, which would be wrong a second after it was drawn.
     pub since: String,
@@ -102,12 +103,19 @@ pub struct Job {
 }
 
 impl Job {
-    pub fn new(id: String, command: String, log: PathBuf, session: SessionId) -> Self {
+    pub fn new(
+        id: String,
+        command: String,
+        log: PathBuf,
+        session: SessionId,
+        item: bingo_sdk::ItemId,
+    ) -> Self {
         Self {
             id,
             command,
             log,
             session,
+            item,
             since: jiff::Zoned::now().strftime("%H:%M:%S").to_string(),
             started: Instant::now(),
             state: watch::Sender::new(State::Running),
@@ -304,8 +312,8 @@ impl Jobs {
     /// What a session's jobs look like on the rail (ADR-0013 §2): a table
     /// while any run, and nothing at all when none do.
     pub fn view(&self, session: &SessionId) -> Value {
-        let rows: Vec<Vec<String>> = self
-            .running_in(session)
+        let running = self.running_in(session);
+        let rows: Vec<Vec<String>> = running
             .iter()
             .map(|job| vec![job.id.clone(), head(&job.command), job.since.clone()])
             .collect();
@@ -316,7 +324,29 @@ impl Jobs {
             headers: vec!["job".into(), "command".into(), "since".into()],
             rows,
         };
-        serde_json::to_value(view).unwrap_or(Value::Null)
+        let status = bingo_sdk::slot::Slot::Status {
+            text: format!(
+                "{} {}",
+                running.len(),
+                if running.len() == 1 {
+                    "shell"
+                } else {
+                    "shells"
+                }
+            ),
+            tone: bingo_sdk::Tone::Neutral,
+            until: None,
+        };
+        let slots =
+            std::iter::once(status).chain(running.iter().map(|job| bingo_sdk::slot::Slot::Row {
+                item: job.item.clone(),
+                mark: None,
+                title: None,
+                badge: None,
+                body: Some(View::text("Running in the background")),
+                actions: vec![],
+            }));
+        bingo_sdk::slot::with(serde_json::to_value(view).unwrap_or(Value::Null), slots)
     }
 
     /// Publish the set as it is now. One signal per change of it: a job that
@@ -347,6 +377,7 @@ mod tests {
             command.to_string(),
             PathBuf::from("/tmp/job.log"),
             session(),
+            bingo_sdk::ItemId::from_raw("itm_test"),
         ))
     }
 
@@ -356,6 +387,7 @@ mod tests {
             "sleep 1".into(),
             PathBuf::from("/tmp/x.log"),
             session(),
+            bingo_sdk::ItemId::from_raw("itm_test"),
         ))
     }
 
@@ -365,10 +397,15 @@ mod tests {
         let job = job("sleep 1");
         jobs.file(job.clone());
         let payload = jobs.view(&session());
-        let slots: Vec<bingo_sdk::slot::Slot> = serde_json::from_value(payload["slots"].clone()).unwrap();
-        assert!(matches!(&slots[0], bingo_sdk::slot::Slot::Status { text, .. } if text == "1 shell"));
-        assert!(matches!(&slots[1], bingo_sdk::slot::Slot::Row { body: Some(body), .. }
-            if body == &View::text("Running in the background")));
+        let slots: Vec<bingo_sdk::slot::Slot> =
+            serde_json::from_value(payload["slots"].clone()).unwrap();
+        assert!(
+            matches!(&slots[0], bingo_sdk::slot::Slot::Status { text, .. } if text == "1 shell")
+        );
+        assert!(
+            matches!(&slots[1], bingo_sdk::slot::Slot::Row { body: Some(body), .. }
+            if body == &View::text("Running in the background"))
+        );
         job.finished(State::Killed);
         assert_eq!(jobs.view(&session()), Value::Null);
     }

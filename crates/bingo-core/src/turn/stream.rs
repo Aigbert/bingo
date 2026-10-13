@@ -83,12 +83,19 @@ impl Turn<'_> {
     fn publish(&mut self, emit: Emit) {
         let event = match emit {
             Emit::Started(mut item) => {
-                if let ItemBody::ToolCall { name, input, quiet, .. } = &mut item.body {
-                    *quiet = self.late.tools.iter().find(|tool| tool.spec().name == *name)
+                if let ItemBody::ToolCall {
+                    name, input, quiet, ..
+                } = &mut item.body
+                {
+                    *quiet = self
+                        .late
+                        .tools
+                        .iter()
+                        .find(|tool| tool.spec().name == *name)
                         .is_some_and(|tool| tool.traits(input).quiet);
                 }
                 Event::ItemStarted { item }
-            },
+            }
             Emit::Delta {
                 item,
                 n,

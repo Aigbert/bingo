@@ -47,8 +47,8 @@ impl Tool for TaskCreateTool {
         }
     }
 
-    fn traits(&self, _input: &Value) -> ToolTraits {
-        crate::traits()
+    fn traits(&self, input: &Value) -> ToolTraits {
+        crate::traits(input)
     }
 
     async fn call(&self, input: Value, cx: &ToolContext) -> Result<ToolOutput, ToolError> {
@@ -199,6 +199,9 @@ mod tests {
         assert!(spec.input_schema["properties"].get("blockedBy").is_some());
         assert!(spec.input_schema["properties"].get("in").is_some());
         assert_eq!(spec.input_schema["required"], json!(["subject"]));
-        assert_eq!(TaskCreateTool.traits(&Value::Null), crate::traits());
+        assert_eq!(
+            TaskCreateTool.traits(&Value::Null),
+            crate::traits(&Value::Null)
+        );
     }
 }

@@ -212,6 +212,7 @@ impl BashTool {
             command.to_string(),
             log,
             cx.session.clone(),
+            cx.item.clone(),
         ));
         self.jobs.file(job.clone());
         job

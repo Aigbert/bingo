@@ -312,6 +312,7 @@ mod tests {
             "cargo test --workspace".into(),
             PathBuf::from("/tmp/bash/ab12cd34.log"),
             SessionId::from_raw("ses_test"),
+            bingo_sdk::ItemId::from_raw("itm_test"),
         )
     }
 

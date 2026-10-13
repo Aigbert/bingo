@@ -289,7 +289,9 @@ impl Actor {
                 return Ok(());
             }
         };
-        let item = self.open_call(&serving.turn, &call, serving.tool.traits(&call.input).quiet).await?;
+        let item = self
+            .open_call(&serving.turn, &call, serving.tool.traits(&call.input).quiet)
+            .await?;
         let bridged = invoke::Bridged {
             config: serving.config,
             mailbox: self.mailbox.clone(),
@@ -348,7 +350,12 @@ impl Actor {
     /// The call's own item, journaled under the turn as the model's calls are
     /// and marked as none of the model's: it is the caller's, and the
     /// provider fold skips it (ADR-0036 §2).
-    async fn open_call(&mut self, turn: &TurnId, call: &ToolCall, quiet: bool) -> Result<ItemId, KernelError> {
+    async fn open_call(
+        &mut self,
+        turn: &TurnId,
+        call: &ToolCall,
+        quiet: bool,
+    ) -> Result<ItemId, KernelError> {
         let body = ItemBody::ToolCall {
             call_id: call.call_id.clone(),
             name: call.name.clone(),

@@ -41,8 +41,8 @@ impl Tool for TaskGetTool {
         }
     }
 
-    fn traits(&self, _input: &Value) -> ToolTraits {
-        crate::traits()
+    fn traits(&self, input: &Value) -> ToolTraits {
+        crate::traits(input)
     }
 
     async fn call(&self, input: Value, cx: &ToolContext) -> Result<ToolOutput, ToolError> {

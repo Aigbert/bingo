@@ -122,6 +122,7 @@ mod tests {
             command.into(),
             std::path::PathBuf::from("/tmp/bash/job.log"),
             SessionId::from_raw("ses_test"),
+            bingo_sdk::ItemId::from_raw("itm_test"),
         ));
         jobs.file(job.clone());
         (jobs, job)

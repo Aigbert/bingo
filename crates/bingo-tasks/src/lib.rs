@@ -78,8 +78,9 @@ static MANIFEST: PluginManifest = PluginManifest {
 /// concurrency-safe: the list is one value, and two calls running at once —
 /// on one board, two of them — would each publish it without the other's
 /// change (ADR-0023 §4).
-pub(crate) fn traits() -> ToolTraits {
+pub(crate) fn traits(input: &serde_json::Value) -> ToolTraits {
     ToolTraits {
+        quiet: input.get("in").is_none_or(serde_json::Value::is_null),
         read_only: true,
         trusted: true,
         concurrency_safe: false,
@@ -195,7 +196,7 @@ mod plugin_tests {
 
     #[test]
     fn every_tool_is_read_only_trusted_and_alone() {
-        let traits = traits();
+        let traits = traits(&serde_json::Value::Null);
         assert!(traits.read_only && traits.trusted);
         assert!(!traits.concurrency_safe && !traits.destructive && !traits.edit);
     }
