@@ -1,0 +1,2709 @@
+M149 terminal captures — 2026-10-14
+
+15 configurations: 120x40, 80x24, 38x14 crossed with dark/light OSC 11,
+NO_COLOR, BINGO_ASCII=1, BINGO_MOTION=off. Six captures per configuration:
+opening, waiting, streaming, answer/worked, tool, stopped.
+
+Driven through an owned, unique tmux -L socket, with temporary homes/cwds,
+update.check=false and BINGO_FAKE_SCRIPT. Inherited look overrides were
+cleared before setting each configuration. Temporary state and owned tmux
+servers were removed after the drive. No terminal app or live provider used.
+Foreground RGB entries come from capture-pane -p -e; panes below are -p.
+
+120x40 dark: opening
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-dark/cwd
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 dark: waiting
+Foreground RGB: 143;180;222, 156;88;40, 240;136;62, 249;169;95, 252;182;108
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-dark/cwd
+
+
+> say hello
+
+▍ Kindling… (esc to interrupt · 0s)
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 dark: streaming
+Foreground RGB: 143;180;222, 198;112;51, 240;136;62, 242;142;68, 249;172;98, 251;179;105, 252;184;110
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-dark/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+ ·
+▍ Kindling… (esc to interrupt · 1s)
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 dark: answer and worked
+Foreground RGB: 143;180;222, 240;136;62
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-dark/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+▍ Worked for 3s · done 02:54
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     13k/191k · fake/fake-1
+
+
+120x40 dark: tool
+Foreground RGB: 143;180;222, 156;88;40, 240;136;62, 240;137;63, 240;138;64, 241;138;64, 241;139;65, 241;140;66, 241;141;67, 242;142;68, 242;143;69, 242;144;70, 242;145;71, 243;146;72, 243;147;73, 243;148;74, 243;149;75, 244;150;76, 244;151;77, 244;152;78, 244;153;79, 245;154;80, 245;155;81, 245;156;82, 245;157;83, 246;158;84, 246;159;85, 246;160;86, 246;161;87, 247;161;87, 247;162;88, 247;163;89, 247;164;90, 247;165;91, 248;165;91, 248;166;92, 248;167;93, 248;168;94, 248;169;95, 249;169;95, 249;170;96, 249;171;97, 249;172;98, 250;173;99, 250;174;100, 250;175;101, 250;176;102, 251;177;103, 251;178;104, 251;179;105, 251;180;106, 252;181;107, 252;182;108, 252;183;109, 252;184;110, 253;185;111, 253;186;112, 253;187;113, 253;188;114, 254;189;115, 254;190;116, 254;191;117, 254;192;118, 255;192;118, 255;193;119, 255;194;120
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-dark/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     14k/191k · fake/fake-1
+
+
+120x40 dark: stopped
+Foreground RGB: 143;180;222, 143;207;138
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     14k/191k · fake/fake-1
+
+
+120x40 light: opening
+Foreground RGB: 168;77;18, 47;95;153
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-light/cwd
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 light: waiting
+Foreground RGB: 139;64;15, 168;77;18, 47;95;153
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-light/cwd
+
+
+> say hello
+
+▍ Tracking… (esc to interrupt · 0s)
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 light: streaming
+Foreground RGB: 109;50;12, 168;77;18, 169;78;19, 172;80;20, 205;107;34, 208;109;35, 219;118;40, 47;95;153
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-light/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+ ·
+▍ Tracking… (esc to interrupt · 1s)
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 light: answer and worked
+Foreground RGB: 168;77;18, 47;95;153
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-light/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+▍ Worked for 3s · done 02:54
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     13k/191k · fake/fake-1
+
+
+120x40 light: tool
+Foreground RGB: 153;70;16, 168;77;18, 169;78;19, 171;79;19, 172;80;20, 173;81;20, 175;82;21, 176;83;21, 177;84;22, 177;85;22, 179;86;23, 180;87;23, 181;88;24, 183;89;24, 184;90;25, 185;91;25, 187;92;26, 188;93;27, 189;94;27, 191;95;28, 192;96;28, 193;97;29, 195;98;29, 196;100;30, 196;99;30, 197;101;31, 199;102;31, 200;103;32, 201;104;32, 203;105;33, 204;106;33, 205;107;34, 207;108;35, 208;109;35, 209;110;36, 211;111;36, 212;112;37, 213;113;37, 215;114;38, 215;115;38, 216;116;39, 217;117;39, 219;118;40, 220;119;40, 221;120;41, 223;121;41, 224;122;42, 47;95;153
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-light/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     14k/191k · fake/fake-1
+
+
+120x40 light: stopped
+Foreground RGB: 47;95;153, 53;114;48
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     14k/191k · fake/fake-1
+
+
+120x40 no-color: opening
+Foreground RGB:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-no-color/cwd
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 no-color: waiting
+Foreground RGB:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-no-color/cwd
+
+
+> say hello
+
+▍ Burrowing… (esc to interrupt · 0s)
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 no-color: streaming
+Foreground RGB:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-no-color/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+ ·
+▍ Burrowing… (esc to interrupt · 1s)
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 no-color: answer and worked
+Foreground RGB:
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-no-color/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+▍ Worked for 3s · done 02:54
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     13k/191k · fake/fake-1
+
+
+120x40 no-color: tool
+Foreground RGB:
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-no-color/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     14k/191k · fake/fake-1
+
+
+120x40 no-color: stopped
+Foreground RGB:
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     14k/191k · fake/fake-1
+
+
+120x40 ascii: opening
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+bingo|
+fake-1 · bypassPermissions · /var/.../T/bingo-m149-rwvj0dnp/120-ascii/cwd
+
+
+
++----------------------------------------------------------------------------------------------------------------------+
+| > ask anything · / for commands · ! for shell                                                                        |
++----------------------------------------------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 ascii: waiting
+Foreground RGB: 143;180;222, 240;136;62, 241;142;68, 245;154;80, 246;160;86, 249;173;99, 251;179;105, 254;191;117
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+bingo|
+fake-1 · bypassPermissions · /var/.../T/bingo-m149-rwvj0dnp/120-ascii/cwd
+
+
+> say hello
+
+| Sniffing around... (esc to interrupt · 0s)
++----------------------------------------------------------------------------------------------------------------------+
+| > ask anything · ⏎ steers · tab queues                                                                               |
++----------------------------------------------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 ascii: streaming
+Foreground RGB: 143;180;222, 156;88;40, 240;136;62, 242;145;71, 247;164;90, 252;182;108, 252;183;109, 253;188;114
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+bingo|
+fake-1 · bypassPermissions · /var/.../T/bingo-m149-rwvj0dnp/120-ascii/cwd
+
+
+> say hello
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+ .
+| Sniffing around... (esc to interrupt · 1s)
++----------------------------------------------------------------------------------------------------------------------+
+| > ask anything · ⏎ steers · tab queues                                                                               |
++----------------------------------------------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 ascii: answer and worked
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+bingo|
+fake-1 · bypassPermissions · /var/.../T/bingo-m149-rwvj0dnp/120-ascii/cwd
+
+
+> say hello
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+|     fn main() { println!("hello"); }  rust
+
+| Worked for 3s · done 02:54
+
+
++----------------------------------------------------------------------------------------------------------------------+
+| > ask anything · / for commands · ! for shell                                                                        |
++----------------------------------------------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     13k/191k · fake/fake-1
+
+
+120x40 ascii: tool
+Foreground RGB: 143;180;222, 240;136;62, 240;137;63, 240;138;64, 241;138;64, 241;139;65, 241;140;66, 241;141;67, 242;142;68, 242;143;69, 242;144;70, 242;145;71, 243;146;72, 243;147;73, 243;148;74, 243;149;75, 244;150;76, 244;151;77, 244;152;78, 244;153;79, 245;153;79, 245;154;80, 245;155;81, 245;156;82, 245;157;83, 246;157;83, 246;158;84, 246;159;85, 246;160;86, 247;161;87, 247;162;88, 247;163;89, 247;164;90, 248;166;92, 248;167;93, 248;168;94, 248;169;95, 249;170;96, 249;171;97, 249;172;98, 249;173;99, 250;173;99, 250;174;100, 250;175;101, 250;176;102, 250;177;103, 251;177;103, 251;178;104, 251;179;105, 251;180;106, 252;181;107, 252;182;108, 252;183;109, 252;184;110, 253;185;111, 253;186;112, 253;187;113, 253;188;114, 254;189;115, 254;190;116, 254;191;117, 254;192;118, 255;192;118, 255;193;119
+
+
+bingo|
+fake-1 · bypassPermissions · /var/.../T/bingo-m149-rwvj0dnp/120-ascii/cwd
+
+
+> say hello
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+|     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+* Bash(sleep 4; echo TOOL_FINISHED)
+  -  [ b background ]
+
+
++----------------------------------------------------------------------------------------------------------------------+
+| > ask anything · ⏎ steers · tab queues                                                                               |
++----------------------------------------------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     14k/191k · fake/fake-1
+
+
+120x40 ascii: stopped
+Foreground RGB: 143;180;222, 143;207;138
+> say hello
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+|     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+* Bash(sleep 4; echo TOOL_FINISHED)
+  -  TOOL_FINISHED
+
+| Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
++----------------------------------------------------------------------------------------------------------------------+
+| > ask anything · / for commands · ! for shell                                                                        |
++----------------------------------------------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     14k/191k · fake/fake-1
+
+
+120x40 motion-off: opening
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-motion-off/cwd
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 motion-off: waiting
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-motion-off/cwd
+
+
+> say hello
+
+▍ Tinkering… (esc to interrupt · 1s)
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 motion-off: streaming
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-motion-off/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ Tinkering… (esc to interrupt · 1s)
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)         tmux: pictures need `set -g allow-passthrough on`          fake/fake-1
+
+
+120x40 motion-off: answer and worked
+Foreground RGB: 143;180;222, 240;136;62
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-motion-off/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+▍ Worked for 3s · done 02:54
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     13k/191k · fake/fake-1
+
+
+120x40 motion-off: tool
+Foreground RGB: 143;180;222, 240;136;62
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/120-motion-off/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     14k/191k · fake/fake-1
+
+
+120x40 motion-off: stopped
+Foreground RGB: 143;180;222, 143;207;138
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret
+  is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+▍ Stopped after 1s · 02:55
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)                     ? for shortcuts                     14k/191k · fake/fake-1
+
+
+80x24 dark: opening
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/80-dark/cwd
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 dark: waiting
+Foreground RGB: 143;180;222, 177;100;46, 240;136;62, 245;157;83, 247;164;90, 254;190;116
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/80-dark/cwd
+
+
+> say hello
+
+▍ Burrowing… (esc to interrupt · 0s)
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 dark: streaming
+Foreground RGB: 143;180;222, 177;100;46, 240;136;62, 244;153;79, 249;169;95, 253;186;112, 254;189;115
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-rwvj0dnp/80-dark/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+ ·
+▍ Burrowing… (esc to interrupt · 1s)
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 dark: answer and worked
+Foreground RGB: 143;180;222
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+▍ Worked for 3s · done 02:55
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  13k/191k · fake/fake-1
+
+
+80x24 dark: tool
+Foreground RGB: 143;180;222, 219;124;57, 240;136;62, 240;138;64, 241;138;64, 241;140;66, 242;142;68, 242;144;70, 242;145;71, 243;146;72, 243;147;73, 243;148;74, 243;149;75, 244;150;76, 244;151;77, 244;152;78, 244;153;79, 245;154;80, 245;155;81, 245;156;82, 245;157;83, 246;159;85, 246;161;87, 247;163;89, 247;165;91, 248;165;91, 248;167;93, 249;169;95, 249;171;97, 250;173;99, 250;174;100, 250;175;101, 250;176;102, 251;177;103, 251;178;104, 251;179;105, 251;180;106, 252;181;107, 252;182;108, 252;183;109, 252;184;110, 253;185;111, 253;186;112, 253;188;114, 254;190;116, 254;192;118, 255;192;118, 255;194;120
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  14k/191k · fake/fake-1
+
+
+80x24 dark: stopped
+Foreground RGB: 143;180;222, 143;207;138
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  14k/191k · fake/fake-1
+
+80x24 light: opening
+Foreground RGB: 168;77;18, 47;95;153
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-dy10n39n/80-light/cwd
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 light: waiting
+Foreground RGB: 124;57;13, 168;77;18, 47;95;153
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-dy10n39n/80-light/cwd
+
+
+> say hello
+
+▍ Kindling… (esc to interrupt · 0s)
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 light: streaming
+Foreground RGB: 168;77;18, 174;82;21, 203;105;33, 208;109;35, 209;110;36, 47;95;153
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-dy10n39n/80-light/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+ ·
+▍ Kindling… (esc to interrupt · 1s)
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 light: answer and worked
+Foreground RGB: 47;95;153
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+▍ Worked for 3s · done 02:56
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  13k/191k · fake/fake-1
+
+
+80x24 light: tool
+Foreground RGB: 124;57;13, 168;77;18, 170;78;19, 170;79;19, 172;80;20, 174;82;20, 174;82;21, 176;83;21, 176;84;22, 178;85;22, 180;86;23, 180;87;23, 182;88;24, 184;90;25, 186;91;26, 186;92;26, 188;93;26, 188;93;27, 190;95;27, 190;95;28, 192;96;28, 194;98;29, 196;100;30, 196;99;30, 198;101;31, 200;103;32, 202;104;32, 202;104;33, 204;106;33, 204;106;34, 206;107;34, 206;108;34, 208;109;35, 210;111;36, 212;112;37, 212;113;37, 214;114;38, 216;115;38, 216;116;39, 218;117;39, 218;117;40, 220;119;40, 222;120;41, 222;121;41, 224;122;42, 47;95;153
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  14k/191k · fake/fake-1
+
+
+80x24 light: stopped
+Foreground RGB: 47;95;153, 53;114;48
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  14k/191k · fake/fake-1
+
+
+80x24 no-color: opening
+Foreground RGB:
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-dy10n39n/80-no-color/cwd
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 no-color: waiting
+Foreground RGB:
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-dy10n39n/80-no-color/cwd
+
+
+> say hello
+
+▍ Tracking… (esc to interrupt · 0s)
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 no-color: streaming
+Foreground RGB:
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-dy10n39n/80-no-color/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+ ·
+▍ Tracking… (esc to interrupt · 1s)
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 no-color: answer and worked
+Foreground RGB:
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+▍ Worked for 3s · done 02:56
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  13k/191k · fake/fake-1
+
+
+80x24 no-color: tool
+Foreground RGB:
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  14k/191k · fake/fake-1
+
+
+80x24 no-color: stopped
+Foreground RGB:
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  14k/191k · fake/fake-1
+
+
+80x24 ascii: opening
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+bingo|
+fake-1 · bypassPermissions · /var/.../T/bingo-m149-dy10n39n/80-ascii/cwd
+
+
+
++------------------------------------------------------------------------------+
+| > ask anything · / for commands · ! for shell                                |
++------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 ascii: waiting
+Foreground RGB: 143;180;222, 177;100;46, 240;136;62, 240;137;63, 241;140;66, 245;156;82, 246;159;85, 250;174;100, 251;177;103, 255;192;118
+
+
+
+
+
+
+
+
+
+
+
+
+
+bingo|
+fake-1 · bypassPermissions · /var/.../T/bingo-m149-dy10n39n/80-ascii/cwd
+
+
+> say hello
+
+| Sniffing around... (esc to interrupt · 0s)
++------------------------------------------------------------------------------+
+| > ask anything · ⏎ steers · tab queues                                       |
++------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 ascii: streaming
+Foreground RGB: 143;180;222, 177;100;46, 240;136;62, 254;190;116
+
+
+
+
+
+
+
+bingo|
+fake-1 · bypassPermissions · /var/.../T/bingo-m149-dy10n39n/80-ascii/cwd
+
+
+> say hello
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+ .
+| Sniffing around... (esc to interrupt · 1s)
++------------------------------------------------------------------------------+
+| > ask anything · ⏎ steers · tab queues                                       |
++------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 ascii: answer and worked
+Foreground RGB: 143;180;222
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+|     fn main() { println!("hello"); }  rust
+
+| Worked for 3s · done 02:56
+
+
++------------------------------------------------------------------------------+
+| > ask anything · / for commands · ! for shell                                |
++------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)  ? for shortc…  13k/191k · fake/fake-1
+
+
+80x24 ascii: tool
+Foreground RGB: 143;180;222, 240;136;62, 240;137;63, 241;139;65, 241;141;67, 242;143;69, 242;144;70, 242;145;71, 242;146;72, 243;147;73, 243;148;74, 243;149;75, 244;150;76, 244;151;77, 244;152;78, 244;153;79, 245;154;80, 245;155;81, 245;156;82, 246;157;83, 246;158;84, 246;160;86, 247;162;88, 247;164;90, 248;166;92, 248;168;94, 249;170;96, 249;172;98, 249;173;99, 250;174;100, 250;175;101, 250;176;102, 251;177;103, 251;178;104, 251;179;105, 251;180;106, 252;181;107, 252;182;108, 252;183;109, 253;184;110, 253;185;111, 253;186;112, 253;187;113, 253;188;114, 254;189;115, 254;191;117, 255;193;119
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+|     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+* Bash(sleep 4; echo TOOL_FINISHED)
+  -  [ b background ]
+
+
++------------------------------------------------------------------------------+
+| > ask anything · ⏎ steers · tab queues                                       |
++------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)  ? for shortc…  14k/191k · fake/fake-1
+
+
+80x24 ascii: stopped
+Foreground RGB: 143;180;222, 143;207;138
+| The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+|     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+* Bash(sleep 4; echo TOOL_FINISHED)
+  -  TOOL_FINISHED
+
+| Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
++------------------------------------------------------------------------------+
+| > ask anything · / for commands · ! for shell                                |
++------------------------------------------------------------------------------+
+>> bypassPermissions (shift+tab to cycle)  ? for shortc…  14k/191k · fake/fake-1
+
+
+80x24 motion-off: opening
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-dy10n39n/80-motion-off/cwd
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 motion-off: waiting
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-dy10n39n/80-motion-off/cwd
+
+
+> say hello
+
+▍ Sifting… (esc to interrupt · 1s)
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 motion-off: streaming
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+█      ▀
+█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
+█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                ▄▄▄▄▄█
+fake-1 · bypassPermissions · /var/…/T/bingo-m149-dy10n39n/80-motion-off/cwd
+
+
+> say hello
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ Sifting… (esc to interrupt · 1s)
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  tmux: pictures need `se…  fake/fake-1
+
+
+80x24 motion-off: answer and worked
+Foreground RGB: 143;180;222
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+▍ Worked for 3s · done 02:57
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  13k/191k · fake/fake-1
+
+
+80x24 motion-off: tool
+Foreground RGB: 143;180;222, 240;136;62
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab queues                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  14k/191k · fake/fake-1
+
+
+80x24 motion-off: stopped
+Foreground RGB: 143;180;222, 143;207;138
+▍ The caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice. The caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s voice. The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+
+▍     fn main() { println!("hello"); }  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > ask anything · / for commands · ! for shell                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+⏵⏵ bypassPermissions (shift+tab to cycle)  ? for shortc…  14k/191k · fake/fake-1
+
+
+38x14 dark: opening
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+bingo▍
+fake-1 · bypassPermissions · /var…/cwd
+
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 dark: waiting
+Foreground RGB: 143;180;222, 219;124;57, 240;136;62, 244;150;76, 247;164;90, 253;187;113
+
+
+
+bingo▍
+fake-1 · bypassPermissions · /var…/cwd
+
+
+> say hello
+
+▍ Tracking… (esc to interrupt · 0s)
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 dark: streaming
+Foreground RGB: 143;180;222, 240;136;62, 240;137;63, 241;140;66, 250;174;100, 251;177;103, 252;183;109
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice.
+ ·
+▍ Tracking… (esc to interrupt · 1s)
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 dark: answer and worked
+Foreground RGB: 143;180;222
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice.
+
+▍     fn main() { println!("hel…  rust
+
+▍ Worked for 3s · done 02:57
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…13k/191k · fake/fake-1
+
+
+38x14 dark: tool
+Foreground RGB: 143;180;222, 177;100;46, 240;136;62, 241;139;65, 241;140;66, 242;144;70, 243;148;74, 244;152;78, 244;153;79, 245;157;83, 246;161;87, 247;161;87, 248;165;91, 248;166;92, 249;170;96, 250;174;100, 250;175;101, 251;179;105, 252;183;109, 253;187;113, 253;188;114, 254;192;118
+  caret is bingo’s voice.
+
+▍     fn main() { println!("hel…  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…14k/191k · fake/fake-1
+
+
+38x14 dark: stopped
+Foreground RGB: 143;180;222, 143;207;138
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…14k/191k · fake/fake-1
+
+
+38x14 light: opening
+Foreground RGB: 168;77;18, 47;95;153
+
+
+
+
+
+bingo▍
+fake-1 · bypassPermissions · /var…/cwd
+
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 light: waiting
+Foreground RGB: 109;50;12, 168;77;18, 47;95;153
+
+
+
+bingo▍
+fake-1 · bypassPermissions · /var…/cwd
+
+
+> say hello
+
+▍ Tracking… (esc to interrupt · 0s)
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 light: streaming
+Foreground RGB: 168;77;18, 173;81;20, 204;106;33, 209;110;35, 215;115;38, 47;95;153
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice.
+ ·
+▍ Tracking… (esc to interrupt · 1s)
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 light: answer and worked
+Foreground RGB: 47;95;153
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice.
+
+▍     fn main() { println!("hel…  rust
+
+▍ Worked for 3s · done 02:57
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…13k/191k · fake/fake-1
+
+
+38x14 light: tool
+Foreground RGB: 168;77;18, 169;78;18, 169;78;19, 173;81;20, 174;82;20, 178;85;22, 182;88;24, 186;91;26, 186;92;26, 190;95;28, 194;98;29, 195;98;29, 199;102;31, 203;105;33, 207;108;35, 207;109;35, 211;112;37, 212;112;37, 215;115;38, 216;115;38, 220;119;40, 224;122;42, 47;95;153
+  caret is bingo’s voice.
+
+▍     fn main() { println!("hel…  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…14k/191k · fake/fake-1
+
+
+38x14 light: stopped
+Foreground RGB: 47;95;153, 53;114;48
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…14k/191k · fake/fake-1
+
+
+38x14 no-color: opening
+Foreground RGB:
+
+
+
+
+
+bingo▍
+fake-1 · bypassPermissions · /var…/cwd
+
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 no-color: waiting
+Foreground RGB:
+
+
+
+bingo▍
+fake-1 · bypassPermissions · /var…/cwd
+
+
+> say hello
+
+▍ Foraging… (esc to interrupt · 0s)
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 no-color: streaming
+Foreground RGB:
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice.
+ ·
+▍ Foraging… (esc to interrupt · 1s)
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 no-color: answer and worked
+Foreground RGB:
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice.
+
+▍     fn main() { println!("hel…  rust
+
+▍ Worked for 3s · done 02:57
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…13k/191k · fake/fake-1
+
+
+38x14 no-color: tool
+Foreground RGB:
+  caret is bingo’s voice.
+
+▍     fn main() { println!("hel…  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…14k/191k · fake/fake-1
+
+
+38x14 no-color: stopped
+Foreground RGB:
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…14k/191k · fake/fake-1
+
+
+38x14 ascii: opening
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+bingo|
+fake-1 · bypassPermissions · /va...cwd
+
+
+
++------------------------------------+
+| > ask anything · / for commands ·  |
++------------------------------------+
+>> bypassPermissions (shif…fake/fake-1
+
+
+38x14 ascii: waiting
+Foreground RGB: 143;180;222, 177;100;46, 240;136;62, 243;147;73, 244;150;76, 251;177;103, 252;181;107
+
+
+
+bingo|
+fake-1 · bypassPermissions · /va...cwd
+
+
+> say hello
+
+| Pouncing... (esc to interrupt · 0s)
++------------------------------------+
+| > ask anything · ⏎ steers · tab qu |
++------------------------------------+
+>> bypassPermissions (shif…fake/fake-1
+
+
+38x14 ascii: streaming
+Foreground RGB: 143;180;222, 156;88;40, 240;136;62, 252;184;110
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice.
+ .
+| Pouncing... (esc to interrupt · 1s)
++------------------------------------+
+| > ask anything · ⏎ steers · tab qu |
++------------------------------------+
+>> bypassPermissions (shif…fake/fake-1
+
+
+38x14 ascii: answer and worked
+Foreground RGB: 143;180;222
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice.
+
+|     fn main() { println!("h...  rust
+
+| Worked for 3s · done 02:57
+
+
++------------------------------------+
+| > ask anything · / for commands ·  |
++------------------------------------+
+>> bypassPermis…13k/191k · fake/fake-1
+
+
+38x14 ascii: tool
+Foreground RGB: 143;180;222, 177;100;46, 240;136;62, 241;139;65, 241;140;66, 242;144;70, 243;148;74, 244;152;78, 244;153;79, 245;157;83, 246;161;87, 247;162;88, 248;165;91, 248;166;92, 249;170;96, 250;174;100, 250;175;101, 251;178;104, 251;179;105, 252;183;109, 253;187;113, 253;188;114, 254;189;115, 254;192;118, 255;192;118
+  caret is bingo’s voice.
+
+|     fn main() { println!("h...  rust
+
+> hold a tool
+
+* Bash(sleep 4; echo TOOL_FINISHED)
+  -  [ b background ]
+
+
++------------------------------------+
+| > ask anything · ⏎ steers · tab qu |
++------------------------------------+
+>> bypassPermis…14k/191k · fake/fake-1
+
+
+38x14 ascii: stopped
+Foreground RGB: 143;180;222, 143;207;138
+* Bash(sleep 4; echo TOOL_FINISHED)
+  -  TOOL_FINISHED
+
+| Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
++------------------------------------+
+| > ask anything · / for commands ·  |
++------------------------------------+
+>> bypassPermis…14k/191k · fake/fake-1
+
+
+38x14 motion-off: opening
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+
+
+bingo▍
+fake-1 · bypassPermissions · /var…/cwd
+
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 motion-off: waiting
+Foreground RGB: 143;180;222, 240;136;62
+
+
+
+bingo▍
+fake-1 · bypassPermissions · /var…/cwd
+
+
+> say hello
+
+▍ Pouncing… (esc to interrupt · 0s)
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 motion-off: streaming
+Foreground RGB: 143;180;222, 240;136;62
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice. The caret is
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice.
+
+▍ Pouncing… (esc to interrupt · 1s)
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermissions (shif…fake/fake-1
+
+
+38x14 motion-off: answer and worked
+Foreground RGB: 143;180;222
+  bingo’s voice. The caret is bingo’s
+  voice. The caret is bingo’s voice.
+  The caret is bingo’s voice. The
+  caret is bingo’s voice.
+
+▍     fn main() { println!("hel…  rust
+
+▍ Worked for 3s · done 02:58
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…13k/191k · fake/fake-1
+
+
+38x14 motion-off: tool
+Foreground RGB: 143;180;222, 240;136;62
+  caret is bingo’s voice.
+
+▍     fn main() { println!("hel…  rust
+
+> hold a tool
+
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  [ b background ]
+
+
+╭────────────────────────────────────╮
+│ > ask anything · ⏎ steers · tab qu │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…14k/191k · fake/fake-1
+
+
+38x14 motion-off: stopped
+Foreground RGB: 143;180;222, 143;207;138
+⏺ Bash(sleep 4; echo TOOL_FINISHED)
+  ⎿  TOOL_FINISHED
+
+▍ Tool finished.
+
+> wait for a stop
+
+[Request interrupted by user]
+
+
+╭────────────────────────────────────╮
+│ > ask anything · / for commands ·  │
+╰────────────────────────────────────╯
+⏵⏵ bypassPermis…14k/191k · fake/fake-1

@@ -534,11 +534,23 @@ mod tests {
         let lines = render("```rust\nfn main() {}\n// go\n```", 40);
         assert_eq!(
             text(&lines),
-            vec!["    rust", "    fn main() {}", "    // go"]
+            vec!["    fn main() {}  rust", "    // go             "]
         );
-        assert_eq!(lines[0].spans[0].style, theme::dim(), "the fence's word");
-        assert_eq!(lines[1].spans[1].style, theme::mode(), "`fn` is a keyword");
-        assert_eq!(lines[2].spans[1].style, theme::dim(), "the comment");
+        assert_eq!(
+            lines[0].spans.last().unwrap().style,
+            theme::raised().patch(theme::dim()),
+            "the fence's word"
+        );
+        assert_eq!(
+            lines[0].spans[1].style,
+            theme::raised().patch(theme::mode()),
+            "`fn` is a keyword"
+        );
+        assert_eq!(
+            lines[1].spans[1].style,
+            theme::raised().patch(theme::dim()),
+            "the comment"
+        );
     }
 
     #[test]

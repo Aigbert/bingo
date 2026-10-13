@@ -50,7 +50,7 @@ fn a_thought_between_a_question_and_its_answer() {
     both("thinking", &solo(&state), &mut ui, now);
 }
 
-/// A thought streams as it is thought (2026-09-02, user-directed): `✻
+/// A thought streams as it is thought (2026-09-02, user-directed): `▍
 /// Thinking…` over the newest **two** rows of what has arrived so far, dim
 /// under the `⎿` a running tool's tail hangs from — and no comet on them,
 /// because the glow is for words being said and thinking is where `dim` lives
@@ -145,7 +145,7 @@ fn a_run_of_thoughts_draws_as_one_thought() {
 }
 
 /// The same run one item earlier: the third thought is still being had, so the
-/// whole run says `✻ Thinking…` and its tail is the newest of what the run has
+/// whole run says `▏ Thinking…` and its tail is the newest of what the run has
 /// thought — the two thoughts that are over are read through the one that is
 /// not, because a person is watching one thought and not three.
 #[test]
@@ -238,7 +238,7 @@ fn an_empty_thought_draws_the_row_alone() {
     both("reasoning_redacted", &solo(&state), &mut ui, now);
 }
 
-/// `⏎` on a `✻ Thought for 2s` row: what was thought, whole.
+/// `⏎` on a `▏ Thought for 2s` row: what was thought, whole.
 #[test]
 fn a_thought_opens_in_a_sheet() {
     let state = folded(vec![item(

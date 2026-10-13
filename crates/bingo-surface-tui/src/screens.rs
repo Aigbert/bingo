@@ -153,7 +153,7 @@ fn welcome_on_a_fresh_session() {
 #[test]
 fn welcome_with_a_newer_release_out() {
     let (mut ui, now) = scene();
-    ui.update = Some("0.5.0".to_string());
+    ui.welcome.update = Some("0.5.0".to_string());
     both("welcome_update", &solo(&state()), &mut ui, now);
 }
 

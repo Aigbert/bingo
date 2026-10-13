@@ -1,33 +1,12 @@
-//! The opening: the welcome box drawing itself, in two and four tenths of a
-//! second, out of the motions the product already has.
-//!
-//! `docs/design/tui.md` §11 is the storyboard in words and this is it in code.
-//! One point of warm light runs the box's perimeter with a comet tail behind it
-//! ([`lap`]), the mark ignites through the sparkle's own frames where the light
-//! came home, the three rows arrive under a beam that crosses them left to
-//! right, and the border takes one breath and rests ([`beat`], [`frame`]).
-//!
-//! Nothing on the screen moves but the box's own cells: the piece plays at the
-//! box's resting height, so the transcript never reflows and the composer never
-//! jumps (§3, *nothing jumps*).
-//!
-//! The whole of it is a pure function of one number — the second of the piece a
-//! frame is for — and it costs microseconds, so it is drawn *in* the draw. A
-//! frame that arrives late is skipped rather than played slowly, and the same
-//! second is the same picture on a fast machine and a slow one.
-//!
-//! What is not here: when it plays. That is [`crate::run::opening`]'s.
-
-mod beat;
+//! The wordmark entrance, a pure function of elapsed seconds.
 mod cells;
 mod frame;
-mod lap;
 
 use std::time::Instant;
 
 use crate::clock::Now;
 
-pub use beat::END;
+pub const END: f32 = 2.4;
 pub use frame::frame;
 
 /// The frames the beats are reviewed from.
@@ -39,7 +18,7 @@ mod storyboard;
 ///
 /// A frame is a pure function of how long ago that was, so there is nothing to
 /// hold in step and nothing to go stale — and the moment the piece has run out
-/// the fact is taken away, leaving the box the transcript has always had.
+/// the fact is taken away, leaving the resting wordmark.
 #[derive(Clone, Copy, Debug)]
 pub struct Playing(Instant);
 

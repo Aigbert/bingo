@@ -6,7 +6,13 @@
 
 bingo in a terminal is a counterpart you work beside for hours, and it should feel **alive**: it breathes while it thinks, its work arrives with a pulse, what it wants from you comes forward and the rest recedes. Alive is not busy — every motion says something true about state (thinking, arriving, waiting, done), nothing moves for decoration, and stillness is the default when nothing is happening. Three rules hold the energy: **hierarchy first** (the eye is led, never searched), **content over furniture** (chrome is thin and dim; colour and motion are spent on what matters), and **full control** (the surface owns the whole screen, so nothing is left to the terminal's mercy — scrolling, selection, layout and every transition are ours to make good).
 
-The **grammar is Claude Code's**, taken whole because a person who knows it should feel at home: `⏺` for what the model says and does, `⎿` for what came back, `>` for what you said, a rounded box around the input, `✻` that sparkles through a verb while it works (`✻ Simmering… (esc to interrupt · 8s · ↓ 1.2k tokens)`), `… +12 lines (ctrl+o to expand)`, a bordered card asking `Do you want to…?` with numbered answers, a mode line `⏵⏵ accept edits on (shift+tab to cycle)`, a welcome box. On top of that grammar, what Claude Code does not do: warm truecolor, an input box that glows while the model works, bullets that pulse while live and flip when done, a comet tail on streaming text, translucent diff backgrounds, child sessions as rows you can step into, and a full screen we own. And one thing Claude Code does not do that we keep not doing: a header — nothing sits above the transcript; the one line of furniture is under the input box. Other references, one trait each: `btop` — live meters that never flicker; Charm's `gum` — motion with wit and restraint. Density is middle-high: 80 columns must be good; the transcript keeps the width at every size.
+The **face is bingo's; the hands keep Claude Code's grammar** (M149,
+2026-10-14). The caret `▍` is the voice and presence; `▏` marks thinking.
+Ember amber is the accent, and the opening is the site's half-block wordmark.
+Tool rows keep `⏺`, results `⎿`, and the person's words `>` on a raised bar.
+Cards, keys, the esc stack and the full-screen frame keep their behaviour.
+There is no header above the transcript; the status line is its one line of
+furniture. Warmth and motion report work; stillness is the default.
 
 ## 2. Three glances
 
@@ -42,13 +48,13 @@ The surface owns the alternate screen for the whole run. Regions, top to bottom 
 
   > write me a note and run the tests
 
-  ✻ Thought for 2s                                                       ← the two rows it ended on, held
+  ▏ Thought for 2s                                                       ← the two rows it ended on, held
     ⎿  the note first, then the tests
 
   ⏺ Write(note.txt)                                                       ← bullet orange, pulsing
     ⎿  Wrote 27 bytes to note.txt
 
-  ✻ Writing the note… (esc to interrupt · 4s · ↓ 0.4k tokens)            ← activity row, sparkling; the task being done is its verb
+  ▍ Writing the note… (esc to interrupt · 4s · ↓ 0.4k tokens)            ← activity row, sparkling; the task being done is its verb
     ⎿  ◼ Write the note                                                  ← the task list hangs under it (M74); between turns
        ◻ Run the tests                                                      `2 tasks (0 done, 1 in progress, 1 open)` stands in the row's place
   ╭──────────────────────────────────────────────────────────────────╮
@@ -153,16 +159,16 @@ What is left is the **accent palette**. Truecolor is the native look, chosen aft
 | token | ANSI | truecolor (dark) | where, and only where |
 |---|---|---|---|
 | `text` | default | default | answers, what you type, option labels — the terminal's own foreground, spelled `Reset` rather than left unsaid so it can be patched over a colour.; and what a row of the opening settles into behind its beam (§11) |
-| `dim` | DIM | DIM | results under `⎿`, thinking, hints, the status line, everything behind a card — and every hairline: a box's border, a band's rule, a table's rule, a tree's guides, a mockup's frame, a diff's hunk header, an idle bullet. A weight and not a hue, so one stroke reads on either ground; the hairline a border rests as is where the opening's light begins and ends (§11) |
+| `dim` | DIM | DIM | results under `⎿`, thinking, hints, the status line, everything behind a card — and every hairline: a box's border, a band's rule, a table's rule, a tree's guides, a mockup's frame, a diff's hunk header, an idle bullet. A weight and not a hue, so one stroke reads on either ground; the facts row of the opening uses dim text (§11) |
 | `raised` | none | `#211d17` (bg + one step) | the bar behind a `>` line, the surface of a sheet; never text |
-| `presence` | yellow | `#d97757`, glow `#f2a07c` | bingo's own colour: the `✻` sparkle, a live `⏺`, the glowing input border, the welcome mark, progress fills, **and the one light that draws the welcome box at the start of a session (§11)** — the one warm colour, and the only one that moves |
+| `presence` | yellow | dark `#f0883e`, glow `#ffc278`; light `#a84d12`, glow `#e07a2a` | caret, live tool bullet, input border, progress and the opening’s light |
 | `good` / `bad` | green / red | `#8fcf8a` / `#e0655a` | a finished `⏺` and a failed one; a failed turn's line; diff tints; activity nodes and status slots with the corresponding tone |
 | `mode` | blue | `#8fb4de` | the `⏵⏵` on the status line and links — the one cool colour |
-| `bold` | BOLD | — | tool names in `⏺ Read(…)`, card titles, markdown headings; the model's own `⏺` is bold white |
+| `bold` | BOLD | — | tool names in `⏺ Read(…)`, card titles, markdown headings; the model’s caret is bold at rest |
 
 Activity slots spend `text` on neutral nodes, `presence` on the active mark, and `good` on completed marks; completed words, titles, badges and overflow text use `dim`. `activity.rs` owns those tokens. `status.rs` maps status tones to `dim`, `good`, `bad` or `attention`; `transcript/slots.rs` owns placed row headings and bodies. The exact source-file map remains asserted in `theme.rs`.
 
-Gradients exist in two places only: a progress bar's fill (`presence` → its glow) and the comet tail of streaming text (§6) — and, for the two and a half seconds it lasts, the light that draws the welcome box (§11). The tail's cold end is the resting ink, which no ramp can reach, so it runs `glow` → `presence` and hands to the terminal's own half-way down. The ramps that used to pass through a grey — the light across a landed name, a failure cooling into the words, a notice arriving, the context notice warming — take their two ends in every look, which is what the eight colours always drew them as. Diff lines sit on translucent `good`/`bad` tints. Colour never carries a fact alone: every state has a glyph, so `NO_COLOR` and a monochrome terminal lose nothing.
+Gradients exist in these places: a progress bar’s fill (`presence` → its glow), the comet tail and the fading embers (§6) — and, for the two and a half seconds it lasts, the light that reveals the wordmark (§11). The tail's cold end is the resting ink, which no ramp can reach, so it runs `glow` → `presence` and hands to the terminal's own half-way down. The ramps that used to pass through a grey — the light across a landed name, a failure cooling into the words, a notice arriving, the context notice warming — take their two ends in every look, which is what the eight colours always drew them as. Diff lines sit on translucent `good`/`bad` tints. Colour never carries a fact alone: every state has a glyph, so `NO_COLOR` and a monochrome terminal lose nothing.
 
 ### The look that follows (M71)
 
@@ -192,11 +198,11 @@ The second row is the load-bearing one, and it is the one that is measured: what
 
 | element | form |
 |---|---|
-| presence | `✻` on the activity row and in the welcome box, `presence`; the activity row's sparkles `✻ ✢ ✶ ✽` and breathes while a turn runs — and, from 2026-09-07 (M82), while this session waits on agents that are; when nothing at all is at work none of it is on screen |
+| presence | `▍` is bingo’s mark in the activity band and opening; its style reports the turn phase, while the worked row rests dim |
 | your line | `> what is in this workspace?` on a `raised` bar the width of the transcript; in a room it is a post like any other — `⏺ parent: then let us ship it`, no bar |
 | a post | in the room's own view only: `⏺ reviewer: the plan is thin on tests`, the name bold and the whole message in `text` under the bullet, wrapped as prose, nothing folded. In a member's view a room's rows are not drawn at all |
 | foot | `↓ 37 lines below · end or click to follow` on the band's first row while the transcript is held (M95): the count in `text` and the hint in `dim`, both on a `raised` bar in the middle of the row; the row is plain air the moment the foot is on the screen |
-| the model speaks | `⏺` bold white, then the text; a blank line before and after |
+| the model speaks | `▍`, bold `text` at rest and `presence` while streaming; the comet tail is unchanged |
 | tool row | `⏺ Read(Cargo.toml)` — the name bold, the argument plain; the bullet `presence` and pulsing while live, `good` when done, `bad` when failed |
 | memory row | `⏺ Recall from memory(bingo-rewrite-plan)`, `⏺ Write memory(prefers-short-replies)`, `⏺ Edit memory(the-build)` — `bingo-context` places a `Row` from its before-tool hook, using its own memory directories and naming rule. The TUI draws the placed title and badge; the pager reads the same placement. Other files keep their ordinary rows (M123, 2026-10-13) |
 | skill row | `❖ Skill(guide) the wire format` — a tool row with the skill's own mark in the bullet's place, one cell wide so nothing under it shifts, wearing the bullet's colours by the same states; the words the skill was given sit *outside* the parentheses, because they are what it reads and not what it is. The model's `Skill` call and a person's own `/guide` are one run and draw this one row. `BINGO_ASCII=1` gives the mark the bullet's `*` — no seventh character, since the row says `Skill(guide)` in words. Both doors are placed by `bingo-skills`: `mark`, `title`, `badge` and optional `caption` describe the heading. `body` stays absent, so the ordinary expanded result remains below it (M123, 2026-10-13) |
@@ -204,8 +210,8 @@ The second row is the load-bearing one, and it is the one that is measured: what
 | receipt | plain allow draws nothing (2026-10-14, M147); `allowed for this session` and `denied — <feedback>` remain |
 | shell | A background call reads `⎿  Running in the background` while the producer places its live row, and its result says `⎿  Ran in the background` afterward. The jobs signal also places the running count in `Status`. Foreground calls place an action keyed `b`; ctrl+b submits the newest unfinished item’s placed action. The TUI knows no tool or command name (M121/M123, 2026-10-13) |
 | sending | `⏎` runs one light along the input box's border, `presence` → glow, left to right — the most repeated gesture in the surface, and until 2026-09-04 the only one with no answer at all. It rides over whatever the border already says and comes back to it | 6 frames |
-| thinking | `✻ Thinking…` dim italic while it lasts, with **exactly two dim `⎿` rows of what is being thought under it** — rows of the transcript as they are wrapped, not lines of the text, so a paragraph with no newline in it is two rows like anything else and the block never changes height (2026-09-06) — the newest of what has arrived, scrolling up as the deltas do, no cut mark and no key (a tool's tail keeps three; a thought keeps two, because a tool's output is read and a thought is read past); after, the heading becomes `✻ Thought for 2s` (`<1s` under a second) and **the two rows stay exactly as they were** — the same tail at the same width, so the close changes the heading's words and nothing else and the conversation above it does not move (2026-09-06, later). The whole of it is one click or one `ctrl+o` away and stays where it happened: the first opens it in place, and from there `ctrl+o` takes the sheet while a second click comes round to the row alone — the one way to put a thought away, asked for rather than met on arrival. A thought that came back empty (redacted, or a provider that summarised nothing) is the row alone with no states at all: no tail, no fold, no key, no sheet. **Consecutive thoughts are one thought** (2026-09-06, later still): reasoning items adjacent in the transcript draw as one block, hung on the **last** of them — one heading over the sum of their times (`3m 21s` from a minute, `<1s` under a second), their texts joined by a blank line under it, and one fold, one click and one sheet for the run. Any item between two of them keeps them apart, even one that draws no row of its own |
-| activity row | `✻ Simmering… (esc to interrupt · 8s · ↓ 1.2k tokens)`: the sparkle cycles, the verb is one of bingo's own (Simmering, Noodling, Tinkering, Rummaging, Mulling, Weaving, Sketching, Percolating — one per turn, at random), the clock ticks each second. Once `esc` has been pressed the verb is `Stopping` and the hint is gone — the key it named has been pressed — while the sparkle and the clock carry on: `✻ Stopping… (8s · ↓ 1.2k tokens)`, until `TurnCompleted` takes the row away. **While a task on the list is in progress the verb is that task's own words** (M74, 2026-09-05): `✻ Writing the plan…` — its `activeForm`, else its subject — as Claude Code's spinner reads; `Stopping` still outranks it, and a turn with nothing in progress keeps bingo's word. **Between turns the row is what the session is waiting on, landed 2026-09-07 (M82)**: `✻ Waiting for 2 background agents to finish` while the session on screen has no turn and sessions **under** it are still running — one count with a scope, the status line's `2 running` being the same count over every session but the one in view — because a parent that ended its turn to be woken (M81) otherwise read as finished. The scope is the point: a child looking up at a running parent is waiting on nothing of its own and says nothing. It is not a turn and wears none of a turn's furniture: no `esc to interrupt` (there is nothing to end), no clock and no token count (they are what a turn has spent), and the input box's border stays dim. A turn's own row outranks it — the wake that ends the wait opens one — and `esc` does nothing here, as it already did |
+| thinking | `▏ Thinking…` dim italic while it lasts, with **exactly two dim `⎿` rows of what is being thought under it** — rows of the transcript as they are wrapped, not lines of the text, so a paragraph with no newline in it is two rows like anything else and the block never changes height (2026-09-06) — the newest of what has arrived, scrolling up as the deltas do, no cut mark and no key (a tool's tail keeps three; a thought keeps two, because a tool's output is read and a thought is read past); after, the heading becomes `▏ Thought for 2s` (`<1s` under a second) and **the two rows stay exactly as they were** — the same tail at the same width, so the close changes the heading's words and nothing else and the conversation above it does not move (2026-09-06, later). The whole of it is one click or one `ctrl+o` away and stays where it happened: the first opens it in place, and from there `ctrl+o` takes the sheet while a second click comes round to the row alone — the one way to put a thought away, asked for rather than met on arrival. A thought that came back empty (redacted, or a provider that summarised nothing) is the row alone with no states at all: no tail, no fold, no key, no sheet. **Consecutive thoughts are one thought** (2026-09-06, later still): reasoning items adjacent in the transcript draw as one block, hung on the **last** of them — one heading over the sum of their times (`3m 21s` from a minute, `<1s` under a second), their texts joined by a blank line under it, and one fold, one click and one sheet for the run. Any item between two of them keeps them apart, even one that draws no row of its own |
+| activity row | `▍ Kindling… (esc to interrupt · 8s · ↓ 1.2k)`; one verb per turn from Kindling, Stoking, Smouldering, Foraging, Tracking, Burrowing, Sniffing around, Pouncing, Sifting, Tinkering. A placed activity verb overrides it. Stopping outranks both, removes the key hint and dims the caret. Background agents hold the waiting row at the blocked breath |
 | card | a bordered box (`╭ ╮ ╰ ╯` in `presence`) under the asking row's `⎿`: title bold, a diff or command preview on its tints, `Do you want to create note.txt?`, `❯ 1. Yes` / `2. Yes, allow Edit(src/) during this session` (the scope is the kernel's answer spec; no `(shift+tab)` — here shift+tab cycles the mode and does not answer) / `3. No, and tell bingo what to do differently (esc)`; no hint row under the options — every hint lives in the thing it acts on. **The form card is the exception from 2026-09-04 (M57)**: its last row is one dim `Enter to select · ↑/↓ to navigate · Tab to switch questions · Esc to cancel` (`Space to toggle` too, on a set), because a card that walks tabs and holds an answer back until `Submit` has more to say than a row can carry — and it is the first row that card gives up when the screen is short |
 | form card | the band of §2 (M57). Row one is the tabs, `←  ☐ Layout  ☒ Theme  ✔ Submit  →`: a box per question, ticked once fixed, a `Submit` tab the walk reaches after the last question, and an arrow at each end that is dim where the walk stops. Then the question, then its options — numbered, a description each, `[ ]`/`[✔]` on a set, and `Type something.` last where the question takes words. A question whose options carry mockups drops the descriptions and shows the mockup of the one under the cursor inside a dim single-line frame that hugs it: beside the options past 100 columns, above them under that — the frame is what keeps a mockup drawn out of box characters from reading as an edge. Under the band's lower rule, `N. Chat about this` cancels the form and leaves the caret in the composer, then the key line |
 | input box | `╭─╮ │ > ▌ │ ╰─╯` the width of the transcript, one to ten rows; the border `dim`, `presence` and glowing while the model works; a dim placeholder until the first keystroke |
@@ -213,8 +219,8 @@ The second row is the load-bearing one, and it is the one that is measured: what
 | child row | `⏺ reviewer(review the manifest)` — the row *is* the call that spawned it (not `⏺ SpawnAgent(…)`), the name bold, the brief plain, the bullet by state as a tool's; `⎿  Starting…` before its first turn, `⎿  Running… 3 tools · 1.2k tokens` live, `⎿  Done (4 tools · 8.1k tokens · 40s)`, `⎿  Needs you` (an open question, not merely unread) pulsing; a room's row is its name alone; `⏎` steps in |
 | the list | `↓` on an empty composer or `ctrl+g` (`ctrl+t` is the task list's, as it is Claude Code's, and the panel sheet is `ctrl+p` since M74): a dropdown above the input box like the `/` menu, one column grouped under dim `Agents` / `Rooms` labels at the margin — the sessions that answer a model, then the rooms, a room's members among the sessions and never under the room. A row is `❯ ~ reviewer  running · in #design · 3 unread · live · owes an answer · 22m · 3 tools · 1.2k tokens`: the coloured `⏺` for the glance and the words for `NO_COLOR`, `~` in the dot's place for a seat on the live ear, the name in `text` where the cursor is and `dim` elsewhere, `needs you` and `owes an answer` in `attention`. A session that has not run says what it was asked instead of a status; a room's row is `#design  2 seats · 1 owed`, its `#` in the column the dots are in. No title and no hint row. `↑↓` walk the column, stepping over the labels, and switch the view as they go; `⏎` keeps where the walk landed, `esc` gives back where it started, a click does what the cursor there does and a click on a label does nothing. One window under the cursor covers the whole list, `…` at each end that was cut, and a row too long for the width is cut from the tail. **Typed into since 2026-09-04 (M55, re-cut the same day by M58)**: what is typed goes in the **input box** and the list narrows on it — nothing of the query is drawn over the rows — `tab` completes the name under the cursor into the box, and `esc` takes the box's line before it takes the list |
 | status line | left `⏵⏵ accept edits on (shift+tab to cycle)` in `mode` (`default` shows nothing but the hint); middle, notices only while true — `1 needs you (ctrl+g)` pulsing `presence`, `2 running`, the latest notice for 4 s, else `? for shortcuts` while the box is empty; right `in reviewer · 168k/200k · openai/gpt-5.4 · high`, dim — where you are, the tokens the next request carries over the model's window (always, once a turn has run; `dim` warming to `bad` across the last fifth of the compaction trigger, ` · /compact` from 90 %), who serves the model and which, and the reasoning effort in force (nothing where the turn asks for none) |
-| welcome | a bordered box on a fresh session: `✻ Welcome to bingo!`, `/help for help · /login codex to use a subscription`, `cwd: ~/…`; and, when the start-up check found a newer release out (M63), one more dim row under the help line — `  ↑ v0.5.0 is out · bingo update`, the version alone in `presence`. Scrolls away like anything else; where it already has, the status line says the same thing once |
-| worked row | `✻ Worked for 15m 11s · done 13:48` — what the last turn cost, closing the transcript under the answer once the turn is over (M84, 2026-09-08, user-directed: Claude Code's own line; first drawn in the verb's slot over the composer, moved the same day on the user's word: it is a fact about what was said, so it scrolls with it). The verb the verdict earns (`Worked for` completed, `Stopped after` interrupted, `Failed after` failed), how long it ran (`42s`, `15m 11s`, `1h 5m` — two units at most), and the hour it ended on in the terminal's zone, with the day in front when it was not today, which a session read back from its journal may find. The whole row dim under a sparkle at rest: it is not the answer. Derived from the fold's `last_turn` (ADR-0002 §8, amended) and the clock, nothing kept, drawn as the transcript's last block beside the failed turn's line (`transcript::closing`); the next turn takes it away. No parentheses: no key, no token count. A turn that ran under a second says nothing, as it drew no row while it ran |
+| welcome | the half-block wordmark, facts, reserved resume hint and optional update row; no box. Small terminals and ASCII draw the compact mark (§11) |
+| worked row | `▍ Worked for 15m 11s · done 13:48` — what the last turn cost, closing the transcript under the answer once the turn is over (M84, 2026-09-08, user-directed: Claude Code's own line; first drawn in the verb's slot over the composer, moved the same day on the user's word: it is a fact about what was said, so it scrolls with it). The verb the verdict earns (`Worked for` completed, `Stopped after` interrupted, `Failed after` failed), how long it ran (`42s`, `15m 11s`, `1h 5m` — two units at most), and the hour it ended on in the terminal's zone, with the day in front when it was not today, which a session read back from its journal may find. The whole row dim under a dim caret at rest: it is not the answer. Derived from the fold's `last_turn` (ADR-0002 §8, amended) and the clock, nothing kept, drawn as the transcript's last block beside the failed turn's line (`transcript::closing`); the next turn takes it away. No parentheses: no key, no token count. A turn that ran under a second says nothing, as it drew no row while it ran |
 | tasks | **Claude Code's own shape, landed 2026-09-05 (M74, user-directed: the board was not intuitive)**: the session's list (`bingo.tasks`/`tasks`, read as data) hangs under the activity row while a turn runs — `⎿  ◼ Ship it` on the first row, the rest at its indent — and between turns stands in that row's place under `3 tasks (1 done, 1 in progress, 1 open)`, dim with the counts bold, at the transcript's text column. A row is `◻` to do, `◼` being done in `presence` with the subject bold, `✔` done in `good` with the subject `dim` and struck through; an owner rides after the subject, dim, ` — reviewer`. Five rows at most: when the list fits, every task in list order; when it does not, the open ones in list order and one dim `… +6 pending, 1 completed` counting the rest — the done ones first, because what is left to do is what the rows are for. `ctrl+t` takes the rows and the summary off the band and brings them back; the verb keeps the task being done either way. The four calls that move the list draw **no row** in the transcript — the list is their row — unless one failed or was sent `in #room`, which draw as any tool row because their effect is not on this screen. A room's board is the room's own list, drawn by the same code in the room's own view. ASCII: `-` `*` `x`. Not a rail card and not a row of the panel sheet: a thing drawn twice is two things to read |
 | paths | relative inside the cwd, `~` for home, middle-elided `…` beyond 48 cells |
 
@@ -245,14 +251,14 @@ A terminal moves in three ways — a glyph changes, a row appears or leaves, bri
 
 | moment | cue | rhythm |
 |---|---|---|
-| presence | the activity row's `✻` sparkles `✻ ✢ ✶ ✽` and breathes between 65 % and 100 % while a turn runs; the input box border glows in step; neither exists while nothing is at work. The breath's **period is what the turn is doing** (2026-09-04): a fixed one reported only "a turn is running", which the row's presence already says. A **wait row breathes at the blocked pace with the border left dim** (2026-09-07, M82): the work is somebody else's, which that pace already says, and nothing is arriving *here* | 150 ms per glyph; the breath 0.9 s while words arrive, 2.2 s while a tool holds the turn or an agent does, 1.6 s thinking |
-| thinking | `✻ Thinking…` dim italic over the two dim `⎿` tail rows of what has been thought so far — rows of the transcript as they are wrapped, so the block is the same height on every delta and nothing above it moves (2026-09-06) — scrolling up as the deltas arrive; then the heading alone changes to `✻ Thought for 2s` and the two rows **hold** where the last delta left them (2026-09-06, later), because a block that gave its rows back at the close moved everything above it at the one moment a person was reading. The tail wears no comet: the glow is for words being said, and thinking is where `dim` lives (§4). A run of thoughts is one block and moves as one: the heading says `✻ Thinking…` while the newest of them is being had, the tail is the newest rows of the whole run, and the run growing by a thought changes neither (2026-09-06, later still) | per delta |
-| streaming | text after a `⏺` grows in place with a **comet tail**: the last eight cells fade `glow` → `presence`, and the half of the tail behind that is the terminal's own ink (M73) | per frame, tail 180 ms |
+| presence | `▍` blinks before the first byte, holds `glow` while words or thoughts arrive, breathes while a tool or agent holds the turn, and stays dim while stopping; the input border keeps its existing breath | 530 ms blink; 2.2 s blocked breath |
+| thinking | `▏ Thinking…` dim italic over the two dim `⎿` tail rows of what has been thought so far — rows of the transcript as they are wrapped, so the block is the same height on every delta and nothing above it moves (2026-09-06) — scrolling up as the deltas arrive; then the heading alone changes to `▏ Thought for 2s` and the two rows **hold** where the last delta left them (2026-09-06, later), because a block that gave its rows back at the close moved everything above it at the one moment a person was reading. The tail wears no comet: the glow is for words being said, and thinking is where `dim` lives (§4). A run of thoughts is one block and moves as one: the heading says `▏ Thinking…` while the newest of them is being had, the tail is the newest rows of the whole run, and the run growing by a thought changes neither (2026-09-06, later still) | per delta |
+| streaming | text after a `▍` grows in place with a **comet tail**: the last eight cells fade `glow` → `presence`, and the half of the tail behind that is the terminal's own ink (M73) | per frame, tail 180 ms |
 | tool running | the row's `⏺` pulses `presence` ↔ glow; three dim `⎿` tail rows — rows of the transcript as they are wrapped, however long the lines a program prints (2026-09-06) — that scroll up as they arrive | 1.2 s pulse |
 | tool done | the `⏺` turns `good` and one light crosses the row's name, `good` at the crest and the row's own weight where it has passed, left to right (2026-09-04, replacing one bold frame: 33 ms is below the threshold at which a person reads it as *something happening*); the tail folds into `⎿ … +N lines (ctrl+o to expand)` | 6 frames |
 | tool failed | the `⏺` turns `bad` and the row's own words land in `bad` and cool into the ink behind them — a flare that settles, never a shake: §3's "nothing jumps" outranks it, and the withdrawn rise is the precedent. The bullet keeps the fact; what cools is how fresh it is (2026-09-04) | 12 frames |
 | block arriving | *withdrawn 2026-09-02 (§10)*: a block arrives in place, taking its own room and nothing more | — |
-| activity row | appears only after 300 ms of a turn: `✻ Tinkering… (esc to interrupt · 4s · ↓ 0.4k tokens)`; one verb per turn, or the task being done (M74) | 300 ms delay, 1 s clock |
+| activity row | appears only after 300 ms of a turn: `▍ Tinkering… (esc to interrupt · 4s · ↓ 0.4k tokens)`; one verb per turn, or the task being done (M74) | 300 ms delay, 1 s clock |
 | card opening | the world dims; the card reveals top-down; rows are dim through the kernel's 400 ms guard and brighten as it lifts, with the bell | 3 frames + guard |
 | card closing | the reverse; the world brightens | 3 frames |
 | sheet | slides up from the composer; `esc` slides it down | 4 frames |
@@ -263,7 +269,7 @@ A terminal moves in three ways — a glyph changes, a row appears or leaves, bri
 | progress | a bounded bar's fill ramps `presence` → glow across its lit run (§4's second gradient); an unbounded one's three lit cells walk the track and come back round, because there is no fraction to say it with (2026-09-04, M11c's own TODO) | 4 steps a second |
 | context | the `168k/200k` count on the right of the status line, `dim` until 90 % of the compaction trigger, where it turns `bad` and ` · /compact` joins it — one turn for the hue and the words both; always there once a turn has run | per turn |
 | idle | no redraw at all | 0 Hz |
-| reduced motion | `BINGO_MOTION=off`: spinners freeze to `•`, no breath, no tail, no reveals, no pulse — and no light on a sent line, none across a landed name, no flare, the sheen parked at the head (2026-09-04); `NO_COLOR` strips colour, and every cue above it is pure colour, so nothing is lost (§4: colour never carries a fact alone) | — |
+| reduced motion | `BINGO_MOTION=off`: the waiting caret stays steady, no breath, no tail, no reveals, no pulse — and no light on a sent line, none across a landed name, no flare, the sheen parked at the head (2026-09-04); `NO_COLOR` strips colour, and every cue above it is pure colour, so nothing is lost (§4: colour never carries a fact alone) | — |
 
 Each motion reports its next change (M124, 2026-10-13). The layout's
 `next_frame` is the earliest: 33 ms samples for continuous motion, the next
@@ -274,6 +280,12 @@ next frame boundary; an idle layout has no deadline. Carets and other later
 cues use this same contract.
 
 Budget: an animation tick of 33 ms while continuous motion runs, none otherwise; a full draw under 4 ms at 120×40; a keystroke echoes on the next frame. Every frame is written between the two halves of DEC mode 2026 (2026-09-04), so the terminal composites it whole instead of painting it as it arrives — not through a multiplexer, which consumes the mode rather than passing it on. Smoothness is the absence of flicker, tearing, jumps and dropped keys — the motion above sits on top of that, never instead of it.
+
+Embers (M149) rise into the reserved activity air row: one per 64 estimated
+streaming tokens, at most four, gone after 0.6 seconds. The estimate is one
+token per four arriving characters across this turn's assistant and reasoning
+text; reported token usage remains unchanged. The foot outranks embers, and
+motion-off draws none. Only their birth instants are held, cleared at turn end.
 
 ## 7. Ergonomics
 
@@ -293,7 +305,7 @@ an opening, search, layer or interaction; the switcher keeps its row clicks.
 - **No hidden state, no idle furniture.** Nothing lives above the transcript. What is true now is on the status line: the mode; `N needs you` and `N running` for as long as they are true; where you are, the window's used-over-whole count, and the model. A queued line shows dim above the input box, and one the running turn will not be steered with wears `(waits)` (2026-09-04, M68) — a held line, and a command, which has always waited; `/status` opens the sheet with the rest.
 - **Two keys send, and they mean different things** (2026-09-04, M68, user-directed). While a turn runs, `⏎` sends a line the turn absorbs at its next barrier — a steer, which is what every mid-turn line has always been — and `tab` sends one that waits for the turn to end and opens the next. The box says so instead of the usual offer: `ask anything · ⏎ steers · tab queues`. `tab` is a third ordered stack beside `esc`'s and `ctrl+c`'s — complete → queue → next card — so a dropdown still completes, an empty box still walks the card ring, and with nothing running there is nothing to wait for.
 - **A queued line is still yours to edit** (2026-09-04, M68, user-directed). `↑` at the top of the box walks back through your own lines the queue is still holding before it walks the prompt history: the newest comes out of the queue and back into the composer whole, pictures and all, and the next `↑` takes the next. Only lines this surface sent are offered, because only those are its to take back; one the turn took first leaves the box empty and says `already sent`. A withdrawn line is a line: `ctrl+c` clears it as it clears any other, and the queue does not get it back — the person has it.
-- **Esc is one ordered stack**: sheet → card (cancel/deny) → a typed query (M55; the input box's own line since M58, cleared before the list closes) → dropdown → interrupt the turn; `ctrl+c` clears the composer, twice exits, and says so. **One `esc` ends a turn** — there is no second, harder press to learn: the kernel drops every call in flight, a shell command's process group with it. The activity row says `✻ Stopping…` from the frame the key was pressed, because the answer to a key never waits for the kernel to come back.
+- **Esc is one ordered stack**: sheet → card (cancel/deny) → a typed query (M55; the input box's own line since M58, cleared before the list closes) → dropdown → interrupt the turn; `ctrl+c` clears the composer, twice exits, and says so. **One `esc` ends a turn** — there is no second, harder press to learn: the kernel drops every call in flight, a shell command's process group with it. The activity row says `▍ Stopping…` from the frame the key was pressed, because the answer to a key never waits for the kernel to come back.
 - **Readable widths**: prose wraps at the width it is drawn in, and at `min(width, that)` for a person who set `tui.measure` in the settings (2026-09-10, M89); tables and code never wrap — they fold to the width and open in a sheet.
 - **Predictable geometry**: the input box never moves; the transcript baseline is fixed; cards and sheets are layers, not reflows.
 - **Latency**: a keystroke echoes within one frame; the loop never awaits the kernel.
@@ -451,88 +463,31 @@ What a change is checked against, in this order: `TestBackend` snapshots for eve
 - **2026-09-14** — **The foot is a row away** (M95, user-directed: 如果TUI里面消息展示的不是最新的，也就是没有滚动到最新消息，则会在input上面有一个button click to bottom). A held transcript keeps its line while more arrives (M34), and nothing on the screen said the foot was off it: `end` and `pgdn` were the ways back and the mouse had none. The band's air is the row it rides — the frame holds that row whether or not a turn runs (the reservation of 2026-08-31), so the pill costs nothing and moves nothing; the count is the lines under the frame's last row, read at draw time, never a counter of its own. A click on the pill is `end`; beside it, the air is air.
 - **2026-09-15** — **The picture sent to a window nobody was in** (user-reported: a picture drawn while the terminal was elsewhere was not there on coming back; the earlier codebase had met the same thing and recorded the cause). Under tmux with `allow-passthrough on` the envelope is carried only while the pane is on screen: the chunks of a picture sent for a frame in a hidden window are dropped and never re-sent, and `Stored` — which sends each picture once — believes the terminal holds it, so the hole is permanent. M49 named this as risk 2 and left the cure for later; this is the cure. `Passthrough` now reads `on` and `all` apart, and a run that reads `on` raises **its own pane** to `all` with `tmux set -p` — pane-scoped, gone with the pane, no other pane touched — before any picture goes out. `off` stays `off`: a passthrough a person turned off is not this surface's to turn on, and the opening notice already names the setting. Nothing changes for a bare terminal, which drops nothing while it is in the background.
 
+- **2026-10-14 — M149:** bingo takes the caret and ember amber. Assistant
+  blocks use the caret while tools keep their bullets; thinking uses the
+  narrow caret. The wordmark replaces the box; working verbs belong to the
+  ember and fox. Code stands on its own raised band, with the language at
+  the first row's right edge. The generic worked row stays dim and keeps
+  its words; the earned Bingo variant awaits a producer-owned contract.
+
 ## 11. The opening
 
-> M69 built a ray-marched storyboard and **M70** played it inside the welcome
-> box. **M72, 2026-09-05**, is the piece as it ships, at the user's call:
-> redrawn from nothing, with no world, no camera and no pixels — the box's own
-> furniture arriving in the product's own motion vocabulary. The one deliberate
-> exception to `docs/design/effects-research.md`'s refusals — that list is about
-> the *transcript*, which is a record a person reads, searches and copies. This
-> is an **entrance**: it happens once, before there is a transcript at all, it
-> says what bingo is, and it is over in two and a half seconds. It spends only
-> the tokens of §4, and it does not play at all where `NO_COLOR`, ANSI,
-> `BINGO_ASCII` or `BINGO_MOTION=off` would take something away from it.
+M149 (2026-10-14) replaces the welcome box with the site's wordmark. Four
+half-block rows end in the caret. Below them stand `model · effort · mode ·
+cwd`, a reserved resume row, and M63's update row when a release is available.
+The cwd is elided from the middle. The resume hint names the newest earlier
+root model session in this cwd, read once on the loop's host-call lane.
+There is no repeated help or unconditional login instruction.
 
-The welcome box draws itself: one point of warm light runs its border, the mark
-ignites, the words come in on a beam, the border breathes once, and it is the
-box. **2.4 seconds, at the box's resting height** — nothing on the screen moves
-but the box's own cells, so the transcript never reflows and the composer never
-jumps (§3, *nothing jumps*).
+Under 40 columns or 16 rows the mark is `bingo▍`; ASCII is `bingo|`.
+At rest the same rows are drawn under `NO_COLOR`, ANSI and motion-off.
+The animation plays only for a fresh root model session without command-line
+work, in truecolour with Unicode and motion enabled, at least 40×16.
+Any key skips it and is consumed. A resumed session never plays it.
 
-**Made of what the product already does.** §4: one warm colour, and it is the
-only one that moves; §6: every motion reports a state change, stillness is the
-default, and when motion stops the words remain. The piece is made of exactly
-the four motions the surface already has, so it looks like bingo and not like a
-demo — the **comet** (the tail on streaming text), the **beam** (the light
-across a landed name and bingo's working word), the **breath** (the input box's
-border while a turn runs) and the **sparkle** (`✻ ✢ ✶ ✽`).
-
-### The beats
-
-Times in seconds from `started`. The beats overlap on purpose — the first row
-arrives while the mark is still sparkling — and every one of them is a pure
-function of the second the frame is for.
-
-| from | to | beat | what is on screen |
-|---|---|---|---|
-| 0.0 | 0.9 | **The line** | The box's border does not exist yet. A point of light leaves the top-left corner and runs the perimeter clockwise; behind it a tail fades `glow` → `presence` → the hairline it rests as (`theme::hairline`), and behind the tail the border stands as that hairline. The inside of the box is empty. The head runs a tail's length past home, so the border is at rest by the end of the beat. |
-| 0.9 | 1.5 | **The mark** | Where the head stopped — one cell inside the corner, on the greeting row — the mark ignites: `✻ ✢ ✶ ✽` at the surface's own 150 ms, one whole turn, so it ends on the resting `✻`; and the light the head spent on it cools `glow` → `presence`. One light on the screen at every instant, never two. |
-| 1.1 | 2.0 | **The words** | The greeting, the help line and the cwd — each arrives under a beam that sweeps left to right across *its own* glyphs: ahead of the beam the row is blank, under it the glyphs wear the glow, and behind it they settle into the row's own weight (`text`, `dim`). Rows arrive 150 ms apart; the M63 update row, when there is one, arrives last the same way, and the rows close the gap rather than run past the beat. |
-| 2.0 | 2.35 | **The breath** | The border warms to `presence` and comes back to the hairline. Then it rests: the last two frames are the box, so the piece does not finish on a step of colour. |
-
-There are no cuts and no dissolve: it is one continuous take of one box. A frame
-is a pure function of one number — the second of the piece it is for — so a
-frame that arrives late is **skipped** and never played slowly, and the same
-second is the same picture on a fast machine and a slow one.
-
-**Two numbers were settled by looking at the frames.** The light runs at an
-even speed rather than through `clock::ease_in_out`: cubic ease-in-out puts
-three times the average speed in the middle of the beat, which draws four fifths
-of the perimeter in its middle third and leaves the rest of the beat with
-nothing moving. And the tail is a **share** of the perimeter rather than a count
-of cells: the light crosses a box of 120 columns in the same nine tenths of a
-second it crosses one of 80, so at the wider size the head travels eleven cells
-between two frames — and a tail shorter than that reads as a strobe rather than
-as one light moving.
-
-### How it is wired
-
-The welcome box is derived at render time from `SessionState`; the opening is a
-**`Ui` fact** and the whole of it is *when it started*. A frame costs
-microseconds, so it is drawn **in the draw**: the transcript's rows carry the
-second, and the box is derived from it like everything else — nothing is
-rendered off the loop's thread, nothing is held, and nothing can be stale at a
-width the screen no longer has.
-
-`opening::frame` does not draw a picture of the welcome box. It takes the box
-`welcome::lines` drew and says, cell by cell, what the light has done to that
-cell yet — so the resting frame *is* the box, and the piece cannot drift from
-the thing it lands on. The moment the piece has run out the fact is taken away.
-
-### When it plays, and when it does not
-
-One pure rule (`welcome::opens`), one table, every reason a fact about *this
-run* rather than about the piece:
-
-- this surface opened the session — not a sub-session, not a room;
-- nothing has happened in it yet, so a **resumed** session is never entered;
-- no work came in on the command line;
-- the terminal is at least **80 × 16**;
-- the look draws twenty-four bits, and more than ASCII;
-- `BINGO_MOTION` is not `off`.
-
-**Any key skips it**, and is spent on nothing else: the `/` that cut the piece
-short does not also open the dropdown. It never plays under `--print`, which has
-no screen to enter. The box's M63 update row is drawn on the end state as it
-always was.
+A frame is a pure function of elapsed seconds. At 16 ms per column the
+caret types the wordmark, with glow at the head and text behind. From 0.5
+through 1.56 seconds it blinks twice; three embers fade over the following
+0.6 seconds. Facts arrive on a beam from 0.5 to 2.0 seconds. At 2.4 seconds
+the mark rests. Every frame holds the resting row count; a late frame is
+skipped, and the composer never moves.

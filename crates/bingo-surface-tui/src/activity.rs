@@ -31,18 +31,20 @@ const BREATH_ARRIVING: std::time::Duration = std::time::Duration::from_millis(90
 /// The breath while a tool holds the turn: slower, because the waiting is
 /// somebody else's and the row says so.
 const BREATH_BLOCKED: std::time::Duration = std::time::Duration::from_millis(2200);
-/// One turn of the sparkle: four glyphs, 150 ms each (§6).
-const SPARKLE: std::time::Duration = std::time::Duration::from_millis(4 * theme::SPARKLE_MS as u64);
-/// bingo's own words for working (§4), one per turn.
-const VERBS: [&str; 8] = [
-    "Simmering",
-    "Noodling",
+/// One visible phase of a terminal caret.
+const BLINK: std::time::Duration = std::time::Duration::from_millis(530);
+/// bingo's own words for working, selected from the turn id.
+const VERBS: [&str; 10] = [
+    "Kindling",
+    "Stoking",
+    "Smouldering",
+    "Foraging",
+    "Tracking",
+    "Burrowing",
+    "Sniffing around",
+    "Pouncing",
+    "Sifting",
     "Tinkering",
-    "Rummaging",
-    "Mulling",
-    "Weaving",
-    "Sketching",
-    "Percolating",
 ];
 
 pub fn next_change(tree: &Tree, ui: &Ui, now: Now) -> Option<std::time::Instant> {
@@ -75,7 +77,7 @@ pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'s
     // A blank row between the transcript and these, as between any two blocks
     // (§3): they are not the tail of what was said, they are what is going on.
     if !out.is_empty() {
-        out.insert(0, Line::default());
+        out.insert(0, ui.embers.row(state, now, width, !ui.scroll.following()));
     }
     out
 }
@@ -230,17 +232,17 @@ fn pending(origin: &Origin) -> bool {
     )
 }
 
-/// `✻ Simmering… (esc to interrupt · 4s · ↓ 1.2k)` — but only once the
+/// `▍ Kindling… (esc to interrupt · 4s · ↓ 1.2k)` — but only once the
 /// turn has been at it for [`ACTIVITY_AFTER`]: a turn that answers at once
 /// says nothing at all, because a row that flashes reports nothing (§6).
 ///
-/// A turn a person has asked to stop reads `✻ Stopping… (4s · ↓ 1.2k)`
-/// from the frame the key was pressed and keeps its sparkle and its clock
+/// A turn a person has asked to stop reads `▍ Stopping… (4s · ↓ 1.2k)`
+/// from the frame the key was pressed and dims its caret and keeps its clock
 /// until `TurnCompleted` takes the row away. The hint goes with the asking:
 /// `esc` has been pressed, and there is nothing further to press.
 ///
 /// While a task on the list is in progress the verb is that task's own words
-/// — `✻ Writing the plan…` — as Claude Code's spinner reads (M74); bingo's
+/// — `▍ Writing the plan…` — as Claude Code's spinner reads (M74); bingo's
 /// own word is for a turn that has not said what it is doing.
 fn working(
     state: &SessionState,
@@ -264,8 +266,8 @@ fn working(
         ),
     };
     let mut spans = vec![Span::styled(
-        format!("{} ", sparkle(now)),
-        breathing(state, now),
+        format!("{} ", theme::mark()),
+        caret_style(state, stopping, now),
     )];
     spans.extend(beamed(format!("{verb}{}", theme::ellipsis()), now));
     spans.push(Span::styled(
@@ -281,7 +283,7 @@ fn working(
     Some(Line::from(spans))
 }
 
-/// `✻ Waiting for 2 background agents to finish` — what an idle session says
+/// `▍ Waiting for 2 background agents to finish` — what an idle session says
 /// while agents it started are still at work (M82). A turn that ended to be
 /// woken (M81) is not finished work, and the row that left with
 /// `TurnCompleted` made it look finished: an empty composer over a dim
@@ -289,7 +291,7 @@ fn working(
 ///
 /// The wait is not a turn, so it wears none of a turn's furniture: no `esc to
 /// interrupt`, because there is no turn to end, and no clock and no token
-/// count, which are what a turn has spent. The sparkle cycles and breathes at
+/// count, which are what a turn has spent. The caret breathes at
 /// [`BREATH_BLOCKED`] — the pace that already means the waiting is somebody
 /// else's — and the input box's border stays dim, because nothing is arriving
 /// here ([`crate::view`]'s `border` reads `busy`, which this session is not).
@@ -305,7 +307,7 @@ fn waiting(tree: &Tree, now: Now) -> Option<Line<'static>> {
     let running = tree::count(tree, Wants::Running, Scope::Under(&viewed.summary.id))?;
     Some(Line::from(vec![
         Span::styled(
-            format!("{} ", sparkle(now)),
+            format!("{} ", theme::mark()),
             breathing_at(BREATH_BLOCKED, now),
         ),
         Span::styled(waiting_for(running), theme::text()),
@@ -321,7 +323,7 @@ fn waiting_for(running: usize) -> String {
 }
 
 /// How long one light takes to cross the working word and come round again.
-/// Slower than the sparkle's breath, so the two are read as two things.
+/// Slower than the caret's breath, so the two are read as two things.
 const BEAM: std::time::Duration = std::time::Duration::from_millis(2400);
 
 /// bingo's word with one light walking across it while the turn runs (user,
@@ -369,16 +371,30 @@ fn seed(id: &str) -> usize {
     hash as usize
 }
 
-/// The sparkle's frame, or its first one when nothing may move.
-fn sparkle(now: Now) -> &'static str {
-    match now.motion {
-        true => theme::sparkle(clock::cycle(now, SPARKLE)),
-        false => theme::spark(),
+/// The mark reports the phase; the input border keeps its existing breath.
+pub(crate) fn caret_style(state: &SessionState, stopping: bool, now: Now) -> ratatui::style::Style {
+    if stopping || !state.busy() {
+        return theme::dim();
+    }
+    if state.transcript.items().iter().any(|item| arriving(item)) {
+        return theme::glow();
+    }
+    if state.transcript.items().iter().any(|item| blocking(item)) {
+        return breathing_at(BREATH_BLOCKED, now);
+    }
+    let elapsed = state
+        .turn
+        .as_ref()
+        .map(|turn| now.past(turn.started_at))
+        .unwrap_or_default();
+    if now.motion && (elapsed.as_millis() / BLINK.as_millis()) % 2 == 1 {
+        theme::dim()
+    } else {
+        theme::presence()
     }
 }
 
-/// bingo breathing: the sparkle and the input box's border share one clock,
-/// so the whole surface inhales together.
+/// The input border keeps its breath while the caret names the turn phase.
 pub(crate) fn breathing(state: &SessionState, now: Now) -> ratatui::style::Style {
     breathing_at(breath_of(state), now)
 }
@@ -414,8 +430,10 @@ pub(crate) fn breath_of(state: &SessionState) -> std::time::Duration {
 
 /// Whether an item is an answer still being said.
 fn arriving(item: &bingo_sdk::Item) -> bool {
-    matches!(item.body, bingo_sdk::ItemBody::Assistant { .. })
-        && item.status == bingo_sdk::ItemStatus::Running
+    matches!(
+        item.body,
+        bingo_sdk::ItemBody::Assistant { .. } | bingo_sdk::ItemBody::Reasoning { .. }
+    ) && item.status == bingo_sdk::ItemStatus::Running
 }
 
 /// Whether an item is a call the turn is waiting on.

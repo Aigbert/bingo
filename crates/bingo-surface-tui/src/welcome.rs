@@ -1,29 +1,38 @@
-//! The welcome box: the first block of a session's transcript, which scrolls
-//! away like anything else once there is something above it. A sub-session and
-//! a room are joined, not started, so neither is welcomed.
-//!
-//! It is also where the opening plays ([`crate::opening`]): the piece runs
-//! *inside* this box and lands on it, so what says whether it plays at all is
-//! here, beside the box it would be playing in.
-
-use bingo_sdk::{Driver, SessionState};
+//! The wordmark and the facts of this session, at the head of its transcript.
+use crate::{paths, theme};
+use bingo_sdk::{Driver, SessionState, SessionSummary};
+use jiff::Timestamp;
 use ratatui::text::{Line, Span};
-use unicode_width::UnicodeWidthStr;
 
-use crate::{paths, theme, wrap};
+/// The site's cell grid, paired into half-block rows.
+const WORDMARK: [&str; 4] = [
+    "█      ▀",
+    "█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█",
+    "█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█",
+    "                ▄▄▄▄▄█",
+];
 
-const GREETING: &str = "Welcome to bingo!";
-const HELP: &str = "/help for help · /login codex to use a subscription";
-/// What a person types to become the release the check found (M63).
-const BECOME: &str = "bingo update";
+/// Host answers shown at the opening, independent of session state.
+#[derive(Debug, Default)]
+pub struct Details {
+    pub update: Option<String>,
+    pub resume: Option<SessionSummary>,
+}
 
-/// Where the box's own mark stands, from the box's top-left corner: one cell
-/// of border, one of padding, and the greeting is the first row inside.
-///
-/// It is the cell the opening ignites when its light comes home to that corner
-/// ([`crate::opening`]), which is the only reason it is written down — a test
-/// below holds it against the box the surface actually draws.
-pub const MARK: (u16, u16) = (2, 1);
+#[derive(Clone, Copy)]
+pub struct Entrance<'a> {
+    pub height: u16,
+    pub resume: Option<&'a SessionSummary>,
+}
+
+impl Default for Entrance<'_> {
+    fn default() -> Self {
+        Self {
+            height: 24,
+            resume: None,
+        }
+    }
+}
 
 /// Whether this surface opened the session, and so has a box to say things
 /// in. The start-up check asks the same question before it asks anything of
@@ -57,7 +66,7 @@ pub struct Opens {
 
 /// The smallest screen the opening plays on: under this there is no room for a
 /// world above the composer, and the box is drawn as it always was.
-pub const ROOM: (u16, u16) = (80, 16);
+pub const ROOM: (u16, u16) = (40, 16);
 
 /// Whether the opening plays. Every reason it would not is a fact about this
 /// run, and they are all here: nothing about the piece itself decides it.
@@ -72,140 +81,137 @@ pub fn opens(at: Opens) -> bool {
         && at.screen.1 >= ROOM.1
 }
 
-/// The box, or nothing at all for a session this surface did not open.
-pub fn lines(state: &SessionState, width: usize, update: Option<&str>) -> Vec<Line<'static>> {
+/// The wordmark's rows are held through every frame of the opening.
+pub fn draw(
+    state: &SessionState,
+    width: usize,
+    entrance: Entrance<'_>,
+    update: Option<&str>,
+    now: Timestamp,
+) -> Vec<Line<'static>> {
     if !wanted(state) {
         return Vec::new();
     }
-    let mut body = vec![greeting(), Line::default(), help(), cwd(&state.summary.cwd)];
-    body.extend(update.map(newer));
-    boxed(body, width)
-}
-
-fn greeting() -> Line<'static> {
-    Line::from(vec![
-        Span::styled(format!("{} ", theme::spark()), theme::presence()),
-        Span::styled(GREETING.to_string(), theme::text()),
-    ])
-}
-
-/// Under the mark, as everything the box says after the greeting is.
-fn help() -> Line<'static> {
-    Line::from(Span::styled(format!("  {HELP}"), theme::dim()))
-}
-
-/// A release this build could become, under the rest: the version in the
-/// spark's own colour, and the words that fetch it.
-fn newer(version: &str) -> Line<'static> {
-    Line::from(vec![
-        Span::styled("  ↑ ".to_string(), theme::dim()),
-        Span::styled(format!("v{version}"), theme::presence()),
-        Span::styled(format!(" is out · {BECOME}"), theme::dim()),
-    ])
-}
-
-fn cwd(cwd: &str) -> Line<'static> {
-    Line::from(Span::styled(
-        format!("  cwd: {}", paths::short(cwd, "", paths::home())),
+    let mut rows = mark(width, entrance.height);
+    rows.push(Line::from(Span::styled(facts(state, width), theme::dim())));
+    rows.push(Line::from(Span::styled(
+        resume(entrance.resume, width, now),
         theme::dim(),
-    ))
-}
-
-/// Rows inside a rounded border, padded by one cell — the only box the
-/// transcript draws for itself.
-fn boxed(body: Vec<Line<'static>>, width: usize) -> Vec<Line<'static>> {
-    let border = theme::border();
-    let inner = width.saturating_sub(4);
-    let rule = border.horizontal_top.repeat(inner + 2);
-    let mut out = vec![edge(format!(
-        "{}{rule}{}",
-        border.top_left, border.top_right
-    ))];
-    for line in wrap::wrap_all(&body, inner) {
-        out.push(walled(line, inner, border.vertical_left));
-    }
-    out.push(edge(format!(
-        "{}{rule}{}",
-        border.bottom_left, border.bottom_right
     )));
-    out
+    if let Some(version) = update {
+        rows.push(Line::from(Span::styled(
+            crate::views::clip(&format!("↑ v{version} is out · bingo update"), width),
+            theme::presence(),
+        )));
+    }
+    rows
 }
 
-fn edge(text: String) -> Line<'static> {
-    Line::from(Span::styled(text, theme::dim()))
+fn mark(width: usize, height: u16) -> Vec<Line<'static>> {
+    if width < 40 || height < 16 || theme::glyphs() == &theme::ASCII {
+        return vec![Line::from(vec![
+            Span::styled("bingo", theme::text()),
+            Span::styled(theme::mark(), theme::presence()),
+        ])];
+    }
+    WORDMARK
+        .iter()
+        .enumerate()
+        .map(|(row, text)| {
+            let mut spans = vec![Span::styled(*text, theme::text())];
+            if row == 2 {
+                spans.push(Span::styled(
+                    format!(" {}", theme::mark()),
+                    theme::presence(),
+                ));
+            }
+            Line::from(spans)
+        })
+        .collect()
 }
 
-fn walled(line: Line<'static>, inner: usize, wall: &'static str) -> Line<'static> {
-    let used: usize = line.spans.iter().map(|s| s.content.width()).sum();
-    let mut spans = vec![Span::styled(format!("{wall} "), theme::dim())];
-    spans.extend(line.spans);
-    spans.push(Span::raw(" ".repeat(inner.saturating_sub(used) + 1)));
-    spans.push(Span::styled(wall.to_string(), theme::dim()));
-    Line::from(spans)
+fn facts(state: &SessionState, width: usize) -> String {
+    let mut parts: Vec<String> = state.summary.model.clone().into_iter().collect();
+    if let Some(level) = state
+        .config
+        .kernel
+        .get("thinking")
+        .and_then(|value| serde_json::from_value::<bingo_sdk::Effort>(value.clone()).ok())
+    {
+        parts.push(level.name().into());
+    }
+    parts.extend(bingo_sdk::slot::placed(state).into_iter().filter_map(
+        |placed| match placed.slot {
+            bingo_sdk::slot::Slot::Mode { current, .. } => Some(current),
+            _ => None,
+        },
+    ));
+    let prefix = parts.join(" · ");
+    let room = width.saturating_sub(
+        unicode_width::UnicodeWidthStr::width(prefix.as_str())
+            + if prefix.is_empty() { 0 } else { 3 },
+    );
+    let cwd = paths::short(&state.summary.cwd, "", paths::home());
+    parts.push(paths::elide(&cwd, room));
+    crate::views::clip(&parts.join(" · "), width)
+}
+
+fn resume(previous: Option<&SessionSummary>, width: usize, now: Timestamp) -> String {
+    let Some(previous) = previous else {
+        return String::new();
+    };
+    let age = now.duration_since(previous.updated_at).unsigned_abs();
+    let arrow = if theme::glyphs() == &theme::ASCII {
+        "<"
+    } else {
+        "↺"
+    };
+    let title = previous.title.as_deref().unwrap_or("previous session");
+    let suffix = format!(" · {} ago · /resume", crate::worked::duration(age));
+    let room = width.saturating_sub(suffix.chars().count() + 2);
+    crate::views::clip(
+        &format!("{arrow} {}{suffix}", crate::views::clip(title, room)),
+        width,
+    )
+}
+
+#[cfg(test)]
+pub fn lines(state: &SessionState, width: usize, update: Option<&str>) -> Vec<Line<'static>> {
+    draw(
+        state,
+        width,
+        Entrance::default(),
+        update,
+        state.summary.updated_at,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_support::{child_summary, folded, log_summary, state};
-
-    fn drawn(state: &SessionState, width: usize) -> Vec<String> {
-        lines(state, width, None)
-            .iter()
-            .map(ToString::to_string)
-            .collect()
-    }
-
     #[test]
-    fn a_fresh_session_is_welcomed_in_a_box_of_its_own_width() {
-        let drawn = drawn(&state(), 60);
-        assert_eq!(drawn.len(), 6, "border, greeting, blank, help, cwd, border");
-        for row in &drawn {
-            assert_eq!(row.width(), 60, "{row}");
-        }
-        assert!(drawn[1].contains("✻ Welcome to bingo!"), "{:?}", drawn[1]);
-        assert!(drawn[4].contains("cwd: /tmp/project"), "{:?}", drawn[4]);
-    }
-
-    #[test]
-    fn the_box_is_as_wide_as_the_transcript_it_opens() {
-        let drawn = drawn(&state(), 120);
-        assert!(drawn.iter().all(|row| row.width() == 120), "{drawn:#?}");
-    }
-
-    #[test]
-    fn a_newer_release_is_one_more_row_under_the_help_line() {
-        let plain = drawn(&state(), 60);
-        let told = lines(&state(), 60, Some("0.5.0"))
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>();
-        assert_eq!(told.len(), plain.len() + 1, "one row, and no other change");
-        assert!(
-            told[5].contains("↑ v0.5.0 is out · bingo update"),
-            "{:?}",
-            told[5]
+    fn compact_height_and_resume_hold_their_rows() {
+        let state = state();
+        let at = Entrance {
+            height: 14,
+            resume: None,
+        };
+        let empty = draw(&state, 80, at, None, state.summary.updated_at);
+        assert_eq!(empty[0].to_string(), "bingo▍");
+        let filled = draw(
+            &state,
+            80,
+            Entrance {
+                resume: Some(&state.summary),
+                ..at
+            },
+            None,
+            state.summary.updated_at,
         );
-        for row in &told {
-            assert_eq!(row.width(), 60, "{row}");
-        }
+        assert_eq!(empty.len(), filled.len());
+        assert!(filled[2].to_string().contains("/resume"));
     }
-
-    /// The box's own mark stands where [`MARK`] says it does. One fact, held
-    /// against the box the surface draws rather than counted by hand twice.
-    #[test]
-    fn the_mark_stands_where_the_opening_walks_its_block_down_to() {
-        let drawn = drawn(&state(), 60);
-        let row = drawn
-            .get(usize::from(MARK.1))
-            .expect("the row the mark is on");
-        assert_eq!(
-            row.chars().nth(usize::from(MARK.0)),
-            theme::spark().chars().next(),
-            "{row:?}"
-        );
-    }
-
     /// The table of §11: every reason the opening does not play.
     #[test]
     fn the_opening_plays_on_a_fresh_session_and_nowhere_else() {

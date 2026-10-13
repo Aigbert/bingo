@@ -324,6 +324,7 @@ pub struct Ui {
     /// the task being done either way: hiding the list is about rows, not
     /// about what the turn is doing.
     pub activity_hidden: bool,
+    pub embers: crate::embers::Embers,
     /// How much of each block a person opened or shut, with `ctrl+o` or a
     /// click (§7). A block that is not in it wears its kind's own start
     /// ([`crate::fold`]), so the default is never written down twice.
@@ -350,7 +351,7 @@ pub struct Ui {
     /// may send this surface after ([`crate::graphics::linked`]).
     pub linked: Linked,
     /// A newer release than this build, as the start-up check found it (M63).
-    pub update: Option<String>,
+    pub welcome: crate::welcome::Details,
     /// The widest a line of prose is drawn, where a person set a measure
     /// (`tui.measure`, [`crate::settings`]; design §7). Terminal-side like the
     /// fold and the scroll, and read once at the start: it is a fact about
@@ -375,6 +376,7 @@ impl Ui {
             notices: Vec::new(),
             block: None,
             activity_hidden: false,
+            embers: crate::embers::Embers::default(),
             folds: Folds::new(),
             focused: true,
             switched: None,
@@ -382,7 +384,7 @@ impl Ui {
             shown: Layout::default(),
             decoded: Decoded::default(),
             linked: Linked::default(),
-            update: None,
+            welcome: crate::welcome::Details::default(),
             measure: None,
             files: Files::default(),
         }

@@ -111,7 +111,7 @@ fn between_turns(records: serde_json::Value) -> bingo_sdk::SessionState {
     folded(frames)
 }
 
-/// `✻ Shipping it…` over the three rows hung from a `⎿`; the two calls that
+/// `▍ Shipping it…` over the three rows hung from a `⎿`; the two calls that
 /// moved the list are nowhere in the transcript.
 #[test]
 fn tasks_at_work() {
@@ -119,7 +119,7 @@ fn tasks_at_work() {
     let state = at_work(three());
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(
-        screen.contains("✻ Shipping it… (esc to interrupt"),
+        screen.contains("▍ Shipping it… (esc to interrupt"),
         "{screen}"
     );
     assert!(screen.contains("⎿  ✔ Write the plan"), "{screen}");
@@ -169,7 +169,7 @@ fn activity_hidden() {
     ui.activity_hidden = true;
     let state = at_work(three());
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
-    assert!(screen.contains("✻ Shipping it…"), "{screen}");
+    assert!(screen.contains("▍ Shipping it…"), "{screen}");
     assert!(!screen.contains("Write the plan"), "{screen}");
     insta::assert_snapshot!("tasks_hidden_80x24", screen);
 }

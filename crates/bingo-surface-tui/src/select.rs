@@ -389,7 +389,7 @@ mod tests {
 
     #[test]
     fn a_selection_is_the_cells_that_were_read_not_the_bytes_behind_them() {
-        let lines = vec!["✻ 你好 warm".to_string()];
+        let lines = vec!["▍ 你好 warm".to_string()];
         assert_eq!(run((0, 2), (0, 6)).text(&lines), "你好");
     }
 

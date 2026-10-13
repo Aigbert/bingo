@@ -1,6 +1,5 @@
 ---
 source: crates/bingo-surface-tui/src/screens/tasks.rs
-assertion_line: 174
 expression: screen
 ---
 "                                                                                "
@@ -10,19 +9,19 @@ expression: screen
 "                                                                                "
 "                                                                                "
 "                                                                                "
-"╭──────────────────────────────────────────────────────────────────────────────╮"
-"│ ✻ Welcome to bingo!                                                          │"
-"│                                                                              │"
-"│   /help for help · /login codex to use a subscription                        │"
-"│   cwd: /tmp/project                                                          │"
-"╰──────────────────────────────────────────────────────────────────────────────╯"
+"█      ▀                                                                        "
+"█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█                                                   "
+"█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍                                                 "
+"                ▄▄▄▄▄█                                                          "
+"fake-1 · /tmp/project                                                           "
+"                                                                                "
 "                                                                                "
 "> plan it, ship it, and celebrate                                               "
 "                                                                                "
 "⏺ Bash(cargo test)                                                              "
 "  ⎿     Compiling bingo v0.1.0                                                  "
 "                                                                                "
-"✻ Shipping it… (esc to interrupt · 1s)                                          "
+"▍ Shipping it… (esc to interrupt · 1s)                                          "
 "╭──────────────────────────────────────────────────────────────────────────────╮"
 "│ > ask anything · ⏎ steers · tab queues                                       │"
 "╰──────────────────────────────────────────────────────────────────────────────╯"

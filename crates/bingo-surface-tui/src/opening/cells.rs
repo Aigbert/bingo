@@ -1,10 +1,10 @@
 //! One drawn row as the cells a terminal draws it in, and back again.
 //!
-//! The piece rewrites the welcome box cell by cell — a border glyph the light
+//! The piece rewrites the wordmark cell by cell — a mark the light
 //! has not reached is blank, a word the beam has not reached is blank — and a
 //! `Line` is runs of text rather than cells, so it is taken apart and put back
 //! together. Whatever shares a style comes back as one span, which is what
-//! makes the frame the piece lands on the box itself and not a wordier drawing
+//! makes the frame the piece lands on the wordmark itself and not a wordier drawing
 //! of it.
 
 use ratatui::style::Style;
@@ -72,12 +72,12 @@ mod tests {
     #[test]
     fn a_row_comes_apart_into_cells_and_back_into_the_runs_it_was() {
         let row = Line::from(vec![
-            Span::styled("✻ ", theme::presence()),
+            Span::styled("▍ ", theme::presence()),
             Span::styled("hello", theme::text()),
         ]);
         let cells = of(&row);
         assert_eq!(cells.len(), 7, "one cell a glyph");
-        assert_eq!(cells[0].glyph, "✻");
+        assert_eq!(cells[0].glyph, "▍");
         assert_eq!(cells[1].style, theme::presence(), "the space is the mark's");
         assert_eq!(line(cells), row, "and the runs come back as they were");
     }

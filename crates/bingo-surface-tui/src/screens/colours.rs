@@ -13,7 +13,7 @@ fn an_answer_row_is_white_after_its_bullet() {
         &painted,
         "All 33 pass.",
         &[
-            ("⏺ ", crate::theme::text().patch(crate::theme::bold())),
+            ("▍ ", crate::theme::text().patch(crate::theme::bold())),
             ("All 33 pass.", crate::theme::text()),
         ],
     );

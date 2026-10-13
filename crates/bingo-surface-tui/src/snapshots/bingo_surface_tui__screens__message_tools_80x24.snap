@@ -2,8 +2,8 @@
 source: crates/bingo-surface-tui/src/screens.rs
 expression: "draw_tree(80, 24, tree, ui, now)"
 ---
-"│   cwd: /tmp/project                                                          │"
-"╰──────────────────────────────────────────────────────────────────────────────╯"
+"fake-1 · /tmp/project                                                           "
+"                                                                                "
 "                                                                                "
 "⏺ OpenRoom(design)                                                              "
 "  ⎿  └─ #design                                                                 "

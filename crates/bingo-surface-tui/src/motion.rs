@@ -87,49 +87,36 @@ fn turning() -> Tree {
 }
 
 #[test]
-fn the_sparkle_walks_its_four_glyphs_at_a_hundred_and_fifty_milliseconds() {
+fn waiting_caret_blinks_without_changing_its_glyph() {
     let tree = turning();
-    let (mut ui, now) = mid_turn();
-    let mut glyph = |ms| {
-        row(&tree, &mut ui, later(now, ms), "esc to interrupt")
-            .chars()
-            .next()
-            .expect("its first cell")
-    };
-    assert_eq!(glyph(0), '✻');
-    assert_eq!(glyph(150), '✢');
-    assert_eq!(glyph(300), '✶');
-    assert_eq!(glyph(450), '✽');
-    assert_eq!(glyph(600), '✻', "and it comes back round");
+    let (mut ui, now) = scene();
+    for ms in [530, 1060, 1590] {
+        let at = later(now, ms);
+        let style = leading_style(&tree, &mut ui, at, "esc to interrupt");
+        let expected = if ms / 530 % 2 == 1 {
+            theme::dim()
+        } else {
+            theme::presence()
+        };
+        assert_eq!(style, theme::as_drawn(expected));
+        assert!(row(&tree, &mut ui, at, "esc to interrupt").starts_with('▍'));
+    }
 }
 
 #[test]
-fn the_presence_mark_breathes_between_two_thirds_and_all_of_itself() {
-    let tree = turning();
+fn the_blocked_caret_breathes_on_the_tool_period() {
     let (mut ui, now) = mid_turn();
-    let mut at = |ms| leading_style(&tree, &mut ui, later(now, ms), "esc to interrupt");
-    // Five samples across the 1.6 s breath. On the eight colours the ramp has
-    // only its two ends, which is what a terminal without 24 bits can show.
-    let sampled: Vec<Style> = [0i64, 400, 800, 1200, 1600]
-        .iter()
-        .map(|ms| at(*ms))
-        .collect();
-    assert_eq!(sampled[0], theme::as_drawn(theme::breath(0.0)));
-    assert_eq!(sampled[1], theme::as_drawn(theme::breath(0.5)));
-    assert_eq!(sampled[2], theme::as_drawn(theme::breath(1.0)));
-    assert_eq!(sampled[3], sampled[1], "and back down the way it came");
-    assert_eq!(sampled[4], sampled[0]);
-
-    crate::theme::with(crate::painted::truecolor(), || {
-        let mut steps: Vec<String> = (0..32)
-            .map(|i| {
-                let style = leading_style(&tree, &mut ui, later(now, i * 50), "esc to interrupt");
-                format!("{style:?}")
-            })
-            .collect();
-        steps.sort();
-        steps.dedup();
-        assert_eq!(steps.len(), 5, "five steps where 24 bits can draw them");
+    theme::with(crate::painted::truecolor(), || {
+        for ms in [0, 550, 1100, 1650, 2200] {
+            let at = later(now, ms);
+            assert_eq!(
+                leading_style(&solo(&calling()), &mut ui, at, "esc to interrupt"),
+                theme::as_drawn(theme::breath(crate::clock::breath(
+                    at,
+                    Duration::from_millis(2200)
+                )))
+            );
+        }
     });
 }
 
@@ -173,7 +160,7 @@ fn the_breath_quickens_while_words_arrive_and_slows_while_a_tool_holds_the_turn(
 /// The row is drawn on that period and not on a constant, which is the half
 /// of the cue a unit test cannot see.
 #[test]
-fn the_sparkle_is_drawn_on_the_period_the_state_asks_for() {
+fn arriving_words_hold_the_caret_steady_while_tools_breathe() {
     let (mut ui, now) = mid_turn();
     let at = later(now, 250);
     crate::theme::with(crate::painted::truecolor(), || {
@@ -186,7 +173,7 @@ fn the_sparkle_is_drawn_on_the_period_the_state_asks_for() {
                 Duration::from_millis(period),
             )))
         };
-        assert_eq!(drawn(&answering()), on(900));
+        assert_eq!(drawn(&answering()), theme::as_drawn(theme::glow()));
         assert_eq!(drawn(&calling()), on(2_200));
         assert_ne!(
             drawn(&answering()),
@@ -204,8 +191,7 @@ fn the_input_box_glows_on_the_same_breath_and_is_dim_when_idle() {
     let working = leading_style(&turning(), &mut ui, now, keys::BUSY_PLACEHOLDER);
     assert_eq!(
         working,
-        leading_style(&turning(), &mut ui, now, "esc to interrupt"),
-        "the box and the sparkle share one breath"
+        theme::as_drawn(crate::activity::breathing(turning().viewed(), now))
     );
 
     let idle = solo(&state());
@@ -246,7 +232,7 @@ fn nothing_of_the_presence_is_on_screen_while_no_turn_runs() {
     let screen = screen(&solo(&state()), &mut ui, now);
     assert!(!screen.contains("esc to interrupt"), "{screen}");
     assert!(
-        !screen.contains('✻') || screen.contains("Welcome"),
+        !screen.contains('▍') || screen.contains("█▀▀▀▀█"),
         "{screen}"
     );
 }
@@ -452,7 +438,7 @@ fn the_activity_row_says_a_verb_a_clock_and_what_the_turn_has_said() {
     let mut row = |ms| row(&tree, &mut ui, later(now, ms), "esc to interrupt");
     assert_eq!(
         row(4_000),
-        "✻ Rummaging… (esc to interrupt · 4s · ↓ 1.2k)",
+        "▍ Burrowing… (esc to interrupt · 4s · ↓ 1.2k)",
         "the verb is drawn from the turn's own id, so the row never changes its mind"
     );
     assert!(
@@ -471,7 +457,7 @@ fn a_turn_asked_to_stop_says_so_and_keeps_its_sparkle_and_its_clock() {
     let (mut ui, now) = scene();
     ui.stop_asked = Some(bingo_sdk::TurnId::from_raw("trn_1"));
     let mut row = |ms| row(&tree, &mut ui, later(now, ms), crate::activity::STOPPING);
-    assert_eq!(row(4_000), "✻ Stopping… (4s)");
+    assert_eq!(row(4_000), "▍ Stopping… (4s)");
     // The sparkle is at another of its four glyphs a second later, which is
     // the point: the row is still alive while it winds down.
     assert!(
@@ -483,16 +469,9 @@ fn a_turn_asked_to_stop_says_so_and_keeps_its_sparkle_and_its_clock() {
         !row(4_000).contains("esc to interrupt"),
         "the key it named has been pressed"
     );
-    let (mut working, _) = scene();
     assert_eq!(
         leading_style(&tree, &mut ui, later(now, 4_000), crate::activity::STOPPING),
-        leading_style(
-            &turning(),
-            &mut working,
-            later(now, 4_000),
-            "esc to interrupt"
-        ),
-        "the sparkle is bingo's presence either way"
+        theme::as_drawn(theme::dim())
     );
 }
 
@@ -529,14 +508,16 @@ fn the_next_turn_is_not_the_one_that_was_stopped() {
 #[test]
 fn every_verb_is_one_of_bingos_own() {
     let words = [
-        "Simmering",
-        "Noodling",
+        "Kindling",
+        "Stoking",
+        "Smouldering",
+        "Foraging",
+        "Tracking",
+        "Burrowing",
+        "Sniffing around",
+        "Pouncing",
+        "Sifting",
         "Tinkering",
-        "Rummaging",
-        "Mulling",
-        "Weaving",
-        "Sketching",
-        "Percolating",
     ];
     let (mut ui, now) = mid_turn();
     for id in ["trn_1", "trn_2", "trn_9", "trn_ffff", "trn_01J"] {
@@ -841,7 +822,7 @@ fn motion_off_holds_every_cue_at_its_resting_frame() {
         "the sparkle rests at presence"
     );
     let drawn = row(&tree, &mut ui, still, "esc to interrupt");
-    assert!(drawn.starts_with('✻'), "and holds its first glyph: {drawn}");
+    assert!(drawn.starts_with('▍'), "and holds its first glyph: {drawn}");
 
     // A live bullet and a tail are both absent rather than frozen.
     let bash = solo(&folded(running_bash()));
@@ -852,7 +833,9 @@ fn motion_off_holds_every_cue_at_its_resting_frame() {
     );
     let tail = crate::painted::painted(80, 24, &streaming(), &mut ui, still);
     assert!(
-        tail.coloured("still warm").is_empty(),
+        tail.coloured("still warm")
+            .iter()
+            .all(|text| text.trim() == "▍"),
         "and streaming text carries no tail"
     );
 }

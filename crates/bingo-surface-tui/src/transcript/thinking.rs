@@ -1,5 +1,5 @@
-//! The rows a thought draws (§4's thinking row, §6's): `✻ Thinking…` while it
-//! is being had, `✻ Thought for 2s` once it is over, and the newest rows of
+//! The rows a thought draws (§4's thinking row, §6's): `▏ Thinking…` while it
+//! is being had, `▏ Thought for 2s` once it is over, and the newest rows of
 //! what was thought under either — or of the whole run of thoughts it ends,
 //! because consecutive thoughts are one thought ([`crate::thoughts`], M79).
 //!
@@ -15,9 +15,9 @@ use super::{Place, Rows, THOUGHT_ROWS, plain, returns, tail};
 use crate::fold::Fold;
 use crate::{theme, thoughts};
 
-/// A thought is readable where it happened, and while it is being had: `✻
+/// A thought is readable where it happened, and while it is being had: `▏
 /// Thinking…` over the newest [`THOUGHT_ROWS`] rows of what has arrived so
-/// far, and once it is over `✻ Thought for 2s` over the very same rows.
+/// far, and once it is over `▏ Thought for 2s` over the very same rows.
 ///
 /// The heading is the whole of what the close changes (2026-09-06,
 /// user-directed). The transcript is anchored at its foot, so a thought that
@@ -57,7 +57,7 @@ pub(super) fn lines(
 /// The row of a thought as it is being had: dim italic, and the ellipsis
 /// breathing with the rest of the surface.
 fn still_thinking() -> Line<'static> {
-    sparkled(
+    marked(
         format!("Thinking{}", theme::ellipsis()),
         theme::dim().patch(theme::italic()),
     )
@@ -66,7 +66,7 @@ fn still_thinking() -> Line<'static> {
 /// The row of a thought that is over: how long it took — the whole run of
 /// them, where it is the last of a run.
 fn thought_for(span: jiff::SignedDuration) -> Line<'static> {
-    sparkled(format!("Thought for {}", took(span)), theme::dim())
+    marked(format!("Thought for {}", took(span)), theme::dim())
 }
 
 /// What hangs under a thought's row, dim under the same `⎿` a running tool's
@@ -94,10 +94,10 @@ fn thought_rows(text: &str, fold: Fold, width: usize) -> Vec<Line<'static>> {
     }
 }
 
-/// The `✻` and what it says beside it.
-fn sparkled(text: String, style: Style) -> Line<'static> {
+/// The `▏` and what it says beside it.
+fn marked(text: String, style: Style) -> Line<'static> {
     Line::from(vec![
-        Span::styled(format!("{} ", theme::spark()), theme::dim()),
+        Span::styled(format!("{} ", theme::thinking()), theme::dim()),
         Span::styled(text, style),
     ])
 }
