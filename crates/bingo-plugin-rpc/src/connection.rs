@@ -495,6 +495,25 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn dropping_a_connection_closes_a_grandchilds_stdout() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let shell = bingo_process::shell::resolve().expect("shell");
+        let command = entry(shell.path().to_str().expect("shell path"), &[
+            "-c", "sleep 60 & read line; echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}'; wait"
+        ]);
+        let connection = Connection::spawn("tree", &command, dir.path(), dir.path(), None).expect("spawn");
+        tokio::time::timeout(std::time::Duration::from_secs(10), connection.request("ready", json!({})))
+            .await.expect("ready deadline").expect("ready");
+        let router = connection.router.clone();
+        drop(connection);
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            while router.alive.load(Ordering::Acquire) {
+                tokio::task::yield_now().await;
+            }
+        }).await.expect("the grandchild must close stdout when its connection drops");
+    }
+
     #[test]
     fn a_plugin_logs_its_stderr_under_the_data_directory() {
         assert_eq!(
