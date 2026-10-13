@@ -32,9 +32,10 @@ Current paths and required adapters replace the original plan's stale paths.
    transformer and codegen; strip TS and compile JSX to h/Fragment.
    Refuse import(), require and specifiers other than bingo or relative
    files inside the mod root, naming file:line. Loader enforces the same.
-5. **Sandbox.** Custom context without Eval; no Function, Node, DOM,
+5. **Sandbox.** Custom context with only required intrinsics; hide eval/Function and all
+   function constructors before mod code. No Node, DOM,
    WebAssembly or timers. Install h/Fragment JSON nodes, URL (url), UTF-8
-   TextEncoder/Decoder, AbortController, randomUUID (uuid), SHA-256
+   TextEncoder/Decoder, AbortController, randomUUID (existing getrandom), SHA-256
    (bingo-digest) and performance.now. Memory defaults to mods.memoryMiB=64;
    cap the stack. Escaper fails in words; hog fails without killing host.
 6. **One bingo module.** Split pure registration/matching in on.ts from
@@ -114,6 +115,8 @@ file-watcher dependencies, watching non-explicit directories; no live tests.
   objects, host work is asynchronous and bounded. MSVC builds are checked
   locally where possible and in Windows CI; never cfg-gate failures away.
 - Pin weekly oxc; measure 50 idle fixture mods' RSS without an assertion.
+- rquickjs requires Eval internally for safe module compilation. Disable
+  JavaScript evaluation entry points before loading; no unsafe bytecode API.
 - Core's current external deadline is 5 s: preserve it for process links
   while allowing mods to own their 10 s active-time budget.
 - Current catalogue has only enabled/reason/from; plugin.register is absent.
@@ -267,4 +270,36 @@ budget ok
 `cargo deny check`:
 ```text
 advisories ok, bans ok, licenses ok, sources ok
+```
+
+`cargo test -p bingo-mods --test sandbox (before implementation)`:
+```text
+test globals_are_available_and_encode_real_bytes ... FAILED
+test trusted_module_loading_survives_without_dynamic_code ... FAILED
+called `Result::unwrap()` on an `Err` value: Exception
+escaped with eval('1')
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+`cargo test -p bingo-mods --test sandbox`:
+```text
+test trusted_module_loading_survives_without_dynamic_code ... ok
+test globals_are_available_and_encode_real_bytes ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+`cargo test -p bingo-mods`:
+```text
+test budget::tests::only_resumed_intervals_spend_the_budget ... ok
+test load::tests::nested_imports_resolve_inside_the_root ... ok
+test load::tests::a_symlink_cannot_import_an_outside_file ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test trusted_module_loading_survives_without_dynamic_code ... ok
+test globals_are_available_and_encode_real_bytes ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test strings_and_comments_do_not_count_as_dynamic_imports ... ok
+test typescript_and_jsx_compile_without_a_runtime_import ... ok
+test imports_stay_inside_the_module_root_or_bingo ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 ```
