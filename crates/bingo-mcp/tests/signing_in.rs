@@ -160,6 +160,7 @@ async fn endpoint(accepts: &str, renews_to: &str) -> (MockServer, Arc<Endpoint>)
 
 fn http(url: String) -> Server {
     Server::Http {
+        tool_timeout: None,
         url,
         headers: BTreeMap::new(),
         oauth: None,
@@ -346,6 +347,7 @@ async fn a_header_a_person_wrote_themselves_fails_rather_than_needing_a_sign_in(
     let configured = BTreeMap::from([(
         "remote".to_string(),
         Server::Http {
+            tool_timeout: None,
             url: format!("{}/mcp", server.uri()),
             headers: BTreeMap::from([("Authorization".to_string(), "Bearer mine".to_string())]),
             oauth: None,

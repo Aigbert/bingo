@@ -291,6 +291,7 @@ fn describe(name: &str, server: &Server) -> String {
             args,
             env,
             cwd,
+            ..
         } => {
             lines.push(format!("  command: {command}"));
             if !args.is_empty() {
@@ -305,6 +306,7 @@ fn describe(name: &str, server: &Server) -> String {
             url,
             headers,
             oauth,
+            ..
         } => {
             lines.push(format!("  url: {url}"));
             lines.push(format!("  headers: {}", names(headers)));
@@ -406,6 +408,7 @@ mod tests {
 
     fn stdio(command: &str, args: &[&str]) -> Server {
         Server::Stdio {
+            tool_timeout: None,
             command: command.into(),
             args: args.iter().map(|arg| (*arg).to_string()).collect(),
             env: BTreeMap::from([("GITHUB_TOKEN".to_string(), "ghp_live".to_string())]),
@@ -415,6 +418,7 @@ mod tests {
 
     fn http(url: &str) -> Server {
         Server::Http {
+            tool_timeout: None,
             url: url.into(),
             headers: BTreeMap::from([("X-Tenant".to_string(), "acme".to_string())]),
             oauth: None,
@@ -522,6 +526,7 @@ mod tests {
         let said = describe(
             "remote",
             &Server::Http {
+                tool_timeout: None,
                 url: "https://mcp.example.com/mcp".into(),
                 headers: BTreeMap::from([(
                     "Authorization".to_string(),
@@ -539,6 +544,7 @@ mod tests {
         let said = describe(
             "remote",
             &Server::Http {
+                tool_timeout: None,
                 url: "https://mcp.example.com/mcp".into(),
                 headers: BTreeMap::new(),
                 oauth: None,

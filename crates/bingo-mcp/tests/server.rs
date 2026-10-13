@@ -43,6 +43,7 @@ fn echo_server() -> PathBuf {
 
 fn stdio(command: impl Into<String>, args: &[&str]) -> Server {
     Server::Stdio {
+        tool_timeout: None,
         command: command.into(),
         args: args.iter().map(|arg| (*arg).to_string()).collect(),
         env: BTreeMap::new(),
@@ -443,6 +444,7 @@ async fn a_child_is_spawned_in_the_directory_and_environment_it_was_given() {
         panic!("a real working directory");
     };
     let server = Server::Stdio {
+        tool_timeout: None,
         command: echo_server().display().to_string(),
         args: Vec::new(),
         env: BTreeMap::from([("BINGO_MCP_MARKER".to_string(), "seen".to_string())]),

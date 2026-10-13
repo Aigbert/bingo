@@ -33,6 +33,9 @@ pub struct Manifest {
     /// workspace validates a document against a schema.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<Value>,
+    /// Maximum seconds for tool/call and command/run; absent allows ten minutes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub call_timeout: Option<std::num::NonZeroU64>,
 }
 
 /// The process to spawn.

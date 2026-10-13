@@ -72,13 +72,13 @@ tool error the model reads, never a hang.
 ## Files
 
 - `crates/bingo-plugin-rpc/src/{deadline,manifest,tool,command,
-  schema,bridge}.rs`, its fixtures, examples and `tests/plugin/**`
+  schema,bridge,manager,connection}.rs`, its fixtures, examples and `tests/plugin/**`
 - `crates/bingo-mcp/src/{tool,config,dial,auth,manager}.rs`, `src/guide.md`, examples, tests
 - `crates/bingo-provider-acp/src/{provider,connection,child,session}.rs`,
   `src/bin/fake_agent/**`, fixtures and tests
 - `crates/bingo-auth-oauth/src/{lib,http,discover,error}.rs`, tests,
   `crates/bingo-provider-openai/src/lib.rs`, `crates/bingo/src/mcp.rs`
-- touched crates' dev `Cargo.toml` (`test-util`); mechanical constructor fixtures;
+- touched crates' dev `Cargo.toml` (`test-util`); mechanical constructor fixtures in MCP `src/command.rs` and `bingo/src/mcp.rs`;
 - `schema/plugin.json`, the settings schema snapshot; `docs/adr/{0068,0035}*.md`
 
 ## Exit criteria

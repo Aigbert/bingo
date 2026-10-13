@@ -429,6 +429,7 @@ mod tests {
 
     fn stdio(command: &str) -> Server {
         Server::Stdio {
+            tool_timeout: None,
             command: command.to_string(),
             args: Vec::new(),
             env: BTreeMap::new(),
