@@ -7,53 +7,26 @@ hooks, checkpoints, policy, person); the agent turn sends the newest input
 and no history; `holds_context` is deleted. An old journal draws the same.
 Audit §6.
 ## Bricks, in build order
-1. **Contract and failing tests.** `bingo-sdk/src/agent.rs`: `Agent`,
-   `AgentTurn`, `AgentStream`, `AgentEvent`, `ExternalCall`, `CallKind`,
-   `Judge`, `Verdict`; `Contribution::Agent`. `ExternalCall::{to_input,
-   from_input}` round-trips with a golden fixture (the journal's spelling
-   is the contract, M113). Failing tests in core on a scripted agent: a
-   `Call`/`Done` pair journals one external `ToolCall` named
-   `fake:edit`; a `BeforeTool` hook sees a judged `Execute`; a deny rule
-   for `fake:execute` answers the agent's reject option.
-2. **Pure bricks.** `traits_of(CallKind) -> ToolTraits`, the fail-closed
-   table of ADR-0076 §5 (`trusted` false everywhere, `Other` all false).
-   `narrowest(options, Verdict) -> Option<OptionId>` over ACP's
-   `allow_once`/`allow_always`/`reject_once`/`reject_always` (no
-   allow option → reject; no reject option → the turn fails in words).
-   `CallKind::writes()` for `Edit`/`Delete`/`Move`. Table tests.
-3. **The judge.** `bingo-core/src/judge.rs`: builds the stand-in call
-   (`<agent>:<kind>`, input from `to_input`, traits from the table) and
-   runs the `tool.check` chain M131 built; maps `Gated` to `Verdict`.
-   Raced inside the turn's supervised future (ADR-0068): esc drops a
-   waiting permission and the agent is told reject on the way out.
-4. **The agent turn.** `bingo-core/src/turn/agent.rs`: one `run` per
-   turn. `Said` goes through the same stream fold the model turn uses
-   (`turn/stream.rs`), `Context` and `Compacted` as ADR-0055 §2–§4 read
-   them today; `Call`/`Update` start and update an external `ToolCall`
-   item; `Done` passes `tool.call` as an observer (ADR-0076 §4) and ends
-   the item. `run_turn` picks the driver by what the resolved id names.
-5. **Composition.** `Registrar::agent`; a provider id registered as both
-   is a `KernelError` at build; model resolution and the catalogue list an
-   agent's `models()` as they list a provider's. `ModelRequest.session`
-   stays for a stateful `Provider` (ADR-0035 §3 named OpenAI's).
-6. **The ACP crate becomes an agent.** `provider.rs` → `agent.rs`;
-   `events.rs` emits `AgentEvent::Call/Update/Done` and drops `Call::
-   metadata` and the reasoning path; `question.rs` → `permission.rs`
-   over `Judge` and `narrowest`; preserve M108's image blocks when
-   the agent declared `promptCapabilities.image`, and its fallback note
-   otherwise (`tests/pictures.rs` already covers both). `session/cancel` from the
-   stream's drop. Fixtures re-recorded; the bridge (ADR-0036) untouched.
-7. **Delete `holds_context`** from `EndpointCapabilities`,
-   `ModelCapabilities` and `models/resolve.rs`, and every literal. Agent readings use the existing
-   learned-window store; the ACP-only window cache is removed.
-8. **Old journals.** The record's upgrade step (ADR-0065): a reasoning
-   item whose metadata carries `acp.external` reads as the external
-   `ToolCall` it held. A fixture journal in `979a6d27`'s recorded format draws its
-   calls as tool rows in the TUI and in `--print`.
-9. **Surfaces.** Delete `bingo-surface-tui/src/acp.rs` and its screens;
-   the transcript draws an external call's `title` as the row heading via
-   `ExternalCall::from_input`. Checkpoints' `written` reads `locations`
-   when `kind.writes()`.
+1. **Contracts first:** sdk Agent/AgentTurn/AgentStream/AgentEvent/Judge and
+   ExternalCall/CallKind; Contribution::Agent and a golden journal spelling.
+   Red core, legacy-plugin and historical-store fixtures precede implementation.
+2. **Judge:** fail-closed kind traits and ACP narrowest-option mapping;
+   stand-in calls run tool.check, hooks, policy and person, raced with cancel.
+3. **Agent turn:** one run, newest input and ToolSet::gather's tools; Said
+   shares the accumulator; external Call/Update/Done journal ordinary ToolCall
+   items. tool.call links have tighten rights; AfterTool may end the turn.
+4. **Composition:** an id names Provider or Agent, never both; resolve and
+   catalogue both. Agents compact their own context and refuse model side calls.
+5. **ACP:** rename provider/question to agent/permission; preserve pictures,
+   restore ladder, knobs, reported context/compactions and drop cancellation.
+   Pass resolved tools to the unchanged bridge. Remove the private window cache.
+6. **Capability removal:** remove holds_context and literals; generate both
+   plugin schemas. Ignore legacy input; one named Info notice for legacy true.
+7. **Records:** version-3 journal migration upgrades 979a6d27-format metadata
+   to external ToolCall; invalidate version-2 checkpoints for replay.
+8. **Surfaces/checkpoints:** remove ACP-only TUI parser/screens; render titles
+   through the ordinary tool path; snapshot every reported write location.
+
 ## Files
 - `crates/bingo-sdk/src/{agent.rs (new),plugin.rs,model.rs,lib.rs,store/checkpoint.rs}`
 - `crates/bingo-core/src/{judge.rs (new),turn/agent.rs (new),turn/endpoint.rs (new),turn.rs,turn/stream.rs,session.rs,session/{complete,invoke}.rs,spec.rs,host.rs,commands/model.rs,models/{resolve,learned}.rs,test_support.rs}`
@@ -124,13 +97,40 @@ Audit §6.
   Actual TUI files changed: the nine TUI paths listed in Files, plus the four
   deleted `screens__acp_*` snapshots. No layout code or M133-owned code.
 
-## Decision — mid-stream retry (2026-10-13)
+## Decisions and verification status (2026-10-13)
 
-The person's delegate chose A: the open retry (ADR-0009 §6) is a model's,
-not an agent's. Mid-answer loss fails with a reason, emits no `TurnRetrying`,
-and retains journaled speech/work. Bury the child with one `ACP_RESPAWN`;
-the next prompt uses a new child. The existing silent-death retry inside
-`Agent::run` stays. `cli/acp/life.rs` is authorized for this behavioral test.
-Add dated notes to ADR-0076 and ADR-0009. All three stops are resolved.
+The delegate chose no open retry for an agent (ADR-0009 §6, ADR-0076).
+Mid-answer loss fails with a reason, retains speech/work, buries the child
+with one `ACP_RESPAWN`, and serves the next prompt on a new child.
+`cli/acp/life.rs` is authorized; its silent-death test is unchanged.
+Dev moved `TurnHost` to `turn/host.rs`; M134 has not changed that trait.
 
-Dev moved `TurnHost` to `turn/host.rs` after this branch; M134 leaves the trait unchanged.
+## Verified (2026-10-13, incomplete — protocol stop)
+
+Sequential gates, pasted output:
+```
+cargo fmt --all -- --check
+fmt exit=0
+cargo check --workspace --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.68s
+cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.89s
+cargo test --workspace --locked -- --skip <three bridge token tests>
+test exit=0
+cargo test -p bingo-provider-acp --test bridge token --locked -- --test-threads=1
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out
+scripts/check_discipline.sh
+FAIL crates/bingo-surface-tui/src/test_support.rs: 1029 non-test lines (>1000)
+FAIL crates/bingo-core/src/turn.rs: 1005 non-test lines (>1000)
+FAIL crates/bingo-sdk/src/event.rs: 1004 non-test lines (>1000)
+discipline FAILED
+```
+The full suite includes every PTY test; none flaked. The three token tests
+were explicitly excluded there and then run alone as above. Focused ACP CLI:
+`40 passed; 0 failed`; permission interactions: `2 passed; 0 failed`.
+**STOP:** sdk `event.rs` is unchanged, already 1004 lines at `e9e45bb9`,
+and outside Files. Protocol step 6 forbids fixing it without scope approval.
+Proposed extension: extract `ToolOutput` and its impl into `event/output.rs`,
+re-exporting it unchanged. Fix the two M134-owned overages alongside it.
+Budget, deny, Windows checks and tmux smoke remain pending; no milestone
+completion is claimed. Contract-red evidence will be included when verified.
