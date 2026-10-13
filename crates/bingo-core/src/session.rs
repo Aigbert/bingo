@@ -131,11 +131,23 @@ impl Actor {
     }
 
     async fn handle(&mut self, msg: Msg) -> Flow {
-        self.dispatch(msg).await.unwrap_or(Flow::Stop)
+        let (calling, msg) = match msg {
+            Msg::Calling(calling, msg) => (calling, *msg),
+            msg => (Vec::new(), msg),
+        };
+        invocation::scope(calling, self.dispatch(msg))
+            .await
+            .unwrap_or(Flow::Stop)
     }
 
     async fn dispatch(&mut self, msg: Msg) -> Result<Flow, KernelError> {
         match msg {
+            Msg::Calling(_, _) => {
+                return Err(KernelError::new(
+                    ErrorCode::Internal,
+                    "nested operation envelope",
+                ));
+            }
             Msg::CatalogueEvent(event) => {
                 self.publish(*event, None).await?;
             }
@@ -451,10 +463,8 @@ impl Actor {
     /// observe the session; publishing never waits on them.
     fn observe_named(&self, entry: LinkPoint, payload: Value) {
         if let Some(observed) = &self.observed {
-            let _ = observed.events.send(crate::chain::observe::Work::Named(
-                entry,
-                payload,
-                self.hook_context(),
+            let _ = observed.events.send(crate::chain::observe::capture(
+                crate::chain::observe::Work::Named(entry, payload, self.hook_context()),
             ));
         }
     }
@@ -692,9 +702,8 @@ impl Actor {
         if let Some(observed) = &self.observed
             && !matches!(frame.event, Event::ItemDelta { .. })
         {
-            let _ = observed.events.send(crate::chain::observe::Work::Frame(
-                Box::new(frame.clone()),
-                self.hook_context(),
+            let _ = observed.events.send(crate::chain::observe::capture(
+                crate::chain::observe::Work::Frame(Box::new(frame.clone()), self.hook_context()),
             ));
         }
         self.state.apply(&frame);

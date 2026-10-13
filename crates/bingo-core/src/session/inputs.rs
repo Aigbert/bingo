@@ -308,7 +308,7 @@ impl Actor {
             item,
             call,
         };
-        self.tracker.spawn(bridged.serve(reply));
+        self.tracker.spawn(invocation::carry(bridged.serve(reply)));
         Ok(())
     }
 

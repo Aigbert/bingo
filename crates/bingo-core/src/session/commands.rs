@@ -290,7 +290,7 @@ impl Commands {
             self.holding = Some(intent.clone());
         }
         let mailbox = self.mailbox.clone();
-        self.tracker.spawn(async move {
+        self.tracker.spawn(bingo_sdk::invocation::carry(async move {
             let report = crate::chain::Report::default();
             let work =
                 crate::chain::command::run(command, args, &cx, &hooks, &hook_cx, report.clone());
@@ -309,7 +309,7 @@ impl Commands {
                 let _ = mailbox.record(notice).await;
             }
             mailbox.send(Msg::CommandFinished { intent, outcome });
-        });
+        }));
         Ok(())
     }
 
