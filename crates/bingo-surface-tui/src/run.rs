@@ -152,6 +152,7 @@ fn pasted(data_dir: &std::path::Path, bytes: &[u8]) -> Result<std::path::PathBuf
 }
 
 struct Run {
+    detection: crate::render::Detection,
     host: HostHandle,
     data_dir: std::path::PathBuf,
     session: Attached,
@@ -211,7 +212,8 @@ pub(crate) async fn drive(
     mut keys: Keys,
 ) -> Result<Farewell, KernelError> {
     let (tx, mut replies) = mpsc::channel(16);
-    let (mut run, mut events, mut gateway) = standing(host, opts, screen.size(), tx).await?;
+    let (mut run, mut events, mut gateway) =
+        standing(host, opts, screen.size(), tx, screen.detection()).await?;
     loop {
         // `biased`, keys first: a person outranks the machine, and a
         // keystroke is never continuously ready, so checking it first
@@ -251,7 +253,7 @@ pub(crate) async fn drive(
                 Wake::Event
             },
         };
-        let now = Now::real();
+        let now = run.detection.now();
         run.ui.expire(now);
         run.ui.drag_step(now);
         if let Some(exit) = run.exit.take() {
@@ -270,12 +272,16 @@ async fn standing(
     opts: SurfaceOptions,
     screen: (u16, u16),
     replies: mpsc::Sender<Reply>,
+    detection: crate::render::Detection,
 ) -> Result<(Run, Option<FrameStream>, Option<GatewayStream>), KernelError> {
     // A run given work on the command line goes and does it, so what the
     // opening is decided from is read before the prompt is spent.
     let asked = opts.prompt.is_some();
     let (mut run, events) = attach(host, opts, replies).await?;
-    opening::begin(&mut run, screen, asked, Now::real());
+    run.detection = detection;
+    notices::raise(&mut run.ui, run.detection.notice(), Instant::now());
+    let now = run.detection.now();
+    opening::begin(&mut run, screen, asked, now);
     Ok((run, events, Some(host.gateway_events())))
 }
 
@@ -290,6 +296,7 @@ async fn attach(
         .open(opts.selector, identity(), OpenOptions::with_children())
         .await?;
     let mut run = Run {
+        detection: crate::render::Detection::default(),
         host: host.clone(),
         data_dir: opts.env.data_dir.clone(),
         session: Attached::new(attachment.snapshot, attachment.handle),
@@ -312,7 +319,6 @@ async fn attach(
     run.ui.measure = crate::settings::given(&opts.args);
     run.fetch_catalogs();
     run.ask_for_updates(&opts.args);
-    notices::raise(&mut run.ui, Instant::now());
     if let Some(prompt) = opts.prompt {
         run.effect(Effect::Submit(bingo_sdk::Input::text(
             prompt,
@@ -434,8 +440,11 @@ impl Run {
             &self.ui,
             ratatui::layout::Rect::new(0, 0, width, height),
             now,
+            &self.detection.render(),
         );
-        screen.draw(&layout).map_err(stdio)?;
+        screen
+            .draw(&layout, &self.detection.render())
+            .map_err(stdio)?;
         self.ui.shown = layout;
         self.grumble(began.elapsed());
         showing::hand(self, screen)?;
@@ -650,22 +659,28 @@ impl Run {
     /// frame, the notice it has just made wrong, and the palette the next
     /// frame is drawn in (M71).
     fn answered_late(&mut self, reply: &[u8]) {
-        if let Some(wrong) = crate::graphics::late(reply) {
+        let before = self.detection.notice();
+        self.detection.reply(reply);
+        if let Some(wrong) = before.filter(|_| self.detection.notice().is_none()) {
             self.ui.withdraw(wrong);
         }
-        look::answered(reply);
     }
 
     fn terminal_event(&mut self, event: Term) {
         match event {
             Term::Key(key) => {
                 self.session.tree.mark_read();
-                let effects = input::on_key(&mut self.ui, &self.session.tree, key, Now::real());
+                let effects =
+                    input::on_key(&mut self.ui, &self.session.tree, key, self.detection.now());
                 self.apply(effects);
             }
             Term::Mouse(mouse) => {
-                let effects =
-                    pointer::on_mouse(&mut self.ui, &self.session.tree, mouse, Now::real());
+                let effects = pointer::on_mouse(
+                    &mut self.ui,
+                    &self.session.tree,
+                    mouse,
+                    self.detection.now(),
+                );
                 self.apply(effects);
             }
             Term::Paste(text) => input::on_paste(&mut self.ui, &text),
@@ -1820,6 +1835,7 @@ mod tests {
         at: Instant,
     ) -> Run {
         Run {
+            detection: crate::render::current().into(),
             stored: Stored::default(),
             cache: None,
             ear: late::Late::default(),
@@ -2279,6 +2295,7 @@ mod tests {
         let mut recorder = Recorder::default();
         let now = crate::test_support::scene().1;
         crate::graphics::with(crate::graphics::drawing(), || {
+            run.detection = crate::render::current().into();
             run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
         });
         assert!(
@@ -2298,6 +2315,7 @@ mod tests {
 
         settle(&mut run, &mut waiting).await;
         crate::graphics::with(crate::graphics::drawing(), || {
+            run.detection = crate::render::current().into();
             run.paint(&mut recorder, Wake::Frame, now).expect("another");
             run.paint(&mut recorder, Wake::Frame, now).expect("a third");
         });
@@ -2329,6 +2347,7 @@ mod tests {
         let mut recorder = Recorder::default();
         let now = crate::test_support::scene().1;
         crate::graphics::with(crate::graphics::drawing(), || {
+            run.detection = crate::render::current().into();
             let path = pasted(&run.data_dir, &bingo_pictures::testing::png_bytes(400, 300))
                 .expect("written");
             assert!(path.starts_with(dir.path().join(viewer::DIR).join(PASTED)));
@@ -2350,12 +2369,14 @@ mod tests {
         // The file read back, then the strip asks for a fit of it.
         settle(&mut run, &mut waiting).await;
         crate::graphics::with(crate::graphics::drawing(), || {
+            run.detection = crate::render::current().into();
             run.paint(&mut recorder, Wake::Frame, now)
                 .expect("the read landed");
         });
         assert!(recorder.places.is_empty(), "{:?}", places(&recorder));
         settle(&mut run, &mut waiting).await;
         crate::graphics::with(crate::graphics::drawing(), || {
+            run.detection = crate::render::current().into();
             run.paint(&mut recorder, Wake::Frame, now).expect("another");
             // What a submit leaves behind: the line taken and the pictures
             // let go (`input::submit`, `Run::send_text`).
@@ -2421,10 +2442,20 @@ mod tests {
         let now = crate::test_support::still(crate::test_support::scene().1);
         let drawing = crate::graphics::drawing();
         crate::graphics::with(drawing, || {
+            run.detection = crate::render::Render {
+                motion: now.motion,
+                ..crate::render::current()
+            }
+            .into();
             run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
         });
         settle(&mut run, &mut waiting).await;
         crate::graphics::with(drawing, || {
+            run.detection = crate::render::Render {
+                motion: now.motion,
+                ..crate::render::current()
+            }
+            .into();
             run.paint(&mut recorder, Wake::Frame, now)
                 .expect("the picture");
         });
@@ -2437,6 +2468,11 @@ mod tests {
         run.terminal_event(Term::Key(ctrl('g')));
         settle(&mut run, &mut waiting).await;
         crate::graphics::with(drawing, || {
+            run.detection = crate::render::Render {
+                motion: now.motion,
+                ..crate::render::current()
+            }
+            .into();
             run.paint(&mut recorder, Wake::Frame, now)
                 .expect("the list");
         });
@@ -2456,6 +2492,11 @@ mod tests {
         // esc: the list goes, and the cells under it are written back.
         run.terminal_event(Term::Key(key(KeyCode::Esc)));
         crate::graphics::with(drawing, || {
+            run.detection = crate::render::Render {
+                motion: now.motion,
+                ..crate::render::current()
+            }
+            .into();
             run.paint(&mut recorder, Wake::Frame, now)
                 .expect("back again");
         });
@@ -2508,6 +2549,7 @@ mod tests {
         let mut recorder = Recorder::default();
         let now = crate::test_support::scene().1;
         crate::graphics::with(crate::graphics::drawing(), || {
+            run.detection = crate::render::current().into();
             run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
         });
         assert!(
@@ -2517,6 +2559,7 @@ mod tests {
 
         settle(&mut run, &mut waiting).await;
         crate::graphics::with(crate::graphics::drawing(), || {
+            run.detection = crate::render::current().into();
             run.paint(&mut recorder, Wake::Frame, now).expect("another");
         });
         assert!(
@@ -2525,6 +2568,7 @@ mod tests {
         );
         settle(&mut run, &mut waiting).await;
         crate::graphics::with(crate::graphics::drawing(), || {
+            run.detection = crate::render::current().into();
             run.paint(&mut recorder, Wake::Frame, now).expect("a third");
         });
         let sent = places(&recorder);
@@ -2535,6 +2579,7 @@ mod tests {
         // And neither the file nor the decoder is asked again, however many
         // frames draw it.
         crate::graphics::with(crate::graphics::drawing(), || {
+            run.detection = crate::render::current().into();
             run.paint(&mut recorder, Wake::Frame, now)
                 .expect("a fourth");
         });
@@ -2563,6 +2608,7 @@ mod tests {
         let mut recorder = Recorder::default();
         let now = crate::test_support::scene().1;
         crate::graphics::with(crate::graphics::drawing(), || {
+            run.detection = crate::render::current().into();
             run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
         });
         let reply = waiting.recv().await.expect("the answer came back");
@@ -2570,6 +2616,7 @@ mod tests {
         assert_eq!(run.ui.linked.failure("gone.png"), Some("not found"));
 
         crate::graphics::with(crate::graphics::drawing(), || {
+            run.detection = crate::render::current().into();
             run.paint(&mut recorder, Wake::Frame, now).expect("another");
         });
         assert!(waiting.try_recv().is_err(), "and it is not tried again");
@@ -2664,6 +2711,10 @@ mod tests {
             &run.ui,
             ratatui::layout::Rect::new(0, 0, 80, 24),
             opened,
+            &crate::render::Render {
+                motion: opened.motion,
+                ..crate::render::current()
+            },
         );
         assert!(
             run.next_draw().is_some_and(|due| due < after.instant),
@@ -2675,6 +2726,10 @@ mod tests {
             &run.ui,
             ratatui::layout::Rect::new(0, 0, 80, 24),
             after,
+            &crate::render::Render {
+                motion: after.motion,
+                ..crate::render::current()
+            },
         );
         assert!(
             run.next_draw().is_none(),
@@ -2718,6 +2773,10 @@ mod tests {
             &run.ui,
             ratatui::layout::Rect::new(0, 0, 80, 24),
             now,
+            &crate::render::Render {
+                motion: now.motion,
+                ..crate::render::current()
+            },
         );
         assert_eq!(run.next_draw(), None);
         run.grumble(SLOW_DRAW);
@@ -2743,6 +2802,7 @@ mod tests {
         let mut run = idle(now.instant);
         let mut recorder = Recorder::default();
         crate::theme::with(crate::painted::truecolor(), || {
+            run.detection = crate::render::current().into();
             run.terminal_event(Term::FocusGained);
             run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
             assert_eq!(
@@ -2776,6 +2836,7 @@ mod tests {
         let now = crate::test_support::scene().1;
         let mut run = idle(now.instant);
         crate::theme::with(crate::painted::truecolor(), || {
+            run.detection = crate::render::current().into();
             assert!(look::asking(&run), "idle, and the look is the terminal's");
             look::ask(&mut run);
             assert!(!look::asking(&run), "and nothing is asked twice over");
@@ -2788,6 +2849,7 @@ mod tests {
         crate::theme::with(crate::painted::truecolor(), || {
             assert!(!look::asking(&turning), "a turn is running");
         });
+        run.detection = crate::render::Detection::default();
         assert!(
             !look::asking(&run),
             "and a look with no ground to follow is never on the clock"
@@ -2801,15 +2863,16 @@ mod tests {
         let now = crate::test_support::scene().1;
         let mut run = idle(now.instant);
         crate::theme::with(crate::painted::truecolor(), || {
+            run.detection = crate::render::current().into();
             run.answered_late(b"\x1b]11;rgb:fdfd/f6f6/e3e3\x1b\\");
             assert_eq!(
-                crate::theme::current().colors,
+                run.detection.render().look.colors,
                 crate::theme::Colors::True(crate::theme::LIGHT),
                 "the ground turned light"
             );
             run.answered_late(b"\x1b_Gi=31;OK\x1b\\");
             assert_eq!(
-                crate::theme::current().colors,
+                run.detection.render().look.colors,
                 crate::theme::Colors::True(crate::theme::LIGHT),
                 "and another probe's reply is not an answer to this question"
             );

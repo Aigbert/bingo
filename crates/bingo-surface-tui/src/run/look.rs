@@ -2,8 +2,8 @@
 //!
 //! Which of the two palettes bingo draws in is the terminal's own to say, and
 //! a terminal that follows the system's appearance says something different an
-//! hour later. [`crate::theme`] holds that answer in a slot; this is when the
-//! slot is written — the question at the moments a change is likely, and the
+//! hour later. The run holds that answer as a value; this is when the
+//! terminal is asked — the question at the moments a change is likely, and the
 //! answer whenever one comes back.
 //!
 //! Two doors lead in, and one of them is nailed shut.
@@ -86,7 +86,9 @@ impl Owed {
 /// watching a turn is not the one who just changed their system's appearance,
 /// and a reply that lands between two keystrokes is rarer while nobody types.
 pub(super) fn asking(run: &Run) -> bool {
-    theme::follows() && !run.look.question && !run.session.tree.sessions().any(SessionState::busy)
+    theme::follows(run.detection.ask)
+        && !run.look.question
+        && !run.session.tree.sessions().any(SessionState::busy)
 }
 
 /// The clock the loop waits on: a wake when the terminal is worth asking
@@ -101,21 +103,7 @@ pub(super) async fn wait(asking: bool, next: Instant) {
 /// Owe the terminal the question. A person who named a look with
 /// `BINGO_THEME`, and a terminal with no palette to follow, are never asked.
 pub(super) fn ask(run: &mut Run) {
-    run.look.question |= theme::follows();
-}
-
-/// A reply the terminal sent, read: an answer to that question swaps the look,
-/// and every frame after it is drawn in the other palette. Anything else is
-/// another probe's reply and is left alone.
-///
-/// A swap that changes nothing says nothing; a swap that changes the look
-/// needs no announcing either, because the screen itself is the message — and
-/// the frame that carries it is the one the loop paints on the way out of this
-/// pass.
-pub(super) fn answered(reply: &[u8]) {
-    if let Some(light) = theme::answered(reply) {
-        theme::swap(light);
-    }
+    run.look.question |= theme::follows(run.detection.ask);
 }
 
 /// Put the question, where one is owed. Between frames, with the title and the

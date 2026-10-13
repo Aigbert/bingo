@@ -62,6 +62,7 @@ mod complete;
 mod composer;
 mod dialog;
 mod effect;
+mod focus;
 mod fold;
 mod foot;
 mod form;
@@ -72,8 +73,6 @@ pub mod guide;
 mod highlight;
 mod history;
 mod input;
-mod focus;
-mod render;
 mod keys;
 /// An answer that came back after the probe that asked for it gave up (M60).
 mod late;
@@ -92,6 +91,7 @@ mod pictures;
 mod pointer;
 mod preview;
 mod rail;
+mod render;
 mod rewind;
 mod roster;
 mod run;
@@ -134,7 +134,6 @@ use bingo_sdk::{
 
 /// How long the graphics probe waits for an answer that has tmux to cross, so
 /// the pty harness's late scene can outlast the same window the surface uses.
-#[cfg(not(test))]
 pub use theme::PROBE_THROUGH;
 
 /// The surface id, and the origin every input it submits carries.

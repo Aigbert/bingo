@@ -42,9 +42,13 @@ pub fn drawn(width: u16, height: u16, tree: &Tree, ui: &mut Ui, now: Now) -> Tes
         ui,
         ratatui::layout::Rect::new(0, 0, width, height),
         now,
+        &crate::render::Render {
+            motion: now.motion,
+            ..crate::render::current()
+        },
     );
     terminal
-        .draw(|frame| layout::paint(&shown, frame))
+        .draw(|frame| layout::paint(&shown, frame, &crate::render::current()))
         .expect("a drawn frame");
     ui.shown = shown;
     terminal.backend().clone()

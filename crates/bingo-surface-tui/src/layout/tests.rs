@@ -1,4 +1,24 @@
-use super::{Layout, layout};
+use super::Layout;
+
+fn layout(
+    previous: Layout,
+    tree: &crate::tree::Tree,
+    ui: &crate::ui::Ui,
+    size: Rect,
+    now: crate::clock::Now,
+) -> Layout {
+    super::layout(
+        previous,
+        tree,
+        ui,
+        size,
+        now,
+        &crate::render::Render {
+            motion: now.motion,
+            ..crate::render::current()
+        },
+    )
+}
 use crate::test_support::*;
 use ratatui::layout::Rect;
 

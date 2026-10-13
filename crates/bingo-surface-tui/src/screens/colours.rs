@@ -254,11 +254,7 @@ fn a_terminal_that_turns_light_under_a_drawn_screen_is_followed() {
             before.contains(&crate::theme::DARK.raised),
             "the line is banded in the dark palette's tint: {before:?}"
         );
-        assert!(
-            crate::theme::swap(true),
-            "and then the terminal says its ground has turned"
-        );
-        let after = band(&painted(80, 24, &tree, &mut ui, now));
+        let after = crate::theme::with(daylight(), || band(&painted(80, 24, &tree, &mut ui, now)));
         assert!(
             after.contains(&crate::theme::LIGHT.raised),
             "the next frame wears the light one: {after:?}"

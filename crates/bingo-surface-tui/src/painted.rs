@@ -61,9 +61,13 @@ pub fn painted(width: u16, height: u16, tree: &Tree, ui: &mut Ui, now: Now) -> P
         ui,
         ratatui::layout::Rect::new(0, 0, width, height),
         now,
+        &crate::render::Render {
+            motion: now.motion,
+            ..crate::render::current()
+        },
     );
     terminal
-        .draw(|frame| layout::paint(&shown, frame))
+        .draw(|frame| layout::paint(&shown, frame, &crate::render::current()))
         .expect("a drawn frame");
     ui.shown = shown;
     Painted(terminal.backend().buffer().clone())

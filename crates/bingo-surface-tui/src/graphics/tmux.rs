@@ -106,7 +106,7 @@ pub fn allows(said: &str) -> Passthrough {
 ///
 /// The answer is what tmux now carries: `All` when the pane was raised,
 /// what was read when it was not.
-#[cfg(all(unix, not(test)))]
+#[cfg(unix)]
 pub fn reach_hidden(passthrough: Passthrough) -> Passthrough {
     if passthrough != Passthrough::On {
         return passthrough;
@@ -118,14 +118,14 @@ pub fn reach_hidden(passthrough: Passthrough) -> Passthrough {
 }
 
 /// A console that asks no tmux has no pane to raise ([`passthrough`]).
-#[cfg(all(not(unix), not(test)))]
+#[cfg(not(unix))]
 pub fn reach_hidden(passthrough: Passthrough) -> Passthrough {
     passthrough
 }
 
 /// Whether `tmux set -p allow-passthrough all` was run and said nothing
 /// against it, inside the window a probe is given ([`ended`]).
-#[cfg(all(unix, not(test)))]
+#[cfg(unix)]
 fn raised() -> bool {
     let Ok(mut child) = std::process::Command::new("tmux")
         .args(["set", "-p", "allow-passthrough", "all"])
@@ -150,7 +150,7 @@ fn raised() -> bool {
 /// otherwise hold the whole start-up: a local server answers in milliseconds,
 /// and one that has not answered in a probe's own window is one whose answer
 /// is not worth waiting for.
-#[cfg(all(unix, not(test)))]
+#[cfg(unix)]
 pub fn passthrough(transport: Transport) -> Passthrough {
     if transport == Transport::Bare {
         return Passthrough::Unknown;
@@ -163,14 +163,14 @@ pub fn passthrough(transport: Transport) -> Passthrough {
 
 /// No Windows console draws pictures and none is asked ([`super::exchange`]),
 /// so there is no tmux to ask either.
-#[cfg(all(not(unix), not(test)))]
+#[cfg(not(unix))]
 pub fn passthrough(_transport: Transport) -> Passthrough {
     Passthrough::Unknown
 }
 
 /// What `tmux display-message` printed, or nothing at all when it could not be
 /// run, took too long, or failed.
-#[cfg(all(unix, not(test)))]
+#[cfg(unix)]
 fn asked() -> Option<String> {
     let mut child = std::process::Command::new("tmux")
         .args(["display-message", "-p", "#{allow-passthrough}"])
@@ -190,7 +190,7 @@ fn asked() -> Option<String> {
 }
 
 /// Whether the process ended inside the window a probe is given.
-#[cfg(all(unix, not(test)))]
+#[cfg(unix)]
 fn ended(child: &mut std::process::Child) -> bool {
     let deadline = std::time::Instant::now() + crate::theme::PROBE;
     while std::time::Instant::now() < deadline {

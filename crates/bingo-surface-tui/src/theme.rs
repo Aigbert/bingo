@@ -258,141 +258,23 @@ impl Theme {
     }
 }
 
-#[cfg(test)]
-thread_local! {
-    /// The look one test draws in. Thread-local because the suite runs in
-    /// parallel and a process-wide switch would leak between tests.
-    static OVERRIDE: std::cell::Cell<Option<Theme>> = const { std::cell::Cell::new(None) };
-}
-
-/// The look under test: the ANSI table unless a test asked for another, so a
-/// snapshot never depends on the terminal that ran it.
-#[cfg(test)]
+/// The look of the active pass, or the resting look outside a pass.
 pub fn current() -> Theme {
-    OVERRIDE.with(std::cell::Cell::get).unwrap_or(Theme {
-        colors: Colors::Ansi,
-        glyphs: &UNICODE,
-    })
+    crate::render::current().look
 }
 
-/// What the environment asked for, read once: nothing in it can change while
-/// the run lasts.
-#[cfg(not(test))]
-static ASK: std::sync::OnceLock<Ask> = std::sync::OnceLock::new();
-
-/// What the terminal last said its ground was — the one part of the look that
-/// may change under a running surface (M71), so the one part that is a slot
-/// rather than a settled value. A number and not a lock: [`current`] is read
-/// on every span of every frame.
-#[cfg(not(test))]
-static GROUND: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(UNASKED);
-
-/// The three things the terminal may have said about its ground, as [`GROUND`]
-/// holds them.
-const UNASKED: u8 = 0;
-const LIGHT_GROUND: u8 = 1;
-const DARK_GROUND: u8 = 2;
-
-/// What one of those numbers says.
-fn ground(said: u8) -> Option<bool> {
-    match said {
-        LIGHT_GROUND => Some(true),
-        DARK_GROUND => Some(false),
-        _ => None,
-    }
+/// Pure detection, shared by the run and the fixtures.
+pub fn detect(ask: Ask, light: Option<bool>) -> Theme {
+    choose(ask, light)
 }
 
-/// And the number for one of those answers.
-fn number(ground: Option<bool>) -> u8 {
-    match ground {
-        Some(true) => LIGHT_GROUND,
-        Some(false) => DARK_GROUND,
-        None => UNASKED,
-    }
-}
-
-/// The look this frame is drawn in. Read on every span, and read again by the
-/// two memos of a drawing — the transcript's blocks and the highlighter's rows
-/// — which a change of look throws away.
-#[cfg(not(test))]
-pub fn current() -> Theme {
-    let said = GROUND.load(std::sync::atomic::Ordering::Relaxed);
-    choose(*ASK.get_or_init(asked), ground(said))
-}
-
-/// Settle what the environment says and ask the terminal what colour its
-/// background is, where that is what decides it. Called once, before the
-/// terminal is taken: a probe writes an escape and waits for the answer, which
-/// is not something a draw may do — and, since the answer is a slot of its
-/// own, not something a draw can do either. A test never reaches it — the
-/// suite fixes the look instead.
-#[cfg(not(test))]
-pub fn detect() {
-    let _ = ASK.set(asked());
-    if follows() {
-        GROUND.store(number(background()), std::sync::atomic::Ordering::Relaxed);
-    }
-}
-
-#[cfg(test)]
-pub fn detect() {}
-
-/// The terminal said again ([`crate::run::look`]): `true` where the look
-/// actually changed and the screen is now wearing the wrong ink, `false`
-/// where the answer is the one already standing — or where nothing follows the
-/// terminal at all, which [`follows`] is the question for.
-#[cfg(not(test))]
-pub fn swap(light: bool) -> bool {
-    let before = current();
-    GROUND.store(number(Some(light)), std::sync::atomic::Ordering::Relaxed);
-    current() != before
-}
-
-/// The same under test, on the thread-local look [`with`] fixes, so a swap in
-/// one test is not a swap in another and nothing leaks out of the closure.
-#[cfg(test)]
-pub fn swap(light: bool) -> bool {
-    let before = current();
-    let after = match before.colors {
-        Colors::True(_) => Theme {
-            colors: choose(
-                Ask {
-                    truecolor: true,
-                    ..Ask::default()
-                },
-                Some(light),
-            )
-            .colors,
-            ..before
-        },
-        _ => before,
-    };
-    OVERRIDE.with(|slot| slot.set(Some(after)));
-    after != before
-}
-
-/// Whether the terminal is the one that says what the look is, and so whether
-/// it is worth asking — once before the first frame, and again while the run
-/// lasts. A named look, a terminal of eight colours and `NO_COLOR` all answer
-/// no: there is nothing an answer would change, and a person who named a look
-/// is not asked again.
-#[cfg(not(test))]
-pub fn follows() -> bool {
-    let ask = *ASK.get_or_init(asked);
+pub fn follows(ask: Ask) -> bool {
     !ask.no_color && ask.truecolor && ask.look == Look::Terminal
-}
-
-/// The same under test, where the look is the one [`with`] fixed: the two
-/// palettes are the truecolor look's, and nothing else has a ground to follow.
-#[cfg(test)]
-pub fn follows() -> bool {
-    matches!(current().colors, Colors::True(_))
 }
 
 /// How long a probe of the terminal is given, this one and the graphics probe
 /// beside it ([`crate::graphics`]). A terminal that has not answered by then is
 /// one whose answer would have arrived after the first frame.
-#[cfg(not(test))]
 pub(crate) const PROBE: std::time::Duration = std::time::Duration::from_millis(400);
 
 /// How long the graphics probe is given when tmux is carrying the questions
@@ -409,33 +291,8 @@ pub(crate) const PROBE: std::time::Duration = std::time::Duration::from_millis(4
 ///
 /// It is public because the pty harness's late scene has to outlast it, and a
 /// window the test spells for itself is a window that drifts.
-#[cfg(not(test))]
 pub const PROBE_THROUGH: std::time::Duration =
     std::time::Duration::from_millis(3 * PROBE.as_millis() as u64);
-
-#[cfg(not(test))]
-fn asked() -> Ask {
-    Ask {
-        no_color: std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()),
-        truecolor: matches!(
-            std::env::var("COLORTERM").ok().as_deref(),
-            Some("truecolor" | "24bit")
-        ),
-        ascii: std::env::var_os("BINGO_ASCII").is_some_and(|v| v == "1"),
-        look: look(std::env::var("BINGO_THEME").ok().as_deref()),
-    }
-}
-
-/// Whether the terminal says its background is light (OSC 10/11). A terminal
-/// that will not say leaves the dark palette standing.
-#[cfg(not(test))]
-fn background() -> Option<bool> {
-    let mut options = terminal_colorsaurus::QueryOptions::default();
-    options.timeout = PROBE;
-    terminal_colorsaurus::theme_mode(options)
-        .ok()
-        .map(|mode| mode == terminal_colorsaurus::ThemeMode::Light)
-}
 
 // ---- and asked again (M71) ----------------------------------------------
 
@@ -527,10 +384,11 @@ pub fn background_is_light(red: u16, green: u16, blue: u16) -> bool {
 /// Draw whatever `f` draws in another look.
 #[cfg(test)]
 pub fn with<R>(theme: Theme, f: impl FnOnce() -> R) -> R {
-    let previous = OVERRIDE.with(|slot| slot.replace(Some(theme)));
-    let out = f();
-    OVERRIDE.with(|slot| slot.set(previous));
-    out
+    crate::render::Render {
+        look: theme,
+        ..crate::render::current()
+    }
+    .scope(f)
 }
 
 // ---- the tokens ---------------------------------------------------------
@@ -1396,65 +1254,6 @@ mod tests {
             .colors,
             Colors::Plain,
         );
-    }
-
-    // ---- and the ground that may change under it (M71) ------------------
-
-    /// The look follows the terminal: an answer that says the other thing is
-    /// the palette every draw after it wears, and one that says the same thing
-    /// is nothing at all.
-    #[test]
-    fn a_ground_answered_again_swaps_the_palette() {
-        with(crate::painted::truecolor(), || {
-            assert_eq!(current().colors, Colors::True(DARK));
-            assert!(swap(true), "the ground turned light");
-            assert_eq!(current().colors, Colors::True(LIGHT));
-            assert!(!swap(true), "and says so again");
-            assert_eq!(current().colors, Colors::True(LIGHT));
-            assert!(swap(false), "and back");
-            assert_eq!(current().colors, Colors::True(DARK));
-        });
-    }
-
-    /// A swap changes the palette and nothing else: the glyph table a person
-    /// asked for is not the terminal's to say.
-    #[test]
-    fn a_swap_leaves_the_glyphs_where_they_were() {
-        with(
-            Theme {
-                colors: Colors::True(DARK),
-                glyphs: &ASCII,
-            },
-            || {
-                assert!(swap(true));
-                assert_eq!(current().glyphs, &ASCII);
-            },
-        );
-    }
-
-    /// Where there is no ground to follow there is nothing to swap: eight
-    /// colours and `NO_COLOR` both stand still, and say so.
-    #[test]
-    fn a_look_with_no_ground_to_follow_never_swaps() {
-        for look in [crate::painted::no_colour(), crate::painted::ascii()] {
-            with(look, || {
-                assert!(!follows(), "{:?} has no ground", look.colors);
-                assert!(!swap(true));
-                assert_eq!(current().colors, look.colors);
-            });
-        }
-        with(crate::painted::truecolor(), || {
-            assert!(follows(), "and the native look does")
-        });
-    }
-
-    /// What the terminal said, as the one number the slot holds it in.
-    #[test]
-    fn the_ground_survives_the_number_it_is_kept_in() {
-        for said in [Some(true), Some(false), None] {
-            assert_eq!(ground(number(said)), said);
-        }
-        assert_eq!(ground(97), None, "and a number nothing wrote is silence");
     }
 
     /// An `OSC 11` reply, read the way `xparsecolor` reads the colour strings
