@@ -6,9 +6,7 @@
 [ADR-0081](../adr/0081-the-screen-is-the-persons.md). The rail and the
 `ctrl+p` sheet — what the person called "the board" — go, by the
 person's word of 2026-10-13. The transcript takes the width at every
-size. A plugin is seen in the TUI only where it placed itself; the
-in-tree producers that relied on the legacy lanes place themselves or
-become data. No new dependency.
+size. Plugins place themselves or remain data. No new dependency.
 
 ## Bricks, in build order
 
@@ -55,6 +53,7 @@ become data. No new dependency.
 - `crates/bingo-demo-ui/src/{board,command,journal,progress,lib,tests}.rs`
 - `crates/bingo-rooms/src/{owed,roster,room}.rs`, `crates/bingo-collab/src/{room,owed}.rs`
 - `crates/bingo-schedule/src/wake.rs`
+- `crates/bingo/tests/rooms.rs` (approved default-slot expectation)
 - `crates/bingo-context/src/baseline/lifecycle.rs` (approved Null-absence assertion)
 - `scripts/tui-smoke.sh`, the guide pages naming `ctrl+p` or the rail
 - `docs/adr/{0013,0070,0079,0081}-*.md`, `docs/design/tui.md`,
@@ -62,21 +61,22 @@ become data. No new dependency.
 
 ## Exit criteria
 
-- [ ] Each brick-1 test failed first (output pasted) and passes now.
-- [ ] `rg 'RAIL_AT|RAIL_WIDTH|ctrl\+p' crates/bingo-surface-tui/src` and
+- [x] Each brick-1 test failed first (output pasted) and passes now.
+- [x] `rg 'RAIL_AT|RAIL_WIDTH|ctrl\+p' crates/bingo-surface-tui/src` and
       `rg '^mod (rail|panel);' crates/bingo-surface-tui/src/lib.rs` find nothing.
       `views/panel.rs` remains: it draws `View::Panel`, not the removed sheet.
-- [ ] A tmux drive at 80×24, 120×40 and 200×50 with a room open and
+- [x] A tmux drive at 80×24, 120×40 and 200×50 with a room open and
       `--demo-ui`: no column beside the transcript at any width; `/board`
       shows the board row and its Tick button changes the table; the
       progress bar runs in the activity band; `ctrl+p` does nothing.
-- [ ] The removed snapshots (rail, sheet, pins, `owed_*`, the rail cases
+- [x] The removed snapshots (rail, sheet, pins, `owed_*`, the rail cases
       of `roster_*`) are listed with the reason; retained help/roster snapshots change only
       the removed shortcut/cards and reflow, keeping their assertions.
-- [ ] `scripts/tui-smoke.sh` passes; its `❯ Board` and pinned-board steps
-      now go through `/board` (edit the steps, say so).
-- [ ] All gates of the upgrade protocol, plus the Windows cross-check
-      for every touched crate.
+- [x] `scripts/tui-smoke.sh` passes; its `❯ Board` and former pin steps
+      now go through `/board`, Tab and the row’s Tick/Reset actions.
+- [x] All gates of the upgrade protocol, plus the Windows cross-check
+      for every touched crate. TUI (`aws-lc-sys`) and bin (`aws-lc-sys`,
+      `tree-sitter`, `tree-sitter-bash`) await Windows CI for SDK C headers, per step 7.
 
 ## Non-goals
 
@@ -89,11 +89,8 @@ become data. No new dependency.
 
 ## Risks
 
-- A protocol-1 plugin that drew only through the panel lane disappears
-  from the TUI. That is the decision; its guide page says how to place
-  itself, and its data stays in the fold.
-- `Null` removing an extension changes a journaled fold. Old journals
-  fold to fewer entries, never more; the fixture pins it.
+- Legacy protocol-1 views disappear until placed; their data stays in the fold.
+- Null removes old journal entries from the fold; the fixture pins it.
 - `bingo-context/src/baseline/lifecycle.rs`: approved Null-absence expectation.
 - Approved TUI removal scope (relative to `src/`; each is removal/caller-only):
   - `blocks.rs`.
@@ -123,6 +120,15 @@ become data. No new dependency.
   - `views/tests.rs`: delete the removed legacy action traversal test.
   - `window.rs`.
 - Deleted snapshots: `panel_end`, `panel_middle`, `custom_panel_{80x24,120x40}`, `panel_sheet_{80x24,120x40}`, `owed_{80x24,120x40}`, `ctrl_p_shows_what_the_plugins_wrote_into_the_session`, `the_rail_holds_the_pinned_board_and_the_live_progress_card`, `without_a_rail_the_same_cards_draw_under_the_running_rows`: removed sheet/rail/lane only.
+- `bingo/tests/rooms.rs`: approved default `slots: []` in the membership expectation.
+- TUI `screens/snapshots/bingo_surface_tui__screens__teams__roster_in_the_rooms.snap`: removal-only reflow.
+- TUI `snapshots/bingo_surface_tui__motion__sheet_close.snap`: removal-only reflow.
+- TUI `snapshots/bingo_surface_tui__motion__sheet_slide.snap`: removal-only reflow.
+- TUI `snapshots/bingo_surface_tui__screens__help_100x30.snap`: removal-only reflow.
+- TUI `snapshots/bingo_surface_tui__screens__help_80x30.snap`: removal-only reflow.
+- TUI `snapshots/bingo_surface_tui__screens__roster_120x40.snap`: removal-only reflow.
+- TUI `snapshots/bingo_surface_tui__screens__roster_80x24.snap`: removal-only reflow.
+- TUI `snapshots/bingo_surface_tui__view__tests__help_panel.snap`: removal-only reflow.
 - `bingo-rooms/src/room.rs`: approved default `slots: []` in two complete-payload expectations.
 - Standing approval (2026-10-14): any crate's expectation may add default `slots: []` or assert absence after Null removal; other outside-scope changes still stop.
 - `bingo-surface-tui/src/screens/shells.rs`: remove stale rail comments.
@@ -329,4 +335,268 @@ $ cargo fmt --all -- --check
 (exit 0; no output)
 $ cargo clippy --workspace --all-targets --locked -- -D warnings
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.54s
+```
+
+```text
+$ cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.01s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.06s
+test result: ok. 259 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 38.82s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.30s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.90s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test a_post_in_a_room_wakes_its_member_and_is_not_fanned_back ... FAILED
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+assertion `left == right` failed: the membership lives in the room's own journal, wearing the tree a surface draws it as (ADR-0013 §2) and the ear each seat asked for
+  left: Object {"kind": String("tree"), "nodes": Array [Object {"label": String("reviewer"), "badge": String("live"), "tone": String("neutral")}], "members": Array [String("reviewer")], "listeners": Array [Object {"name": String("reviewer"), "patience_s": Number(0)}], "slots": Array []}
+ right: Object {"members": Array [String("reviewer")], "listeners": Array [Object {"name": String("reviewer"), "patience_s": Number(0)}], "kind": String("tree"), "nodes": Array [Object {"label": String("reviewer"), "badge": String("live"), "tone": String("neutral")}]}
+error: test failed, to rerun pass `-p bingo --test rooms`
+```
+
+```text
+$ cargo test --workspace --locked --no-fail-fast -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed
+test room::m148::m148_members_are_unplaced_and_readable ... ok
+test owed::m148::m148_owed_is_unplaced_data ... ok
+test tests::m148_a_fresh_board_records_a_transcript_anchor ... ok
+test progress::m148::m148_progress_places_an_activity ... ok
+test tests::m148_board_places_its_table_and_buttons_on_its_recorded_row ... ok
+test wake::m148::m148_wake_is_unplaced_data ... ok
+test state::tests::m148_null_extension_journal_removes_only_its_kind ... ok
+test frame::m148::m148_room_and_wake_data_draw_nothing_at_every_width ... ok
+test frame::m148::m148_unplaced_payloads_leave_the_screen_unchanged_at_every_width ... ok
+test input::m148::m148_row_focus_uses_the_ascii_cursor ... ok
+test input::m148::m148_tab_focuses_a_placed_row_and_its_button_dispatches ... ok
+test keys::m148::m148_control_p_is_unbound_and_absent_from_help ... ok
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.01s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.09s
+test result: ok. 259 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 38.84s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.30s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.93s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.65s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.90s
+test result: ok. 158 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 103 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.17s
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 120 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
+test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 99 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+test result: ok. 497 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.92s
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 82 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.56s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 90 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 103 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 68 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.18s
+test result: ok. 146 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.32s
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 155 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.03s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 86 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 230 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 116 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.04s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 136 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.93s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 86 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 67 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.62s
+test result: ok. 102 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 41 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 8.62s
+test result: ok. 1099 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.96s
+test result: ok. 76 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 149 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+test result: ok. 83 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.65s
+test result: ok. 92 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+```text
+$ cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1
+test a_proxy_with_a_token_this_run_never_minted_gets_nothing ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.03s
+$ cargo test -p bingo-provider-acp --test bridge token --locked -- --test-threads=1
+test a_second_concurrent_stream_on_one_token_is_refused ... ok
+test a_token_may_be_dialled_again_once_its_stream_has_closed ... ok
+test a_token_nobody_minted_never_gets_a_conversation ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+$ scripts/check_discipline.sh
+dependency direction ok
+shared service declarations ok
+cohesion ok
+catalogue entry declarations ok
+discipline ok
+$ scripts/budget.sh
+dependencies (unique, normal): 355 (max  355)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 6 GB (soft max  5)
+warn: target/debug exceeds the soft limit
+test binaries: 136
+budget ok
+```
+
+```text
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+$ cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.18s
+$ cargo check -p bingo-context --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.45s
+$ cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/third_party/jitterentropy/jitterentropy-library/arch/jitterentropy-base-windows.h:49:10: fatal error: 'windows.h' file not found
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+$ cargo check -p bingo-demo-ui --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.15s
+$ cargo check -p bingo-collab --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.64s
+$ cargo check -p bingo-rooms --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.73s
+$ cargo check -p bingo-schedule --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.56s
+$ cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc
+warning: tree-sitter@0.26.13: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.26.13/src/./alloc.h:9:10: fatal error: 'stdio.h' file not found
+error: failed to run custom build command for `tree-sitter v0.26.13`
+warning: tree-sitter-bash@0.25.1: src/tree_sitter/parser.h:10:10: fatal error: 'stdlib.h' file not found
+warning: tree-sitter-bash@0.25.1: src/tree_sitter/./alloc.h:9:10: fatal error: 'stdio.h' file not found
+error: failed to run custom build command for `tree-sitter-bash v0.25.1`
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/third_party/jitterentropy/jitterentropy-library/arch/jitterentropy-base-windows.h:49:10: fatal error: 'windows.h' file not found
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+```
+
+```text
+$ cargo build -p bingo --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.82s
+$ scripts/tui-smoke.sh
+  80x24: board Tick/Reset and Activity ok; ctrl+p unbound
+  120x40: board Tick/Reset and Activity ok; ctrl+p unbound
+  200x50: board Tick/Reset and Activity ok; ctrl+p unbound
+tui-smoke ok
+$ rg 'RAIL_AT|RAIL_WIDTH|ctrl\+p' crates/bingo-surface-tui/src
+(exit 1; no matches)
+$ rg '^mod (rail|panel);' crates/bingo-surface-tui/src/lib.rs
+(exit 1; no matches)
+$ cargo fmt --all -- --check
+(exit 0; no output)
+```
+
+```text
+$ cargo check --workspace --all-targets --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.86s
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.80s
+$ scripts/check_discipline.sh
+dependency direction ok
+shared service declarations ok
+cohesion ok
+catalogue entry declarations ok
+discipline ok
+$ git diff --check
+(exit 0; no output)
 ```

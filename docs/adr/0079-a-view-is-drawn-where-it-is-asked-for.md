@@ -1,7 +1,6 @@
 # ADR-0079 — A view is drawn where it is asked for
 
-Status: proposed · 2026-10-13 · Plans: M140 (elements, pulled views),
-M141 (components) · Amends: ADR-0013 §1 §3, ADR-0070 §1
+Status: proposed · 2026-10-13 · Plans: M140 (elements, pulled views), M141 (components) · Amends: ADR-0013 §1 §3, ADR-0070 §1
 
 **2026-10-14:** §3’s future pane docking is subject to ADR-0081 §7, still proposed for M151 (including §5’s viewport). M148 implements ADR-0081 §§1–6 only: no rail or panel sheet; it does not implement panes.
 
@@ -115,8 +114,7 @@ the state the host holds (ADR-0078 §6). This door opens, no other.
   selection and clipboard stay its own, so `$.ui.scroll`, `focus`,
   `selection`, `copy` and `open`'s `isPlaced` are gaps (design §8).
 
-Refs: ADR-0002, ADR-0013, ADR-0065, ADR-0070, ADR-0078, ADR-0080;
-design/mods-parity-2026-10.md.
+Refs: ADR-0002, ADR-0013, ADR-0065, ADR-0070, ADR-0078, ADR-0080; design/mods-parity-2026-10.md.
 Non-goals: `Client` modules, meaning code that runs on a surface's
 drawing thread, and `$.ui.blit`. A mod drawing the permission prompt.
 Styling beyond the table.
