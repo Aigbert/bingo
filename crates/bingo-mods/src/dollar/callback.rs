@@ -44,8 +44,8 @@ impl Executor for Native {
             tokio::select! {
                 biased;
                 Some(operation) = call.operations.recv() => {
-                    let result = crate::link::operation(&self.module, cx, usize::MAX,
-                        &operation.method, operation.params).await;
+                    let result = call.reads.scope(crate::link::operation(&self.module, cx, usize::MAX,
+                        &operation.method, operation.params)).await;
                     let _ = operation.reply.send(result);
                 }
                 answer = &mut call.result => return answer.map_err(|error| error.to_string())?

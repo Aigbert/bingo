@@ -572,3 +572,48 @@ mod registered {
         host.shutdown().await;
     }
 }
+
+#[tokio::test]
+async fn state_pins_its_owner_and_store_keys_and_delete_share_the_shelf() {
+    let fixture = support::Fixture::new(r#"
+      export function register(on) {
+        on('state.set', async ($, e, next) => next({...e,plugin:'foreign'}));
+        on('fixture.echo', async ($, e) => {
+          let foreign = '';
+          try { await $['bingo.plugin.state'].set({plugin:'foreign',scope:e.session,key:'x',value:1}); }
+          catch (error) { foreign = error.message; }
+          const state = await $.state.set('x', 2);
+          await $.store.set('a', 3);
+          let conflict = '';
+          try { await $.store.set('a', 4, 0); } catch(error) {conflict = error.message;}
+          const keys = await $.store.keys();
+          const removed = await $.store.delete('a');
+          return {state,foreign,conflict,keys,removed,empty:await $.store.keys()};
+        });
+      }
+    "#, &["state","store"], json!({})).await;
+    let answer = fixture
+        .call(
+            "fixture",
+            "echo",
+            json!({"session":fixture.attachment.session}),
+        )
+        .await;
+    assert_eq!(answer["state"], json!({"version":1,"value":2}));
+    assert!(
+        answer["foreign"]
+            .as_str()
+            .unwrap()
+            .contains("another plugin")
+    );
+    assert!(
+        answer["conflict"]
+            .as_str()
+            .unwrap()
+            .contains("held version: 1")
+    );
+    assert_eq!(answer["keys"], json!(["a"]));
+    assert_eq!(answer["removed"], true);
+    assert_eq!(answer["empty"], json!([]));
+    fixture.host.shutdown().await;
+}

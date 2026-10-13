@@ -52,6 +52,7 @@ pub struct Operation {
     pub reply: oneshot::Sender<Result<Value, String>>,
 }
 pub struct Call {
+    pub reads: bingo_plugin_host::state::ReadLog,
     pub operations: mpsc::UnboundedReceiver<Operation>,
     pub result: oneshot::Receiver<Result<Value, Fault>>,
     cancel: CancellationToken,
@@ -154,6 +155,7 @@ impl Engine {
             })
             .map_err(Fault::load)?;
         Ok(Call {
+            reads: Default::default(),
             operations: incoming,
             result: answer,
             cancel,

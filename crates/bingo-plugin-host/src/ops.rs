@@ -78,7 +78,7 @@ pub async fn call(
         }
         .answer(method, params)
         .await
-        .map_err(|error| error.message);
+        .map_err(crate::host::error_message);
     }
     let wire = host
         .service_wire(&key(noun))
@@ -191,7 +191,7 @@ impl WireService for Ops {
         }
         .answer(method, params)
         .await
-        .map_err(|error| ServiceError(error.message))
+        .map_err(|error| ServiceError(crate::host::error_message(error)))
     }
 }
 

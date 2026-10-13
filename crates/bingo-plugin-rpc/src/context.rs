@@ -19,18 +19,37 @@ pub struct Context {
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct Chains(Arc<Mutex<BTreeMap<String, Vec<CallingHook>>>>);
+pub(crate) struct Chains(Arc<Mutex<BTreeMap<String, Invocation>>>);
+struct Invocation {
+    calling: Vec<CallingHook>,
+    reads: BTreeMap<Option<usize>, bingo_plugin_host::state::ReadLog>,
+}
 
 impl Chains {
     pub fn hold(&self, chain: &str) -> Held {
-        self.0
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(chain.into(), invocation::current());
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).insert(
+            chain.into(),
+            Invocation {
+                calling: invocation::current(),
+                reads: BTreeMap::new(),
+            },
+        );
         Held {
             chains: self.clone(),
             chain: chain.into(),
         }
+    }
+
+    pub fn reads(&self, context: &Context) -> bingo_plugin_host::state::ReadLog {
+        let Some(parent) = &context.parent else {
+            return Default::default();
+        };
+        self.0
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .get_mut(parent)
+            .map(|invocation| invocation.reads.entry(context.hook).or_default().clone())
+            .unwrap_or_default()
     }
 
     pub fn bind(&self, plugin: &str, context: Context) -> Result<Vec<CallingHook>, String> {
@@ -40,7 +59,7 @@ impl Chains {
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .get(&parent)
-                .cloned()
+                .map(|invocation| invocation.calling.clone())
                 .ok_or_else(|| {
                     "the parent hook chain is not live on this connection".to_string()
                 })?,

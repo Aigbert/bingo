@@ -92,7 +92,30 @@ impl Runtime {
     }
 
     async fn call(&self, caller: &Caller, method: &str, params: Value) -> Result<Value, String> {
+        if method.starts_with("state.") || method.starts_with("store.") && method != "store.keys" {
+            let global = params.get("scope").and_then(Value::as_str) == Some("global");
+            if global != method.starts_with("store.") {
+                return Err("operation scope does not match its noun".into());
+            }
+        }
         match method {
+            "store.keys" => Ok(json!(
+                caller
+                    .state
+                    .keys("global".into())
+                    .await
+                    .map_err(bingo_plugin_host::host::error_message)?
+            )),
+            "store.delete" => {
+                let input: bingo_plugin_host::host::StateGet = parse(params)?;
+                Ok(json!(
+                    caller
+                        .state
+                        .delete(input.scope, input.key)
+                        .await
+                        .map_err(bingo_plugin_host::host::error_message)?
+                ))
+            }
             "session.version" => Ok(json!(env!("CARGO_PKG_VERSION"))),
             "session.root" => Ok(json!(self.root)),
             "session.messages" => {
@@ -234,7 +257,7 @@ async fn operation(caller: &Caller, method: &str, input: Value) -> Result<Value,
     }
     .answer(method, input)
     .await
-    .map_err(|error| error.message)
+    .map_err(bingo_plugin_host::host::error_message)
 }
 async fn send(caller: &Caller, mut input: catalogue::Send) -> Result<Value, String> {
     bind_origin(caller, &mut input.input);

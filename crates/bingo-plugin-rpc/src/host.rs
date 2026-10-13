@@ -69,8 +69,14 @@ impl Server {
             .transpose()
             .map_err(failed)?
             .unwrap_or_default();
+        let reads = self.contexts.reads(&context);
         let calling = self.contexts.bind(&self.plugin, context).map_err(failed)?;
-        bingo_plugin_host::invocation::scope(calling, self.answer_bound(method, params)).await
+        reads
+            .scope(bingo_plugin_host::invocation::scope(
+                calling,
+                self.answer_bound(method, params),
+            ))
+            .await
     }
 
     async fn answer_bound(&self, method: &str, params: Value) -> Result<Value, RpcError> {

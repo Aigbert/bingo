@@ -118,7 +118,7 @@ impl Chain<'_> {
                     let result = if operation.method == "next" {
                         self.continue_with(position, input, operation.params, pending).await
                     } else {
-                        link::operation(&self.module, &self.cx, hook, &operation.method, operation.params).await
+                        call.reads.scope(link::operation(&self.module, &self.cx, hook, &operation.method, operation.params)).await
                     };
                     let _ = operation.reply.send(result);
                 }

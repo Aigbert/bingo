@@ -39,6 +39,8 @@ export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root:
       return rpc.request<{ result: unknown }>('service/call', { key: route.face, method, params }).then(reply => reply.result);
     };
   }
+  const deleteKey = hostApi.store.delete;
+  hostApi.store.delete = (key: string) => deleteKey({scope:'global',key});
   for (const noun of ['tool', 'command']) {
     const register = hostApi[noun].register;
     hostApi[noun].register = (spec: { name: string }, handler: Callback) => {
