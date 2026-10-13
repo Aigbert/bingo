@@ -52,10 +52,10 @@ M133's; this milestone makes every verb it needs answerable.
    per round like `HookSource`, each link named by its process; M131's
    tier tests move onto a one-link source. `hook/decide` and its handler
    go; `hook.rs` keeps observation only.
-9. **The process tree.** `Connection::spawn` uses `bingo-process` and
-   framing uses `bingo-jsonrpc` (M128); `codec.rs` goes if M128 has not
-   already removed it. A test: a plugin whose entry starts a grandchild
-   leaves no process behind after the host drops it (unix and Windows).
+9. **The process tree (landed in M128).** Retain `Connection::spawn`
+   on `bingo_process::Tree`, the shared `Peer`, and `codec.rs` (only a
+   re-export plus protocol error codes). Re-run its existing cross-platform
+   `dropping_a_connection_closes_a_grandchilds_stdout` test.
 10. **Hot reload.** `--plugin-dir` writes `pluginDirs` in `cli_layer`;
     discovery adds them as the last layer. `reload.rs`: a pure
     `changed(before, after: &Stamps) -> bool` over (path, len, mtime),
@@ -69,11 +69,19 @@ M133's; this milestone makes every verb it needs answerable.
 - `crates/bingo-plugin-rpc/src/{wire.rs,connection.rs,bridge.rs,hook.rs,source.rs,manager.rs,discovery.rs,config.rs,manifest.rs,schema.rs,testing.rs,lib.rs}`
 - `crates/bingo-plugin-rpc/src/{host.rs,state.rs,intercept.rs,reload.rs}` (new; one noun each)
 - `crates/bingo-plugin-rpc/examples/stub_plugin/{main.rs,hooks.rs}`, `tests/plugin/*.rs`
-- `crates/bingo-sdk/src/{host.rs (complete),intercept.rs (InterceptorSource),plugin.rs}`
-- `crates/bingo-core/src/{host.rs,plugins.rs}`, `crates/bingo-core/src/chain/mod.rs`
+- `crates/bingo-sdk/src/{host.rs,error.rs,intercept.rs,plugin.rs,event.rs,state.rs}`
+- `crates/bingo-sdk/src/event/raw.rs`, `tests/record.rs`, `fixtures/record/event/usageCharged.json`
+  (all under `crates/bingo-sdk`); `src/testing/{api.rs,calls.rs}` as needed.
+- `crates/bingo-core/src/{host.rs,plugins.rs,session.rs,turn.rs}`;
+  `host/{registry.rs,complete.rs}`, `session/{mailbox.rs,running.rs,complete.rs}`,
+  `turn/late.rs`, `chain/*.rs`, `session/{inputs.rs,invoke.rs}` and their tests.
 - `crates/bingo/src/main.rs` (`--plugin-dir`), `crates/bingo/src/plugins.rs` (who asks for `model`)
 - `examples/plugins/wordcount/main.py` (protocol 2), `crates/bingo/tests/plugin_rpc.rs`
 - `docs/adr/{0015,0030,0031}-*.md` (dated notes)
+- `crates/bingo-plugin-rpc/Cargo.toml`, `Cargo.lock`: existing workspace
+  `bingo-shelf` dependency for state (ADR-0072); no external dependency.
+- Mechanical constructors, exhaustive Event/Contribution matches and generated
+  schema fixtures outside these files follow execution protocol step 6.
 
 ## Exit criteria
 
@@ -121,4 +129,8 @@ M133's; this milestone makes every verb it needs answerable.
   APIs and whether `codec.rs` survived; M129's shelf path and API;
   ADR-0068/M116 supervised turns (the link runs inside the turn's
   future); M131's `Interceptor`/`Next` as built; M111's shared test host
-  and clock for the reload poll. Line numbers are from `979a6d27`.
+  and clock for the reload poll. Re-verified at `32dcbfb1`: slots use
+  `slot::with` over signals; shelf uses `Shelf<Codec>::save`; chain sources
+  belong in `host/registry.rs` and `turn/late.rs`. `UsageCharged` requires
+  the sdk fold and actor mailbox; completed usage must use the actor tally.
+  `ErrorCode` needs additive `Unsupported` for the default complete refusal.
