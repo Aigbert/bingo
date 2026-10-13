@@ -4,13 +4,15 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use super::MARKER;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-pub(super) fn open(path: &Path) -> io::Result<File> {
+static NEXT: AtomicU64 = AtomicU64::new(0);
+
+pub(super) fn open(path: &Path, marker: &str) -> io::Result<File> {
     match existing(path) {
         Ok(file) => Ok(file),
         Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            publish(path)?;
+            publish(path, marker)?;
             existing(path)
         }
         Err(e) => Err(e),
@@ -21,11 +23,10 @@ fn existing(path: &Path) -> io::Result<File> {
     File::options().read(true).write(true).open(path)
 }
 
-fn publish(path: &Path) -> io::Result<()> {
-    let staging = path.with_file_name(format!(".runner-{}.tmp", ulid::Ulid::generate()));
-    let mut file = File::create_new(&staging)?;
+fn publish(path: &Path, marker: &str) -> io::Result<()> {
+    let (staging, mut file) = staging(path)?;
     let _cleanup = Staging(staging.clone());
-    file.write_all(MARKER.as_bytes())?;
+    file.write_all(marker.as_bytes())?;
     file.sync_all()?;
     drop(file);
     // A hard link publishes complete bytes atomically without replacing an
@@ -42,5 +43,17 @@ struct Staging(PathBuf);
 impl Drop for Staging {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+fn staging(path: &Path) -> io::Result<(PathBuf, File)> {
+    loop {
+        let id = NEXT.fetch_add(1, Ordering::Relaxed);
+        let staging = path.with_file_name(format!(".claim-{}-{id}.tmp", std::process::id()));
+        match File::create_new(&staging) {
+            Ok(file) => return Ok((staging, file)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
     }
 }
