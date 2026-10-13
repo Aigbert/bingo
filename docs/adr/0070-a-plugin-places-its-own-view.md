@@ -1,7 +1,7 @@
 # ADR-0070 — A plugin places its own view
 
-Status: accepted for §§1–3,6 (M121) · 2026-10-13; §§4–5,7 remain proposed
-for M123. Amends: ADR-0013 §2, §4, ADR-0019 §8
+Status: accepted · 2026-10-13 · Plans: M121, M123.
+Amends: ADR-0013 §2, §4, ADR-0019 §8
 
 ## Context
 

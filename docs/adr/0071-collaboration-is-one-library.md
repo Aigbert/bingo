@@ -1,7 +1,7 @@
 # ADR-0071 — Collaboration is one library
 
-Status: accepted for §§1–3 · 2026-10-13 · Plan: M122
-§4 remains proposed for M123; the TUI consumers of §1 also land in M123.
+Status: accepted · 2026-10-13 · Plans: M122, M123.
+M123 implements §4 and the TUI consumers of §1.
 Amends: ADR-0021, ADR-0022 §3, ADR-0025 §2, ADR-0029 §3,
 ADR-0034 §3 (M123), ADR-0019 §8
 
@@ -99,5 +99,5 @@ Everything here is a library a plugin chooses to depend on (ADR-0012 §1).
   member names become `Name`s.
 
 Refs: ADR-0012, ADR-0019, ADR-0021, ADR-0022, ADR-0025, ADR-0029,
-ADR-0034, ADR-0053, ADR-0068, ADR-0069, ADR-0070; Plan: M122;
+ADR-0034, ADR-0053, ADR-0068, ADR-0069, ADR-0070; Plans: M122, M123;
 audit-2026-10 §2, §3
