@@ -36,7 +36,8 @@ No kernel door, no wire change.
    `apply(&mut self, &Frame) -> Applied`,
    `removed(&mut self, &GatewayEvent) -> Vec<SessionId>`, `root()`,
    `get(&SessionId)`, `sessions()` (root first, then id order), and
-   `children_of(&SessionId)`. Removal returns every id it took, so a
+   `children_of(&SessionId)`, and `mark_read(&SessionId)` for the existing
+   client read marker. Parent links are read from each summary. Removal returns every id it took, so a
    surface drops what it keeps per session in the same step. It holds a
    `SessionState` per session and the parent links, nothing else
    (ADR-0064 §5).
@@ -45,11 +46,12 @@ No kernel door, no wire change.
    time, and no session is present whose ancestor was removed.
 4. **The TUI moves.** `tree::Tree` wraps a `TreeState` and keeps `view`
    and the switcher rows. `apply`, `state_mut` and `close` are deleted.
-   `run.rs` `closed` and `removed` call the fold and drop `handles` for
-   each id it returns. `removed` keeps pruning the switcher's stored list.
+   `run.rs` folds frames once and drops handles for deleted ids; gateway
+   removal uses the ids returned by `removed`. Frame removal derives the
+   removed ids from membership before and after applying the frame. `removed` keeps pruning the switcher's stored list.
    If the viewed session is among the removed, the view returns to the
-   root. The existing `tree.rs` tests and `screens/` snapshots pass
-   unchanged.
+   root. Existing assertions and snapshots stay unchanged; fixture construction
+   calls the SDK fold directly.
 5. **Channels moves.** The runner holds a `TreeState` in place of
    `states`. `state_of` goes, and `concerns_this_chat` reads the fold. A
    deleted child is dropped, which it never was. A new runner test
@@ -65,10 +67,13 @@ No kernel door, no wire change.
 - `crates/bingo-surface-tui/src/{tree.rs,run.rs}` and the tests that
   build a `Tree` (`test_support.rs`, `screens/`)
 - `crates/bingo-channels/src/runner.rs` and its tests
-- `crates/bingo-surface-print/src/lib.rs` and
+- `crates/bingo-surface-print/src/{lib.rs,hosted.rs}` and
   `crates/bingo/tests/cli/` (print black-box)
 - `docs/adr/0064-one-fold-for-the-transcript-one-for-the-tree.md`
   (accepted for §5–6, with the M112 half already accepted)
+- `docs/adr/0002-event-stream.md` (dated amendment note)
+- Mechanical TUI fixture updates in `view.rs`, `roster.rs`, `seats.rs`
+  and `screens.rs`; existing assertions remain unchanged.
 
 ## Exit criteria
 
@@ -108,3 +113,14 @@ No kernel door, no wire change.
 - Re-verify at start: M112's `Transcript` inside `SessionState`, the
   three fold sites' line numbers, and the `GatewayEvent` variants
   (`bingo-sdk/src/host.rs`).
+
+## Re-verified (2026-10-13, 052defcb)
+
+- M112's `SessionState.transcript` and `Transcript` are present.
+- Fold sites remain `tree.rs:143`, `runner.rs:173`, and print `lib.rs:286`;
+  print `hosted.rs:77` also reads the map and must move with it.
+- `GatewayEvent` in `host.rs:297` has `SessionRemoved`, `SessionCreated`,
+  and `CatalogChanged`; only removal changes this fold.
+- TUI `mark_read` mutates the selected session; the SDK delegates that
+  operation without exposing mutable summaries or duplicating parent links.
+- No dependency change; existing `proptest` supplies the property test.
