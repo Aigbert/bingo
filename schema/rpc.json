@@ -738,6 +738,11 @@
         },
         {
           "type": "string",
+          "const": "INTERRUPTED",
+          "description": "The person stopped it; not a failure."
+        },
+        {
+          "type": "string",
           "const": "PROTOCOL_LIMIT",
           "description": "A negotiated RPC byte or pin budget cannot carry this value safely."
         },

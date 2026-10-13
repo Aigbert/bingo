@@ -60,6 +60,8 @@ pub struct CommandContext {
     pub session: SessionId,
     pub cwd: PathBuf,
     pub host: HostHandle,
+    /// Cancelled when the person stops this command or the session closes.
+    pub cancel: crate::CancellationToken,
 }
 
 impl std::fmt::Debug for CommandContext {

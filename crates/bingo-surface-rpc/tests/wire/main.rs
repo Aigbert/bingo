@@ -776,3 +776,36 @@ async fn the_remote_catalog_answers_on_a_multi_threaded_runtime() {
         Ok(Exit { code: 0 })
     );
 }
+
+#[tokio::test]
+async fn an_interrupted_intent_crosses_ndjson_as_a_rejection() {
+    let intent = IntentId::from_raw("stopped-command");
+    let event = bingo_sdk::Event::IntentAck {
+        intent: intent.clone(),
+        outcome: bingo_sdk::IntentOutcome::Rejected {
+            error: KernelError::new(ErrorCode::Interrupted, "stopped by the person"),
+        },
+    };
+    let frame = bingo_sdk::Frame {
+        seq: bingo_sdk::Seq(1),
+        ts: host::ts(),
+        session: session_id(),
+        cause: Some(intent),
+        event,
+    };
+    let (host, _) = TestHost::with(vec![frame.clone()]);
+    let mut wire = Wire::opened(host).await;
+    let Message::Notification(notification) = wire.recv().await else {
+        panic!("the intent outcome is an event notification");
+    };
+    assert_eq!(notification.method, name::EVENT);
+    assert_eq!(
+        notification.params["event"]["outcome"]["error"]["code"],
+        "INTERRUPTED"
+    );
+    assert_eq!(
+        serde_json::from_value::<bingo_sdk::Frame>(notification.params).unwrap(),
+        frame
+    );
+    assert_eq!(wire.finish().await, Exit { code: 0 });
+}

@@ -30,17 +30,17 @@ pub(crate) fn storage(message: impl Into<String>) -> KernelError {
 }
 
 /// `<data_dir>/sessions`, one directory per session.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct JsonlStore {
     root: PathBuf,
-    locks: Locks,
+    locks: Arc<Locks>,
 }
 
 impl JsonlStore {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
-            locks: Locks::default(),
+            locks: Arc::new(Locks::default()),
         }
     }
 
@@ -63,20 +63,8 @@ impl JsonlStore {
     }
 }
 
-#[async_trait]
-impl SessionStore for JsonlStore {
-    async fn create(&self, summary: &SessionSummary) -> Result<(), KernelError> {
-        let dir = layout::session_dir(&self.root, &summary.id);
-        journal::create(&dir, &summary.id)?;
-        summary::write(&dir, summary)
-    }
-
-    async fn append(&self, session: &SessionId, frame: &Frame) -> Result<(), KernelError> {
-        // The kernel does not send ephemeral frames; the store is the guard
-        // that keeps one out of a journal even so.
-        if !frame.event.is_durable() {
-            return Ok(());
-        }
+impl JsonlStore {
+    fn append_frame(&self, session: &SessionId, frame: &Frame) -> Result<(), KernelError> {
         let dir = self.existing(session)?;
         journal::append(&dir, frame)?;
         let derived = match &frame.event {
@@ -91,31 +79,74 @@ impl SessionStore for JsonlStore {
         }
         Ok(())
     }
+}
+
+#[async_trait]
+impl SessionStore for JsonlStore {
+    async fn create(&self, summary: &SessionSummary) -> Result<(), KernelError> {
+        let dir = layout::session_dir(&self.root, &summary.id);
+        let summary = summary.clone();
+        off_runtime(move || {
+            journal::create(&dir, &summary.id)?;
+            summary::write(&dir, &summary)
+        })
+        .await
+    }
+
+    async fn append(&self, session: &SessionId, frame: &Frame) -> Result<(), KernelError> {
+        if !frame.event.is_durable() {
+            return Ok(());
+        }
+        let store = self.clone();
+        let session = session.clone();
+        let frame = frame.clone();
+        off_runtime(move || store.append_frame(&session, &frame)).await
+    }
 
     async fn replay(&self, session: &SessionId, since: Seq) -> Result<Vec<Frame>, KernelError> {
-        journal::replay(&self.existing(session)?, since)
+        let store = self.clone();
+        let session = session.clone();
+        off_runtime(move || journal::replay(&store.existing(&session)?, since)).await
     }
 
     async fn list(&self, filter: &SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        summary::list(&self.root, filter)
+        let root = self.root.clone();
+        let filter = filter.clone();
+        off_runtime(move || summary::list(&root, &filter)).await
     }
 
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
-        let dir = self.existing(session)?;
-        self.locks.release(session);
-        std::fs::remove_dir_all(&dir).map_err(|e| storage(format!("remove {}: {e}", dir.display())))
+        let store = self.clone();
+        let session = session.clone();
+        off_runtime(move || {
+            let dir = store.existing(&session)?;
+            store.locks.release(&session);
+            std::fs::remove_dir_all(&dir)
+                .map_err(|e| storage(format!("remove {}: {e}", dir.display())))
+        })
+        .await
     }
 
     /// Take the session for this process. The kernel calls this on create and
     /// on resume: creating a directory claims nothing by itself.
     async fn acquire(&self, session: &SessionId) -> Result<(), KernelError> {
-        let dir = self.existing(session)?;
-        self.locks.acquire(session, &layout::lock(&dir))
+        let store = self.clone();
+        let session = session.clone();
+        off_runtime(move || {
+            let dir = store.existing(&session)?;
+            store.locks.acquire(&session, &layout::lock(&dir))
+        })
+        .await
     }
 
     async fn release(&self, session: &SessionId) -> Result<(), KernelError> {
-        self.locks.release(session);
-        Ok(())
+        let locks = self.locks.clone();
+        let session = session.clone();
+        off_runtime(move || {
+            locks.release(&session);
+            Ok(())
+        })
+        .await
     }
 }
 
@@ -157,7 +188,8 @@ impl Plugin for JsonlStorePlugin {
         };
         // Collection that cannot run is not a reason to refuse to start: the
         // sessions are still readable, there are only more of them.
-        match Gc::daily(Timestamp::now()).run(store.root()) {
+        let root = store.root().to_path_buf();
+        match off_runtime(move || Gc::daily(Timestamp::now()).run(&root)).await {
             Ok(removed) if !removed.is_empty() => {
                 tracing::info!(count = removed.len(), sessions = ?removed, "collected old sessions");
             }
@@ -540,6 +572,79 @@ pub(crate) mod tests {
         assert_eq!(
             plugin.store.get().expect("the store").root(),
             Path::new("/home/someone/.bingo/data/sessions")
+        );
+    }
+}
+
+async fn off_runtime<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, KernelError> + Send + 'static,
+) -> Result<T, KernelError> {
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|error| storage(format!("store worker failed: {error}")))?
+}
+
+#[cfg(test)]
+mod runtime_contract {
+    use super::*;
+    use std::sync::Barrier;
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn blocking_io_leaves_current_thread_responsive() {
+        let runtime = std::thread::current().id();
+        let worker = off_runtime(|| Ok(std::thread::current().id()))
+            .await
+            .unwrap();
+        assert_ne!(runtime, worker, "journal I/O must leave the runtime thread");
+        let barrier = Arc::new(Barrier::new(2));
+        let held = barrier.clone();
+        let (entered, started) = tokio::sync::oneshot::channel();
+        let write = tokio::spawn(off_runtime(move || {
+            let _ = entered.send(());
+            held.wait();
+            Ok(())
+        }));
+        started.await.unwrap();
+        assert_eq!(
+            tokio::spawn(async { "responsive" }).await.unwrap(),
+            "responsive"
+        );
+        tokio::task::spawn_blocking(move || barrier.wait())
+            .await
+            .unwrap();
+        write.await.unwrap().unwrap();
+    }
+}
+
+#[cfg(test)]
+mod append_measurement {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore = "manual before/after measurement; no time budget"]
+    async fn append_thousand_frames() {
+        let (_root, store) = tests::root_with();
+        let summary = tests::summary();
+        store.create(&summary).await.unwrap();
+        let start = std::time::Instant::now();
+        for seq in 1..=1000 {
+            store
+                .append(
+                    &summary.id,
+                    &tests::frame(
+                        seq,
+                        Event::SessionUpdated {
+                            summary: summary.clone(),
+                        },
+                    ),
+                )
+                .await
+                .unwrap();
+        }
+        eprintln!("1000 appends: {:?}", start.elapsed());
+        assert_eq!(
+            store.replay(&summary.id, Seq::ZERO).await.unwrap().len(),
+            1000
         );
     }
 }

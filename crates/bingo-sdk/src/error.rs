@@ -12,6 +12,8 @@ pub enum ErrorCode {
     SessionClosed,
     InteractionClosed,
     NotReady,
+    /// The person stopped it; not a failure.
+    Interrupted,
     StaleGeneration,
     /// A negotiated RPC byte or pin budget cannot carry this value safely.
     ProtocolLimit,
@@ -45,6 +47,7 @@ impl ErrorCode {
             ErrorCode::SessionClosed => "SESSION_CLOSED",
             ErrorCode::InteractionClosed => "INTERACTION_CLOSED",
             ErrorCode::NotReady => "NOT_READY",
+            ErrorCode::Interrupted => "INTERRUPTED",
             ErrorCode::StaleGeneration => "STALE_GENERATION",
             ErrorCode::ProtocolLimit => "PROTOCOL_LIMIT",
             ErrorCode::NotInitialized => "NOT_INITIALIZED",
@@ -88,6 +91,13 @@ impl KernelError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn interrupted_is_a_stable_wire_code() {
+        let code: ErrorCode = serde_json::from_str("\"INTERRUPTED\"").expect("interruption code");
+        assert_eq!(code.as_str(), "INTERRUPTED");
+        assert_eq!(serde_json::to_string(&code).unwrap(), "\"INTERRUPTED\"");
+    }
 
     #[test]
     fn the_wire_form_and_the_str_form_agree() {

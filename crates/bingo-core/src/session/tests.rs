@@ -14,6 +14,7 @@ mod images;
 mod invoke;
 mod log;
 mod naming;
+mod owned;
 mod peers;
 mod retry;
 mod storage;

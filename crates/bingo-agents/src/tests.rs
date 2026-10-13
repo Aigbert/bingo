@@ -585,6 +585,7 @@ pub(crate) fn tool_context(session: &SessionId, call: Arc<Recorder>) -> ToolCont
 
 pub(crate) fn command_context(session: &SessionId, fleet: &Fleet) -> CommandContext {
     CommandContext {
+        cancel: bingo_sdk::CancellationToken::new(),
         session: session.clone(),
         cwd: PathBuf::from("/work/project"),
         host: fleet.handle(),

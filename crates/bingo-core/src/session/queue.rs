@@ -25,6 +25,13 @@ pub(super) enum Unit {
 }
 
 impl Queue {
+    /// A wake or command already waiting keeps its place ahead of new input.
+    pub(super) fn ready(&self) -> bool {
+        self.entries
+            .iter()
+            .any(|(_, input)| !input.is_held() || commands::is_command(input))
+    }
+
     /// Append; returns the 1-based position.
     pub(super) fn push(&mut self, intent: IntentId, input: Input) -> u32 {
         self.entries.push_back((intent, input));

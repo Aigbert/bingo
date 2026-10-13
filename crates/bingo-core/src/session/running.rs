@@ -11,8 +11,29 @@ use futures::FutureExt;
 use tokio::task::JoinHandle;
 
 use super::mailbox::{Msg, TurnMail};
-use super::{Actor, TurnKind, panic_message};
-use crate::turn::{TurnConfig, TurnRun, run_turn};
+use super::{Actor, INTERRUPT_GRACE, TurnKind, panic_message};
+use crate::turn::{INTERRUPTED_MARKER, TurnConfig, TurnOutcome, TurnRun, run_turn};
+
+pub(crate) enum Ended {
+    Returned(TurnOutcome),
+    Panicked(String),
+    Dropped,
+}
+
+/// Cancellation allows cooperative cleanup, then drops the entire future.
+pub(super) async fn supervised<T>(
+    future: impl std::future::Future<Output = T>,
+    cancel: &CancellationToken,
+) -> Option<T> {
+    tokio::select! {
+        biased;
+        result = future => Some(result),
+        _ = async {
+            cancel.cancelled().await;
+            tokio::time::sleep(INTERRUPT_GRACE).await;
+        } => None,
+    }
+}
 
 pub(super) struct Running {
     pub(super) turn: TurnId,
@@ -44,11 +65,14 @@ impl Running {
             turn: turn.clone(),
         };
         let config = Arc::clone(&cfg);
+        let stop = cancel.clone();
         let task = tokio::spawn(async move {
-            let outcome = AssertUnwindSafe(run_turn(&cfg, run, &host))
-                .catch_unwind()
-                .await
-                .map_err(panic_message);
+            let future = AssertUnwindSafe(run_turn(&cfg, run, &host)).catch_unwind();
+            let outcome = match supervised(future, &stop).await {
+                Some(Ok(outcome)) => Ended::Returned(outcome),
+                Some(Err(panic)) => Ended::Panicked(panic_message(panic)),
+                None => Ended::Dropped,
+            };
             mailbox.send(Msg::TurnFinished {
                 turn: host.turn.clone(),
                 outcome,
@@ -69,4 +93,45 @@ impl Running {
         self.cancel.cancel();
         self.task.abort();
     }
+}
+
+pub(super) async fn close_dropped_turn(
+    actor: &mut Actor,
+    turn: &TurnId,
+) -> Result<TurnOutcome, KernelError> {
+    let open: Vec<_> = actor.state.transcript.open_items(turn).cloned().collect();
+    for mut item in open {
+        item.status = ItemStatus::Interrupted;
+        item.completed_at = Some(jiff::Timestamp::now());
+        actor.publish(Event::ItemCompleted { item }, None).await?;
+    }
+    let marker = actor.fresh(
+        Some(turn.clone()),
+        None,
+        ItemBody::Interruption {
+            marker: INTERRUPTED_MARKER.into(),
+        },
+    );
+    actor
+        .publish(Event::ItemCompleted { item: marker }, None)
+        .await?;
+    Ok(TurnOutcome {
+        status: TurnStatus::Interrupted {
+            reason: InterruptReason::UserCancel,
+        },
+        usage: actor
+            .state
+            .turn
+            .as_ref()
+            .map(|live| live.usage)
+            .unwrap_or_default(),
+        items: actor
+            .state
+            .transcript
+            .items()
+            .iter()
+            .filter(|item| item.turn.as_ref() == Some(turn))
+            .map(|item| item.as_ref().clone())
+            .collect(),
+    })
 }

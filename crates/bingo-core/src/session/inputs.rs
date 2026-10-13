@@ -18,7 +18,11 @@ use serde_json::Value;
 
 use super::queue::{self, Unit};
 use super::running::Running;
-use super::{Actor, commands, invoke};
+use super::{
+    Actor, commands,
+    gate::{self, Kind},
+    invoke,
+};
 use crate::turn::TurnKind;
 
 impl Actor {
@@ -32,41 +36,22 @@ impl Actor {
                 .reject(intent, ErrorCode::SessionClosed, "the session is closed")
                 .await;
         }
-        match commands::parse(&input) {
-            Some(parsed) => self.submit_command(intent, input, parsed).await?,
-            None => self.submit_prose(intent, input).await?,
-        }
+        gate::gate_input(self, intent, input, Kind::Submit);
         Ok(())
     }
 
     /// A command line: run now if instant, else behind whatever is running.
     /// A shell line is the person's own and nobody else's ([`commands`]).
-    async fn submit_command(
+    pub(super) async fn submit_command(
         &mut self,
         intent: IntentId,
         input: Input,
         parsed: commands::Parsed,
+        command: Arc<dyn Command>,
+        queued: bool,
     ) -> Result<(), KernelError> {
-        if commands::is_shell(&parsed.name) && !commands::may_run_shell(&input) {
-            return self
-                .reject(
-                    intent,
-                    ErrorCode::PermissionDenied,
-                    "a shell line is the person's own: nobody else may run one",
-                )
-                .await;
-        }
-        let Some(command) = self.commands.find(&parsed.name).await else {
-            return self
-                .reject(
-                    intent,
-                    ErrorCode::InvalidInput,
-                    commands::unknown(&parsed.name),
-                )
-                .await;
-        };
         let instant = command.spec().instant;
-        if !instant && self.busy() {
+        if !instant && !queued && (self.busy() || self.queue.ready()) {
             return self.enqueue(intent, input).await;
         }
         let invocation = commands::Invocation::of(&input, &parsed);
@@ -127,8 +112,12 @@ impl Actor {
             }
             Ok(CommandOutcome::Prompt { text }) => {
                 let text = invocation.prompt(&text);
-                self.submit_prose(intent, Input::text(text, invocation.origin))
-                    .await?;
+                gate::gate_input(
+                    self,
+                    intent,
+                    Input::text(text, invocation.origin),
+                    Kind::Prose,
+                );
             }
             Err(e) => self.reject(intent, e.code, e.message).await?,
         }
@@ -137,29 +126,15 @@ impl Actor {
         Ok(())
     }
 
-    async fn submit_prose(&mut self, intent: IntentId, input: Input) -> Result<(), KernelError> {
-        let mut input = input;
-        if let Err(message) = validate(&input) {
-            return self.reject(intent, ErrorCode::InvalidInput, message).await;
-        }
-        let cx = self.hook_context();
-        for hook in self.config.hooks.at(HookPoint::Submit, None).await {
-            match hook.on_submit(&mut input, &cx).await {
-                HookOutcome::Continue | HookOutcome::Ask { .. } => {}
-                HookOutcome::Deny { reason } | HookOutcome::Block { reason } => {
-                    return self
-                        .reject(intent, ErrorCode::PermissionDenied, reason)
-                        .await;
-                }
-                HookOutcome::Redirect { session } => {
-                    return self.redirect(intent, session, input).await;
-                }
-            }
-        }
+    pub(super) async fn submit_prose(
+        &mut self,
+        intent: IntentId,
+        input: Input,
+    ) -> Result<(), KernelError> {
         if !self.answers() {
             return self.log_input(intent, input).await;
         }
-        if self.busy() {
+        if self.busy() || self.queue.ready() {
             return self.enqueue(intent, input).await;
         }
         let inputs = self.held_then(intent, input).await?;
@@ -189,29 +164,22 @@ impl Actor {
         Ok(())
     }
 
-    /// `@name` and the like (ADR-0010 §2): the input as the hook left it goes
-    /// to another session under an intent of its own; this one says where.
-    async fn redirect(
-        &mut self,
-        intent: IntentId,
-        to: SessionId,
-        input: Input,
-    ) -> Result<(), KernelError> {
-        let sent = self
-            .config
-            .host
-            .deliver(&to, IntentId::mint(), input, Delivery::Wake)
-            .await;
-        match sent {
-            Ok(()) => self.applied(intent, json!({ "redirected": to })).await?,
-            Err(e) => self.reject(intent, e.code, e.message).await?,
-        }
-        Ok(())
-    }
-
     /// A peer's message (ADR-0010 §1): prose from another session, past the
     /// command parser and the submit hooks, into the queue or a `Peer` turn.
     pub(super) async fn deliver(
+        &mut self,
+        intent: IntentId,
+        input: Input,
+        delivery: Delivery,
+    ) -> Result<(), KernelError> {
+        if self.gate.busy() {
+            gate::gate_input(self, intent, input, Kind::Deliver(delivery));
+            return Ok(());
+        }
+        self.deliver_ready(intent, input, delivery).await
+    }
+
+    pub(super) async fn deliver_ready(
         &mut self,
         intent: IntentId,
         input: Input,
@@ -234,7 +202,7 @@ impl Actor {
         if !self.answers() {
             return self.log_input(intent, input).await;
         }
-        if self.busy() || input.is_held() {
+        if self.busy() || self.queue.ready() || input.is_held() {
             return self.enqueue(intent, input).await;
         }
         let inputs = self.held_then(intent, input).await?;
@@ -275,6 +243,17 @@ impl Actor {
         scope: InterruptScope,
     ) -> Result<(), KernelError> {
         let Some(running) = &self.running else {
+            if matches!(scope, InterruptScope::Head)
+                && let Some(command) = self.commands.interrupt()
+            {
+                self.cancel_command_interactions().await?;
+                return self.applied(intent, json!({ "command": command })).await;
+            }
+            if matches!(scope, InterruptScope::Head)
+                && let Some(gated) = self.gate.interrupt()
+            {
+                return self.applied(intent, json!({ "input": gated })).await;
+            }
             return self
                 .reject(intent, ErrorCode::NotReady, "no turn is running")
                 .await;
@@ -496,7 +475,7 @@ impl Actor {
 
     /// An idle session takes the next unit off the queue (ADR-0008 §2).
     pub(super) async fn drain_queue(&mut self) -> Result<(), KernelError> {
-        if self.busy() {
+        if self.busy() || self.gate.busy() {
             return Ok(());
         }
         let Some(unit) = self.queue.take_unit() else {
@@ -518,22 +497,7 @@ impl Actor {
 
     /// A command that waited its turn; the table may have lost it meanwhile.
     async fn run_queued(&mut self, intent: IntentId, input: Input) -> Result<(), KernelError> {
-        let parsed = commands::parse(&input);
-        let command = match &parsed {
-            Some(p) => self.commands.find(&p.name).await,
-            None => None,
-        };
-        match (parsed, command) {
-            (Some(parsed), Some(command)) => {
-                let invocation = commands::Invocation::of(&input, &parsed);
-                self.run_command(intent, invocation, command, parsed.args, true)
-                    .await?
-            }
-            _ => {
-                self.reject(intent, ErrorCode::InvalidInput, "unknown command")
-                    .await?
-            }
-        }
+        gate::gate_input(self, intent, input, Kind::Queued);
         Ok(())
     }
 
@@ -679,7 +643,7 @@ pub(crate) fn user_parts(text: String, images: Vec<Image>) -> Vec<ContentPart> {
 
 /// What the kernel accepts as prose: words, a picture, or both — an ask with
 /// neither is empty, and a picture the table or the cap refuses names why.
-fn validate(input: &Input) -> Result<(), String> {
+pub(super) fn validate(input: &Input) -> Result<(), String> {
     match input {
         Input::Text { text, images, .. } => {
             if text.trim().is_empty() && images.is_empty() {

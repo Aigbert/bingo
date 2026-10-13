@@ -135,6 +135,7 @@ mod tests {
 
     fn context(session: &str) -> CommandContext {
         CommandContext {
+            cancel: bingo_sdk::CancellationToken::new(),
             session: SessionId::from_raw(session),
             cwd: PathBuf::from("/work/project"),
             host: UnusedHost.scripted().handle(),

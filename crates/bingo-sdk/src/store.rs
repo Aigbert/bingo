@@ -7,6 +7,7 @@ use crate::event::{Frame, SessionSummary};
 use crate::host::SessionFilter;
 use crate::ids::{Seq, SessionId};
 
+/// An implementation does blocking I/O on the blocking pool.
 #[async_trait]
 pub trait SessionStore: Send + Sync {
     async fn create(&self, summary: &SessionSummary) -> Result<(), KernelError>;
