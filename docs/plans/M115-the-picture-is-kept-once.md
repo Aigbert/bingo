@@ -48,7 +48,11 @@ This is the first use of M113's version line.
    - `VERSION = 2`; the first append to a v1 journal writes the version
      line first (M113's writer); the 1→2 step is the identity.
    - replay resolves references, or the missing-blob text part.
-   - The checkpoint (M114) stores references, not inline pictures.
+   - The checkpoint (M114) stores references, not inline pictures. Bump its
+     independent codec version to 2: old checkpoints must replay and rebuild,
+     and old readers must reject new checkpoints before seeking past a bump.
+   - Preserve opaque record bytes; transform only known content-part paths.
+   - Use the existing workspace `base64` dependency in the store for blob I/O.
 7. ADR-0067 accepted; dated notes on ADR-0005 §8, ADR-0040 §3,
    ADR-0061 §1, ADR-0062 §1.
 
@@ -59,7 +63,10 @@ This is the first use of M113's version line.
 - `crates/bingo-provider-*/src/**` request builders
 - `crates/bingo-pictures/src/**`, `crates/bingo-tool-fs`, `crates/bingo-mcp`
 - `crates/bingo-core/src/context/budget.rs` and the image projection
-- `crates/bingo-store-jsonl/src/{lib.rs,journal.rs,blobs.rs,record.rs}`
+- `crates/bingo-store-jsonl/src/**` and its journal/blob fixtures
+- `crates/bingo-sdk/src/store/checkpoint.rs` and checkpoint fixtures/tests
+- `crates/bingo-sdk/fixtures/record/` and record contract tests
+- Mechanical Image/schema fixtures in provider, core, print, TUI, MCP and RPC tests
 - `docs/adr/{0067,0005,0040,0061,0062}*.md`
 
 ## Exit criteria
@@ -89,5 +96,9 @@ This is the first use of M113's version line.
   picture size; it runs on the store's blocking thread (M116 puts the
   writer there; before M116, measure that a 1 MB picture's append stays
   well under a frame interval and note it).
-- Re-verify at start: M113 and M114 have landed; where the image
-  projection and `IMAGE_ROUNDS_KEPT` live.
+- Re-verified at `cc0b8572`: projection is `context/elide/images.rs`;
+  `IMAGE_ROUNDS_KEPT` remains in `context/budget.rs`. M113 migration steps
+  are in `journal/migrate.rs`; append_version is reserved for this bump.
+  M114 checkpoint.rs and its witness verify only the anchor, so its codec
+  must advance too. M116 already runs store I/O on a blocking worker.
+  Producers already pass bounded Images through; no bridge redesign needed.
