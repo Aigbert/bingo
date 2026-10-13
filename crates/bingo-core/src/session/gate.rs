@@ -121,7 +121,9 @@ fn start_gate(actor: &mut Actor) {
     let mailbox = actor.mailbox.clone();
     actor.tracker.spawn(async move {
         let intent = waiting.intent.clone();
-        let work = AssertUnwindSafe(evaluate(waiting, lookup, hooks, cx)).catch_unwind();
+        let report = crate::chain::Report::default();
+        let work =
+            AssertUnwindSafe(evaluate(waiting, lookup, hooks, cx, report.clone())).catch_unwind();
         let verdict = match supervised(work, &cancel).await {
             _ if cancel.is_cancelled() => Verdict::Rejected(commands::interrupted()),
             Some(Ok(verdict)) => verdict,
@@ -131,6 +133,9 @@ fn start_gate(actor: &mut Actor) {
             )),
             None => Verdict::Rejected(commands::interrupted()),
         };
+        for notice in report.take() {
+            let _ = mailbox.record(notice).await;
+        }
         mailbox.send(Msg::Gated { intent, verdict });
     });
 }
@@ -195,6 +200,7 @@ async fn evaluate(
     lookup: commands::Lookup,
     hooks: HookSet,
     cx: HookContext,
+    report: crate::chain::Report,
 ) -> Verdict {
     let Waiting { input, kind, .. } = waiting;
     if let Kind::Deliver(delivery) = kind {
@@ -208,7 +214,7 @@ async fn evaluate(
     if let Err(message) = inputs::validate(&input) {
         return Verdict::Rejected(KernelError::new(ErrorCode::InvalidInput, message));
     }
-    submit_hooks(input, hooks, cx).await
+    submit_hooks(input, hooks, cx, report).await
 }
 
 async fn find_command(
@@ -237,26 +243,35 @@ async fn find_command(
     }
 }
 
-async fn submit_hooks(mut input: Input, hooks: HookSet, cx: HookContext) -> Verdict {
-    for hook in hooks.at(HookPoint::Submit, None).await {
-        match hook.on_submit(&mut input, &cx).await {
-            HookOutcome::Continue | HookOutcome::Ask { .. } => {}
-            HookOutcome::Deny { reason } | HookOutcome::Block { reason } => {
-                return Verdict::Rejected(KernelError::new(ErrorCode::PermissionDenied, reason));
-            }
-            HookOutcome::Redirect { session } => {
-                let result = cx
-                    .host
-                    .deliver(&session, IntentId::mint(), input, Delivery::Wake)
-                    .await;
-                return Verdict::Redirected {
-                    to: session,
-                    result,
-                };
+async fn submit_hooks(
+    input: Input,
+    hooks: HookSet,
+    cx: HookContext,
+    report: crate::chain::Report,
+) -> Verdict {
+    let matched = hooks.at(HookPoint::Submit, None).await;
+    let result = crate::chain::run::<crate::chain::submit::Submit>(
+        &hooks.links,
+        Next::new(|input| Box::pin(crate::chain::submit::kernel(input, &matched, &cx))),
+        &cx,
+        input,
+        report,
+    )
+    .await;
+    match result {
+        Ok(SubmitResult::Accepted(input)) => Verdict::Prose(input),
+        Ok(SubmitResult::Rejected(error)) | Err(error) => Verdict::Rejected(error),
+        Ok(SubmitResult::Redirect { session, input }) => {
+            let result = cx
+                .host
+                .deliver(&session, IntentId::mint(), input, Delivery::Wake)
+                .await;
+            Verdict::Redirected {
+                to: session,
+                result,
             }
         }
     }
-    Verdict::Prose(input)
 }
 
 #[cfg(test)]

@@ -54,6 +54,7 @@ async fn before(outcome: HookOutcome, policy: &dyn PermissionPolicy) -> (Gated, 
     let item = ItemId::from_raw("i");
     let result = gate_call(
         GateInput {
+            links: &[],
             session: &cx.session,
             cwd: &cx.cwd,
             item: &item,

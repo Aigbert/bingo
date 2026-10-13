@@ -45,11 +45,31 @@ impl std::fmt::Debug for PendingCall {
 
 /// Execute in order. `context` builds the per-call context; `on_done` sees
 /// each outcome as it lands. The returned list is in input order.
+pub struct Dispatch<'a> {
+    pub links: &'a [crate::chain::Link],
+    pub cx: &'a HookContext,
+    pub report: crate::chain::Report,
+}
+
 pub async fn execute<C, F>(
+    calls: Vec<PendingCall>,
+    cancel: &CancellationToken,
+    context: C,
+    on_done: F,
+) -> Vec<ToolOutcome>
+where
+    C: FnMut(&PendingCall) -> ToolContext,
+    F: FnMut(&ToolOutcome),
+{
+    execute_chain(calls, cancel, context, on_done, None).await
+}
+
+pub async fn execute_chain<C, F>(
     calls: Vec<PendingCall>,
     cancel: &CancellationToken,
     mut context: C,
     mut on_done: F,
+    dispatch: Option<&Dispatch<'_>>,
 ) -> Vec<ToolOutcome>
 where
     C: FnMut(&PendingCall) -> ToolContext,
@@ -85,7 +105,7 @@ where
         let futs = batch
             .iter()
             .zip(contexts)
-            .map(|(pc, cx)| run_one(pc, cx, cancel));
+            .map(|(pc, cx)| run_one(pc, cx, cancel, dispatch));
         for o in join_all(futs).await {
             on_done(&o);
             outcomes.push(o);
@@ -106,7 +126,7 @@ pub async fn execute_one(
     if cancel.is_cancelled() {
         return interrupted(&call);
     }
-    run_one(&call, cx, cancel).await
+    run_one(&call, cx, cancel, None).await
 }
 
 fn interrupted(pc: &PendingCall) -> ToolOutcome {
@@ -119,7 +139,12 @@ fn interrupted(pc: &PendingCall) -> ToolOutcome {
     }
 }
 
-async fn run_one(pc: &PendingCall, cx: ToolContext, cancel: &CancellationToken) -> ToolOutcome {
+async fn run_one(
+    pc: &PendingCall,
+    cx: ToolContext,
+    cancel: &CancellationToken,
+    dispatch: Option<&Dispatch<'_>>,
+) -> ToolOutcome {
     let started = Instant::now();
     let finish = |output: ToolOutput, status: ItemStatus| ToolOutcome {
         item: pc.item.clone(),
@@ -144,7 +169,7 @@ async fn run_one(pc: &PendingCall, cx: ToolContext, cancel: &CancellationToken) 
     let result = tokio::select! {
         biased;
         _ = cancel.cancelled() => Err(ToolError::Cancelled),
-        r = tool.call(pc.call.input.clone(), &cx) => r,
+        r = dispatched(pc, tool.as_ref(), &cx, dispatch) => r,
     };
     match result {
         Ok(mut output) => {
@@ -164,6 +189,54 @@ async fn run_one(pc: &PendingCall, cx: ToolContext, cancel: &CancellationToken) 
         ),
         Err(e) => finish(ToolOutput::error(e.to_string()), ItemStatus::Failed),
     }
+}
+
+pub async fn execute_one_chain(
+    call: PendingCall,
+    cancel: &CancellationToken,
+    cx: ToolContext,
+    dispatch: &Dispatch<'_>,
+) -> ToolOutcome {
+    if cancel.is_cancelled() {
+        return interrupted(&call);
+    }
+    run_one(&call, cx, cancel, Some(dispatch)).await
+}
+
+async fn dispatched(
+    pc: &PendingCall,
+    tool: &dyn Tool,
+    cx: &ToolContext,
+    dispatch: Option<&Dispatch<'_>>,
+) -> Result<ToolOutput, ToolError> {
+    let Some(dispatch) = dispatch else {
+        return tool.call(pc.call.input.clone(), cx).await;
+    };
+    let kernel = Next::new(|call: ToolCall| {
+        Box::pin(async move {
+            tool.call(call.input, cx)
+                .await
+                .map_err(|error| match error {
+                    ToolError::Cancelled => KernelError::new(ErrorCode::Interrupted, "cancelled"),
+                    error => KernelError::new(ErrorCode::Internal, error.to_string()),
+                })
+        })
+    });
+    crate::chain::run::<crate::chain::tool::Call>(
+        dispatch.links,
+        kernel,
+        dispatch.cx,
+        pc.call.clone(),
+        dispatch.report.clone(),
+    )
+    .await
+    .map_err(|error| {
+        if error.code == ErrorCode::Interrupted {
+            ToolError::Cancelled
+        } else {
+            ToolError::Failed(error.message)
+        }
+    })
 }
 
 fn clip(output: &mut ToolOutput) {

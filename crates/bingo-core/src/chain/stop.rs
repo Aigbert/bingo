@@ -14,3 +14,18 @@ impl Point for Stop {
         Box::pin(link.turn_stop(cx, input, next))
     }
 }
+
+pub(crate) async fn kernel(
+    hooks: &[Arc<dyn Hook>],
+    cx: &HookContext,
+) -> Result<StopResult, KernelError> {
+    for hook in hooks {
+        if let HookOutcome::Block { reason } = hook.on_stop(cx).await {
+            return Ok(StopResult::Continue {
+                origin: format!("hook:{}", hook.id()),
+                reason,
+            });
+        }
+    }
+    Ok(StopResult::Complete)
+}

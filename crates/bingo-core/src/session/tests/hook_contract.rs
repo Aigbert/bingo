@@ -47,7 +47,13 @@ async fn submit(outcome: HookOutcome) -> (Verdict, Vec<String>) {
             seen: seen.clone(),
         }),
     ]);
-    let result = submit_hooks(Input::text("x", Origin::surface("test")), hooks, cx()).await;
+    let result = submit_hooks(
+        Input::text("x", Origin::surface("test")),
+        hooks,
+        cx(),
+        crate::chain::Report::default(),
+    )
+    .await;
     let seen = seen.lock().unwrap().clone();
     (result, seen)
 }

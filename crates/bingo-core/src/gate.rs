@@ -56,11 +56,13 @@ pub struct GateInput<'a> {
     pub call: ToolCall,
     pub tool: Option<Arc<dyn Tool>>,
     pub policy: &'a dyn PermissionPolicy,
+    pub links: &'a [crate::chain::Link],
     pub hooks: &'a [Arc<dyn Hook>],
     pub hook_cx: &'a HookContext,
 }
 
 pub struct Gated {
+    pub notices: Vec<ItemBody>,
     pub call: ToolCall,
     pub traits: ToolTraits,
     pub gate: Gate,
@@ -72,6 +74,7 @@ impl Gated {
     /// Through the gate with nobody asked, so nothing to receipt.
     fn allowed(call: ToolCall, traits: ToolTraits) -> Self {
         Self {
+            notices: Vec::new(),
             call,
             traits,
             gate: Gate::Allowed,
@@ -82,58 +85,12 @@ impl Gated {
     /// Stopped by a hook or the policy, so nobody was asked either.
     fn denied(call: ToolCall, traits: ToolTraits, message: String) -> Self {
         Self {
+            notices: Vec::new(),
             call,
             traits,
             gate: Gate::Denied { message },
             receipt: None,
         }
-    }
-}
-
-/// What the `BeforeTool` hooks decided; the first non-`Continue` wins.
-enum HookVerdict {
-    Continue,
-    /// A hook wants a person to answer, for this reason.
-    Ask(String),
-    Refused(String),
-}
-
-/// What the policy decided, once an allow that needs no confirmation is settled.
-enum PolicyVerdict {
-    Allowed,
-    Denied(String),
-    /// A person must answer; the scope is the rule that would silence the prompt.
-    Ask(Option<String>),
-}
-
-/// Run the hooks that claim this call. They may rewrite its input.
-async fn run_hooks(call: &mut ToolCall, hooks: &[Arc<dyn Hook>], cx: &HookContext) -> HookVerdict {
-    let name = call.name.clone();
-    let applicable: Vec<&Arc<dyn Hook>> = hooks
-        .iter()
-        .filter(|h| hook_applies(&h.matcher(), HookPoint::BeforeTool, Some(&name)))
-        .collect();
-    for hook in applicable {
-        match hook.before_tool(call, cx).await {
-            HookOutcome::Continue | HookOutcome::Redirect { .. } => {}
-            HookOutcome::Deny { reason } | HookOutcome::Block { reason } => {
-                return HookVerdict::Refused(format!("Denied by hook {}: {reason}", hook.id()));
-            }
-            HookOutcome::Ask { reason } => return HookVerdict::Ask(reason),
-        }
-    }
-    HookVerdict::Continue
-}
-
-/// Ask the one policy. A tool that asks to confirm is never silently allowed.
-async fn run_policy(policy: &dyn PermissionPolicy, input: PolicyInput<'_>) -> PolicyVerdict {
-    match policy.decide(input).await {
-        Decision::Deny { reason } => {
-            PolicyVerdict::Denied(format!("Permission denied ({})", describe(&reason)))
-        }
-        Decision::Allow { .. } if input.confirm.is_none() => PolicyVerdict::Allowed,
-        Decision::Allow { .. } => PolicyVerdict::Ask(None),
-        Decision::Ask { scope, .. } => PolicyVerdict::Ask(scope),
     }
 }
 
@@ -209,55 +166,70 @@ fn receipt_for(call: &ToolCall, decision: DecisionKind, feedback: Option<String>
 
 /// Decide one call: hooks, then the policy, then a person when the answer is `Ask`.
 pub async fn gate_call(input: GateInput<'_>, prompter: &dyn Prompter) -> Gated {
-    let GateInput {
-        session,
-        cwd,
-        item: _,
-        mut call,
-        tool,
-        policy,
-        hooks,
-        hook_cx,
-    } = input;
-    let forced_ask = match run_hooks(&mut call, hooks, hook_cx).await {
-        HookVerdict::Continue => None,
-        HookVerdict::Ask(reason) => Some(reason),
-        HookVerdict::Refused(message) => {
-            let traits = tool
-                .as_ref()
-                .map(|t| t.traits(&call.input))
-                .unwrap_or_default();
+    let report = crate::chain::Report::default();
+    let checked = crate::chain::run::<crate::chain::tool::Check>(
+        input.links,
+        Next::new(|call| Box::pin(crate::chain::tool::check_kernel(call, &input))),
+        input.hook_cx,
+        input.call.clone(),
+        report.clone(),
+    )
+    .await;
+    let mut result = match checked {
+        Ok(checked) => resolve_check(checked, &input, prompter).await,
+        Err(error) => Gated::denied(input.call.clone(), ToolTraits::default(), error.message),
+    };
+    result.notices = report.take();
+    result
+}
+
+async fn resolve_check(
+    checked: CheckResult,
+    input: &GateInput<'_>,
+    prompter: &dyn Prompter,
+) -> Gated {
+    let CheckResult { call, decision } = checked;
+    let traits = input
+        .tool
+        .as_ref()
+        .map(|tool| tool.traits(&call.input))
+        .unwrap_or_default();
+    let (scope, reason) = match decision {
+        Decision::Allow { .. } => return Gated::allowed(call, traits),
+        Decision::Deny { reason } => {
+            let message = match reason {
+                Reason::Hook { hook } => hook,
+                reason => format!("Permission denied ({})", describe(&reason)),
+            };
             return Gated::denied(call, traits, message);
         }
+        Decision::Ask { scope, reason } => (scope, reason),
     };
-    // An unregistered tool has no traits to judge; the executor refuses it.
-    let Some(tool) = tool else {
-        return Gated::allowed(call, ToolTraits::default());
+    let Some(tool) = &input.tool else {
+        return Gated::denied(call, traits, "tool not found".into());
     };
-    let traits = tool.traits(&call.input);
-    let subjects = tool.subjects(&call.input, cwd);
-    let confirm = tool.confirm(&call.input).or(forced_ask);
+    let subjects = tool.subjects(&call.input, input.cwd);
+    let confirm = match reason {
+        Reason::Confirm { detail } => Some(detail),
+        _ => tool.confirm(&call.input),
+    };
     let policy_input = PolicyInput {
         call: &call,
         traits: &traits,
         subjects: &subjects,
         confirm: confirm.as_deref(),
-        session,
-        cwd,
-    };
-    let scope = match run_policy(policy, policy_input).await {
-        PolicyVerdict::Allowed => return Gated::allowed(call, traits),
-        PolicyVerdict::Denied(message) => return Gated::denied(call, traits, message),
-        PolicyVerdict::Ask(scope) => scope,
+        session: input.session,
+        cwd: input.cwd,
     };
     let (gate, decision, feedback) =
-        ask_person(policy_input, tool.as_ref(), scope, policy, prompter).await;
+        ask_person(policy_input, tool.as_ref(), scope, input.policy, prompter).await;
     let receipt = receipt_for(&call, decision, feedback);
     Gated {
         call,
         traits,
         gate,
         receipt: Some(receipt),
+        notices: Vec::new(),
     }
 }
 

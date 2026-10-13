@@ -28,9 +28,9 @@ use stream::Streamed;
 pub use stream::{MAX_RETRY_DELAY, MAX_SERVER_RETRY_DELAY, backoff};
 
 use crate::accumulator::Finished;
-use crate::context::{ContextView, HOOK_PREFIX, KERNEL_SURFACE, budget, elide, estimate_tokens};
+use crate::context::{ContextView, KERNEL_SURFACE, budget, elide, estimate_tokens};
 use crate::executor::{self, Gate, PendingCall};
-use crate::gate::{GateInput, gate_call, hook_applies};
+use crate::gate::{GateInput, gate_call};
 use crate::models::vision;
 
 pub const INTERRUPTED_MARKER: &str = "[Request interrupted by user]";
@@ -502,36 +502,67 @@ impl Turn<'_> {
     /// Let the contributors speak, then measure. A first round that is already
     /// over the compaction threshold compacts before it sends anything.
     async fn assemble_request(&mut self) -> Option<(ModelRequest, ContextUsage)> {
-        let preliminary =
-            self.measure(&self.cfg.system, &ContextView::model_view(&self.transcript));
-        let extra_system = self
-            .contribute(
-                |p| matches!(p, Placement::System { .. } | Placement::RoundStart),
-                &preliminary,
-            )
-            .await?;
-        let mut system = self.cfg.system.clone();
-        system.extend(extra_system);
-        let full = self.without_images(ContextView::model_view(&self.transcript));
-        let recent = self.without_old_images(full);
-        let messages = self.elide_after_overflow(recent);
-        let usage = self.measure(&system, &messages);
         let request = ModelRequest {
             model: self.model.id.clone(),
             max_tokens: self.model.max_tokens,
-            system,
-            messages,
+            system: self.cfg.system.clone(),
+            messages: ContextView::model_view(&self.transcript),
             tools: self.tool_specs(),
             reasoning: self.model.reasoning,
-            // Whose turn this is: a provider that keeps a conversation of
-            // its own per session has no other way to know (ADR-0035 §3).
             session: Some(self.cfg.session.id.clone()),
             provider_options: ProviderMetadata::new(),
         };
+        let links = self.cfg.hooks.links.clone();
+        let cx = self.hook_cx.clone();
+        let report = crate::chain::Report::default();
+        let result = crate::chain::run::<crate::chain::compose::Compose>(
+            &links,
+            Next::new(|request| Box::pin(self.compose_request(request))),
+            &cx,
+            request,
+            report.clone(),
+        )
+        .await;
+        for notice in report.take() {
+            self.record(notice);
+        }
+        let request = result.ok()?;
+        let usage = self.ruler.measure(estimate_tokens(
+            &request.system,
+            &request.messages,
+            &request.tools,
+        ));
         self.recount(&request).await?;
         let usage = self.ruler.anchored(usage);
         self.warn_once(&usage);
         Some((request, usage))
+    }
+
+    async fn compose_request(
+        &mut self,
+        mut request: ModelRequest,
+    ) -> Result<ModelRequest, KernelError> {
+        let preliminary = self.ruler.measure(estimate_tokens(
+            &request.system,
+            &request.messages,
+            &request.tools,
+        ));
+        let original = ContextView::model_view(&self.transcript);
+        let extra = self
+            .contribute(
+                |p| matches!(p, Placement::System { .. } | Placement::RoundStart),
+                &preliminary,
+            )
+            .await
+            .ok_or_else(|| KernelError::new(ErrorCode::Interrupted, "composition interrupted"))?;
+        request.system.extend(extra);
+        if request.messages == original {
+            request.messages = ContextView::model_view(&self.transcript);
+        }
+        let full = self.without_images(request.messages);
+        let recent = self.without_old_images(full);
+        request.messages = self.elide_after_overflow(recent);
+        Ok(request)
     }
 
     async fn assemble(&mut self) -> Option<Assembled> {
@@ -661,20 +692,30 @@ impl Turn<'_> {
         let Some(hooks) = self.racing(self.hooks(HookPoint::Stop)).await else {
             return self.interrupted();
         };
-        for hook in hooks {
-            let Some(outcome) = self.racing(hook.on_stop(&self.hook_cx)).await else {
-                return self.interrupted();
-            };
-            if let HookOutcome::Block { reason } = outcome {
-                self.user_piece(
-                    vec![ContentPart::text(reason)],
-                    format!("{HOOK_PREFIX}{}", hook.id()),
-                );
-                self.round += 1;
-                return Step::Assembling;
-            }
+        let report = crate::chain::Report::default();
+        let cx = self.hook_cx.clone();
+        let result = self
+            .racing(crate::chain::run::<crate::chain::stop::Stop>(
+                &self.cfg.hooks.links,
+                Next::new(|()| Box::pin(crate::chain::stop::kernel(&hooks, &cx))),
+                &cx,
+                (),
+                report.clone(),
+            ))
+            .await;
+        for notice in report.take() {
+            self.record(notice);
         }
-        Step::Closing(TurnStatus::Completed)
+        match result {
+            Some(Ok(StopResult::Continue { origin, reason })) => {
+                self.user_piece(vec![ContentPart::text(reason)], origin);
+                self.round += 1;
+                Step::Assembling
+            }
+            Some(Ok(StopResult::Complete)) => Step::Closing(TurnStatus::Completed),
+            Some(Err(error)) => Step::Closing(TurnStatus::Failed { error }),
+            None => self.interrupted(),
+        }
     }
 
     /// Gate the calls, run them, then hold the barrier before the next round.
@@ -756,17 +797,45 @@ impl Turn<'_> {
         if self.compact_hooks(Phase::Start).await.is_none() {
             return false;
         }
-        let cx = CompactContext {
-            items: &self.transcript.model_items().cloned().collect::<Vec<_>>(),
+        let input = CompactInput {
+            items: self.transcript.model_items().cloned().collect(),
             usage,
-            capabilities: &self.model.capabilities,
-            provider: self.model.provider.clone(),
-            request,
-            cancel: self.cancel.child_token(),
+            request: request.clone(),
+            reason,
             failures: self.cfg.compaction.failures(),
             keep_budget: self.ruler.lines.keep,
         };
-        let outcome = compactor.compact(cx, reason).await;
+        let provider = self.model.provider.clone();
+        let capabilities = &self.model.capabilities;
+        let cancel = self.cancel.child_token();
+        let kernel = Next::new(|input: CompactInput| {
+            Box::pin(async move {
+                let cx = CompactContext {
+                    items: &input.items,
+                    usage: input.usage,
+                    capabilities,
+                    provider,
+                    request: &input.request,
+                    cancel,
+                    failures: input.failures,
+                    keep_budget: input.keep_budget,
+                };
+                Ok(compactor.compact(cx, input.reason).await)
+            })
+        });
+        let report = crate::chain::Report::default();
+        let outcome = crate::chain::run::<crate::chain::compact::Compact>(
+            &self.cfg.hooks.links,
+            kernel,
+            &self.hook_cx,
+            input,
+            report.clone(),
+        )
+        .await
+        .unwrap_or_else(|error| Err(error.into()));
+        for notice in report.take() {
+            self.record(notice);
+        }
         let _ = self.compact_hooks(Phase::End).await;
         match outcome {
             Ok(c) if c.after < c.before && !self.cancel.is_cancelled() => {
@@ -840,6 +909,7 @@ impl Turn<'_> {
             };
             let gated = gate_call(
                 GateInput {
+                    links: &self.cfg.hooks.links,
                     session: &self.cfg.session.id,
                     cwd: &self.cfg.cwd,
                     item: item_id,
@@ -852,6 +922,9 @@ impl Turn<'_> {
                 &prompter,
             )
             .await;
+            for notice in gated.notices {
+                self.record(notice);
+            }
             if let Some(receipt) = gated.receipt {
                 self.record(receipt);
             }
@@ -888,7 +961,13 @@ impl Turn<'_> {
         let turn = self.id.clone();
         let cancel = self.cancel.clone();
 
-        executor::execute(
+        let report = crate::chain::Report::default();
+        let dispatch = executor::Dispatch {
+            links: &cfg.hooks.links,
+            cx: &self.hook_cx.clone(),
+            report: report.clone(),
+        };
+        let outcomes = executor::execute_chain(
             calls,
             &cancel,
             |pc| ToolContext {
@@ -924,8 +1003,13 @@ impl Turn<'_> {
                     );
                 }
             },
+            Some(&dispatch),
         )
-        .await
+        .await;
+        for notice in report.take() {
+            self.record(notice);
+        }
+        outcomes
     }
 
     /// Let the `AfterTool` hooks see each result; one of them may stop the turn.
@@ -952,20 +1036,18 @@ impl Turn<'_> {
                 name: name.clone(),
                 input: input.clone(),
             };
-            for hook in hooks
-                .iter()
-                .filter(|h| hook_applies(&h.matcher(), HookPoint::AfterTool, Some(name)))
-            {
-                let Some(outcome) = self
-                    .racing(hook.after_tool(&call, &o.output, &self.hook_cx))
-                    .await
-                else {
-                    return stop_after;
-                };
-                if let HookOutcome::Block { .. } = outcome {
-                    stop_after = true;
-                }
-            }
+            let Some(blocked) = self
+                .racing(crate::chain::tool::after(
+                    &call,
+                    &o.output,
+                    &hooks,
+                    &self.hook_cx,
+                ))
+                .await
+            else {
+                return stop_after;
+            };
+            stop_after |= blocked;
         }
         stop_after
     }

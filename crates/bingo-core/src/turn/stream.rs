@@ -26,16 +26,35 @@ impl Turn<'_> {
         // Establishing the request is an await of its own — on a long context
         // it is seconds of time to first byte — and the token the provider
         // carries only reaches the stream that does not exist yet.
+        let provider = self.model.provider.clone();
+        let cancel = self.cancel.child_token();
+        let kernel = Next::new(|request| {
+            Box::pin(async move { Ok(provider.stream(request, cancel).await.map(StepStream::new)) })
+        });
+        let report = crate::chain::Report::default();
         let established = self
-            .racing(
-                self.model
-                    .provider
-                    .stream(request, self.cancel.child_token()),
-            )
+            .racing(crate::chain::run::<crate::chain::model::Model>(
+                &self.cfg.hooks.links,
+                kernel,
+                &self.hook_cx,
+                request,
+                report.clone(),
+            ))
             .await;
+        for notice in report.take() {
+            self.record(notice);
+        }
         let mut stream = match established {
-            Some(Ok(s)) => s,
-            Some(Err(e)) => return Streamed::Failed(e, Vec::new()),
+            Some(Ok(Ok(stream))) => stream,
+            Some(Ok(Err(error))) => return Streamed::Failed(error, Vec::new()),
+            Some(Err(error)) => {
+                return Streamed::Failed(
+                    ProviderError::Request {
+                        message: error.message,
+                    },
+                    Vec::new(),
+                );
+            }
             None => return Streamed::Cancelled,
         };
         let mut acc = Accumulator::new(self.id.clone(), self.round);
