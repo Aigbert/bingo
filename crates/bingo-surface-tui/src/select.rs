@@ -127,7 +127,11 @@ impl Run {
     /// Move the far end within the transcript's shape.
     pub fn walk(&mut self, lines: isize, columns: isize, height: usize) {
         self.head = Cell {
-            line: self.head.line.saturating_add_signed(lines).min(height.saturating_sub(1)),
+            line: self
+                .head
+                .line
+                .saturating_add_signed(lines)
+                .min(height.saturating_sub(1)),
             column: self.head.column.saturating_add_signed(columns),
         };
     }

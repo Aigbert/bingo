@@ -18,6 +18,7 @@ use crate::commands::{self, Suggestion};
 use crate::complete;
 use crate::composer::Composer;
 use crate::dialog::Dialog;
+use crate::focus::Focus;
 use crate::fold::Folds;
 use crate::graphics::{Decoded, Linked};
 use crate::history::PromptHistory;
@@ -29,7 +30,6 @@ use crate::rail::Pin;
 use crate::rewind::Rewind;
 use crate::roster;
 use crate::scroll::Scroll;
-use crate::focus::Focus;
 use crate::select::{self, Cell, Dragging, Edge, Select};
 use crate::tree::{self, Row, Tree};
 use crate::views::Marks;
@@ -318,8 +318,6 @@ impl Layer {
     pub fn showing(&self) -> bool {
         self.open != Open::Nothing && !self.closing
     }
-
-
 }
 
 #[derive(Debug)]
@@ -409,17 +407,26 @@ struct Files {
 
 impl Ui {
     pub fn start_selection(&mut self, at: Cell) {
-        self.focus = Focus::Select(select::Run { anchor: at, head: at });
+        self.focus = Focus::Select(select::Run {
+            anchor: at,
+            head: at,
+        });
         self.select.dragging = None;
     }
     pub fn extend_selection(&mut self, to: Cell) {
-        if let Some(run) = self.focus.selection_mut() { run.head = to; }
+        if let Some(run) = self.focus.selection_mut() {
+            run.head = to;
+        }
     }
     pub fn walk_selection(&mut self, lines: isize, columns: isize, height: usize) {
-        if let Some(run) = self.focus.selection_mut() { run.walk(lines, columns, height); }
+        if let Some(run) = self.focus.selection_mut() {
+            run.walk(lines, columns, height);
+        }
     }
     pub fn clear_selection(&mut self) {
-        if matches!(self.focus, Focus::Select(_)) { self.focus = Focus::Composer; }
+        if matches!(self.focus, Focus::Select(_)) {
+            self.focus = Focus::Composer;
+        }
         self.select.dragging = None;
     }
 }
@@ -557,8 +564,11 @@ impl Ui {
         let drag = self
             .select
             .dragging
+            .filter(|_| self.focus.selection().is_some())
             .map(|held| held.stepped + select::EDGE_PACE);
-        let intro = self.focus.intro()
+        let intro = self
+            .focus
+            .intro()
             .filter(|intro| !intro.over(now))
             .map(|_| now.instant + FRAME);
         [exit, send, crossfade, drag, intro]
@@ -693,6 +703,10 @@ impl Ui {
     /// [`select::EDGE_PACE`] has come round again. The loop asks every frame,
     /// and a frame is owed for as long as this has something to do.
     pub fn drag_step(&mut self, now: Now) {
+        if self.focus.selection().is_none() {
+            self.select.dragging = None;
+            return;
+        }
         let Some(held) = self.select.dragging else {
             return;
         };

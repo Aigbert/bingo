@@ -56,23 +56,39 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     match owner {
         crate::focus::Owner::Select => selecting(ui, tree, key, now),
         crate::focus::Owner::Search => searching(ui, key, now),
-        crate::focus::Owner::Layer => layered(ui, tree, key, now).unwrap_or_default(),
+        crate::focus::Owner::Layer => {
+            layered(ui, tree, key, now).unwrap_or_else(|| composer_keys(ui, tree, key, now))
+        }
         crate::focus::Owner::Interaction => interaction_keys(ui, tree, key, now),
         _ => composer_keys(ui, tree, key, now),
     }
 }
 
 fn interaction_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
-    if let Some(effects) = layered(ui, tree, key, now) { return effects; }
-    if key.code == KeyCode::Esc { return escape(ui, tree, now); }
-    tree.open_interaction().map(|(_, interaction)| ui.dialog.on_key(interaction, key, now)).unwrap_or_default()
+    if let Some(effects) = layered(ui, tree, key, now) {
+        return effects;
+    }
+    if key.code == KeyCode::Esc {
+        return escape(ui, tree, now);
+    }
+    tree.open_interaction()
+        .map(|(_, interaction)| ui.dialog.on_key(interaction, key, now))
+        .unwrap_or_default()
 }
 
 fn composer_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
-    if let Some(effects) = layered(ui, tree, key, now) { return effects; }
-    if key.code == KeyCode::Esc { return escape(ui, tree, now); }
-    if key.code == KeyCode::Tab { return tabbed(ui, tree, now); }
-    if let Some(effects) = menu(ui, tree, key) { return effects; }
+    if let Some(effects) = layered(ui, tree, key, now) {
+        return effects;
+    }
+    if key.code == KeyCode::Esc {
+        return escape(ui, tree, now);
+    }
+    if key.code == KeyCode::Tab {
+        return tabbed(ui, tree, now);
+    }
+    if let Some(effects) = menu(ui, tree, key) {
+        return effects;
+    }
     editing(ui, tree, key, now)
 }
 
@@ -540,7 +556,9 @@ fn walk_run(ui: &mut Ui, lines: isize, columns: isize, now: Now) {
 /// Take what is inside the run, and let it go: a selection is answered once.
 /// One road, whether a key asked or a button was released ([`crate::pointer`]).
 pub fn copy(ui: &mut Ui) -> Vec<Effect> {
-    let text = ui.focus.selection()
+    let text = ui
+        .focus
+        .selection()
         .map(|run| run.text(&ui.transcript_text()))
         .unwrap_or_default();
     ui.clear_selection();
@@ -2300,7 +2318,10 @@ mod tests {
         press(&mut ui, &state, key(KeyCode::PageUp), now);
         render(&state, &mut ui, now);
         press(&mut ui, &state, typed('v'), now);
-        assert!(ui.focus.selection().is_some(), "v starts one while reading back");
+        assert!(
+            ui.focus.selection().is_some(),
+            "v starts one while reading back"
+        );
 
         press(&mut ui, &state, key(KeyCode::Down), now);
         press(&mut ui, &state, key(KeyCode::Right), now);
@@ -2412,7 +2433,10 @@ mod tests {
     fn v_is_a_letter_while_the_transcript_is_at_its_foot() {
         let (mut ui, now) = scene();
         write(&mut ui, &state(), "ver", now);
-        assert!(ui.focus.selection().is_none(), "a message may start with one");
+        assert!(
+            ui.focus.selection().is_none(),
+            "a message may start with one"
+        );
         assert_eq!(ui.composer.text(), "ver");
     }
 
@@ -2937,7 +2961,10 @@ mod tests {
         for step in 1..=height {
             ui.drag_step(later(now, 50 * step as i64));
         }
-        assert_eq!(ui.focus.selection().map(|run| run.head.line), Some(height - 1));
+        assert_eq!(
+            ui.focus.selection().map(|run| run.head.line),
+            Some(height - 1)
+        );
         assert!(ui.select.dragging.is_none(), "there is nothing further");
     }
 
@@ -3042,7 +3069,11 @@ mod tests {
         let now = settled_at(now);
         render(&state, &mut ui, now);
         assert_eq!(ui.shown.top, top - WHEEL as usize);
-        assert_eq!(ui.focus.selection(), run, "the run is the hand's, not the wheel's");
+        assert_eq!(
+            ui.focus.selection(),
+            run,
+            "the run is the hand's, not the wheel's"
+        );
     }
 
     #[test]
@@ -3070,7 +3101,10 @@ mod tests {
             vec![Effect::View(child_id())],
             "the `↳` row belongs to the call that spawned it"
         );
-        assert!(ui.focus.selection().is_none(), "stepping in is not selecting");
+        assert!(
+            ui.focus.selection().is_none(),
+            "stepping in is not selecting"
+        );
     }
 
     // ---- a picture is a thing to click (M56) ------------------------------
@@ -3553,7 +3587,11 @@ mod tests {
         press(&mut ui, &state, key(KeyCode::Tab), now);
         assert_eq!(ui.focus.card().cloned(), Some(demo_card("progress")));
         press(&mut ui, &state, key(KeyCode::Tab), now);
-        assert_eq!(ui.focus.card(), None, "and the keys are the composer's again");
+        assert_eq!(
+            ui.focus.card(),
+            None,
+            "and the keys are the composer's again"
+        );
     }
 
     #[test]

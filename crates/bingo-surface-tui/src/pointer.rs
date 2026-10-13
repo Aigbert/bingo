@@ -40,8 +40,12 @@ pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Ef
         crate::focus::Owner::Layer => return layer_mouse(ui, tree, mouse),
         crate::focus::Owner::Interaction => {
             return if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
-                card_option(ui, mouse).map(|index| answer(ui, tree, index, now)).unwrap_or_default()
-            } else { Vec::new() };
+                card_option(ui, mouse)
+                    .map(|index| answer(ui, tree, index, now))
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
         }
         _ => {}
     }
@@ -60,8 +64,12 @@ pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Ef
 }
 
 fn layer_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent) -> Vec<Effect> {
-    if mouse.kind != MouseEventKind::Down(MouseButton::Left) { return Vec::new(); }
-    let Some(cursor) = listed_row(ui, mouse) else { return Vec::new(); };
+    if mouse.kind != MouseEventKind::Down(MouseButton::Left) {
+        return Vec::new();
+    }
+    let Some(cursor) = listed_row(ui, mouse) else {
+        return Vec::new();
+    };
     let chosen = under(ui, tree, cursor);
     walk_to(ui, tree, cursor, chosen)
 }
@@ -153,7 +161,9 @@ fn drag_past(ui: &mut Ui, edge: Edge, mouse: MouseEvent, now: Now) {
 /// run that reaches nowhere is a click, and keeps every meaning a click has.
 fn released(ui: &mut Ui, now: Now) -> Vec<Effect> {
     ui.select.dragging = None;
-    let Some(lines) = ui.focus.selection()
+    let Some(lines) = ui
+        .focus
+        .selection()
         .filter(|run| !run.empty())
         .map(|run| run.lines())
     else {
