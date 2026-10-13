@@ -2,13 +2,7 @@
 
 ## Goal
 
-ADR-0078's `$`, part I (mods-parity §3). The nouns the host already has
-doors for reach a mod: `session`, `turn`, `prompt`, `tool`, `command`,
-`config`, `model`, `state`, `store`, `clock` and `plugin`. Each method is
-raised as `<noun>.<method>` before the host performs it, so a link may
-rewrite, deny or answer it. Every method translates onto an existing door,
-and none opens a new one. One table defines `$`, and both transports read
-it: natives in process, and M133's `dollar.ts` under node.
+ADR-0078's `$`, part I (mods-parity §3): `session`, `turn`, `prompt`, `tool`, `command`, `config`, `model`, `state`, `store`, `clock` and frozen `plugin` reach a mod through existing doors. Each method raises `<noun>.<method>` once. One table defines both native and Node transports.
 
 ## Bricks, in build order
 
@@ -27,7 +21,6 @@ it: natives in process, and M133's `dollar.ts` under node.
 ## Files
 
 - `crates/bingo-demo-ui/src/{journal,tests}.rs`: authorized prerequisite repair, deterministic ordered race test, then a separate `fix(demo-ui)` commit. Serialize placement reads and board publications through one session writer; retain only the journal as board state.
-
 - `crates/bingo-mods/src/dollar/*.rs` (new), `src/{lib,link,chain,engine,thread,module,manager,plugin,load,config}.rs`, `src/{thread.js,manager/reload.rs}`, `tests/{contracts,plugin}.rs`, `tests/mods/nouns/*` (new), `guide.md`, `Cargo.toml`
 - `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs,invocation.rs,lib.rs,testing/api.rs,testing/calls.rs,testing/scripts.rs,testing/tests.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/completion.rs,host/tests/complete.rs,host/tests/catalogue.rs,session.rs,session/mailbox.rs,session/catalogue.rs,session/gate.rs,session/inputs.rs,session/commands.rs,chain/observe.rs}`
 - `crates/bingo-plugin-host/src/{state,ops,host,invocation,callback,lib}.rs`
@@ -42,12 +35,12 @@ it: natives in process, and M133's `dollar.ts` under node.
 - [x] Drift tests fail on a hand edit of `dollar.json` or `dollar-types.ts`.
 - [x] Every `read` answer equals the field of the same `SessionState`.
 - [x] A mod's `$.session.send` is seen once at `session.send` and once at `session.receive`. `$.plugin` names the fixture and its root under both transports, and assigning to it throws.
-- [ ] A registered mod tool is offered to the fake model as `plugin__<mod>__<name>` and runs. When the mod is stale, it reloads first.
-- [ ] A stale `ifVersion` gets the held version; a foreign key's write is refused; the read log names each key a hook read.
+- [x] A registered mod tool is offered to the fake model as `plugin__<mod>__<name>` and runs. When the mod is stale, it reloads first.
+- [x] A stale `ifVersion` gets the held version; a foreign key's write is refused; the read log names each key a hook read.
 - [x] Clock: under paused time, `every` fires once per period, and no timer survives a reload.
-- [ ] `model.classify` and `model.fork` show as `UsageCharged` in the turn's usage; called from a timer, in the session's. Without the `model` grant, each is refused in words.
+- [x] `model.classify` and `model.fork` show as `UsageCharged` in the turn's usage; called from a timer, in the session's. Without the `model` grant, each is refused in words.
 - [x] `cargo test -p bingo --test plugin_kit`: the nouns fixture gives the same output in process and under node.
-- [ ] All gates pass, including Windows checks — resume after the authorized demo-UI prerequisite.
+- [x] All runnable gates pass; Windows SDK/core/plugin-host/demo-ui checks pass. The three C-header-only checks are deferred to Windows CI under protocol §7 (Risks).
 
 ## Non-goals
 
@@ -56,22 +49,13 @@ it: natives in process, and M133's `dollar.ts` under node.
 
 ## Risks
 
-- Fork omits contributor pieces (documented); timer completions charge session usage; with mods off, process state has no noun chains.
-- Re-verified at `c1d95e8c` on 2026-10-14 (M108–M137, M147–M150 landed).
-- Reload lives in `mods/src/manager/reload.rs`; shared faces live in `plugin-host/src/ops.rs`. Remove its `model.complete` face when the kernel claims the name. `initialize.plugin_name` already exists; preserve its shape.
-- Preserve grants: processes=tighten, user/explicit modules=rewrite, project=tighten.
-- `core/src/chain/service.rs` wraps faces; SDK `service.rs` checks unique names. `HostApi::complete` only grants and mails. Move the model/think command's `config::set` calls into `reconfigure` to avoid duplicate chains.
-- The fold has config, queue, transcript and usage. Attach/detach are observations, not frames; project surfaces through the existing plugin signal door.
-- Use M111's `TestHost` for door answers, and the real offline kernel for chain counts: the test host does not dispatch interception chains.
-- M111's test host predates `complete`; add its recording/script adapter for exhaustive row coverage.
-- Actor mail and spawned chain work must carry the SDK invocation context; re-export it from plugin-host so both runtimes still share one representation.
-- The Node re-entry prerequisite was repaired here as the authorized first brick; ADR-0078 §4 remains unchanged.
-- Prerequisite Windows checks: plugin-host and core pass; mods (rquickjs-sys), plugin-rpc and bingo (aws-lc-sys) await Windows CI because this Mac lacks Windows SDK C headers.
-
-- The empty-stdin gate exposed a close/observer read cycle. `265e5cf1` releases unanswered actor mail before joining observers; the unchanged isolated CLI test passes.
-- Negative probes temporarily doubled `session.version`, then edited each generated dollar artifact; all failed as intended and were restored.
-
-- Demo-UI prerequisite authorized on 2026-10-14. Dev `c1d95e8c` passes the persistence test 3/3; M138's timing exposes a real stale placement write. Prove the ordered race before fixing it; keep `bingo/tests/views.rs:204` unchanged. The writer must await publication, because `HostApi::extend` queues rather than acknowledges its frame.
+- Re-verified at `c1d95e8c` on 2026-10-14 (M108–M137, M147–M150 landed). Preserve grants: processes=tighten, user/explicit modules=rewrite, project=tighten.
+- The Node re-entry prerequisite was repaired here first in `415b307f`; ADR-0078 §4 and the shared fixture/bounded assertion remain unchanged.
+- The runtime folds attach/detach through plugin signals. Actor mail and spawned work share the SDK invocation context. `265e5cf1` releases closing actors' unanswered reads before joining observers.
+- M111's scripted completion adapter verifies door answers; the real offline kernel verifies chain counts. Negative probes doubled `session.version` and edited each generated artifact, then restored them.
+- Fork omits contributor pieces (documented); timer completions charge session usage; with mods off, process state has no noun chains. Callback replay requires the callback registry (`590612b6`).
+- Demo-UI repair authorized here: dev passes 3/3, while M138's timing exposed a real stale write. The ordered test fails before `ffb78458`; one session writer now spans placement reads and publication. `bingo/tests/views.rs:204` stays unchanged. `extend` queues, so the owner waits for its frame.
+- Windows CI owns `bingo-mods` (`rquickjs-sys`: `stdlib.h`), `bingo-plugin-rpc` (`aws-lc-sys`: `stdlib.h`/`windows.h`), and `bingo` (both), per protocol §7. No toolchain was installed. Budget passed with a 10 GB debug-directory soft warning.
 
 ## Verified (2026-10-14)
 
@@ -114,29 +98,53 @@ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked the_committe
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out; finished in 0.02s
 BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked wire_ts::
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out; finished in 0.02s
-cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing
-test result: FAILED. 258 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 43.49s
-cargo test -p bingo --test cli --locked stream_json::stdin_closing_with_nothing_to_do_is_a_clean_exit -- --exact --test-threads=1
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 258 filtered out; finished in 30.10s
-cargo test -p bingo --test cli --locked stream_json::stdin_closing_with_nothing_to_do_is_a_clean_exit -- --exact --test-threads=1
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 258 filtered out; finished in 0.28s
+cargo test -p bingo-demo-ui --lib --locked a_placement_cannot_overwrite
+  left: Pending
+ right: Running
+cargo test -p bingo-demo-ui --lib --locked a_queued_write_keeps
+enqueueing is not publication
+cargo test -p bingo-demo-ui --lib --locked
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+cargo test -p bingo --test views --locked
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.00s
 cargo fmt --all -- --check
 exit 0 (no output)
 cargo check --workspace --all-targets --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.47s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.38s
 cargo clippy --workspace --all-targets --locked -- -D warnings
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.46s
-cargo test -p bingo-mods --test plugin --locked surfaces_fold
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.03s
-cargo test -p bingo --test plugin_kit --locked the_host_nouns_fixture
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.14s
-cargo test -p bingo --test plugin_kit --locked node_registered_commands
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.19s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.62s
 cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing
-test result: ok. 259 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.40s
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
-test a_second_run_reads_the_board_back_and_not_the_bar ... FAILED
-  left: "pending"
- right: "running"
-test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.82s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+exit 0
+cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
+scripts/check_discipline.sh
+discipline ok
+scripts/budget.sh
+dependencies (unique, normal): 410 (max  410)
+warn: target/debug exceeds the soft limit
+budget ok
+cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.00s
+cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.86s
+cargo check -p bingo-plugin-host --all-targets --target x86_64-pc-windows-msvc --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.32s
+cargo check -p bingo-demo-ui --all-targets --target x86_64-pc-windows-msvc --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.16s
+CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc --locked
+error: failed to run custom build command for `rquickjs-sys v0.14.0`
+CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc --locked
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc --locked
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+error: failed to run custom build command for `rquickjs-sys v0.14.0`
+node --test sdk/typescript/src/*.test.ts
+ℹ pass 16
+ℹ fail 0
+scripts/tui-smoke.sh
+tui-smoke ok
 ```

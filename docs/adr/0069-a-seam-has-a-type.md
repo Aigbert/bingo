@@ -120,3 +120,5 @@ ADR-0075; Plans: M119, M122, M126; audit-2026-10 §2, §Also
 Amended 2026-10-14 (M136, ADR-0078): optional `WireService::face()` declares noun/method schemas and unsafe metadata. Wire calls raise catalogue chains; typed lookup keeps its existing behaviour.
 
 Verified 2026-10-14 (M137, ADR-0078 §5): external uses includes host nouns; registered grants gate both runtimes, and unsafe face methods require explicit authority.
+
+Verified 2026-10-14 (M138, ADR-0078): one noun table declares kernel and face doors; generated schemas and TypeScript share it, and both transports preserve registered grants.
