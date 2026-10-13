@@ -23,8 +23,8 @@ ADR-0078 §2 `register(on, options)` module is also M137's input.
    `on.ts` handles exact/ns.*/ */! patterns, nested/scalar/RegExp/array
    matchers and one-use `next`. `/after` resolves it; cancel rejects it.
    `dollar.ts` maps status, session/global state, model complete, session
-   deliver/extend and service nouns to protocol-2 doors. Only `node:`
-   built-ins; `.ts` imports and `import type`; no npm dependencies.
+   deliver/extend and service nouns to protocol-2 doors. Only `node:` built-ins;
+   `.ts` imports and `import type`; no npm dependencies.
 4. Validate parses name/entry/config-schema structure, uses the host's
    own process spawner, handshakes, lists tools/commands/link points and
    stops the process. Findings are lines; exit status is 0 or 1.
@@ -61,7 +61,7 @@ ADR-0078 §2 `register(on, options)` module is also M137's input.
 
 ## Exit criteria
 
-- [ ] Renderer and wire drift tests pass; deliberate manual drift fails once.
+- [x] Renderer and wire drift tests pass; deliberate manual drift fails once.
 - [x] Validate tests name missing entry, bad name and protocol-1 failures.
 - [x] External plugin_kit validates wordcount/ts-status, passes acceptance,
   and reports a wrong expectation with exit 1 and the failing step.
@@ -71,8 +71,8 @@ ADR-0078 §2 `register(on, options)` module is also M137's input.
 
 ## Non-goals
 
-Registry publishing, scaffolding, another language SDK, tsc in CI, M137's
-embedded runtime, M142's *.test.ts harness, and private-state expectations.
+Registry publishing, scaffolding, another language SDK, tsc in CI, M137's embedded
+runtime, M142's *.test.ts harness, and private-state expectations.
 
 ## Risks and re-verification (2026-10-13, e9e45bb9)
 
@@ -92,19 +92,20 @@ embedded runtime, M142's *.test.ts harness, and private-state expectations.
 
 ### Stop: Execution protocol step 6
 
-The workspace gate and an isolated rerun both fail the existing ACP test
-`crates/bingo/tests/cli/acp/bridge.rs:246`. It expects “no turn is in flight”
-and receives “[Request interrupted by user for tool use]”. Its assertion
-and ACP behavior are outside M133 and overlap M134; neither was changed.
-Options: resume after the ACP owner resolves it, or explicitly authorize
-coordinated investigation outside M133. No further gates ran after the repeat.
-Review follow-ups on resume: an omitted matcher must accept null-input events
-(currently it defaults to `{}`); add cancellation-before-next cleanup coverage.
-The added startup-refusal black-box test compiled but has not run yet.
+Discipline fails on `crates/bingo-sdk/src/event.rs`: 1004 non-test lines
+(limit 1000), identical at e9e45bb9 and untouched by M133. The fix is outside
+Files. Options: let its owner split it on dev, or explicitly authorize a
+baseline exception for this gate. Budget, deny and MSVC remain unrun.
+SDK follow-ups are fixed: omitted matchers accept null/scalars; cancellation
+rejects and cleans up before next and while awaiting the after hook.
 
 ## Verified (2026-10-13; incomplete, stopped)
 
-Commands and trimmed output, in execution order:
+The skipped ACP test is a user-confirmed known dev failure outside M133;
+its separate fix will land before merge, and ACP code/tests remain untouched.
+An initial rerun with RUST_TEST_THREADS=1 broke child-harness marker parsing;
+claim tests passed alone, then the full suite passed using --test-threads=1.
+Trimmed command output (earlier contracts/gates retained):
 ```text
 cargo test -p bingo-schema-ts                         # contracts first
 FAILED. 0 passed; 2 failed
@@ -114,33 +115,36 @@ cargo test -p bingo committed_scenario_schema        # contracts first
 FAILED. 0 passed; 1 failed: committed schema absent
 node --test sdk/typescript/src/on.test.ts             # contracts first
 ERR_MODULE_NOT_FOUND: sdk/typescript/src/on.ts
-cargo test -p bingo-schema-ts                        # implementation
-ok. 2 passed; 0 failed
 BINGO_UPDATE_SCHEMA=1 cargo test -p bingo --bin bingo committed_scenario_schema
 ok. 1 passed; 0 failed
 cargo test -p bingo-plugin-rpc wire_ts::              # deliberate drift
 FAILED. 0 passed; 1 failed: wire.ts drift
 BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc wire_ts::
 ok. 1 passed; 0 failed                               # regenerated
-cargo test -p bingo-plugin-rpc validate::
-ok. 2 passed; 0 failed
-cargo test -p bingo --test plugin_kit -- --nocapture
+cargo test -p bingo-plugin-rpc validate::              # ok. 2 passed; 0 failed
+cargo test -p bingo --test plugin_kit -- --nocapture  # earlier acceptance
 external TypeScript acceptance ran (validate, state, reload, slot, denial)
-ok. 4 passed; 0 failed
-node --test sdk/typescript/src/*.test.ts
-pass 7; fail 0
-node --version                                      # v24.17.0
-node sdk/typescript/src/index.ts                     # exit 0, no output
+node --test sdk/typescript/src/on.test.ts             # edge contracts first
+✖ an omitted matcher accepts null and scalar event inputs
+✖ cancel before next rejects before and clears the chain
+node --test --test-timeout=10000 sdk/typescript/src/*.test.ts
+ℹ pass 10
+ℹ fail 0
+node sdk/typescript/src/index.ts                     # Node 24.17.0; exit 0, no output
+cargo test -p bingo-schema-ts --locked                # ok. 2 passed; 0 failed
+cargo test -p bingo-plugin-rpc wire_ts:: --locked       # ok. 1 passed; 0 failed
 cargo fmt --all -- --check                           # exit 0, no output
 cargo check --workspace --all-targets --locked
 Finished `dev` profile [unoptimized + debuginfo] target(s) in 27.24s
 cargo clippy --workspace --all-targets --locked -- -D warnings
 Finished `dev` profile [unoptimized + debuginfo] target(s) in 31.96s
-RUST_TEST_THREADS=1 cargo test --workspace --locked
-FAILED. 252 passed; 1 failed (bingo --test cli, ACP assertion above)
-cargo test -p bingo --test cli acp::bridge::a_call_with_no_turn_in_flight_is_refused_with_a_reason --locked -- --exact --nocapture --test-threads=1
-FAILED. 0 passed; 1 failed; 252 filtered out (same assertion)
+cargo test --workspace --locked -- --skip a_call_with_no_turn_in_flight_is_refused_with_a_reason --test-threads=1
+# exit 0; cli and plugin_kit results respectively:
+test result: ok. 252 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 116.17s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+scripts/check_discipline.sh
+FAIL crates/bingo-sdk/src/event.rs: 1004 non-test lines (>1000)
+discipline FAILED
 ```
-Remaining: current renderer/wire checks without update mode; full workspace
-suite; discipline; budget; deny; MSVC for schema-ts/plugin-rpc/provider-fake/bin;
-Linux CI acceptance evidence. Protocol 2's frozen schema is unchanged.
+Remaining: discipline resolution; budget; deny; MSVC for schema-ts/plugin-rpc/
+provider-fake/bin; Linux CI acceptance evidence. Frozen protocol 2 is unchanged.
