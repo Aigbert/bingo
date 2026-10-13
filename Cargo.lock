@@ -603,6 +603,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bingo-mods"
+version = "0.6.6"
+dependencies = [
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "bingo-permissions"
 version = "0.6.6"
 dependencies = [
