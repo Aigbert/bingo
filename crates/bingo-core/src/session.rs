@@ -119,6 +119,12 @@ impl Actor {
             running.abandon();
         }
         self.cancel.cancel();
+        // Observers may be awaiting a read queued behind close. Release their
+        // replies before joining them, since this actor no longer serves mail.
+        self.rx.close();
+        while let Ok(message) = self.rx.try_recv() {
+            drop(message);
+        }
         drop(self.observed.take());
         self.tracker.close();
         if tokio::time::timeout(AFTER_TURN_DEADLINE, self.tracker.wait())
