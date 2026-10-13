@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use async_trait::async_trait;
 use bingo_sdk::{
     Attachment, ContextContributor, ContextPiece, Event, Frame, HostHandle, Input, IntentId,
-    KernelError, Seq, SessionHandle, SessionId, SessionSelector, SessionState,
+    KernelError, Seq, SessionHandle, SessionSelector, SessionState,
 };
 
 use crate::query::Asked;
