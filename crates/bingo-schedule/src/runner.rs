@@ -240,6 +240,7 @@ fn who() -> ClientIdentity {
 /// transcript says so.
 fn origin() -> Origin {
     Origin {
+        voice: None,
         surface: SURFACE.into(),
         principal: None,
         conversation: None,

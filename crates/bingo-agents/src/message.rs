@@ -32,6 +32,7 @@ pub const SEND_MESSAGE: &str = "SendMessage";
 /// text itself.
 pub fn origin(principal: Option<String>) -> Origin {
     Origin {
+        voice: None,
         surface: SURFACE.into(),
         principal,
         conversation: None,

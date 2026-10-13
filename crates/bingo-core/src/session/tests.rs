@@ -59,6 +59,7 @@ fn peer(text: &str, from: &str) -> Input {
     Input::text(
         text,
         Origin {
+            voice: None,
             surface: "agent".into(),
             principal: Some(from.into()),
             conversation: None,

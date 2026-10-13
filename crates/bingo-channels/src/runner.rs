@@ -451,6 +451,7 @@ impl Runner {
                         text,
                         images,
                         origin: Origin {
+                            voice: None,
                             surface: SURFACE_ID.into(),
                             principal: Some(principal.to_string()),
                             conversation: Some(self.key.clone()),

@@ -292,6 +292,7 @@ mod tests {
 
     fn from(surface: &str) -> Origin {
         Origin {
+            voice: None,
             surface: surface.into(),
             principal: None,
             conversation: Some("#design".into()),

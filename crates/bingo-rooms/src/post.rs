@@ -192,6 +192,7 @@ pub(crate) async fn say(
     let input = Input::text(
         text,
         Origin {
+            voice: None,
             surface: SURFACE.into(),
             principal: Some(author.to_string()),
             conversation: None,
@@ -209,6 +210,7 @@ pub(crate) async fn nudge(host: &HostHandle, seat: &SessionId, title: &str, said
     let input = Input::text(
         said,
         Origin {
+            voice: None,
             surface: SURFACE.into(),
             principal: None,
             conversation: Some(title.to_string()),
@@ -628,6 +630,7 @@ pub(crate) async fn write(
         bingo_sdk::Input::text(
             text,
             bingo_sdk::Origin {
+                voice: None,
                 surface: "agent".into(),
                 principal: Some(author.into()),
                 conversation: None,

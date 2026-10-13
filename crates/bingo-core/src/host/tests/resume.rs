@@ -535,6 +535,7 @@ async fn a_delivery_reaches_a_stored_session_that_is_not_live() {
     let from_peer = Input::text(
         "are you there",
         Origin {
+            voice: None,
             surface: "agent".into(),
             principal: Some("scout".into()),
             conversation: None,

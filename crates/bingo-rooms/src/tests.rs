@@ -556,6 +556,7 @@ pub(crate) fn posted_item(text: &str, principal: Option<&str>) -> Item {
     item(ItemBody::User {
         parts: vec![ContentPart::text(text)],
         origin: Origin {
+            voice: None,
             surface: "test".into(),
             principal: principal.map(str::to_string),
             conversation: None,
