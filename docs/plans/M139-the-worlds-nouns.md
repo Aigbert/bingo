@@ -17,6 +17,7 @@ words that say how to grant it, and a granted unsafe noun is put on the record. 
    A link sees each name once.
 2. **Scope, pure.** `scope(path, Roots { project, data }, Access) -> Result<PathBuf, Refusal>`:
    - It normalises lexically, then canonicalises the longest existing ancestor with `dunce`.
+   - Authorized 2026-10-14: budget 410 → 411 for zero-dependency `dunce`, normalizing Windows prefixes.
    - It refuses a `..` or a symlink that leaves both roots.
    - A read may land in either root. A write may land in the mod's data directory
      (`<data_dir>/plugins/<name>/data`). Any other write is `fs` beyond the safe set (ADR-0078 §5).
@@ -63,6 +64,7 @@ words that say how to grant it, and a granted unsafe noun is put on the record. 
 
 ## Files
 
+- `scripts/budget.toml` (authorized 410 → 411 normal-dependency allowance).
 - `crates/bingo-mods/src/dollar/` (world faces, scope, table, contracts),
   `src/{plugin.rs,manager.rs,manager/reload.rs}`, `tests/mods/world/*`, `tests/world.rs`,
   `tests/support/mod.rs`, `guide.md`, `Cargo.toml`.
@@ -94,7 +96,7 @@ words that say how to grant it, and a granted unsafe noun is put on the record. 
   node.
 - [ ] All gates pass. `cargo check --target x86_64-pc-windows-msvc` checks every touched crate; missing
   third-party Windows C headers are left to Windows CI under protocol step 7.
-- [ ] `scripts/budget.sh` shows no change in crates. **Blocked:** 411 normal dependencies; limit 410.
+- [ ] `scripts/budget.sh` passes at the authorized 411 normal dependencies; no new resolved crate.
 
 ## Non-goals
 
@@ -116,14 +118,8 @@ npm, sockets, a PTY, streamed fetch, changing the host environment, unconfigured
   need user-layer grants for unsafe calls, including dynamically unsafe filesystem writes.
 - M140 owns sdk view/render, core chain/render, TUI and surface-rpc. M139 does not edit those; generated files
   are reconciled at merge.
-- **Stopped under protocol step 6 (2026-10-14).** The required dependency budget fails after
-  adding the planned `dunce` runtime edge: 411 normal dependencies, limit 410. It was previously
-  only an `aws-lc-sys` build dependency. The plan's no-change assumption was wrong; no new
-  version was resolved. Raising `scripts/budget.toml` is outside Files and requires an ADR line.
-  Options: authorize that file and document a 410 → 411 allowance for `dunce` (recommended),
-  or revise brick 2 to use a separately reviewed canonicalization implementation without `dunce`.
-  Scope and noun lookup are committed; world faces, integration, parity, schema regeneration and remaining gates
-  are unfinished. Scope emits dead-code warnings until consumed. All exit criteria remain unticked.
+- The initial budget stop is resolved by the user’s 2026-10-14 authorization: `dunce` moves from build-only
+  to normal use. No ADR named `dunce`; ADR-0078’s grants and filesystem boundary remain unchanged.
 
 ## Verified (2026-10-14)
 
