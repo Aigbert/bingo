@@ -92,14 +92,9 @@ impl Command for PermissionCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::any::Any;
     use std::path::{Path, PathBuf};
 
-    use bingo_sdk::{
-        Attachment, Catalog, CatalogKind, ClientIdentity, CloseReason, Decision, GatewayStream,
-        HostApi, HostHandle, OpenOptions, PermissionPolicy, PolicyInput, SessionFilter,
-        SessionSelector, SessionSummary, Subject, ToolCall, ToolTraits,
-    };
+    use bingo_sdk::{Decision, PermissionPolicy, PolicyInput, Subject, ToolCall, ToolTraits};
     use serde_json::{Value, json};
 
     use crate::Settings;
@@ -108,76 +103,33 @@ mod tests {
     /// `/permission` asks the host nothing, so every answer here would be a bug.
     struct UnusedHost;
 
-    #[async_trait]
-    impl HostApi for UnusedHost {
-        async fn sessions(
-            &self,
-            _filter: SessionFilter,
-        ) -> Result<Vec<SessionSummary>, KernelError> {
-            unreachable!("/permission reads no session list")
-        }
-
-        async fn open(
-            &self,
-            _selector: SessionSelector,
-            _who: ClientIdentity,
-            _options: OpenOptions,
-        ) -> Result<Attachment, KernelError> {
-            unreachable!("/permission opens no session")
-        }
-
-        async fn close(
-            &self,
-            _session: &SessionId,
-            _reason: CloseReason,
-        ) -> Result<(), KernelError> {
-            unreachable!("/permission closes no session")
-        }
-
-        async fn delete(&self, _session: &SessionId) -> Result<(), KernelError> {
-            unreachable!("/permission deletes no session")
-        }
-
-        async fn deliver(
-            &self,
-            _to: &SessionId,
-            _intent: bingo_sdk::IntentId,
-            _input: bingo_sdk::Input,
-            _delivery: bingo_sdk::Delivery,
-        ) -> Result<(), KernelError> {
-            unreachable!("this double delivers nothing")
-        }
-
-        async fn extend(
-            &self,
-            _session: &SessionId,
-            _plugin: &str,
-            _kind: &str,
-            _payload: serde_json::Value,
-        ) -> Result<(), KernelError> {
-            unreachable!("this double extends nothing")
-        }
-
-        async fn signal(
-            &self,
-            _session: &SessionId,
-            _plugin: &str,
-            _kind: &str,
-            _payload: serde_json::Value,
-        ) -> Result<(), KernelError> {
-            unreachable!("this double signals nothing")
-        }
-
-        async fn catalog(&self, _kind: CatalogKind) -> Result<Catalog, KernelError> {
-            unreachable!("/permission reads no catalog")
-        }
-
-        fn gateway_events(&self) -> GatewayStream {
-            unreachable!("/permission watches no gateway")
-        }
-
-        fn service_any(&self, _key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
-            None
+    impl UnusedHost {
+        fn scripted(&self) -> bingo_sdk::testing::TestHost {
+            let host = bingo_sdk::testing::TestHost::default();
+            host.on_sessions(
+                |_filter| async move { unreachable!("/permission reads no session list") },
+            );
+            host.on_open(|_selector, _who, _options| async move {
+                unreachable!("/permission opens no session")
+            });
+            host.on_close(|_session, _reason| async move {
+                unreachable!("/permission closes no session")
+            });
+            host.on_delete(
+                |_session| async move { unreachable!("/permission deletes no session") },
+            );
+            host.on_deliver(|_to, _intent, _input, _delivery| async move {
+                unreachable!("this double delivers nothing")
+            });
+            host.on_extend(|_session, _plugin, _kind, _payload| async move {
+                unreachable!("this double extends nothing")
+            });
+            host.on_signal(|_session, _plugin, _kind, _payload| async move {
+                unreachable!("this double signals nothing")
+            });
+            host.on_catalog(|_kind| async move { unreachable!("/permission reads no catalog") });
+            host.on_gateway_events(|| unreachable!("/permission watches no gateway"));
+            host
         }
     }
 
@@ -185,7 +137,7 @@ mod tests {
         CommandContext {
             session: SessionId::from_raw(session),
             cwd: PathBuf::from("/work/project"),
-            host: HostHandle(Arc::new(UnusedHost)),
+            host: UnusedHost.scripted().handle(),
         }
     }
 
