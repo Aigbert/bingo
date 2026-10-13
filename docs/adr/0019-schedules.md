@@ -53,6 +53,13 @@ is a composition, so it may depend on the scheduler for this protocol.
 External deletion of a held inode remains outside the locking contract.
 Neither schedule timing nor spent-occurrence delivery policy changes here.
 
+## Amendment — 2026-10-13 (M121; ADR-0070 §§1–2,6)
+
+Section 8's wake payload now places `Status { text: "wake", until: at }`
+beside its existing `at` and `note`. The TUI reads that slot against its
+frame clock and animates while its deadline is ahead; it no longer reads
+the schedule's record by plugin id. Wake ownership and restart bounds stand.
+
 ## Supersedes
 
 —
