@@ -45,7 +45,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let drawn = rail::render(
         &cards,
         rail::width(regions.rail, regions.transcript),
-        ui.focus.as_ref(),
+        ui.focus.card(),
         &ui.marks(tree.viewed(), now),
     );
     // A card is in the rail, or — where there is no rail — under the running
@@ -123,7 +123,7 @@ fn render_status(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now)
         return;
     }
     let width = area.width as usize;
-    let line = match ui.search.as_ref() {
+    let line = match ui.focus.search() {
         Some(search) => search::row(search),
         None => status::line(tree, ui, width, now),
     };
@@ -176,7 +176,7 @@ fn layers(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) 
         ]
         .concat(),
     );
-    match ui.layer.drawn(now) {
+    match ui.focus.drawn(now) {
         Some(reveal) => layer(tree, ui, frame, above, reveal, width, now),
         None => card(tree, ui, frame, regions, now),
     }
@@ -196,7 +196,7 @@ fn layer(
     // Every list a cursor walks is drawn in the room the layer has, and no
     // more of it than that: what is off the window's ends says so (§3).
     let rows = usize::from(above.height);
-    match &ui.layer.open {
+    match ui.focus.open() {
         Open::Nothing => {}
         // A dropdown above the input box, like the `/` menu: nothing dims.
         Open::Switcher(switcher) => {
@@ -463,7 +463,7 @@ fn render_transcript(
             now,
         )
         .saying(ui.update.as_deref())
-        .opening(ui.intro.as_ref().map(|intro| intro.seconds(now)))
+        .opening(ui.focus.intro().map(|intro| intro.seconds(now)))
         .measuring(ui.measure),
         live,
     );
@@ -478,10 +478,10 @@ fn render_transcript(
     // A mark is measured from the row line `top` was drawn at, which is where
     // the lines start rather than where the region does.
     let lined = lined(area, padding);
-    if let Some(search) = ui.search.as_ref() {
+    if let Some(search) = ui.focus.search() {
         search::mark(&mut frame.canvas, lined, frame.top, search);
     }
-    if let Some(run) = ui.select.run.as_ref() {
+    if let Some(run) = ui.focus.selection().as_ref() {
         select::mark(&mut frame.canvas, lined, frame.top, run);
     }
     if ui.crossfading(now) {
@@ -1850,7 +1850,7 @@ mod tests {
     fn watching() -> (Ui, Now) {
         let (mut ui, now) = scene();
         pin_board(&mut ui);
-        ui.focus = Some(demo_card("board"));
+        ui.focus = crate::focus::Focus::Card(demo_card("board"));
         (ui, now)
     }
 
@@ -2106,7 +2106,7 @@ mod tests {
         crate::pointer::on_mouse(&mut ui, &tree, click(from, row), now);
         crate::pointer::on_mouse(&mut ui, &tree, dragged(to, row), now);
         let marked = drawn(80, 24, &tree, &mut ui, now);
-        ui.select.clear();
+        ui.clear_selection();
         (
             row,
             marked_cells(&drawn(80, 24, &tree, &mut ui, now), &marked),

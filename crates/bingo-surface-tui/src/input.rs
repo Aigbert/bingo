@@ -42,39 +42,46 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if key.kind == KeyEventKind::Release {
         return Vec::new();
     }
-    // Any key skips the opening, and *that* is all it does: the key is
-    // consumed rather than typed, so a `/` pressed to cut the piece short does
-    // not also open the dropdown (M70, design §11).
-    if ui.intro.take().is_some() {
+    ui.prepare(&tree.viewed().summary.cwd);
+    let owner = crate::focus::owner(ui, tree);
+    if owner == crate::focus::Owner::Intro {
+        ui.focus = crate::focus::Focus::Composer;
         return Vec::new();
     }
-    ui.prepare(&tree.viewed().summary.cwd);
     ui.block = None;
-    // `esc esc` needs no clock: any other key is what says the two were not
-    // one gesture.
     ui.esc_armed &= key.code == KeyCode::Esc;
-    let state = tree.viewed();
-    if let Some(effects) = leaving(ui, state, key, now) {
+    if let Some(effects) = leaving(ui, tree.viewed(), key, now) {
         return effects;
     }
-    if ui.select.run.is_some() {
-        return selecting(ui, tree, key, now);
+    match owner {
+        crate::focus::Owner::Select => selecting(ui, tree, key, now),
+        crate::focus::Owner::Search => searching(ui, key, now),
+        crate::focus::Owner::Layer => {
+            layered(ui, tree, key, now).unwrap_or_else(|| composer_keys(ui, tree, key, now))
+        }
+        crate::focus::Owner::Interaction => interaction_keys(ui, tree, key, now),
+        _ => composer_keys(ui, tree, key, now),
     }
-    if ui.search.is_some() {
-        return searching(ui, key, now);
-    }
+}
+
+fn interaction_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     if let Some(effects) = layered(ui, tree, key, now) {
         return effects;
     }
     if key.code == KeyCode::Esc {
         return escape(ui, tree, now);
     }
-    // A prompt raised anywhere in the tree is answered from wherever the
-    // person is looking; the handle routes the answer back to who asked. It
-    // comes before the chords a card has a use of its own for — a form's
-    // `tab` walks its questions (M53) — as every layer that captures does.
-    if let Some((_, interaction)) = tree.open_interaction() {
-        return ui.dialog.on_key(interaction, key, now);
+    tree.open_interaction()
+        .map(|(_, interaction)| ui.dialog.on_key(interaction, key, now))
+        .unwrap_or_default()
+}
+
+fn composer_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
+    if let Some(effects) = layered(ui, tree, key, now) {
+        return effects;
+    }
+    if key.code == KeyCode::Esc {
+        return escape(ui, tree, now);
     }
     if key.code == KeyCode::Tab {
         return tabbed(ui, tree, now);
@@ -116,8 +123,8 @@ fn tabbed(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 /// the chord that opened one is what closes it; a chord that edits a line
 /// ([`LAYERS`] does not name it) belongs to whoever is being typed into.
 fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effect>> {
-    if ui.layer.captures() {
-        match &ui.layer.open {
+    if ui.focus.captures() {
+        match ui.focus.open() {
             Open::Picker(_) => return Some(picker(ui, key, now)),
             Open::Pager(_) => return Some(pager::keys(ui, tree, key, now)),
             Open::Rewind(_) => return Some(rewind_keys(ui, tree, key, now)),
@@ -133,9 +140,9 @@ fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effe
             switcher::put_away(ui, now);
         }
         match chord {
-            'f' => ui.search = Some(Search::open()),
+            'f' => ui.focus = crate::focus::Focus::Search(Search::open()),
             switcher::CHORD => return Some(switcher::toggle(ui, tree, now)),
-            'p' => ui.layer.toggle(Open::Panel, now.instant),
+            'p' => ui.focus.toggle(Open::Panel, now.instant),
             'o' => deepen(ui, tree, now),
             'b' => return Some(background(ui, tree, now)),
             // No other chord reaches here: `LAYERS` is what `chorded` answers.
@@ -143,10 +150,10 @@ fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effe
         }
         return Some(Vec::new());
     }
-    if !ui.layer.captures() {
+    if !ui.focus.captures() {
         return None;
     }
-    Some(match ui.layer.open {
+    Some(match *ui.focus.open() {
         Open::Panel => panel_keys(ui, tree, key, now),
         _ => switcher::keys(ui, tree, key, now),
     })
@@ -281,7 +288,7 @@ fn panel_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     match key.code {
         KeyCode::Up => ui.panel = ui.panel.saturating_sub(1),
         KeyCode::Down => ui.panel = (ui.panel + 1).min(rows.len().saturating_sub(1)),
-        KeyCode::Esc => ui.layer.close(now.instant),
+        KeyCode::Esc => ui.focus.close(now.instant),
         KeyCode::Enter => pin(ui, tree.view(), rows.get(ui.panel)),
         _ => {}
     }
@@ -312,12 +319,12 @@ fn cycle_focus(ui: &mut Ui, tree: &Tree) -> bool {
     }
     let at = ui
         .focus
-        .as_ref()
+        .card()
         .and_then(|id| cards.iter().position(|card| &card.id == id));
     ui.focus = match at {
-        Some(at) if at + 1 == cards.len() => None,
-        Some(at) => Some(cards[at + 1].id.clone()),
-        None => Some(cards[0].id.clone()),
+        Some(at) if at + 1 == cards.len() => crate::focus::Focus::Composer,
+        Some(at) => crate::focus::Focus::Card(cards[at + 1].id.clone()),
+        None => crate::focus::Focus::Card(cards[0].id.clone()),
     };
     true
 }
@@ -326,7 +333,7 @@ fn cycle_focus(ui: &mut Ui, tree: &Tree) -> bool {
 /// button wears the mark until the session's stream moves, which is the ack.
 fn fire(ui: &mut Ui, tree: &Tree, key: char) -> Option<Vec<Effect>> {
     let state = tree.viewed();
-    let focus = ui.focus.clone()?;
+    let focus = ui.focus.card()?.clone();
     let cards = rail::cards(state, tree.view(), &ui.pinned);
     let card = cards.iter().find(|card| card.id == focus)?;
     let action = views::actions::fired(&views::actions_of(&card.body), key)?
@@ -397,7 +404,7 @@ fn interrupt_or_exit(ui: &mut Ui, state: &SessionState, now: Now) -> Vec<Effect>
 fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     let open = keys::Open {
         // One layer is open at a time, whichever form it takes.
-        sheet: ui.layer.showing(),
+        sheet: ui.focus.showing(),
         card: tree.open_interaction().is_some(),
         dropdown: !suggestions(ui, tree).is_empty(),
         busy: tree.viewed().busy(),
@@ -406,7 +413,7 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     let rung = keys::escape(open);
     ui.esc_armed &= rung.is_none();
     match rung {
-        Some(keys::Escape::Sheet) => ui.layer.close(now.instant),
+        Some(keys::Escape::Sheet) => ui.focus.close(now.instant),
         Some(keys::Escape::Card) => return cancel(ui, tree, now),
         Some(keys::Escape::Dropdown) => ui.menu.dismissed = true,
         Some(keys::Escape::Interrupt) => return ask_to_stop(ui, tree.viewed()),
@@ -446,23 +453,23 @@ fn twice(ui: &mut Ui, tree: &Tree, now: Now) {
     if turns.is_empty() {
         return;
     }
-    ui.layer.show(Open::Rewind(Rewind::default()), now.instant);
+    ui.focus.show(Open::Rewind(Rewind::default()), now.instant);
 }
 
 /// The rewind card answers its own keys, as every list does.
 fn rewind_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     let turns = rewind::turns(tree.viewed());
     let rows = rewind::rows(&turns);
-    let Open::Rewind(card) = &mut ui.layer.open else {
+    let Some(Open::Rewind(card)) = ui.focus.open_mut() else {
         return Vec::new();
     };
     match key.code {
         KeyCode::Up => card.selected = card.selected.saturating_sub(1),
         KeyCode::Down => card.selected = (card.selected + 1).min(rows.saturating_sub(1)),
-        KeyCode::Esc => ui.layer.close(now.instant),
+        KeyCode::Esc => ui.focus.close(now.instant),
         KeyCode::Enter => {
             let chosen = turns.get(card.selected).map(rewind::line);
-            ui.layer.close(now.instant);
+            ui.focus.close(now.instant);
             return chosen
                 .map(|line| {
                     vec![Effect::Submit(Input::text(
@@ -491,7 +498,7 @@ fn cancel(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 }
 
 fn picker(ui: &mut Ui, key: KeyEvent, now: Now) -> Vec<Effect> {
-    let Open::Picker(picker) = &mut ui.layer.open else {
+    let Some(Open::Picker(picker)) = ui.focus.open_mut() else {
         return Vec::new();
     };
     match key.code {
@@ -502,10 +509,10 @@ fn picker(ui: &mut Ui, key: KeyEvent, now: Now) -> Vec<Effect> {
         KeyCode::Char(c @ '1'..='9') => {
             picker.selected = (c as usize) - ('1' as usize);
         }
-        KeyCode::Esc => ui.layer.close(now.instant),
+        KeyCode::Esc => ui.focus.close(now.instant),
         KeyCode::Enter => {
             let chosen = picker.sessions.get(picker.selected).map(|s| s.id.clone());
-            ui.layer.close(now.instant);
+            ui.focus.close(now.instant);
             if let Some(id) = chosen {
                 return vec![Effect::Open(SessionSelector::ById { id })];
             }
@@ -524,9 +531,9 @@ fn selecting(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         KeyCode::Left => walk_run(ui, 0, -1, now),
         KeyCode::Right => walk_run(ui, 0, 1, now),
         KeyCode::Char('y') | KeyCode::Char('c') => return copy(ui),
-        KeyCode::Esc => ui.select.clear(),
+        KeyCode::Esc => ui.clear_selection(),
         _ => {
-            ui.select.clear();
+            ui.clear_selection();
             return on_key(ui, tree, key, now);
         }
     }
@@ -539,8 +546,8 @@ fn selecting(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
 /// — and what a person is choosing has to stay in front of them.
 fn walk_run(ui: &mut Ui, lines: isize, columns: isize, now: Now) {
     let (height, rows) = ui.transcript();
-    ui.select.walk(lines, columns, height);
-    let Some(head) = ui.select.run.map(|run| run.head) else {
+    ui.walk_selection(lines, columns, height);
+    let Some(head) = ui.focus.selection().map(|run| run.head) else {
         return;
     };
     ui.scroll.reveal(head.line, height, rows, now.instant);
@@ -550,11 +557,11 @@ fn walk_run(ui: &mut Ui, lines: isize, columns: isize, now: Now) {
 /// One road, whether a key asked or a button was released ([`crate::pointer`]).
 pub fn copy(ui: &mut Ui) -> Vec<Effect> {
     let text = ui
-        .select
-        .run
+        .focus
+        .selection()
         .map(|run| run.text(&ui.transcript_text()))
         .unwrap_or_default();
-    ui.select.clear();
+    ui.clear_selection();
     match text.is_empty() {
         true => Vec::new(),
         false => vec![Effect::Copy(text)],
@@ -576,7 +583,7 @@ fn start_selection(ui: &mut Ui) {
         line: focused_line(ui),
         column: 0,
     };
-    ui.select.start(at);
+    ui.start_selection(at);
 }
 
 fn focused_line(ui: &Ui) -> usize {
@@ -592,11 +599,11 @@ fn focused_line(ui: &Ui) -> usize {
 /// `enter` commits it and then steps, `n`/`N` walk the hits and `esc` gives
 /// the status line back.
 fn searching(ui: &mut Ui, key: KeyEvent, now: Now) -> Vec<Effect> {
-    let Some(search) = ui.search.as_mut() else {
+    let Some(search) = ui.focus.search_mut() else {
         return Vec::new();
     };
     match (search.typing, key.code) {
-        (_, KeyCode::Esc) => ui.search = None,
+        (_, KeyCode::Esc) => ui.focus = crate::focus::Focus::Composer,
         (true, KeyCode::Char(c)) => search.typed(c),
         (true, KeyCode::Backspace) => search.backspace(),
         (true, KeyCode::Enter) => commit(ui, now),
@@ -611,14 +618,14 @@ fn searching(ui: &mut Ui, key: KeyEvent, now: Now) -> Vec<Effect> {
 /// a person is reading — and go to the first hit.
 fn commit(ui: &mut Ui, now: Now) {
     let lines = ui.transcript_text();
-    if let Some(search) = ui.search.as_mut() {
+    if let Some(search) = ui.focus.search_mut() {
         search.find(&lines);
     }
     step(ui, 0, now);
 }
 
 fn step(ui: &mut Ui, by: isize, now: Now) {
-    let Some(search) = ui.search.as_mut() else {
+    let Some(search) = ui.focus.search_mut() else {
         return;
     };
     search.step(by);
@@ -728,11 +735,11 @@ fn plain(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         KeyCode::End => ui.composer.end(),
         KeyCode::Backspace => edit(ui, |c| c.backspace()),
         KeyCode::Delete => edit(ui, |c| c.delete()),
-        KeyCode::Char('?') if ui.composer.is_empty() => ui.layer.toggle(Open::Help, now.instant),
+        KeyCode::Char('?') if ui.composer.is_empty() => ui.focus.toggle(Open::Help, now.instant),
         KeyCode::Char('v') if reading(ui) => start_selection(ui),
         // A key belongs to the focused card's buttons while one is focused and
         // nothing is being typed; the rest of the time it is a letter.
-        KeyCode::Char(c) if ui.composer.is_empty() && ui.focus.is_some() => {
+        KeyCode::Char(c) if ui.composer.is_empty() && ui.focus.card().is_some() => {
             if let Some(effects) = fire(ui, tree, c) {
                 return effects;
             }
@@ -803,7 +810,7 @@ fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect>
     ui.scroll.end();
     match commands::local(&text) {
         Some(Local::Help) => {
-            ui.layer.toggle(Open::Help, now.instant);
+            ui.focus.toggle(Open::Help, now.instant);
             Vec::new()
         }
         Some(Local::Clear) => vec![Effect::Open(SessionSelector::Create {
@@ -841,7 +848,7 @@ fn walk_back(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
     if let Some(intent) = newest_of_ours(tree.viewed()) {
         return vec![Effect::Withdraw(intent)];
     }
-    let older = ui.history.older(ui.composer.text());
+    let older = ui.older();
     recall(ui, older);
     Vec::new()
 }
@@ -930,9 +937,9 @@ mod tests {
             let state = state();
             let tree = solo(&state);
             let (mut ui, now) = scene();
-            ui.intro = Some(crate::opening::Playing::from(now.instant));
+            ui.focus = crate::focus::Focus::Intro(crate::opening::Playing::from(now.instant));
             let effects = on_key(&mut ui, &tree, key, now);
-            assert!(ui.intro.is_none(), "{key:?} skipped it");
+            assert!(ui.focus.intro().is_none(), "{key:?} skipped it");
             assert!(effects.is_empty(), "{key:?} did nothing else: {effects:?}");
             assert_eq!(ui.composer.text(), "", "{key:?} typed nothing");
             assert!(ui.suggestions(&state.summary.cwd, &[]).is_empty());
@@ -945,7 +952,7 @@ mod tests {
         let state = state();
         let tree = solo(&state);
         let (mut ui, now) = scene();
-        ui.intro = Some(crate::opening::Playing::from(now.instant));
+        ui.focus = crate::focus::Focus::Intro(crate::opening::Playing::from(now.instant));
         on_key(&mut ui, &tree, typed('h'), now);
         on_key(&mut ui, &tree, typed('i'), now);
         assert_eq!(ui.composer.text(), "i");
@@ -1070,7 +1077,7 @@ mod tests {
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
         assert!(ui.esc_armed, "the first one arms it and closes nothing");
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(ui.layer.is(&Open::Rewind(Rewind::default())));
+        assert!(ui.focus.is(&Open::Rewind(Rewind::default())));
 
         on_key(&mut ui, &tree, key(KeyCode::Down), now);
         let effects = on_key(&mut ui, &tree, key(KeyCode::Enter), now);
@@ -1094,7 +1101,7 @@ mod tests {
         on_key(&mut ui, &tree, typed('a'), now);
         assert!(!ui.esc_armed);
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(!ui.layer.showing(), "and a half-typed line is not empty");
+        assert!(!ui.focus.showing(), "and a half-typed line is not empty");
     }
 
     /// The picker is offered only where the session has a `/rewind` to run.
@@ -1107,13 +1114,13 @@ mod tests {
         let (mut ui, now) = scene();
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(!ui.layer.showing());
+        assert!(!ui.focus.showing());
         assert!(ui.notices.is_empty(), "and it is silent about it");
     }
 
     /// Where the list's cursor is, when it is the layer that is open.
     fn selected(ui: &Ui) -> Option<roster::Cursor> {
-        match &ui.layer.open {
+        match ui.focus.open() {
             Open::Switcher(switcher) => Some(switcher.cursor),
             _ => None,
         }
@@ -1214,7 +1221,7 @@ mod tests {
     fn help_is_the_surfaces_own_and_reaches_nobody() {
         let (mut ui, now) = scene();
         assert!(line(&mut ui, &state(), "/help", now).is_empty());
-        assert!(ui.layer.is(&Open::Help));
+        assert!(ui.focus.is(&Open::Help));
     }
 
     // ---- the permission mode --------------------------------------------
@@ -1355,10 +1362,10 @@ mod tests {
         ]);
         let (mut ui, now) = scene();
         ui.dialog.focus_on(state.interactions.first());
-        ui.layer.show(Open::Help, now.instant);
+        ui.focus.show(Open::Help, now.instant);
 
         assert!(press(&mut ui, &state, key(KeyCode::Esc), now).is_empty());
-        assert!(!ui.layer.showing(), "the sheet is the outermost thing");
+        assert!(!ui.focus.showing(), "the sheet is the outermost thing");
 
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Esc), now),
@@ -1707,7 +1714,7 @@ mod tests {
             "enter ran the recalled line; a completion would have left it"
         );
         assert!(
-            !ui.layer.is(&Open::Help),
+            !ui.focus.is(&Open::Help),
             "and /help toggled its sheet off again, as a run does"
         );
     }
@@ -1736,13 +1743,13 @@ mod tests {
     fn the_question_mark_only_opens_the_panel_on_an_empty_composer() {
         let (mut ui, now) = scene();
         press(&mut ui, &state(), typed('?'), now);
-        assert!(ui.layer.is(&Open::Help));
+        assert!(ui.focus.is(&Open::Help));
         press(&mut ui, &state(), typed('?'), now);
-        assert!(!ui.layer.is(&Open::Help));
+        assert!(!ui.focus.is(&Open::Help));
         write(&mut ui, &state(), "why", now);
         press(&mut ui, &state(), typed('?'), now);
         assert_eq!(ui.composer.text(), "why?");
-        assert!(!ui.layer.is(&Open::Help));
+        assert!(!ui.focus.is(&Open::Help));
     }
 
     #[test]
@@ -1757,7 +1764,7 @@ mod tests {
     #[test]
     fn the_picker_opens_the_session_it_lands_on() {
         let (mut ui, now) = scene();
-        ui.layer.show(
+        ui.focus.show(
             Open::Picker(crate::ui::Picker {
                 sessions: vec![
                     summary(),
@@ -1777,7 +1784,7 @@ mod tests {
                 id: SessionId::from_raw("ses_2")
             })]
         );
-        assert!(!ui.layer.showing());
+        assert!(!ui.focus.showing());
     }
 
     // ---- the switcher ---------------------------------------------------
@@ -1798,7 +1805,7 @@ mod tests {
             "the walk is the switch"
         );
         assert!(press_tree(&mut ui, &tree, key(KeyCode::Enter), now).is_empty());
-        assert!(!ui.layer.showing());
+        assert!(!ui.focus.showing());
     }
 
     #[test]
@@ -1807,10 +1814,10 @@ mod tests {
         let (mut ui, now) = scene();
         press_tree(&mut ui, &tree, ctrl('g'), now);
         press_tree(&mut ui, &tree, ctrl('g'), now);
-        assert!(!ui.layer.showing(), "the same chord closes it");
+        assert!(!ui.focus.showing(), "the same chord closes it");
         press_tree(&mut ui, &tree, ctrl('g'), now);
         press_tree(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(!ui.layer.showing());
+        assert!(!ui.focus.showing());
     }
 
     /// A root alone in this process may still have children in the store, and
@@ -1822,7 +1829,7 @@ mod tests {
             press(&mut ui, &state(), ctrl('g'), now),
             vec![Effect::ListStored]
         );
-        assert!(ui.layer.showing());
+        assert!(ui.focus.showing());
         assert!(ui.notices.is_empty(), "nothing is said about an empty tree");
     }
 
@@ -1833,7 +1840,7 @@ mod tests {
         let tree = with_child(vec![]);
         let (mut ui, now) = scene();
         press_tree(&mut ui, &tree, ctrl('g'), now);
-        let Open::Switcher(open) = &mut ui.layer.open else {
+        let Some(Open::Switcher(open)) = ui.focus.open_mut() else {
             panic!("the switcher is open");
         };
         open.stored = vec![stored_summary("ses_7", "scout")];
@@ -1845,7 +1852,7 @@ mod tests {
             press_tree(&mut ui, &tree, key(KeyCode::Enter), now).is_empty(),
             "the walk already showed it; `⏎` only settles on where it landed"
         );
-        assert!(!ui.layer.showing());
+        assert!(!ui.focus.showing());
     }
 
     /// The session a walk switched the view to, when it switched it.
@@ -1887,7 +1894,7 @@ mod tests {
 
     /// The line the list set aside when it went up, if it is up.
     fn draft(ui: &Ui) -> String {
-        match &ui.layer.open {
+        match ui.focus.open() {
             Open::Switcher(switcher) => switcher.draft.clone(),
             _ => String::new(),
         }
@@ -1934,7 +1941,7 @@ mod tests {
         tree.show(&agent_id(3));
 
         let effects = press_tree(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(ui.layer.showing(), "the first `esc` is the query's");
+        assert!(ui.focus.showing(), "the first `esc` is the query's");
         assert!(ui.composer.is_empty(), "and it takes the box's line back");
         assert_eq!(
             selected(&ui),
@@ -1944,7 +1951,7 @@ mod tests {
         assert!(effects.is_empty(), "nothing moved, so nothing is asked for");
 
         let effects = press_tree(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(!ui.layer.showing(), "the second closes the list");
+        assert!(!ui.focus.showing(), "the second closes the list");
         assert_eq!(
             effects,
             vec![Effect::View(root)],
@@ -1967,7 +1974,7 @@ mod tests {
         assert!(ui.composer.is_empty());
         assert_eq!(selected(&ui), at(2), "still on the row it narrowed to");
         press_tree(&mut ui, &tree, key(KeyCode::Backspace), now);
-        assert!(ui.layer.showing(), "and the list is still up");
+        assert!(ui.focus.showing(), "and the list is still up");
     }
 
     /// A second opening starts with nothing typed: the query is a fact about
@@ -2008,7 +2015,7 @@ mod tests {
             for _ in 0..presses {
                 press_tree(&mut ui, &tree, closing, now);
             }
-            assert!(!ui.layer.showing());
+            assert!(!ui.focus.showing());
             assert_eq!(
                 ui.composer.text(),
                 "half a thought",
@@ -2029,7 +2036,7 @@ mod tests {
         typing(&mut ui, &tree, "sco", now);
         press_tree(&mut ui, &tree, ctrl('p'), now);
         assert!(
-            ui.layer.is(&Open::Panel),
+            ui.focus.is(&Open::Panel),
             "the chord's own layer is what is up"
         );
         assert_eq!(ui.composer.text(), "half a thought");
@@ -2047,7 +2054,7 @@ mod tests {
         typing(&mut ui, &tree, "sco ut", now);
         press_tree(&mut ui, &tree, ctrl('w'), now);
         assert_eq!(ui.composer.text(), "sco ", "the last word of the query");
-        assert!(ui.layer.showing(), "and the list is still up");
+        assert!(ui.focus.showing(), "and the list is still up");
         assert_eq!(draft(&ui), "half a thought", "with the draft still aside");
     }
 
@@ -2099,7 +2106,7 @@ mod tests {
             press_tree(&mut ui, &tree, key(KeyCode::Enter), now).is_empty(),
             "`⏎` keeps the session the completed name named"
         );
-        assert!(!ui.layer.showing());
+        assert!(!ui.focus.showing());
         assert!(ui.composer.is_empty(), "and the box is the draft's again");
     }
 
@@ -2129,7 +2136,7 @@ mod tests {
         typing(&mut ui, &tree, "zzz", now);
         press_tree(&mut ui, &tree, key(KeyCode::Tab), now);
         assert_eq!(ui.composer.text(), "zzz");
-        assert!(ui.layer.showing(), "and the list is still up");
+        assert!(ui.focus.showing(), "and the list is still up");
     }
 
     // ---- one list, two doors --------------------------------------------
@@ -2172,8 +2179,8 @@ mod tests {
             vec![Effect::ListStored]
         );
         press_tree(&mut chord, &tree, ctrl('g'), now);
-        assert_eq!(down.layer.open, chord.layer.open);
-        assert!(down.layer.showing());
+        assert_eq!(down.focus.open(), chord.focus.open());
+        assert!(down.focus.showing());
     }
 
     /// Walking is switching: the transcript changes as the cursor moves, as
@@ -2189,7 +2196,7 @@ mod tests {
             "the row below the root is the child, and the view goes with it"
         );
         assert_eq!(selected(&ui), at(1));
-        assert!(ui.layer.showing(), "and the list stays up to be walked on");
+        assert!(ui.focus.showing(), "and the list stays up to be walked on");
     }
 
     /// The column is walked to its ends and stops there: a list is not a ring,
@@ -2220,7 +2227,7 @@ mod tests {
             Some(tree.root_id().clone()),
             "back to the session the list was opened from"
         );
-        assert!(!ui.layer.showing());
+        assert!(!ui.focus.showing());
 
         press_tree(&mut ui, &tree, ctrl('g'), now);
         walked_to(&mut ui, &tree, key(KeyCode::Down), now);
@@ -2228,7 +2235,7 @@ mod tests {
             press_tree(&mut ui, &tree, key(KeyCode::Enter), now).is_empty(),
             "the walked-to session is already on screen"
         );
-        assert!(!ui.layer.showing());
+        assert!(!ui.focus.showing());
     }
 
     /// `esc` on the list closes the list and nothing else: it is the one thing
@@ -2239,7 +2246,7 @@ mod tests {
         let (mut ui, now) = scene();
         press_tree(&mut ui, &tree, key(KeyCode::Down), now);
         press_tree(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(!ui.layer.showing());
+        assert!(!ui.focus.showing());
         assert_eq!(
             press_tree(&mut ui, &tree, key(KeyCode::Esc), now),
             vec![Effect::Interrupt],
@@ -2255,7 +2262,7 @@ mod tests {
         assert_eq!(ui.composer.text(), "the first thing");
         press(&mut ui, &state(), key(KeyCode::Down), now);
         assert!(ui.composer.is_empty(), "the walk came back to the draft");
-        assert!(!ui.layer.showing(), "and a session alone opened no list");
+        assert!(!ui.focus.showing(), "and a session alone opened no list");
     }
 
     #[test]
@@ -2264,7 +2271,7 @@ mod tests {
         let (mut ui, now) = scene();
         write(&mut ui, tree.viewed(), "half a thought", now);
         press_tree(&mut ui, &tree, key(KeyCode::Down), now);
-        assert!(!ui.layer.showing());
+        assert!(!ui.focus.showing());
     }
 
     #[test]
@@ -2311,7 +2318,10 @@ mod tests {
         press(&mut ui, &state, key(KeyCode::PageUp), now);
         render(&state, &mut ui, now);
         press(&mut ui, &state, typed('v'), now);
-        assert!(ui.select.run.is_some(), "v starts one while reading back");
+        assert!(
+            ui.focus.selection().is_some(),
+            "v starts one while reading back"
+        );
 
         press(&mut ui, &state, key(KeyCode::Down), now);
         press(&mut ui, &state, key(KeyCode::Right), now);
@@ -2324,7 +2334,7 @@ mod tests {
             2,
             "a run of two lines, cut where the far end is: {text:?}"
         );
-        assert!(ui.select.run.is_none(), "copying lets it go");
+        assert!(ui.focus.selection().is_none(), "copying lets it go");
     }
 
     /// A page back, settled, so a run started at the top of the screen has
@@ -2355,7 +2365,7 @@ mod tests {
         let top = ui.shown.top;
         press(&mut ui, &state, typed('v'), now);
         assert_eq!(
-            ui.select.run.map(|run| run.head.line),
+            ui.focus.selection().map(|run| run.head.line),
             Some(top),
             "a run starts at the first line on the screen"
         );
@@ -2415,7 +2425,7 @@ mod tests {
         render(&state, &mut ui, now);
         press(&mut ui, &state, typed('v'), now);
         press(&mut ui, &state, typed('h'), now);
-        assert!(ui.select.run.is_none());
+        assert!(ui.focus.selection().is_none());
         assert_eq!(ui.composer.text(), "h");
     }
 
@@ -2423,7 +2433,10 @@ mod tests {
     fn v_is_a_letter_while_the_transcript_is_at_its_foot() {
         let (mut ui, now) = scene();
         write(&mut ui, &state(), "ver", now);
-        assert!(ui.select.run.is_none(), "a message may start with one");
+        assert!(
+            ui.focus.selection().is_none(),
+            "a message may start with one"
+        );
         assert_eq!(ui.composer.text(), "ver");
     }
 
@@ -2436,7 +2449,7 @@ mod tests {
         render(&state, &mut ui, now);
         press(&mut ui, &state, typed('v'), now);
         assert!(press(&mut ui, &state, key(KeyCode::Esc), now).is_empty());
-        assert!(ui.select.run.is_none());
+        assert!(ui.focus.selection().is_none());
     }
 
     /// A hand still out past the edge is let go with the run it was drawing:
@@ -2451,7 +2464,7 @@ mod tests {
         on_mouse(&mut ui, &tree, dragged(4, foot), now);
         assert!(ui.select.dragging.is_some());
         press(&mut ui, &state, key(KeyCode::Esc), now);
-        assert!(ui.select.run.is_none(), "esc lets it go");
+        assert!(ui.focus.selection().is_none(), "esc lets it go");
         assert!(ui.select.dragging.is_none(), "and the hand with it");
     }
 
@@ -2514,7 +2527,7 @@ mod tests {
             Some(bingo_sdk::ItemId::from_raw("itm_59")),
             "the last row is the last item"
         );
-        assert!(ui.select.run.is_some(), "and a run starts there");
+        assert!(ui.focus.selection().is_some(), "and a run starts there");
     }
 
     /// A block with more under it than a row can hold.
@@ -2756,7 +2769,7 @@ mod tests {
         assert!(ui.folds.is_empty(), "there is nothing to lift");
         ui.select.block = Some(bingo_sdk::ItemId::from_raw("itm_1"));
         press(&mut ui, &state, key(KeyCode::Enter), now);
-        assert!(!ui.layer.showing(), "and nothing to open");
+        assert!(!ui.focus.showing(), "and nothing to open");
     }
 
     /// A thought being had is not a fold: its two tail rows scroll rather than
@@ -2812,7 +2825,7 @@ mod tests {
         render(&state, &mut ui, now);
         ui.select.block = Some(bingo_sdk::ItemId::from_raw("itm_1"));
         press(&mut ui, &state, key(KeyCode::Enter), now);
-        assert!(matches!(ui.layer.open, Open::Pager(_)));
+        assert!(matches!(*ui.focus.open(), Open::Pager(_)));
     }
 
     #[test]
@@ -2822,7 +2835,7 @@ mod tests {
         render(&state, &mut ui, now);
         on_mouse(&mut ui, &solo(&state), click(2, 15), now);
         on_mouse(&mut ui, &solo(&state), dragged(6, 17), now);
-        let run = ui.select.run.expect("a run");
+        let run = ui.focus.selection().expect("a run");
         assert_eq!(run.anchor.column, 2);
         assert_eq!(run.head.column, 6);
         assert_eq!(run.head.line, run.anchor.line + 2);
@@ -2883,7 +2896,7 @@ mod tests {
         let foot = below_the_transcript(&ui, 3);
         on_mouse(&mut ui, &tree, dragged(4, foot), now);
         assert_eq!(
-            ui.select.run.map(|run| run.head.line),
+            ui.focus.selection().map(|run| run.head.line),
             Some(top + 3 + rows - 1),
             "the run reaches the line now drawn at the foot"
         );
@@ -2922,7 +2935,7 @@ mod tests {
         on_mouse(&mut ui, &tree, click(4, 3), now);
         let foot = below_the_transcript(&ui, 1);
         on_mouse(&mut ui, &tree, dragged(4, foot), now);
-        let reached = |ui: &Ui| ui.select.run.map(|run| run.head.line);
+        let reached = |ui: &Ui| ui.focus.selection().map(|run| run.head.line);
         let head = reached(&ui);
         ui.drag_step(later(now, 49));
         assert_eq!(reached(&ui), head, "not yet");
@@ -2948,7 +2961,10 @@ mod tests {
         for step in 1..=height {
             ui.drag_step(later(now, 50 * step as i64));
         }
-        assert_eq!(ui.select.run.map(|run| run.head.line), Some(height - 1));
+        assert_eq!(
+            ui.focus.selection().map(|run| run.head.line),
+            Some(height - 1)
+        );
         assert!(ui.select.dragging.is_none(), "there is nothing further");
     }
 
@@ -2966,16 +2982,16 @@ mod tests {
         on_mouse(&mut ui, &tree, click(4, 3), now);
         on_mouse(&mut ui, &tree, dragged(4, head_row), now);
         assert_eq!(
-            ui.select.run.map(|run| run.head.line),
+            ui.focus.selection().map(|run| run.head.line),
             Some(top),
             "the run reaches the first line on the screen, and the view holds"
         );
         ui.drag_step(later(now, 50));
-        assert_eq!(ui.select.run.map(|run| run.head.line), Some(top - 1));
+        assert_eq!(ui.focus.selection().map(|run| run.head.line), Some(top - 1));
         for step in 2..=top + 1 {
             ui.drag_step(later(now, 50 * step as i64));
         }
-        assert_eq!(ui.select.run.map(|run| run.head.line), Some(0));
+        assert_eq!(ui.focus.selection().map(|run| run.head.line), Some(0));
         assert!(ui.select.dragging.is_none(), "there is nothing further");
     }
 
@@ -3010,7 +3026,7 @@ mod tests {
             text.contains(&hidden),
             "the run reached what the screen had not: {hidden:?} in {text:?}"
         );
-        assert!(ui.select.run.is_none(), "copying lets it go");
+        assert!(ui.focus.selection().is_none(), "copying lets it go");
         assert!(ui.select.dragging.is_none());
         assert_eq!(
             ui.notice().map(|notice| notice.text.clone()),
@@ -3047,13 +3063,17 @@ mod tests {
         let tree = solo(&state);
         on_mouse(&mut ui, &tree, click(2, 4), now);
         on_mouse(&mut ui, &tree, dragged(6, 6), now);
-        let run = ui.select.run;
+        let run = ui.focus.selection();
         let top = ui.shown.top;
         on_mouse(&mut ui, &tree, wheel(true, 6, 6), now);
         let now = settled_at(now);
         render(&state, &mut ui, now);
         assert_eq!(ui.shown.top, top - WHEEL as usize);
-        assert_eq!(ui.select.run, run, "the run is the hand's, not the wheel's");
+        assert_eq!(
+            ui.focus.selection(),
+            run,
+            "the run is the hand's, not the wheel's"
+        );
     }
 
     #[test]
@@ -3081,7 +3101,10 @@ mod tests {
             vec![Effect::View(child_id())],
             "the `↳` row belongs to the call that spawned it"
         );
-        assert!(ui.select.run.is_none(), "stepping in is not selecting");
+        assert!(
+            ui.focus.selection().is_none(),
+            "stepping in is not selecting"
+        );
     }
 
     // ---- a picture is a thing to click (M56) ------------------------------
@@ -3138,7 +3161,7 @@ mod tests {
             let effects = on_mouse(&mut ui, &solo(&state), click(6, row), now);
             assert_eq!(effects, vec![Effect::OpenPicture(journal_picture())]);
             assert!(
-                ui.select.run.is_none(),
+                ui.focus.selection().is_none(),
                 "opening a picture is not selecting"
             );
             assert!(ui.folds.is_empty(), "and it is not the block's fold");
@@ -3265,7 +3288,7 @@ mod tests {
         crate::graphics::with(crate::graphics::drawing(), || {
             let screen = render(&state, &mut ui, now);
             let row = cells_row(&screen);
-            ui.layer.show(crate::ui::Open::Help, now.instant);
+            ui.focus.show(crate::ui::Open::Help, now.instant);
             assert!(on_mouse(&mut ui, &solo(&state), click(6, row), now).is_empty());
         });
     }
@@ -3385,13 +3408,13 @@ mod tests {
     fn ctrl_p_toggles_the_plugin_state_panel_and_esc_closes_it() {
         let (mut ui, now) = scene();
         assert!(press(&mut ui, &state(), ctrl('p'), now).is_empty());
-        assert!(ui.layer.is(&Open::Panel));
+        assert!(ui.focus.is(&Open::Panel));
         press(&mut ui, &state(), ctrl('p'), now);
-        assert!(!ui.layer.is(&Open::Panel), "the same chord closes it");
+        assert!(!ui.focus.is(&Open::Panel), "the same chord closes it");
 
         press(&mut ui, &state(), ctrl('p'), now);
         assert!(press(&mut ui, &state(), key(KeyCode::Esc), now).is_empty());
-        assert!(!ui.layer.showing(), "and so does esc");
+        assert!(!ui.focus.showing(), "and so does esc");
     }
 
     /// Claude Code's key for its own list (M74): the rows go off the band and
@@ -3402,7 +3425,7 @@ mod tests {
         assert!(!ui.activity_hidden);
         assert!(press(&mut ui, &state(), ctrl('t'), now).is_empty());
         assert!(ui.activity_hidden);
-        assert!(!ui.layer.showing(), "nothing opens");
+        assert!(!ui.focus.showing(), "nothing opens");
         press(&mut ui, &state(), ctrl('t'), now);
         assert!(!ui.activity_hidden, "the same chord brings it back");
     }
@@ -3411,9 +3434,9 @@ mod tests {
     fn one_layer_at_a_time_replaces_the_last() {
         let (mut ui, now) = scene();
         press(&mut ui, &state(), typed('?'), now);
-        assert!(ui.layer.is(&Open::Help));
+        assert!(ui.focus.is(&Open::Help));
         press(&mut ui, &state(), ctrl('p'), now);
-        assert!(ui.layer.is(&Open::Panel), "focus moves, never sideways");
+        assert!(ui.focus.is(&Open::Panel), "focus moves, never sideways");
     }
 
     #[test]
@@ -3421,13 +3444,13 @@ mod tests {
         let (mut ui, now) = scene();
         press(&mut ui, &state(), typed('?'), now);
         press(&mut ui, &state(), key(KeyCode::Esc), now);
-        assert!(!ui.layer.showing(), "it is on its way out");
+        assert!(!ui.focus.showing(), "it is on its way out");
         assert!(
-            !ui.layer.reveal(now).gone(),
+            !ui.focus.reveal(now).gone(),
             "and still drawn while it goes"
         );
         ui.expire(frames_at(now, 4));
-        assert_eq!(ui.layer.open, Open::Nothing);
+        assert_eq!(*ui.focus.open(), Open::Nothing);
     }
 
     #[test]
@@ -3558,20 +3581,24 @@ mod tests {
         let state = boarded();
         let (mut ui, now) = scene();
         pin_board(&mut ui);
-        assert_eq!(ui.focus, None);
+        assert_eq!(ui.focus.card(), None);
         press(&mut ui, &state, key(KeyCode::Tab), now);
-        assert_eq!(ui.focus, Some(demo_card("board")));
+        assert_eq!(ui.focus.card().cloned(), Some(demo_card("board")));
         press(&mut ui, &state, key(KeyCode::Tab), now);
-        assert_eq!(ui.focus, Some(demo_card("progress")));
+        assert_eq!(ui.focus.card().cloned(), Some(demo_card("progress")));
         press(&mut ui, &state, key(KeyCode::Tab), now);
-        assert_eq!(ui.focus, None, "and the keys are the composer's again");
+        assert_eq!(
+            ui.focus.card(),
+            None,
+            "and the keys are the composer's again"
+        );
     }
 
     #[test]
     fn tab_is_left_alone_when_the_rail_has_no_cards_to_walk() {
         let (mut ui, now) = scene();
         press(&mut ui, &state(), key(KeyCode::Tab), now);
-        assert_eq!(ui.focus, None);
+        assert_eq!(ui.focus.card(), None);
     }
 
     #[test]
@@ -3579,7 +3606,7 @@ mod tests {
         let state = boarded();
         let (mut ui, now) = scene();
         pin_board(&mut ui);
-        ui.focus = Some(demo_card("board"));
+        ui.focus = crate::focus::Focus::Card(demo_card("board"));
         let fired = press(&mut ui, &state, typed('1'), now);
         assert_eq!(
             action_of(&fired).map(|action| action.name.as_str()),
@@ -3598,7 +3625,7 @@ mod tests {
         let state = boarded();
         let (mut ui, now) = scene();
         pin_board(&mut ui);
-        ui.focus = Some(demo_card("board"));
+        ui.focus = crate::focus::Focus::Card(demo_card("board"));
         assert!(press(&mut ui, &state, typed('9'), now).is_empty());
         assert_eq!(ui.composer.text(), "9");
     }
@@ -3623,7 +3650,7 @@ mod tests {
         let rail = ui.shown.regions.rail.expect("a rail at 120 columns");
         let effects = on_mouse(&mut ui, &solo(&state), click(rail.x + 2, rail.y), now);
         assert!(effects.is_empty());
-        assert_eq!(ui.focus, Some(demo_card("board")));
+        assert_eq!(ui.focus.card().cloned(), Some(demo_card("board")));
     }
 
     #[test]
@@ -3631,7 +3658,7 @@ mod tests {
         let state = boarded();
         let (mut ui, now) = scene();
         press(&mut ui, &state, ctrl('p'), now);
-        assert!(ui.layer.captures(), "the sheet answers its own keys");
+        assert!(ui.focus.captures(), "the sheet answers its own keys");
         press(&mut ui, &state, key(KeyCode::Enter), now);
         assert!(ui.pinned.contains(&crate::rail::Pin {
             session: bingo_sdk::SessionId::from_raw("ses_1"),
@@ -3640,7 +3667,7 @@ mod tests {
         press(&mut ui, &state, key(KeyCode::Enter), now);
         assert!(ui.pinned.is_empty(), "the same key takes it back");
         press(&mut ui, &state, ctrl('p'), now);
-        assert!(!ui.layer.showing(), "ctrl+p still closes it");
+        assert!(!ui.focus.showing(), "ctrl+p still closes it");
     }
 
     // ---- the line that waits (M68) --------------------------------------

@@ -283,7 +283,7 @@ pub fn drafted(ui: &mut crate::ui::Ui, image: bingo_sdk::Image) -> u32 {
         dest,
         result: Ok(image),
     });
-    ui.pictures.hold(ui.composer.text(), path);
+    ui.hold_picture(path);
     ui.composer.insert(&crate::pictures::placeholder(token));
     token
 }
@@ -773,7 +773,7 @@ pub fn settled() -> (Ui, Now) {
 /// Open a layer that has finished arriving: what a settled sheet or switcher
 /// looks like, rather than the first frame of its slide.
 pub fn shown(ui: &mut Ui, open: crate::ui::Open, now: Now) {
-    ui.layer
+    ui.focus
         .show(open, now.instant - std::time::Duration::from_millis(500));
 }
 

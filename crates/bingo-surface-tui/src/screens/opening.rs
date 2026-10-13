@@ -14,7 +14,7 @@ fn playing(width: u16, height: u16, t: f32) -> String {
     let state = state();
     let tree = solo(&state);
     let (mut ui, now) = scene();
-    ui.intro = Some(crate::opening::Playing::from(
+    ui.focus = crate::focus::Focus::Intro(crate::opening::Playing::from(
         now.instant
             .checked_sub(std::time::Duration::from_secs_f32(t))
             .expect("a clock with the piece behind it"),

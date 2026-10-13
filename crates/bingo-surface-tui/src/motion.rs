@@ -591,7 +591,7 @@ fn a_card_reveals_top_down_and_a_sheet_slides_up() {
     insta::assert_snapshot!("card_reveal", card.join("\n"));
 
     let (mut sheet, now) = scene();
-    sheet.layer.show(crate::ui::Open::Help, now.instant);
+    sheet.focus.show(crate::ui::Open::Help, now.instant);
     let plain = solo(&state());
     let frames: Vec<String> = (0..5)
         .map(|f| screen(&plain, &mut sheet, later(now, f * 33)))
@@ -603,7 +603,7 @@ fn a_card_reveals_top_down_and_a_sheet_slides_up() {
 fn esc_runs_a_sheet_back_down_the_way_it_came() {
     let (mut ui, now) = scene();
     shown(&mut ui, crate::ui::Open::Help, now);
-    ui.layer.close(now.instant);
+    ui.focus.close(now.instant);
     let tree = solo(&state());
     let closing: Vec<String> = (0..5)
         .map(|f| screen(&tree, &mut ui, later(now, f * 33)))
@@ -860,7 +860,7 @@ fn motion_off_holds_every_cue_at_its_resting_frame() {
 #[test]
 fn motion_off_puts_a_layer_up_whole_and_takes_it_away_at_once() {
     let (mut ui, now) = scene();
-    ui.layer.show(crate::ui::Open::Help, now.instant);
+    ui.focus.show(crate::ui::Open::Help, now.instant);
     let still = still(now);
     let tree = solo(&state());
     assert_eq!(
@@ -868,9 +868,9 @@ fn motion_off_puts_a_layer_up_whole_and_takes_it_away_at_once() {
         screen(&tree, &mut ui, later(now, 200)),
         "a sheet is whole on its first frame"
     );
-    ui.layer.close(now.instant);
+    ui.focus.close(now.instant);
     assert!(
-        ui.layer.drawn(still).is_none(),
+        ui.focus.drawn(still).is_none(),
         "and gone on the frame it closes"
     );
 }

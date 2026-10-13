@@ -37,7 +37,7 @@ impl Now {
             // that stops time stops the animation with it.
             instant: tokio::time::Instant::now().into_std(),
             wall: Timestamp::now(),
-            motion: moves(std::env::var("BINGO_MOTION").ok().as_deref()),
+            motion: crate::render::current().motion,
         }
     }
 

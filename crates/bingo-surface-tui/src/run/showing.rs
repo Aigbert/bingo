@@ -72,7 +72,7 @@ fn placing(
 /// frame whose pictures the terminal is already holding: the whole cost
 /// of a redraw is one walk of the blocks.
 pub(super) fn hand(run: &mut Run, screen: &mut dyn Screen) -> Result<(), KernelError> {
-    let Graphics::Kitty { cell, transport } = crate::graphics::chosen() else {
+    let Graphics::Kitty { cell, transport } = run.detection.render().graphics else {
         return Ok(());
     };
     let placed = run.ui.shown.placed();
@@ -109,7 +109,7 @@ pub(super) fn read_linked(run: &mut Run) {
     // the whole of what it will ever show, so a file read or an address
     // fetched for it would be bytes taken and thrown away — and model
     // text is not a reason to reach the network on its own.
-    if crate::graphics::chosen() == Graphics::Off {
+    if run.detection.render().graphics == Graphics::Off {
         return;
     }
     // The draft's own pictures are files too (ADR-0052), read the same way.
@@ -131,7 +131,7 @@ pub(super) fn read_linked(run: &mut Run) {
 /// holding for this surface outlives the run otherwise, and nothing will
 /// ever place it again.
 pub(super) fn forget(run: &mut Run, screen: &mut dyn Screen) -> Result<(), KernelError> {
-    let transport = crate::graphics::chosen().transport();
+    let transport = run.detection.render().graphics.transport();
     let bytes = run.stored.forget_all(transport);
     if bytes.is_empty() {
         return Ok(());

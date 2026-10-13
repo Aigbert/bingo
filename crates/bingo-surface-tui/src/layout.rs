@@ -105,7 +105,29 @@ impl std::ops::DerefMut for Layout {
 }
 
 /// Consume the previous memo; neither the tree nor the UI is changed.
-pub fn layout(previous: Layout, tree: &Tree, ui: &Ui, size: Rect, now: Now) -> Layout {
+pub fn layout(
+    previous: Layout,
+    tree: &Tree,
+    ui: &Ui,
+    size: Rect,
+    now: Now,
+    render: &crate::render::Render,
+) -> Layout {
+    render.scope(|| {
+        compose(
+            previous,
+            tree,
+            ui,
+            size,
+            Now {
+                motion: render.motion,
+                ..now
+            },
+        )
+    })
+}
+
+fn compose(previous: Layout, tree: &Tree, ui: &Ui, size: Rect, now: Now) -> Layout {
     let mut next = Layout {
         blocks: previous.blocks,
         measurements: previous.measurements,
@@ -120,7 +142,11 @@ pub fn layout(previous: Layout, tree: &Tree, ui: &Ui, size: Rect, now: Now) -> L
 }
 
 /// Painting has no geometry, state or clock to decide against.
-pub fn paint(layout: &Layout, frame: &mut ratatui::Frame) {
+pub fn paint(layout: &Layout, frame: &mut ratatui::Frame, render: &crate::render::Render) {
+    render.scope(|| paint_cells(layout, frame));
+}
+
+fn paint_cells(layout: &Layout, frame: &mut ratatui::Frame) {
     frame.buffer_mut().clone_from(&layout.canvas.buffer);
     if let Some(cursor) = layout.canvas.cursor {
         frame.set_cursor_position(cursor);

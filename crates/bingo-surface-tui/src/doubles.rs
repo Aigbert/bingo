@@ -337,13 +337,17 @@ impl Recorder {
 }
 
 impl Screen for Recorder {
-    fn draw(&mut self, layout: &crate::layout::Layout) -> std::io::Result<()> {
+    fn draw(
+        &mut self,
+        layout: &crate::layout::Layout,
+        render: &crate::render::Render,
+    ) -> std::io::Result<()> {
         let area = layout.canvas.buffer.area;
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::TestBackend::new(area.width, area.height))
                 .expect("test terminal");
         terminal
-            .draw(|frame| crate::layout::paint(layout, frame))
+            .draw(|frame| crate::layout::paint(layout, frame, render))
             .expect("paint");
         self.frames.push(terminal.backend().to_string());
         Ok(())

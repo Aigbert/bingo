@@ -37,16 +37,16 @@ pub(super) fn opens(ui: &Ui, tree: &Tree) -> bool {
 /// when the read the opening spawns comes back, which is why it goes up even
 /// where the tree is the root alone.
 pub(super) fn toggle(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
-    if ui.layer.showing() {
+    if ui.focus.showing() {
         put_away(ui, now);
-        ui.layer.close(now.instant);
+        ui.focus.close(now.instant);
         return Vec::new();
     }
     let rows = tree::roster(tree, &[]);
     // The box is the query from here on, so the line being written goes into
     // the gesture's own keeping and the list opens on an empty one.
     let draft = ui.composer.take();
-    ui.layer.show(
+    ui.focus.show(
         Open::Switcher(Switcher {
             cursor: roster::Cursor::on(&roster::listing(tree, &rows, ""), tree.view()),
             draft,
@@ -81,7 +81,7 @@ pub(super) fn keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Eff
 /// the list narrows to what it left. The cursor stays on the row it completed:
 /// a name a person can read is a name the matcher keeps.
 fn completed(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
-    let Open::Switcher(open) = &ui.layer.open else {
+    let Open::Switcher(open) = ui.focus.open() else {
         return Vec::new();
     };
     let query = ui.composer.text();
@@ -97,7 +97,7 @@ fn completed(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
 /// Where the arrows move the cursor, and the session that lands under it.
 /// `None` says the key was not one of the list's own.
 fn walked(ui: &Ui, tree: &Tree, key: KeyEvent) -> Option<(roster::Cursor, Option<SessionId>)> {
-    let Open::Switcher(open) = &ui.layer.open else {
+    let Open::Switcher(open) = ui.focus.open() else {
         return None;
     };
     let rows = tree::roster(tree, &open.stored);
@@ -149,7 +149,7 @@ fn edits(ui: &mut Ui, key: KeyEvent) -> Option<Vec<Effect>> {
 
 /// The session the cursor names on the list as the box leaves it.
 fn on_cursor(ui: &Ui, tree: &Tree) -> Option<SessionId> {
-    let Open::Switcher(open) = &ui.layer.open else {
+    let Open::Switcher(open) = ui.focus.open() else {
         return None;
     };
     open.session(tree, ui.composer.text(), open.cursor)
@@ -167,7 +167,7 @@ fn replaced(ui: &mut Ui, tree: &Tree, was: Option<SessionId>) -> Vec<Effect> {
 /// Where the cursor sits on the list as it stands, for the session it was on:
 /// that row where the query left it, and the first row where it did not.
 fn placed(ui: &Ui, tree: &Tree, was: Option<&SessionId>) -> (roster::Cursor, Option<SessionId>) {
-    let Open::Switcher(open) = &ui.layer.open else {
+    let Open::Switcher(open) = ui.focus.open() else {
         return (roster::Cursor::default(), None);
     };
     let rows = tree::roster(tree, &open.stored);
@@ -187,7 +187,7 @@ pub(crate) fn walk_to(
     cursor: roster::Cursor,
     chosen: Option<SessionId>,
 ) -> Vec<Effect> {
-    if let Open::Switcher(open) = &mut ui.layer.open {
+    if let Some(Open::Switcher(open)) = ui.focus.open_mut() {
         open.cursor = cursor;
     }
     chosen
@@ -201,7 +201,7 @@ pub(crate) fn walk_to(
 /// person typed is the first thing it takes back, and the list itself the
 /// next, putting back the session it was opened from.
 fn settle(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
-    let Open::Switcher(open) = &ui.layer.open else {
+    let Open::Switcher(open) = ui.focus.open() else {
         return Vec::new();
     };
     let opened_from = open.from.clone();
@@ -232,15 +232,15 @@ fn cleared(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
 /// it was, caret at its end, as a recalled line is. The one way out, so a
 /// query a person typed is never left behind in the box for `⏎` to send.
 pub(super) fn put_away(ui: &mut Ui, now: Now) {
-    let Open::Switcher(open) = &ui.layer.open else {
+    let Open::Switcher(open) = ui.focus.open() else {
         return;
     };
     // One already on its way out has given the draft back.
-    if !ui.layer.showing() {
+    if !ui.focus.showing() {
         return;
     }
     let draft = open.draft.clone();
     ui.composer.set(&draft);
     ui.edited();
-    ui.layer.close(now.instant);
+    ui.focus.close(now.instant);
 }

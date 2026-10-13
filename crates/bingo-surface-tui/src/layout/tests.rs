@@ -1,4 +1,24 @@
-use super::{Layout, layout};
+use super::Layout;
+
+fn layout(
+    previous: Layout,
+    tree: &crate::tree::Tree,
+    ui: &crate::ui::Ui,
+    size: Rect,
+    now: crate::clock::Now,
+) -> Layout {
+    super::layout(
+        previous,
+        tree,
+        ui,
+        size,
+        now,
+        &crate::render::Render {
+            motion: now.motion,
+            ..crate::render::current()
+        },
+    )
+}
 use crate::test_support::*;
 use ratatui::layout::Rect;
 
@@ -98,7 +118,7 @@ fn layout_answers_picture_and_rail_clicks_without_painting() {
         .1
         .start;
     crate::pointer::on_mouse(&mut ui, &tree, click(rail.x + 1, rail.y + row as u16), now);
-    assert_eq!(ui.focus, Some(demo_card("board")));
+    assert_eq!(ui.focus.card().cloned(), Some(demo_card("board")));
 
     let mut state = state();
     let mut picture = user("itm_picture", "A picture.");
@@ -258,7 +278,7 @@ fn layout_unbounded_rail_schedules_its_next_step() {
 fn layout_layer_send_and_drag_report_their_own_deadlines() {
     let (mut ui, now) = scene();
     let tree = solo(&state());
-    ui.layer.show(crate::ui::Open::Help, now.instant);
+    ui.focus.show(crate::ui::Open::Help, now.instant);
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
     assert_eq!(first.next_frame, Some(now.instant + crate::clock::FRAME));
     let arrived = later(now, 200);
@@ -270,6 +290,7 @@ fn layout_layer_send_and_drag_report_their_own_deadlines() {
         Some(arrived.instant + crate::clock::FRAME)
     );
     ui.sent = None;
+    ui.start_selection(crate::select::Cell::default());
     ui.select.dragging = Some(crate::select::Dragging {
         edge: crate::select::Edge::Above(0),
         stepped: arrived.instant,
@@ -279,4 +300,8 @@ fn layout_layer_send_and_drag_report_their_own_deadlines() {
         first.next_frame,
         Some(arrived.instant + crate::select::EDGE_PACE)
     );
+    ui.focus = crate::focus::Focus::Search(crate::search::Search::open());
+    assert_eq!(layout(first, &tree, &ui, SIZE, arrived).next_frame, None);
+    ui.drag_step(arrived);
+    assert!(ui.select.dragging.is_none());
 }

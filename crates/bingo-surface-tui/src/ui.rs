@@ -9,30 +9,38 @@ use std::time::{Duration, Instant};
 
 use std::collections::BTreeSet;
 
-use bingo_sdk::{
-    Action, CommandSpec, Level, Seq, SessionId, SessionState, SessionSummary, TurnId, View,
-};
+use bingo_sdk::{Action, CommandSpec, Level, Seq, SessionId, SessionState, SessionSummary, View};
 
 use crate::clock::{Anim, FRAME, Now};
 use crate::commands::{self, Suggestion};
 use crate::complete;
-use crate::composer::Composer;
-use crate::dialog::Dialog;
 use crate::fold::Folds;
 use crate::graphics::{Decoded, Linked};
-use crate::history::PromptHistory;
 use crate::layers::{self, Reveal};
 use crate::layout::Layout;
 use crate::pager::Pager;
-use crate::pictures::Held;
-use crate::rail::{CardId, Pin};
+use crate::rail::Pin;
 use crate::rewind::Rewind;
 use crate::roster;
 use crate::scroll::Scroll;
-use crate::search::Search;
-use crate::select::{self, Cell, Dragging, Edge, Select};
+use crate::select::{self, Cell, Dragging, Edge};
 use crate::tree::{self, Row, Tree};
 use crate::views::Marks;
+
+mod controls;
+
+// Keep callers at the UI boundary while input state has one owner.
+impl std::ops::Deref for Ui {
+    type Target = controls::Controls;
+    fn deref(&self) -> &Self::Target {
+        &self.controls
+    }
+}
+impl std::ops::DerefMut for Ui {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.controls
+    }
+}
 
 /// How long a transient notice holds the status line's middle slot (§3),
 /// between the frames it fades in over and the ones it fades out over.
@@ -263,7 +271,7 @@ pub struct Layer {
 }
 
 impl Layer {
-    fn shut(now: Instant) -> Self {
+    pub(crate) fn shut(now: Instant) -> Self {
         Self {
             open: Open::Nothing,
             since: now,
@@ -315,45 +323,15 @@ impl Layer {
         self.closing = true;
     }
 
-    /// Open this one, or close it when it already is: what a toggle chord does.
-    pub fn toggle(&mut self, open: Open, now: Instant) {
-        match self.open == open && !self.closing {
-            true => self.close(now),
-            false => self.show(open, now),
-        }
-    }
-
-    #[cfg(test)]
-    pub fn is(&self, open: &Open) -> bool {
-        &self.open == open && !self.closing
-    }
-
     pub fn showing(&self) -> bool {
         self.open != Open::Nothing && !self.closing
-    }
-
-    /// Whether the keyboard belongs to it. One on its way out has already
-    /// given the keys back.
-    pub fn captures(&self) -> bool {
-        self.showing() && self.open.captures()
     }
 }
 
 #[derive(Debug)]
 pub struct Ui {
-    pub composer: Composer,
-    /// The pasted pictures behind the composer's line, by their `[image N]`.
-    pub pictures: Held,
-    pub history: PromptHistory,
-    pub dialog: Dialog,
+    controls: controls::Controls,
     pub scroll: Scroll,
-    /// The one layer over the frame, and how far it has come in.
-    pub layer: Layer,
-    pub menu: Menu,
-    /// `ctrl+f`: the query in the status line's row, while it is there.
-    pub search: Option<Search>,
-    /// What the transcript is holding: a focused block, a run of cells.
-    pub select: Select,
     pub notices: Vec<Notice>,
     /// A command's `View`, shown until the next key.
     pub block: Option<View>,
@@ -364,31 +342,10 @@ pub struct Ui {
     /// the task being done either way: hiding the list is about rows, not
     /// about what the turn is doing.
     pub activity_hidden: bool,
-    /// The rail card the keyboard talks to; `tab` cycles it, a click takes it.
-    pub focus: Option<CardId>,
-    /// The panel sheet's cursor: the row `⏎` would pin.
-    pub panel: usize,
-    /// An action fired and not yet answered.
-    pub pending: Option<Pending>,
     /// How much of each block a person opened or shut, with `ctrl+o` or a
     /// click (§7). A block that is not in it wears its kind's own start
     /// ([`crate::fold`]), so the default is never written down twice.
     pub folds: Folds,
-    /// When ctrl+c was pressed on an empty composer.
-    pub armed: Option<Instant>,
-    /// The turn this surface has asked to stop, so the activity row answers
-    /// the key on the very frame it was pressed (§7). The kernel decides what
-    /// an interrupt does and its `TurnCompleted` is the end of the story; this
-    /// is a fact about the keypress, not a copy of session state, and it is
-    /// kept by turn id so it can never speak for the turn after this one.
-    pub stop_asked: Option<TurnId>,
-    /// An `esc` closed nothing, so the next one is the second of `esc esc`.
-    /// It needs no clock: any other key clears it.
-    pub esc_armed: bool,
-    /// What the kernel offers the dropdown, read once at start.
-    pub catalogs: Catalogs,
-    /// An `open` is in flight; the swap happens when it lands.
-    pub opening: bool,
     /// Whether the terminal window is being looked at. A window nobody is
     /// looking at is the one that may say something to the desktop (§6).
     pub focused: bool,
@@ -417,12 +374,6 @@ pub struct Ui {
     /// fold and the scroll, and read once at the start: it is a fact about
     /// this machine, not about the conversation.
     pub measure: Option<usize>,
-    /// The opening, while it is playing (M70, redrawn by M72; design §11). It
-    /// is drawn in the welcome box's place and it lands on that box, so the
-    /// moment it has run out it is taken away and the box the transcript has
-    /// always had is what is derived — there is no last frame that merely looks
-    /// like one.
-    pub intro: Option<crate::opening::Playing>,
     /// The paths the `@` dropdown ranks, walked when the first one asks.
     files: Files,
 }
@@ -435,30 +386,15 @@ struct Files {
 }
 
 impl Ui {
-    pub fn new(history: Vec<String>, now: Instant) -> Self {
+    pub fn new(history: Vec<String>, _now: Instant) -> Self {
         Self {
-            composer: Composer::default(),
-            pictures: Held::default(),
-            history: PromptHistory::new(history),
-            dialog: Dialog::default(),
+            controls: controls::Controls::new(history),
             scroll: Scroll::default(),
-            layer: Layer::shut(now),
-            menu: Menu::default(),
-            search: None,
-            select: Select::default(),
             notices: Vec::new(),
             block: None,
             pinned: BTreeSet::new(),
             activity_hidden: false,
-            focus: None,
-            panel: 0,
-            pending: None,
             folds: Folds::new(),
-            armed: None,
-            stop_asked: None,
-            esc_armed: false,
-            catalogs: Catalogs::default(),
-            opening: false,
             focused: true,
             switched: None,
             sent: None,
@@ -467,7 +403,6 @@ impl Ui {
             linked: Linked::default(),
             update: None,
             measure: None,
-            intro: None,
             files: Files::default(),
         }
     }
@@ -534,12 +469,7 @@ impl Ui {
         {
             next.shown = Some(now.instant);
         }
-        if self.layer.closing && self.layer.reveal(now).gone() {
-            self.layer = Layer::shut(now.instant);
-        }
-        if self.intro.as_ref().is_some_and(|intro| intro.over(now)) {
-            self.intro = None;
-        }
+        self.focus.expire(now);
     }
 
     /// How far the light along the box's border has come since a line was
@@ -575,10 +505,11 @@ impl Ui {
         let drag = self
             .select
             .dragging
+            .filter(|_| self.focus.selection().is_some())
             .map(|held| held.stepped + select::EDGE_PACE);
         let intro = self
-            .intro
-            .as_ref()
+            .focus
+            .intro()
             .filter(|intro| !intro.over(now))
             .map(|_| now.instant + FRAME);
         [exit, send, crossfade, drag, intro]
@@ -648,7 +579,7 @@ impl Ui {
     /// being written (M58). What is typed there names a session, so no `/` or
     /// `@` dropdown answers it and none is drawn over it.
     pub fn listing(&self) -> bool {
-        self.layer.captures() && matches!(self.layer.open, Open::Switcher(_))
+        self.focus.captures() && matches!(*self.focus.open(), Open::Switcher(_))
     }
 
     /// The composer changed: the dropdown reopens and the history walk ends.
@@ -702,7 +633,7 @@ impl Ui {
         let (height, rows) = self.transcript();
         self.scroll.by(edge.lines(), height, rows, now.instant);
         let line = edge.line(self.scroll.target(height, rows), rows, height);
-        self.select.extend(Cell { line, column });
+        self.extend_selection(Cell { line, column });
         self.select.dragging = edge.beyond(line, height).then_some(Dragging {
             edge,
             stepped: now.instant,
@@ -713,6 +644,10 @@ impl Ui {
     /// [`select::EDGE_PACE`] has come round again. The loop asks every frame,
     /// and a frame is owed for as long as this has something to do.
     pub fn drag_step(&mut self, now: Now) {
+        if self.focus.selection().is_none() {
+            self.select.dragging = None;
+            return;
+        }
         let Some(held) = self.select.dragging else {
             return;
         };
@@ -725,7 +660,7 @@ impl Ui {
     /// The column the run's far end is at: a drag walking past an edge keeps
     /// the column the pointer left the region at.
     fn head_column(&self) -> usize {
-        self.select.run.map_or(0, |run| run.head.column)
+        self.focus.selection().map_or(0, |run| run.head.column)
     }
 }
 

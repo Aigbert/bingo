@@ -29,6 +29,9 @@ use ratatui::{Terminal, TerminalOptions, Viewport};
 use crate::graphics::Transport;
 use crate::graphics::tmux;
 use crate::layout::{self, Layout};
+use crate::render::{Detection, Render};
+
+mod probe;
 
 /// Push the window title onto the terminal's stack, and pop it back at exit,
 /// so the shell's own title survives the session.
@@ -56,7 +59,10 @@ static HOOK: Once = Once::new();
 
 /// What the loop needs from a screen, so a test can be the screen.
 pub(crate) trait Screen: Send {
-    fn draw(&mut self, layout: &Layout) -> io::Result<()>;
+    fn detection(&mut self) -> Detection {
+        Detection::default()
+    }
+    fn draw(&mut self, layout: &Layout, render: &Render) -> io::Result<()>;
 
     /// Out-of-band bytes: they paint no cell, so they go between frames.
     fn title(&mut self, text: &str) -> io::Result<()>;
@@ -94,6 +100,7 @@ pub struct Tui {
     /// Whether this run brackets its frames, settled once from the
     /// environment ([`synchronizes`]).
     synchronized: bool,
+    detection: Detection,
 }
 
 impl Tui {
@@ -102,8 +109,7 @@ impl Tui {
         // ours: each probe wants a plain terminal to write its escape to and
         // read the answer from, and they run one after the other so neither
         // reads the other's answer.
-        crate::theme::detect();
-        crate::graphics::detect();
+        let detection = detect();
         let mut out = io::stdout();
         out.write_all(SAVE_TITLE)?;
         enable_raw_mode()?;
@@ -127,6 +133,7 @@ impl Tui {
         )?;
         Ok(Self {
             terminal,
+            detection,
             title: None,
             synchronized: synchronizes(
                 std::env::var("TERM").ok().as_deref(),
@@ -142,15 +149,21 @@ impl Tui {
 }
 
 impl Screen for Tui {
-    fn draw(&mut self, layout: &Layout) -> io::Result<()> {
+    fn detection(&mut self) -> Detection {
+        std::mem::take(&mut self.detection)
+    }
+    fn draw(&mut self, layout: &Layout, render: &Render) -> io::Result<()> {
         if !self.synchronized {
-            self.terminal.draw(|frame| layout::paint(layout, frame))?;
+            self.terminal
+                .draw(|frame| layout::paint(layout, frame, render))?;
             return Ok(());
         }
         // The closing half is written whatever the frame did: a terminal left
         // holding an update that never ends shows nothing at all.
         out_of_band(BEGIN_FRAME)?;
-        let drawn = self.terminal.draw(|frame| layout::paint(layout, frame));
+        let drawn = self
+            .terminal
+            .draw(|frame| layout::paint(layout, frame, render));
         let ended = out_of_band(END_FRAME);
         drawn?;
         ended
@@ -367,6 +380,50 @@ pub fn restore() {
     let _ = disable_raw_mode();
     let _ = out.write_all(RESTORE_TITLE);
     let _ = out.flush();
+}
+
+/// Read environment and probe I/O once; the resulting inputs belong to the run.
+fn detect() -> Detection {
+    let ask = crate::theme::Ask {
+        no_color: std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()),
+        truecolor: matches!(
+            std::env::var("COLORTERM").ok().as_deref(),
+            Some("truecolor" | "24bit")
+        ),
+        ascii: std::env::var_os("BINGO_ASCII").is_some_and(|v| v == "1"),
+        look: crate::theme::look(std::env::var("BINGO_THEME").ok().as_deref()),
+    };
+    let light = crate::theme::follows(ask).then(background).flatten();
+    Detection {
+        ask,
+        light,
+        heard: graphics_probe(),
+        motion: crate::clock::moves(std::env::var("BINGO_MOTION").ok().as_deref()),
+    }
+}
+
+fn background() -> Option<bool> {
+    let mut options = terminal_colorsaurus::QueryOptions::default();
+    options.timeout = crate::theme::PROBE;
+    terminal_colorsaurus::theme_mode(options)
+        .ok()
+        .map(|mode| mode == terminal_colorsaurus::ThemeMode::Light)
+}
+
+fn graphics_probe() -> Option<crate::graphics::Heard> {
+    if !crate::graphics::wanted(std::env::var("BINGO_GRAPHICS").ok().as_deref()) {
+        return None;
+    }
+    let transport = tmux::transport(
+        std::env::var("TERM").ok().as_deref(),
+        std::env::var_os("TMUX").is_some(),
+    )?;
+    let passthrough = tmux::reach_hidden(tmux::passthrough(transport));
+    Some(crate::graphics::Heard {
+        probe: crate::graphics::probe::parse(&probe::exchange(transport, passthrough)),
+        transport,
+        passthrough,
+    })
 }
 
 #[cfg(test)]

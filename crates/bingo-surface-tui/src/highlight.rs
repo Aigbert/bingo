@@ -226,8 +226,7 @@ mod tests {
         theme::with(crate::painted::truecolor(), || {
             let dark = lines("rust", "let x = 1;\n");
             assert_eq!(lines("rust", "let x = 1;\n"), dark, "and again is the memo");
-            assert!(theme::swap(true), "the terminal says its ground has turned");
-            let light = lines("rust", "let x = 1;\n");
+            let light = theme::with(crate::painted::daylight(), || lines("rust", "let x = 1;\n"));
             assert_eq!(text(&light), text(&dark), "the same row of code");
             assert_ne!(runs(&light[0]), runs(&dark[0]), "in the other palette");
         });

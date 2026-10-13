@@ -57,6 +57,7 @@ mod complete;
 mod composer;
 mod dialog;
 mod effect;
+mod focus;
 mod fold;
 mod foot;
 mod form;
@@ -85,6 +86,7 @@ mod pictures;
 mod pointer;
 mod preview;
 mod rail;
+mod render;
 mod rewind;
 mod roster;
 mod run;
@@ -127,7 +129,6 @@ use bingo_sdk::{
 
 /// How long the graphics probe waits for an answer that has tmux to cross, so
 /// the pty harness's late scene can outlast the same window the surface uses.
-#[cfg(not(test))]
 pub use theme::PROBE_THROUGH;
 
 /// The surface id, and the origin every input it submits carries.

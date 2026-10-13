@@ -151,10 +151,10 @@ fn unheard(heard: &Heard) -> Option<&'static str> {
 /// "never asked" cannot be mistaken for "asked and heard nothing" — and a
 /// reply that turns up late for a question nobody put has nothing to join.
 #[derive(Clone, Debug)]
-struct Heard {
-    probe: Probe,
-    transport: Transport,
-    passthrough: Passthrough,
+pub(crate) struct Heard {
+    pub probe: Probe,
+    pub transport: Transport,
+    pub passthrough: Passthrough,
 }
 
 impl Heard {
@@ -162,7 +162,7 @@ impl Heard {
     /// time. Monotone ([`Probe::and`]), which is what makes one late settle
     /// happen and no second one: a reply that says nothing new settles
     /// nothing.
-    fn and(&mut self, later: Probe) {
+    pub fn and(&mut self, later: Probe) {
         self.probe = std::mem::take(&mut self.probe).and(later);
     }
 }
@@ -171,9 +171,9 @@ impl Heard {
 /// there is to say about it. Both come from the one answer, so neither can
 /// go stale against the other.
 #[derive(Clone, Copy, Debug, Default)]
-struct Settled {
-    graphics: Graphics,
-    notice: Option<&'static str>,
+pub(crate) struct Settled {
+    pub graphics: Graphics,
+    pub notice: Option<&'static str>,
 }
 
 impl Settled {
@@ -191,263 +191,22 @@ pub fn wanted(setting: Option<&str>) -> bool {
     setting != Some("off")
 }
 
-/// What this run draws pictures with, settled by [`detect`] before the first
-/// frame. A run that never asked draws none: the question is a write and a
-/// read, which is not something a draw may do.
-#[cfg(not(test))]
+/// Pure detection from the answers belonging to this run.
+pub(crate) fn detect(heard: Option<&Heard>) -> Settled {
+    heard.map(Settled::of).unwrap_or_default()
+}
+
 pub fn chosen() -> Graphics {
-    settled().graphics
+    crate::render::current().graphics
 }
 
-/// What the run has to tell a person about the terminal it found, said once
-/// when the run opens ([`crate::opening`]) and never from a draw.
-#[cfg(not(test))]
-pub fn notice() -> Option<&'static str> {
-    settled().notice
-}
-
-#[cfg(not(test))]
-fn settled() -> Settled {
-    match HEARD.read() {
-        Ok(heard) => heard.as_ref().map(Settled::of).unwrap_or_default(),
-        // A lock poisoned by a panic while it was held for a copy: the run is
-        // already on its way out, and the chip is what silence gets.
-        Err(_) => Settled::default(),
-    }
-}
-
-/// What the terminal said. Terminal state, not session state (ADR-0002): it
-/// belongs to the tty this process has, so it lives beside the questions that
-/// asked for it. Written once by [`detect`], and once more by [`late`] when an
-/// answer arrives after the read gave up.
-#[cfg(not(test))]
-static HEARD: std::sync::RwLock<Option<Heard>> = std::sync::RwLock::new(None);
-
-/// Ask the terminal, once, before it is taken. Called from `Tui::enter`
-/// beside `theme::detect`, one after the other and never at the same time:
-/// both write an escape to the terminal and read what comes back.
-#[cfg(not(test))]
-pub fn detect() {
-    if let Ok(mut slot) = HEARD.write() {
-        *slot = asked();
-    }
-}
-
-#[cfg(test)]
-pub fn detect() {}
-
-/// A reply the terminal sent after the read had ended, out of the key stream
-/// ([`crate::late`], M60 brick 1). It joins the answer, and what the answer
-/// settles is settled again: a late `OK` and a late name turn the pictures on
-/// for the next frame.
-///
-/// Answers with the notice the new answer has made wrong, which is the run's
-/// to take back off the status line.
-#[cfg(not(test))]
-pub fn late(reply: &[u8]) -> Option<&'static str> {
-    let mut slot = HEARD.write().ok()?;
-    let heard = slot.as_mut()?;
-    let said = Settled::of(heard).notice;
-    heard.and(probe::parse(reply));
-    said.filter(|_| Settled::of(heard).notice.is_none())
-}
-
-/// What the terminal said, or nothing at all where it was never asked: a run
-/// told not to draw pictures, and one behind a multiplexer this cannot reach
-/// through — a terminal of its own that would have to carry the pictures and
-/// cannot, so asking through it would answer for the wrong terminal (M49
-/// non-goals).
-#[cfg(not(test))]
-fn asked() -> Option<Heard> {
-    if !wanted(std::env::var("BINGO_GRAPHICS").ok().as_deref()) {
-        return None;
-    }
-    let transport = tmux::transport(
-        std::env::var("TERM").ok().as_deref(),
-        std::env::var_os("TMUX").is_some(),
-    )?;
-    // Raised before the first picture rather than before the probe: the
-    // probe's answers come back to the active pane either way (M49 risk 1),
-    // and it is the pictures a hidden pane loses.
-    let passthrough = tmux::reach_hidden(tmux::passthrough(transport));
-    Some(Heard {
-        probe: ask(transport, passthrough),
-        transport,
-        passthrough,
-    })
-}
-
-/// What the terminal answered, read. The reading is the same on every
-/// platform; the asking is what differs.
-#[cfg(not(test))]
-fn ask(transport: Transport, passthrough: Passthrough) -> Probe {
-    probe::parse(&exchange(transport, passthrough))
-}
-
-/// Put the three queries on the terminal and read until DA1 comes back.
-///
-/// The terminal is opened directly rather than through stdout, so a run whose
-/// output is redirected still asks the terminal a person is looking at, and
-/// the handle is non-blocking, so a terminal that answers nothing costs the
-/// timeout and not the run: a blocking read of a tty has no deadline, and a
-/// thread abandoned in one would hold a lock the next frame wants.
-#[cfg(all(unix, not(test)))]
-fn exchange(transport: Transport, passthrough: Passthrough) -> Vec<u8> {
-    use std::io::Write;
-
-    // tmux says it drops the envelope, so none is sent and nothing is waited
-    // for: the question would reach nobody and the window would be spent on a
-    // silence that was promised in advance (M60 brick 3).
-    if passthrough == Passthrough::Off {
-        return Vec::new();
-    }
-    let Ok(mut tty) = tty() else {
-        return Vec::new();
-    };
-    // Raw mode, or the answer waits for a newline that will never be typed.
-    if crossterm::terminal::enable_raw_mode().is_err() {
-        return Vec::new();
-    }
-    let query = probe::query(transport);
-    let asked = tty.write_all(&query).and_then(|()| tty.flush());
-    let answer = match asked {
-        Ok(()) => listen(&mut tty, window(transport, passthrough)),
-        Err(_) => Vec::new(),
-    };
-    let _ = crossterm::terminal::disable_raw_mode();
-    answer
-}
-
-/// How long the answers are given. Under a tmux that says it carries them
-/// they have three legs to travel rather than one, so they get three times as
-/// long ([`crate::theme::PROBE_THROUGH`]); whatever still arrives after that
-/// is heard out of the key stream instead ([`late`]).
-#[cfg(all(unix, not(test)))]
-fn window(transport: Transport, passthrough: Passthrough) -> std::time::Duration {
-    match transport {
-        Transport::Tmux if passthrough.carries() => crate::theme::PROBE_THROUGH,
-        _ => crate::theme::PROBE,
-    }
-}
-
-/// No Windows console host speaks the kitty graphics protocol, and a console
-/// that will never answer would cost every start-up the whole timeout. The
-/// question is not asked there — design §5's chip is what is drawn, which is
-/// what an unanswered question comes to anyway.
-#[cfg(all(not(unix), not(test)))]
-fn exchange(_transport: Transport, _passthrough: Passthrough) -> Vec<u8> {
-    Vec::new()
-}
-
-/// The terminal itself, opened so that a read answers at once whether or not
-/// anything has arrived (`O_NONBLOCK`). A process with no controlling
-/// terminal has none to open, and draws no pictures.
-#[cfg(all(unix, not(test)))]
-fn tty() -> std::io::Result<std::fs::File> {
-    use std::os::unix::fs::OpenOptionsExt;
-    std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .custom_flags(libc::O_NONBLOCK)
-        .open("/dev/tty")
-}
-
-/// Read until the terminal has answered or the clock runs out. Nothing here
-/// blocks: an empty read is a wait, and the waiting is bounded.
-#[cfg(all(unix, not(test)))]
-fn listen(tty: &mut std::fs::File, window: std::time::Duration) -> Vec<u8> {
-    use std::io::Read;
-
-    let deadline = std::time::Instant::now() + window;
-    let mut answer = Vec::new();
-    let mut buffer = [0u8; 256];
-    while !probe::answered(&answer) && answer.len() < MOST {
-        match tty.read(&mut buffer) {
-            Ok(0) => break,
-            Ok(read) => answer.extend_from_slice(&buffer[..read]),
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                if std::time::Instant::now() >= deadline {
-                    break;
-                }
-                std::thread::sleep(BETWEEN);
-            }
-            Err(_) => break,
-        }
-    }
-    answer
-}
-
-/// How long to wait between two looks at a terminal that has not answered
-/// yet. Short enough that a start-up spends no visible time on it, long
-/// enough that the wait is not a spin.
-#[cfg(all(unix, not(test)))]
-const BETWEEN: std::time::Duration = std::time::Duration::from_millis(2);
-
-/// The most an answer may be. A terminal that will not stop talking is not
-/// answering the question that was asked.
-#[cfg(all(unix, not(test)))]
-const MOST: usize = 4096;
-
-#[cfg(test)]
-thread_local! {
-    /// What one test's probe came back with. Thread-local because the suite
-    /// runs in parallel, as the theme's own override is.
-    static OVERRIDE: std::cell::Cell<Settled> = const {
-        std::cell::Cell::new(Settled {
-            graphics: Graphics::Off,
-            notice: None,
-        })
-    };
-}
-
-#[cfg(test)]
-pub fn chosen() -> Graphics {
-    OVERRIDE.with(std::cell::Cell::get).graphics
-}
-
-#[cfg(test)]
-pub fn notice() -> Option<&'static str> {
-    OVERRIDE.with(std::cell::Cell::get).notice
-}
-
-/// The suite fixes what the terminal said rather than hearing it, so there is
-/// no answer here for a late reply to join. The path itself is driven through
-/// a pty, where a terminal answers late for real.
-#[cfg(test)]
-pub fn late(_reply: &[u8]) -> Option<&'static str> {
-    None
-}
-
-/// Draw whatever `f` draws on a terminal of this kind.
 #[cfg(test)]
 pub fn with<R>(graphics: Graphics, f: impl FnOnce() -> R) -> R {
-    settled(
-        Settled {
-            graphics,
-            notice: None,
-        },
-        f,
-    )
-}
-
-/// Open whatever `f` opens on a run whose probe had this to say.
-#[cfg(test)]
-pub fn saying<R>(notice: &'static str, f: impl FnOnce() -> R) -> R {
-    settled(
-        Settled {
-            graphics: Graphics::Off,
-            notice: Some(notice),
-        },
-        f,
-    )
-}
-
-#[cfg(test)]
-fn settled<R>(settled: Settled, f: impl FnOnce() -> R) -> R {
-    let previous = OVERRIDE.with(|slot| slot.replace(settled));
-    let out = f();
-    OVERRIDE.with(|slot| slot.set(previous));
-    out
+    crate::render::Render {
+        graphics,
+        ..crate::render::current()
+    }
+    .scope(f)
 }
 
 /// A terminal that draws pictures, with the cell most of them have.
