@@ -72,7 +72,7 @@ no new dependency.
 
 - `crates/bingo-sdk/src/{slot.rs,lib.rs,tool.rs,event.rs}`,
   `crates/bingo-sdk/fixtures/slots/` (new), `tests/record.rs`,
-  `fixtures/record/` (quiet-call compatibility), wire schema snapshots
+  `fixtures/record/` (quiet-call compatibility), wire schema snapshots (`schema/{rpc,plugin}.json`)
 - `crates/bingo-core/src/{turn.rs,turn/stream.rs,accumulator.rs,commands/status.rs}`,
   `session/inputs.rs` (external calls also stamp quiet), turn contract tests,
   `crates/bingo-surface-print/src/stream_json.rs`
