@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, clippy::unwrap_used, clippy::expect_used)]
 mod offline;
 use bingo_core::{Host, HostConfig};
 use bingo_mods::ModsPlugin;

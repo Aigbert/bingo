@@ -67,14 +67,12 @@ fn supported(schema: &Value, depth: usize) -> Result<(), String> {
                 }
             }
             "enum" => {
-                if !value.as_array().is_some_and(|values| !values.is_empty()) {
+                if value.as_array().is_none_or(|values| values.is_empty()) {
                     return Err("enum must be a nonempty array".into());
                 }
             }
-            "uniqueItems" => {
-                if !value.is_boolean() {
-                    return Err("uniqueItems must be boolean".into());
-                }
+            "uniqueItems" if !value.is_boolean() => {
+                return Err("uniqueItems must be boolean".into());
             }
             _ => (),
         }
