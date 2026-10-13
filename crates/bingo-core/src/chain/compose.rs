@@ -4,7 +4,7 @@ pub(crate) struct Compose;
 impl Point for Compose {
     type Input = ModelRequest;
     type Output = ModelRequest;
-    const POINT: LinkPoint = LinkPoint::PromptCompose;
+    const POINT: LinkPoint = bingo_sdk::catalogue::PROMPT_COMPOSE;
     fn dispatch<'a>(
         link: &'a dyn Interceptor,
         cx: &'a HookContext,

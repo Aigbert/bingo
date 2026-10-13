@@ -45,7 +45,12 @@ impl ToolSet {
         let mut tools: Vec<Arc<dyn Tool>> = Vec::new();
         let mut shadowed = Vec::new();
         let mut take = |tool: Arc<dyn Tool>| {
-            let name = tool.spec().name;
+            let spec = tool.spec();
+            let name = spec.name;
+            if let Some(field) = catalogue::reserved_tool_field(&spec.input_schema) {
+                shadowed.push(format!("{name} (reserved input field {field})"));
+                return;
+            }
             if self
                 .only
                 .as_ref()
@@ -114,6 +119,10 @@ pub struct HookSet {
 }
 
 impl HookSet {
+    pub fn has_links(&self) -> bool {
+        !self.links.is_empty() || !self.interceptors.is_empty()
+    }
+
     pub async fn links(&self) -> Vec<crate::chain::Link> {
         let mut links = self.links.clone();
         for source in &self.interceptors {
@@ -145,7 +154,10 @@ impl HookSet {
     /// Whether anything could answer at all. A session with no hook anywhere
     /// skips the machinery rather than gathering an empty list.
     pub fn is_empty(&self) -> bool {
-        self.fixed.is_empty() && self.sources.is_empty()
+        self.fixed.is_empty()
+            && self.sources.is_empty()
+            && self.links.is_empty()
+            && self.interceptors.is_empty()
     }
 
     pub async fn gather(&self) -> Vec<Arc<dyn Hook>> {

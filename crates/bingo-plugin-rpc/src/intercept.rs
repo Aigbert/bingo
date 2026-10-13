@@ -4,7 +4,6 @@ use bingo_sdk::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct LinkSpec {
@@ -44,43 +43,41 @@ pub struct Cancel {
     pub chain: String,
 }
 
-/// Catalogue spelling: tool input fields live beside the pinned identity.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct ToolEvent {
-    pub tool: String,
-    pub tool_use_id: String,
-    #[serde(flatten)]
-    pub input: BTreeMap<String, Value>,
-}
+pub use bingo_sdk::catalogue::ToolCall as ToolEvent;
 
 use crate::connection::Connection;
 use async_trait::async_trait;
-use futures::{FutureExt, StreamExt};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 
 pub fn point_name(point: LinkPoint) -> &'static str {
-    match point {
-        LinkPoint::PromptSubmit => "prompt.submit",
-        LinkPoint::ToolCheck => "tool.check",
-        LinkPoint::ToolCall => "tool.call",
-        LinkPoint::TurnStep => "turn.step",
-        LinkPoint::PromptCompose => "prompt.compose",
-        LinkPoint::SessionCompact => "session.compact",
-        LinkPoint::TurnStop => "turn.complete",
-    }
+    point.name.as_ref()
 }
 
 pub struct Remote {
     id: String,
-    spec: LinkSpec,
+    matcher: LinkMatcher,
+    tool: Option<String>,
+    after: bool,
     connection: Arc<Connection>,
 }
 impl Remote {
     pub fn new(plugin: &str, spec: LinkSpec, connection: Arc<Connection>) -> Self {
         Self {
             id: format!("{plugin}:{}", point_name(spec.point)),
-            spec,
+            matcher: LinkMatcher::at(spec.point),
+            tool: spec.tool,
+            after: spec.after,
+            connection,
+        }
+    }
+
+    pub fn subscription(plugin: &str, matcher: LinkMatcher, connection: Arc<Connection>) -> Self {
+        Self {
+            id: format!("{plugin}:catalogue"),
+            matcher,
+            tool: None,
+            after: true,
             connection,
         }
     }
@@ -103,6 +100,7 @@ impl Remote {
 
     async fn cross<I, O>(
         &self,
+        entry: &catalogue::Entry,
         cx: &HookContext,
         input: I,
         next: Next<'_, I, O>,
@@ -116,7 +114,7 @@ impl Remote {
             connection: self.connection.clone(),
             chain: Some(chain.clone()),
         };
-        let method = format!("intercept/{}", point_name(self.spec.point));
+        let method = format!("intercept/{}", entry.name);
         let answer: Proceed<I, O> = self
             .phase(
                 &method,
@@ -132,7 +130,7 @@ impl Remote {
             Proceed::Answer(output) => output,
             Proceed::Next(input) => {
                 let result = next.run(input).await?;
-                if self.spec.after {
+                if self.after {
                     self.phase::<_, ResultValue<O>>(
                         &format!("{method}/after"),
                         After { chain, result },
@@ -165,128 +163,39 @@ fn failed(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::Internal, error.to_string())
 }
 
-impl TryFrom<ToolCall> for ToolEvent {
-    type Error = KernelError;
-    fn try_from(call: ToolCall) -> Result<Self, Self::Error> {
-        let input = serde_json::from_value(call.input).map_err(failed)?;
-        Ok(Self {
-            tool: call.name,
-            tool_use_id: call.call_id,
-            input,
-        })
-    }
-}
-impl From<ToolEvent> for ToolCall {
-    fn from(event: ToolEvent) -> Self {
-        Self {
-            name: event.tool,
-            call_id: event.tool_use_id,
-            input: Value::Object(event.input.into_iter().collect()),
-        }
-    }
-}
-
 #[async_trait]
 impl Interceptor for Remote {
     fn id(&self) -> &str {
         &self.id
     }
     fn matcher(&self) -> LinkMatcher {
-        LinkMatcher {
-            points: vec![self.spec.point],
-            tool: self.spec.tool.clone(),
-        }
+        self.matcher.clone()
     }
-    async fn prompt_submit(
-        &self,
-        cx: &HookContext,
-        input: Input,
-        next: Next<'_, Input, SubmitResult>,
-    ) -> Result<SubmitResult, KernelError> {
-        self.cross(cx, input, next).await
+    async fn observe(&self, entry: &catalogue::Entry, cx: &HookContext, input: &Value) {
+        self.connection.notify("hook/observe", serde_json::json!({
+            "id":self.id, "site":HookSite::from(cx), "point":"catalogue", "event":entry.name, "payload":input,
+        })).await;
     }
-    async fn tool_check(
+    async fn chain(
         &self,
+        entry: &catalogue::Entry,
         cx: &HookContext,
-        input: ToolCall,
-        next: Next<'_, ToolCall, CheckResult>,
-    ) -> Result<CheckResult, KernelError> {
-        let tier = next.tier();
-        let continuation = Next::at(tier, move |event: ToolEvent| {
-            async move { next.run(event.into()).await }.boxed()
-        });
-        self.cross(cx, input.try_into()?, continuation).await
-    }
-    async fn tool_call(
-        &self,
-        cx: &HookContext,
-        input: ToolCall,
-        next: Next<'_, ToolCall, ToolOutput>,
-    ) -> Result<ToolOutput, KernelError> {
-        let tier = next.tier();
-        let continuation = Next::at(tier, move |event: ToolEvent| {
-            async move { next.run(event.into()).await }.boxed()
-        });
-        self.cross(cx, input.try_into()?, continuation).await
-    }
-    async fn prompt_compose(
-        &self,
-        cx: &HookContext,
-        input: ModelRequest,
-        next: Next<'_, ModelRequest, ModelRequest>,
-    ) -> Result<ModelRequest, KernelError> {
-        self.cross(cx, input, next).await
-    }
-    async fn session_compact(
-        &self,
-        cx: &HookContext,
-        input: CompactInput,
-        next: Next<'_, CompactInput, Result<Compaction, CompactError>>,
-    ) -> Result<Result<Compaction, CompactError>, KernelError> {
-        self.cross(cx, input, next).await
-    }
-    async fn turn_stop(
-        &self,
-        cx: &HookContext,
-        input: (),
-        next: Next<'_, (), StopResult>,
-    ) -> Result<StopResult, KernelError> {
-        self.cross(cx, input, next).await
-    }
-    async fn turn_step(
-        &self,
-        cx: &HookContext,
-        input: ModelRequest,
-        next: Next<'_, ModelRequest, Result<StepStream, ProviderError>>,
-    ) -> Result<Result<StepStream, ProviderError>, KernelError> {
-        let held = Arc::new(std::sync::Mutex::new(None));
-        let hold = held.clone();
-        let continuation = Next::at(next.tier(), move |request| {
-            async move {
-                next.run_then(request, |original| async move {
-                    let events: Result<Vec<ModelEvent>, ProviderError> = match original.clone() {
-                        Ok(stream) => stream.collect::<Vec<_>>().await.into_iter().collect(),
-                        Err(error) => Err(error),
-                    };
-                    *hold.lock().unwrap_or_else(|e| e.into_inner()) =
-                        Some((events.clone(), original));
-                    events
-                })
-                .await
+        input: Value,
+        next: Next<'_, Value, Value>,
+    ) -> Result<Value, KernelError> {
+        if let Some(pattern) = &self.tool {
+            let tool = input
+                .get("tool")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            if !pattern
+                .strip_suffix('*')
+                .map_or(pattern == tool, |prefix| tool.starts_with(prefix))
+            {
+                return next.run(input).await;
             }
-            .boxed()
-        });
-        let result: Result<Vec<ModelEvent>, ProviderError> =
-            self.cross(cx, input, continuation).await?;
-        let original = held.lock().unwrap_or_else(|e| e.into_inner()).take();
-        if let Some((events, original)) = original
-            && result == events
-        {
-            return Ok(original);
         }
-        Ok(result.map(|events| {
-            StepStream::new(Box::pin(futures::stream::iter(events.into_iter().map(Ok))))
-        }))
+        self.cross(entry, cx, input, next).await
     }
 }
 
@@ -301,8 +210,8 @@ mod tests {
         .unwrap();
         assert_eq!(event.input["command"], "ls");
         assert_eq!(
-            serde_json::to_value(LinkPoint::TurnStop).unwrap(),
-            "turn.complete"
+            serde_json::to_value(bingo_sdk::catalogue::TURN_STOP).unwrap(),
+            "turn.stop"
         );
         let next = Proceed::<_, ToolOutput>::Next(event);
         let value = serde_json::to_value(next).unwrap();
@@ -313,5 +222,20 @@ mod tests {
         })
         .unwrap();
         assert_eq!(result["result"]["isError"], true);
+    }
+}
+
+#[cfg(test)]
+mod catalogue_contract {
+    #[test]
+    fn initialization_retains_open_catalogue_subscriptions() {
+        let value = serde_json::json!({"protocol":2,"name":"watch","version":"1",
+            "subscriptions":[{"patterns":["mcp.*"],"prefilter":null}]});
+        let result: crate::wire::InitializeResult = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(
+            serde_json::to_value(result).unwrap()["subscriptions"],
+            value["subscriptions"]
+        );
+        assert!(crate::wire::capabilities().contains("intercept/*"));
     }
 }

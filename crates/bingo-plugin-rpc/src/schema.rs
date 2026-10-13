@@ -17,7 +17,10 @@ use crate::wire::{METHODS, NOTIFICATIONS, PROTOCOL, Ref, schema_of};
 
 /// Types the method table does not name. The manifest is the first thing a
 /// plugin author writes and the last thing the wire mentions.
-static UNNAMED: &[Ref] = &[schema_of::<Manifest>];
+static UNNAMED: &[Ref] = &[
+    schema_of::<Manifest>,
+    schema_of::<crate::wire::ServiceMethod>,
+];
 
 pub fn document() -> Value {
     let mut generator = generator();

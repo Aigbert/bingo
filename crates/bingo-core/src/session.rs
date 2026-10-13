@@ -3,6 +3,7 @@
 //! actor mints `seq`, persists durable frames, folds them with the one reducer
 //! and fans them out to bounded subscriber channels. It never awaits a client.
 
+mod catalogue;
 mod checkpoint;
 mod commands;
 mod complete;
@@ -84,7 +85,7 @@ struct Actor {
     cancel: CancellationToken,
     /// Every frame but the deltas for the hooks that observe the session, in
     /// order, on a task of their own; `None` when no hook asked (ADR-0009 §4).
-    observed: Option<mpsc::UnboundedSender<(Frame, HookContext)>>,
+    observed: Option<catalogue::Queues>,
     /// Flipped when the actor is done, for whoever waits on the mailbox.
     done: watch::Sender<bool>,
     pending: HashMap<InteractionId, Pending>,
@@ -135,6 +136,11 @@ impl Actor {
 
     async fn dispatch(&mut self, msg: Msg) -> Result<Flow, KernelError> {
         match msg {
+            Msg::CatalogueEvent(event) => {
+                self.publish(*event, None).await?;
+            }
+            Msg::CompletionReady(completed) => return catalogue::finished(self, *completed).await,
+            Msg::Observe(entry, payload) => self.observe_named(entry, payload),
             Msg::Submit { intent, input } => self.submit(intent, input).await?,
             Msg::Gated { intent, verdict } => gate::gated(self, intent, verdict).await?,
             Msg::Deliver {
@@ -191,8 +197,9 @@ impl Actor {
             Msg::Record { body, reply } => drop(reply.send(self.record(body).await?)),
             Msg::Progress { item, tail } => self.progress(item, tail).await?,
             Msg::CommandFinished { intent, outcome } => {
-                self.command_finished(intent, outcome).await?
+                catalogue::command_finished(self, intent, outcome).await?
             }
+            Msg::CommandReady { intent, outcome } => self.command_finished(intent, outcome).await?,
             Msg::Reconfigure { config } => self.reconfigure(config).await?,
             Msg::Offered { turn, tools } => self.turn_offers(&turn, tools),
             Msg::Complete {
@@ -238,7 +245,11 @@ impl Actor {
             kind,
             payload,
         };
-        self.publish(event, None).await?;
+        if self.config.hooks.has_links() {
+            catalogue::rewrite(self, event);
+        } else {
+            self.publish(event, None).await?;
+        }
         Ok(())
     }
 
@@ -343,6 +354,10 @@ impl Actor {
         self.restate_extensions().await?;
         self.refresh_config().await?;
         self.recover().await?;
+        self.observe_named(
+            bingo_sdk::catalogue::SESSION_START,
+            json!({"session":self.id}),
+        );
         let cx = self.hook_context();
         Ok(Box::pin(run_session_hooks(
             self.config.hooks.clone(),
@@ -406,7 +421,11 @@ impl Actor {
             plugins,
         };
         if config != self.state.config {
-            self.publish(Event::ConfigChanged { config }, None).await?;
+            if self.config.hooks.has_links() {
+                catalogue::rewrite(self, Event::ConfigChanged { config });
+            } else {
+                self.publish(Event::ConfigChanged { config }, None).await?;
+            }
         }
         Ok(())
     }
@@ -415,6 +434,11 @@ impl Actor {
     /// asked inside the task: a source answers after I/O, and the actor that
     /// is stopping must not wait on one.
     fn session_hooks(&self, phase: Phase) {
+        let entry = match phase {
+            Phase::Start => bingo_sdk::catalogue::SESSION_START,
+            Phase::End => bingo_sdk::catalogue::SESSION_END,
+        };
+        self.observe_named(entry, json!({"session":self.id}));
         if self.config.hooks.is_empty() {
             return;
         }
@@ -425,21 +449,21 @@ impl Actor {
 
     /// One ordered task feeds every frame but the deltas to the hooks that
     /// observe the session; publishing never waits on them.
+    fn observe_named(&self, entry: LinkPoint, payload: Value) {
+        if let Some(observed) = &self.observed {
+            let _ = observed.events.send(crate::chain::observe::Work::Named(
+                entry,
+                payload,
+                self.hook_context(),
+            ));
+        }
+    }
+
     fn observe_journal(&mut self) {
         if self.config.hooks.is_empty() {
             return;
         }
-        let set = self.config.hooks.clone();
-        let (tx, mut rx) = mpsc::unbounded_channel::<(Frame, HookContext)>();
-        self.observed = Some(tx);
-        self.tracker.spawn(async move {
-            let hooks = set.at(HookPoint::Event, None).await;
-            while let Some((frame, cx)) = rx.recv().await {
-                for hook in &hooks {
-                    hook.on_event(&frame, &cx).await;
-                }
-            }
-        });
+        self.observed = Some(catalogue::start(self));
     }
 
     /// The next turn runs on a config the host rebuilt; the running one
@@ -668,7 +692,10 @@ impl Actor {
         if let Some(observed) = &self.observed
             && !matches!(frame.event, Event::ItemDelta { .. })
         {
-            let _ = observed.send((frame.clone(), self.hook_context()));
+            let _ = observed.events.send(crate::chain::observe::Work::Frame(
+                Box::new(frame.clone()),
+                self.hook_context(),
+            ));
         }
         self.state.apply(&frame);
         self.subscribers.fanout(&frame);
@@ -824,29 +851,7 @@ impl Actor {
                 Vec::new(),
             ),
         };
-        if let Some(running) = self.running.take() {
-            running.finish();
-        }
-        let usage = self
-            .state
-            .turn
-            .as_ref()
-            .map(|turn| turn.usage)
-            .unwrap_or_default();
-        self.publish(
-            Event::TurnCompleted {
-                turn: turn.clone(),
-                status,
-                usage,
-            },
-            None,
-        )
-        .await?;
-        self.after_turn(turn, items);
-        if let Some(reason) = self.closing.take() {
-            return self.finish_close(reason).await;
-        }
-        self.drain_queue().await?;
+        catalogue::complete(self, turn, status, items);
         Ok(Flow::Continue)
     }
 

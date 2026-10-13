@@ -68,13 +68,18 @@ impl Actor {
         args: String,
         holds: bool,
     ) -> Result<(), KernelError> {
-        let spawned = self.commands.spawn(commands::Run {
-            intent: intent.clone(),
-            invocation,
-            command,
-            args,
-            holds,
-        });
+        let hook_cx = self.hook_context();
+        let spawned = self.commands.spawn(
+            commands::Run {
+                intent: intent.clone(),
+                invocation,
+                command,
+                args,
+                holds,
+            },
+            self.config.hooks.clone(),
+            hook_cx,
+        );
         if let Err(e) = spawned {
             self.reject(intent, e.code, e.message).await?;
         }
@@ -172,7 +177,7 @@ impl Actor {
         input: Input,
         delivery: Delivery,
     ) -> Result<(), KernelError> {
-        if self.gate.busy() {
+        if self.gate.busy() || self.config.hooks.has_links() {
             gate::gate_input(self, intent, input, Kind::Deliver(delivery));
             return Ok(());
         }

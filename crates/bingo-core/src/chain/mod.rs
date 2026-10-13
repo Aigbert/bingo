@@ -21,7 +21,7 @@ use std::sync::Mutex;
 #[derive(Clone, Default)]
 pub struct Report(Arc<Mutex<Vec<ItemBody>>>);
 impl Report {
-    fn notice(&self, link: &Link, point: LinkPoint, reason: &str) {
+    fn notice(&self, link: &Link, point: &catalogue::Entry, reason: &str) {
         let name = link
             .external
             .as_deref()
@@ -61,6 +61,12 @@ pub(crate) trait Point: Send + Sync + 'static {
     type Input: Clone + PartialEq + Send + Sync;
     type Output: Clone + PartialEq + Send + Sync;
     const POINT: LinkPoint;
+    fn entry(_: &Self::Input) -> &catalogue::Entry {
+        Self::POINT
+    }
+    fn payload(input: &Self::Input) -> serde_json::Value {
+        serde_json::json!({"tool": Self::tool(input)})
+    }
     fn tool(_: &Self::Input) -> Option<&str> {
         None
     }
@@ -70,10 +76,15 @@ pub(crate) trait Point: Send + Sync + 'static {
         input: Self::Input,
         next: Next<'a, Self::Input, Self::Output>,
     ) -> BoxFuture<'a, Result<Self::Output, KernelError>>;
-    fn accepts(tier: Tier, before: Option<&Self::Output>, after: &Self::Output) -> bool {
+    fn accepts(
+        entry: &catalogue::Entry,
+        tier: Tier,
+        before: Option<&Self::Output>,
+        after: &Self::Output,
+    ) -> bool {
         match before {
-            Some(before) => before == after || admits(tier, Self::POINT, Act::Rewrite),
-            None => admits(tier, Self::POINT, Act::Answer),
+            Some(before) => before == after || admits(tier, entry, Act::Rewrite),
+            None => admits(tier, entry, Act::Answer),
         }
     }
     fn pinned(_before: &Self::Input, _after: &Self::Input) -> bool {
@@ -118,15 +129,8 @@ pub(crate) async fn run<'a, P: Point>(
     run_at::<P>(links, Arc::new(Mutex::new(Some(kernel))), cx, input, report).await
 }
 
-fn applies(matcher: &LinkMatcher, point: LinkPoint, tool: Option<&str>) -> bool {
-    (matcher.points.is_empty() || matcher.points.contains(&point))
-        && match (&matcher.tool, tool) {
-            (None, _) => true,
-            (Some(_), None) => false,
-            (Some(pattern), Some(tool)) => pattern
-                .strip_suffix('*')
-                .map_or(pattern == tool, |prefix| tool.starts_with(prefix)),
-        }
+fn applies(matcher: &LinkMatcher, point: &catalogue::Entry, input: &serde_json::Value) -> bool {
+    matcher.matches(point, input)
 }
 
 fn run_at<'a, P: Point>(
@@ -147,7 +151,11 @@ fn run_at<'a, P: Point>(
                 )),
             };
         };
-        if !applies(&link.interceptor.matcher(), P::POINT, P::tool(&input)) {
+        if !applies(
+            &link.interceptor.matcher(),
+            P::entry(&input),
+            &P::payload(&input),
+        ) {
             return run_at::<P>(rest, kernel, cx, input, report).await;
         }
         invoke::<P>(link, rest, kernel, cx, input, report).await
@@ -162,6 +170,7 @@ async fn invoke<'a, P: Point>(
     input: P::Input,
     report: Report,
 ) -> Result<P::Output, KernelError> {
+    let entry = P::entry(&input).clone();
     let pending: Continuation<'a, P::Output> = Arc::new(Mutex::new(Continued::default()));
     let phase = pending
         .lock()
@@ -199,7 +208,7 @@ async fn invoke<'a, P: Point>(
         }
         None => None,
     };
-    if rewritten && P::POINT == LinkPoint::ToolCall {
+    if rewritten && &entry == bingo_sdk::catalogue::TOOL_CALL {
         report.receipt(link, P::tool(&input));
     }
     if invalid {
@@ -210,15 +219,18 @@ async fn invoke<'a, P: Point>(
     }
     if let Ok(output) = &answer {
         let before = baseline.as_ref().and_then(|result| result.as_ref().ok());
-        if P::accepts(link.tier, before, output) {
-            if !rewritten && P::POINT == LinkPoint::ToolCall && before != Some(output) {
+        if P::accepts(&entry, link.tier, before, output) {
+            if !rewritten && &entry == bingo_sdk::catalogue::TOOL_CALL && before != Some(output) {
                 report.receipt(link, P::tool(&input));
             }
             return answer;
         }
-        report.notice(link, P::POINT, "answer exceeds its trust tier");
+        report.notice(link, &entry, "answer exceeds its trust tier");
     } else if let Err(error) = &answer {
-        report.notice(link, P::POINT, &error.message);
+        if error.code == ErrorCode::PermissionDenied && entry.acts.deny && baseline.is_none() {
+            return answer;
+        }
+        report.notice(link, &entry, &error.message);
     }
     match baseline {
         Some(result) => result,
@@ -235,6 +247,7 @@ fn continuation<'a, P: Point>(
     report: Report,
     pending: Continuation<'a, P::Output>,
 ) -> Next<'a, P::Input, P::Output> {
+    let entry = P::entry(&original).clone();
     let clock = pending
         .lock()
         .unwrap_or_else(|e| e.into_inner())
@@ -242,10 +255,10 @@ fn continuation<'a, P: Point>(
         .clone();
     Next::at(link.tier, move |mut input| {
         let changed = input != original;
-        let invalid = !P::pinned(&original, &input)
-            || (changed && !admits(link.tier, P::POINT, Act::Rewrite));
+        let invalid =
+            !P::pinned(&original, &input) || (changed && !admits(link.tier, &entry, Act::Rewrite));
         if invalid {
-            report.notice(link, P::POINT, "input rewrite exceeds its authority");
+            report.notice(link, &entry, "input rewrite exceeds its authority");
             input = original;
         }
         let phase = pending
@@ -294,3 +307,21 @@ async fn phase_deadline<O>(
         }
     }
 }
+
+pub(crate) mod json;
+
+pub(crate) mod deliver;
+pub(crate) mod describe;
+
+pub(crate) mod complete;
+
+pub(crate) mod command;
+
+pub(crate) mod service;
+
+pub(crate) mod autocomplete;
+
+pub(crate) mod observe;
+
+pub(crate) mod append;
+pub(crate) mod config;

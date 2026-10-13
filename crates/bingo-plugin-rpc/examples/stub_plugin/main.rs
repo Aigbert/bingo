@@ -222,6 +222,7 @@ fn handshake(options: &Options) -> Value {
         }],
         hooks: hooks::hooks(),
         links: hooks::links(),
+        subscriptions: Vec::new(),
         services: declared(options),
     };
     let mut declared = serde_json::to_value(result).unwrap_or(Value::Null);
@@ -247,9 +248,10 @@ fn declared(options: &Options) -> BTreeMap<String, ServiceSpec> {
     BTreeMap::from([(
         "kv".to_string(),
         ServiceSpec {
+            noun: None,
             methods: methods
                 .into_iter()
-                .map(|(name, schema)| (name.to_string(), schema))
+                .map(|(name, schema)| (name.to_string(), schema.into()))
                 .collect(),
         },
     )])

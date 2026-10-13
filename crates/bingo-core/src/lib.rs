@@ -5,6 +5,7 @@
 pub mod accumulator;
 pub mod chain;
 pub(crate) mod commands;
+mod config;
 pub mod context;
 pub mod executor;
 pub mod gate;

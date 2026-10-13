@@ -7,14 +7,19 @@ impl Point for Submit {
     fn needs_baseline(tier: Tier, output: &SubmitResult) -> bool {
         tier != Tier::Full && matches!(output, SubmitResult::Accepted(_))
     }
-    fn accepts(tier: Tier, before: Option<&SubmitResult>, after: &SubmitResult) -> bool {
+    fn accepts(
+        _entry: &bingo_sdk::catalogue::Entry,
+        tier: Tier,
+        before: Option<&SubmitResult>,
+        after: &SubmitResult,
+    ) -> bool {
         tier == Tier::Full
             || match after {
                 SubmitResult::Rejected(_) | SubmitResult::Redirect { .. } => true,
                 SubmitResult::Accepted(_) => matches!(before, Some(SubmitResult::Accepted(_))),
             }
     }
-    const POINT: LinkPoint = LinkPoint::PromptSubmit;
+    const POINT: LinkPoint = bingo_sdk::catalogue::PROMPT_SUBMIT;
     fn dispatch<'a>(
         link: &'a dyn Interceptor,
         cx: &'a HookContext,

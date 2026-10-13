@@ -2,7 +2,7 @@
 use crate::answer;
 use bingo_plugin_rpc::intercept::LinkSpec;
 use bingo_plugin_rpc::wire::{HookObservation, HookObserveParams, HookSpec};
-use bingo_sdk::{HookMatcher, HookPoint, LinkPoint};
+use bingo_sdk::{HookMatcher, HookPoint};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 type Store = BTreeMap<String, String>;
@@ -18,12 +18,12 @@ pub fn hooks() -> Vec<HookSpec> {
 pub fn links() -> Vec<LinkSpec> {
     vec![
         LinkSpec {
-            point: LinkPoint::ToolCall,
+            point: bingo_sdk::catalogue::TOOL_CALL,
             tool: Some("Bash".into()),
             after: true,
         },
         LinkSpec {
-            point: LinkPoint::TurnStop,
+            point: bingo_sdk::catalogue::TURN_STOP,
             tool: None,
             after: false,
         },
@@ -45,7 +45,7 @@ pub fn intercept(
         answer(id, json!({"result":params["result"]}));
     } else {
         note(point, "before", store);
-        if point == "turn.complete" {
+        if point == "turn.stop" {
             return;
         }
         let command = params["input"]["command"].as_str().unwrap_or_default();
@@ -67,6 +67,7 @@ pub fn observed(params: &Value, store: &mut Store) {
 
 fn watched(observation: &HookObservation) -> &'static str {
     match observation {
+        HookObservation::Catalogue(_) => "catalogue",
         HookObservation::Turn { .. } => "turn",
         HookObservation::Compact { .. } => "compact",
         HookObservation::Session { .. } => "session",

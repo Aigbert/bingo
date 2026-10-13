@@ -12,6 +12,9 @@ use tokio::sync::{mpsc, oneshot, watch};
 use crate::turn::{TurnConfig, TurnHost};
 
 pub(crate) enum Msg {
+    CatalogueEvent(Box<Event>),
+    Observe(LinkPoint, Value),
+    CompletionReady(Box<super::catalogue::Completed>),
     Complete {
         turn: Option<TurnId>,
         request: Box<Completion>,
@@ -119,6 +122,10 @@ pub(crate) enum Msg {
     Progress {
         item: ItemId,
         tail: String,
+    },
+    CommandReady {
+        intent: IntentId,
+        outcome: Result<CommandOutcome, KernelError>,
     },
     CommandFinished {
         intent: IntentId,
@@ -420,6 +427,10 @@ impl Mailbox {
 
     /// The client-facing port, stamped with who is holding it.
     pub fn port(&self, who: ClientIdentity) -> SessionHandle {
+        self.send(Msg::Observe(
+            catalogue::SESSION_ATTACH,
+            serde_json::json!({"session":self.id(), "client":who}),
+        ));
         SessionHandle(Arc::new(Port {
             mailbox: self.clone(),
             who,
@@ -430,6 +441,15 @@ impl Mailbox {
 struct Port {
     mailbox: Mailbox,
     who: ClientIdentity,
+}
+
+impl Drop for Port {
+    fn drop(&mut self) {
+        self.mailbox.send(Msg::Observe(
+            catalogue::SESSION_DETACH,
+            serde_json::json!({"session":self.mailbox.id(), "client":self.who}),
+        ));
+    }
 }
 
 #[async_trait]

@@ -294,3 +294,5 @@ mod tests {
         plugin.stop().await.expect("stop");
     }
 }
+
+mod events_ts;

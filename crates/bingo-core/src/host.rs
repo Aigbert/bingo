@@ -7,6 +7,7 @@ mod ask;
 mod auth;
 mod catalog;
 mod choose;
+mod interception;
 mod refresh;
 mod registry;
 mod resume;
@@ -520,6 +521,13 @@ impl Host {
         system
     }
 
+    pub(crate) fn hook_set(&self) -> HookSet {
+        interception::hook_set(self)
+    }
+    pub(crate) fn catalogue_context(&self, session: Option<&SessionId>) -> HookContext {
+        interception::catalogue_context(self, session)
+    }
+
     fn turn_config(
         &self,
         spec: &SessionSpec,
@@ -543,13 +551,7 @@ impl Host {
                 only: spec.tools.clone(),
             },
             policy: self.policy(),
-            hooks: HookSet {
-                links: self.registry.links.clone(),
-                interceptors: self.registry.sources.interceptors.clone(),
-                grants: self.settings.kernel.plugin_trust.clone(),
-                fixed: self.registry.hooks.clone(),
-                sources: self.registry.sources.hooks.clone(),
-            },
+            hooks: self.hook_set(),
             contributors: ContributorSet {
                 fixed: self.registry.contributors.clone(),
                 sources: self.registry.sources.contexts.clone(),
@@ -797,8 +799,33 @@ impl HostApi for Host {
         input: Input,
         delivery: Delivery,
     ) -> Result<(), KernelError> {
-        self.mailbox_of(to).await?.deliver(intent, input, delivery);
-        Ok(())
+        let mailbox = self.mailbox_of(to).await?;
+        let input = catalogue::Send {
+            to: to.clone(),
+            input,
+            delivery,
+        };
+        let report = crate::chain::Report::default();
+        let result = crate::chain::json::dispatch(
+            catalogue::SESSION_SEND,
+            &self.hook_set().links().await,
+            &self.catalogue_context(Some(to)),
+            input,
+            Next::new(|input: catalogue::Send| {
+                Box::pin(async move {
+                    self.mailbox_of(&input.to)
+                        .await?
+                        .deliver(intent, input.input, input.delivery);
+                    Ok(())
+                })
+            }),
+            report.clone(),
+        )
+        .await;
+        for notice in report.take() {
+            let _ = mailbox.record(notice).await;
+        }
+        result
     }
 
     async fn extend(
@@ -903,18 +930,7 @@ impl HostApi for Host {
     }
 
     async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
-        let resolved = self.providers().await;
-        Ok(Catalog {
-            kind,
-            entries: catalog::entries(
-                &self.registry,
-                &resolved,
-                self.settings.kernel.model.as_deref(),
-                &self.served,
-                kind,
-            )
-            .await,
-        })
+        interception::catalogue_answer(self, kind).await
     }
 
     /// Every session that is open right now, and no other: a line that belongs
@@ -959,7 +975,15 @@ impl HostApi for Host {
     }
 
     fn service_wire(&self, key: &str) -> Option<Arc<dyn WireService>> {
-        self.registry.services.wire(key)
+        let owner = self.registry.services.wire(key)?;
+        match self.registry.services.face(key) {
+            Some(face) => Some(Arc::new(crate::chain::service::Wire {
+                host: self.weak.clone(),
+                owner,
+                face,
+            })),
+            None => Some(owner),
+        }
     }
 
     fn open_service(&self, key: &str, wire: Arc<dyn WireService>) -> Result<(), KernelError> {

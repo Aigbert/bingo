@@ -26,14 +26,23 @@ pub fn find(host: &HostHandle) -> Option<Arc<dyn TeamFile>> {
 
 struct ToWire(Arc<dyn TeamFile>);
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 struct Asked {
     cwd: std::path::PathBuf,
     key: String,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+struct Answer {
+    section: Value,
+}
+
 #[async_trait]
 impl WireService for ToWire {
+    fn face(&self) -> Option<bingo_sdk::Face> {
+        Some(bingo_sdk::Face::new("team").method::<Asked, Answer>("section", false))
+    }
+
     async fn call(&self, method: &str, params: Value) -> Result<Value, TeamError> {
         if method != "section" {
             return Err(TeamError(format!(

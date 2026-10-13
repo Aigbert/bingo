@@ -321,10 +321,7 @@ impl Interceptor for HungLink {
         "hung-link"
     }
     fn matcher(&self) -> LinkMatcher {
-        LinkMatcher {
-            points: vec![LinkPoint::ToolCheck],
-            tool: None,
-        }
+        LinkMatcher::at(bingo_sdk::catalogue::TOOL_CHECK)
     }
     async fn tool_check(
         &self,

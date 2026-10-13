@@ -1,5 +1,5 @@
 //! The authority order, independent of dispatch and I/O.
-use bingo_sdk::{Decision, LinkPoint, Tier};
+use bingo_sdk::{Decision, Tier};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Act {
@@ -20,21 +20,17 @@ fn rank(decision: &Decision) -> u8 {
     }
 }
 
-pub fn admits(tier: Tier, point: LinkPoint, act: Act) -> bool {
+pub fn admits(tier: Tier, point: &bingo_sdk::catalogue::Entry, act: Act) -> bool {
     match (tier, act) {
         (_, Act::Observe) | (Tier::Full, _) => true,
         (_, Act::Allow) => false,
-        (Tier::Tighten, Act::Rewrite | Act::Answer) => {
-            matches!(point, LinkPoint::PromptSubmit | LinkPoint::ToolCheck)
-        }
-        (Tier::Rewrite, Act::Rewrite) => true,
-        (Tier::Rewrite, Act::Answer) => matches!(
-            point,
-            LinkPoint::ToolCall
-                | LinkPoint::TurnStep
-                | LinkPoint::PromptCompose
-                | LinkPoint::SessionCompact
-        ),
+        (Tier::Tighten, Act::Rewrite | Act::Answer) => [
+            bingo_sdk::catalogue::PROMPT_SUBMIT,
+            bingo_sdk::catalogue::TOOL_CHECK,
+        ]
+        .contains(&point),
+        (Tier::Rewrite, Act::Rewrite) => point.acts.rewrite,
+        (Tier::Rewrite, Act::Answer) => point.acts.answer,
     }
 }
 
@@ -64,7 +60,11 @@ mod tests {
     }
     #[test]
     fn each_tier_has_exactly_its_declared_rights() {
-        use LinkPoint::*;
+        use bingo_sdk::catalogue::{
+            PROMPT_COMPOSE as PromptCompose, PROMPT_SUBMIT as PromptSubmit,
+            SESSION_COMPACT as SessionCompact, TOOL_CALL as ToolCall, TOOL_CHECK as ToolCheck,
+            TURN_STEP as TurnStep, TURN_STOP as TurnStop,
+        };
         let points = [
             PromptSubmit,
             ToolCheck,
@@ -81,11 +81,11 @@ mod tests {
             assert!(admits(Tier::Tighten, point, Act::Observe));
             assert_eq!(
                 admits(Tier::Tighten, point, Act::Rewrite),
-                matches!(point, PromptSubmit | ToolCheck)
+                [PromptSubmit, ToolCheck].contains(&point)
             );
             assert_eq!(
                 admits(Tier::Rewrite, point, Act::Answer),
-                matches!(point, ToolCall | TurnStep | PromptCompose | SessionCompact)
+                [ToolCall, TurnStep, PromptCompose, SessionCompact].contains(&point)
             );
         }
     }

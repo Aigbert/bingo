@@ -7,6 +7,14 @@ cleanup and C-header-blocked builds remain for Windows CI (protocol step 7).
 M133 author-kit verification (2026-10-13) is recorded in its plan, including
 authorized baseline exceptions and pending Linux/Windows CI evidence.
 
+Pre-release amendment (2026-10-13, M136): protocol 2 has not shipped
+(v0.6.6 ships protocol 1). Its old `turn.complete` becomes `turn.stop`
+with unchanged shape and behaviour; `turn.complete` takes the catalogue's
+metadata-to-completion-text meaning. Amend the frozen baseline for these
+entries only. Any protocol-2 change after the first release that ships it
+still needs protocol 3. M134's `holds_context` note
+is on its parallel branch; both pre-release amendments apply.
+
 ## Context
 
 ADR-0015 kept `PROTOCOL` at 1 "until a plugin outside this repository
@@ -111,3 +119,7 @@ the first release carrying protocol 2 (v0.6.6 carries protocol 1). Before
 that release, ADR-0076 §6 removes `holdsContext` from both capability
 types and the generator regenerates `plugin.json` and `plugin-2.json`.
 This authorizes that one removal, not other changes to the frozen wire.*
+
+Verified 2026-10-14 (M136): catalogue subscriptions and dynamic service-face
+chains cross protocol 2; generated schema and TypeScript drift tests pass,
+as does the additive-only test against the amended pre-release baseline.

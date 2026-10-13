@@ -1,27 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { matches, patternMatches, Hooks } from './on.ts';
+import cases from '../test/cases.json' with { type: 'json' };
 
 test('matchers are partial, nested, scalar, regex or alternatives', () => {
-  for (const [matcher, event, expected] of [
-    [{ tool: 'Read' }, { tool: 'Read', path: 'a' }, true],
-    [{ tool: /^Ba/ }, { tool: 'Bash' }, true],
-    [{ tool: ['Read', 'Bash'] }, { tool: 'Write' }, false],
-    [{ input: { force: false } }, { input: { force: false, count: 2 } }, true],
-    [{ input: null }, { input: {} }, false],
-    [{ missing: true }, {}, false],
-  ] as const) assert.equal(matches(matcher, event), expected);
+  for (const [matcher, event, expected] of cases.matchers) assert.equal(matches(matcher, event), expected);
+  assert.equal(matches({ tool: /^Ba/ }, { tool: 'Bash' }), true);
   const matcher = /a/g;
   assert.equal(matches(matcher, 'a'), true);
   assert.equal(matches(matcher, 'a'), true);
 });
 
 test('patterns do not depend on the current event catalogue', () => {
-  for (const [pattern, name, expected] of [
-    ['*', 'future.verb', true], ['tool.*', 'tool.call', true],
-    ['tool.*', 'tools.call', false], ['!tool.*', 'turn.complete', true],
-    ['!tool.call', 'tool.call', false], ['future.verb', 'future.verb', true],
-  ] as const) assert.equal(patternMatches(pattern, name), expected);
+  for (const [pattern, name, expected] of cases.patterns) assert.equal(patternMatches(pattern as string, name as string), expected);
 });
 
 test('multiple hooks wrap once, preserving after order', async () => {

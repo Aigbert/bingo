@@ -9,35 +9,32 @@ use serde::{Deserialize, Serialize};
 /// Wall bound for an external dispatch link (ADR-0032, ADR-0074).
 pub const HOOK_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
 
+mod json;
 mod stream;
 pub use stream::StepStream;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub enum LinkPoint {
-    #[serde(rename = "prompt.submit")]
-    PromptSubmit,
-    #[serde(rename = "tool.check")]
-    ToolCheck,
-    #[serde(rename = "tool.call")]
-    ToolCall,
-    #[serde(rename = "turn.step")]
-    TurnStep,
-    #[serde(rename = "prompt.compose")]
-    PromptCompose,
-    #[serde(rename = "session.compact")]
-    SessionCompact,
-    #[serde(rename = "turn.complete")]
-    TurnStop,
-}
+pub type LinkPoint = &'static crate::catalogue::Entry;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct LinkMatcher {
     #[serde(default)]
-    pub points: Vec<LinkPoint>,
-    /// Exact tool name or a trailing `*` prefix, as with hooks.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool: Option<String>,
+    pub patterns: Vec<crate::catalogue::Pattern>,
+    #[serde(default)]
+    pub prefilter: serde_json::Value,
+}
+impl LinkMatcher {
+    pub fn at(entry: LinkPoint) -> Self {
+        Self {
+            patterns: crate::catalogue::Pattern::parse(&entry.name)
+                .into_iter()
+                .collect(),
+            prefilter: serde_json::Value::Null,
+        }
+    }
+    pub fn matches(&self, entry: &crate::catalogue::Entry, input: &serde_json::Value) -> bool {
+        (self.patterns.is_empty() || self.patterns.iter().any(|p| p.matches(&entry.name)))
+            && (self.prefilter.is_null() || crate::catalogue::prefilter(&self.prefilter, input))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -175,62 +172,79 @@ pub trait Interceptor: Send + Sync {
     fn id(&self) -> &str;
     fn matcher(&self) -> LinkMatcher;
 
+    async fn chain(
+        &self,
+        _entry: &catalogue::Entry,
+        _cx: &HookContext,
+        input: serde_json::Value,
+        next: Next<'_, serde_json::Value, serde_json::Value>,
+    ) -> Result<serde_json::Value, KernelError> {
+        next.run(input).await
+    }
+    async fn observe(
+        &self,
+        _entry: &catalogue::Entry,
+        _cx: &HookContext,
+        _input: &serde_json::Value,
+    ) {
+    }
+
     async fn prompt_submit(
         &self,
-        _cx: &HookContext,
+        cx: &HookContext,
         input: Input,
         next: Next<'_, Input, SubmitResult>,
     ) -> Result<SubmitResult, KernelError> {
-        next.run(input).await
+        json::bridge(self, catalogue::PROMPT_SUBMIT, cx, input, next).await
     }
     /// Tool identity and call id are pinned; links may rewrite `input`.
     async fn tool_check(
         &self,
-        _cx: &HookContext,
+        cx: &HookContext,
         input: ToolCall,
         next: Next<'_, ToolCall, CheckResult>,
     ) -> Result<CheckResult, KernelError> {
-        next.run(input).await
+        json::tool(self, catalogue::TOOL_CHECK, cx, input, next).await
     }
     async fn tool_call(
         &self,
-        _cx: &HookContext,
+        cx: &HookContext,
         input: ToolCall,
         next: Next<'_, ToolCall, ToolOutput>,
     ) -> Result<ToolOutput, KernelError> {
-        next.run(input).await
+        json::tool(self, catalogue::TOOL_CALL, cx, input, next).await
     }
     async fn turn_step(
         &self,
-        _cx: &HookContext,
+        cx: &HookContext,
         input: ModelRequest,
         next: Next<'_, ModelRequest, Result<StepStream, ProviderError>>,
     ) -> Result<Result<StepStream, ProviderError>, KernelError> {
-        next.run(input).await
+        json::step(self, cx, input, next).await
     }
     /// The final composed request is measured after this chain returns.
     async fn prompt_compose(
         &self,
-        _cx: &HookContext,
+        cx: &HookContext,
         input: ModelRequest,
         next: Next<'_, ModelRequest, ModelRequest>,
     ) -> Result<ModelRequest, KernelError> {
-        next.run(input).await
+        json::bridge(self, catalogue::PROMPT_COMPOSE, cx, input, next).await
     }
     async fn session_compact(
         &self,
-        _cx: &HookContext,
+        cx: &HookContext,
         input: CompactInput,
         next: Next<'_, CompactInput, Result<Compaction, CompactError>>,
     ) -> Result<Result<Compaction, CompactError>, KernelError> {
-        next.run(input).await
+        json::bridge(self, catalogue::SESSION_COMPACT, cx, input, next).await
     }
     async fn turn_stop(
         &self,
-        _cx: &HookContext,
+        cx: &HookContext,
         input: (),
         next: Next<'_, (), StopResult>,
     ) -> Result<StopResult, KernelError> {
-        next.run(input).await
+        json::bridge(self, catalogue::TURN_STOP, cx, input, next).await
     }
 }

@@ -41,6 +41,7 @@ impl RemoteHook {
     /// Tell the process, and do not wait: nothing here has an answer to read.
     async fn observe(&self, cx: &HookContext, observation: HookObservation) {
         let params = HookObserveParams {
+            event: None,
             id: self.spec.id.clone(),
             site: HookSite::from(cx),
             observation,

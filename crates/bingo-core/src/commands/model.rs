@@ -62,14 +62,14 @@ async fn set(
 ) -> Result<CommandOutcome, KernelError> {
     let known = host.catalog(CatalogKind::Providers).await?.entries;
     let (provider, model) = split(wanted, |id| known.iter().any(|p| p.id == id));
-    host.reconfigure(
-        &cx.session,
-        SessionChange::Model {
-            provider: provider.map(str::to_string),
-            model: model.to_string(),
-        },
-    )
-    .await?;
+    let provider = crate::config::set(host, &cx.session, "provider", json!(provider)).await?;
+    let model = crate::config::set(host, &cx.session, "model", json!(model)).await?;
+    let provider: Option<String> = serde_json::from_value(provider)
+        .map_err(|error| KernelError::new(ErrorCode::InvalidInput, error.to_string()))?;
+    let model: String = serde_json::from_value(model)
+        .map_err(|error| KernelError::new(ErrorCode::InvalidInput, error.to_string()))?;
+    host.reconfigure(&cx.session, SessionChange::Model { provider, model })
+        .await?;
     let choice = running_on(host, cx).await?;
     let mut message = said(&choice);
     let keys = [

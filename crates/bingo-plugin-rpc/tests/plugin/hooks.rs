@@ -21,7 +21,7 @@ async fn link_of(started: &Started, point: LinkPoint) -> Arc<dyn Interceptor> {
         .interceptors()
         .await
         .into_iter()
-        .find(|link| link.link.matcher().points.contains(&point))
+        .find(|link| link.link.matcher().matches(point, &serde_json::Value::Null))
         .expect("the handshake declares this link")
         .link
 }
@@ -64,7 +64,7 @@ async fn an_observation_point_lands_as_a_notification_nobody_waits_on() {
 #[tokio::test]
 async fn a_remote_tool_link_sees_its_result_after_next() {
     let started = with_hooks().await;
-    let link = link_of(&started, LinkPoint::ToolCall).await;
+    let link = link_of(&started, bingo_sdk::catalogue::TOOL_CALL).await;
     let next = Next::at(Tier::Rewrite, |call: ToolCall| {
         async move {
             assert_eq!(call.name, "Bash");
@@ -97,7 +97,7 @@ async fn a_remote_tool_link_sees_its_result_after_next() {
 #[tokio::test]
 async fn dropping_a_first_phase_notifies_the_process() {
     let started = with_hooks().await;
-    let link = link_of(&started, LinkPoint::TurnStop).await;
+    let link = link_of(&started, bingo_sdk::catalogue::TURN_STOP).await;
     let cx = hook_context();
     let next = Next::new(|()| async { panic!("first phase never answers") }.boxed());
     let mut call = Box::pin(link.turn_stop(&cx, (), next));
@@ -105,7 +105,7 @@ async fn dropping_a_first_phase_notifies_the_process() {
     drop(call);
     assert_eq!(
         crossings(&started).await,
-        json!("turn.complete/before,chain/cancel")
+        json!("turn.stop/before,chain/cancel")
     );
     started.manager.shutdown().await;
 }

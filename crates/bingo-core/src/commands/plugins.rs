@@ -45,14 +45,14 @@ impl Command for PluginsCommand {
         }
     }
 
-    async fn run(&self, args: &str, _cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
+    async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
         let host = super::host(&self.host)?;
         let listed = listing(host.registry()).await;
         match parse(args)? {
             None => Ok(CommandOutcome::View {
                 view: table(&listed),
             }),
-            Some((name, enabled)) => switched(&host, &listed, name, enabled),
+            Some((name, enabled)) => switched(&host, &cx.session, &listed, name, enabled).await,
         }
     }
 }
@@ -104,15 +104,15 @@ fn row(status: &PluginStatus) -> Vec<String> {
 }
 
 /// Write one switch into the user layer, or say why this is not one to write.
-fn switched(
+async fn switched(
     host: &Host,
+    session: &SessionId,
     listed: &[PluginStatus],
     name: &str,
     enabled: bool,
 ) -> Result<CommandOutcome, KernelError> {
     refuse(host, listed, name)?;
-    crate::plugins::switch(host.env(), name, enabled)
-        .map_err(|e| KernelError::new(ErrorCode::Internal, e.to_string()))?;
+    crate::plugins::switch_in(host, session, name, enabled).await?;
     Ok(CommandOutcome::Applied {
         message: Some(format!("{name} is {} at the next start.", state(enabled))),
     })

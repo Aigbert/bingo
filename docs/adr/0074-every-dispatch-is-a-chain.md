@@ -104,3 +104,7 @@ themselves; policy over the wire below `full`.
 Revised 2026-10-13 for ADR-0078: the points take the catalogue's names,
 `pluginTrust` carries `uses` (ADR-0078 §5), and the in-process JS engine
 this record refused is ADR-0078's.
+
+Verified 2026-10-14 (M136): the catalogue owns event names, shapes, pins and
+authority rules. The seven typed points bridge through JSON chains; the stop
+hook is `turn.stop`, while `turn.complete` composes completion text.

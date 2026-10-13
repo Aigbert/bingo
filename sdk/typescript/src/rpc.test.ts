@@ -43,3 +43,27 @@ test('protocol one is refused before register runs', async () => {
   await peer.receive({ id: 1, method: 'initialize', params: { protocol: 1 } });
   assert.match(messages[0].error.message, /protocol 2.*1/);
 });
+
+test('catalogue subscriptions wrap a service event added after initialization', async () => {
+  const messages: any[] = [];
+  const peer = new Peer(message => messages.push(message));
+  let observed = 0;
+  const app = runtime(peer, on => {
+    on('mcp.*', async ($, e, next) => ({ ...await next(e), wrapped: true }));
+    on('session.start', () => { observed++; });
+  });
+  await peer.receive({ id: 1, method: 'initialize', params: {
+    protocol: 2, pluginName: 'example', config: {},
+    capabilities: ['intercept/*', 'intercept/*/after', 'hook/observe'],
+  } });
+  assert.deepEqual(messages[0].result.links, []);
+  assert.deepEqual(messages[0].result.subscriptions,
+    [{ patterns: ['mcp.*', 'session.start'], prefilter: null }]);
+  await peer.receive({ id: 2, method: 'intercept/mcp.servers', params: { chain: 'c', input: null, site: { session: 's' } } });
+  assert.deepEqual(messages[1].result, { next: null });
+  await peer.receive({ id: 3, method: 'intercept/mcp.servers/after', params: { chain: 'c', result: { servers: {} } } });
+  assert.deepEqual(messages[2].result, { result: { servers: {}, wrapped: true } });
+  await peer.receive({ method: 'hook/observe', params: { event: 'session.start', payload: { session: 's' }, site: { session: 's' } } });
+  assert.equal(observed, 1);
+  app.close();
+});

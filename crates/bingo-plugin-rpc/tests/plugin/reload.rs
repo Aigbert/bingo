@@ -1,7 +1,7 @@
 //! Polling a real process with a controlled clock and durable host state.
 use super::harness::*;
 use bingo_plugin_rpc::Manager;
-use bingo_sdk::{Env, LinkPoint, Next};
+use bingo_sdk::{Env, Next};
 use futures::FutureExt;
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -121,7 +121,11 @@ async fn reload_fails_a_held_link_and_reports_changed_services() {
         .interceptors()
         .await
         .into_iter()
-        .find(|link| link.link.matcher().points.contains(&LinkPoint::TurnStop))
+        .find(|link| {
+            link.link
+                .matcher()
+                .matches(bingo_sdk::catalogue::TURN_STOP, &serde_json::Value::Null)
+        })
         .unwrap();
     let cx = hook_context();
     let next = Next::new(|()| async { panic!("the first phase holds") }.boxed());
