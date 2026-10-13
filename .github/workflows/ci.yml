@@ -1,13 +1,17 @@
 name: ci
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
 jobs:
   fmt-and-discipline:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,6 +21,7 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: scripts/check_discipline.sh
   test:
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -34,6 +39,7 @@ jobs:
       # the shared runner has fewer to begin with than a developer's machine.
       - run: cargo test --workspace --locked -- --test-threads=2
   tui-smoke:
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -53,6 +59,7 @@ jobs:
       - run: cargo build --locked
       - run: scripts/tui-smoke.sh
   windows:
+    timeout-minutes: 45
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,19 +69,15 @@ jobs:
       # and a Windows build breaking is the build breaking: a unix-only API
       # written without its counterpart fails here and nowhere else.
       - run: cargo check --workspace --all-targets --locked
-      # The one step here that is not blocking. Every command a shell runs
-      # still goes to a shell resolved as `/bin/bash` or `/bin/sh`
-      # (`bingo-tool-bash/src/run.rs`, `bingo-hooks-shell/src/run.rs`), so on
-      # Windows the suites that spawn one fail at spawn. Which dialect a
-      # Windows bingo writes is M6's question; this step is required with it.
-      - run: cargo test --workspace --locked
-        continue-on-error: true
+      - run: cargo test --workspace --locked -- --test-threads=2
   deny:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
   budget:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
