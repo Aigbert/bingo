@@ -12,6 +12,7 @@ description = "MCP client plugin for bingo: servers dialled in the background, t
 workspace = true
 
 [dependencies]
+bingo-services.workspace = true
 bingo-sdk.workspace = true
 # M85: the OAuth flows, the credential store and the MCP sign-in handle
 # (ADR-0050 §1). A library, which any plugin may depend on (ADR-0012 §1).

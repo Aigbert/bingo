@@ -72,7 +72,8 @@ no new external dependency.
 - `crates/bingo-core/src/host/registry.rs` and
   `crates/bingo-core/src/host/tests/services.rs`
 - `crates/bingo-services/{Cargo.toml,src/lib.rs,src/team.rs,src/mcp.rs,fixtures/}` (new)
-- `crates/bingo-agents/src/{team/service.rs,lib.rs}`
+- `crates/bingo-agents/src/{team/service.rs,lib.rs}`; `team.rs` and
+  `team/seat.rs` mechanically reuse the shared name/re-export.
 - `crates/bingo-rooms/src/{team.rs,lib.rs,tests.rs,hook.rs}` (service fixtures).
 - `crates/bingo-mcp/src/{rows.rs,lib.rs}`
 - `crates/bingo-provider-acp/src/{crossing.rs,lib.rs}`

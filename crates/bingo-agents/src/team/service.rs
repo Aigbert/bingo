@@ -1,66 +1,29 @@
-//! `agents.team`: the one door another plugin has onto `.bingo/team.json`.
-//!
-//! A project declares its team in one file, and the keys in it belong to
-//! different plugins — `roles` and `norms` to this one, `rooms` to whoever
-//! owns rooms. A plugin may not import another (ADR-0001), and it must not
-//! keep a second parser for the file either, so the file crosses the way
-//! ADR-0031 says a fact crosses a plugin line: a service under a key, met by
-//! method and JSON. Not by a trait in the sdk — `team` is a feature noun the
-//! kernel does not have, and never will.
-//!
-//! One method, `section`, answering one top-level key of the nearest file to
-//! a directory. What that key *means* stays with whoever owns it: the value
-//! goes back as a person wrote it and nothing here reads a word of it.
-//!
-//! No wire face. Every key of the file is reachable through this one method,
-//! and what a person may write under a name nobody has claimed yet is not
-//! this plugin's to hand an out-of-process stranger (ADR-0031 §3: crossing is
-//! the owner's choice). One can be opened the day something asks.
-
-use std::path::PathBuf;
-
+//! The team file owner implements the shared typed contract.
+use std::path::Path;
 use async_trait::async_trait;
-use bingo_sdk::{ServiceError, WireService};
-use serde::Deserialize;
-use serde_json::{Value, json};
-
+use bingo_services::team::{self, TeamError};
+use serde_json::Value;
 use crate::team::file;
 
-/// The key the service is registered under, and the one the manifest declares.
-pub const TEAM: &str = "agents.team";
-
-/// The method it speaks.
-const SECTION: &str = "section";
-
-/// What a caller asks for: a directory to look up from, and the key it owns.
-#[derive(Debug, Deserialize)]
-struct Asked {
-    cwd: PathBuf,
-    key: String,
-}
-
-/// The team file, answering one key at a time.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TeamFile;
 
 #[async_trait]
-impl WireService for TeamFile {
-    async fn call(&self, method: &str, params: Value) -> Result<Value, ServiceError> {
-        if method != SECTION {
-            return Err(ServiceError(format!(
-                "{TEAM} speaks `{SECTION}`, not `{method}`"
-            )));
-        }
-        let asked: Asked =
-            serde_json::from_value(params).map_err(|e| ServiceError(e.to_string()))?;
-        let section = file::section(&asked.cwd, &asked.key).map_err(|e| ServiceError(e.message))?;
-        Ok(json!({ SECTION: section }))
+impl team::TeamFile for TeamFile {
+    async fn section(&self, cwd: &Path, key: &str) -> Result<Value, TeamError> {
+        file::section(cwd, key).map(|section| section.unwrap_or(Value::Null)).map_err(|error| TeamError(error.message))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bingo_sdk::ServiceError;
+    use serde_json::json;
+    const SECTION: &str = "section";
+    fn wire() -> std::sync::Arc<dyn bingo_sdk::WireService> {
+        bingo_services::team::wire(std::sync::Arc::new(TeamFile))
+    }
     use crate::tests::Tree;
 
     const FULL: &str = r#"{
@@ -69,7 +32,7 @@ mod tests {
     }"#;
 
     async fn asked(cwd: &std::path::Path, key: &str) -> Result<Value, ServiceError> {
-        TeamFile
+        wire()
             .call(SECTION, json!({ "cwd": cwd, "key": key }))
             .await
     }
@@ -120,7 +83,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_method_this_service_does_not_speak_says_which_one_it_does() {
-        let refused = TeamFile
+        let refused = wire()
             .call("roles", json!({}))
             .await
             .expect_err("a refusal");
@@ -130,7 +93,7 @@ mod tests {
     #[tokio::test]
     async fn params_that_name_no_directory_are_refused_rather_than_guessed() {
         assert!(
-            TeamFile
+            wire()
                 .call(SECTION, json!({ "key": "rooms" }))
                 .await
                 .is_err()

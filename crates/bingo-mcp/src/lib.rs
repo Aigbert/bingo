@@ -29,7 +29,7 @@ use std::sync::{Arc, OnceLock};
 use async_trait::async_trait;
 use bingo_sdk::{
     Command, ConfigClaim, Contribution, HostHandle, Merge, Plugin, PluginError, PluginManifest,
-    Registrar, ServiceHandle, ToolSource, WireService,
+    Registrar, ToolSource,
 };
 
 pub use client::{Asker, Client};
@@ -37,7 +37,8 @@ pub use command::McpCommand;
 pub use config::{Server, Settings};
 pub use dial::CONNECT_TIMEOUT;
 pub use manager::{Line, Manager, Status};
-pub use rows::{Rows, SERVERS};
+pub use rows::Rows;
+use bingo_services::mcp;
 pub use source::McpSource;
 pub use tool::{McpTool, tool_name};
 
@@ -48,7 +49,7 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     provides: &[
         "tools:mcp",
         "command:mcp",
-        "service:mcp.servers",
+        mcp::CAPABILITY,
         "service:bingo.mcp.pages",
     ],
     requires: &[],
@@ -116,21 +117,10 @@ impl Plugin for McpPlugin {
     }
 }
 
-/// The rows, under the key another plugin looks them up by. The typed lookup
-/// is a `ServiceHandle` over the wire face, which is how a service met by
-/// method rather than by type is reached from in process (ADR-0031 §4).
-///
-/// No wire face is opened: a row carries a person's `env` and `headers`, so
-/// the answer stays inside this process. Opening one would put those keys
-/// within reach of every out-of-process plugin, and nothing asks for them
-/// there.
+/// Both faces read the same live manager.
 fn service(manager: Arc<Manager>) -> Contribution {
-    let wire = Arc::new(Rows::new(manager)) as Arc<dyn WireService>;
-    Contribution::Service {
-        key: SERVERS.to_string(),
-        value: Arc::new(ServiceHandle::new(wire)),
-        wire: None,
-    }
+    let owner: Arc<dyn mcp::Servers> = Arc::new(Rows::new(manager));
+    Contribution::service(&mcp::KEY, owner.clone(), Some(mcp::wire(owner)))
 }
 
 #[cfg(test)]
@@ -220,10 +210,10 @@ pub(crate) mod tests {
         }
         match &contributions[2] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, SERVERS);
+                assert_eq!(key, mcp::KEY.name());
                 assert!(
-                    wire.is_none(),
-                    "a row carries env and headers: no face across a process line"
+                    wire.is_some(),
+                    "the typed and wire faces share one live owner"
                 );
             }
             other => panic!("expected the rows service, got {other:?}"),

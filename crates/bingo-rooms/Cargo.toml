@@ -12,6 +12,7 @@ description = "Rooms plugin for bingo: a room is a session nobody answers, and a
 workspace = true
 
 [dependencies]
+bingo-services.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
 # M18: `OpenRoom`'s argument type is the schema the model is shown, derived

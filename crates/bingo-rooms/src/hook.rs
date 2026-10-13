@@ -417,7 +417,7 @@ mod tests {
 
     /// A fleet whose team file declares these rooms.
     fn declaring(section: Value) -> Fleet {
-        Fleet::default().serving(crate::team::TEAM, Stub::declaring(section))
+        Fleet::default().serving(bingo_services::team::KEY.name(), Stub::declaring(section))
     }
 
     fn declared() -> Value {
@@ -476,7 +476,7 @@ mod tests {
     #[tokio::test]
     async fn a_team_file_that_will_not_parse_seats_nobody_and_fails_nothing() {
         let fleet = Fleet::default().serving(
-            crate::team::TEAM,
+            bingo_services::team::KEY.name(),
             Stub::refusing("/work/project/.bingo/team.json: { not json"),
         );
         let root = fleet.root();

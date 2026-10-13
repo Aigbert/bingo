@@ -12,6 +12,7 @@ description = "Agent Client Protocol adapters as model providers"
 workspace = true
 
 [dependencies]
+bingo-services.workspace = true
 bingo-sdk.workspace = true
 # ADR-0035 §2: the message types are the contract; the transport is ours. The
 # schema crate alone is +5 crates where the full SDK is +27, fourteen of them a

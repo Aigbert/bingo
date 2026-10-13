@@ -16,7 +16,7 @@ use bingo_sdk::{
     SessionId, SessionPort, SessionSelector, SessionSpec, SessionState, SessionSummary,
     ToolContext, ToolHost, TurnId, Usage,
 };
-use bingo_sdk::{ServiceError, ServiceHandle, WireService, testing::ServiceHost};
+use bingo_sdk::{ServiceError, WireService, testing::ServiceHost};
 use jiff::Timestamp;
 use serde_json::{Value, json};
 
@@ -66,7 +66,9 @@ impl WireService for Stub {
 /// A host that answers for one service and nothing else.
 pub(crate) fn service_host(key: &str, stub: Arc<Stub>) -> HostHandle {
     let wire = stub as Arc<dyn WireService>;
-    ServiceHost::holding(key, Arc::new(ServiceHandle::new(wire)))
+    let host = ServiceHost::handle();
+    host.open_service(key, wire).expect("one wire service");
+    host
 }
 
 /// Long ago: what a room's journal was stamped with before this process.
@@ -269,6 +271,8 @@ impl Fleet {
         self.script_signal(&host);
         host.on_catalog(|_kind| async move { unreachable!("this plugin reads no catalogue") });
         self.script_service_any(&host);
+        let fixture = self.clone();
+        host.on_service_wire(move |key| fixture.0.services.wire(&key));
         host
     }
 

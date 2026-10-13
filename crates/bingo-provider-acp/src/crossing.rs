@@ -16,20 +16,15 @@ use std::path::Path;
 use std::sync::Arc;
 
 use agent_client_protocol_schema::v1::{AgentCapabilities, McpCapabilities, McpServer};
-use bingo_sdk::{HostHandle, Level, ServiceHandle, SessionId};
+use bingo_sdk::{HostHandle, Level, SessionId};
 use serde_json::{Map, Value};
+use bingo_services::mcp;
 
 use crate::bridge::{Bridge, Token};
 use crate::config::Adapter;
 use crate::error::AcpError;
 use crate::servers;
 use crate::shared::Shared;
-
-/// The service `bingo-mcp` registers its configured rows under, and the one
-/// method it speaks. Two strings across a plugin line, which is what a service
-/// key is; the rows themselves are never read from settings here.
-const ROWS: &str = "mcp.servers";
-const SERVERS: &str = "servers";
 
 /// The code a person sees when a row of theirs did not cross.
 const SKIPPED: &str = "ACP_MCP";
@@ -135,15 +130,9 @@ async fn say(host: &HostHandle, line: Option<String>) {
 /// build, or has nothing to say: an ACP adapter with no MCP plugin beside it
 /// forwards no rows and serves everything itself.
 async fn rows(host: &HostHandle) -> Map<String, Value> {
-    let Some(service) = host.service::<ServiceHandle>(ROWS) else {
-        return Map::new();
-    };
-    let Ok(answered) = service.call(SERVERS, Value::Null).await else {
-        return Map::new();
-    };
-    match &answered[SERVERS] {
-        Value::Object(rows) => rows.clone(),
-        _ => Map::new(),
+    match mcp::find(host) {
+        Some(service) => service.servers().await,
+        None => Map::new(),
     }
 }
 
@@ -164,7 +153,7 @@ mod tests {
     #[async_trait]
     impl WireService for Configured {
         async fn call(&self, _method: &str, _params: Value) -> Result<Value, ServiceError> {
-            Ok(json!({ SERVERS: self.0 }))
+            Ok(json!({ "servers": self.0 }))
         }
     }
 
@@ -172,10 +161,11 @@ mod tests {
     /// at all.
     fn host(rows: Option<Value>) -> HostHandle {
         match rows {
-            Some(rows) => ServiceHost::holding(
-                ROWS,
-                Arc::new(ServiceHandle::new(Arc::new(Configured(rows)))),
-            ),
+            Some(rows) => {
+                let host = ServiceHost::handle();
+                host.open_service(mcp::KEY.name(), Arc::new(Configured(rows))).unwrap();
+                host
+            },
             None => ServiceHost::handle(),
         }
     }
