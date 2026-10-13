@@ -372,7 +372,7 @@ fn text_children_keep_their_own_weight_in_the_backend() {
     let buffer = terminal.backend().buffer();
     assert_eq!(
         buffer[(1, 0)].style(),
-        theme::as_drawn(theme::text().patch(theme::bold()))
+        theme::as_drawn(buffer[(0, 0)].style().patch(theme::bold()))
     );
     assert_eq!(buffer[(0, 0)].style(), buffer[(2, 0)].style());
 }

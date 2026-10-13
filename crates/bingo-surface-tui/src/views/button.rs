@@ -30,7 +30,7 @@ pub fn lines(
     };
     let style = match props.variant.as_deref() {
         Some("danger") => theme::bad(),
-        Some("primary") => theme::presence(),
+        Some("primary") => theme::bold(),
         _ => Default::default(),
     };
     for line in &mut lines {

@@ -10,14 +10,7 @@ pub fn lines(props: &SelectProps, width: usize) -> Vec<Line<'static>> {
         let selected = props.value.as_deref() == Some(&option.value);
         lines.push(super::fit(
             Line::from(vec![
-                Span::styled(
-                    if selected {
-                        format!("{} ", theme::point())
-                    } else {
-                        "  ".into()
-                    },
-                    theme::presence(),
-                ),
+                theme::cursor_span(selected),
                 Span::styled(option.label.clone(), theme::text()),
             ]),
             width,

@@ -140,7 +140,7 @@ fn render_status(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now)
             frame
                 .waiting
                 .push((pane.key, Rect::new(x, area.y, cells, 1)));
-            spans.push(Span::styled(text, theme::presence()));
+            spans.push(Span::styled(text, theme::dim()));
             x += cells;
         }
         frame.render_widget(Paragraph::new(Line::from(spans)), area);

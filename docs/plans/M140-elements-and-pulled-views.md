@@ -71,9 +71,10 @@ After M121, M123–M125, M137, M138.
   `globals.js` still emits `{type,props,children}`. Direct Text writers need migration.
 - 2026-10-14, person's delegate: authorize the scoped pre-release View/Shown/place/ui-render baseline amendment; protocol 2 freezes at its first release (ADR-0075).
 - 2026-10-14, person's delegate: authorize print Invalidated ignore arms and all mechanical Event/Shown/element sibling mappings; record files below, stop only for new out-of-scope behaviour.
-- Stopped (2026-10-14): TUI `theme::tests::every_token_is_spent_where_the_design_says` pins token-use files and rejects the new element/toast renderers. `theme.rs` is outside Files; protocol step 6 excludes changing an out-of-scope fixture assertion. Proposed: authorize only updating that test's file allowlists, leaving theme values/runtime behavior unchanged; then continue M140. No final gates or tmux drive completed yet.
+- 2026-10-14, person's delegate: authorize theme-test file additions only for fitting token roles, keep ember/accent lists and theme values unchanged; merge dev before regenerating and running final gates.
 ## Verified (2026-10-14)
 
+Theme allowlist additions: text → `toast.rs`, `views/{input,select}.rs`; dim → `views/{button,flex,input,link,mod,text}.rs`; bad → `views/button.rs`; no ember/accent additions.
 Mechanical match updates: `bingo-surface-print/src/{render,stream_json}.rs` (ignore Invalidated).
 ```text
 cargo fmt --all -- --check
