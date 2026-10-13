@@ -2,16 +2,9 @@
 
 ## Goal
 
-ADR-0070 §4, §5 and §7, and ADR-0071 §4. After M121 the TUI still
-reads four producers by name: the memory directories
-(`_bingo.context`/`memory`), the `Skill` tool and the `skill` command
-family, the rooms records (`seats.rs`, `roster.rs`, `mentions.rs`),
-and the Bash call it promotes (`input.rs`). It also decides how a line
-was said from a closed list of producers' surface words
-(`transcript/said.rs`). Each producer now stamps a voice or places a
-`Row`, the room records are read through `bingo-collab`, and a
-discipline check keeps plugin ids and tool names out of TUI production
-code. No `HostApi` verb, no new external dependency.
+Implement ADR-0070 §§4–5,7 and ADR-0071 §4: producers stamp voices and place rows;
+the TUI reads navigation through `bingo-collab` and names no plugin or tool.
+No new host verb or external dependency.
 
 ## Bricks, in build order
 
@@ -103,21 +96,14 @@ code. No `HostApi` verb, no new external dependency.
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-sdk voice` passes; the failing first run is pasted.
-- [ ] `rg '"_?bingo\.' crates/bingo-surface-tui/src --glob '!**/tests/**'`
-      finds nothing outside `#[cfg(test)]` code but the TUI's own
-      manifest id, and check 4f fails on a seeded literal (output pasted).
-- [ ] `rg 'QUIET_SURFACES|ROOMS_READING|PROMOTE|fn running_shell' crates/bingo-surface-tui/src`
-      finds only the frozen voiceless table.
-- [ ] Each producer asserts its voice or its `Row` beside the record;
-      the stranger test draws a `Row`'s title, badge and action.
-- [ ] `screens/` snapshots are unchanged except the model's skill row
-      bullet; the diff is pasted.
-- [ ] `scripts/tui-smoke.sh` passes, and a tmux drive shows a memory
-      row, `/guide` and a model `Skill` call, ctrl+b on a running Bash
-      call, a room's switcher columns and `@` completion.
-- [ ] All gates of the upgrade protocol, plus the Windows cross-check
-      for the TUI and every producer crate touched.
+- [x] `cargo test -p bingo-sdk voice` passes; the failing first run is pasted.
+- [ ] `rg '"_?bingo\.' crates/bingo-surface-tui/src --glob '!**/tests/**'` finds nothing outside `#[cfg(test)]` code but the TUI's own manifest id, and check 4f fails on a seeded literal (output pasted).
+- [ ] `rg 'QUIET_SURFACES|ROOMS_READING|PROMOTE|fn running_shell' crates/bingo-surface-tui/src` finds only the frozen voiceless table.
+- [ ] Each producer asserts its voice or its `Row` beside the record; the stranger test draws a `Row`'s title, badge and action.
+- [ ] `screens/` snapshots are unchanged except the model's skill row bullet; the diff is pasted.
+- [ ] `scripts/tui-smoke.sh` passes, and a tmux drive shows a memory row, `/guide` and a model `Skill` call, ctrl+b on a running Bash call, a room's switcher columns and `@` completion.
+- [ ] All gates of the upgrade protocol, plus the Windows cross-check for the TUI and every producer crate touched.
+
 
 ## Non-goals
 
@@ -127,23 +113,38 @@ code. No `HostApi` verb, no new external dependency.
 
 ## Risks
 
-- A `Row` placed by a hook lands a frame after its item opens, so a
-  memory call can draw as `Read(…)` for one frame. The snapshot tests
-  fold whole frames; the tmux drive is the check.
-- One extension kind per placed row grows `extensions` by one small
-  entry per memory or skill call. Rewind and compaction keep them, as
-  they keep any extension; a long session pays bytes, not frames.
-- Decided 2026-10-13: the skill row keeps `❖` on both doors through
-  `Row.mark` (ADR-0070 §1), rather than falling back to the tool bullet.
-- `on_turn(Start)` must see the prompt item in `items`. If it does not,
-  the skills hook reads it at `on_event` for the item instead.
-- Re-verified at `e415e97e` (2026-10-13): M121's `slot` module and `Row` fields, M122's
-  collab readers and `HOLDER`, the producer origins named above by
-  symbol, the gate's `GateInput.item`, and the test-only module list in
-  `lib.rs`.
+- **Stopped 2026-10-13, protocol step 6.** M121's contract in
+  `bingo-surface-tui/src/test_lanes.rs:201` requires `Row.body` to replace
+  the original body (`assert!(!screen.contains("old body"))`). Brick 7
+  specifies skill `body: args`, but unchanged skill snapshots retain the
+  original expanded result and put arguments on the heading. Treating
+  `Row.body` as a caption violated that contract; the experiment was removed.
+- Decision needed: add an optional row caption field (amend the fixed plan
+  and ADR-0070; coordinate M132 schemas), or retain replacement semantics
+  and revise skill presentation/snapshots. The M121 assertion is not a mechanical update.
+- Remaining: TUI rows/input, discipline, integration tests, records, snapshots, tmux and gates.
+- Re-verified at `e415e97e`: M131 dispatch is in `chain/tool.rs`; M122's
+  bounce is a tool result and its holder constant is `name::PARENT`;
 
-M121 already provides `Row.mark` and `transcript/slots.rs`; no slot wire change.
-M131 keeps `HookContext` in `hook.rs`; after-tool dispatch is in `chain/tool.rs`.
-M122 has `name::PARENT` and record fixtures; add the `room::HOLDER` alias; TUI presentation readers remain to move.
-Turn-start hooks receive the prompt in the transcript. Bash foreground calls are
-owned by `promote.rs`; publish their placed actions beside the jobs signal.
+## Verified (2026-10-13, partial; stopped)
+
+```text
+cargo test -p bingo-sdk voice                         # first run
+E0432: unresolved import bingo_sdk::Voice
+E0599: no method named voiced; E0609: no field voice
+cargo test -p bingo-sdk voice                         # after implementation
+2 passed; 0 failed (origin fixture unchanged)
+cargo test -p bingo-core before_deny_ends_the_run      # first: E0609 cx.item
+1 passed; 0 failed (after implementation)
+cargo test -p bingo-context memory::row               # 3 passed; 0 failed
+cargo test -p bingo-skills both_doors_place            # 1 passed; 0 failed
+cargo test -p bingo-tool-bash promote                 # 9 passed; 0 failed
+cargo test -p bingo-collab room_readers                # first: missing readers
+1 passed; 0 failed (after implementation)
+cargo test -p bingo-surface-tui a_stranger_places      # experiment, reverted
+FAILED test_lanes::a_stranger_places_every_slot_without_a_surface_registration
+assertion failed: !screen.contains("old body") at test_lanes.rs:201
+```
+The new heading contract remains failing on the retained M121 renderer.
+No snapshots changed. Full gates, Windows checks, smoke and tmux were not run.
+ADRs remain partially accepted; M123 is not complete.
