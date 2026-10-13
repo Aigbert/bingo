@@ -1,35 +1,119 @@
 //! The session tree folded from one attachment's frames and gateway events.
 
-use crate::{Applied, Frame, GatewayEvent, SessionId, SessionState};
+use std::collections::{BTreeMap, BTreeSet};
 
+use crate::{Applied, CloseReason, Event, Frame, GatewayEvent, SessionId, SessionState};
+
+/// One root and the descendants announced on its attachment's stream.
+#[derive(Clone, Debug)]
 pub struct TreeState {
     root: SessionState,
+    children: BTreeMap<SessionId, SessionState>,
 }
 
 impl TreeState {
     pub fn new(root: SessionState) -> Self {
-        Self { root }
+        Self {
+            root,
+            children: BTreeMap::new(),
+        }
     }
-    pub fn apply(&mut self, _frame: &Frame) -> Applied {
-        Applied::Stale
+
+    /// Unknown sessions need a summary before any other frame can apply.
+    pub fn apply(&mut self, frame: &Frame) -> Applied {
+        if frame.session == self.root.summary.id {
+            return self.root.apply(frame);
+        }
+        if !self.children.contains_key(&frame.session) {
+            let Event::SessionUpdated { summary } = &frame.event else {
+                return Applied::Stale;
+            };
+            self.children
+                .insert(frame.session.clone(), SessionState::new(summary.clone()));
+        }
+        let Some(state) = self.children.get_mut(&frame.session) else {
+            return Applied::Stale;
+        };
+        let applied = state.apply(frame);
+        if applied != Applied::Stale
+            && matches!(
+                frame.event,
+                Event::SessionClosed {
+                    reason: CloseReason::Deleted
+                }
+            )
+        {
+            self.remove(&frame.session);
+        }
+        applied
     }
-    pub fn removed(&mut self, _event: &GatewayEvent) -> Vec<SessionId> {
-        Vec::new()
+
+    /// Remove a stored child and its subtree; the attachment owns its root.
+    pub fn removed(&mut self, event: &GatewayEvent) -> Vec<SessionId> {
+        match event {
+            GatewayEvent::SessionRemoved { session } => self.remove(session),
+            _ => Vec::new(),
+        }
     }
+
+    fn remove(&mut self, session: &SessionId) -> Vec<SessionId> {
+        if session == &self.root.summary.id {
+            return Vec::new();
+        }
+        let mut reached = BTreeSet::from([session.clone()]);
+        loop {
+            let before = reached.len();
+            for child in self.children.values() {
+                if child
+                    .summary
+                    .parent
+                    .as_ref()
+                    .is_some_and(|p| reached.contains(&p.session))
+                {
+                    reached.insert(child.summary.id.clone());
+                }
+            }
+            if reached.len() == before {
+                break;
+            }
+        }
+        reached
+            .into_iter()
+            .filter(|id| self.children.remove(id).is_some())
+            .collect()
+    }
+
     pub fn root(&self) -> &SessionState {
         &self.root
     }
+
     pub fn get(&self, id: &SessionId) -> Option<&SessionState> {
-        (id == &self.root.summary.id).then_some(&self.root)
+        if id == &self.root.summary.id {
+            Some(&self.root)
+        } else {
+            self.children.get(id)
+        }
     }
+
+    /// Root first, followed by descendants in session id order.
     pub fn sessions(&self) -> impl Iterator<Item = &SessionState> {
-        std::iter::once(&self.root)
+        std::iter::once(&self.root).chain(self.children.values())
     }
+
     pub fn children_of<'a>(&'a self, id: &'a SessionId) -> impl Iterator<Item = &'a SessionState> {
-        self.sessions()
+        self.children
+            .values()
             .filter(move |s| s.summary.parent.as_ref().is_some_and(|p| &p.session == id))
     }
-    pub fn mark_read(&mut self, _id: &SessionId) {}
+
+    /// Preserve the client's existing read marker without mutable tree access.
+    pub fn mark_read(&mut self, id: &SessionId) {
+        if id == &self.root.summary.id {
+            self.root.mark_read();
+        } else if let Some(child) = self.children.get_mut(id) {
+            child.mark_read();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -117,7 +201,13 @@ mod tests {
 
     #[test]
     fn other_closes_preserve_the_state_for_reopening() {
-        for reason in [CloseReason::Shutdown, CloseReason::Client] {
+        for reason in [
+            CloseReason::Shutdown,
+            CloseReason::Client,
+            CloseReason::Error {
+                message: "failed".into(),
+            },
+        ] {
             let mut tree = tree();
             tree.apply(&announce(1, 0, 1));
             tree.apply(&frame(
@@ -157,5 +247,70 @@ mod tests {
             Applied::Stale
         );
         assert!(tree.get(&id(1)).is_some());
+    }
+
+    fn step(tree: &mut TreeState, (kind, n, parent): (u8, u8, u8), seq: u64) {
+        match kind {
+            0 => {
+                tree.apply(&announce(n, parent, seq));
+            }
+            1 => {
+                tree.apply(&close(n, seq, CloseReason::Shutdown));
+            }
+            2 => {
+                tree.apply(&close(n, seq, CloseReason::Deleted));
+            }
+            _ => {
+                tree.removed(&removed(n));
+            }
+        }
+    }
+
+    fn snapshot(tree: &TreeState) -> serde_json::Value {
+        serde_json::to_value(tree.sessions().collect::<Vec<_>>()).unwrap()
+    }
+
+    fn prune(parents: &mut BTreeMap<u8, u8>, n: u8) {
+        let mut pending = vec![n];
+        while let Some(parent) = pending.pop() {
+            let children: Vec<_> = parents
+                .iter()
+                .filter_map(|(&child, &p)| (p == parent).then_some(child))
+                .collect();
+            for child in children {
+                parents.remove(&child);
+                pending.push(child);
+            }
+        }
+        parents.remove(&n);
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::test_runner::Config::with_cases(1000))]
+        #[test]
+        fn tree_matches_replay_and_removal_oracle(
+            codes in proptest::collection::vec((0u8..4, 1u8..8, 0u8..8), 0..80)
+        ) {
+            let mut incremental = tree();
+            let mut parents = BTreeMap::new();
+            for (at, &(kind, n, parent)) in codes.iter().enumerate() {
+                let known = parents.contains_key(&n);
+                step(&mut incremental, (kind, n, parent), at as u64 + 1);
+                match kind {
+                    0 => { parents.insert(n, parent); }
+                    2 if known => prune(&mut parents, n),
+                    3 => prune(&mut parents, n),
+                    _ => {}
+                }
+                let expected: Vec<_> = std::iter::once(id(0)).chain(parents.keys().map(|&n| id(n))).collect();
+                let actual: Vec<_> = incremental.sessions().map(|s| s.summary.id.clone()).collect();
+                proptest::prop_assert_eq!(actual, expected);
+                let mut replay = tree();
+                for (index, &code) in codes[..=at].iter().enumerate() {
+                    step(&mut replay, code, index as u64 + 1);
+                }
+                proptest::prop_assert_eq!(snapshot(&incremental), snapshot(&replay));
+            }
+        }
     }
 }
