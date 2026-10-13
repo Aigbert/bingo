@@ -550,8 +550,9 @@ mod tests {
         file.try_lock().unwrap();
         let held = case.report(&Fake::empty(), true);
         assert!(held.contains("channel OS lock is held"), "{held}");
-        assert_eq!(std::fs::read(&path).unwrap(), marker);
+        assert!(path.exists(), "doctor keeps the held claim file");
         drop(file);
+        assert_eq!(std::fs::read(&path).unwrap(), marker);
         let free = case.report(&Fake::empty(), true);
         assert!(free.contains("channel OS lock is free"), "{free}");
         assert_eq!(std::fs::read(path).unwrap(), marker);
