@@ -5,6 +5,7 @@
 //! journal body, and the lock is the only claim of ownership. The kernel says
 //! when to take and give back that claim — `create` does not lock by itself.
 
+mod checkpoint;
 pub mod gc;
 pub mod journal;
 pub mod layout;
