@@ -248,3 +248,6 @@ mod tests {
         assert_eq!(replay(&dir, Seq::ZERO).expect("replay").len(), 1);
     }
 }
+
+#[cfg(test)]
+mod compatibility;
