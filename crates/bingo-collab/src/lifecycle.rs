@@ -19,8 +19,20 @@ pub struct Facts {
     pub working: bool,
 }
 
-pub fn decide(_facts: Facts) -> Option<Lifecycle> {
-    None
+pub fn decide(facts: Facts) -> Option<Lifecycle> {
+    if !facts.seated {
+        Some(Lifecycle::Unseated)
+    } else if facts.log {
+        None
+    } else if !facts.open {
+        Some(Lifecycle::Stored)
+    } else if facts.asking {
+        Some(Lifecycle::Asking)
+    } else if facts.working {
+        Some(Lifecycle::Working)
+    } else {
+        Some(Lifecycle::Idle)
+    }
 }
 
 impl Lifecycle {
