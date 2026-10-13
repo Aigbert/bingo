@@ -3446,7 +3446,7 @@ mod tests {
     #[test]
     fn a_view_block_is_dismissed_by_the_next_key() {
         let (mut ui, now) = scene();
-        ui.block = Some(bingo_sdk::View::Text { text: "x".into() });
+        ui.block = Some(bingo_sdk::View::text("x"));
         press(&mut ui, &state(), key(KeyCode::Left), now);
         assert!(ui.block.is_none());
     }

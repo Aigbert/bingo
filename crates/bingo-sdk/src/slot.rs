@@ -130,7 +130,16 @@ mod tests {
     #[test]
     fn slot_variants_round_trip_the_golden_json() {
         let json: Value = serde_json::from_str(include_str!("../fixtures/slots/all.json")).unwrap();
-        assert_eq!(serde_json::to_value(slots()).unwrap(), json);
+        let generated = serde_json::to_value(slots()).unwrap();
+        if std::env::var_os("BINGO_UPDATE_SCHEMA").is_some() {
+            std::fs::write(
+                concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/slots/all.json"),
+                format!("{}\n", serde_json::to_string_pretty(&generated).unwrap()),
+            )
+            .unwrap();
+        } else {
+            assert_eq!(generated, json);
+        }
         assert_eq!(slots().len(), 7);
     }
 

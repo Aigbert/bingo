@@ -69,7 +69,7 @@ fn rows(view: &View) -> Vec<Vec<String>> {
     let View::Panel { child, .. } = view else {
         panic!("a board is a panel: {view:?}");
     };
-    let View::Stack { children } = child.as_ref() else {
+    let View::Box { children, .. } = child.as_ref() else {
         panic!("a table and its buttons");
     };
     children
@@ -86,7 +86,7 @@ fn buttons(view: &View) -> Vec<String> {
     let View::Panel { child, .. } = view else {
         panic!("a board is a panel");
     };
-    let View::Stack { children } = child.as_ref() else {
+    let View::Box { children, .. } = child.as_ref() else {
         panic!("a table and its buttons");
     };
     children

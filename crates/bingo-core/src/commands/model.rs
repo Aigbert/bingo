@@ -47,9 +47,7 @@ impl Command for ModelCommand {
 async fn report(host: &Arc<Host>, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
     let choice = running_on(host, cx).await?;
     Ok(CommandOutcome::View {
-        view: View::Text {
-            text: format!("{}\n{USAGE}", said(&choice)),
-        },
+        view: View::text(format!("{}\n{USAGE}", said(&choice))),
     })
 }
 

@@ -346,9 +346,11 @@ impl Tool for GrepTool {
             .map(|(file, suffix)| format!("{}{suffix}", path::display(file, &cx.cwd, &cx.env.home)))
             .collect::<Vec<_>>();
         let mut result = ToolOutput::text(output::join(&lines, usize::MAX, noun(mode)));
-        result.display = Some(bingo_sdk::View::Text {
-            text: output::join(&display, usize::MAX, noun(mode)),
-        });
+        result.display = Some(bingo_sdk::View::text(output::join(
+            &display,
+            usize::MAX,
+            noun(mode),
+        )));
         Ok(result)
     }
 }
@@ -378,9 +380,7 @@ mod tests {
             );
             assert_eq!(
                 out.display,
-                Some(bingo_sdk::View::Text {
-                    text: format!("a.rs{suffix}")
-                })
+                Some(bingo_sdk::View::text(format!("a.rs{suffix}")))
             );
         }
     }

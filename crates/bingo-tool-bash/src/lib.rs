@@ -944,10 +944,7 @@ pub(crate) mod tests {
             let out = tool.call(input, &cx).await.expect("the call ran");
             assert_eq!(text(&out), "$ echo hi\nhi\n[Exited with code 0]");
             assert!(!out.is_error);
-            assert_eq!(
-                out.display,
-                Some(bingo_sdk::View::Text { text: "hi".into() })
-            );
+            assert_eq!(out.display, Some(bingo_sdk::View::text("hi")));
             assert!(jobs.find("").is_err(), "no job was filed");
         }
     }
@@ -966,12 +963,7 @@ pub(crate) mod tests {
                 text(&out),
                 "$ echo failed >&2; exit 7\nfailed\n[Exited with code 7]"
             );
-            assert_eq!(
-                out.display,
-                Some(bingo_sdk::View::Text {
-                    text: "failed\nexit 7".into()
-                })
-            );
+            assert_eq!(out.display, Some(bingo_sdk::View::text("failed\nexit 7")));
             assert!(jobs.find("").is_err(), "no job was filed");
         }
     }

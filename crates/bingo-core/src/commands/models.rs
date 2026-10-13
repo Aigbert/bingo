@@ -35,9 +35,7 @@ impl Command for ModelsCommand {
         let host = super::host(&self.host)?;
         match args.trim() {
             "" => Ok(CommandOutcome::View {
-                view: View::Text {
-                    text: listing(&host).await?,
-                },
+                view: View::text(listing(&host).await?),
             }),
             REFRESH => Ok(CommandOutcome::Applied {
                 message: Some(counted(&host.refresh_models().await)),

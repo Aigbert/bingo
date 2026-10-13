@@ -105,7 +105,7 @@ mod tests {
             "{said}"
         );
         assert!(
-            matches!(out.display, Some(bingo_sdk::View::Stack { .. })),
+            matches!(out.display, Some(bingo_sdk::View::Box { .. })),
             "a surface draws the table it folded"
         );
     }

@@ -65,7 +65,7 @@ pub fn next_change(view: &View, now: Now) -> Option<std::time::Instant> {
     }
     match view {
         View::Progress { total, .. } if total.unwrap_or(0) == 0 => Some(progress::next_change(now)),
-        View::Stack { children } | View::Columns { children } => children
+        View::Box { children, .. } => children
             .iter()
             .filter_map(|child| next_change(child, now))
             .min(),
@@ -83,9 +83,9 @@ pub fn render(view: &View, width: usize) -> Vec<Line<'static>> {
 /// A view as styled lines.
 pub fn marked(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
     match view {
-        View::Text { text } => text::lines(text),
-        View::Markdown { text } => markdown::lines(text, width),
-        View::Code { lang, text } => code::lines(lang.as_deref(), text, width),
+        View::Text { children, .. } => text::lines(&bingo_sdk::view::text_children(children)),
+        View::Markdown { text, .. } => markdown::lines(text, width),
+        View::Code { language, source } => code::lines(language.as_deref(), source, width),
         View::Diff { unified } => diff::lines(unified),
         View::List { items } => list::lines(items),
         View::Table { headers, rows } => table::lines(headers, rows, width),
@@ -97,14 +97,20 @@ pub fn marked(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
         } => progress::lines(*value, *total, label.as_deref(), width, marks.beat),
         View::Badge { text, tone } => badge::lines(text, *tone),
         View::Tree { nodes } => tree::lines(nodes),
-        View::Stack { children } => stack::lines(children, width, marks),
-        View::Columns { children } => columns::lines(children, width, marks),
+        View::Box { children, layout } => {
+            if layout.flex_direction == Some(bingo_sdk::view::Direction::Row) {
+                columns::lines(children, width, marks)
+            } else {
+                stack::lines(children, width, marks)
+            }
+        }
         View::Panel { title, child } => panel::lines(title, child, width, marks),
         View::Actions { items } => actions::lines(items, width, marks),
         // A word this surface has not learned is the text its author wrote
         // for exactly this (ADR-0038 §1). Learning a kind richly is a
         // surface's own affair, and no kind is learned here yet.
         View::Custom { fold, .. } => text::lines(fold),
+        _ => text::lines(&view.fold()),
     }
 }
 

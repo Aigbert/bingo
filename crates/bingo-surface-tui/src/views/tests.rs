@@ -95,19 +95,17 @@ fn tree() -> View {
 }
 
 fn columns() -> View {
-    View::Columns {
-        children: vec![
-            View::KeyValue {
-                rows: vec![
-                    ("model".into(), "gpt-5.4".into()),
-                    ("rounds".into(), "12".into()),
-                ],
-            },
-            View::List {
-                items: vec!["one".into(), "two".into(), "three".into()],
-            },
-        ],
-    }
+    View::columns(vec![
+        View::KeyValue {
+            rows: vec![
+                ("model".into(), "gpt-5.4".into()),
+                ("rounds".into(), "12".into()),
+            ],
+        },
+        View::List {
+            items: vec!["one".into(), "two".into(), "three".into()],
+        },
+    ])
 }
 
 /// Every node, once. The match is exhaustive on purpose.
@@ -123,11 +121,23 @@ fn named(view: &View) -> &'static str {
         View::Progress { .. } => "progress",
         View::Badge { .. } => "badge",
         View::Tree { .. } => "tree",
-        View::Stack { .. } => "stack",
-        View::Columns { .. } => "columns",
+        View::Box { layout, .. }
+            if layout.flex_direction == Some(bingo_sdk::view::Direction::Row) =>
+        {
+            "columns"
+        }
+        View::Box { .. } => "stack",
         View::Panel { .. } => "panel",
         View::Actions { .. } => "actions",
         View::Custom { .. } => "custom",
+        View::Button { .. } => "button",
+        View::Input { .. } => "input",
+        View::Select { .. } => "select",
+        View::Link { .. } => "link",
+        View::Image { .. } => "image",
+        View::Raster { .. } => "raster",
+        View::Svg { .. } => "svg",
+        View::Engine { .. } => "engine",
     }
 }
 
@@ -146,10 +156,11 @@ fn every_node() -> Vec<View> {
         View::text("what a plugin wrote"),
         View::Markdown {
             text: "# Title\n\nbody with **weight** and a [link](https://x.dev)".into(),
+            dim_color: false,
         },
         View::Code {
-            lang: Some("rust".into()),
-            text: (1..=10)
+            language: Some("rust".into()),
+            source: (1..=10)
                 .map(|i| format!("let line_{i} = {i};\n"))
                 .collect::<String>(),
         },
@@ -177,9 +188,7 @@ fn every_node() -> Vec<View> {
             tone: Tone::Attention,
         },
         tree(),
-        View::Stack {
-            children: vec![View::text("above"), View::text(""), table()],
-        },
+        View::column(vec![View::text("above"), View::text(""), table()]),
         columns(),
         View::Panel {
             title: "Board".into(),

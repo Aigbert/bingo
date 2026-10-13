@@ -133,7 +133,7 @@ fn activity_view(view: &bingo_sdk::View, width: usize, now: Now) -> Vec<Line<'st
             out.extend(activity_view(child, width, now));
             out
         }
-        View::Stack { children } => children
+        View::Box { children, .. } => children
             .iter()
             .flat_map(|v| activity_view(v, width, now))
             .collect(),
@@ -141,7 +141,10 @@ fn activity_view(view: &bingo_sdk::View, width: usize, now: Now) -> Vec<Line<'st
             .iter()
             .map(|node| activity_node(node, width))
             .collect(),
-        View::Text { text } => vec![Line::from(Span::styled(text.clone(), theme::dim()))],
+        View::Text { children, .. } => vec![Line::from(Span::styled(
+            bingo_sdk::view::text_children(children),
+            theme::dim(),
+        ))],
         _ => views::marked(view, width, &views::Marks::at(now)),
     }
 }

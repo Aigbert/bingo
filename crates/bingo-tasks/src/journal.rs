@@ -89,9 +89,7 @@ fn activity(tasks: &[Task]) -> Option<bingo_sdk::slot::Slot> {
         nodes: shown.iter().map(|task| node(task)).collect(),
     };
     let child = match overflow(tasks, shown.len()) {
-        Some(text) => View::Stack {
-            children: vec![tree, View::text(text)],
-        },
+        Some(text) => View::column(vec![tree, View::text(text)]),
         None => tree,
     };
     Some(bingo_sdk::slot::Slot::Activity {

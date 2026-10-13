@@ -1,20 +1,22 @@
 ---
-source: crates/bingo-sdk/src/view.rs
+source: crates/bingo-sdk/src/view/tests.rs
 expression: views
 ---
 [
   {
-    "kind": "text",
-    "text": "plain"
+    "kind": "Text",
+    "children": [
+      "plain"
+    ]
   },
   {
-    "kind": "markdown",
+    "kind": "Markdown",
     "text": "# Title\n\nbody"
   },
   {
-    "kind": "code",
-    "lang": "rust",
-    "text": "fn main() {}"
+    "kind": "Code",
+    "language": "rust",
+    "source": "fn main() {}"
   },
   {
     "kind": "diff",
@@ -77,37 +79,64 @@ expression: views
     ]
   },
   {
-    "kind": "stack",
+    "kind": "Box",
     "children": [
       {
-        "kind": "text",
-        "text": "a"
+        "kind": "Text",
+        "children": [
+          "a"
+        ]
       },
       {
-        "kind": "text",
-        "text": "b"
+        "kind": "Text",
+        "children": [
+          "b"
+        ]
       }
     ]
   },
   {
-    "kind": "columns",
+    "kind": "Box",
     "children": [
       {
-        "kind": "text",
-        "text": "left"
+        "kind": "Box",
+        "children": [
+          {
+            "kind": "Text",
+            "children": [
+              "left"
+            ]
+          }
+        ],
+        "flexGrow": 1,
+        "width": 29
       },
       {
-        "kind": "text",
-        "text": "right"
+        "kind": "Box",
+        "children": [
+          {
+            "kind": "Text",
+            "children": [
+              "right"
+            ]
+          }
+        ],
+        "flexGrow": 1,
+        "width": 29
       }
-    ]
+    ],
+    "flexDirection": "row",
+    "flexWrap": "wrap",
+    "gap": 2
   },
   {
     "kind": "panel",
     "title": "Board",
     "child": {
-      "kind": "text",
-      "text": "empty"
+      "kind": "Text",
+      "children": [
+        "empty"
+      ]
     }
   },
   {

@@ -36,12 +36,10 @@ impl Command for TeamCommand {
     async fn run(&self, _args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
         let Some(team) = file::of(&cx.cwd)? else {
             return Ok(CommandOutcome::View {
-                view: View::Text {
-                    text: format!(
-                        "This project seats no team; {} would name its roles.",
-                        file::path_in(&cx.cwd).display()
-                    ),
-                },
+                view: View::text(format!(
+                    "This project seats no team; {} would name its roles.",
+                    file::path_in(&cx.cwd).display()
+                )),
             });
         };
         let seated = names::children(&cx.host, &cx.session).await?;
@@ -132,9 +130,13 @@ mod tests {
         let tree = Tree::new();
         let fleet = Fleet::default();
         let root = fleet.root();
-        let View::Text { text } = run(&tree.cwd(), &fleet, &root).await else {
+        let View::Text {
+            children: spans, ..
+        } = run(&tree.cwd(), &fleet, &root).await
+        else {
             panic!("a project with no team says so in one line");
         };
+        let text = bingo_sdk::view::text_children(&spans);
         assert_eq!(text.lines().count(), 1, "{text}");
         assert!(text.contains(".bingo/team.json"), "{text}");
     }

@@ -27,21 +27,19 @@ const NEVER: &str = "—";
 /// store.
 pub fn view(shelf: &Shelf, holder: &str, trouble: Option<&str>, tz: &TimeZone) -> View {
     let mut parts = vec![match shelf.is_empty() {
-        true => View::Text { text: NONE.into() },
+        true => View::text(NONE),
         false => View::Table {
             headers: HEADERS.map(str::to_string).to_vec(),
             rows: shelf.entries.iter().map(|e| row(e, tz)).collect(),
         },
     }];
-    parts.push(View::Text {
-        text: format!("schedules: {holder}"),
-    });
+    parts.push(View::text(format!("schedules: {holder}")));
     parts.extend(trouble.map(|said| View::Badge {
         text: said.to_string(),
         tone: bingo_sdk::Tone::Bad,
     }));
     parts.extend(unreadable(shelf));
-    View::Stack { children: parts }
+    View::column(parts)
 }
 
 /// A file that was meant to be an entry says so here, and nowhere else: a
@@ -55,13 +53,11 @@ fn unreadable(shelf: &Shelf) -> Option<View> {
         .iter()
         .map(|bad| format!("{}: {}", bad.file, bad.why))
         .collect();
-    Some(View::Text {
-        text: format!(
-            "{} file(s) could not be read:\n{}",
-            lines.len(),
-            lines.join("\n")
-        ),
-    })
+    Some(View::text(format!(
+        "{} file(s) could not be read:\n{}",
+        lines.len(),
+        lines.join("\n")
+    )))
 }
 
 pub fn row(entry: &Entry, tz: &TimeZone) -> Vec<String> {
@@ -131,7 +127,7 @@ mod tests {
 
     fn children(view: View) -> Vec<View> {
         match view {
-            View::Stack { children } => children,
+            View::Box { children, .. } => children,
             other => panic!("a schedule table is a stack, not {other:?}"),
         }
     }
@@ -144,13 +140,8 @@ mod tests {
             None,
             &TimeZone::UTC,
         ));
-        assert_eq!(shown[0], View::Text { text: NONE.into() });
-        assert_eq!(
-            shown[1],
-            View::Text {
-                text: "schedules: held by this process".into()
-            }
-        );
+        assert_eq!(shown[0], View::text(NONE));
+        assert_eq!(shown[1], View::text("schedules: held by this process"));
         assert_eq!(shown.len(), 2);
     }
 
@@ -170,9 +161,7 @@ mod tests {
         assert_eq!(rows[0][0], "abcd1234");
         assert_eq!(
             shown[1],
-            View::Text {
-                text: "schedules: standby — another runner holds this store".into()
-            }
+            View::text("schedules: standby — another runner holds this store")
         );
     }
 
@@ -186,9 +175,13 @@ mod tests {
             }],
         };
         let shown = children(view(&shelf, "held by this process", None, &TimeZone::UTC));
-        let View::Text { text } = &shown[2] else {
+        let View::Text {
+            children: spans, ..
+        } = &shown[2]
+        else {
             panic!("the notice is text: {shown:?}");
         };
+        let text = bingo_sdk::view::text_children(&spans);
         assert!(text.contains("broken.json"), "{text}");
         assert!(text.contains("1 file(s) could not be read"), "{text}");
     }

@@ -109,8 +109,8 @@ fn done() -> ToolOutput {
         ))],
         is_error: false,
         display: Some(View::Code {
-            lang: Some("rust".into()),
-            text: LOOP.into(),
+            language: Some("rust".into()),
+            source: LOOP.into(),
         }),
     }
 }

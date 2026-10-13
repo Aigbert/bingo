@@ -18,8 +18,16 @@ fn legacy_nodes_read_into_the_canonical_vocabulary() {
     for (wire, kind, fold) in [
         (json!({"kind":"text","text":"old"}), "Text", "old"),
         (json!({"kind":"code","text":"x","lang":"rust"}), "Code", "x"),
-        (json!({"kind":"stack","children":[{"kind":"text","text":"a"}]}), "Box", "a"),
-        (json!({"kind":"columns","children":[{"kind":"text","text":"a"}]}), "Box", "a"),
+        (
+            json!({"kind":"stack","children":[{"kind":"text","text":"a"}]}),
+            "Box",
+            "a",
+        ),
+        (
+            json!({"kind":"columns","children":[{"kind":"text","text":"a"}]}),
+            "Box",
+            "a",
+        ),
     ] {
         let view: View = serde_json::from_value(wire).unwrap();
         assert_eq!(view.fold(), fold);
