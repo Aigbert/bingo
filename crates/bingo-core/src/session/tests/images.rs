@@ -9,9 +9,11 @@ fn log_session() -> Mailbox {
     let provider = ScriptedProvider::new(vec![]);
     let mut summary = summary("ses_log");
     summary.driver = Driver::Log;
+    let spec = Arc::new(crate::spec::spec_of(&SessionState::new(summary.clone())));
     spawn(summary, None, Services::none(), |_| {
         let mut cfg = config(provider, vec![], Arc::new(NoHost));
         cfg.model = None;
+        cfg.spec = spec;
         Arc::new(cfg)
     })
 }

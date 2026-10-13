@@ -7,9 +7,11 @@ fn log_session() -> Mailbox {
     let provider = ScriptedProvider::new(vec![]);
     let mut summary = summary("ses_log");
     summary.driver = Driver::Log;
+    let spec = Arc::new(crate::spec::spec_of(&SessionState::new(summary.clone())));
     spawn(summary, None, Services::none(), |_| {
         let mut cfg = config(provider, vec![], Arc::new(NoHost));
         cfg.model = None;
+        cfg.spec = spec;
         Arc::new(cfg)
     })
 }
@@ -161,6 +163,7 @@ async fn a_resumed_session_restates_its_extensions_for_the_observers() {
     let second = resume(journal, None, Services::none(), move |_| {
         let mut cfg = config(provider, vec![], Arc::new(NoHost));
         cfg.model = None;
+        cfg.spec = spec;
         cfg.hooks = HookSet::fixed(vec![observer as Arc<dyn Hook>]);
         Arc::new(cfg)
     })

@@ -101,7 +101,8 @@ took the host's default model, not the parent's live one), 79107b13
 - `crates/bingo-core/src/{spec.rs (new),host.rs,host/resume.rs,
   session.rs,turn/config.rs,lib.rs,turn.rs}`, `host/tests/**`
 - Mechanical `TurnConfig.spec` fixtures: `src/test_support.rs`,
-  `src/turn/tests.rs` in `bingo-core` (protocol step 6).
+  `src/turn/tests.rs`, `src/session/tests/{log,images}.rs` in
+  `bingo-core` (protocol step 6; the latter construct Log configs).
 - `docs/adr/{0008,0047}*.md`
 
 ## Exit criteria

@@ -114,6 +114,7 @@ pub struct Host {
 #[derive(Clone)]
 struct Live {
     mailbox: Mailbox,
+    changing: Arc<tokio::sync::Mutex<()>>,
     created_at: Timestamp,
     /// What the session was opened with, resolved: `/model` and `/think`
     /// rewrite it (ADR-0008 §4, ADR-0047 §1), and it is the one holder of
@@ -125,6 +126,7 @@ impl Live {
     fn new(mailbox: Mailbox, summary: &SessionSummary, spec: SessionSpec) -> Self {
         Self {
             mailbox,
+            changing: Arc::new(tokio::sync::Mutex::new(())),
             created_at: summary.created_at,
             spec,
         }
@@ -849,6 +851,8 @@ impl HostApi for Host {
         session: &SessionId,
         change: SessionChange,
     ) -> Result<(), KernelError> {
+        let changing = self.live(session)?.changing;
+        let _guard = changing.lock().await;
         let live = self.live(session)?;
         if !matches!(change, SessionChange::Key(_)) && live.spec.driver == Driver::Log {
             return Err(KernelError::new(

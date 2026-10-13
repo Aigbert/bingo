@@ -125,12 +125,21 @@ async fn every_spec_field_survives_the_journal_round_trip() {
         &host,
         SessionSpec {
             provider: Some("scripted".into()),
-            model: Some("m3".into()),
+            model: Some("m2".into()),
             thinking: Some(Some(Effort::Low)),
             ..spec("/work")
         },
     )
     .await;
+    host.reconfigure(
+        &parent.session,
+        SessionChange::Model {
+            provider: None,
+            model: "m3".into(),
+        },
+    )
+    .await
+    .unwrap();
     for spec in variants(parent.session) {
         assert_round_trip(&host, &store, spec).await;
     }
@@ -138,7 +147,18 @@ async fn every_spec_field_survives_the_journal_round_trip() {
 }
 
 async fn assert_round_trip(host: &Host, store: &crate::journal::MemoryStore, spec: SessionSpec) {
+    let inherits_model = spec.parent.is_some() && spec.model.is_none();
+    let inherits_level = spec.parent.is_some() && spec.thinking.is_none();
     let a = opened(host, spec).await;
+    if inherits_model {
+        assert_eq!(a.snapshot.summary.model.as_deref(), Some("m3"));
+    }
+    if inherits_level {
+        assert_eq!(
+            host.session_thinking(&a.session).unwrap(),
+            Some(Effort::Low)
+        );
+    }
     let mut expected = host.live(&a.session).unwrap().spec;
     expected.provider = a.snapshot.summary.provider.clone();
     expected.model = a.snapshot.summary.model.clone();
