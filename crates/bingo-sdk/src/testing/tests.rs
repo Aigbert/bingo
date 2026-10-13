@@ -289,3 +289,27 @@ async fn a_service_has_one_owner_and_both_faces() {
         matches!(&host.calls()[0], HostCall::OpenService { key, wire: recorded } if key == "echo" && Arc::ptr_eq(recorded, &wire))
     );
 }
+
+#[tokio::test]
+async fn completion_is_scripted_and_recorded_like_the_other_host_doors() {
+    let host = TestHost::default();
+    host.on_complete(|_, _, _| async { Ok(Vec::new()) });
+    let request = serde_json::from_value(
+        serde_json::json!({"model":"m","maxTokens":1,"messages":[],"system":[],"tools":[]}),
+    )
+    .unwrap();
+    host.handle()
+        .complete(
+            &SessionId::from_raw("s"),
+            None,
+            Completion {
+                plugin: "p".into(),
+                request,
+            },
+        )
+        .await
+        .unwrap();
+    assert!(
+        matches!(host.calls().as_slice(), [HostCall::Complete {request,..}] if request.plugin == "p")
+    );
+}

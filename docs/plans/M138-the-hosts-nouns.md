@@ -13,7 +13,6 @@ it: natives in process, and M133's `dollar.ts` under node.
 ## Bricks, in build order
 
 0. **Node re-entry prerequisite (authorized 2026-10-14).** Preserve the shared fixture and bounded assertion; carry per-invocation hook identity across reverse RPC. Bind it at the bridge, isolate concurrent calls, and land a separate fix before runtime features.
-
 1. **The table, as a contract.** `crates/bingo-mods/src/dollar/table.rs` has one row per method: `(noun, method, door, unsafe, input, result)`. A door is `Kernel(&'static Entry)`, whose door already raises a chain of this meaning, so `$` calls it and raises nothing more; or `Face`, a method of a face the runtime registers, raised through the service-wire door by M136's wrapper (ADR-0078 §1). M136's one-namespace rule keeps a name to one owner. A `BINGO_UPDATE_SCHEMA` test writes `schema/dollar.json`, and M133's `render` turns it into `sdk/typescript/src/dollar-types.ts`. Failing test: on M111's test host, a fixture mod calls every row once, a link hooked at each name sees exactly one call, and a row raised twice fails it.
 2. **Kernel doors.** `prompt.submit` is `submit`; `session.append` is `extend`; `session.send` is `HostApi::deliver`, which raises it, and the target's actor then raises `session.receive` (M136); `session.compact` and `command.run` submit `Input::Action`; `tool.call` is `HostApi::invoke`, which runs `tool.check` and `AfterTool` (M131). `config.set` is `HostApi::reconfigure`, routed through M136's `config::set`, so the chain is raised once wherever a setting changes. `model.complete` joins the catalogue as a chain at `HostApi::complete`, so a process plugin's `host/model/complete` and a mod's call raise it alike, inside a turn or outside one (M132).
 3. **Reads from the fold.** The runtime is a client (ADR-0002). For each session it serves, it opens the stream lazily as `ClientIdentity` `mods` and folds it with `SessionState::apply`. A pure `read(&state, method) -> Value` answers, with table tests: `session.id`, `cwd`, `model`, `turns`, `usage` (context and last-turn usage); `config.list`/`read` (`ConfigView`); `prompt.read` (queue and last submitted text). `session.messages` pages through `history`; `session.surfaces` folds attach/detach; `session.root` is discovery's project directory; `session.version` is the workspace version. Nothing is kept beside the fold.
@@ -67,7 +66,6 @@ it: natives in process, and M133's `dollar.ts` under node.
 - M111's test host predates `complete`; add its recording/script adapter for exhaustive row coverage.
 - Actor mail and spawned chain work must carry the SDK invocation context; re-export it from plugin-host so both runtimes still share one representation.
 - The Node re-entry prerequisite was repaired here as the authorized first brick; ADR-0078 §4 remains unchanged.
-
 - Prerequisite Windows checks: plugin-host and core pass; mods (rquickjs-sys), plugin-rpc and bingo (aws-lc-sys) await Windows CI because this Mac lacks Windows SDK C headers.
 
 ## Verified (2026-10-14)
@@ -147,4 +145,6 @@ timer did not fire: Elapsed(())
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s
 cargo test -p bingo-mods --lib --locked dollar::model
 test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.04s
+cargo test -p bingo-sdk --lib --features testing --locked completion_is_scripted
+KernelError { code: Unsupported, message: "this host does not complete model requests" }
 ```

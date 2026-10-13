@@ -5,6 +5,11 @@ use std::sync::Arc;
 /// Every HostApi verb, with the arguments supplied by its caller.
 #[derive(Clone)]
 pub enum HostCall {
+    Complete {
+        session: SessionId,
+        turn: Option<TurnId>,
+        request: Completion,
+    },
     Sessions {
         filter: SessionFilter,
     },
@@ -84,6 +89,16 @@ pub enum HostCall {
 impl std::fmt::Debug for HostCall {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Complete {
+                session,
+                turn,
+                request,
+            } => f
+                .debug_struct("Complete")
+                .field("session", session)
+                .field("turn", turn)
+                .field("request", request)
+                .finish(),
             Self::Sessions { filter } => {
                 f.debug_struct("Sessions").field("filter", filter).finish()
             }
