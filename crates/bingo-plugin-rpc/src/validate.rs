@@ -190,7 +190,36 @@ fn findings(result: &InitializeResult) -> Result<Vec<String>, KernelError> {
             link.after
         )
     }));
+    lines.extend(subscription_findings(&result.subscriptions));
     Ok(lines)
+}
+
+fn subscription_findings(subscriptions: &[bingo_sdk::LinkMatcher]) -> Vec<String> {
+    let mut lines: Vec<String> = subscriptions
+        .iter()
+        .flat_map(|subscription| {
+            subscription
+                .patterns
+                .iter()
+                .map(|pattern| format!("subscription: {}", String::from(pattern.clone())))
+        })
+        .collect();
+    for entry in bingo_sdk::catalogue::ALL {
+        if subscriptions.iter().any(|subscription| {
+            subscription.patterns.is_empty()
+                || subscription
+                    .patterns
+                    .iter()
+                    .any(|pattern| pattern.matches(&entry.name))
+        }) {
+            let kind = match entry.kind {
+                bingo_sdk::catalogue::Kind::Chain => "chain",
+                bingo_sdk::catalogue::Kind::Observation => "observation",
+            };
+            lines.push(format!("{kind}: {}", entry.name));
+        }
+    }
+    lines
 }
 
 fn invalid(why: impl std::fmt::Display) -> KernelError {
@@ -233,19 +262,27 @@ mod tests {
             let result = serde_json::from_value(json!({
                 "protocol": PROTOCOL, "name": "catalogue", "version": "1",
                 "subscriptions": [{"patterns": [entry.name], "prefilter": null}]
-            })).unwrap();
+            }))
+            .unwrap();
             let lines = findings(&result).unwrap();
-            assert!(lines.iter().any(|line| line.contains(entry.name.as_ref())),
-                "missing catalogue subscription {}: {lines:?}", entry.name);
+            assert!(
+                lines.iter().any(|line| line.contains(entry.name.as_ref())),
+                "missing catalogue subscription {}: {lines:?}",
+                entry.name
+            );
         }
         let result = serde_json::from_value(json!({
             "protocol": PROTOCOL, "name": "catalogue", "version": "1",
             "subscriptions": [{"patterns": ["*", "mcp.*"], "prefilter": null}]
-        })).unwrap();
+        }))
+        .unwrap();
         let lines = findings(&result).unwrap();
         for entry in bingo_sdk::catalogue::ALL {
-            assert!(lines.iter().any(|line| line.contains(entry.name.as_ref())),
-                "wildcard missed {}", entry.name);
+            assert!(
+                lines.iter().any(|line| line.contains(entry.name.as_ref())),
+                "wildcard missed {}",
+                entry.name
+            );
         }
         assert!(lines.iter().any(|line| line.contains("mcp.*")));
     }
