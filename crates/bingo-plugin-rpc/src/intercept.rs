@@ -179,13 +179,14 @@ impl Interceptor for Remote {
         let held = Arc::new(std::sync::Mutex::new(None));
         let hold = held.clone();
         let continuation = Next::at(next.tier(), move |request| async move {
-            let original = next.run(request).await?;
+            next.run_then(request, |original| async move {
             let events: Result<Vec<ModelEvent>, ProviderError> = match original.clone() {
                 Ok(stream) => stream.collect::<Vec<_>>().await.into_iter().collect(),
                 Err(error) => Err(error),
             };
             *hold.lock().unwrap_or_else(|e| e.into_inner()) = Some((events.clone(), original));
-            Ok(events)
+            events
+            }).await
         }.boxed());
         let result: Result<Vec<ModelEvent>, ProviderError> = self.cross(cx, input, continuation).await?;
         let original = held.lock().unwrap_or_else(|e| e.into_inner()).take();
