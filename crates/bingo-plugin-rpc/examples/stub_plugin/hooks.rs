@@ -1,123 +1,34 @@
-//! The hooks this stub declares, and what it does when one is asked.
-//!
-//! One at each kind of point: `guard` decides about one tool by name and
-//! rewrites the call it lets through, `prefix` rewrites what was typed,
-//! `watch` only watches, and `silent` is asked and never answers — which is
-//! what a hook past its deadline looks like from the host's side.
-//!
-//! Every crossing is written into the map the `kv` service serves, so a test
-//! reads what arrived out of this process's own memory — and reads nothing
-//! where the matcher kept an event off the pipe.
-
+//! Stub links and observations record every crossing in the kv service.
 use std::collections::BTreeMap;
-
-use bingo_plugin_rpc::codec::{INVALID_PARAMS, RpcError};
-use bingo_plugin_rpc::wire::{
-    HookDecideParams, HookDecideResult, HookDecision, HookObservation, HookObserveParams, HookSpec,
-    HookValue,
-};
-use bingo_sdk::{HookMatcher, HookOutcome, HookPoint, Input, ToolCall};
+use bingo_plugin_rpc::wire::{HookSpec, HookObservation, HookObserveParams};
+use bingo_plugin_rpc::intercept::LinkSpec;
+use bingo_sdk::{HookMatcher, HookPoint, LinkPoint};
 use serde_json::{Value, json};
-
-use crate::{answer, fail};
-
-/// What this process has written down, which is also what `kv` serves.
+use crate::answer;
 type Store = BTreeMap<String, String>;
-
-/// The hooks this stub declares, one for each thing a test needs to see: a
-/// `beforeTool` hook that claims one tool name, a `submit` hook that rewrites
-/// what was typed, a watcher at two observation points, and one that is asked
-/// and never answers.
 pub fn hooks() -> Vec<HookSpec> {
-    vec![
-        claims("guard", vec![HookPoint::BeforeTool], Some("Bash")),
-        claims("prefix", vec![HookPoint::Submit], None),
-        claims("watch", vec![HookPoint::Session, HookPoint::Turn], None),
-        claims("silent", vec![HookPoint::Stop], None),
-    ]
+    vec![HookSpec {id:"watch".into(),matcher:HookMatcher {points:vec![HookPoint::Session,HookPoint::Turn],tool:None}}]
 }
-
-fn claims(id: &str, points: Vec<HookPoint>, tool: Option<&str>) -> HookSpec {
-    HookSpec {
-        id: id.to_string(),
-        matcher: HookMatcher {
-            points,
-            tool: tool.map(str::to_string),
-        },
+pub fn links() -> Vec<LinkSpec> {
+    vec![LinkSpec {point:LinkPoint::ToolCall, tool:Some("Bash".into()), after:true},
+         LinkSpec {point:LinkPoint::TurnStop, tool:None, after:false}]
+}
+pub fn intercept(id: bingo_plugin_rpc::codec::Id, method: &str, mut params: Value, store: &mut Store) {
+    let point = method.strip_prefix("intercept/").unwrap_or(method);
+    if let Some(point) = point.strip_suffix("/after") {
+        note(point, "after", store);
+        let text = params["result"]["parts"][0]["text"].as_str().unwrap_or_default();
+        params["result"]["parts"][0]["text"] = json!(format!("{text} (stub)"));
+        answer(id, json!({"result":params["result"]}));
+    } else {
+        note(point, "before", store);
+        if point == "turn.complete" { return; }
+        let command = params["input"]["command"].as_str().unwrap_or_default();
+        params["input"]["command"] = json!(format!("{command} --safe"));
+        answer(id, json!({"next":params["input"]}));
     }
 }
-
-/// One decision point. What crossed is written down first — into the same map
-/// the `kv` service serves, so a test reads it out of this process's own
-/// memory — and then whichever hook owns the id answers. `silent` never does,
-/// which is what a hook past its deadline looks like from the host's side.
-pub fn decide(id: bingo_plugin_rpc::codec::Id, params: Value, store: &mut Store) {
-    let Ok(params) = serde_json::from_value::<HookDecideParams>(params) else {
-        fail(id, RpcError::new(INVALID_PARAMS, "not a hook decision"));
-        return;
-    };
-    note(&params.id, asked_at(&params.decision), store);
-    match (params.id.as_str(), params.decision) {
-        ("silent", _) => {}
-        ("guard", HookDecision::BeforeTool { call }) => answer(id, guarded(call)),
-        ("prefix", HookDecision::Submit { input }) => answer(id, prefixed(input)),
-        _ => answer(id, decided(HookOutcome::Continue, None)),
-    }
-}
-
-fn asked_at(decision: &HookDecision) -> &'static str {
-    match decision {
-        HookDecision::Submit { .. } => "submit",
-        HookDecision::BeforeTool { .. } => "beforeTool",
-        HookDecision::AfterTool { .. } => "afterTool",
-        HookDecision::Stop => "stop",
-    }
-}
-
-/// `guard`: a call whose input carries a `deny` is refused in the hook's own
-/// words; anything else goes through with `--safe` on the end of it.
-fn guarded(mut call: ToolCall) -> Value {
-    if let Some(reason) = call.input.get("deny").and_then(Value::as_str) {
-        return decided(
-            HookOutcome::Deny {
-                reason: reason.to_string(),
-            },
-            None,
-        );
-    }
-    let command = call
-        .input
-        .get("command")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    call.input = json!({ "command": format!("{command} --safe") });
-    decided(HookOutcome::Continue, Some(HookValue::Call { call }))
-}
-
-/// `prefix`: the line as it was typed, with this stub's mark on the end.
-fn prefixed(input: Input) -> Value {
-    let Input::Text {
-        text,
-        images,
-        origin,
-        delivery,
-    } = input
-    else {
-        return decided(HookOutcome::Continue, None);
-    };
-    let input = Input::Text {
-        text: format!("{text} (stub)"),
-        images,
-        origin,
-        delivery,
-    };
-    decided(HookOutcome::Continue, Some(HookValue::Input { input }))
-}
-
-fn decided(outcome: HookOutcome, value: Option<HookValue>) -> Value {
-    serde_json::to_value(HookDecideResult { outcome, value }).unwrap_or(Value::Null)
-}
-
+pub fn cancelled(store: &mut Store) { note("chain", "cancel", store); }
 /// One observation point: written down, and nothing sent back — the host is
 /// not waiting.
 pub fn observed(params: &Value, store: &mut Store) {

@@ -155,7 +155,7 @@ fn request_line(request: Request, options: &Options, state: &mut State) -> bool 
         name::COMPACTOR_COMPACT => answer(request.id, compact(request.params)),
         name::PROVIDER_STREAM => return stream(request.id, request.params, state),
         name::SERVICE_CALL => served(request.id, request.params, state),
-        name::HOOK_DECIDE => hooks::decide(request.id, request.params, &mut state.store),
+        method if method.starts_with("intercept/") => hooks::intercept(request.id, method, request.params, &mut state.store),
         other => fail(
             request.id,
             RpcError::new(METHOD_NOT_FOUND, format!("no such method: {other}")),
@@ -169,6 +169,7 @@ fn notification_line(method: &str, params: &Value, state: &mut State) {
         name::TOOL_CANCEL => cancel(params, state),
         name::PROVIDER_CANCEL => cancel_stream(params, state),
         name::HOOK_OBSERVE => hooks::observed(params, &mut state.store),
+        "intercept/cancel" => hooks::cancelled(&mut state.store),
         _ => {}
     }
 }
@@ -218,7 +219,7 @@ fn handshake(options: &Options) -> Value {
             },
         }],
         hooks: hooks::hooks(),
-        links: Vec::new(),
+        links: hooks::links(),
         services: declared(options),
     };
     let mut declared = serde_json::to_value(result).unwrap_or(Value::Null);
