@@ -178,6 +178,7 @@ impl SessionState {
             Event::TurnStarted { turn, origin, .. } => self.turn_started(turn, *origin, frame.ts),
             Event::TurnRetrying { attempt, max, .. } => self.turn_retrying(*attempt, *max),
             Event::TurnUsage { usage, context, .. } => self.turn_usage(*usage, *context),
+            Event::UsageCharged { turn, usage, .. } => self.usage_charged(turn.as_ref(), *usage),
             Event::TurnCompleted {
                 turn,
                 status,
@@ -281,6 +282,14 @@ impl SessionState {
         if let Some(t) = self.turn.as_mut() {
             t.retrying = Some(Retry { attempt, max });
         }
+        Applied::Turn
+    }
+
+    fn usage_charged(&mut self, turn: Option<&TurnId>, usage: Usage) -> Applied {
+        if let Some(live) = self.turn.as_mut().filter(|live| Some(&live.id) == turn) {
+            live.usage.add(usage);
+        }
+        self.summary.usage.add(usage);
         Applied::Turn
     }
 

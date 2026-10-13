@@ -9,6 +9,7 @@ use crate::test_support::*;
 mod ask;
 mod checkpoint;
 mod commands;
+mod complete;
 mod login;
 mod models;
 mod policy;

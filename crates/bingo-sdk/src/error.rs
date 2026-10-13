@@ -36,6 +36,7 @@ pub enum ErrorCode {
     TurnBudgetExhausted,
     /// The store could not read or write; the disk, not the kernel.
     Storage,
+    Unsupported,
     Internal,
 }
 
@@ -66,6 +67,7 @@ impl ErrorCode {
             ErrorCode::TurnLost => "TURN_LOST",
             ErrorCode::TurnBudgetExhausted => "TURN_BUDGET_EXHAUSTED",
             ErrorCode::Storage => "STORAGE",
+            ErrorCode::Unsupported => "UNSUPPORTED",
             ErrorCode::Internal => "INTERNAL",
         }
     }
