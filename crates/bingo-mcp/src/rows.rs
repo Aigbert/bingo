@@ -15,6 +15,15 @@ impl Rows {
 }
 #[async_trait]
 impl Servers for Rows {
+    async fn call(
+        &self,
+        input: bingo_services::mcp::Call,
+    ) -> Result<bingo_sdk::ToolOutput, bingo_sdk::ServiceError> {
+        self.manager.call(input).await
+    }
+    async fn connect(&self, server: &str) -> Result<(), bingo_sdk::ServiceError> {
+        self.manager.connect(server).await
+    }
     async fn servers(&self) -> Map<String, Value> {
         self.manager.rows().await
     }

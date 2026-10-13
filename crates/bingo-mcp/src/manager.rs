@@ -68,6 +68,7 @@ pub struct Line {
 }
 
 pub struct Manager {
+    host: std::sync::OnceLock<std::sync::Weak<dyn bingo_sdk::HostApi>>,
     servers: BTreeMap<String, Server>,
     /// One per server that can be signed in to, fixed at construction as the
     /// servers themselves are.
@@ -110,10 +111,69 @@ impl Manager {
             Arc::new(CredentialStore::new(data_dir.clone())),
         );
         Self {
+            host: Default::default(),
             servers,
             auth,
             data_dir,
             slots: RwLock::new(slots),
+        }
+    }
+
+    pub fn bind(&self, host: &bingo_sdk::HostHandle) {
+        let _ = self.host.set(Arc::downgrade(&host.0));
+    }
+    pub async fn call(
+        &self,
+        input: bingo_services::mcp::Call,
+    ) -> Result<bingo_sdk::ToolOutput, bingo_sdk::ServiceError> {
+        if !self.knows(&input.server) {
+            return Err(bingo_sdk::ServiceError(format!(
+                "MCP server {} is not configured",
+                input.server
+            )));
+        }
+        let host = self
+            .host
+            .get()
+            .and_then(std::sync::Weak::upgrade)
+            .map(bingo_sdk::HostHandle)
+            .ok_or_else(|| bingo_sdk::ServiceError("MCP host is unavailable".into()))?;
+        host.invoke(
+            &input.session,
+            bingo_sdk::ToolCall {
+                call_id: bingo_sdk::ItemId::mint().to_string(),
+                name: crate::tool::tool_name(&input.server, &input.tool),
+                input: input.args,
+            },
+        )
+        .await
+        .map(|outcome| outcome.output)
+        .map_err(|e| bingo_sdk::ServiceError(e.message))
+    }
+    pub async fn connect(self: &Arc<Self>, name: &str) -> Result<(), bingo_sdk::ServiceError> {
+        let epoch = {
+            let mut slots = self.slots.write().await;
+            let slot = slots.get_mut(name).ok_or_else(|| {
+                bingo_sdk::ServiceError(format!("MCP server {name} is not configured"))
+            })?;
+            match slot.state {
+                State::Disabled => {
+                    return Err(bingo_sdk::ServiceError(format!(
+                        "MCP server {name} is disabled"
+                    )));
+                }
+                State::Connected(_) => return Ok(()),
+                _ => begin(slot),
+            }
+        };
+        self.dial_one(name.into(), epoch).await;
+        let slots = self.slots.read().await;
+        if matches!(slots.get(name).map(|s| &s.state), Some(State::Connected(_))) {
+            Ok(())
+        } else {
+            Err(bingo_sdk::ServiceError(format!(
+                "MCP server {name} did not connect"
+            )))
         }
     }
 
