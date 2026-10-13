@@ -107,6 +107,13 @@ setting, a flag, the wire or a card.
 
 ## Risks
 
+- **Stopped (2026-10-13), protocol step 6:** the targeted test gate fails
+  at `crates/bingo-gateway/tests/claim.rs:177`: M129 constructs `Patient`
+  without the new `platforms` field. This integration test is outside Files.
+  Options: authorize adding that test to Files and pass a test platform list
+  (recommended), or revise the doctor API within the existing scope.
+  Brick 6 edits remain uncommitted; loopback is not yet gated in the bin.
+
 - Re-verified at `eddd0ebc`: M109 claim and M112 transcript folds remain;
   M129 gateway dispatch still constructs `Patient` in `src/lib.rs`, so
   that path and both composition manifests are included. Gateway CLI
@@ -123,7 +130,19 @@ setting, a flag, the wire or a card.
   in the commit body and the guide.
 - The open slices rest on no runtime schema validation (only provider
   tests consume schemas today). Re-verify it.
-- M109 (the claim), M127 (Feishu's `api.rs` client) and M119/M126
-  (composition) touch these files. Follow the tree.
-- Re-verify at start: every line and symbol named here, and where the
-  bin reads `--channels`.
+
+## Verified (2026-10-13, partial — stopped)
+
+- `cargo test -p bingo-channels -- --list`: `251 tests`; `120` start with `feishu::`.
+- Brick 1 `INSTA_UPDATE=no cargo test -p bingo-channel-adapter -p bingo-channels`:
+  `test result: ok. 22 passed`; `test result: ok. 229 passed` (total 251).
+- Brick 1 `scripts/budget.sh`: `dependencies (unique, normal): 346 (max 347)`; `budget ok`.
+- Contract red `cargo test -p bingo-channel-adapter platform::tests`:
+  `FAILED. 1 passed; 2 failed`; `Ok([])` instead of the named refusals.
+- Brick 3 `INSTA_UPDATE=no cargo test -p bingo-channel-adapter`: `32 passed; 0 failed`.
+- Brick 5 `INSTA_UPDATE=no cargo test -p bingo-channel-feishu`: `120 passed; 0 failed`.
+- Composition `cargo check -p bingo --all-targets`: `Finished dev ... in 4.30s`.
+- `INSTA_UPDATE=no cargo test -p bingo-channel-adapter -p bingo-channels -p bingo-channel-feishu -p bingo-gateway`:
+  `error[E0063]: missing field platforms in initializer of Patient` at `tests/claim.rs:177`.
+- Full sequential gates, Windows classification/checks, black-box refusal and final records remain pending.
+- [ ] Feishu live smoke: requires real credentials; not attempted as instructed.
