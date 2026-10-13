@@ -17,6 +17,9 @@ pub const ELIDE_MIN_CHARS: usize = 1_000;
 /// two, and every round after that pays its megabytes again.
 pub const IMAGE_ROUNDS_KEPT: usize = 3;
 
+/// Decoded picture bytes retained in one model request, newest first.
+pub const REQUEST_PICTURE_BYTES: usize = 4 * 1024 * 1024;
+
 /// The lines for one model, all from the effective window: what is left for
 /// input once the output budget is reserved.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
