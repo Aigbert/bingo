@@ -555,6 +555,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bingo-process"
+version = "0.6.6"
+dependencies = [
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "bingo-provider-acp"
 version = "0.6.6"
 dependencies = [
