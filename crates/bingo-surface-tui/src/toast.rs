@@ -131,7 +131,7 @@ mod tests {
     fn a_holding_pane_pauses_visible_time_and_alerts_only_once() {
         let (mut ui, now) = scene();
         let mut state = state();
-        let slots = [
+        let mut slots = [
             Slot::Toast {
                 text: "held".into(),
                 until: now.wall + std::time::Duration::from_secs(4),
@@ -148,6 +148,7 @@ mod tests {
                 view: bingo_sdk::View::text("hold").into(),
             },
         ];
+        slots.swap(0,1);
         state.signals.entry("counter".into()).or_default().insert(
             "held".into(),
             bingo_sdk::slot::with(serde_json::json!({}), slots),
@@ -157,7 +158,9 @@ mod tests {
         assert!(!ui.toasts.sync(&state, true, later(now, 6000)));
         assert!(ui.toasts.next(&state, later(now, 6000)).is_none());
         assert_eq!(ui.toasts.lines(&state, later(now, 6000), 80).len(), 1);
-        ui.toasts.sync(&state, false, later(now, 6000));
+        state.signals.get_mut("counter").unwrap().get_mut("held").unwrap()["slots"].as_array_mut().unwrap().retain(|slot|slot["kind"]!="pane");
+        assert!(!ui.panes.holding(&state));
+        ui.toasts.sync(&state, ui.panes.holding(&state), later(now, 6000));
         assert_eq!(
             ui.toasts.next(&state, later(now, 6000)),
             Some(now.instant + std::time::Duration::from_secs(10))
