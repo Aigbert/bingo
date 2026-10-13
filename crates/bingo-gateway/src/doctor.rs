@@ -198,12 +198,16 @@ fn gateway_check(patient: &Patient<'_>, probe: &dyn Probe) -> Row {
         Ok(State::Stale(record)) => Row::new(
             "gateway.pid",
             Verdict::Bad,
-            format!(
-                "gateway pid {} no longer owns this store but its record is still here ({}). \
-                 The next `start` can replace it.",
-                record.pid,
-                path.display()
-            ),
+            match record.claimed {
+                true => format!(
+                    "gateway pid {} no longer owns this store but its record is still here ({}). The next `start` can replace it.",
+                    record.pid, path.display()
+                ),
+                false => format!(
+                    "pid {} is gone but its record is still here ({}). It did not stop cleanly.",
+                    record.pid, path.display()
+                ),
+            },
         )
         .fixing(path),
         Ok(State::Running(record)) => running(&record),

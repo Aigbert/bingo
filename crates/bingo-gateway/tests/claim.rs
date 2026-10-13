@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use std::io::{BufRead, Read, Write};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
