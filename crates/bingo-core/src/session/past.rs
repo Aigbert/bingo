@@ -18,119 +18,118 @@ pub(crate) enum Request {
     Rewind(TurnId, oneshot::Sender<Result<u32, KernelError>>),
 }
 
-impl Actor {
-    pub(super) fn attach_read(&mut self, budget: Option<usize>, reply: oneshot::Sender<Attached>) {
-        let (snapshot, history, stream) = self.attached(budget);
-        if budget.is_none() && self.state.transcript.history().has_more {
-            self.read_past(Request::Attach(Box::new(snapshot), stream, reply));
-        } else {
-            let _ = reply.send((snapshot, history, stream));
-        }
+pub(super) fn attach_read(
+    actor: &mut Actor,
+    budget: Option<usize>,
+    reply: oneshot::Sender<Attached>,
+) {
+    let (snapshot, history, stream) = actor.attached(budget);
+    if budget.is_none() && actor.state.transcript.history().has_more {
+        read_past(actor, Request::Attach(Box::new(snapshot), stream, reply));
+    } else {
+        let _ = reply.send((snapshot, history, stream));
     }
+}
 
-    pub(super) fn history_read(
-        &self,
-        page: HistoryPage,
-        reply: oneshot::Sender<Result<HistoryChunk, KernelError>>,
-    ) {
-        if self.state.transcript.history().has_more {
-            self.read_past(Request::Page(page, reply));
-        } else {
-            let _ = reply.send(History(&self.state.transcript).history(&page));
-        }
+pub(super) fn history_read(
+    actor: &Actor,
+    page: HistoryPage,
+    reply: oneshot::Sender<Result<HistoryChunk, KernelError>>,
+) {
+    if actor.state.transcript.history().has_more {
+        read_past(actor, Request::Page(page, reply));
+    } else {
+        let _ = reply.send(History(&actor.state.transcript).history(&page));
     }
+}
 
-    pub(super) fn pin_read(
-        &self,
-        id: ItemId,
-        generation: u64,
-        reply: oneshot::Sender<Result<Item, KernelError>>,
-    ) {
-        if self.state.transcript.history().has_more {
-            self.read_past(Request::Pin(id, generation, reply));
-        } else {
-            let _ = reply.send(History(&self.state.transcript).item_for_pin(&id, generation));
-        }
+pub(super) fn pin_read(
+    actor: &Actor,
+    id: ItemId,
+    generation: u64,
+    reply: oneshot::Sender<Result<Item, KernelError>>,
+) {
+    if actor.state.transcript.history().has_more {
+        read_past(actor, Request::Pin(id, generation, reply));
+    } else {
+        let _ = reply.send(History(&actor.state.transcript).item_for_pin(&id, generation));
     }
+}
 
-    pub(super) async fn rewind_read(
-        &mut self,
-        turn: TurnId,
-        reply: oneshot::Sender<Result<u32, KernelError>>,
-    ) {
-        if self.state.transcript.history().has_more {
-            self.read_past(Request::Rewind(turn, reply));
-        } else {
-            let transcript = self.state.transcript.clone();
-            let _ = reply.send(self.rewind(&transcript, &turn).await);
-        }
+pub(super) async fn rewind_read(
+    actor: &mut Actor,
+    turn: TurnId,
+    reply: oneshot::Sender<Result<u32, KernelError>>,
+) {
+    if actor.state.transcript.history().has_more {
+        read_past(actor, Request::Rewind(turn, reply));
+    } else {
+        let transcript = actor.state.transcript.clone();
+        let _ = reply.send(actor.rewind(&transcript, &turn).await);
     }
+}
 
-    fn read_past(&self, request: Request) {
-        let Some(store) = self.store.clone() else {
-            return;
-        };
-        let session = self.id.clone();
-        let cut = self.state.seq;
-        let window = self.state.transcript.clone();
-        let generation = window.generation();
-        let mailbox = self.mailbox.clone();
-        self.tracker.spawn(async move {
-            let transcript = read(store, session, cut, window).await;
-            mailbox.send(Msg::PastLoaded {
-                cut,
-                generation,
-                transcript,
-                request: Box::new(request),
-            });
+fn read_past(actor: &Actor, request: Request) {
+    let Some(store) = actor.store.clone() else {
+        return;
+    };
+    let session = actor.id.clone();
+    let cut = actor.state.seq;
+    let window = actor.state.transcript.clone();
+    let generation = window.generation();
+    let mailbox = actor.mailbox.clone();
+    actor.tracker.spawn(async move {
+        let transcript = read(store, session, cut, window).await;
+        mailbox.send(Msg::PastLoaded {
+            cut,
+            generation,
+            transcript,
+            request: Box::new(request),
         });
-    }
+    });
+}
 
-    pub(super) async fn past_loaded(
-        &mut self,
-        cut: Seq,
-        generation: u64,
-        transcript: Result<Transcript, KernelError>,
-        request: Request,
-    ) {
-        if let Request::Attach(mut snapshot, stream, reply) = request {
-            match transcript {
-                Ok(transcript) => {
-                    snapshot.transcript = transcript;
-                    let _ = reply.send((*snapshot, None, stream));
-                }
-                Err(error) => {
-                    tracing::warn!(session = %self.id, %error, "unbounded attachment history failed")
-                }
+pub(super) async fn past_loaded(
+    actor: &mut Actor,
+    cut: Seq,
+    generation: u64,
+    transcript: Result<Transcript, KernelError>,
+    request: Request,
+) {
+    if let Request::Attach(mut snapshot, stream, reply) = request {
+        match transcript {
+            Ok(transcript) => {
+                snapshot.transcript = transcript;
+                let _ = reply.send((*snapshot, None, stream));
             }
-            return;
+            Err(error) => {
+                tracing::warn!(session = %actor.id, %error, "unbounded attachment history failed")
+            }
         }
-        let transcript = History(&self.state.transcript)
-            .check_generation(Some(generation))
-            .and(transcript);
-        match request {
-            Request::Page(page, reply) => {
-                let _ = reply.send(transcript.and_then(|t| History(&t).history(&page)));
-            }
-            Request::Pin(id, generation, reply) => {
-                let _ =
-                    reply.send(transcript.and_then(|t| History(&t).item_for_pin(&id, generation)));
-            }
-            Request::Rewind(turn, reply) => {
-                let result = match transcript {
-                    Ok(transcript) if cut == self.state.seq => {
-                        self.rewind(&transcript, &turn).await
-                    }
-                    Ok(_) => Err(KernelError::new(
-                        ErrorCode::StaleGeneration,
-                        "history changed during rewind",
-                    )),
-                    Err(error) => Err(error),
-                };
-                let _ = reply.send(result);
-            }
-            Request::Attach(..) => {}
+        return;
+    }
+    let transcript = History(&actor.state.transcript)
+        .check_generation(Some(generation))
+        .and(transcript);
+    match request {
+        Request::Page(page, reply) => {
+            let _ = reply.send(transcript.and_then(|t| History(&t).history(&page)));
         }
+        Request::Pin(id, generation, reply) => {
+            let _ = reply.send(transcript.and_then(|t| History(&t).item_for_pin(&id, generation)));
+        }
+        Request::Rewind(turn, reply) => {
+            let result = match transcript {
+                Ok(transcript) if cut == actor.state.seq => actor.rewind(&transcript, &turn).await,
+                Ok(_) => Err(KernelError::new(
+                    ErrorCode::StaleGeneration,
+                    "history changed during rewind",
+                )),
+                Err(error) => Err(error),
+            };
+            let _ = reply.send(result);
+        }
+        Request::Attach(..) => {}
     }
 }
 

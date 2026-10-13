@@ -113,7 +113,8 @@ async fn checkpoint_history_pages_join_the_client_window_without_duplicates() {
     assert_eq!(history.before, Some(ItemId::from_raw("i3")));
     assert!(history.has_more);
     let (tx, rx) = tokio::sync::oneshot::channel();
-    actor.history_read(
+    past::history_read(
+        &actor,
         HistoryPage {
             before: history.before,
             generation: Some(1),
@@ -137,7 +138,7 @@ async fn checkpoint_history_pages_join_the_client_window_without_duplicates() {
         .collect();
     assert_eq!(ids, ["i1", "i2", "i3", "i4"]);
     let (tx, rx) = tokio::sync::oneshot::channel();
-    actor.pin_read(ItemId::from_raw("i2"), 1, tx);
+    past::pin_read(&actor, ItemId::from_raw("i2"), 1, tx);
     settle(&mut actor).await;
     assert_eq!(rx.await.unwrap().unwrap().id.as_str(), "i2");
     assert!(
@@ -154,7 +155,7 @@ async fn checkpoint_unbounded_attachment_restores_full_history_at_its_cut() {
     let mut actor = cut_actor().await;
     let cut = actor.seq;
     let (tx, rx) = tokio::sync::oneshot::channel();
-    actor.attach_read(None, tx);
+    past::attach_read(&mut actor, None, tx);
     let new = actor
         .record(ItemBody::Assistant {
             text: "after cut".into(),
@@ -190,7 +191,8 @@ async fn checkpoint_unbounded_attachment_restores_full_history_at_its_cut() {
 async fn checkpoint_storage_page_rechecks_generation_on_delivery() {
     let mut actor = cut_actor().await;
     let (tx, rx) = tokio::sync::oneshot::channel();
-    actor.history_read(
+    past::history_read(
+        &actor,
         HistoryPage {
             before: Some(ItemId::from_raw("i3")),
             generation: Some(1),
@@ -223,7 +225,12 @@ async fn checkpoint_failure_retains_the_actor_window() {
     let (mut actor, _) = storage::failing_actor().await;
     actor.open().await.unwrap().await;
     let count = actor.journal.len();
-    actor.checkpointed(actor.seq, Err(KernelError::new(ErrorCode::Storage, "full")));
+    let seq = actor.seq;
+    crate::session::checkpoint::acknowledge(
+        &mut actor,
+        seq,
+        Err(KernelError::new(ErrorCode::Storage, "full")),
+    );
     assert_eq!(actor.journal.len(), count);
     assert_eq!(actor.checkpoint_seq, Seq::ZERO);
 }
@@ -232,7 +239,8 @@ async fn checkpoint_failure_retains_the_actor_window() {
 async fn checkpoint_oversized_history_item_is_pinned_from_storage() {
     let mut actor = cut_actor().await;
     let (tx, rx) = tokio::sync::oneshot::channel();
-    actor.history_read(
+    past::history_read(
+        &actor,
         HistoryPage {
             before: Some(ItemId::from_raw("i3")),
             generation: Some(1),
@@ -247,13 +255,14 @@ async fn checkpoint_oversized_history_item_is_pinned_from_storage() {
     assert_eq!(page.next, Some(ItemId::from_raw("i2")));
     let marker = page.oversized.unwrap();
     let (tx, rx) = tokio::sync::oneshot::channel();
-    actor.pin_read(marker.id.clone(), 1, tx);
+    past::pin_read(&actor, marker.id.clone(), 1, tx);
     settle(&mut actor).await;
     let bytes = serde_json::to_vec(&rx.await.unwrap().unwrap()).unwrap();
     assert_eq!(bytes.len(), marker.total_bytes);
     assert_eq!(fnv1a64(&bytes), marker.checksum);
     let (tx, rx) = tokio::sync::oneshot::channel();
-    actor.history_read(
+    past::history_read(
+        &actor,
         HistoryPage {
             before: Some(marker.id),
             generation: Some(1),
@@ -277,7 +286,7 @@ async fn checkpoint_io_does_not_block_actor_or_discard_newer_frames() {
     actor.open().await.unwrap().await;
     let release = store.hold_checkpoints();
     let cut = actor.seq;
-    actor.write_checkpoint();
+    crate::session::checkpoint::write(&actor);
     let id = actor
         .record(ItemBody::Assistant {
             text: "while checkpoint waits".into(),

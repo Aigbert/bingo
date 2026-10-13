@@ -95,7 +95,7 @@ struct Actor {
 impl Actor {
     async fn run(mut self) {
         if self.seq > Seq::ZERO && self.checkpoint_seq == Seq::ZERO {
-            self.write_checkpoint();
+            checkpoint::write(&self);
         }
         let (held, mut flow) = match self.open().await {
             Ok(starting) => (self.serve_start(starting).await, Flow::Continue),
@@ -158,28 +158,25 @@ impl Actor {
                 reply,
             } => drop(reply.send(self.withdraw(intent, surface).await)),
             Msg::Answer(answered) => self.answer(answered).await?,
-            Msg::Checkpointed { seq, result } => self.checkpointed(seq, result),
+            Msg::Checkpointed { seq, result } => checkpoint::acknowledge(self, seq, result),
             Msg::PastLoaded {
                 cut,
                 generation,
                 transcript,
                 request,
-            } => {
-                self.past_loaded(cut, generation, transcript, *request)
-                    .await
-            }
-            Msg::Attach { max_bytes, reply } => self.attach_read(max_bytes, reply),
+            } => past::past_loaded(self, cut, generation, transcript, *request).await,
+            Msg::Attach { max_bytes, reply } => past::attach_read(self, max_bytes, reply),
             Msg::TailEvents { reply } => {
                 let seq = self.state.seq;
                 drop(reply.send((seq, self.subscribe(seq))));
             }
             Msg::EventsSince { since, reply } => drop(reply.send(self.subscribe(since))),
-            Msg::History { page, reply } => self.history_read(page, reply),
+            Msg::History { page, reply } => past::history_read(self, page, reply),
             Msg::ItemForPin {
                 id,
                 generation,
                 reply,
-            } => self.pin_read(id, generation, reply),
+            } => past::pin_read(self, id, generation, reply),
             Msg::Summary { reply } => drop(reply.send(self.stamped(self.state.summary.clone()))),
             Msg::Emit { turn, event } => self.emit(turn, *event).await?,
             Msg::Ask {
@@ -200,7 +197,7 @@ impl Actor {
             Msg::Invoke { call, reply } => self.invoke(call, reply).await?,
             Msg::CallAllowed { item, input } => self.call_allowed(&item, input).await?,
             Msg::CallFinished { outcome } => self.call_finished(outcome).await?,
-            Msg::Rewind { to_turn, reply } => self.rewind_read(to_turn, reply).await,
+            Msg::Rewind { to_turn, reply } => past::rewind_read(self, to_turn, reply).await,
             Msg::Compact {
                 instructions,
                 reply,
@@ -645,7 +642,7 @@ impl Actor {
         let checkpoint = matches!(frame.event, Event::Compacted { .. });
         self.broadcast(frame);
         if checkpoint {
-            self.write_checkpoint();
+            checkpoint::write(self);
         }
         Ok(self.seq)
     }
@@ -877,7 +874,7 @@ impl Actor {
         let checkpoint = matches!(reason, CloseReason::Client | CloseReason::Shutdown);
         self.publish(Event::SessionClosed { reason }, None).await?;
         if checkpoint {
-            self.write_checkpoint();
+            checkpoint::write(self);
         }
         self.subscribers.clear();
         self.session_hooks(Phase::End);
