@@ -1,8 +1,10 @@
 # Architecture upgrade — 2026-10
 
-> The work [audit-2026-10.md](audit-2026-10.md) leads to: 28 milestones
-> (M108–M135) in six phases, 15 proposed ADRs (0063–0077), and the protocol
-> an executing agent follows. Each milestone has a plan in `docs/plans/`;
+> The work [audit-2026-10.md](audit-2026-10.md) leads to: 39 milestones
+> (M108–M146) in seven phases, 18 proposed ADRs (0063–0080), and the protocol
+> an executing agent follows. Phase 7 was added the same day, at the
+> person's request for mods at Claude Code's capability and a desktop app
+> rebuilt as a surface ([mods-parity-2026-10.md](mods-parity-2026-10.md)). Each milestone has a plan in `docs/plans/`;
 > each ADR is `Status: proposed` until the milestone that implements it
 > lands. Written 2026-10-13 at `979a6d27`. The ordering principle: fix what
 > is false first, then make the journal and the turn cheap and honest, then
@@ -29,10 +31,19 @@ spawner, one JSON-RPC stack, one claim, one file shelf, channel adapters.
 **Phase 5 — Mods.** Interceptor chains, plugin protocol 2, the author kit.
 The acceptance test: a plugin written outside the workspace, in
 TypeScript, places a status entry, intercepts a tool call, and keeps its
-state across a hot reload.
+state across a hot reload. Its module is already ADR-0078's `register(on)`,
+so Phase 7 runs the same file in process.
 
 **Phase 6 — Agents.** The ACP seam split from `Provider`; one lifecycle
 vocabulary.
+
+**Phase 7 — Mods at parity, and the desktop app.** The event catalogue, an
+in-process QuickJS runtime that runs a mod module, `$` over the host and
+the world, elements and sites drawn where they are asked for, the mod
+kit, and the desktop app rebuilt in this repository as a surface that
+draws what the TUI draws. The acceptance test: Claude Code's example
+mods, ported by their imports, run in the TUI and on the desktop.
+Phases 6 and 7 are independent; M143 can start once M113, M123 and M133 land.
 
 ## Milestones
 
@@ -66,6 +77,17 @@ vocabulary.
 | 133 | The author kit | 0075 | 132 |
 | 134 | An agent is not a model | 0076 | 112, 113, 131 |
 | 135 | One lifecycle vocabulary | 0077 | 120, 122, 123, 134 |
+| 136 | The event catalogue | 0078 | 119, 131 |
+| 137 | The mod runtime | 0078 | 132, 133, 136 |
+| 138 | The host's nouns | 0078 | 137 |
+| 139 | The world's nouns | 0078 | 127, 128, 138 |
+| 140 | Elements and pulled views | 0079 | 121, 123, 124, 125, 137, 138 |
+| 141 | Components | 0079 | 138, 140 |
+| 142 | The mod kit | 0078 | 137, 140 |
+| 143 | The desktop app: the shell and the wire | 0080 | 113, 123, 133 |
+| 144 | The desktop app draws what mods draw | 0079, 0080 | 140, 141, 143 |
+| 145 | Rei's features as views | 0080 | 144 |
+| 146 | Parity: Claude Code's examples run in both | — | 139, 141, 142, 144 |
 
 Run in table order. "After" is the hard dependency; anything not listed is
 ordered only so that two milestones do not edit the same files at once.
@@ -75,8 +97,12 @@ written at the same commit and **must be re-verified at their start**
 
 ## New crates
 
-Eleven, all `tier = "library"` except the Feishu platform, with no new
-external dependency; each plan raises `scripts/budget.toml` by its own.
+Fifteen. Through Phase 6, all `tier = "library"` except the Feishu
+platform, with no new external dependency; each plan raises
+`scripts/budget.toml` by its own. Phase 7 brings the first external ones,
+each justified in ADR-0078 or ADR-0080 and measured: `rquickjs`, `oxc`,
+and `wasm-bindgen` for the fold. The desktop app is an npm package at
+`apps/desktop`, outside cargo.
 
 | Crate | Milestone | Holds |
 |---|---|---|
@@ -90,7 +116,11 @@ external dependency; each plan raises `scripts/budget.toml` by its own.
 | `bingo-jsonrpc` | 128 | the codec and the peer |
 | `bingo-shelf` | 129 | file shelves, ids, unified diff |
 | `bingo-channel-adapter` | 130 | the platform contract and the loopback |
+| `bingo-schema-ts` | 133 | JSON Schema rendered to TypeScript (and zod) |
 | `bingo-channel-feishu` | 130 | the Feishu platform (a plugin) |
+| `bingo-plugin-host` | 137 | the plugin manifest, discovery and state store both runtimes read |
+| `bingo-mods` | 137 | the in-process mod runtime (a plugin) |
+| `bingo-fold-wasm` | 143 | `SessionState::apply` for the desktop app |
 
 ## ADRs (proposed)
 
@@ -107,10 +137,13 @@ external dependency; each plan raises `scripts/budget.toml` by its own.
 | 0071 | Collaboration is one library | 0021, 0022 §3, 0025 §2, 0029 §3, 0034 §3, 0019 §8 |
 | 0072 | Mechanism lives in the library tier | supersedes 0056 §5 |
 | 0073 | A channel is an adapter | 0016 |
-| 0074 | Every dispatch is a chain | 0032 §4 |
-| 0075 | Plugin protocol 2 | 0015 §3, 0030, 0031 |
+| 0074 | Every dispatch is a chain (revised for 0078) | 0032 §4 |
+| 0075 | Plugin protocol 2 (revised for 0078) | 0015 §3, 0030, 0031 |
 | 0076 | An agent is not a model | 0035 §1, §4, §5; 0039 §3; 0055 §1 |
 | 0077 | One lifecycle vocabulary for an agent | 0027, 0029, 0060 |
+| 0078 | A mod is a module the host runs | 0074 §1 §3, 0075, 0031 §6 |
+| 0079 | A view is drawn where it is asked for | 0013 §1 §3, 0070 §1 |
+| 0080 | The desktop app is a surface in this repository | 0007, 0046 §1 |
 
 A proposed ADR's Decision is the contract the milestone implements. When the
 milestone lands, its status becomes `accepted · <date> · Plan: M<n>` and
@@ -136,6 +169,13 @@ ask (protocol step 6).
   file shelves (M127–M129).
 - `examples/plugins/ts-status` passes `bingo plugins test` and does the
   acceptance test above (M133).
+- The same `register.ts` loads in process; a mod hooks any catalogue
+  event, calls any `$` noun its grant allows, and draws a pane, a band and
+  a tool row in the TUI and on the desktop (M137–M144).
+- `rg '"_?bingo\.' apps/desktop/src` finds nothing, and the desktop app
+  folds with the sdk's own fold (M143).
+- Claude Code's example mods run in both surfaces; the parity matrix has
+  evidence for every row and a written reason for every gap (M146).
 
 ## Execution protocol
 
@@ -167,6 +207,9 @@ For the agent that executes a milestone (written for Codex; any agent).
    layering forbids; a gate fails and the fix is outside the plan's Files;
    two attempts at the same failure have not moved it; anything would touch
    a user's live binary, journal, settings or a process you did not start.
+   Not a stop (decided at M130): a test or fixture outside Files that only
+   constructs or names a type the plan changes is updated mechanically and
+   listed in the plan; one whose behaviour or assertion would change stops.
 7. **Gates.** All must pass, run one at a time (a second cargo job beside
    them makes wall-clock tests flake):
    ```
@@ -179,6 +222,12 @@ For the agent that executes a milestone (written for Codex; any agent).
    cargo deny check
    cargo check -p <each touched crate> --all-targets --target x86_64-pc-windows-msvc
    ```
+   A Windows check that fails only because a third-party build script
+   cannot find Windows SDK C headers (`stdio.h`, `stdlib.h`, `windows.h`;
+   today `aws-lc-sys`, `tree-sitter` and later `rquickjs`) cannot be run
+   on a Mac. That is decided (M110, 2026-10-13): install no toolchain,
+   record the crate and the C crate that failed as left to the Windows CI
+   job, and do not stop for it. A Rust compile error still stops.
    A test known to hang under parallel runs (the ACP bridge token test) is
    run alone, never skipped silently. TUI-visible changes also run
    `scripts/tui-smoke.sh`. Never launch a terminal application, never send
