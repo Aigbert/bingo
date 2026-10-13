@@ -91,6 +91,7 @@
 # takes a document that is the reader too; the `toml` crate would have bought
 # a second copy of the same parser and was not taken. `winnow` resolves at two
 # majors, which deny.toml warns on and does not refuse.
-max_dependencies = 342
+# M110 (ADR-0063): bingo-process adds one member and no external crate.
+max_dependencies = 343
 max_core_check_seconds = 20
 max_target_gb = 5
