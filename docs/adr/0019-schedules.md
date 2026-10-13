@@ -63,3 +63,10 @@ the schedule's record by plugin id. Wake ownership and restart bounds stand.
 ## Supersedes
 
 —
+
+## Amendment — 2026-10-13 (M122)
+
+[ADR-0071](0071-collaboration-is-one-library.md) amends this record:
+§8 keeps wakes in memory, now in owned keyed `bingo-alarm` tasks. A session
+start with no held wake clears the entire journaled wake extension, including
+its M121 status slot; a countdown cannot survive the wake it describes.

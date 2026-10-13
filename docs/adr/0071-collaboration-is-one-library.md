@@ -1,7 +1,9 @@
 # ADR-0071 — Collaboration is one library
 
-Status: proposed · 2026-10-13 · Plan: M122 · Amends: ADR-0021, ADR-0022
-§3, ADR-0025 §2, ADR-0029 §3, ADR-0034 §3, ADR-0019 §8
+Status: accepted for §§1–3 · 2026-10-13 · Plan: M122
+§4 remains proposed for M123; the TUI consumers of §1 also land in M123.
+Amends: ADR-0021, ADR-0022 §3, ADR-0025 §2, ADR-0029 §3,
+ADR-0034 §3 (M123), ADR-0019 §8
 
 ## Context
 
