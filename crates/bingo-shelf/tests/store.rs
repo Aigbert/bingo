@@ -15,7 +15,8 @@ impl Codec for Json {
     type Record = Entry;
     const EXT: &'static str = "json";
     fn encode(record: &Entry) -> Result<String, CodecError> {
-        serde_json::to_string_pretty(record).map(|s| format!("{s}\n"))
+        serde_json::to_string_pretty(record)
+            .map(|s| format!("{s}\n"))
             .map_err(|e| CodecError(e.to_string()))
     }
     fn decode(id: &str, text: &str) -> Result<Entry, CodecError> {
@@ -25,9 +26,17 @@ impl Codec for Json {
     }
 }
 
-fn entry(id: &str) -> Entry { Entry { id: id.into(), text: "kept".into() } }
+fn entry(id: &str) -> Entry {
+    Entry {
+        id: id.into(),
+        text: "kept".into(),
+    }
+}
 fn names(dir: &Path) -> Vec<String> {
-    let mut names: Vec<_> = std::fs::read_dir(dir).unwrap().map(|f| f.unwrap().file_name().to_string_lossy().into_owned()).collect();
+    let mut names: Vec<_> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|f| f.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
     names.sort();
     names
 }
@@ -48,13 +57,37 @@ fn a_missing_store_is_empty_and_a_round_trip_leaves_no_temp() {
 fn entries_and_unreadable_files_are_sorted_and_dotfiles_are_skipped() {
     let dir = tempfile::tempdir().unwrap();
     let shelf = Shelf::<Json>::new(dir.path());
-    for id in ["ccc", "aaa", "bbb"] { shelf.save(id, &entry(id)).unwrap(); }
-    for name in ["z.json", "d.json", ".hidden.json", "runner.lock", "README.txt"] {
+    for id in ["ccc", "aaa", "bbb", "a", "a-b"] {
+        shelf.save(id, &entry(id)).unwrap();
+    }
+    for name in [
+        "z.json",
+        "d.json",
+        ".hidden.json",
+        "runner.lock",
+        "README.txt",
+    ] {
         std::fs::write(dir.path().join(name), "broken").unwrap();
     }
     let loaded = shelf.load();
-    assert_eq!(loaded.entries, [entry("aaa"), entry("bbb"), entry("ccc")]);
-    assert_eq!(loaded.unreadable.iter().map(|u| u.file.as_str()).collect::<Vec<_>>(), ["d.json", "z.json"]);
+    assert_eq!(
+        loaded.entries,
+        [
+            entry("a"),
+            entry("a-b"),
+            entry("aaa"),
+            entry("bbb"),
+            entry("ccc")
+        ]
+    );
+    assert_eq!(
+        loaded
+            .unreadable
+            .iter()
+            .map(|u| u.file.as_str())
+            .collect::<Vec<_>>(),
+        ["d.json", "z.json"]
+    );
     assert!(loaded.unreadable.iter().all(|u| !u.why.is_empty()));
 }
 
@@ -63,7 +96,10 @@ fn saving_replaces_deleting_is_idempotent_and_minted_ids_are_free() {
     let dir = tempfile::tempdir().unwrap();
     let shelf = Shelf::<Json>::new(dir.path());
     shelf.save("abc", &entry("abc")).unwrap();
-    let revised = Entry { text: "revised".into(), ..entry("abc") };
+    let revised = Entry {
+        text: "revised".into(),
+        ..entry("abc")
+    };
     shelf.save("abc", &revised).unwrap();
     assert_eq!(shelf.load().entries, [revised]);
     assert!(!shelf.path(&shelf.mint()).exists());
