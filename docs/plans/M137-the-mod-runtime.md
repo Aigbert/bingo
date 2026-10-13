@@ -303,3 +303,37 @@ test imports_stay_inside_the_module_root_or_bingo ... ok
 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 ```
+
+`node --test sdk/typescript/src/on.test.ts` (before implementation):
+```text
+✖ registration rejects duplicate hooks and duplicate catch handlers (0.114041ms)
+✖ a hook catch receives the original error and continuation state (0.091833ms)
+ℹ tests 9
+ℹ pass 7
+ℹ fail 2
+✖ registration rejects duplicate hooks and duplicate catch handlers (0.114041ms)
+  TypeError: Cannot read properties of undefined (reading 'catch')
+✖ a hook catch receives the original error and continuation state (0.091833ms)
+  TypeError: Cannot read properties of undefined (reading 'catch')
+```
+
+`node --test --test-reporter=tap sdk/typescript/src/*.test.ts`:
+```text
+ok 1 - matchers are partial, nested, scalar, regex or alternatives
+ok 2 - patterns do not depend on the current event catalogue
+ok 3 - multiple hooks wrap once, preserving after order
+ok 4 - short circuit answers without next and cancellation rejects next
+ok 5 - an omitted matcher accepts null and scalar event inputs
+ok 6 - cancel before next rejects before and clears the chain
+ok 7 - cancel while the after hook is waiting rejects after
+ok 8 - registration rejects duplicate hooks and duplicate catch handlers
+ok 9 - a hook catch receives the original error and continuation state
+ok 10 - RPC pairs ids, rejects unknown requests and closes all pending calls
+ok 11 - handshake advertises matching points and intersects host capabilities
+ok 12 - protocol one is refused before register runs
+ok 13 - catalogue subscriptions wrap a service event added after initialization
+# tests 13
+# pass 13
+# fail 0
+# skipped 0
+```

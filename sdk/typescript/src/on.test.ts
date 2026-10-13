@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { matches, patternMatches, Hooks } from './on.ts';
+import { matches, patternMatches } from './on.ts';
+import { Hooks } from './cross.ts';
 import cases from '../test/cases.json' with { type: 'json' };
 
 test('matchers are partial, nested, scalar, regex or alternatives', () => {
