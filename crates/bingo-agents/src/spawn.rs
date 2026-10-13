@@ -55,7 +55,7 @@ to stand by for: everything reaching it from elsewhere is labelled — \
 conversation is the person it works for, or you, writing directly, which it \
 answers whatever else it was told.";
 
-#[derive(Debug, Deserialize, JsonSchema)]
+#[derive(Debug, serde::Serialize, Deserialize, JsonSchema)]
 pub struct SpawnArgs {
     /// The task, in full.
     pub prompt: String,
@@ -177,7 +177,7 @@ impl Plan {
             key: Some(format!("agent/{}/{name}", cx.session)),
             parent: Some(ParentLink {
                 session: cx.session.clone(),
-                item: Some(cx.item.clone()),
+                item: (!cx.call_id.is_empty()).then(|| cx.item.clone()),
             }),
             title: Some(name.to_string()),
             provider: self.provider.clone(),
@@ -288,12 +288,16 @@ fn pick<'a>(
 /// is untouched, and every call the child then makes is gated in the child.
 #[derive(Debug, Default, Clone)]
 pub struct SpawnAgentTool {
+    pub(crate) definitions: std::sync::Arc<library::Definitions>,
     reports: std::sync::Arc<crate::report::Reports>,
 }
 
 impl SpawnAgentTool {
     pub(crate) fn new(reports: std::sync::Arc<crate::report::Reports>) -> Self {
-        Self { reports }
+        Self {
+            reports,
+            definitions: Default::default(),
+        }
     }
 
     /// The child, running, with the prompt already on its way.
@@ -304,7 +308,7 @@ impl SpawnAgentTool {
     ) -> Result<(String, SessionId, Attachment), ToolError> {
         let host = &cx.host;
         let delivery = args.delivery().map_err(ToolError::Failed)?;
-        let definitions = library::load(&cx.env, &cx.cwd);
+        let definitions = self.definitions.load(&cx.env, &cx.cwd);
         let definition = pick(args.agent.as_deref(), &definitions).map_err(ToolError::Failed)?;
         let plan = Plan::of(args, definition, host).await.map_err(failed)?;
         let children = names::children(host, &cx.session).await.map_err(failed)?;
@@ -324,6 +328,39 @@ impl SpawnAgentTool {
             .await
             .map_err(failed)?;
         Ok((name, session, attachment))
+    }
+}
+
+impl SpawnAgentTool {
+    pub(crate) async fn execute(
+        &self,
+        input: Value,
+        cx: &ToolContext,
+    ) -> Result<ToolOutput, ToolError> {
+        let args: SpawnArgs =
+            serde_json::from_value(input).map_err(|e| ToolError::InvalidInput(e.to_string()))?;
+        let (name, session, mut attachment) = match self.open(&args, cx).await {
+            Ok(started) => started,
+            // Whatever stopped the child before it ran — a name, a
+            // definition, a limit — is something the model reads and acts on.
+            Err(ToolError::Failed(message)) => return Ok(ToolOutput::error(message)),
+            Err(other) => return Err(other),
+        };
+        // No watcher on a standby member: a teammate is not a one-shot task,
+        // and nothing wakes this session when its turns end (ADR-0027 §3).
+        if args.standby() {
+            return Ok(ToolOutput::text(seated(&name, &session)));
+        }
+        if !args.background() {
+            let reply = watch::next_reply(&cx.host, &mut attachment, &cx.cancel).await?;
+            return Ok(watch::output(&name, &session, &reply));
+        }
+        let host = cx.host.clone();
+        let parent = cx.session.clone();
+        self.reports
+            .promise(attachment, host, parent, &cx.cancel)
+            .await?;
+        Ok(ToolOutput::text(named(&name, &session)))
     }
 }
 
@@ -385,30 +422,10 @@ impl Tool for SpawnAgentTool {
     }
 
     async fn call(&self, input: Value, cx: &ToolContext) -> Result<ToolOutput, ToolError> {
-        let args: SpawnArgs =
-            serde_json::from_value(input).map_err(|e| ToolError::InvalidInput(e.to_string()))?;
-        let (name, session, mut attachment) = match self.open(&args, cx).await {
-            Ok(started) => started,
-            // Whatever stopped the child before it ran — a name, a
-            // definition, a limit — is something the model reads and acts on.
-            Err(ToolError::Failed(message)) => return Ok(ToolOutput::error(message)),
-            Err(other) => return Err(other),
-        };
-        // No watcher on a standby member: a teammate is not a one-shot task,
-        // and nothing wakes this session when its turns end (ADR-0027 §3).
-        if args.standby() {
-            return Ok(ToolOutput::text(seated(&name, &session)));
+        if let Some(wire) = cx.host.service_wire("agent") {
+            return crate::service::invoke(wire, input, cx).await;
         }
-        if !args.background() {
-            let reply = watch::next_reply(&cx.host, &mut attachment, &cx.cancel).await?;
-            return Ok(watch::output(&name, &session, &reply));
-        }
-        let host = cx.host.clone();
-        let parent = cx.session.clone();
-        self.reports
-            .promise(attachment, host, parent, &cx.cancel)
-            .await?;
-        Ok(ToolOutput::text(named(&name, &session)))
+        self.execute(input, cx).await
     }
 }
 

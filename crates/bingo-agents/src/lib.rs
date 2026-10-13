@@ -45,6 +45,7 @@ mod models;
 mod names;
 
 mod note;
+mod service;
 mod spawn;
 mod stop;
 mod team;
@@ -90,6 +91,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "command:agents",
         "command:team",
         team_service::CAPABILITY,
+        "service:bingo.agents.agent",
         "service:bingo.agents.pages",
     ],
     requires: &[],
@@ -127,6 +129,7 @@ pub(crate) fn traits() -> ToolTraits {
 /// holds the host: a tool reads it from its call, a hook from its context.
 #[derive(Debug, Default)]
 pub struct AgentsPlugin {
+    service: std::sync::OnceLock<Arc<service::AgentService>>,
     reports: Arc<report::Reports>,
 }
 
@@ -137,7 +140,18 @@ impl Plugin for AgentsPlugin {
     }
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
-        registrar.tool(Arc::new(SpawnAgentTool::new(self.reports.clone())) as Arc<dyn Tool>);
+        let definitions = Arc::new(library::Definitions::default());
+        let mut spawn = SpawnAgentTool::new(self.reports.clone());
+        spawn.definitions = definitions.clone();
+        registrar.tool(Arc::new(spawn) as Arc<dyn Tool>);
+        let service = Arc::new(service::AgentService::new(
+            registrar.env().clone(),
+            self.reports.clone(),
+            definitions,
+        ));
+        self.service
+            .set(service.clone())
+            .map_err(|_| PluginError::Failed("agents already registered".into()))?;
         registrar.tool(Arc::new(MessageTool) as Arc<dyn Tool>);
         registrar.tool(Arc::new(ListAgentsTool) as Arc<dyn Tool>);
         registrar.tool(Arc::new(ListModelsTool) as Arc<dyn Tool>);
@@ -158,7 +172,18 @@ impl Plugin for AgentsPlugin {
             self.reports.clone(),
         ))));
         registrar.add(team_file());
+        registrar.add(Contribution::service(
+            &service::KEY,
+            service.clone(),
+            Some(service),
+        ));
         registrar.add(guide::contribution(registrar));
+        Ok(())
+    }
+    async fn start(&self, host: bingo_sdk::HostHandle) -> Result<(), PluginError> {
+        if let Some(service) = self.service.get() {
+            service.bind(&host);
+        }
         Ok(())
     }
     async fn stop(&self) -> Result<(), PluginError> {
@@ -268,7 +293,11 @@ mod plugin_tests {
         let page = bingo_sdk::Pages::key(MANIFEST.id);
         assert_eq!(
             services,
-            [(team_service::KEY.name(), true), (page.name(), false)],
+            [
+                (team_service::KEY.name(), true),
+                (service::KEY.name(), true),
+                (page.name(), false)
+            ],
             "the team file has both faces; the page stays in process"
         );
     }
