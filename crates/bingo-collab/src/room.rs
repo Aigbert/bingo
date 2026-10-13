@@ -252,7 +252,7 @@ pub fn payload(seats: &[Seat]) -> Value {
     if let Some(listeners) = ear::listeners_of(seats) {
         payload[LISTENERS] = listeners;
     }
-    payload
+    bingo_sdk::slot::with(payload, [])
 }
 
 /// The roster in the vocabulary every surface already draws, so `ctrl+t` and

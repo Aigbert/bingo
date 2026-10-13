@@ -5,7 +5,7 @@
 //!
 //! - **block** — [`DemoProgressTool`] returns a `Code` view as
 //!   `ToolOutput.display`: what a person reads beside what the model reads.
-//! - **panel** — `/board` publishes [`Board::view`] with `HostApi::extend`.
+//! - **row** — `/board` records an anchor and places its table and buttons.
 //!   It is journaled, so `--continue` reads back the same board.
 //! - **live** — the same tool publishes a `Progress` with `HostApi::signal`
 //!   every 200 ms. A signal is never journaled and is gone after a resume, so
@@ -75,6 +75,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "command:board",
         "command:board.tick",
         "command:board.reset",
+        "hook:demo-ui:board-row",
     ],
     requires: &[],
     config: Some(ConfigClaim {
@@ -101,6 +102,7 @@ impl Plugin for DemoUiPlugin {
         // 2026-10-13: remove this legacy read after the next release (M126).
         let slice: serde_json::Value = registrar.config()?;
         let _ = self.legacy.set(slice.get(SETTING).is_some());
+        registrar.add(Contribution::Hook(Arc::new(journal::BoardRow)));
         registrar.tool(Arc::new(DemoProgressTool) as Arc<dyn Tool>);
         for command in [command::SHOW, command::TICK_COMMAND, command::RESET_COMMAND] {
             registrar.add(Contribution::Command(Arc::new(command) as Arc<dyn Command>));
@@ -155,6 +157,7 @@ mod plugin_tests {
                 "command:board",
                 "command:board.tick",
                 "command:board.reset",
+                "hook:demo-ui:board-row",
             ]
         );
         assert!(MANIFEST.requires.is_empty());
@@ -178,6 +181,7 @@ mod plugin_tests {
         let names: Vec<String> = contributions
             .iter()
             .map(|c| match c {
+                Contribution::Hook(hook) => hook.id().into(),
                 Contribution::Tool(tool) => tool.spec().name,
                 Contribution::Command(command) => command.spec().name,
                 other => panic!("unexpected {other:?}"),
@@ -185,7 +189,13 @@ mod plugin_tests {
             .collect();
         assert_eq!(
             names,
-            ["DemoProgress", "board", "board.tick", "board.reset"]
+            [
+                "demo-ui:board-row",
+                "DemoProgress",
+                "board",
+                "board.tick",
+                "board.reset"
+            ]
         );
     }
 }

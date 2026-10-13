@@ -69,7 +69,7 @@ pub fn view(debts: Vec<Debt>) -> Value {
     }
     let mut payload = drawn(&debts);
     payload[DEBTS] = json!(debts);
-    payload
+    bingo_sdk::slot::with(payload, [])
 }
 
 /// The two columns a person reads on the card: which room, and who has not

@@ -87,6 +87,7 @@ mod tests {
             view(debts("#design", &open)),
             serde_json::json!({
                 "kind": "table",
+                "slots": [],
                 "headers": ["room", "owed"],
                 "rows": [["#design", "reviewer"], ["#design", "scout"]],
                 "debts": [

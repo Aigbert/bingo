@@ -113,6 +113,19 @@ impl Board {
         }
     }
 
+    pub(crate) fn placement(&self, item: bingo_sdk::ItemId) -> bingo_sdk::slot::Slot {
+        let actions = actions();
+        bingo_sdk::slot::Slot::Row {
+            item,
+            mark: None,
+            title: Some("Board".into()),
+            badge: None,
+            caption: None,
+            body: Some(self.table()),
+            actions,
+        }
+    }
+
     /// The inverse of [`Board::view`]. What the journal holds is the view a
     /// person was shown, so the next run reads its board straight back out of
     /// it: one fact, one representation, and no shadow record to keep in step.
@@ -179,19 +192,21 @@ fn row(cells: &[String]) -> Option<Row> {
 /// A plugin names labels and the command each fires; which key does it is the
 /// surface's answer (ADR-0013 §4), so no key is named here.
 fn buttons() -> View {
-    View::Actions {
-        items: [("Tick", TICK), ("Reset", RESET)]
-            .into_iter()
-            .map(|(label, name)| ActionItem {
-                label: label.into(),
-                action: Action {
-                    name: name.into(),
-                    args: serde_json::Value::Null,
-                },
-                key: None,
-            })
-            .collect(),
-    }
+    View::Actions { items: actions() }
+}
+
+fn actions() -> Vec<ActionItem> {
+    [("Tick", TICK), ("Reset", RESET)]
+        .into_iter()
+        .map(|(label, name)| ActionItem {
+            label: label.into(),
+            action: Action {
+                name: name.into(),
+                args: serde_json::Value::Null,
+            },
+            key: None,
+        })
+        .collect()
 }
 
 #[cfg(test)]
