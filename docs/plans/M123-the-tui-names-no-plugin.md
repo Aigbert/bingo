@@ -45,7 +45,7 @@ code. No `HostApi` verb, no new external dependency.
    `transcript.rs` already drops context. The pending area
    (`activity.rs`) asks `voice` too.
 5. **`HookContext.item: Option<ItemId>`.** The gate sets it for
-   `before_tool` from `GateInput.item`, and `after_tool_hooks` from the
+   `before_tool` from `GateInput.item`, and M131’s `chain/tool.rs::after_outcomes` from the
    outcome's item. Every other construction says `None`.
 6. **Memory places.** `bingo-context` gains a `before_tool` hook
    (matcher `Read|Write|Edit`). When the path's parent is a memory
@@ -86,15 +86,18 @@ code. No `HostApi` verb, no new external dependency.
 ## Files
 
 - `crates/bingo-sdk/src/{event.rs,hook.rs,slot.rs}`, `fixtures/`
-- `crates/bingo-core/src/{gate.rs,turn.rs,session.rs,session/commands.rs,session/invoke.rs}`
+- `crates/bingo-core/src/{gate.rs,turn.rs,chain/tool.rs,session.rs,session/commands.rs,session/invoke.rs}`
 - `crates/bingo-context/src/{lib.rs,memory/mod.rs}`, a new `memory/row.rs`
 - `crates/bingo-skills/src/{lib.rs,tool.rs}`, a new `hook.rs`
-- `crates/bingo-tool-bash/src/{jobs,notify,lib}.rs`
+- `crates/bingo-tool-bash/src/{jobs,promote,notify,lib}.rs`
 - `crates/bingo-agents/src/{message,hook}.rs`, `crates/bingo-rooms/src/{post,serial}.rs`,
   `crates/bingo-schedule/src/{wake,runner}.rs`, `crates/bingo-channels/src/runner.rs`
-- `crates/bingo-collab/src/room.rs` (readers)
+- `crates/bingo-collab/src/room.rs` and `room/readers.rs` (readers)
 - `crates/bingo-surface-tui/{Cargo.toml,src/{transcript,transcript/said,pager,blocks,input,seats,roster,mentions,activity}.rs}`;
   `{memory,skill}.rs` deleted; `screens.rs`, `test_support.rs`
+- `Cargo.lock` (TUI library dependency); mechanical `Origin`/`HookContext`
+  constructors in core, checkpoints, provider-acp, hooks-shell, plugin-rpc,
+  agents, rooms, context, schedule and bin tests; sdk schema golden fixtures.
 - `scripts/check_discipline.sh`, `docs/design/tui.md`,
   `docs/adr/{0034,0044,0070,0071}-*.md`
 
@@ -134,7 +137,13 @@ code. No `HostApi` verb, no new external dependency.
   `Row.mark` (ADR-0070 §1), rather than falling back to the tool bullet.
 - `on_turn(Start)` must see the prompt item in `items`. If it does not,
   the skills hook reads it at `on_event` for the item instead.
-- Re-verify at start: M121's `slot` module and `Row` fields, M122's
+- Re-verified at `e415e97e` (2026-10-13): M121's `slot` module and `Row` fields, M122's
   collab readers and `HOLDER`, the producer origins named above by
   symbol, the gate's `GateInput.item`, and the test-only module list in
   `lib.rs`.
+
+M121 already provides `Row.mark` and `transcript/slots.rs`; no slot wire change.
+M131 keeps `HookContext` in `hook.rs`; after-tool dispatch is in `chain/tool.rs`.
+M122 has `room::HOLDER` and record fixtures; TUI presentation readers remain to move.
+Turn-start hooks receive the prompt in the transcript. Bash foreground calls are
+owned by `promote.rs`; publish their placed actions beside the jobs signal.
