@@ -450,12 +450,7 @@ impl Runner {
                     Input::Text {
                         text,
                         images,
-                        origin: Origin {
-                            voice: Some(bingo_sdk::Voice::Said),
-                            surface: SURFACE_ID.into(),
-                            principal: Some(principal.to_string()),
-                            conversation: Some(self.key.clone()),
-                        },
+                        origin: incoming_origin(principal, &self.key),
                         delivery: Delivery::Wake,
                     },
                 );
@@ -762,5 +757,25 @@ mod tests {
             })
             .await;
         assert!(runner.tree.get(&id).is_none());
+    }
+}
+
+fn incoming_origin(principal: &str, conversation: &str) -> Origin {
+    Origin {
+        voice: Some(bingo_sdk::Voice::Said),
+        surface: SURFACE_ID.into(),
+        principal: Some(principal.into()),
+        conversation: Some(conversation.into()),
+    }
+}
+
+#[cfg(test)]
+mod voice_tests {
+    #[test]
+    fn an_incoming_message_is_said_by_its_sender() {
+        let origin = super::incoming_origin("sender", "conversation");
+        assert_eq!(origin.voice, Some(bingo_sdk::Voice::Said));
+        assert_eq!(origin.principal.as_deref(), Some("sender"));
+        assert_eq!(origin.conversation.as_deref(), Some("conversation"));
     }
 }

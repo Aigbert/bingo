@@ -180,7 +180,10 @@ pub(crate) async fn after_outcomes(
             name: name.clone(),
             input: input.clone(),
         };
-        let cx = HookContext { item: Some(outcome.item.clone()), ..cx.clone() };
+        let cx = HookContext {
+            item: Some(outcome.item.clone()),
+            ..cx.clone()
+        };
         stop |= after(&call, &outcome.output, &hooks, &cx).await;
     }
     stop
@@ -198,5 +201,81 @@ impl Prompter for AskVia<'_> {
         answers: Vec<AnswerSpec>,
     ) -> Result<Answer, KernelError> {
         self.host.ask(Some(self.item.clone()), kind, answers).await
+    }
+}
+
+#[cfg(test)]
+mod item_tests {
+    use super::*;
+
+    struct SeesItem;
+    #[async_trait::async_trait]
+    impl Hook for SeesItem {
+        fn id(&self) -> &str {
+            "item-observer"
+        }
+        fn matcher(&self) -> HookMatcher {
+            HookMatcher::default()
+        }
+        async fn after_tool(
+            &self,
+            call: &ToolCall,
+            _: &ToolOutput,
+            cx: &HookContext,
+        ) -> HookOutcome {
+            assert_eq!(
+                cx.item.as_ref().map(ItemId::as_str),
+                Some(call.call_id.as_str())
+            );
+            HookOutcome::Continue
+        }
+    }
+
+    fn outcome(id: &str, transcript: &mut Transcript) -> ToolOutcome {
+        let Event::ItemCompleted { mut item } = serde_json::from_str(include_str!(
+            "../../../bingo-sdk/fixtures/record/event/itemCompleted.json"
+        ))
+        .unwrap() else {
+            panic!("item")
+        };
+        item.id = ItemId::from_raw(id);
+        item.body = ItemBody::ToolCall {
+            call_id: id.into(),
+            name: "Example".into(),
+            input: serde_json::json!({}),
+            output: None,
+            progress: None,
+            duration_ms: None,
+            quiet: false,
+        };
+        transcript.apply(&Event::ItemCompleted { item });
+        ToolOutcome {
+            item: ItemId::from_raw(id),
+            call_id: id.into(),
+            output: ToolOutput::text("done"),
+            status: ItemStatus::Completed,
+            duration_ms: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn after_hooks_receive_each_outcomes_own_item() {
+        let mut transcript = Transcript::new();
+        let outcomes = [
+            outcome("itm_first", &mut transcript),
+            outcome("itm_second", &mut transcript),
+        ];
+        let hooks = crate::turn::HookSet::fixed(vec![Arc::new(SeesItem)]);
+        let cx = HookContext {
+            item: None,
+            session: SessionId::from_raw("session"),
+            turn: None,
+            cwd: "/".into(),
+            provider: None,
+            model: None,
+            host: bingo_sdk::testing::NoHost::handle(),
+        };
+        assert!(!after_outcomes(&outcomes, &transcript, &hooks, &cx).await);
+        assert_eq!(cx.item, None);
     }
 }

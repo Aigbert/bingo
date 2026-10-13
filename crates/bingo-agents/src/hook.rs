@@ -102,7 +102,16 @@ mod tests {
             "{outcome:?}"
         );
         assert_eq!(text_of(&input), "look at the diff again");
-        assert!(matches!(input, Input::Text { origin: Origin { voice: Some(bingo_sdk::Voice::Said), .. }, .. }));
+        assert!(matches!(
+            input,
+            Input::Text {
+                origin: Origin {
+                    voice: Some(bingo_sdk::Voice::Said),
+                    ..
+                },
+                ..
+            }
+        ));
     }
 
     #[tokio::test]
