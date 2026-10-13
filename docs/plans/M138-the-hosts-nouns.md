@@ -28,11 +28,11 @@ it: natives in process, and M133's `dollar.ts` under node.
 ## Files
 
 - `crates/bingo-mods/src/dollar/*.rs` (new), `src/{lib,link,chain,engine,thread,module,manager,plugin,load,config}.rs`, `src/{thread.js,manager/reload.rs}`, `tests/{contracts,plugin}.rs`, `tests/mods/nouns/*` (new), `guide.md`, `Cargo.toml`
-- `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs,invocation.rs,lib.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/completion.rs,host/tests/complete.rs,host/tests/catalogue.rs,session.rs,session/mailbox.rs,session/catalogue.rs,session/gate.rs,session/inputs.rs,session/commands.rs,chain/observe.rs}`
+- `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs,invocation.rs,lib.rs,testing/api.rs,testing/calls.rs,testing/scripts.rs,testing/tests.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/completion.rs,host/tests/complete.rs,host/tests/catalogue.rs,session.rs,session/mailbox.rs,session/catalogue.rs,session/gate.rs,session/inputs.rs,session/commands.rs,chain/observe.rs}`
 - `crates/bingo-plugin-host/src/{state,ops,host,invocation,callback,lib}.rs`
 - `crates/bingo-plugin-rpc/src/{host,service,bridge,schema,wire,wire_ts,context,connection,intercept,callback,reload,lib}.rs`
 - `schema/{dollar,plugin,events}.json`, `sdk/typescript/src/{cross,rpc,dollar,dollar-types,callbacks,plugin,wire,events}.ts`, SDK noun tests
-- `crates/bingo/tests/{plugin_kit.rs,support/reentry.rs}`, noun fixture modules and mechanical schema/fixture consumers
+- `crates/bingo/tests/{plugin_kit.rs,support/reentry.rs,support/nouns.rs}`, noun fixture modules and mechanical schema/fixture consumers
 - Existing workspace dependencies only: `jiff` for the specified timestamp, and `bingo-schema-ts` as a dev dependency for the generated dollar types; measure with `scripts/budget.sh`.
 
 ## Exit criteria
@@ -64,6 +64,7 @@ it: natives in process, and M133's `dollar.ts` under node.
 - `core/src/chain/service.rs` wraps faces; SDK `service.rs` checks unique names. `HostApi::complete` only grants and mails. Move the model/think command's `config::set` calls into `reconfigure` to avoid duplicate chains.
 - The fold has config, queue, transcript and usage. Attach/detach are observations, not frames; project surfaces through the existing plugin signal door.
 - Use M111's `TestHost` for door answers, and the real offline kernel for chain counts: the test host does not dispatch interception chains.
+- M111's test host predates `complete`; add its recording/script adapter for exhaustive row coverage.
 - Actor mail and spawned chain work must carry the SDK invocation context; re-export it from plugin-host so both runtimes still share one representation.
 - The Node re-entry prerequisite was repaired here as the authorized first brick; ADR-0078 §4 remains unchanged.
 
