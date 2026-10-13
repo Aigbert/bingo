@@ -29,7 +29,7 @@ impl Admission {
             execution: PluginExecution {
                 origin: found.origin,
                 runtime,
-                grant: grant(found.origin, trust, &found.manifest.uses),
+                grant: grant(runtime, found.origin, trust, &found.manifest.uses),
             },
         })
     }

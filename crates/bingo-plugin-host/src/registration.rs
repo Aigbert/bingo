@@ -42,7 +42,7 @@ impl Registration {
             execution: PluginExecution {
                 origin: self.origin,
                 runtime: self.runtime,
-                grant: grant(self.origin, trust, &descriptor.uses),
+                grant: grant(self.runtime, self.origin, trust, &descriptor.uses),
             },
         })
     }

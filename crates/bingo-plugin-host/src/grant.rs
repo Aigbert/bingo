@@ -1,11 +1,16 @@
 //! A directory and the person's explicit trust bound the requested nouns.
 pub use bingo_sdk::{PluginGrant as Grant, PluginOrigin as Origin};
-use bingo_sdk::{PluginTrust, Tier};
+use bingo_sdk::{PluginRuntime, PluginTrust, Tier};
 use std::collections::BTreeSet;
 
 pub const UNSAFE: &[&str] = &["process", "http", "env", "model"];
 
-pub fn grant(origin: Origin, trust: Option<&PluginTrust>, uses: &[String]) -> Grant {
+pub fn grant(
+    _runtime: PluginRuntime,
+    origin: Origin,
+    trust: Option<&PluginTrust>,
+    uses: &[String],
+) -> Grant {
     let tier = trust.map_or(
         if origin == Origin::Project {
             Tier::Tighten
@@ -100,14 +105,64 @@ pub async fn admit_service(
 mod tests {
     use super::*;
     #[test]
+    fn runtime_origin_and_user_trust_bound_grants() {
+        use Origin::{Explicit, Project, User};
+        use PluginRuntime::{Module, Process};
+        use Tier::{Full, Rewrite, Tighten};
+
+        let declared = vec!["session".into(), "model".into()];
+        for (runtime, origin, default_tier, default_uses) in [
+            (Process, User, Tighten, vec!["session", "model"]),
+            (Process, Explicit, Tighten, vec!["session", "model"]),
+            (Process, Project, Tighten, vec!["session"]),
+            (Module, User, Rewrite, vec!["session", "model"]),
+            (Module, Explicit, Rewrite, vec!["session", "model"]),
+            (Module, Project, Tighten, vec!["session"]),
+        ] {
+            for tier in [None, Some(Tighten), Some(Rewrite), Some(Full)] {
+                let trust = tier.map(|tier| PluginTrust {
+                    tier,
+                    uses: vec!["model".into(), "env".into()],
+                });
+                let granted = grant(runtime, origin, trust.as_ref(), &declared);
+                let case = format!("{runtime:?} × {origin:?} × {tier:?}");
+                assert_eq!(granted.tier, tier.unwrap_or(default_tier), "{case}");
+                let expected_uses = if trust.is_some() {
+                    vec!["session", "model", "env"]
+                } else {
+                    default_uses.clone()
+                };
+                assert_eq!(
+                    granted.uses,
+                    expected_uses.into_iter().map(str::to_owned).collect(),
+                    "{case}"
+                );
+                assert!(
+                    admits(&granted, "session", "extend", false).is_ok(),
+                    "{case}"
+                );
+                assert_eq!(
+                    admits(&granted, "model", "complete", true).is_ok(),
+                    granted.tier != Tighten && granted.uses.contains("model"),
+                    "{case}"
+                );
+                assert!(
+                    admits(&granted, "undeclared", "read", false).is_err(),
+                    "{case}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn origin_and_explicit_trust_bound_unsafe_methods() {
         let uses = vec!["model".into(), "agents".into(), "state".into()];
         for origin in [Origin::User, Origin::Explicit] {
-            let grant = grant(origin, None, &uses);
+            let grant = grant(PluginRuntime::Module, origin, None, &uses);
             assert_eq!(grant.tier, Tier::Rewrite);
             assert!(admits(&grant, "model", "complete", false).is_ok());
         }
-        let project = grant(Origin::Project, None, &uses);
+        let project = grant(PluginRuntime::Module, Origin::Project, None, &uses);
         assert!(admits(&project, "state", "get", false).is_ok());
         assert!(
             admits(&project, "model", "complete", false)
@@ -117,6 +172,7 @@ mod tests {
         );
         assert!(admits(&project, "agents", "spawn", true).is_err());
         let trusted = grant(
+            PluginRuntime::Module,
             Origin::Project,
             Some(&PluginTrust {
                 tier: Tier::Full,

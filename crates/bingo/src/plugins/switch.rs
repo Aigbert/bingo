@@ -69,6 +69,7 @@ pub fn run(
             && let Some(trust) = settings.kernel.plugin_trust.get(&status.id)
         {
             execution.grant = bingo_plugin_host::grant::grant(
+                execution.runtime,
                 execution.origin,
                 Some(trust),
                 &execution.grant.uses.iter().cloned().collect::<Vec<_>>(),
@@ -165,7 +166,7 @@ fn installed(found: Found, switched_off: &BTreeSet<String>) -> PluginStatus {
         )
         .err()
     };
-    let grant = bingo_plugin_host::grant::grant(found.origin, None, &found.manifest.uses);
+    let grant = bingo_plugin_host::grant::grant(runtime, found.origin, None, &found.manifest.uses);
     PluginStatus {
         id: found.name,
         version: found.manifest.version,
