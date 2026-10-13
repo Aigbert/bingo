@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+mod offline;
 use bingo_core::{Host, HostConfig};
 use bingo_mods::ModsPlugin;
 use bingo_sdk::*;
@@ -15,6 +16,12 @@ pub struct Fixture {
 }
 impl Fixture {
     pub async fn new(source: &str, uses: &[&str], options: Value) -> Self {
+        Self::build(source, uses, options, false).await
+    }
+    pub async fn agent(source: &str, uses: &[&str], options: Value) -> Self {
+        Self::build(source, uses, options, true).await
+    }
+    async fn build(source: &str, uses: &[&str], options: Value, agent: bool) -> Self {
         let home = tempfile::tempdir().unwrap();
         let root = home.path().join("fixture");
         std::fs::create_dir(&root).unwrap();
@@ -25,16 +32,20 @@ impl Fixture {
         .unwrap();
         std::fs::write(root.join("main.ts"), source).unwrap();
         let plugin = ModsPlugin::default().with_dirs(vec![root.clone()]);
-        let config = HostConfig::new(Env::rooted(home.path())).with_layer("test", options);
-        let host = Host::build(vec![Box::new(plugin.clone())], config)
-            .await
-            .unwrap();
+        let config = HostConfig::new(Env::rooted(home.path()))
+            .with_layer("test", options)
+            .with_layer("offline", json!({"provider":"offline","model":"offline"}));
+        let mut plugins: Vec<Box<dyn Plugin>> = vec![Box::new(plugin.clone())];
+        if agent {
+            plugins.push(Box::new(offline::Offline::default()));
+        }
+        let host = Host::build(plugins, config).await.unwrap();
         let attachment = host
             .open(
                 SessionSelector::Create {
                     spec: SessionSpec {
                         cwd: home.path().into(),
-                        driver: Driver::Log,
+                        driver: if agent { Driver::default() } else { Driver::Log },
                         ..Default::default()
                     },
                 },
