@@ -327,3 +327,5 @@ pub(crate) mod append;
 pub(crate) mod config;
 
 pub(crate) mod registration;
+
+pub(crate) mod render;

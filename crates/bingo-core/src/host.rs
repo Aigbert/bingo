@@ -8,6 +8,7 @@ mod auth;
 mod catalog;
 mod choose;
 mod completion;
+mod throttle;
 mod interception;
 mod refresh;
 mod registry;
