@@ -32,7 +32,7 @@
 //! here: it rides inside one `service/call`'s params, so it lives with the
 //! doors that read it ([`crate::doors`]).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use bingo_sdk::{
@@ -45,15 +45,33 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// The major the host speaks. A process that answers with another one is
-/// refused rather than guessed at (ADR-0015 §Consequences). It stays at one
-/// until a plugin outside this repository speaks it: until then the wire
-/// changes in place and `schema/plugin.json` is the record of what it is,
-/// and a number nobody is held to would only count our own edits.
-pub const PROTOCOL: u32 = 1;
+/// Protocol 2 is frozen by schema/plugin-2.json (ADR-0075).
+pub const PROTOCOL: u32 = 2;
+
+pub type Cap = String;
+
+/// Capabilities are method names; unknown additions can be negotiated unchanged.
+pub fn negotiated(host: &BTreeSet<Cap>, plugin: &BTreeSet<Cap>) -> BTreeSet<Cap> {
+    host.intersection(plugin).cloned().collect()
+}
+
+pub fn capabilities() -> BTreeSet<Cap> {
+    METHODS.iter().map(|method| method.0)
+        .chain(NOTIFICATIONS.iter().map(|note| note.0))
+        .filter(|method| *method != name::INITIALIZE)
+        .map(str::to_owned).collect()
+}
 
 /// Every name that travels on the wire, in one place.
 pub mod name {
+    pub const HOST_PLACE: &str = "host/place";
+    pub const HOST_EXTEND: &str = "host/extend";
+    pub const HOST_DELIVER: &str = "host/deliver";
+    pub const STATE_GET: &str = "host/state/get";
+    pub const STATE_SET: &str = "host/state/set";
+    pub const MODEL_COMPLETE: &str = "host/model/complete";
+    pub const TOOLS_CHANGED: &str = "tools/changed";
+    pub const COMMANDS_CHANGED: &str = "commands/changed";
     /// Kernel → plugin, once, before anything else.
     pub const INITIALIZE: &str = "initialize";
     /// Kernel → plugin: run one tool call.
@@ -118,6 +136,8 @@ pub struct InitializeParams {
     pub protocol: u32,
     /// The directory the manifest was read from, already resolved.
     pub plugin_root: PathBuf,
+    pub plugin_name: String,
+    pub capabilities: BTreeSet<Cap>,
     /// This plugin's settings slice (`plugins.<name>`); `null` when unset.
     #[serde(default)]
     pub config: Value,
@@ -134,6 +154,8 @@ pub struct InitializeResult {
     pub protocol: u32,
     pub name: String,
     pub version: String,
+    #[serde(default)]
+    pub capabilities: BTreeSet<Cap>,
     #[serde(default)]
     pub tools: Vec<ToolSpec>,
     #[serde(default)]
@@ -576,6 +598,12 @@ pub type Method = (&'static str, Ref, Ref);
 pub type Notification = (&'static str, Ref);
 
 pub static METHODS: &[Method] = &[
+    (name::HOST_PLACE, schema_of::<crate::host::Place>, schema_of::<()>),
+    (name::HOST_EXTEND, schema_of::<crate::host::Extend>, schema_of::<()>),
+    (name::HOST_DELIVER, schema_of::<crate::host::Deliver>, schema_of::<()>),
+    (name::STATE_GET, schema_of::<crate::host::StateGet>, schema_of::<Option<crate::host::StateValue>>),
+    (name::STATE_SET, schema_of::<crate::host::StateSet>, schema_of::<crate::host::StateValue>),
+    (name::MODEL_COMPLETE, schema_of::<crate::host::Complete>, schema_of::<crate::host::Completed>),
     (
         name::INITIALIZE,
         schema_of::<InitializeParams>,
@@ -632,6 +660,18 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn capabilities_are_only_the_intersection() {
+        for (host, plugin, expected) in [
+            (vec![], vec!["host/place"], vec![]),
+            (vec!["host/place"], vec![], vec![]),
+            (vec!["host/place", "future"], vec!["host/place"], vec!["host/place"]),
+        ] {
+            let set = |v: Vec<&str>| v.into_iter().map(str::to_owned).collect();
+            assert_eq!(negotiated(&set(host), &set(plugin)), set(expected));
+        }
+    }
+
+    #[test]
     fn no_name_is_used_twice() {
         let mut names: Vec<&str> = METHODS
             .iter()
@@ -649,6 +689,8 @@ mod tests {
         let params = InitializeParams {
             protocol: PROTOCOL,
             plugin_root: PathBuf::from("/plugins/wordcount"),
+            plugin_name: "wordcount".into(),
+            capabilities: super::capabilities(),
             config: json!({ "limit": 10 }),
             env: HostEnv::from(&Env::rooted("/home/u")),
         };

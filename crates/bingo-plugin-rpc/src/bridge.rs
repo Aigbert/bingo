@@ -472,6 +472,8 @@ impl Bridge {
         let params = InitializeParams {
             protocol: PROTOCOL,
             plugin_root: self.root.clone(),
+            plugin_name: self.name.clone(),
+            capabilities: crate::wire::capabilities(),
             config: self.config.clone(),
             env: self.env.clone(),
         };
@@ -548,6 +550,7 @@ mod tests {
             protocol,
             name: "wordcount".into(),
             version: "0.1.0".into(),
+            capabilities: crate::wire::capabilities(),
             tools: Vec::new(),
             commands: Vec::new(),
             contributors: Vec::new(),

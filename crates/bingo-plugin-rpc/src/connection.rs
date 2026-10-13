@@ -130,14 +130,13 @@ impl Router {
     }
 
     async fn asked(&self, plugin: &str, request: Request, sender: Option<bingo_jsonrpc::Sender>) {
-        match (
-            self.serving.as_ref().filter(|_| served(&request.method)),
-            sender,
-        ) {
-            (Some(serving), Some(sender)) => serving.answer(request, sender).await,
-            _ => {
-                tracing::warn!(plugin, method = %request.method, "a plugin asked, which it may not")
-            }
+        let Some(sender) = sender else { return; };
+        if let Some(serving) = self.serving.as_ref().filter(|_| served(&request.method)) {
+            serving.answer(request, sender).await;
+        } else {
+            let error = RpcError::new(crate::codec::METHOD_NOT_FOUND,
+                format!("the host does not serve {} for {plugin}", request.method));
+            let _ = sender.send(Message::Response(Response::failed(Some(request.id), error)));
         }
     }
 

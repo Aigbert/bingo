@@ -175,6 +175,7 @@ fn notification_line(method: &str, params: &Value, state: &mut State) {
 
 fn handshake(options: &Options) -> Value {
     let result = InitializeResult {
+        capabilities: bingo_plugin_rpc::wire::capabilities(),
         protocol: options.protocol,
         name: "stub".into(),
         version: "0.1.0".into(),
