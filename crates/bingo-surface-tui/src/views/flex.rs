@@ -36,18 +36,13 @@ pub fn lines(
     let py = space(style.padding_y.or(style.padding));
     let inner = width.saturating_sub(2 * (px + border));
     let children: Vec<_> = children.iter().filter(|child| !hidden(child)).collect();
-    let mut out = body(&children, style, inner, marks);
-    if let Some(height) = style.height {
-        let height = usize::from(height)
+    let height = style.height.map(|height| {
+        usize::from(height)
             .min(1024)
-            .saturating_sub(2 * (py + border));
-        let spare = height.saturating_sub(out.len());
-        let before = match style.justify_content {
-            Some(Justify::Center) => spare / 2,
-            Some(Justify::FlexEnd) => spare,
-            _ => 0,
-        };
-        out.splice(0..0, vec![Line::default(); before]);
+            .saturating_sub(2 * (py + border))
+    });
+    let mut out = body(&children, style, inner, height, marks);
+    if let Some(height) = height {
         out.resize(height, Line::default());
         out.truncate(height);
     }
@@ -96,7 +91,13 @@ fn grow(view: &View) -> usize {
         0
     }
 }
-fn body(children: &[&View], style: &BoxStyle, width: usize, marks: &Marks) -> Vec<Line<'static>> {
+fn body(
+    children: &[&View],
+    style: &BoxStyle,
+    width: usize,
+    height: Option<usize>,
+    marks: &Marks,
+) -> Vec<Line<'static>> {
     let gap = space(style.gap);
     let desired: usize = children
         .iter()
@@ -106,40 +107,84 @@ fn body(children: &[&View], style: &BoxStyle, width: usize, marks: &Marks) -> Ve
     let is_row = style.flex_direction == Some(Direction::Row)
         && !(style.flex_wrap == Some(Wrap::Wrap) && desired > width);
     if is_row {
-        return row(children, style, width, marks);
+        return row(children, style, width, height, marks);
     }
     let gap = if style.flex_direction == Some(Direction::Row) {
         0
     } else {
         gap
     };
-    let mut out = Vec::new();
-    for child in children {
-        if !out.is_empty() {
-            out.extend(vec![Line::default(); gap]);
+    column(children, style, width, height, gap, marks)
+}
+fn column(
+    children: &[&View],
+    style: &BoxStyle,
+    width: usize,
+    height: Option<usize>,
+    gap: usize,
+    marks: &Marks,
+) -> Vec<Line<'static>> {
+    let mut drawn: Vec<_> = children
+        .iter()
+        .map(|child| column_child(child, style, width, marks))
+        .collect();
+    let used = drawn.iter().map(Vec::len).sum::<usize>() + gap * children.len().saturating_sub(1);
+    let spare = height.unwrap_or(used).saturating_sub(used);
+    let total: usize = children.iter().map(|child| grow(child)).sum();
+    if total > 0 {
+        for (lines, child) in drawn.iter_mut().zip(children) {
+            let extra = spare * grow(child) / total;
+            if extra > 0 {
+                let mut child = (*child).clone();
+                if let View::Box { layout, .. } = &mut child {
+                    layout.height = Some((lines.len() + extra).min(1024) as u16);
+                }
+                *lines = column_child(&child, style, width, marks);
+            }
         }
-        let child_width = if matches!(
-            style.align_items,
-            Some(Align::Center | Align::FlexEnd | Align::FlexStart)
-        ) {
-            hint(child).min(width)
-        } else {
-            width
-        };
-        let by = match style.align_items {
-            Some(Align::Center) => width.saturating_sub(child_width) / 2,
-            Some(Align::FlexEnd) => width.saturating_sub(child_width),
-            _ => 0,
-        };
-        out.extend(
-            marked(child, child_width, marks)
-                .into_iter()
-                .map(|line| indent(line, by)),
-        );
+    }
+    let used = drawn.iter().map(Vec::len).sum::<usize>() + gap * children.len().saturating_sub(1);
+    let (before, extra) = justify(
+        style.justify_content,
+        height.unwrap_or(used).saturating_sub(used),
+        children.len(),
+    );
+    let mut out = vec![Line::default(); before];
+    for (index, lines) in drawn.into_iter().enumerate() {
+        if index > 0 {
+            out.extend(vec![Line::default(); gap + extra]);
+        }
+        out.extend(lines);
     }
     out
 }
-fn row(children: &[&View], style: &BoxStyle, width: usize, marks: &Marks) -> Vec<Line<'static>> {
+fn column_child(child: &View, style: &BoxStyle, width: usize, marks: &Marks) -> Vec<Line<'static>> {
+    let child_width = if matches!(
+        style.align_items,
+        Some(Align::Center | Align::FlexEnd | Align::FlexStart)
+    ) {
+        hint(child).min(width)
+    } else {
+        width
+    };
+    let by = match style.align_items {
+        Some(Align::Center) => width.saturating_sub(child_width) / 2,
+        Some(Align::FlexEnd) => width.saturating_sub(child_width),
+        _ => 0,
+    };
+    marked(child, child_width, marks)
+        .into_iter()
+        .map(|line| indent(line, by))
+        .collect()
+}
+
+fn row(
+    children: &[&View],
+    style: &BoxStyle,
+    width: usize,
+    height: Option<usize>,
+    marks: &Marks,
+) -> Vec<Line<'static>> {
     let gap = space(style.gap);
     let gaps = gap * children.len().saturating_sub(1);
     let mut widths: Vec<_> = children.iter().map(|child| hint(child)).collect();
@@ -161,7 +206,7 @@ fn row(children: &[&View], style: &BoxStyle, width: usize, marks: &Marks) -> Vec
         .zip(&widths)
         .map(|(child, size)| marked(child, (*size).min(width), marks))
         .collect();
-    let height = drawn.iter().map(Vec::len).max().unwrap_or(0);
+    let height = height.unwrap_or_else(|| drawn.iter().map(Vec::len).max().unwrap_or(0));
     (0..height)
         .map(|y| {
             let mut spans = vec![Span::raw(" ".repeat(before))];
@@ -197,7 +242,17 @@ fn justify(justify: Option<Justify>, spare: usize, count: usize) -> (usize, usiz
     }
 }
 fn bordered(lines: Vec<Line<'static>>, width: usize, style: &BoxStyle) -> Vec<Line<'static>> {
-    let glyphs = theme::border();
+    let default = theme::border();
+    let glyphs = if default.top_left == "+" {
+        default
+    } else {
+        match style.border_style.as_deref() {
+            Some("single") => ratatui::symbols::border::PLAIN,
+            Some("double") => ratatui::symbols::border::DOUBLE,
+            Some("bold") => ratatui::symbols::border::THICK,
+            _ => default,
+        }
+    };
     let ink = text::color(theme::dim(), style.border_color.as_deref());
     let middle = width.saturating_sub(2);
     let edge = |left: &str, right: &str| {
