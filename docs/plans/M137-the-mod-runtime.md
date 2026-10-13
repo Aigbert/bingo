@@ -131,6 +131,18 @@ file-watcher dependencies, watching non-explicit directories; no live tests.
   Process reload fixture constructors change mechanically with Launch.
   Core commands/plugins.rs status constructors gain empty execution metadata.
 
+- Stop 2026-10-14, protocol step 6: `tests/plugin/harness.rs` in plugin-rpc
+  starts Manager over TestHost, never adjudicates registrations and exposes
+  no granted catalogue. Its `only_tool` now sees 0 instead of 1. Updating
+  that behavior is outside Files, beyond a mechanical constructor change.
+  Option A (recommended): include RPC integration fixtures in Files; make
+  the harness perform registration, publish grants and declare fixture uses,
+  preserving existing assertions, including the host's default refusal.
+  Option B: include those fixtures and run them over an isolated real kernel
+  instead of TestHost; justify its dev dependency and remeasure the budget.
+  Still pending: remaining grant/re-entry/interrupt contracts, mod reload,
+  binary composition and listing, ts-status parity, RSS and final gates.
+
 ## Verified (2026-10-14)
 
 Branch: `m137-the-mod-runtime`, base `23810b23`. No push, merge or PR.
@@ -600,3 +612,88 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 # fail 0
 # skipped 0
 ```
+
+The serial fmt/check/clippy gates below precede the final RPC source adapter.
+
+`cargo test -p bingo-plugin-rpc host::tests::model_completion_requires_the_catalogues_granted_noun --locked`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.43s
+test host::tests::model_completion_requires_the_catalogues_granted_noun ... FAILED
+thread 'host::tests::model_completion_requires_the_catalogues_granted_noun' (8075459) panicked at crates/bingo-plugin-rpc/src/host.rs:134:9:
+[UNSUPPORTED] this host does not complete model requests
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 125 filtered out; finished in 0.03s
+error: test failed, to rerun pass `-p bingo-plugin-rpc --lib`
+```
+
+`cargo fmt --all -- --check`: exit 0, no output.
+
+`cargo check --workspace --all-targets --locked`:
+```text
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.19s
+```
+
+`cargo clippy --workspace --all-targets --locked -- -D warnings`:
+```text
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.25s
+```
+
+`cargo test --workspace --locked`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 00s
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.11s
+test result: ok. 259 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.99s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+test a_stub_completion_is_in_the_turns_terminal_bill ... FAILED
+thread 'a_stub_completion_is_in_the_turns_terminal_bill' (8148495) panicked at crates/bingo/tests/plugin_rpc.rs:299:5:
+the side call was billed: [Frame …] (frame dump elided)
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.23s
+error: test failed, to rerun pass `-p bingo --test plugin_rpc`
+```
+
+`cargo test -p bingo --test plugin_rpc a_stub_completion_is_in_the_turns_terminal_bill --locked`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 18.17s
+test a_stub_completion_is_in_the_turns_terminal_bill ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.35s
+```
+
+`cargo test -p bingo-plugin-rpc --test plugin host::model_completion_reaches_the_hosts_default_refusal --locked`:
+```text
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.85s
+test host::model_completion_reaches_the_hosts_default_refusal ... FAILED
+thread 'host::model_completion_reaches_the_hosts_default_refusal' (8214175) panicked at crates/bingo-plugin-rpc/tests/plugin/harness.rs:144:5:
+assertion `left == right` failed: the stub offers one tool
+  left: 0
+ right: 1
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 48 filtered out; finished in 0.05s
+error: test failed, to rerun pass `-p bingo-plugin-rpc --test plugin`
+```
+
+`cargo fmt --all`: exit 0, no output (format the final adapter before recording the stop).
+
+`git diff --check`: exit 0, no output.
+
+Not run after the protocol stop:
+
+| Command | Result |
+|---|---|
+| `cargo fmt --all -- --check` | Not rerun on the final adapter. |
+| `cargo check --workspace --all-targets --locked` | Not rerun on the final adapter. |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Not rerun on the final adapter. |
+| `cargo test --workspace --locked` | Not rerun; billing regression passes alone, RPC fixture remains blocked. |
+| `scripts/check_discipline.sh` | Not run. |
+| `scripts/budget.sh` | Final run not performed; earlier 410-dependency measurement above. |
+| `cargo deny check` | Final run not performed; earlier pass above. |
+| `cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc` | Not run. |
+| `cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc` | Not run. |
+| `cargo check -p bingo-plugin-host --all-targets --target x86_64-pc-windows-msvc` | Not run. |
+| `cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc` | Not run. |
+| `cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc` | Not run. |
+| `cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc` | Not run. |
