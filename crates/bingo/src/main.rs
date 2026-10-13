@@ -683,6 +683,11 @@ fn plugins(
         Box::new(SkillsPlugin::default()),
         Box::new(McpPlugin::default()),
         Box::new(PluginRpcPlugin::default()),
+        Box::new(
+            bingo_mods::ModsPlugin::default()
+                .with_dirs(composition.mods.plugin_dirs)
+                .with_settings(composition.mods.plugins),
+        ),
         Box::new(AgentsPlugin::default()),
         Box::new(RoomsPlugin::default()),
         Box::new(TasksPlugin),

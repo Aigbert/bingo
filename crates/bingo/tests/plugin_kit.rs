@@ -89,6 +89,12 @@ fn typescript_acceptance_runs_outside_the_workspace() {
     }
     let root = tempfile::tempdir().unwrap();
     let plugin = fixture(root.path(), "ts-status");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(plugin.join("plugin.json")).unwrap())
+            .unwrap();
+    manifest.as_object_mut().unwrap().remove("module");
+    manifest["entry"] = serde_json::json!({"command":"node","args":["${PLUGIN_ROOT}/main.ts"]});
+    std::fs::write(plugin.join("plugin.json"), manifest.to_string()).unwrap();
     let validated = success(&run(root.path(), "validate", &plugin));
     assert!(validated.contains("protocol 2") && validated.contains("tool.check"));
     let tested = success(&run(root.path(), "test", &plugin));
@@ -215,8 +221,8 @@ fn module_listing_names_the_runtime_and_its_disabled_reason() {
         .unwrap();
     assert!(row.ends_with("\tmodule"), "{row}");
     std::fs::write(
-        root.path().join(".bingo/settings.json"),
-        r#"{"enabledPlugins":{"bingo.mods":false}}"#,
+        root.path().join(".bingo/settings.toml"),
+        "[enabledPlugins]\n\"bingo.mods\" = false\n",
     )
     .unwrap();
     let disabled = success(&list());

@@ -1,6 +1,14 @@
 {
   "name": "ts-status",
   "version": "0.1.0",
-  "entry": { "command": "node", "args": ["${PLUGIN_ROOT}/main.ts"] },
-  "config": { "type": "object", "properties": {}, "additionalProperties": false }
+  "config": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "module": "hooks/register.ts",
+  "uses": [
+    "store",
+    "ui"
+  ]
 }

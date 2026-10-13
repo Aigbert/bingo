@@ -8,6 +8,7 @@ use bingo_sdk::{ErrorCode, KernelError, Plugin};
 #[derive(Default)]
 pub(crate) struct Composition {
     pub demo: bool,
+    pub mods: bingo_plugin_rpc::Settings,
     pub print: bingo_surface_print::Options,
     pub rpc: bingo_surface_rpc::Options,
     pub tui: bingo_surface_tui::Options,
@@ -17,6 +18,14 @@ impl Composition {
     pub fn for_cli(cli: &Cli, merged: &Merged) -> Self {
         Self {
             demo: demo(cli.demo_ui, merged),
+            mods: serde_json::from_value(
+                merged
+                    .plugins
+                    .get(bingo_plugin_rpc::ID)
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!({})),
+            )
+            .unwrap_or_default(),
             print: bingo_surface_print::Options {
                 output_format: cli.output_format,
                 input_format: cli.input_format,
