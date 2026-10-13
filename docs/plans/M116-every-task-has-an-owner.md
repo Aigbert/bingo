@@ -85,6 +85,8 @@ these holds only where a `select!` was remembered.
    - Queries, frames from the turn, `Interrupt` and `Close` are never
      behind the gate.
 6. **Journal I/O off the runtime.** `bingo-store-jsonl/src/lib.rs`:
+   - Promote the existing workspace `tokio` dev dependency to production
+     for `spawn_blocking`; no new external crate or budget increase.
    - `append` moves `journal::append` and the summary writes into one
      `spawn_blocking` closure. `replay`, `list` and `create` do the
      same.
@@ -106,7 +108,7 @@ these holds only where a `select!` was remembered.
   `session/tests/{owned,storage}.rs`, `test_support/**`
 - `crates/bingo-sdk/src/{error.rs,command.rs,tool.rs,store.rs,
   transcript.rs}`, `transcript/tests.rs`, `schema/rpc.json`
-- `crates/bingo-store-jsonl/src/lib.rs`
+- `crates/bingo-store-jsonl/{src/lib.rs,Cargo.toml}`, `Cargo.lock`
 - every `CommandContext {` constructor outside the kernel (production and tests):
   `rg -n 'CommandContext \{' crates`
 - `docs/adr/{0068,0002,0008}*.md`
@@ -136,7 +138,7 @@ these holds only where a `select!` was remembered.
 
 - Dropping may leave plugin work behind (M117); the kernel promises only that the session moves on.
 - Test prose/command/prose during a slow submit hook: acknowledgements and turns keep arrival order.
-- Update all `CommandContext` literals, including production `bingo-agents/src/team/command.rs`.
+- Update all `CommandContext` literals; the team command literal is inside `cfg(test)`.
 - Record a 1 000-frame append benchmark before and after the blocking-pool change (not a budget).
 - Re-verification at `01789d66` (2026-10-13): M112's `Transcript` and the named session methods
   exist; M113's fixtures do not. The actor already has a `TaskTracker`; commands still use an
