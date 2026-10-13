@@ -8,3 +8,6 @@ pub struct Link {
     pub interceptor: Arc<dyn Interceptor>,
     pub tier: Tier,
 }
+
+mod tier;
+pub use tier::{Act, admits, tightens};
