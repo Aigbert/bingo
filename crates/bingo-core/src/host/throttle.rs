@@ -5,6 +5,15 @@ use std::time::Duration;
 #[derive(Default)]
 pub(super) struct Throttle(BTreeMap<String, VecDeque<Duration>>);
 impl Throttle {
+    pub(super) fn delay(&self, request: &str, now: Duration) -> Duration {
+        self.0
+            .get(request)
+            .filter(|times| times.len() >= 30)
+            .and_then(|times| times.front())
+            .map_or(Duration::ZERO, |first| {
+                (*first + Duration::from_secs(1)).saturating_sub(now)
+            })
+    }
     pub(super) fn admit(&mut self, request: &str, now: Duration) -> bool {
         self.0.retain(|_, times| {
             while times
@@ -34,6 +43,10 @@ mod tests {
             .count();
         assert_eq!(admitted, 30);
         assert!(!throttle.admit("counter", Duration::from_millis(999)));
+        assert_eq!(
+            throttle.delay("counter", Duration::from_millis(999)),
+            Duration::from_millis(1)
+        );
         assert!(throttle.admit("other", Duration::from_millis(999)));
         assert!(throttle.admit("counter", Duration::from_secs(1)));
     }

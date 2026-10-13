@@ -33,18 +33,36 @@ pub(super) async fn invalidate(
 ) -> Result<(), KernelError> {
     let mailbox = host.mailbox_of(session).await?;
     let live = host.live(session)?;
-    let accepted = {
-        let mut throttle = live.invalidations.lock().unwrap_or_else(|e| e.into_inner());
-        let now = live.render_started.elapsed();
-        requests
-            .into_iter()
-            .collect::<std::collections::BTreeSet<_>>()
-            .into_iter()
-            .filter(|request| throttle.admit(request, now))
-            .collect::<Vec<_>>()
-    };
-    if !accepted.is_empty() {
-        mailbox.invalidate(accepted);
+    let mut pending: Vec<_> = requests
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    while !pending.is_empty() {
+        let (accepted, delay) = {
+            let mut throttle = live.invalidations.lock().unwrap_or_else(|e| e.into_inner());
+            let now = live.render_started.elapsed();
+            let mut accepted = Vec::new();
+            pending.retain(|request| {
+                if throttle.admit(request, now) {
+                    accepted.push(request.clone());
+                    false
+                } else {
+                    true
+                }
+            });
+            let delay = pending
+                .iter()
+                .map(|request| throttle.delay(request, now))
+                .min();
+            (accepted, delay)
+        };
+        if !accepted.is_empty() {
+            mailbox.invalidate(accepted);
+        }
+        if let Some(delay) = delay {
+            tokio::time::sleep(delay).await;
+        }
     }
     Ok(())
 }
