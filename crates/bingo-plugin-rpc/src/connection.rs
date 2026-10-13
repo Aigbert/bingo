@@ -331,9 +331,12 @@ impl Connection {
     /// handshake and will never be spoken to again.
     pub async fn stop(&self) {
         self.peer.close();
-        if let Err(error) = self.child.lock().await.start_kill() {
+        let mut child = self.child.lock().await;
+        if let Err(error) = child.start_kill() {
             tracing::debug!(plugin = %self.plugin, %error, "the plugin process was already gone");
+            return;
         }
+        let _ = child.wait().await;
     }
 }
 
