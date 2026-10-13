@@ -129,7 +129,13 @@ bad = []
 for crate in pathlib.Path("crates").iterdir():
     if crate.name == "bingo-services" or not (crate / "src").is_dir():
         continue
-    sources = [p.read_text().split("#[cfg(test)]")[0] for p in (crate / "src").rglob("*.rs") if "tests" not in p.parts and "test" not in p.name]
+    sources = []
+    for path in (crate / "src").rglob("*.rs"):
+        if "tests" in path.parts or "test" in path.name:
+            continue
+        # A test-only module declaration can precede the production manifest.
+        text = re.sub(r"#\[cfg\(test\)\]\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+;", "", path.read_text())
+        sources.append(text.split("#[cfg(test)]")[0])
     source = "\n".join(sources)
     declarations = " ".join(re.findall(r"(?:provides|requires|uses):\s*&\[([^]]*)\]", source, re.S))
     for module, key in contracts.items():

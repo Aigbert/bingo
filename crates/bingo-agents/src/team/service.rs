@@ -121,11 +121,13 @@ mod native_path_tests {
     }
 
     #[tokio::test]
-    async fn a_typed_owner_reads_a_directory_json_cannot_name() {
+    async fn a_typed_owner_accepts_a_path_json_cannot_name() {
         let home = tempfile::tempdir().unwrap();
         let cwd = home.path().join(native_name());
-        std::fs::create_dir_all(cwd.join(".bingo")).unwrap();
-        std::fs::write(cwd.join(".bingo/team.json"), r#"{"rooms":[]}"#).unwrap();
+        assert!(cwd.to_str().is_none());
+        // Some filesystems reject non-Unicode names; the path still reaches its ancestor.
+        std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
+        std::fs::write(home.path().join(".bingo/team.json"), r#"{"rooms":[]}"#).unwrap();
         let owner: Arc<dyn team::TeamFile> = Arc::new(TeamFile);
         let host = bingo_sdk::testing::ServiceHost::holding(&team::KEY, owner);
         let section = team::find(&host)
