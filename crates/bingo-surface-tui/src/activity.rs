@@ -523,8 +523,7 @@ mod tests {
 
     /// The row counts what hangs under this session, not everything else
     /// that is running: a child looking up at a running parent is waiting on
-    /// nothing of its own. The status line's `1 running` is the other sense
-    /// of the same count and is unchanged — furniture counts, the row speaks.
+    /// nothing of its own. The crew strip likewise names only descendants.
     #[test]
     fn a_child_under_a_running_root_is_not_waiting_on_an_agent() {
         let (mut ui, now) = scene();
@@ -535,7 +534,7 @@ mod tests {
         tree.show(&child_id());
         assert_eq!(row(&tree, now), "");
         let drawn = draw_tree(80, 24, &tree, &mut ui, now);
-        assert!(drawn.contains("1 running"), "{drawn}");
+        assert!(!drawn.contains("running"), "{drawn}");
     }
 
     /// The wake that ends the wait opens a turn, and the turn's own row is

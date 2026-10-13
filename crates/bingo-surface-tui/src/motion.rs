@@ -661,14 +661,14 @@ fn what_wants_a_person_alternates_on_the_second() {
     let at = |ms| {
         crate::status::styles(&crate::status::line(&tree, &ui, 80, later(now, ms)))
             .into_iter()
-            .find(|(text, _)| text.contains("needs you"))
+            .find(|(text, _)| text.contains(crate::face::face("reviewer").sigil()))
             .map(|(_, style)| style)
             .expect("the notice")
     };
-    assert_eq!(at(0), theme::presence());
-    assert_eq!(at(999), theme::presence());
-    assert_eq!(at(1_000), theme::text(), "on the second");
-    assert_eq!(at(2_000), theme::presence());
+    assert_eq!(at(0), crate::face::style("reviewer"));
+    assert_eq!(at(999), at(0));
+    assert_ne!(at(1_000), at(0), "on the second");
+    assert_eq!(at(2_000), at(0));
 }
 
 /// The card's border is the fourth place that beat is said, and no longer

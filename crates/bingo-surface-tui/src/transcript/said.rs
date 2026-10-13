@@ -52,11 +52,12 @@ pub fn lines(
     item: &Item,
     parts: &[ContentPart],
     origin: &Origin,
+    place: &super::Place<'_>,
     fold: Fold,
     rows: &Rows<'_>,
 ) -> Vec<Line<'static>> {
-    if rows.driver == Driver::Log {
-        return post(item, parts, origin.principal.as_deref(), rows);
+    if rows.state.summary.driver == Driver::Log {
+        return post(item, place, rows);
     }
     match voice(origin) {
         bingo_sdk::Voice::Aside => Vec::new(),
@@ -78,33 +79,105 @@ pub fn lines(
 /// A post nobody signed came from the session the room hangs under — a person
 /// at this composer, or the model that holds it — and every seat reads that one
 /// under the roster's own word for it.
-fn post(
-    item: &Item,
-    parts: &[ContentPart],
-    principal: Option<&str>,
-    rows: &Rows<'_>,
-) -> Vec<Line<'static>> {
-    let text = said(parts);
-    let text = text.trim();
-    if text.is_empty() {
+fn post(item: &Item, place: &super::Place<'_>, rows: &Rows<'_>) -> Vec<Line<'static>> {
+    let Some(post) = bingo_collab::mentions::Post::of(item) else {
+        return Vec::new();
+    };
+    if post.text.trim().is_empty() {
         return Vec::new();
     }
-    let mut body: Vec<Line<'static>> = text
+    let previous = place.previous.and_then(bingo_collab::mentions::Post::of);
+    let grouped = previous
+        .as_ref()
+        .is_some_and(|before| bingo_collab::name::same(&before.author, &post.author));
+    let mut body: Vec<Line<'static>> = post
+        .text
+        .trim()
         .lines()
-        .map(|line| Line::from(Span::styled(line.to_string(), theme::text())))
+        .map(|line| {
+            Line::from(crate::markdown::mentions::spans(
+                line,
+                theme::text(),
+                &rows.names,
+            ))
+        })
         .collect();
-    if let Some(first) = body.first_mut() {
-        first
-            .spans
-            .insert(0, name(principal.unwrap_or(seats::HOLDER)));
+    if !grouped && let Some(first) = body.first_mut() {
+        first.spans.insert(
+            0,
+            Span::styled(
+                format!("{}: ", post.author),
+                crate::face::style(&post.author).patch(theme::bold()),
+            ),
+        );
     }
-    speaks(bullet_style(item.status, false), body, rows)
+    let members = seats::members(rows.state);
+    if addressed(&post, &members)
+        && let Some(last) = body.last_mut()
+    {
+        let arrow = if theme::glyphs() == &theme::ASCII {
+            " -> you"
+        } else {
+            " → you"
+        };
+        last.spans.push(Span::styled(arrow, theme::dim()));
+    }
+    let glyph = if grouped {
+        " "
+    } else {
+        crate::face::face(&post.author).sigil()
+    };
+    let mut out = super::marked(glyph, crate::face::style(&post.author), body, rows);
+    if first_post(item, rows.state) {
+        out.extend(member_row(&members, rows));
+    }
+    out
 }
 
-/// Who said it: the one span a post spends on emphasis, so the eye finds the
-/// author before it reads the line.
-fn name(principal: &str) -> Span<'static> {
-    Span::styled(format!("{principal}: "), theme::text().patch(theme::bold()))
+fn member_row(members: &[String], rows: &Rows<'_>) -> Vec<Line<'static>> {
+    if members.is_empty() {
+        return Vec::new();
+    }
+    super::under(
+        Span::raw("  "),
+        vec![Line::from(crate::status::clip(
+            vec![Span::styled(
+                format!("members: {}", members.join(", ")),
+                theme::dim(),
+            )],
+            rows.measured().saturating_sub(2),
+        ))],
+        2,
+        rows.measured(),
+    )
+}
+
+fn first_post(item: &Item, state: &bingo_sdk::SessionState) -> bool {
+    state
+        .transcript
+        .items()
+        .iter()
+        .find(|item| matches!(item.body, bingo_sdk::ItemBody::User { .. }))
+        .is_some_and(|first| first.id == item.id)
+}
+
+/// The room's composer speaks as the holder; the shared matcher owns @all.
+fn addressed(post: &bingo_collab::mentions::Post, members: &[String]) -> bool {
+    if bingo_collab::name::same(&post.author, seats::HOLDER)
+        || !members
+            .iter()
+            .any(|name| bingo_collab::name::same(name, seats::HOLDER))
+    {
+        return false;
+    }
+    bingo_collab::mentions::named(&post.text, members)
+        .iter()
+        .any(|owed| match owed {
+            bingo_collab::mentions::Owed::Member(name) => {
+                bingo_collab::name::same(name, seats::HOLDER)
+            }
+            bingo_collab::mentions::Owed::Room => true,
+        })
 }
 
 /// What a `User` item says, as its parts spell it.
@@ -159,7 +232,7 @@ fn elsewhere<'a>(origin: &'a Origin, rows: &Rows<'_>) -> Option<&'a str> {
     origin
         .conversation
         .as_deref()
-        .filter(|room| Some(*room) != rows.title)
+        .filter(|room| Some(*room) != rows.state.summary.title.as_deref())
 }
 
 /// The marked line itself: the sender's name where the origin carries one —
@@ -194,7 +267,13 @@ fn user(parts: &[ContentPart], origin: &Origin, rows: &Rows<'_>) -> Vec<Line<'st
     }
     let mut body: Vec<Line<'static>> = text
         .lines()
-        .map(|line| Line::from(Span::styled(line.to_string(), theme::text())))
+        .map(|line| {
+            Line::from(crate::markdown::mentions::spans(
+                line,
+                theme::text(),
+                &rows.names,
+            ))
+        })
         .collect();
     if let Some(name) = origin.principal.as_deref()
         && let Some(first) = body.first_mut()

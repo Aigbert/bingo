@@ -38,7 +38,7 @@ fn a_room_transcript() {
         !screen.contains("⎿"),
         "no post is a folded result: {screen}"
     );
-    assert!(screen.contains("⏺ parent: then let us ship it"), "{screen}");
+    assert!(screen.contains("✦ parent: then let us ship it"), "{screen}");
     both("room_transcript", &tree, &mut ui, now);
 }
 
@@ -264,7 +264,7 @@ fn the_roster() {
         "a live seat wears the sigil and says so: {wide}"
     );
     assert!(
-        wide.contains("⏺ watcher   idle · in #design · listening · 600s"),
+        wide.contains("●  watcher   idle · in #design · listening · 600s"),
         "a patience the roster asked for is said in seconds: {wide}"
     );
     assert!(
@@ -298,10 +298,8 @@ fn the_roster_spends_colour_only_where_the_design_says() {
     );
     assert_eq!(
         painted.coloured("owes an answer · 22m"),
-        vec!["~", "owes an answer · 22m"],
-        "the sigil in the dot's place for the session at work — it took the \
-         glyph and none of the hue — the debt for what wants a person, and \
-         nothing else on the row"
+        vec!["owes an answer · 22m"],
+        "ANSI keeps the face in text; only the debt spends attention colour"
     );
 }
 
@@ -343,7 +341,7 @@ fn the_two_doors_open_byte_identical_lists() {
         );
     }
     assert!(
-        draw_tree(80, 24, &tree, &mut down, now).contains("❯ ⏺ project"),
+        draw_tree(80, 24, &tree, &mut down, now).contains("❯ ◆  project"),
         "and it is the list that both of them opened"
     );
 }

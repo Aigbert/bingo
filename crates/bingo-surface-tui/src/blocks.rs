@@ -32,6 +32,10 @@ use crate::welcome;
 #[derive(Clone, Debug, PartialEq)]
 struct Revision {
     status: ItemStatus,
+    /// Names and room data affect prose even when an item's bytes stay put.
+    names: Vec<crate::markdown::mentions::Name>,
+    room: Option<Seq>,
+    agent_pulse: Option<ratatui::style::Style>,
     /// How much the body holds. Anything that grows a block grows this: the
     /// text of an answer, a tail, an output.
     size: usize,
@@ -73,6 +77,21 @@ fn revision(
 ) -> Revision {
     Revision {
         status: item.status,
+        names: rows.names.clone(),
+        room: (rows.state.summary.driver == bingo_sdk::Driver::Log).then_some(rows.state.seq),
+        agent_pulse: agent.map(|child| {
+            crate::face::pulse(
+                &crate::tree::name(child),
+                matches!(
+                    bingo_collab::lifecycle::Lifecycle::of_state(child),
+                    Some(
+                        bingo_collab::lifecycle::Lifecycle::Working
+                            | bingo_collab::lifecycle::Lifecycle::Asking
+                    )
+                ),
+                rows.now,
+            )
+        }),
         size: size(&item.body),
         agent: agent.map(|child| child.seq),
         fold,
