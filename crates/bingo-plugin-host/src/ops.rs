@@ -46,10 +46,7 @@ pub async fn call(
         };
         return CALLER.scope(caller, service(host, plugin, params)).await;
     }
-    let (noun, verb) =
-        route(method, &params).ok_or_else(|| format!("the host does not serve {method}"))?;
-    let grant = granted(host, plugin).await?;
-    admits(&grant, noun, verb, false).map_err(|error| error.to_string())?;
+    let (noun, verb) = admit(host, plugin, method, &params).await?;
     let wire = host
         .service_wire(&key(noun))
         .ok_or_else(|| format!("{noun}: host face is unavailable"))?;
@@ -63,6 +60,20 @@ pub async fn call(
         .await
         .map_err(|error| error.to_string())
 }
+/// Both transports consult the same catalogue grant before a host operation.
+pub async fn admit(
+    host: &HostHandle,
+    plugin: &str,
+    method: &str,
+    params: &Value,
+) -> Result<(&'static str, &'static str), String> {
+    let (noun, verb) =
+        route(method, params).ok_or_else(|| format!("the host does not serve {method}"))?;
+    let grant = granted(host, plugin).await?;
+    admits(&grant, noun, verb, false).map_err(|error| format!("{plugin}: {error}"))?;
+    Ok((noun, verb))
+}
+
 async fn service(host: &HostHandle, plugin: &str, params: Value) -> Result<Value, String> {
     let key = params
         .get("key")

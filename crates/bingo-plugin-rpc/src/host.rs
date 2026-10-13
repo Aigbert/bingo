@@ -71,12 +71,9 @@ impl Server {
         if method == name::SERVICE_CALL {
             return self.service.call(params).await;
         }
-        if method == name::MODEL_COMPLETE {
-            let grant = bingo_plugin_host::grant::granted(&self.host, &self.plugin)
-                .await
-                .map_err(failed)?;
-            bingo_plugin_host::grant::admits(&grant, "model", "complete", true).map_err(failed)?;
-        }
+        bingo_plugin_host::ops::admit(&self.host, &self.plugin, method, &params)
+            .await
+            .map_err(failed)?;
         bingo_plugin_host::host::Operations {
             plugin: &self.plugin,
             host: &self.host,
@@ -179,15 +176,30 @@ mod tests {
         );
         server.initialize(&crate::wire::capabilities());
         for (method, params, noun) in [
-            ("host/state/get", json!({"scope":"ses_1", "key":"key"}), "state"),
-            ("host/state/set", json!({"scope":"global", "key":"key", "value":1}), "store"),
+            (
+                "host/state/get",
+                json!({"scope":"ses_1", "key":"key"}),
+                "state",
+            ),
+            (
+                "host/state/set",
+                json!({"scope":"global", "key":"key", "value":1}),
+                "store",
+            ),
             ("host/place", json!({"slot":"calls", "view":null}), "ui"),
-            ("host/extend", json!({"session":"ses_1", "key":"key", "value":1}), "session"),
+            (
+                "host/extend",
+                json!({"session":"ses_1", "key":"key", "value":1}),
+                "session",
+            ),
             ("host/deliver", json!({}), "session"),
         ] {
             let error = server.answer(method, params).await.expect_err(method);
-            assert!(error.message.contains(&format!("{noun} grant")), "{method}: {}", error.message);
+            assert!(
+                error.message.contains(&format!("{noun} grant")),
+                "{method}: {}",
+                error.message
+            );
         }
     }
-
 }
