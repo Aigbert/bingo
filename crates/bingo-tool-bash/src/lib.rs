@@ -116,12 +116,11 @@ pub struct BashArgs {
 /// process to the first and stops listening to the second.
 pub struct BashTool {
     jobs: Arc<Jobs>,
-    promotions: Arc<Promotions>,
 }
 
 impl BashTool {
-    pub fn new(jobs: Arc<Jobs>, promotions: Arc<Promotions>) -> Self {
-        Self { jobs, promotions }
+    pub fn new(jobs: Arc<Jobs>) -> Self {
+        Self { jobs }
     }
 
     /// The command a call names, as the gate and the shell both see it.
@@ -153,11 +152,15 @@ impl BashTool {
         conditions: Conditions,
         cx: &ToolContext,
     ) -> Result<ToolOutput, ToolError> {
-        let listening = self.promotions.listen(&cx.call_id);
+        let listening = self.jobs.promotions.listen(&cx.call_id, &cx.session, &cx.item);
         let timeout = deadline(args.timeout);
         let mut running = run::start(&args.command, &cx.cwd, Sink::buffer(MAX_OUTPUT_CHARS))?;
         let context = run::Context::of_call(cx, listening.token());
-        match run::watch(&mut running, timeout, &context).await? {
+        self.jobs.publish(&cx.host, &cx.session).await;
+        let stopped = run::watch(&mut running, timeout, &context).await;
+        drop(listening);
+        self.jobs.publish(&cx.host, &cx.session).await;
+        match stopped? {
             run::Stop::Over(over) => {
                 let finished = run::conclude(running, over, timeout).await?;
                 Ok(output::shape(
@@ -428,9 +431,9 @@ impl Plugin for BashPlugin {
             registrar.add(Contribution::Hook(Arc::new(MissingShell(error))));
             return Ok(());
         }
-        let promotions = Arc::new(Promotions::new());
+        let promotions = self.jobs.promotions.clone();
         registrar
-            .tool(Arc::new(BashTool::new(self.jobs.clone(), promotions.clone())) as Arc<dyn Tool>);
+            .tool(Arc::new(BashTool::new(self.jobs.clone())) as Arc<dyn Tool>);
         registrar.tool(Arc::new(BashOutputTool::new(self.jobs.clone())) as Arc<dyn Tool>);
         registrar.tool(Arc::new(KillShellTool::new(self.jobs.clone())) as Arc<dyn Tool>);
         registrar.add(Contribution::Command(
@@ -721,8 +724,8 @@ pub(crate) mod tests {
     /// The tool with a table and a promotion registry of its own.
     pub(crate) fn tool() -> (Arc<Jobs>, Arc<Promotions>, BashTool) {
         let jobs = Arc::new(Jobs::new());
-        let promotions = Arc::new(Promotions::new());
-        let tool = BashTool::new(jobs.clone(), promotions.clone());
+        let promotions = jobs.promotions.clone();
+        let tool = BashTool::new(jobs.clone());
         (jobs, promotions, tool)
     }
 
