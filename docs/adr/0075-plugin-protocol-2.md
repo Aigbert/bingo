@@ -45,10 +45,11 @@ usage, which the kernel owns. Yes: that door opens, and no other.
      version that `set` bumps and `ifVersion` compares. Held on the file
      shelf under the plugin's data directory: it survives a reload and a
      restart; a session's values go when the session is deleted.
-   - `host/model/complete {session, turn, request}` — one model call on
-     the session's resolved model, billed to that running turn by an
-     additive `UsageCharged` event; outside a running turn it is refused
-     in words.
+   - `host/model/complete {session, turn?, request}` — one model call on
+     the session's resolved model, billed by an additive `UsageCharged`
+     event to the running turn, or to the session when `turn` is absent
+     (a clock or a press; revised 2026-10-13 for ADR-0078, whose `model`
+     grant it needs).
    - `tools/changed {tools}` — a notification replacing the plugin's
      whole tool list (replace-whole); commands likewise.
    - `service/call` stays. **Any request the host does not serve is
@@ -93,6 +94,9 @@ usage, which the kernel owns. Yes: that door opens, and no other.
 
 Refs: ADR-0015, ADR-0030, ADR-0031, ADR-0032, ADR-0070, ADR-0072,
 ADR-0074, audit-2026-10 Mods.
-Non-goals: an embedded JS engine; a marketplace or publishing; process
-to process pipes; a plugin spawning agents (it delivers to a session,
-whose model may).
+Non-goals: a marketplace or publishing; process to process pipes; a
+plugin spawning agents (it delivers to a session, whose model may).
+
+Revised 2026-10-13 for ADR-0078: the embedded JS engine this record
+refused is ADR-0078's; the TypeScript SDK speaks ADR-0078 §2's
+`register(on)` so one module runs in either transport.
