@@ -28,6 +28,7 @@ pub mod surface;
 pub mod testing;
 pub mod tokens;
 pub mod tool;
+pub mod transcript;
 pub mod view;
 
 pub use command::{ArgSpec, Command, CommandContext, CommandOutcome, CommandSpec};
@@ -59,6 +60,7 @@ pub use tool::{
     Env, ResultLimit, Subject, Tool, ToolCall, ToolContext, ToolError, ToolHost, ToolOutcome,
     ToolTraits, input_schema,
 };
+pub use transcript::Transcript;
 pub use view::{ActionItem, Tone, TreeNode, View};
 
 /// Re-exported so plugins share one cancellation type without naming tokio-util.

@@ -424,6 +424,35 @@ mod tests {
         }
     }
 
+    #[test]
+    fn transcript_snapshot_keeps_the_wire_bytes() {
+        let mut state = SessionState::new(summary());
+        state.apply(&frame(
+            1,
+            Event::ItemCompleted {
+                item: assistant("i1", "hello", ItemStatus::Completed),
+            },
+        ));
+        state.apply(&frame(
+            2,
+            Event::Compacted {
+                generation: 3,
+                boundary: ItemId::from_raw("i1"),
+                summary: ItemId::from_raw("missing"),
+                kept: vec![],
+            },
+        ));
+        let wire = serde_json::to_string(&state).unwrap();
+        assert_eq!(
+            wire,
+            r#"{"seq":2,"summary":{"id":"ses_1","cwd":"/tmp","driver":"model","createdAt":"2023-11-14T22:13:20Z","updatedAt":"2023-11-14T22:13:20Z","usage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheWriteTokens":0,"reasoningTokens":0},"busy":false,"messages":1},"config":{"kernel":null,"plugins":{}},"historyGeneration":3,"items":[{"id":"i1","turn":"trn_1","round":0,"status":"completed","startedAt":"2023-11-14T22:13:20Z","body":{"kind":"assistant","text":"hello"}}],"queue":[],"interactions":[],"unread":false,"closed":false}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&serde_json::from_str::<SessionState>(&wire).unwrap()).unwrap(),
+            wire
+        );
+    }
+
     fn frame(seq: u64, event: Event) -> Frame {
         Frame {
             seq: Seq(seq),

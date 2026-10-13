@@ -1053,6 +1053,90 @@ mod tests {
     }
 
     #[test]
+    fn two_compactions_do_not_resurrect_the_first_summary() {
+        let summary = |id: &str| {
+            item(
+                id,
+                ItemBody::Compaction {
+                    summary: id.into(),
+                    replaced: 1,
+                    before: 100,
+                    after: 20,
+                    duration_ms: 0,
+                },
+            )
+        };
+        let all = [
+            user("a", "old"),
+            user("b", "tail"),
+            summary("s1"),
+            summary("s2"),
+        ];
+        let cut = |id: &str, generation| Event::Compacted {
+            generation,
+            boundary: ItemId::from_raw("b"),
+            kept: vec![],
+            summary: ItemId::from_raw(id),
+        };
+        let mut frames = frames_of(&all[..3]);
+        let mut frame = frames[0].clone();
+        frame.seq = Seq(7);
+        frame.event = cut("s1", 1);
+        frames.push(frame.clone());
+        frame.seq = Seq(8);
+        frame.event = Event::ItemCompleted {
+            item: all[3].clone(),
+        };
+        frames.push(frame.clone());
+        frame.seq = Seq(9);
+        frame.event = cut("s2", 2);
+        frames.push(frame);
+        let mut transcript = Transcript::new();
+        for frame in &frames {
+            transcript.apply(&frame.event);
+        }
+        assert_eq!(
+            ContextView::items(&frames)
+                .iter()
+                .map(|i| i.id.as_str())
+                .collect::<Vec<_>>(),
+            ["s2", "b"]
+        );
+        assert_eq!(
+            transcript.model_items().cloned().collect::<Vec<_>>(),
+            ContextView::items(&frames)
+        );
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::test_runner::Config::with_cases(1000))]
+        #[test]
+        fn transcript_model_matches_frame_oracle(codes in proptest::collection::vec((0u8..7, 0u8..8, 0u8..8), 1..100)) {
+            let mut transcript = Transcript::new();
+            let mut frames = Vec::new();
+            for (n, (kind, id, other)) in codes.into_iter().enumerate() {
+                let id_of = |n| ItemId::from_raw(format!("i{n}"));
+                let item = user(&format!("i{id}"), &other.to_string());
+                let event = match kind {
+                    0 => Event::ItemStarted { item },
+                    1 => Event::ItemUpdated { item },
+                    2 => Event::ItemCompleted { item },
+                    3 => Event::TurnRetrying { turn: TurnId::from_raw("t"), attempt: 1,
+                        max: 2, delay_ms: 0, reason: "retry".into(), dropped: vec![id_of(id)] },
+                    4 => Event::Rewound { generation: n as u64, to_turn: TurnId::from_raw("t"),
+                        dropped: vec![id_of(id)], files_restored: vec![] },
+                    _ => Event::Compacted { generation: n as u64, boundary: id_of(id),
+                        kept: vec![id_of(other)], summary: id_of((other + 1) % 8) },
+                };
+                transcript.apply(&event);
+                frames.push(Frame { seq: Seq(n as u64 + 1), ts: Timestamp::UNIX_EPOCH,
+                    session: SessionId::from_raw("s"), cause: None, event });
+                proptest::prop_assert_eq!(transcript.model_items().cloned().collect::<Vec<_>>(), ContextView::items(&frames));
+            }
+        }
+    }
+
+    #[test]
     fn rewind_drops_items() {
         let ts = Timestamp::from_second(0).unwrap();
         let ses = SessionId::from_raw("ses_1");
