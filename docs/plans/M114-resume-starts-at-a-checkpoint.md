@@ -3,9 +3,9 @@
 ## Goal
 
 ADR-0066. A session resumes from a verified sidecar checkpoint plus the
-journal's tail, and the actor holds a window — items from the latest
-compaction boundary on, frames since the checkpoint — instead of the
-whole past. Older history and old catch-up are read from storage off
+journal's tail, and the actor holds the client tail from the latest
+compaction boundary, model-only kept items, and frames since the checkpoint
+instead of the whole past. Older history and old catch-up are read from storage off
 the actor. M107 bounded what a client receives; this bounds what the
 kernel holds.
 
@@ -48,7 +48,7 @@ kernel holds.
    the mid-turn check work on the folded state either way. Test: a
    session with a compaction resumes reading only the tail (assert via
    a counting store wrapper), and its `SessionState` equals a full
-   replay's (`PartialEq`).
+   replay's after the same window projection (`PartialEq`).
 7. **The window.** `Transcript` gains `drop_before_cut()`, which removes
    unneeded pre-boundary items, hides model-only items, and records `OpenHistory`'s
    `before`/`has_more`; the actor calls it after a checkpoint is written.
@@ -107,25 +107,44 @@ kernel holds.
 - 2026-10-13 decision: use ADR-0066 §4's clarified model/client window
   invariant and a checkpoint-specific state codec; client wire unchanged.
 
-## Verified (2026-10-13)
+- **STOP (2026-10-13, protocol step 6):** three CLI watch tests fail.
+  `crates/bingo/tests/cli/jobs.rs::journal_text` reads every data file;
+  `checkpoint.json` repeats `journal.jsonl` text, doubling notice counts.
+  This out-of-Files helper needs behavior changes, not type-fixture updates.
+- Options: authorize restricting that helper to `journal.jsonl` (recommended,
+  assertions unchanged), or change the checkpoint state contract. Neither done.
 
-- Branch `m114-resume-starts-at-a-checkpoint`, base `1335830b`; clean on
-  entry. Read the execution protocol, audit and ADR-0066/0005, plus the
-  relevant ADR-0064/0065 and M107 contracts. No implementation started.
-- Temporary SDK probes constructed the four-item example above, applied
-  `Compacted`, then compared model ids after a boundary window and a
-  `SessionState` JSON round trip. Command:
-  `cargo test -p bingo-sdk m114_reverification --locked -- --nocapture`.
-  Actual output (trimmed):
+## Verified (2026-10-13; stopped at workspace test gate)
+
+- Branch `m114-resume-starts-at-a-checkpoint`, base `1335830b`; clean on entry.
+  Temporary probes (`cargo test -p bingo-sdk m114_reverification --locked
+  -- --nocapture`): `0 passed; 2 failed`. Window model `[i4,i3]` and
+  serialized model `[i1,i2,i3,i4]` differed from `[i1,i4,i3]`. Probes removed;
+  the user decision above resolved that initial stop.
+- RED contracts: `cargo test -p bingo-sdk checkpoint --locked`: `2 failed`
+  (missing codec, client still i1–i4); `cargo test -p bingo-store-jsonl
+  checkpoint --locked`: `2 failed` (state None, sidecar absent);
+  `cargo test -p bingo-core checkpoint_ack --locked`: `1 failed`
+  (`actor.journal.is_empty()`). Contract commits precede implementations.
+- GREEN: `cargo test -p bingo-digest -p bingo-update`: `3 passed` / `47 passed`;
+  `scripts/budget.sh`: `349 (max 349)`, `budget ok`.
+  `cargo test -p bingo-sdk -p bingo-store-jsonl --locked`: SDK `111 passed`
+  plus record/opaque tests/docs; store `54 passed; 1 ignored` (measurement).
+  `cargo test -p bingo-core --locked`: `432 passed`; then the additional
+  held-write/oversized-page cases with `cargo test -p bingo-core checkpoint
+  --locked`: `9 passed; 0 failed`. Logs: `target/m114-*-tests.log` and
+  `target/m114-core-checkpoints.log`.
+- Gates: fmt exit 0; workspace all-targets locked check exit 0 (54.56s);
+  workspace all-targets locked clippy with `-D warnings` exit 0 (26.75s).
+- `cargo test --workspace --locked -- --test-threads=1 --skip
+  a_token_may_be_dialled_again_once_its_stream_has_closed --skip
+  a_proxy_with_a_token_this_run_never_minted_gets_nothing`: exit 101.
+  `target/m114-workspace-tests.log`, CLI: `248 passed; 3 failed`:
   ```text
-  m114_reverification_boundary_window_preserves_model ... FAILED
-  left: ["i4", "i3"]
-  right: ["i1", "i4", "i3"]
-  m114_reverification_checkpoint_state_roundtrip ... FAILED
-  left: ["i1", "i2", "i3", "i4"]
-  right: ["i1", "i4", "i3"]
-  test result: FAILED. 0 passed; 2 failed; 0 ignored
+  jobs::a_default_watch_still_says_it_once_and_counts_nothing: 2 != 1
+  jobs::a_pinned_watch_wakes_once_and_counts_the_rest_onto_the_end: 2 != 1
+  jobs::an_ongoing_watch_on_a_slow_stream_wakes_on_every_line: 4 != 2
   ```
-  Exit 101; both failures demonstrate the findings, not a build failure.
-  The temporary probes were removed; only this plan is changed.
-- The user resolved the initial stop with the dated decision above.
+- Stopped before remaining tests (including isolated ACP), discipline, final
+  budget, deny, Windows and TUI smoke. Exit criteria await final verification;
+  ADR-0066 remains proposed. No push, merge, PR or parallel-owner file edits.
