@@ -367,6 +367,8 @@ impl Host {
         let live = self.lock().remove(session);
         if let Some(live) = &live {
             live.mailbox.close(CloseReason::Deleted);
+            // The actor's closing writes land in the directory being removed.
+            live.mailbox.wait_closed().await;
         }
         match &self.registry.store {
             Some(store) => store.delete(session).await?,
