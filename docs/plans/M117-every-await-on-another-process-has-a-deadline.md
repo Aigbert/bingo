@@ -111,6 +111,39 @@ tool error the model reads, never a hang.
   state. 10 s is five times `codex-acp`'s own stdin-close grace. The
   fresh child resumes with `session/load` where the agent supports it
   (existing path).
-- Re-verify at start: M116 has landed; the `select!` in MCP `call`,
-  `Abandons` in plugin-rpc `tool.rs`, the cancel arm in ACP
-  `provider.rs`.
+- M116 landed; MCP `call`, plugin-rpc `Abandons`, and ACP's cancel arm exist.
+- **Stopped during re-verification, 2026-10-13, at `9bb55f07`
+  (execution protocol steps 2 and 6).** ADR-0068 §5 requires that
+  "every HTTP client has a connect and a total timeout". Brick 5 above
+  and ADR-0056 §1 require provider streams to retain connect and idle
+  bounds without a total bound. The production stream clients in
+  `bingo-provider-openai/src/lib.rs:490` and
+  `bingo-provider-anthropic/src/lib.rs:261` implement the latter.
+  Accepting §5 literally would change those decided stream semantics;
+  implementing brick 5 would leave §5's universal requirement unmet.
+- The workspace-wide `Client::new()` exit criterion also cannot follow
+  from replacing the three sites in brick 5: production builder-failure
+  fallbacks remain in OpenAI `lib.rs:494`, Anthropic `lib.rs:265`, and
+  `bingo-channel-feishu/src/feishu/api.rs:96`. Anthropic and Feishu are
+  outside Files. These are production behavior, not mechanical fixtures.
+- **Options requiring a decision:** (A) qualify ADR-0068 §5 to preserve
+  ADR-0056's stream exception, then explicitly scope the client search
+  and assign the unbounded fallbacks to this milestone or M127;
+  (B) retain §5 literally and revise ADR-0056 and this plan to impose
+  total stream bounds and include the remaining production clients.
+
+## Verified (2026-10-13)
+
+Re-verification stopped before contracts, failing tests or implementation.
+No exit criterion is complete; the build/test gates and Windows check were
+not run. ADR-0068 §5 remains proposed. Read-only evidence (production hits
+trimmed from `rg -n 'reqwest::Client::new\(\)' crates --glob '!**/tests/**'`):
+
+```text
+crates/bingo-provider-openai/src/lib.rs:120:            reqwest::Client::new(),
+crates/bingo-provider-openai/src/lib.rs:494:        .unwrap_or_else(|_| reqwest::Client::new())
+crates/bingo-provider-anthropic/src/lib.rs:265:        .unwrap_or_else(|_| reqwest::Client::new())
+crates/bingo-channel-feishu/src/feishu/api.rs:96:                .unwrap_or_else(|_| reqwest::Client::new()),
+crates/bingo-mcp/src/auth.rs:31:    let http = reqwest::Client::new();
+crates/bingo/src/mcp.rs:369:    bingo_mcp::auth::handle(name, server, store, reqwest::Client::new()).ok_or_else(|| {
+```
