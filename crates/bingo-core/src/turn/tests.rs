@@ -32,6 +32,15 @@ impl RecordingHost {
     fn events(&self) -> Vec<Event> {
         self.events.lock().unwrap().clone()
     }
+    fn usage(&self) -> Usage {
+        let mut total = Usage::default();
+        for event in self.events() {
+            if let Event::TurnUsage { usage, .. } | Event::UsageCharged { usage, .. } = event {
+                total.add(usage);
+            }
+        }
+        total
+    }
     fn kinds(&self) -> Vec<String> {
         self.events()
             .iter()
@@ -182,7 +191,7 @@ async fn a_text_only_turn_streams_one_assistant_item_and_completes() {
     let host = RecordingHost::new();
     let out = run(&cfg, &host, CancellationToken::new()).await;
     assert_eq!(out.status, TurnStatus::Completed);
-    assert_eq!(out.usage.input_tokens, 10);
+    assert_eq!(host.usage().input_tokens, 10);
     assert_eq!(
         host.kinds(),
         [

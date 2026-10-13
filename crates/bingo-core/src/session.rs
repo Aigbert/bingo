@@ -5,6 +5,7 @@
 
 mod checkpoint;
 mod commands;
+mod complete;
 mod gate;
 mod history;
 mod inputs;
@@ -194,6 +195,8 @@ impl Actor {
             }
             Msg::Reconfigure { config } => self.reconfigure(config).await?,
             Msg::Offered { turn, tools } => self.turn_offers(&turn, tools),
+            Msg::Complete { turn, request, reply } => self.complete(turn, *request, reply),
+            Msg::Charge { turn, plugin, usage, reply } => { let result = self.charge(turn, plugin, usage).await; let _ = reply.send(result); }
             Msg::Invoke { call, reply } => self.invoke(call, reply).await?,
             Msg::CallAllowed { item, input } => self.call_allowed(&item, input).await?,
             Msg::CallFinished { outcome } => self.call_finished(outcome).await?,
@@ -792,11 +795,11 @@ impl Actor {
             return Ok(Flow::Continue);
         }
         self.cancel_interactions(CancelReason::TurnEnded).await?;
-        let (status, usage, items) = match outcome {
-            Ended::Returned(outcome) => (outcome.status, outcome.usage, outcome.items),
+        let (status, items) = match outcome {
+            Ended::Returned(outcome) => (outcome.status, outcome.items),
             Ended::Dropped => {
                 let outcome = running::close_dropped_turn(self, &turn).await?;
-                (outcome.status, outcome.usage, outcome.items)
+                (outcome.status, outcome.items)
             }
             Ended::Panicked(panic) => (
                 TurnStatus::Failed {
@@ -805,11 +808,11 @@ impl Actor {
                         format!("the turn loop panicked: {panic}"),
                     ),
                 },
-                Usage::default(),
                 Vec::new(),
             ),
         };
-        self.running = None;
+        if let Some(running) = self.running.take() { running.cancel.cancel(); }
+        let usage = self.state.turn.as_ref().map(|turn| turn.usage).unwrap_or_default();
         self.publish(
             Event::TurnCompleted {
                 turn: turn.clone(),

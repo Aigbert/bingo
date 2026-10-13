@@ -257,7 +257,6 @@ pub(super) fn stopped_early(
         status: TurnStatus::Interrupted {
             reason: InterruptReason::UserCancel,
         },
-        usage: Usage::default(),
         items: transcript.model_items().cloned().collect(),
     }
 }

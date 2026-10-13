@@ -12,6 +12,8 @@ use tokio::sync::{mpsc, oneshot, watch};
 use crate::turn::{TurnConfig, TurnHost};
 
 pub(crate) enum Msg {
+    Complete { turn: Option<TurnId>, request: Box<Completion>, reply: super::complete::Reply },
+    Charge { turn: Option<TurnId>, plugin: String, usage: Usage, reply: oneshot::Sender<Result<(), KernelError>> },
     Checkpointed {
         seq: Seq,
         result: Result<(), KernelError>,
@@ -366,6 +368,10 @@ impl Mailbox {
     /// Hand a call to the running turn and wait for what it comes to
     /// (ADR-0036 §2). Refused when no turn is in flight, and when the turn
     /// was never offered the tool the call names.
+    pub async fn complete(&self, turn: Option<TurnId>, request: Completion) -> Result<Vec<ModelEvent>, KernelError> {
+        self.call(|reply| Msg::Complete { turn, request: Box::new(request), reply }).await?
+    }
+
     pub async fn invoke(&self, call: ToolCall) -> Result<ToolOutcome, KernelError> {
         self.call(|reply| Msg::Invoke { call, reply }).await?
     }

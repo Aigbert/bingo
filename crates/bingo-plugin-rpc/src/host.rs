@@ -114,8 +114,16 @@ impl Server {
             name::HOST_DELIVER => self.deliver(parse(params)?).await,
             name::STATE_GET => self.get(parse(params)?).await,
             name::STATE_SET => self.set(parse(params)?).await,
+            name::MODEL_COMPLETE => self.complete(parse(params)?).await,
             _ => Err(unknown(method)),
         }
+    }
+
+    async fn complete(&self, params: Complete) -> Result<Value, RpcError> {
+        let events = self.host.complete(&params.session, params.turn.as_ref(), bingo_sdk::Completion {
+            plugin: self.plugin.clone(), request: params.request,
+        }).await.map_err(failed)?;
+        serde_json::to_value(Completed { events }).map_err(failed)
     }
 
     async fn get(&self, params: StateGet) -> Result<Value, RpcError> {

@@ -97,7 +97,6 @@ pub enum TurnKind {
 #[derive(Debug, PartialEq)]
 pub struct TurnOutcome {
     pub status: TurnStatus,
-    pub usage: Usage,
     /// The transcript as the turn left it, for the hooks that run after it.
     pub items: Vec<Item>,
 }
@@ -120,7 +119,6 @@ struct Turn<'a> {
     overflow_compacted: bool,
     /// Accepted cuts can reissue context without making the whole request fit.
     threshold_compactions: u32,
-    usage: Usage,
     hook_cx: HookContext,
     ruler: Ruler,
 }
@@ -181,7 +179,6 @@ fn unanswered(items: Vec<Item>) -> TurnOutcome {
         status: TurnStatus::Failed {
             error: KernelError::new(ErrorCode::InvalidInput, "this session answers nothing"),
         },
-        usage: Usage::default(),
         items,
     }
 }
@@ -233,7 +230,6 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
         empty_retry_used: false,
         overflow_compacted: false,
         threshold_compactions: 0,
-        usage: Usage::default(),
         hook_cx,
     };
     let started = turn.start_hooks().await;
@@ -246,7 +242,6 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
     };
     TurnOutcome {
         status,
-        usage: turn.usage,
         items: turn.transcript.model_items().cloned().collect(),
     }
 }
@@ -611,8 +606,13 @@ impl Turn<'_> {
     }
 
     /// Bill the round to the turn, and say where the context stands after it.
+    fn charge(&self, plugin: &str, usage: Usage) {
+        if usage != Usage::default() {
+            self.host.emit(Event::UsageCharged { turn: Some(self.id.clone()), plugin: plugin.into(), usage });
+        }
+    }
+
     fn account(&mut self, finished: &Finished, usage: ContextUsage) {
-        self.usage.add(finished.usage);
         let context = self.measured(finished, usage);
         emit_and_fold(
             &mut self.transcript,
@@ -805,14 +805,14 @@ impl Turn<'_> {
         let _ = self.compact_hooks(Phase::End).await;
         match outcome {
             Ok(c) if c.after < c.before && !self.cancel.is_cancelled() => {
-                self.usage.add(c.usage);
+                self.charge("core", c.usage);
                 self.cfg.compaction.succeeded();
                 self.absorb_compaction(c, started.elapsed());
                 self.ruler.forget();
                 true
             }
             Ok(c) => {
-                self.usage.add(c.usage);
+                self.charge("core", c.usage);
                 let failures = self.cfg.compaction.failed();
                 self.warn("COMPACTION_USELESS", format!(
                         "the summary would not shrink the context ({} → {} tokens); discarded, {failures} in a row",
@@ -821,7 +821,7 @@ impl Turn<'_> {
                 false
             }
             Err(e) => {
-                self.usage.add(e.usage);
+                self.charge("core", e.usage);
                 self.cfg.compaction.failed();
                 self.warn("COMPACTION_FAILED", e.to_string());
                 false
