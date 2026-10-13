@@ -19,6 +19,7 @@ tier = "composition"
 workspace = true
 
 [dependencies]
+bingo-channel-adapter.workspace = true
 bingo-claim.workspace = true
 bingo-sdk.workspace = true
 # `doctor` reads the settings this invocation would have loaded, through the
@@ -49,4 +50,5 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [dev-dependencies]
+bingo-channel-feishu.workspace = true
 tempfile.workspace = true

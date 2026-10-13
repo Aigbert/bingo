@@ -95,6 +95,8 @@ impl Channels {
 }
 
 pub fn wanted(settings: &Value, platforms: &Platforms) -> Result<bool, String> {
+    let parsed: Settings = serde_json::from_value(settings.clone()).map_err(|e| e.to_string())?;
+    parsed.channels.access(platforms)?;
     Ok(!crate::secret::configured(settings, platforms)?.is_empty())
 }
 

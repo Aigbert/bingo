@@ -179,6 +179,7 @@ fn doctor_never_removes_the_gateway_claim_file() {
         env: &env,
         cwd: home.path(),
         settings: None,
+        platforms: &Vec::new(),
     };
     let claim =
         bingo_claim::Claim::take(paths.data_dir(), bingo_gateway::pidfile::PROTOCOL).unwrap();

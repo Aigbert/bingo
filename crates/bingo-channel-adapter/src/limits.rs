@@ -1,10 +1,9 @@
 //! What one platform will carry: how long a message may be, in whose units,
 //! which markup it renders, and how many buttons fit under a question.
 //!
-//! "Length" is not one thing (ADR-0016 §1): Feishu counts a card's serialised
-//! bytes, Telegram counts characters, Slack counts UTF-8 and Discord's client
-//! counts UTF-16 units. A limit without its unit is a limit that is wrong on
-//! three platforms out of four, so the unit travels with the number.
+//! "Length" is not one thing (ADR-0016 §1): platforms count characters,
+//! serialised bytes, or UTF-16 units. The unit travels with the number so a
+//! limit cannot silently measure the wrong representation.
 
 /// How a platform measures the length of a message.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

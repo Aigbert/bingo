@@ -156,4 +156,35 @@ mod tests {
         assert_eq!(credential("sample"), "channels.sample");
         assert_eq!(credential("loopback"), "channels.loopback");
     }
+    #[test]
+    fn only_named_platforms_are_configured_and_only_those_with_secrets_sign() {
+        use serde_json::json;
+        use std::sync::Arc;
+        let platforms: crate::Platforms = vec![
+            Arc::new(crate::testing::TestPlatform),
+            Arc::new(crate::loopback::Platform),
+        ];
+        assert!(configured(&json!({}), &platforms).unwrap().is_empty());
+        assert_eq!(
+            configured(&json!({"channels": {"loopback": {}}}), &platforms).unwrap(),
+            [Requirement {
+                id: "loopback",
+                variable: None
+            }]
+        );
+        assert_eq!(
+            configured(&json!({"channels": {"sample": {}}}), &platforms).unwrap(),
+            signing(&platforms)
+        );
+        assert_eq!(
+            configured(
+                &json!({"channels": {"sample": {}, "loopback": {}}}),
+                &platforms
+            )
+            .unwrap()
+            .len(),
+            2
+        );
+        assert!(configured(&json!({"channels": "nonsense"}), &platforms).is_err());
+    }
 }

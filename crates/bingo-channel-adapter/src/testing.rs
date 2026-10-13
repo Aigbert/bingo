@@ -21,10 +21,13 @@ impl Platform for TestPlatform {
         }
     }
     fn build(&self, _slice: &Value, _env: &Env) -> Result<Arc<dyn ChannelAdapter>, String> {
-        Ok(Arc::new(crate::loopback::Loopback::new(Default::default())))
+        Err("sample has no transport".into())
     }
     fn secret(&self) -> Option<Requirement> {
-        None
+        Some(Requirement {
+            id: "sample",
+            variable: Some("BINGO_TEST_SAMPLE_SECRET"),
+        })
     }
     fn flag(&self, value: Option<&str>) -> Value {
         json!({"value": value})

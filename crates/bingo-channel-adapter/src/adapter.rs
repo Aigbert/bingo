@@ -149,8 +149,8 @@ pub trait ChannelAdapter: Send + Sync {
 }
 
 /// Replacing what a message says. The text is always the whole of it: a
-/// platform that prefers deltas diffs for itself, and Feishu's prefix-diff
-/// typing punishes anything else (ADR-0016 §2).
+/// platform that prefers deltas diffs for itself; prefix-diff typing requires
+/// the full accumulated text (ADR-0016 §2).
 #[async_trait]
 pub trait Edit: Send + Sync {
     async fn replace(&self, at: &Posted, text: &str) -> Result<(), ChannelError>;
@@ -222,8 +222,7 @@ pub trait Files: Send + Sync {
 /// Saying that a message is being worked on, and taking the sign off again
 /// when the turn it started has ended (ADR-0051 §5).
 ///
-/// What the sign *is* belongs to the platform — a reaction on Feishu, a badge
-/// elsewhere, nothing at all where there is none. The runner brackets a turn
+/// What the sign *is* belongs to the platform — a reaction, a badge, nothing at all where there is none. The runner brackets a turn
 /// with whatever it is handed and never waits on it: a sign that would not go
 /// up has not cost anybody an answer.
 #[async_trait]

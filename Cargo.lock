@@ -230,6 +230,8 @@ dependencies = [
  "base64 0.23.1",
  "bingo-agents",
  "bingo-auth-oauth",
+ "bingo-channel-adapter",
+ "bingo-channel-feishu",
  "bingo-channels",
  "bingo-checkpoints",
  "bingo-context",
@@ -364,6 +366,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
 ]
@@ -466,6 +469,8 @@ dependencies = [
 name = "bingo-gateway"
 version = "0.6.6"
 dependencies = [
+ "bingo-channel-adapter",
+ "bingo-channel-feishu",
  "bingo-channels",
  "bingo-claim",
  "bingo-core",

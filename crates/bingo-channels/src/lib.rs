@@ -230,4 +230,28 @@ mod plugin_tests {
             "{error}"
         );
     }
+    #[test]
+    fn registration_refuses_unknown_and_platform_rejected_slices() {
+        for (config, expected) in [
+            (
+                serde_json::json!({"channels": {"telegram": {}}}),
+                "no such channel adapter: telegram",
+            ),
+            (
+                serde_json::json!({"channels": {"sample": {"refuse": true}}}),
+                "sample refuses this slice",
+            ),
+        ] {
+            let mut registrar = Registrar::new(
+                MANIFEST.id,
+                config,
+                Env::rooted("/nonexistent-channel-test"),
+                Default::default(),
+            );
+            let plugin =
+                ChannelsPlugin::new(vec![Arc::new(bingo_channel_adapter::testing::TestPlatform)]);
+            let error = plugin.register(&mut registrar).expect_err("a refusal");
+            assert_eq!(error.to_string(), format!("configuration: {expected}"));
+        }
+    }
 }

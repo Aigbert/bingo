@@ -27,7 +27,7 @@ use crate::directory::Directory;
 /// The name the model calls it by, and the name a permission rule writes.
 pub const SEND_FILE: &str = "SendFile";
 
-/// Feishu's own ceiling on an upload, and a sane one anywhere: past this the
+/// The surface ceiling on an upload: past this the
 /// chat is the wrong way to move the file, and the model is told the size.
 const MAX_BYTES: u64 = 30 * 1024 * 1024;
 
