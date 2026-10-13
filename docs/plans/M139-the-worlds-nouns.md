@@ -10,57 +10,32 @@ words that say how to grant it, and a granted unsafe noun is put on the record. 
 
 ## Bricks, in build order
 
-1. **Contract and failing tests.** M138's table gains a row per method: `fs` read, write, list, exists, stat,
-   ancestors; `http` fetch; `process` run, spawn, read, write, kill; `env` get, set; `mcp` call, connect;
-   `agent` spawn, list, register. Failing tests use fixture mods under `tests/mods/world/`. A
-   project-directory mod is refused at every unsafe method. With a `pluginTrust` grant, the same call answers.
-   A link sees each name once.
-2. **Scope, pure.** `scope(path, Roots { project, data }, Access) -> Result<PathBuf, Refusal>`:
-   - It normalises lexically, then canonicalises the longest existing ancestor with `dunce`.
-   - Authorized 2026-10-14: budget 410 → 411 for zero-dependency `dunce`, normalizing Windows prefixes.
-   - It refuses a `..` or a symlink that leaves both roots.
-   - A read may land in either root. A write may land in the mod's data directory
-     (`<data_dir>/plugins/<name>/data`). Any other write is `fs` beyond the safe set (ADR-0078 §5).
-   - `cap(len, 4 MiB)` refuses with both sizes.
-   - Table tests. The Windows cases (a drive prefix, `\\?\`, UNC) carry the same `cfg` gate as the unix ones.
-3. **`fs`.** A face over `tokio::fs`, with each path through `scope`.
-   - `read` returns UTF-8 text or base64.
-   - `list` and `stat` return no more than they are asked for.
-   - `ancestors(name)` lists the directories from `cwd` up to the project root that hold `name`.
-4. **`http.fetch`.** One client per runtime, from `bingo_http::client(Bounds::CALL)`.
-   - The request is `{ url, method, headers, body }`, http and https only.
-   - The response is `{ status, headers, body }`. A body is cut at 4 MiB, and the cut is said in words.
-   - The hook's `signal` aborts the request.
-5. **`process`.** `bingo_process::tree` (M128) over an argv, with no shell unless the argv names one. `cwd`
-   goes through `scope`. Each stream is capped at 4 MiB, and `run` takes a timeout bounded by the wall bound.
-   - `spawn` returns a handle id minted for this mod, with `read`, `write` and `kill`.
-   - The JS handle in Claude Code's shape is built over those three.
-   - A mod reaches only its own trees. A tree dies with its handle, at a reload and at `session.end` (`Drop`,
-     then `terminate(GRACE)`).
-6. **`env`.** `get` reads the host's environment. `set` writes a per-mod overlay that only that mod's
-   `process.*` sees. Rust 2024 makes `std::env::set_var` unsafe, and this workspace forbids it. Names are
-   literals: M142's `validate` refuses a computed name, and the runtime refuses a name that is not a valid
-   identifier.
-7. **Nouns by name, and unsafe by declaration.**
-   - M136's registry indexes each face under its noun as well as its key, so `$.<noun>` resolves through
-     `service_wire(noun)`. The registry refuses a noun that equals another key.
-   - `admits` reads M136's per-method `unsafe` declaration for faces, and `UNSAFE` for the host's nouns
-     (ADR-0078 §5). `uses` is one list of nouns, so a grant names `mcp` or `agent` as it names `http`.
-8. **`mcp` and `agent`.** These are the owning plugins' faces, not bingo-mods'.
-   - bingo-mcp's face gains `call { server, tool, args }` and `connect { server }` over `Manager`, for
-     configured servers only. `connect` starts a process, so it declares itself unsafe (ADR-0078 §5).
-   - bingo-agents' face gains `spawn`, `list` and `register`. `register` adds a definition to the agents'
-     library for the host's lifetime. `spawn` spends a model, so it declares itself unsafe.
-   - The `Agent` tool calls its own `spawn` through `service_wire`, so `agent.spawn` is raised for the model's
-     spawns too.
-9. **Words and record.** A pure `refusal(plugin, noun, method, reason)` is golden-tested: `"<plugin> may not
-   <noun>.<method>: <reason>. Grant it under pluginTrust in <user settings path>."`
-   - The first granted use of each unsafe noun by a plugin in a session posts one notice line.
-   - Every use is logged at `info`.
-   - plugin-rpc's bridge calls the same `admits` before a process's `service/call` reaches an unsafe face,
-     binding `plugin` as M138 does.
-10. **Node parity.** `dollar.ts` reaches every row by `service/call`. A fixture calls one method of each noun,
-   and gives the same output in process and under node.
+1. Commit contracts and failing fixtures first. One table row and one noun event per world method:
+   fs read/write/list/exists/stat/ancestors; http fetch; process run/spawn/read/write/kill; env get/set;
+   mcp call/connect; agent spawn/list/register. Project unsafe calls require user-layer trust.
+2. Pure `scope(path, Roots { project, data }, Access)` lexically normalizes then canonicalizes the longest
+   existing ancestor with `dunce`. Refuse escapes from both roots, including symlinks; safe writes stay in
+   `<data_dir>/plugins/<name>/data`. Granted writes may use the project. `cap` reports actual/limit bytes.
+   Authorized 2026-10-14: budget 410 → 411 for zero-dependency `dunce`, Windows-safe without UNC prefixes.
+   Table-test traversal, symlinks, drive/verbatim/UNC prefixes with matching platform gates.
+3. Files use canonical scoped paths; UTF-8/base64 reads and writes cap at 4 MiB, lists are bounded,
+   stat returns fixed metadata, ancestors walks session cwd to project root for one filename.
+4. One `bingo_http::client(Bounds::CALL)` per runtime; HTTP(S) request URL/method/headers/body, response
+   status/headers/body with explicit 4 MiB truncation notice. Dropping the hook cancels pending I/O.
+5. `bingo_process::tree` executes argv directly, scoped cwd, 4 MiB per stream, run timeout within hook wall
+   bound. Mint mod/session-owned handles with read/write/kill and JS wrappers. Reload/session end kills
+   owned trees; generation cancellation closes descendant stdout. Foreign handles are refused.
+6. Env get reads the host; set stores a per-mod child overlay and never mutates the host. Validate literal
+   identifier syntax at runtime; M142 later rejects computed names statically.
+7. Resolve face nouns through the existing registry; reject noun/key collisions. Shared admission reads
+   per-method unsafe metadata plus host UNSAFE declarations; process plugins retain default tighten,
+   user/explicit modules rewrite, project modules tighten until user-layer pluginTrust grants more.
+8. MCP owns call/connect for configured servers; connect is unsafe. Agents owns spawn/list/register,
+   definitions live for the host lifetime, spawn is unsafe, and model SpawnAgent crosses the same face.
+9. Golden refusal names plugin/noun/method/reason and actual user settings path. Log every granted unsafe
+   use at info and post one notice per plugin/noun/session. Bind caller identity in both transports.
+10. Generate schema and TypeScript from the table. A fixture uses one method of every noun and produces
+    the same result under QuickJS and Node through service/call.
 
 ## Files
 
@@ -83,20 +58,20 @@ words that say how to grant it, and a granted unsafe noun is put on the record. 
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-mods scope::`: `..`, a symlink out, and a write outside the data directory are each
+- [x] `cargo test -p bingo-mods scope::`: `..`, a symlink out, and a write outside the data directory are each
   refused. A read inside either root passes. A 4 MiB + 1 read is refused with both sizes.
-- [ ] `fetch` against M127's local test peer answers. An over-cap body is cut and says so. `esc` aborts a
+- [x] `fetch` against M127's local test peer answers. An over-cap body is cut and says so. `esc` aborts a
   pending fetch.
-- [ ] A spawned tree's stdout reaches EOF after a reload: M128's test, with no signal probe. Killing an id of
+- [x] A spawned tree's stdout reaches EOF after a reload: M128's test, with no signal probe. Killing an id of
   another mod is refused.
-- [ ] `env.set` is visible to the mod's child process, and `std::env::var` in the host is unchanged.
-- [ ] `mcp.call` reaches bingo-mcp's test server. A link at `agent.spawn` sees the model's own `Agent` call.
-- [ ] Refusal goldens pass. One notice per (plugin, unsafe noun, session).
-- [ ] `cargo test -p bingo --test plugin_kit`: the world fixture gives the same output in process and under
+- [x] `env.set` is visible to the mod's child process, and `std::env::var` in the host is unchanged.
+- [x] `mcp.call` reaches bingo-mcp's test server. A link at `agent.spawn` sees the model's own `Agent` call.
+- [ ] Refusal goldens: workspace stopped before plugin-host tests; one-notice integration passed.
+- [x] `cargo test -p bingo --test plugin_kit`: the world fixture gives the same output in process and under
   node.
-- [ ] All gates pass. `cargo check --target x86_64-pc-windows-msvc` checks every touched crate; missing
-  third-party Windows C headers are left to Windows CI under protocol step 7.
-- [ ] `scripts/budget.sh` passes at the authorized 411 normal dependencies; no new resolved crate.
+- [ ] All gates: fmt/check/clippy pass; workspace fails as below. Isolated ACP, final discipline/budget/deny
+  and Windows checks remain pending because protocol step 6 stops the run.
+- [ ] Final budget run at the authorized 411 remains pending; no new resolved crate.
 
 ## Non-goals
 
@@ -121,26 +96,44 @@ npm, sockets, a PTY, streamed fetch, changing the host environment, unconfigured
 - The initial budget stop is resolved by the user’s 2026-10-14 authorization: `dunce` moves from build-only
   to normal use. No ADR named `dunce`; ADR-0078’s grants and filesystem boundary remain unchanged.
 
+- **Protocol stop (2026-10-14).** Workspace RPC deletion failed with `Directory not empty`; the isolated
+  rerun failed identically. Step 6 stops after two attempts without progress. Dev's `878f3c10` fixes this
+  actor-removal race; the user reserved it for merge reconciliation, so it was not applied here.
+  Options: authorize bringing that fix into this branch, or resume gates after reconciliation.
+  M139 implementation is committed; milestone verification is incomplete. No live/credential tests ran.
+
 ## Verified (2026-10-14)
 
 ```text
 cargo test -p bingo-sdk noun_lookup_resolves_the_same_wire_and_face --locked
-test service::tests::noun_lookup_resolves_the_same_wire_and_face ... FAILED
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 138 filtered out; finished in 0.02s
 cargo test -p bingo-mods world_methods_have_one_declared_door --locked
 assertion `left == right` failed: fs.read
-  left: 0
- right: 1
 cargo test -p bingo-sdk service::tests --locked
 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 131 filtered out; finished in 0.00s
-cargo test -p bingo-mods scope::
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
 scripts/budget.sh
 dependencies (unique, normal): 411 (max  410)
-FAIL: too many dependencies
-warm cargo check -p bingo-core: 0s (max  20s)
-relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
-target/debug: 2 GB (soft max  5)
-test binaries: 25
 budget FAILED
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-plugin-rpc -p bingo-mods --lib --locked
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.33s
+test result: ok. 139 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.43s
+cargo test -p bingo-mods --test world --locked
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+cargo test -p bingo-mcp --locked --test server the_mcp_noun_connects_and_calls_the_local_server_through_invoke
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.04s
+cargo fmt --all -- --check
+exit_code: 0
+cargo check --workspace --all-targets --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.78s
+cargo clippy --workspace --all-targets --locked -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.65s
+cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed
+test the_models_spawn_agent_call_crosses_the_agent_noun_chain ... ok
+test world_nouns_give_the_same_answer_in_process_and_under_node ... ok
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+test delete_removes_the_session_from_disk_and_shutdown_exits_zero ... FAILED
+test result: FAILED. 14 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.72s
+cargo test -p bingo --test rpc --locked delete_removes_the_session_from_disk_and_shutdown_exits_zero -- --exact --test-threads=1
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.37s
 ```
