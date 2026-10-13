@@ -64,38 +64,21 @@ it: natives in process, and M133's `dollar.ts` under node.
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-mods dollar::`: every row answers on M111's
-      test host, and a link at each name sees exactly one call. A row
-      raised twice fails the test (shown once, pasted).
+- [ ] `cargo test -p bingo-mods dollar::`: every row answers on M111's test host, and a link at each name sees exactly one call. A row raised twice fails the test (shown once, pasted).
 - [ ] Drift tests fail on a hand edit of `dollar.json` or `dollar-types.ts`.
 - [ ] Every `read` answer equals the field of the same `SessionState`.
-- [ ] A mod's `$.session.send` is seen once at `session.send` and once at
-      `session.receive`. `$.plugin` names the fixture and its root under
-      both transports, and assigning to it throws.
-- [ ] A registered mod tool is offered to the fake model as
-      `plugin__<mod>__<name>` and runs. When the mod is stale, it reloads
-      first.
-- [ ] A stale `ifVersion` gets the held version; a foreign key's write is
-      refused; the read log names each key a hook read.
-- [ ] Clock: under paused time, `every` fires once per period, and no
-      timer survives a reload.
-- [ ] `model.classify` and `model.fork` show as `UsageCharged` in the
-      turn's usage; called from a timer, in the session's. Without the
-      `model` grant, each is refused in words.
-- [ ] `cargo test -p bingo --test plugin_kit`: the nouns fixture gives
-      the same output in process and under node.
-- [ ] All gates pass, including `cargo check --target
-      x86_64-pc-windows-msvc` for core and plugin-rpc.
+- [ ] A mod's `$.session.send` is seen once at `session.send` and once at `session.receive`. `$.plugin` names the fixture and its root under both transports, and assigning to it throws.
+- [ ] A registered mod tool is offered to the fake model as `plugin__<mod>__<name>` and runs. When the mod is stale, it reloads first.
+- [ ] A stale `ifVersion` gets the held version; a foreign key's write is refused; the read log names each key a hook read.
+- [ ] Clock: under paused time, `every` fires once per period, and no timer survives a reload.
+- [ ] `model.classify` and `model.fork` show as `UsageCharged` in the turn's usage; called from a timer, in the session's. Without the `model` grant, each is refused in words.
+- [ ] `cargo test -p bingo --test plugin_kit`: the nouns fixture gives the same output in process and under node.
+- [ ] All gates pass, including `cargo check --target x86_64-pc-windows-msvc` for core and plugin-rpc.
 
 ## Non-goals
 
-- `fs`, `http`, `process`, `env`, `mcp` and `agent` (M139). `ui` and
-  `prompt.fill`/`suggest` (M140, M141).
-- The gaps of mods-parity §8, each kept out by ADR-0078's ratchet with its
-  reason: `tool.check` without a run (no door judges a call without making
-  it; a mod hooks `tool.check`); `prompt.compose` as a read (no composed
-  prompt is published); `prompt.edit` and unsent text (the surface's);
-  `session.repo` (no VCS fact is kept; `$.process` asks git).
+- `fs`, `http`, `process`, `env`, `mcp` and `agent` (M139). `ui` and `prompt.fill`/`suggest` (M140, M141).
+- The gaps of mods-parity §8, each kept out by ADR-0078's ratchet with its reason: `tool.check` without a run (no door judges a call without making it; a mod hooks `tool.check`); `prompt.compose` as a read (no composed prompt is published); `prompt.edit` and unsent text (the surface's); `session.repo` (no VCS fact is kept; `$.process` asks git).
 
 ## Risks
 
@@ -103,18 +86,14 @@ it: natives in process, and M133's `dollar.ts` under node.
 - Timer model calls require the model grant and charge the session without a turn.
 - With mods off, process state falls back to the library without noun chains.
 - Re-verified at `c1d95e8c` on 2026-10-14 (M108–M137, M147–M150 landed).
-- Reload lives in `mods/src/manager/reload.rs`; shared faces live in
-  `plugin-host/src/ops.rs`. Remove its `model.complete` face when the kernel
-  claims the name. `initialize.plugin_name` already exists; preserve its shape.
+- Reload lives in `mods/src/manager/reload.rs`; shared faces live in `plugin-host/src/ops.rs`. Remove its `model.complete` face when the kernel claims the name. `initialize.plugin_name` already exists; preserve its shape.
 - Preserve grants: processes=tighten, user/explicit modules=rewrite, project=tighten.
-- `core/src/chain/service.rs` wraps faces; SDK `service.rs` checks unique names.
-  `HostApi::complete` only grants and mails. Move the model/think command's
-  `config::set` calls into `reconfigure` to avoid duplicate chains.
-- The fold has config, queue, transcript and usage. Attach/detach are observations,
-  not frames; project surfaces through the existing plugin signal door.
-- Use M111's `TestHost` for door answers, and the real offline kernel for chain
-  counts: the test host does not dispatch interception chains.
+- `core/src/chain/service.rs` wraps faces; SDK `service.rs` checks unique names. `HostApi::complete` only grants and mails. Move the model/think command's `config::set` calls into `reconfigure` to avoid duplicate chains.
+- The fold has config, queue, transcript and usage. Attach/detach are observations, not frames; project surfaces through the existing plugin signal door.
+- Use M111's `TestHost` for door answers, and the real offline kernel for chain counts: the test host does not dispatch interception chains.
 - The Node re-entry prerequisite was repaired here as the authorized first brick; ADR-0078 §4 remains unchanged.
+
+- Prerequisite Windows checks: plugin-host and core pass; mods (rquickjs-sys), plugin-rpc and bingo (aws-lc-sys) await Windows CI because this Mac lacks Windows SDK C headers.
 
 ## Verified (2026-10-14)
 
@@ -136,4 +115,31 @@ cargo test -p bingo --test plugin_kit --locked node_reentry -- --nocapture
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.09s
 cargo test -p bingo-mods --test contracts --locked a_reentrant_call -- --nocapture
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.02s
+cargo fmt --all -- --check
+exit 0 (no output)
+cargo check --workspace --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.59s
+cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.93s
+cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing
+exit 0
+cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
+scripts/check_discipline.sh
+discipline ok
+scripts/budget.sh
+dependencies (unique, normal): 410 (max  410)
+budget ok
+cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+cargo check -p bingo-plugin-host --all-targets --target x86_64-pc-windows-msvc --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.66s
+CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc --locked
+rquickjs-sys: fatal error: 'stdlib.h' file not found
+CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc --locked
+aws-lc-sys: fatal error: 'windows.h' file not found
+CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc --locked
+aws-lc-sys: fatal error: 'stdlib.h' file not found
+cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.12s
 ```
