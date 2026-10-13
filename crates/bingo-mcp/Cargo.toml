@@ -12,6 +12,7 @@ description = "MCP client plugin for bingo: servers dialled in the background, t
 workspace = true
 
 [dependencies]
+bingo-process.workspace = true
 bingo-services.workspace = true
 bingo-sdk.workspace = true
 # M85: the OAuth flows, the credential store and the MCP sign-in handle
@@ -31,7 +32,7 @@ tracing.workspace = true
 rmcp = { workspace = true, features = [
   "client",
   "reqwest",
-  "transport-child-process",
+  "transport-async-rw",
   "transport-streamable-http-client-reqwest",
 ] }
 # M7: the header types an HTTP server's `headers` map becomes, taken from the

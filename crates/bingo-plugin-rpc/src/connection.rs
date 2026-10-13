@@ -23,10 +23,11 @@ use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use bingo_process::Tree;
 use bingo_sdk::{ModelEvent, ToolHost};
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::process::{ChildStdin, ChildStdout, Command};
 use tokio::sync::mpsc::{Sender, UnboundedSender};
 use tokio::sync::oneshot;
 
@@ -239,7 +240,7 @@ impl Router {
 /// One live plugin process.
 pub struct Connection {
     plugin: String,
-    child: tokio::sync::Mutex<Child>,
+    child: tokio::sync::Mutex<Tree>,
     writer: Arc<Writer>,
     next_id: AtomicI64,
     router: Arc<Router>,
@@ -272,12 +273,10 @@ impl Connection {
             .current_dir(root)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(stderr_sink(data_dir, plugin))
-            .kill_on_drop(true);
-        let mut child = command
-            .spawn()
-            .map_err(|e| format!("spawning {}: {e}", entry.command))?;
-        let (Some(stdin), Some(stdout)) = (child.stdin.take(), child.stdout.take()) else {
+            .stderr(stderr_sink(data_dir, plugin));
+        let mut child =
+            bingo_process::tree(command).map_err(|e| format!("spawning {}: {e}", entry.command))?;
+        let (Some(stdin), Some(stdout)) = (child.take_stdin(), child.take_stdout()) else {
             return Err("the child was spawned without pipes".to_string());
         };
         Ok(Self::over(plugin, child, stdin, stdout, serving))
@@ -285,7 +284,7 @@ impl Connection {
 
     fn over(
         plugin: &str,
-        child: Child,
+        child: Tree,
         stdin: ChildStdin,
         stdout: ChildStdout,
         serving: Option<Arc<dyn ServiceCalls>>,
@@ -398,7 +397,7 @@ impl Connection {
     /// handshake and will never be spoken to again.
     pub async fn stop(&self) {
         self.router.closed();
-        if let Err(error) = self.child.lock().await.kill().await {
+        if let Err(error) = self.child.lock().await.start_kill() {
             tracing::debug!(plugin = %self.plugin, %error, "the plugin process was already gone");
         }
     }
@@ -499,19 +498,31 @@ mod tests {
     async fn dropping_a_connection_closes_a_grandchilds_stdout() {
         let dir = tempfile::tempdir().expect("tempdir");
         let shell = bingo_process::shell::resolve().expect("shell");
-        let command = entry(shell.path().to_str().expect("shell path"), &[
-            "-c", "sleep 60 & read line; echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}'; wait"
-        ]);
-        let connection = Connection::spawn("tree", &command, dir.path(), dir.path(), None).expect("spawn");
-        tokio::time::timeout(std::time::Duration::from_secs(10), connection.request("ready", json!({})))
-            .await.expect("ready deadline").expect("ready");
+        let command = entry(
+            shell.path().to_str().expect("shell path"),
+            &[
+                "-c",
+                "sleep 60 & read line; echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}'; wait",
+            ],
+        );
+        let connection =
+            Connection::spawn("tree", &command, dir.path(), dir.path(), None).expect("spawn");
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            connection.request("ready", json!({})),
+        )
+        .await
+        .expect("ready deadline")
+        .expect("ready");
         let router = connection.router.clone();
         drop(connection);
         tokio::time::timeout(std::time::Duration::from_secs(3), async {
             while router.alive.load(Ordering::Acquire) {
                 tokio::task::yield_now().await;
             }
-        }).await.expect("the grandchild must close stdout when its connection drops");
+        })
+        .await
+        .expect("the grandchild must close stdout when its connection drops");
     }
 
     #[test]
