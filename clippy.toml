@@ -2,6 +2,7 @@ allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-dbg-in-tests = true
 disallowed-methods = [
+  { path = "reqwest::get", reason = "ADR-0072: build a client with bingo_http::client" },
   { path = "reqwest::Client::new", reason = "ADR-0072: build a client with bingo_http::client" },
   { path = "reqwest::Client::builder", reason = "ADR-0072: build a client with bingo_http::client" },
 ]

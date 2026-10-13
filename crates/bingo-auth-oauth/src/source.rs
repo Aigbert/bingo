@@ -704,7 +704,10 @@ mod tests {
         let (_, query) = url.split_once('?').expect("a query");
         let redirect_uri = field(query, "redirect_uri").expect("a redirect uri");
         let state = field(query, "state").expect("a state");
-        let response = reqwest::get(format!("{redirect_uri}?code=ac-browser&state={state}"))
+        let response = bingo_http::client(bingo_http::Bounds::CALL)
+            .expect("a client")
+            .get(format!("{redirect_uri}?code=ac-browser&state={state}"))
+            .send()
             .await
             .expect("the callback answers");
         assert_eq!(response.status().as_u16(), 200);

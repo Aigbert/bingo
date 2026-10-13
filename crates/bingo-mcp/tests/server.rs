@@ -60,8 +60,11 @@ fn manager(servers: &[(&str, Server)], disabled: &[String]) -> (Arc<Manager>, te
         .iter()
         .map(|(name, server)| ((*name).to_string(), server.clone()))
         .collect();
+    let Ok(http) = bingo_http::client(bingo_http::Bounds::CALL) else {
+        panic!("a bounded HTTP client");
+    };
     let manager = Arc::new(Manager::new(
-        bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+        http,
         configured,
         disabled,
         data.path().to_path_buf(),

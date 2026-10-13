@@ -119,7 +119,13 @@ mod tests {
     ) -> (u16, Result<callback::Callback, AuthError>) {
         let loopback = bind().await.expect("a callback port");
         let url = format!("{}?{query}", uri(loopback.port()));
-        let request = tokio::spawn(async move { reqwest::get(url).await });
+        let request = tokio::spawn(async move {
+            bingo_http::client(bingo_http::Bounds::CALL)
+                .expect("a client")
+                .get(url)
+                .send()
+                .await
+        });
         let outcome = receive(loopback, expected_state).await;
         let status = request
             .await

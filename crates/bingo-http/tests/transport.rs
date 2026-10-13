@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+
 use bingo_http::round_trip;
 use bingo_sdk::ProviderError;
 use std::time::Duration;

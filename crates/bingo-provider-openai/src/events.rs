@@ -376,6 +376,12 @@ fn u64_at(value: &Value, key: &str) -> u64 {
     value.get(key).and_then(Value::as_u64).unwrap_or(0)
 }
 
+impl bingo_http::Decode for Decoder {
+    fn decode(&mut self, event: &str, data: &str) -> Result<Vec<ModelEvent>, ProviderError> {
+        Decoder::decode(self, event, data)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -781,11 +787,5 @@ mod tests {
             ),
             Err(ProviderError::Stream { .. })
         ));
-    }
-}
-
-impl bingo_http::Decode for Decoder {
-    fn decode(&mut self, event: &str, data: &str) -> Result<Vec<ModelEvent>, ProviderError> {
-        Decoder::decode(self, event, data)
     }
 }
