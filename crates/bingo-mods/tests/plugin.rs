@@ -617,3 +617,200 @@ async fn state_pins_its_owner_and_store_keys_and_delete_share_the_shelf() {
     assert_eq!(answer["empty"], json!([]));
     fixture.host.shutdown().await;
 }
+
+mod model_nouns {
+    use super::*;
+    use bingo_sdk::*;
+    use futures::StreamExt;
+    use std::sync::Arc;
+    struct Model;
+    static MANIFEST: PluginManifest = PluginManifest {
+        id: "fixture.side",
+        version: "1",
+        uses: &[],
+        provides: &[],
+        requires: &[],
+        config: None,
+    };
+    #[async_trait::async_trait]
+    impl Plugin for Model {
+        fn manifest(&self) -> &'static PluginManifest {
+            &MANIFEST
+        }
+        fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+            registrar.provider(Arc::new(Model));
+            Ok(())
+        }
+    }
+    #[async_trait::async_trait]
+    impl Provider for Model {
+        fn id(&self) -> &str {
+            "fixture.side"
+        }
+        fn endpoint(&self, _: &str) -> EndpointCapabilities {
+            EndpointCapabilities::default()
+        }
+        async fn stream(
+            &self,
+            request: ModelRequest,
+            _: CancellationToken,
+        ) -> Result<ModelStream, ProviderError> {
+            let usage = if request.session.is_none() {
+                Usage {
+                    input_tokens: 7,
+                    output_tokens: 2,
+                    ..Default::default()
+                }
+            } else {
+                Usage::default()
+            };
+            Ok(Box::pin(futures::stream::iter([
+                Ok(ModelEvent::TextStart { id: "a".into() }),
+                Ok(ModelEvent::TextDelta {
+                    id: "a".into(),
+                    delta: "yes".into(),
+                }),
+                Ok(ModelEvent::TextEnd { id: "a".into() }),
+                Ok(ModelEvent::Finish {
+                    usage,
+                    finish_reason: FinishReason::unified(UnifiedFinish::Stop),
+                }),
+            ])))
+        }
+    }
+    async fn fixture() -> (tempfile::TempDir, Arc<Host>, Attachment) {
+        let home = tempfile::tempdir().unwrap();
+        let root = home.path().join("fixture");
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(root.join("plugin.json"), json!({"name":"fixture","version":"1","module":"main.ts","uses":["model","clock","session"]}).to_string()).unwrap();
+        std::fs::write(root.join("main.ts"), r#"
+          export function register(on) {
+            async function side($) {
+              if (await $.model.classify({text:'a question',labels:['yes','no']}) !== 'yes') throw new Error('wrong label');
+              await $.model.fork({prompt:'side question'});
+            }
+            on('session.start', async ($) => {
+              await $.clock.after(0, async ($) => {await side($); await $.session.append({key:'timer-done',value:true});});
+            });
+            on('turn.step', async ($, e, next) => {await side($); return next(e);});
+          }
+        "#).unwrap();
+        let host = Host::build(
+            vec![
+                Box::new(ModsPlugin::default().with_dirs(vec![root])),
+                Box::new(Model),
+            ],
+            HostConfig::new(Env::rooted(home.path())).with_layer(
+                "offline",
+                json!({"provider":"fixture.side","model":"offline"}),
+            ),
+        )
+        .await
+        .unwrap();
+        let session = host
+            .open(
+                SessionSelector::Create {
+                    spec: SessionSpec {
+                        cwd: home.path().into(),
+                        ..Default::default()
+                    },
+                },
+                ClientIdentity {
+                    name: "fixture".into(),
+                    surface: "test".into(),
+                },
+                OpenOptions::default(),
+            )
+            .await
+            .unwrap();
+        (home, host, session)
+    }
+    #[tokio::test]
+    async fn classify_and_fork_bill_the_turn_but_timer_calls_bill_the_session() {
+        let (_home, host, mut session) = fixture().await;
+        let mut state = session.snapshot.clone();
+        let mut charges = Vec::new();
+        loop {
+            let frame =
+                tokio::time::timeout(std::time::Duration::from_secs(15), session.events.next())
+                    .await
+                    .expect("timer callback did not finish")
+                    .unwrap();
+            state.apply(&frame);
+            if let Event::UsageCharged {
+                turn,
+                plugin,
+                usage,
+            } = &frame.event
+            {
+                assert_eq!(plugin, "fixture");
+                assert_eq!(usage.input_tokens, 7);
+                charges.push(turn.clone());
+            }
+            if matches!(frame.event, Event::Extension {ref kind,..} if kind == "timer-done") {
+                break;
+            }
+        }
+        assert_eq!(charges, vec![None, None]);
+        session.handle.submit(
+            IntentId::mint(),
+            Input::text("main", Origin::surface("test")),
+        );
+        loop {
+            let frame =
+                tokio::time::timeout(std::time::Duration::from_secs(15), session.events.next())
+                    .await
+                    .expect("main turn did not finish")
+                    .unwrap();
+            state.apply(&frame);
+            if let Event::UsageCharged { turn, .. } = &frame.event {
+                charges.push(turn.clone());
+            }
+            if matches!(frame.event, Event::TurnCompleted { .. }) {
+                break;
+            }
+        }
+        assert_eq!(charges.len(), 4);
+        assert!(charges[2].is_some());
+        assert_eq!(charges[2], charges[3]);
+        assert_eq!(state.last_turn.unwrap().usage.input_tokens, 14);
+        assert_eq!(state.summary.usage.input_tokens, 28);
+        host.shutdown().await;
+    }
+}
+
+#[tokio::test]
+async fn model_helpers_without_a_model_grant_are_refused_in_words() {
+    let fixture = support::Fixture::new(
+        r#"
+      export function register(on) {
+        on('fixture.echo', async ($, e) => {
+          const errors = [];
+          for (const method of ['classify','fork']) {
+            try {await $.model[method]({session:e.session,text:'x',labels:['yes'],prompt:'x'});}
+            catch(error) {errors.push(error.message);}
+          }
+          return {errors};
+        });
+      }
+    "#,
+        &[],
+        json!({}),
+    )
+    .await;
+    let answer = fixture
+        .call(
+            "fixture",
+            "echo",
+            json!({"session":fixture.attachment.session}),
+        )
+        .await;
+    let errors = answer["errors"].as_array().unwrap();
+    assert_eq!(errors.len(), 2);
+    assert!(
+        errors
+            .iter()
+            .all(|error| error.as_str().unwrap().contains("model grant"))
+    );
+    fixture.host.shutdown().await;
+}

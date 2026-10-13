@@ -1,9 +1,10 @@
 import type { Callbacks, Callback } from './callbacks.ts';
 import { dollarRoutes } from './dollar-types.ts';
+import type { DollarInputs, DollarResults } from './dollar-types.ts';
 import type { Rpc } from './rpc.ts';
-import type { HookSite, StateValue, ModelRequest, Completed, Input, Tone } from './wire.ts';
+import type { HookSite, StateValue, ModelRequest, Completed, Input, Tone, ToolSpec, CommandSpec } from './wire.ts';
 
-export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root: string } = { name: '', root: '' }, callbacks?: Callbacks) {
+export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root: string } = { name: '', root: '' }, callbacks?: Callbacks): Dollar {
   const store = (scope: string) => ({
     get: (key: string) => rpc.request<StateValue | null>('host/state/get', { scope, key }),
     set: (key: string, value: unknown, ifVersion?: number) =>
@@ -65,9 +66,41 @@ export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root:
       return new Proxy({}, { get: (_, method: string) => (params: unknown) =>
         rpc.request<{ result: unknown }>('service/call', { key: noun, method, params }).then(reply => reply.result) });
     },
-  });
+  }) as Dollar;
 }
 
-export type Dollar = ReturnType<typeof dollar>;
+type Operation = keyof DollarInputs;
+type Noun = Operation extends `${infer N}.${string}` ? N : never;
+type AtSite<I> = I extends object ? Omit<I, 'session' | 'turn'> & Partial<Pick<I, Extract<keyof I, 'session' | 'turn'>>> : I;
+type Method<K extends Operation> = AtSite<DollarInputs[K]> extends null
+  ? () => Promise<DollarResults[K]>
+  : {} extends AtSite<DollarInputs[K]>
+    ? (input?: AtSite<DollarInputs[K]>) => Promise<DollarResults[K]>
+    : (input: AtSite<DollarInputs[K]>) => Promise<DollarResults[K]>;
+type HostNouns = { [N in Noun]: { [K in Operation as K extends `${N}.${infer M}` ? M : never]: Method<K> } };
+type Replace<T, With> = Omit<T, keyof With> & With;
+type State = {
+  get(key: string): Promise<StateValue | null>;
+  set(key: string, value: unknown, ifVersion?: number): Promise<StateValue>;
+};
+export type Dollar = Replace<HostNouns, {
+  readonly plugin: Readonly<{name: string; root: string}>;
+  state: State;
+  store: State & {keys(): Promise<string[]>; delete(key: string): Promise<boolean>};
+  model: Replace<HostNouns['model'], {complete(request: ModelRequest): Promise<Completed>}>;
+  tool: Replace<HostNouns['tool'], {register(spec: ToolSpec, handler: Callback): Promise<string>}>;
+  command: Replace<HostNouns['command'], {register(spec: CommandSpec, handler: Callback): Promise<string>}>;
+  clock: {
+    now(): Promise<string>;
+    sleep(ms: number): Promise<null>;
+    after(ms: number, handler: Callback): Promise<string>;
+    every(ms: number, handler: Callback): Promise<string>;
+  };
+  session: HostNouns['session'] & {
+    deliver(input: Input, wake?: boolean): Promise<null>;
+    extend(key: string, value: unknown): Promise<null>;
+  };
+  ui: {status(text: string | null, options?: {key?: string; tone?: Tone}): Promise<null>};
+}>;
 // A service face augments this type without widening the host's built-in nouns.
 export type WithServices<Services> = Dollar & Services;

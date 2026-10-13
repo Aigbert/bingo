@@ -159,6 +159,8 @@ impl Runtime {
             }
             "session.append" | "session.extend" => operation(caller, "host/extend", params).await,
             "session.deliver" => operation(caller, "host/deliver", params).await,
+            "model.classify" => super::model::classify(caller, parse(params)?).await,
+            "model.fork" => self.fork(caller, parse(params)?).await,
             "model.complete" => operation(caller, "host/model/complete", params).await,
             "state.get" | "store.get" => operation(caller, "host/state/get", params).await,
             "state.set" | "store.set" => operation(caller, "host/state/set", params).await,
@@ -188,6 +190,19 @@ impl Runtime {
             _ => Err(format!("{method}: runtime operation is unavailable")),
         }
     }
+    async fn fork(&self, caller: &Caller, input: Fork) -> Result<Value, String> {
+        let live = self.sessions.get(&caller.host, &input.session).await?;
+        let history = live
+            .handle
+            .history(HistoryPage::default())
+            .await
+            .map_err(failed)?;
+        let request = super::model::fork_request(&history.items, &input.prompt);
+        let events =
+            super::model::complete(caller, &input.session, input.turn.as_ref(), request).await?;
+        Ok(json!(bingo_plugin_host::host::Completed { events }))
+    }
+
     async fn timer(&self, caller: &Caller, input: Timer, every: bool) -> Result<Value, String> {
         let registry = caller
             .host
