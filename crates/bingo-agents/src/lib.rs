@@ -256,3 +256,5 @@ mod plugin_tests {
         }
     }
 }
+
+mod report;
