@@ -511,6 +511,23 @@ mod tests {
     }
 
     #[test]
+    fn modern_channel_claims_are_probed_and_never_removed() {
+        let case = Case::new();
+        let path = case.lock("channels", "feishu-cli_a1.lock", 4242);
+        let marker = b"bingo-channel-claim-v1\n";
+        std::fs::write(&path, marker).unwrap();
+        let file = std::fs::File::options().read(true).write(true).open(&path).unwrap();
+        file.try_lock().unwrap();
+        let held = case.report(&Fake::empty(), true);
+        assert!(held.contains("channel OS lock is held"), "{held}");
+        assert_eq!(std::fs::read(&path).unwrap(), marker);
+        drop(file);
+        let free = case.report(&Fake::empty(), true);
+        assert!(free.contains("channel OS lock is free"), "{free}");
+        assert_eq!(std::fs::read(path).unwrap(), marker);
+    }
+
+    #[test]
     fn every_lock_under_the_data_dir_is_found_whatever_plugin_left_it() {
         let case = Case::new();
         case.lock("schedules", "runner.lock", 4242);
