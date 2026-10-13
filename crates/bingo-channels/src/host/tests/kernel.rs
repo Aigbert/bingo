@@ -4,18 +4,16 @@
 //! what was submitted, so a chat's two directions can both be asserted
 //! without a kernel in the way.
 
-use std::any::Any;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Activation, Answer, Attachment, Catalog, CatalogEntry, CatalogKind, ClientIdentity,
-    CloseReason, Delivery, Env, ErrorCode, Event, Frame, FrameStream, GatewayStream, HistoryChunk,
-    HistoryPage, HostApi, HostHandle, Input, IntentId, InteractionId, InterruptScope, KernelError,
-    OpenOptions, Seq, SessionChange, SessionFilter, SessionHandle, SessionId, SessionPort,
-    SessionSelector, SessionSpec, SessionState, SessionSummary, SurfaceOptions,
+    Activation, Answer, Attachment, Catalog, CatalogEntry, Env, ErrorCode, Event, Frame,
+    FrameStream, HistoryChunk, HistoryPage, HostHandle, Input, IntentId, InteractionId,
+    InterruptScope, KernelError, Seq, SessionChange, SessionHandle, SessionId, SessionPort,
+    SessionSelector, SessionSpec, SessionState, SurfaceOptions,
 };
 use tokio::sync::mpsc;
 
@@ -174,109 +172,81 @@ impl TestHost {
     }
 }
 
-#[async_trait]
-impl HostApi for TestHost {
-    async fn sessions(&self, _filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        Ok(Vec::new())
+impl TestHost {
+    pub fn scripted(self: &Arc<Self>) -> bingo_sdk::testing::TestHost {
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_sessions(|_filter| async move { Ok(Vec::new()) });
+        self.script_open(&host);
+        host.on_close(|_session, _reason| async move { Ok(()) });
+        self.script_reconfigure(&host);
+        host.on_delete(|_session| async move { Ok(()) });
+        host.on_deliver(|_to, _intent, _input, _delivery| async move {
+            unreachable!("this double delivers nothing")
+        });
+        host.on_extend(|_session, _plugin, _kind, _payload| async move {
+            unreachable!("this double extends nothing")
+        });
+        host.on_signal(|_session, _plugin, _kind, _payload| async move {
+            unreachable!("this double signals nothing")
+        });
+        host.on_catalog(|kind| async move {
+            Ok(Catalog {
+                kind,
+                entries: Vec::<CatalogEntry>::new(),
+            })
+        });
+        host
     }
 
-    async fn open(
-        &self,
-        selector: SessionSelector,
-        _who: ClientIdentity,
-        options: OpenOptions,
-    ) -> Result<Attachment, KernelError> {
-        assert!(options.children, "a chat attaches to the whole tree");
-        locked(&self.opened).push(selector.clone());
-        match selector {
-            SessionSelector::ByKey { key } => self
-                .session(&key)
-                .map(|session| self.attachment(session))
-                .ok_or_else(|| KernelError::new(ErrorCode::SessionNotFound, "no such session")),
-            SessionSelector::Create {
-                spec: SessionSpec { key: Some(key), .. },
-            } => {
-                let session = Arc::new(TestSession {
-                    key: Mutex::new(key),
-                    ..TestSession::default()
-                });
-                locked(&self.sessions).push(Arc::clone(&session));
-                Ok(self.attachment(session))
+    fn script_open(self: &Arc<Self>, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_open(move |selector, _who, options| {
+            let fixture = fixture.clone();
+            async move {
+                assert!(options.children, "a chat attaches to the whole tree");
+                locked(&fixture.opened).push(selector.clone());
+                match selector {
+                    SessionSelector::ByKey { key } => fixture
+                        .session(&key)
+                        .map(|session| fixture.attachment(session))
+                        .ok_or_else(|| {
+                            KernelError::new(ErrorCode::SessionNotFound, "no such session")
+                        }),
+                    SessionSelector::Create {
+                        spec: SessionSpec { key: Some(key), .. },
+                    } => {
+                        let session = Arc::new(TestSession {
+                            key: Mutex::new(key),
+                            ..TestSession::default()
+                        });
+                        locked(&fixture.sessions).push(Arc::clone(&session));
+                        Ok(fixture.attachment(session))
+                    }
+                    other => panic!("a chat never opens by {other:?}"),
+                }
             }
-            other => panic!("a chat never opens by {other:?}"),
-        }
+        });
     }
 
-    async fn close(&self, _session: &SessionId, _reason: CloseReason) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    async fn reconfigure(
-        &self,
-        _session: &SessionId,
-        change: SessionChange,
-    ) -> Result<(), KernelError> {
-        if let SessionChange::Key(key) = change
-            && let Some(session) = locked(&self.sessions).first()
-        {
-            session.set_key(key);
-        }
-        Ok(())
-    }
-
-    async fn delete(&self, _session: &SessionId) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    async fn deliver(
-        &self,
-        _to: &SessionId,
-        _intent: IntentId,
-        _input: Input,
-        _delivery: Delivery,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double delivers nothing")
-    }
-
-    async fn extend(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double extends nothing")
-    }
-
-    async fn signal(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double signals nothing")
-    }
-
-    async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
-        Ok(Catalog {
-            kind,
-            entries: Vec::<CatalogEntry>::new(),
-        })
-    }
-
-    fn gateway_events(&self) -> GatewayStream {
-        Box::pin(futures::stream::empty())
-    }
-
-    fn service_any(&self, _key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
-        None
+    fn script_reconfigure(self: &Arc<Self>, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_reconfigure(move |_session, change| {
+            let fixture = fixture.clone();
+            async move {
+                if let SessionChange::Key(key) = change
+                    && let Some(session) = locked(&fixture.sessions).first()
+                {
+                    session.set_key(key);
+                }
+                Ok(())
+            }
+        });
     }
 }
 
 /// A host nothing is ever asked of, for the tests that never get that far.
 pub fn nowhere() -> HostHandle {
-    HostHandle(Arc::new(TestHost::default()))
+    Arc::new(TestHost::default()).scripted().handle()
 }
 
 pub fn options(cwd: &str) -> SurfaceOptions {
