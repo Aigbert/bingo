@@ -962,3 +962,6 @@ fn turn_start_shares_ten_thousand_bodies_without_a_journal() {
         assert_eq!(Arc::strong_count(original), 2);
     }
 }
+
+#[path = "../chain/hook_contract_turn.rs"]
+mod hook_contract;

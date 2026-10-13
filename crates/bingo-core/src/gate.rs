@@ -337,3 +337,7 @@ mod summary_tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "chain/hook_contract_gate.rs"]
+mod hook_contract;

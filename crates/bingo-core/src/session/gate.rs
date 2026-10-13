@@ -258,3 +258,7 @@ async fn submit_hooks(mut input: Input, hooks: HookSet, cx: HookContext) -> Verd
     }
     Verdict::Prose(input)
 }
+
+#[cfg(test)]
+#[path = "tests/hook_contract.rs"]
+mod hook_contract;
