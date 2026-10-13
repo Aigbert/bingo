@@ -998,3 +998,19 @@ fn token(style: ratatui::style::Style) -> &'static str {
     }
     "?"
 }
+
+#[test]
+fn a_stranger_places_a_row_with_a_title_badge_and_action() {
+    let state = folded(vec![
+        item(1, running_tool("itm_1", "Inspect", "checking")),
+        frame(2, extended("stranger", "row:itm_1", bingo_sdk::slot::with(json!({}), [bingo_sdk::slot::Slot::Row {
+            item: bingo_sdk::ItemId::from_raw("itm_1"), mark: Some('❖'),
+            title: Some("Review".into()), badge: Some("sample".into()), body: None,
+            actions: vec![bingo_sdk::ActionItem { label: "open".into(), action: bingo_sdk::Action { name: "stranger.open".into(), args: json!("sample") }, key: Some('b') }],
+        }]))),
+    ]);
+    let (ui, now) = scene();
+    let screen = draw_tree(80, 24, &solo(&state), &ui, now);
+    assert!(screen.contains("❖ Review(sample)"), "{screen}");
+    assert!(screen.contains("open"), "{screen}");
+}
