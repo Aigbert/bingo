@@ -1,0 +1,128 @@
+---
+source: crates/bingo-mcp/src/config.rs
+expression: "schemars::schema_for!(Settings)"
+---
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Settings",
+  "description": "The claimed slice, as the kernel hands it over.",
+  "type": "object",
+  "properties": {
+    "mcpServers": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Entry"
+      }
+    },
+    "disabledMcpServers": {
+      "description": "Names that start disabled; a disabled server is never dialled.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    }
+  },
+  "$defs": {
+    "Entry": {
+      "description": "A server entry as it is written, before it is known to be one transport.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/Transport"
+        },
+        "command": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "cwd": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "oauth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OAuth"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "toolTimeout": {
+          "description": "Maximum seconds per tool call; absent allows ten minutes. Must be positive.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 1,
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "Transport": {
+      "oneOf": [
+        {
+          "description": "A child process speaking the protocol over its stdin and stdout.",
+          "type": "string",
+          "const": "stdio"
+        },
+        {
+          "description": "A streamable-HTTP endpoint.",
+          "type": "string",
+          "const": "http"
+        }
+      ]
+    },
+    "OAuth": {
+      "description": "The sign-in half of an HTTP server's entry. Only a client id: a public\nnative client holds no secret, and a token never enters a settings file\n(ADR-0012 §2).",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

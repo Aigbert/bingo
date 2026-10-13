@@ -43,6 +43,7 @@ getrandom.workspace = true
 base64.workspace = true
 
 [dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
 bingo-sdk = { workspace = true, features = ["testing"] }
 tempfile.workspace = true
 # M39: the bridge's tests are a real MCP client on the other end of the

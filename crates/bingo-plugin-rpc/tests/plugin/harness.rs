@@ -95,7 +95,24 @@ impl Started {
 /// Those plugins, started over a host that keeps whatever services they open
 /// and hears whatever the bridge says.
 pub async fn started_with(plugins: &[(&str, &[&str])]) -> Started {
+    started_with_timeout(plugins, None).await
+}
+
+pub async fn started_with_timeout(plugins: &[(&str, &[&str])], seconds: Option<u64>) -> Started {
     let home = installed(plugins);
+    if let Some(seconds) = seconds {
+        for (name, _) in plugins {
+            let path = home
+                .path()
+                .join(".bingo/plugins")
+                .join(name)
+                .join("plugin.json");
+            let mut manifest: Value =
+                serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+            manifest["callTimeout"] = json!(seconds);
+            std::fs::write(path, manifest.to_string()).unwrap();
+        }
+    }
     let project = tempfile::tempdir().expect("a project");
     let manager = Arc::new(Manager::new(
         Env::rooted(home.path()),

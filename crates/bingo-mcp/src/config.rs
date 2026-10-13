@@ -33,6 +33,7 @@ pub enum Server {
         args: Vec<String>,
         env: BTreeMap<String, String>,
         cwd: Option<PathBuf>,
+        tool_timeout: Option<std::num::NonZeroU64>,
     },
     Http {
         url: String,
@@ -41,7 +42,17 @@ pub enum Server {
         /// registers no clients of its own (ADR-0050 §1). Absent is the
         /// ordinary case: bingo registers itself.
         oauth: Option<OAuth>,
+        tool_timeout: Option<std::num::NonZeroU64>,
     },
+}
+
+impl Server {
+    pub fn tool_timeout(&self) -> std::time::Duration {
+        let (Self::Stdio { tool_timeout, .. } | Self::Http { tool_timeout, .. }) = self;
+        tool_timeout
+            .map(|seconds| std::time::Duration::from_secs(seconds.get()))
+            .unwrap_or(crate::dial::TOOL_CALL)
+    }
 }
 
 /// The sign-in half of an HTTP server's entry. Only a client id: a public
@@ -71,6 +82,7 @@ impl fmt::Debug for Server {
                 url,
                 headers,
                 oauth,
+                ..
             } => f
                 .debug_struct("Http")
                 .field("url", url)
@@ -109,6 +121,9 @@ struct Entry {
     headers: BTreeMap<String, String>,
     #[serde(default)]
     oauth: Option<OAuth>,
+    /// Maximum seconds per tool call; absent allows ten minutes. Must be positive.
+    #[serde(default)]
+    tool_timeout: Option<std::num::NonZeroU64>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, JsonSchema, PartialEq, Eq)]
@@ -141,6 +156,7 @@ impl Entry {
             args: self.args,
             env: self.env,
             cwd: self.cwd,
+            tool_timeout: self.tool_timeout,
         })
     }
 
@@ -155,6 +171,7 @@ impl Entry {
             url,
             headers: self.headers,
             oauth: self.oauth,
+            tool_timeout: self.tool_timeout,
         })
     }
 }
@@ -174,12 +191,13 @@ impl<'de> Deserialize<'de> for Server {
 /// headers. Written here, beside the reader, so the two spellings of the entry
 /// cannot drift apart — the round trip is a test.
 pub fn row(server: &Server) -> Value {
-    match server {
+    let mut row = match server {
         Server::Stdio {
             command,
             args,
             env,
             cwd,
+            ..
         } => json!({
             "type": "stdio",
             "command": command,
@@ -191,6 +209,7 @@ pub fn row(server: &Server) -> Value {
             url,
             headers,
             oauth,
+            ..
         } => {
             let mut row = json!({ "type": "http", "url": url, "headers": headers });
             // Absent rather than null: a row is forwarded verbatim to a
@@ -203,7 +222,12 @@ pub fn row(server: &Server) -> Value {
             }
             row
         }
+    };
+    let (Server::Stdio { tool_timeout, .. } | Server::Http { tool_timeout, .. }) = server;
+    if let Some(seconds) = tool_timeout {
+        row["toolTimeout"] = json!(seconds);
     }
+    row
 }
 
 /// The schema a client reads is the entry's: the two transports are one shape
@@ -236,6 +260,25 @@ mod tests {
     }
 
     #[test]
+    fn deadline_settings_schema_is_pinned() {
+        insta::assert_json_snapshot!("settings_schema", schemars::schema_for!(Settings));
+    }
+
+    #[test]
+    fn deadline_setting_is_positive_and_round_trips_on_both_transports() {
+        for mut entry in [
+            json!({"command":"slow"}),
+            json!({"type":"http", "url":"http://localhost"}),
+        ] {
+            entry["toolTimeout"] = json!(5);
+            let configured = server(entry.clone()).expect("a positive deadline");
+            assert_eq!(row(&configured)["toolTimeout"], json!(5));
+            entry["toolTimeout"] = json!(0);
+            assert!(server(entry).is_err(), "zero must not disable the deadline");
+        }
+    }
+
+    #[test]
     fn an_empty_slice_configures_no_servers() {
         let settings = settings(json!({})).expect("a readable slice");
         assert!(settings.mcp_servers.is_empty());
@@ -258,6 +301,7 @@ mod tests {
                 args: vec!["-y".into(), "mcp-server-files".into()],
                 env: BTreeMap::from([("TOKEN".to_string(), "s3cret".to_string())]),
                 cwd: Some(PathBuf::from("/work")),
+                tool_timeout: None,
             }
         );
     }
@@ -279,6 +323,7 @@ mod tests {
                     "Bearer s3cret".to_string()
                 )]),
                 oauth: None,
+                tool_timeout: None,
             }
         );
     }

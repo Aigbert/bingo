@@ -28,7 +28,7 @@ pub fn handles(
     servers: &BTreeMap<String, Server>,
     store: Arc<CredentialStore>,
 ) -> BTreeMap<String, Arc<McpAuth>> {
-    let http = reqwest::Client::new();
+    let http = bingo_auth_oauth::client();
     servers
         .iter()
         .filter_map(|(name, server)| {
@@ -48,6 +48,7 @@ pub fn handle(
         url,
         headers,
         oauth,
+        ..
     } = server
     else {
         return None;
@@ -130,6 +131,7 @@ mod tests {
 
     fn http(headers: &[(&str, &str)]) -> Server {
         Server::Http {
+            tool_timeout: None,
             url: "https://mcp.example.com/mcp".into(),
             headers: headers
                 .iter()
@@ -166,6 +168,7 @@ mod tests {
     #[test]
     fn a_child_process_signs_in_to_nothing_here() {
         let stdio = Server::Stdio {
+            tool_timeout: None,
             command: "npx".into(),
             args: Vec::new(),
             env: BTreeMap::new(),
@@ -185,6 +188,7 @@ mod tests {
             (
                 "files".to_string(),
                 Server::Stdio {
+                    tool_timeout: None,
                     command: "npx".into(),
                     args: Vec::new(),
                     env: BTreeMap::new(),

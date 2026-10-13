@@ -3235,6 +3235,15 @@
         },
         "config": {
           "description": "A JSON Schema for this plugin's own settings — the slice a person\nwrites under `plugins.<name>`, which reaches the process as\n`initialize.config`. It is what a person reads; nothing in this\nworkspace validates a document against a schema."
+        },
+        "callTimeout": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 1,
+          "description": "Maximum seconds for tool/call and command/run; absent allows ten minutes."
         }
       },
       "required": [

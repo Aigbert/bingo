@@ -254,6 +254,7 @@ impl Manager {
             found.root.clone(),
             found.manifest.entry.rooted(&found.root),
             config,
+            found.manifest.call_timeout,
             Setting {
                 env: HostEnv::from(&self.env),
                 data_dir: self.env.data_dir.clone(),

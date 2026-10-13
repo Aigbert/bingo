@@ -526,6 +526,7 @@ mod tests {
         std::collections::BTreeMap::from([(
             "files".to_string(),
             crate::config::Server::Stdio {
+                tool_timeout: None,
                 command: "/bin/echo".into(),
                 args: Vec::new(),
                 env: Default::default(),

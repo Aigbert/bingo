@@ -30,6 +30,10 @@ use crate::config::Server;
 /// deadline is a failure a person retries with `/mcp reconnect`.
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Builds and crawls can take minutes. A server may override toolTimeout,
+/// but an unattended call must eventually return an error to the model.
+pub const TOOL_CALL: Duration = Duration::from_secs(600);
+
 /// The client side of one live server. The handler is this client's own
 /// [`Client`], because a server may ask *us* something (`elicitation/create`)
 /// while it answers a call.
@@ -99,6 +103,7 @@ async fn connect(
             args,
             env,
             cwd,
+            ..
         } => {
             let service = spawn_child(
                 server_name,
@@ -353,6 +358,7 @@ mod tests {
     #[tokio::test]
     async fn a_failed_http_dial_never_reports_a_credential_from_the_url() {
         let server = Server::Http {
+            tool_timeout: None,
             url: "http://127.0.0.1:1/mcp?key=s3cret".into(),
             headers: BTreeMap::from([("Authorization".to_string(), "Bearer t0ken".to_string())]),
             oauth: None,
@@ -370,6 +376,7 @@ mod tests {
     #[tokio::test]
     async fn a_command_that_does_not_exist_fails_without_waiting() {
         let server = Server::Stdio {
+            tool_timeout: None,
             command: "bingo-no-such-mcp-server".into(),
             args: Vec::new(),
             env: BTreeMap::new(),

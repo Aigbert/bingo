@@ -44,3 +44,6 @@ pub use mcp::McpAuth;
 pub use source::{Status, TokenSource};
 pub use store::{CredentialStore, Entry, mcp_key};
 pub use tokens::Tokens;
+
+mod http;
+pub use http::client;

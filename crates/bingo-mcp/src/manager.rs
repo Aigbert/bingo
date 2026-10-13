@@ -133,7 +133,14 @@ impl Manager {
         let slots = self.slots.read().await;
         slots
             .iter()
-            .flat_map(|(name, slot)| offered(name, &slot.state, Arc::downgrade(self)))
+            .flat_map(|(name, slot)| {
+                let timeout = self
+                    .servers
+                    .get(name)
+                    .map(Server::tool_timeout)
+                    .unwrap_or(crate::dial::TOOL_CALL);
+                offered(name, &slot.state, Arc::downgrade(self), timeout)
+            })
             .collect()
     }
 
@@ -377,7 +384,12 @@ fn report(name: &str, outcome: &Dialled) {
     }
 }
 
-fn offered(server: &str, state: &State, manager: std::sync::Weak<Manager>) -> Vec<Arc<dyn Tool>> {
+fn offered(
+    server: &str,
+    state: &State,
+    manager: std::sync::Weak<Manager>,
+    timeout: std::time::Duration,
+) -> Vec<Arc<dyn Tool>> {
     let State::Connected(connection) = state else {
         return Vec::new();
     };
@@ -391,6 +403,7 @@ fn offered(server: &str, state: &State, manager: std::sync::Weak<Manager>) -> Ve
                 Arc::clone(&connection.service),
                 Arc::clone(&connection.asker),
                 manager.clone(),
+                timeout,
             )) as Arc<dyn Tool>
         })
         .collect()
@@ -429,6 +442,7 @@ mod tests {
 
     fn stdio(command: &str) -> Server {
         Server::Stdio {
+            tool_timeout: None,
             command: command.to_string(),
             args: Vec::new(),
             env: BTreeMap::new(),

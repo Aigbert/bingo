@@ -117,7 +117,7 @@ impl OpenAiProvider {
             &id,
             codex_issuer(endpoint.issuer),
             store,
-            reqwest::Client::new(),
+            bingo_auth_oauth::client(),
         );
         let base_url = endpoint
             .base_url

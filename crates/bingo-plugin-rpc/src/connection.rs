@@ -535,10 +535,13 @@ mod tests {
         let connection =
             Connection::spawn("quiet", &entry("true", &[]), dir.path(), dir.path(), None)
                 .expect("`true` exists on every unix");
-        let error = connection
-            .request("initialize", json!({}))
-            .await
-            .expect_err("a process that says nothing answers nothing");
+        let error = tokio::time::timeout(
+            crate::deadline::HANDSHAKE,
+            connection.request("initialize", json!({})),
+        )
+        .await
+        .expect("a closed pipe answers within the handshake bound")
+        .expect_err("a process that says nothing answers nothing");
         assert_eq!(error.code, TRANSPORT_ERROR);
         assert!(!connection.is_alive());
         assert!(connection.claim_death(), "the first to notice reports it");

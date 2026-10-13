@@ -33,6 +33,9 @@ pub struct Manifest {
     /// workspace validates a document against a schema.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<Value>,
+    /// Maximum seconds for tool/call and command/run; absent allows ten minutes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub call_timeout: Option<std::num::NonZeroU64>,
 }
 
 /// The process to spawn.
@@ -85,6 +88,18 @@ mod tests {
                 .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
                 .collect(),
         }
+    }
+
+    #[test]
+    fn deadline_manifest_round_trips_the_override() {
+        let manifest: Manifest = serde_json::from_value(json!({
+            "name":"slow", "version":"1", "entry":{"command":"slow"}, "callTimeout":5
+        }))
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(manifest).unwrap()["callTimeout"],
+            json!(5)
+        );
     }
 
     #[test]

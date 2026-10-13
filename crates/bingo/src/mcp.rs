@@ -291,6 +291,7 @@ fn describe(name: &str, server: &Server) -> String {
             args,
             env,
             cwd,
+            ..
         } => {
             lines.push(format!("  command: {command}"));
             if !args.is_empty() {
@@ -305,6 +306,7 @@ fn describe(name: &str, server: &Server) -> String {
             url,
             headers,
             oauth,
+            ..
         } => {
             lines.push(format!("  url: {url}"));
             lines.push(format!("  headers: {}", names(headers)));
@@ -366,7 +368,7 @@ fn signs_in(
     server: &Server,
 ) -> Result<Arc<bingo_auth_oauth::McpAuth>, KernelError> {
     let store = Arc::new(CredentialStore::new(env.data_dir.clone()));
-    bingo_mcp::auth::handle(name, server, store, reqwest::Client::new()).ok_or_else(|| {
+    bingo_mcp::auth::handle(name, server, store, bingo_auth_oauth::client()).ok_or_else(|| {
         invalid(format!(
             "`{name}` signs in to nothing: it is a child process, or its \
              Authorization header is already written in the settings"
@@ -406,6 +408,7 @@ mod tests {
 
     fn stdio(command: &str, args: &[&str]) -> Server {
         Server::Stdio {
+            tool_timeout: None,
             command: command.into(),
             args: args.iter().map(|arg| (*arg).to_string()).collect(),
             env: BTreeMap::from([("GITHUB_TOKEN".to_string(), "ghp_live".to_string())]),
@@ -415,6 +418,7 @@ mod tests {
 
     fn http(url: &str) -> Server {
         Server::Http {
+            tool_timeout: None,
             url: url.into(),
             headers: BTreeMap::from([("X-Tenant".to_string(), "acme".to_string())]),
             oauth: None,
@@ -522,6 +526,7 @@ mod tests {
         let said = describe(
             "remote",
             &Server::Http {
+                tool_timeout: None,
                 url: "https://mcp.example.com/mcp".into(),
                 headers: BTreeMap::from([(
                     "Authorization".to_string(),
@@ -539,6 +544,7 @@ mod tests {
         let said = describe(
             "remote",
             &Server::Http {
+                tool_timeout: None,
                 url: "https://mcp.example.com/mcp".into(),
                 headers: BTreeMap::new(),
                 oauth: None,

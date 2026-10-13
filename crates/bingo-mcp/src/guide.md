@@ -80,3 +80,8 @@ login <name> [--paste] | logout <name>` is the headless twin: `add` and
 *names* and never their values, and `--paste` reads the redirect back from the
 keyboard instead of opening a browser. `bingo mcp login` is also the way in
 from `--print`, which renders no sign-in dialog.
+
+Each server may set `toolTimeout` to a positive number of seconds for a tool
+call. Both stdio and HTTP default to 600 seconds (10 minutes). A call past
+that deadline returns a tool error naming the server and the bound. Set a
+longer value for builds or crawls; zero does not disable the deadline.

@@ -149,6 +149,7 @@ fn request_line(request: Request, options: &Options, state: &mut State) -> bool 
             announce(options, state);
         }
         name::TOOL_CALL => return call(request.id, request.params, state),
+        name::COMMAND_RUN if request.params["args"] == "never-answer" => {}
         name::COMMAND_RUN => answer(request.id, run(request.params)),
         name::CONTEXT_CONTRIBUTE => answer(request.id, contribute(request.params)),
         name::COMPACTOR_COMPACT => answer(request.id, compact(request.params)),

@@ -110,6 +110,7 @@ pub struct Bridge {
     /// process's, so nothing past this point knows the placeholder exists.
     entry: Entry,
     config: Value,
+    call_timeout: Option<std::num::NonZeroU64>,
     env: HostEnv,
     data_dir: PathBuf,
     notices: Arc<Notices>,
@@ -137,6 +138,7 @@ impl Bridge {
         root: PathBuf,
         entry: Entry,
         config: Value,
+        call_timeout: Option<std::num::NonZeroU64>,
         setting: Setting,
     ) -> Self {
         Self {
@@ -144,6 +146,7 @@ impl Bridge {
             root,
             entry,
             config,
+            call_timeout,
             env: setting.env,
             data_dir: setting.data_dir,
             notices: setting.notices,
@@ -222,6 +225,9 @@ impl Bridge {
                     spec.clone(),
                     Arc::clone(&live.connection),
                     Arc::clone(&self.notices),
+                    self.call_timeout
+                        .map(|seconds| Duration::from_secs(seconds.get()))
+                        .unwrap_or(deadline::TOOL_CALL),
                 )) as Arc<dyn Tool>
             })
             .collect()
@@ -239,6 +245,9 @@ impl Bridge {
                     &self.name,
                     spec.clone(),
                     Arc::clone(&live.connection),
+                    self.call_timeout
+                        .map(|seconds| Duration::from_secs(seconds.get()))
+                        .unwrap_or(deadline::COMMAND_RUN),
                 )) as Arc<dyn SdkCommand>
             })
             .collect()
@@ -492,6 +501,7 @@ impl Bridge {
                 env: Default::default(),
             },
             Value::Null,
+            None,
             Setting {
                 env: HostEnv::from(&bingo_sdk::Env::rooted("/nowhere")),
                 data_dir: PathBuf::new(),
