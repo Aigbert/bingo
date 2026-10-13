@@ -42,6 +42,8 @@ pub mod source;
 pub mod state;
 pub mod tool;
 pub mod wire;
+#[cfg(test)]
+mod wire_ts;
 
 #[cfg(test)]
 mod testing;

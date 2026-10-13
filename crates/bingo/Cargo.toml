@@ -12,6 +12,11 @@ description = "bingo: a local coding-agent harness"
 workspace = true
 
 [dependencies]
+# M133: typed scenarios, their schema, streams and disposable author-test homes.
+serde.workspace = true
+schemars.workspace = true
+futures.workspace = true
+tempfile.workspace = true
 bingo-http.workspace = true
 bingo-channel-feishu.workspace = true
 bingo-channel-adapter.workspace = true

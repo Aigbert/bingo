@@ -28,6 +28,7 @@ tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+bingo-schema-ts.workspace = true
 bingo-pictures = { workspace = true, features = ["testing"] }
 bingo-sdk = { workspace = true, features = ["testing"] }
 tempfile.workspace = true
