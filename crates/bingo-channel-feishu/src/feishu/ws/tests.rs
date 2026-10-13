@@ -12,9 +12,9 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::*;
-use crate::adapter::Arrival;
-use crate::conversation::Conversation;
 use crate::feishu::frame::{Frame, Method, encode, header, kind};
+use bingo_channel_adapter::adapter::Arrival;
+use bingo_channel_adapter::conversation::Conversation;
 
 const ME: &str = "ou_bot";
 

@@ -16,6 +16,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use bingo_agents::AgentsPlugin;
+use bingo_channel_adapter::Platforms;
 use bingo_channels::ChannelsPlugin;
 use bingo_checkpoints::CheckpointsPlugin;
 use bingo_context::ContextPlugin;
@@ -360,18 +361,19 @@ async fn run(cli: Cli) -> Result<i32, KernelError> {
     check_input(&cli)?;
     let interactive = interactive(&cli);
     let cwd = working_dir(cli.cwd.as_deref())?;
+    let platforms = platforms(&environment(&cwd));
     migrate_settings(&cwd)?;
-    if let Some(code) = before_any_host(&cli, &cwd).await {
+    if let Some(code) = before_any_host(&cli, &cwd, &platforms).await {
         return code;
     }
     // Held for the whole run and dropped after `Host::shutdown`, so the
     // pidfile goes only once every plugin has given its own claims back.
     let mut resident = resident(work, &cwd)?;
-    let config = host_config(&cli, &cwd)?;
+    let config = host_config(&cli, &cwd, &platforms)?;
     let demo = demo_ui(&cli, &config.layers);
-    let listening = channels_wanted(&cli, &config.layers);
+    let listening = channels_wanted(&cli, &config.layers, &platforms)?;
     let decided = Decided::of(&config.layers)?;
-    let host = Host::build(plugins(demo)?, config)
+    let host = Host::build(plugins(demo, &platforms)?, config)
         .await
         .map_err(|e| KernelError::new(ErrorCode::Internal, e.to_string()))?;
     report_notices(&host);
@@ -496,26 +498,32 @@ async fn credentials(host: &Host, cli: &Cli) -> Option<Result<i32, KernelError>>
 
 /// The commands answered before a kernel exists: they write what the *next*
 /// run reads, or they speak to a bingo rather than being one.
-async fn before_any_host(cli: &Cli, cwd: &std::path::Path) -> Option<Result<i32, KernelError>> {
+async fn before_any_host(
+    cli: &Cli,
+    cwd: &std::path::Path,
+    platforms: &Platforms,
+) -> Option<Result<i32, KernelError>> {
     let env = environment(cwd);
     match &cli.command {
         // Not a bingo run at all: no host, no session, and nothing on stdout
         // but the bytes it is carrying (ADR-0036 §3).
         Some(Command::AcpMcpProxy) => Some(acp_proxy::run().await),
-        Some(Command::Provider { .. }) => Some(added_provider(&env).await),
+        Some(Command::Provider { .. }) => Some(added_provider(&env, platforms).await),
         Some(Command::Mcp { action }) => Some(configured_mcp(cli, &env, cwd, action).await),
-        Some(Command::Plugins { action }) => Some(switched_plugins(cli, &env, cwd, action)),
+        Some(Command::Plugins { action }) => {
+            Some(switched_plugins(cli, &env, cwd, action, platforms))
+        }
         // An asked-for update always asks: the daily stamp is the start-up
         // check's discipline, not a person's.
         Some(Command::Update { check }) => Some(update::run(&env, *check).await),
         Some(Command::Channels {
             action: Some(ChannelsAction::Add { adapter }),
-        }) => Some(channel_add(&env, adapter).await),
+        }) => Some(channel_add(&env, adapter, platforms).await),
         Some(Command::Channels {
             action: Some(ChannelsAction::Secret { adapter }),
-        }) => Some(channel_secret(&env, adapter).await),
+        }) => Some(channel_secret(&env, adapter, platforms).await),
         Some(Command::Gateway { verb }) if !verb.is_run() => {
-            Some(bingo_gateway::dispatch(verb, &env, cwd, cli.settings.as_deref()).await)
+            Some(bingo_gateway::dispatch(verb, &env, cwd, cli.settings.as_deref(), platforms).await)
         }
         _ => None,
     }
@@ -545,22 +553,27 @@ fn switched_plugins(
     env: &Env,
     cwd: &std::path::Path,
     action: &plugins::Action,
+    platforms: &Platforms,
 ) -> Result<i32, KernelError> {
     let layers = settings::load(env, cwd, cli.settings.as_deref())
         .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e.to_string()))?;
-    let composed = plugins(demo_ui(cli, &layers))?;
+    let composed = plugins(demo_ui(cli, &layers), platforms)?;
     plugins::run(action, env, cwd, &layers, composed)
 }
 
 /// `bingo channels add <adapter>`: app id and secret in one sitting.
-async fn channel_add(env: &Env, adapter: &str) -> Result<i32, KernelError> {
-    println!("{}", channels::add(env, adapter).await?);
+async fn channel_add(env: &Env, adapter: &str, platforms: &Platforms) -> Result<i32, KernelError> {
+    println!("{}", channels::add(env, adapter, platforms).await?);
     Ok(0)
 }
 
 /// `bingo channels secret <adapter>` (ADR-0020 §8).
-async fn channel_secret(env: &Env, adapter: &str) -> Result<i32, KernelError> {
-    println!("{}", channels::secret(env, adapter).await?);
+async fn channel_secret(
+    env: &Env,
+    adapter: &str,
+    platforms: &Platforms,
+) -> Result<i32, KernelError> {
+    println!("{}", channels::secret(env, adapter, platforms).await?);
     Ok(0)
 }
 
@@ -592,11 +605,17 @@ fn tui_measure(layers: &[settings::Layer]) -> Option<usize> {
 
 /// Whether a chat is being listened on: the flag, else any settings layer
 /// that names an adapter. The plugin owns the spelling of the key.
-fn channels_wanted(cli: &Cli, layers: &[settings::Layer]) -> bool {
-    !cli.channels.is_empty()
-        || layers
-            .iter()
-            .any(|layer| bingo_channels::wanted(&Value::Object(layer.value.clone())))
+fn channels_wanted(
+    cli: &Cli,
+    layers: &[settings::Layer],
+    platforms: &Platforms,
+) -> Result<bool, KernelError> {
+    let mut wanted = !cli.channels.is_empty();
+    for layer in layers {
+        wanted |= bingo_channels::wanted(&Value::Object(layer.value.clone()), platforms)
+            .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e))?;
+    }
+    Ok(wanted)
 }
 
 /// The chat surface beside the one that owns the terminal. It is
@@ -719,8 +738,17 @@ fn demo_ui(cli: &Cli, layers: &[settings::Layer]) -> bool {
         .is_some_and(|layer| bingo_demo_ui::wanted(&Value::Object(layer.value.clone())))
 }
 
+/// The platforms shared by every channel configuration reader.
+fn platforms(env: &Env) -> Platforms {
+    let mut platforms: Platforms = vec![Arc::new(bingo_channel_feishu::Platform)];
+    if bingo_channel_adapter::loopback::enabled(env) {
+        platforms.push(Arc::new(bingo_channel_adapter::loopback::Platform));
+    }
+    platforms
+}
+
 /// Every plugin this build ships, in registration order.
-fn plugins(demo_ui: bool) -> Result<Vec<Box<dyn Plugin>>, KernelError> {
+fn plugins(demo_ui: bool, platforms: &Platforms) -> Result<Vec<Box<dyn Plugin>>, KernelError> {
     // The fake provider exists for the scripted harness alone: without
     // `BINGO_FAKE_SCRIPT` it is not registered, so a packaged binary never
     // lists it and never defaults to it.
@@ -756,7 +784,7 @@ fn plugins(demo_ui: bool) -> Result<Vec<Box<dyn Plugin>>, KernelError> {
         Box::new(PrintPlugin),
         Box::new(RpcPlugin),
         Box::new(TuiPlugin),
-        Box::new(ChannelsPlugin),
+        Box::new(ChannelsPlugin::new(platforms.clone())),
     ]);
     if demo_ui {
         all.push(Box::new(DemoUiPlugin));
@@ -767,16 +795,16 @@ fn plugins(demo_ui: bool) -> Result<Vec<Box<dyn Plugin>>, KernelError> {
 /// `bingo provider add` (`ProviderAction::Add`, the only one), before any
 /// kernel: a provider is registered at boot, so what this writes is what the
 /// next run reads (ADR-0017).
-async fn added_provider(env: &Env) -> Result<i32, KernelError> {
-    println!("{}", provider::add(env, provider_ids()?).await?);
+async fn added_provider(env: &Env, platforms: &Platforms) -> Result<i32, KernelError> {
+    println!("{}", provider::add(env, provider_ids(platforms)?).await?);
     Ok(0)
 }
 
 /// Every provider id this build registers before an instance is read, from
 /// the manifests the plugins publish (`provider:<id>`): a name to refuse is
 /// nothing this file knows on its own.
-fn provider_ids() -> Result<BTreeSet<String>, KernelError> {
-    Ok(plugins(false)?
+fn provider_ids(platforms: &Platforms) -> Result<BTreeSet<String>, KernelError> {
+    Ok(plugins(false, platforms)?
         .iter()
         .flat_map(|plugin| plugin.manifest().provides)
         .filter_map(|provided| provided.strip_prefix("provider:"))
@@ -784,7 +812,11 @@ fn provider_ids() -> Result<BTreeSet<String>, KernelError> {
         .collect())
 }
 
-fn host_config(cli: &Cli, cwd: &std::path::Path) -> Result<HostConfig, KernelError> {
+fn host_config(
+    cli: &Cli,
+    cwd: &std::path::Path,
+    platforms: &Platforms,
+) -> Result<HostConfig, KernelError> {
     let mut config = HostConfig::new(environment(cwd));
     config.layers = settings::load(&config.env, cwd, cli.settings.as_deref())
         .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e.to_string()))?;
@@ -793,7 +825,7 @@ fn host_config(cli: &Cli, cwd: &std::path::Path) -> Result<HostConfig, KernelErr
     }
     let mut cli_settings = cli_layer(cli);
     cli_settings.extend(
-        bingo_channels::from_flags(&cli.channels)
+        bingo_channels::from_flags(&cli.channels, platforms)
             .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e))?,
     );
     config

@@ -15,7 +15,8 @@ setting, a flag, the wire or a card.
    `tier = "library"`, on `bingo-sdk`, `bingo-auth-oauth` and what the
    moved files already use. Move `adapter.rs`, `conversation.rs`,
    `error.rs`, `limits.rs`, `question.rs` and `secret.rs` with their
-   tests, and `fixtures.rs` behind a `testing` feature. The `pub use`
+   tests, and `fixtures.rs` behind a `testing` feature. Keep the fixed-list
+   secret queries in the surface until brick 4 removes that dependency. The `pub use`
    lines in `bingo-channels` keep their names and point at the library,
    so no caller changes yet. The channels test count holds (paste).
 2. **The platform contract, tests first.** `trait Platform` in the
@@ -73,47 +74,77 @@ setting, a flag, the wire or a card.
 ## Files
 
 - `crates/bingo-channel-{adapter,feishu}/**` (new), `Cargo.toml`,
-  `scripts/budget.toml`
+  `scripts/budget.toml`, `Cargo.lock`
 - `crates/bingo-channels/{Cargo.toml,src/**}`
-- `crates/bingo/src/{main,channels}.rs`, `crates/bingo/tests/channels.rs`
-- `crates/bingo-gateway/{Cargo.toml,src/doctor.rs}`
+- `crates/bingo/{Cargo.toml,src/{main,channels}.rs}`
+- `crates/bingo/tests/{channels.rs,channel_claim.rs,cli/gateway.rs,support/mod.rs}`
+- `crates/bingo-gateway/{Cargo.toml,src/{doctor,lib}.rs,tests/claim.rs}`
 - `scripts/feishu-smoke.md`, `docs/adr/0016-*.md`
 
 ## Exit criteria
 
-- [ ] Brick 2's tests and brick 7's refusal pass (paste before and after).
-- [ ] `cargo tree -p bingo-channels -e normal --depth 1 | rg
+- [x] Brick 2's tests and brick 7's refusal pass (paste before and after).
+- [x] `cargo tree -p bingo-channels -e normal --depth 1 | rg
       'reqwest|tungstenite|base64|bingo-pictures'` finds nothing.
-- [ ] `rg -il feishu crates/bingo-channels crates/bingo-channel-adapter`
+- [x] `rg -il feishu crates/bingo-channels crates/bingo-channel-adapter`
       finds nothing. In `crates/bingo-gateway/src`, only test modules
       match (paste).
-- [ ] `cargo test -p bingo-channel-adapter -p bingo-channels
+- [x] `cargo test -p bingo-channel-adapter -p bingo-channels
       -p bingo-channel-feishu -p bingo-gateway` passes, with brick 5's
       counts equal, and so does `cargo test -p bingo --test channels`.
-- [ ] `scripts/check_discipline.sh` refuses a scratch
+- [x] `scripts/check_discipline.sh` refuses a scratch
       `bingo-channels → bingo-channel-feishu` edge (paste, then revert).
-- [ ] `scripts/budget.sh` (+2), `cargo deny check`, and the Windows
-      `cargo check` of the three channel crates pass. All gates pass.
+- [x] `scripts/budget.sh` (+2), `cargo deny check`, and all required local gates pass.
+- [ ] Windows builds: all five touched crates resolve `aws-lc-sys`; left to Windows CI as instructed.
 
 ## Non-goals
 
-- A second platform (Telegram, Slack).
-- Any change to the Deliverer, the question ladder, Feishu's wire, or
-  the sdk (`ChannelAdapter` stays out of it).
-- The live Feishu smoke, owed since M83–M86. It does not gate this plan.
-- The channels' claim (M109).
+- A second platform; changes to the Deliverer, question ladder, wire, sdk or M109 claim.
+- The live Feishu smoke, owed since M83–M86, does not gate this plan.
 
 ## Risks
 
-- Snapshots move with the files. Run with `INSTA_UPDATE=no`, so a
-  moved one is never rewritten silently.
-- Moving modules widens `pub(crate)` items to `pub`. Keep each one
-  `#[doc(hidden)]` or behind `testing` where only tests reach it.
-- Gating the loopback changes what a packaged binary accepts. Name it
-  in the commit body and the guide.
-- The open slices rest on no runtime schema validation (only provider
-  tests consume schemas today). Re-verify it.
-- M109 (the claim), M127 (Feishu's `api.rs` client) and M119/M126
-  (composition) touch these files. Follow the tree.
-- Re-verify at start: every line and symbol named here, and where the
-  bin reads `--channels`.
+- **Authorized (2026-10-13):** add the platform list to M129's gateway
+  claim test without changing its assertions. For the rest of M130, tests
+  or fixtures outside Files may be updated mechanically when they only
+  construct or name a changed type; record those paths here. Changes to
+  behavior or assertions outside Files still require a protocol stop.
+  `tests/channel_claim.rs` and `tests/support/mod.rs` only gain the loopback switch.
+- Re-verified at `eddd0ebc`: M109 claim, M129 gateway and M112 folds remain.
+  Composition manifests, gateway dispatch and loopback CLI fixtures are included.
+  The directory constant moves to the library; claim behavior stays unchanged.
+- Schemas remain descriptive; platform slices have no runtime schema validator.
+- Move snapshots unchanged; run with `INSTA_UPDATE=no`.
+- Newly public internals stay `#[doc(hidden)]` or behind `testing`.
+- Name the packaged loopback opt-in change in the commit body and guide.
+
+## Verified (2026-10-13)
+
+- Baseline `cargo test -p bingo-channels -- --list`: `251 tests`; `120` named `feishu::`.
+- Brick 1 `INSTA_UPDATE=no cargo test -p bingo-channel-adapter -p bingo-channels`: `22 passed; 0 failed` + `229 passed; 0 failed` = 251; initial budget `346 (max 347)`, `budget ok`.
+- Contract red `cargo test -p bingo-channel-adapter platform::tests`: `1 passed; 2 failed`;
+  `Ok([])` instead of `Err("no such channel adapter: telegram")` / `Err("sample refuses this slice")`.
+- Contract green is included in the adapter's `33 passed; 0 failed` below; unknown flag wording stays pinned.
+- `INSTA_UPDATE=no cargo test -p bingo-channel-adapter -p bingo-channels -p bingo-channel-feishu -p bingo-gateway`:
+  adapter `33 passed`, surface `102 passed`, platform `120 passed`, gateway `50 passed` + claim `8 passed`; all `0 failed`.
+  Feishu count remains 120; snapshots unchanged. Initial missing `Patient.platforms` resolved by authorized fixture wiring.
+- `INSTA_UPDATE=no cargo test -p bingo --test channels loopback_without_the_switch_is_refused_before_listening`:
+  red `0 passed; 1 failed`, stderr `the loopback peer 127.0.0.1:9: Connection refused` (missing switch remedy).
+  Green `INSTA_UPDATE=no cargo test -p bingo --test channels`: `16 passed; 0 failed`; stdout/status/remedy asserted.
+- `cargo tree -p bingo-channels -e normal --depth 1 | rg 'reqwest|tungstenite|base64|bingo-pictures'`: no matches (exit 1).
+- `rg -il feishu crates/bingo-channels crates/bingo-channel-adapter`: no matches (exit 1).
+  Gateway matches only `doctor.rs` / `unit.rs` test modules; no production matches.
+- Scratch `scripts/check_discipline.sh`: exit 1, `bingo-channels -> bingo-channel-feishu (plugin -> plugin; use a service trait via the sdk)`; manifest and lock restored.
+- `cargo fmt --all -- --check`: exit 0, no output.
+- `cargo check --workspace --all-targets --locked`: `Finished dev ... in 22.74s`.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev ... in 10.59s`; two single-element guide loops fixed.
+- `INSTA_UPDATE=no cargo test --workspace --locked -- --test-threads=1 --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing`:
+  exit 0; summed `5000 passed; 0 failed; 3 ignored` (existing stress/manual tests); no flaky reruns needed.
+- `INSTA_UPDATE=no cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1`:
+  `1 passed; 0 failed; 0 ignored; 2 filtered out`. No parallel Cargo jobs; workspace PTY suite also passed.
+- `scripts/check_discipline.sh`: `discipline ok` (historical size warnings).
+- `scripts/budget.sh`: `347 (max 347)`; core `0s`; isolation `0` recompiled; target `5 GB`; `budget ok`.
+- `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok` (duplicate-version warnings).
+- Sequential `cargo tree -p <crate> -i aws-lc-sys --target x86_64-pc-windows-msvc --locked`:
+  adapter, platform, channels, gateway and bin each return `aws-lc-sys v0.44.0`; Windows CI owns all five builds. No toolchain installed.
+- [ ] Feishu live smoke: requires real credentials; not attempted as instructed. No TUI-byte changes or separate TUI smoke.

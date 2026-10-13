@@ -34,9 +34,8 @@ pub fn contribution(registrar: &Registrar) -> Contribution {
 mod tests {
     use super::*;
     use crate::MANIFEST;
-    use crate::feishu::Feishu;
     use crate::loopback::Loopback;
-    use crate::settings::{APP_ID, APP_SECRET, schema};
+    use crate::settings::schema;
     use serde_json::Value;
 
     fn page() -> &'static Page {
@@ -59,6 +58,7 @@ mod tests {
     fn claimed() -> Vec<String> {
         let mut found = Vec::new();
         walk(schema().as_value(), &mut found);
+        walk(schemars::schema_for!(crate::Access).as_value(), &mut found);
         found.sort();
         found.dedup();
         found
@@ -83,7 +83,8 @@ mod tests {
     #[test]
     fn the_page_names_every_settings_key_and_word_this_plugin_claims() {
         let claimed = claimed();
-        assert!(claimed.len() > 20, "the schema was read: {claimed:?}");
+        assert!(claimed.iter().any(|key| key == "coalesce"));
+        assert!(claimed.iter().any(|key| key == "policy"));
         let unsaid: Vec<String> = claimed.into_iter().filter(|word| !quoted(word)).collect();
         assert!(unsaid.is_empty(), "the page never says {unsaid:?}");
     }
@@ -103,18 +104,15 @@ mod tests {
 
     #[test]
     fn the_page_names_every_adapter_this_crate_has() {
-        for id in [Loopback::ID, Feishu::ID] {
-            assert!(quoted(id), "the page never says the {id} adapter");
-        }
+        let id = Loopback::ID;
+        assert!(quoted(id), "the page never says the {id} adapter");
     }
 
-    /// The secret is the one thing that is never settings, so the page says
-    /// where it does come from, in the spelling the environment is read by.
+    /// The local platform stays off until the documented switch is set.
     #[test]
-    fn the_page_names_the_variables_an_app_is_signed_with() {
-        for variable in [APP_ID, APP_SECRET] {
-            assert!(quoted(variable), "the page never says {variable}");
-        }
+    fn the_page_names_the_local_platform_switch() {
+        let variable = crate::loopback::ENABLE_ENV;
+        assert!(quoted(variable), "the page never says {variable}");
     }
 
     #[test]

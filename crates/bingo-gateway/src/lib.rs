@@ -92,6 +92,7 @@ pub async fn dispatch(
     env: &Env,
     cwd: &Path,
     settings: Option<&Path>,
+    platforms: &bingo_channel_adapter::Platforms,
 ) -> Result<i32, KernelError> {
     let paths = Paths::new(env);
     let home = env.home.clone();
@@ -109,6 +110,7 @@ pub async fn dispatch(
             env,
             cwd,
             settings,
+            platforms,
         })?;
     }
     let said = match verb {
@@ -123,6 +125,7 @@ pub async fn dispatch(
                 env,
                 cwd,
                 settings,
+                platforms,
             },
             &probe,
             *fix,

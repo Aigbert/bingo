@@ -5,7 +5,7 @@
 //! string to everybody else — that is the point of it — so the two live
 //! behind one spelling, here and nowhere else.
 
-use crate::conversation::Posted;
+use bingo_channel_adapter::conversation::Posted;
 
 const CARD: &str = "card:";
 const MESSAGE: &str = "message:";

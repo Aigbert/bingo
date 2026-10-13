@@ -2,6 +2,8 @@
 //! use: a session state, frames folded into it, and nothing invented that the
 //! kernel would not send.
 
+#![allow(clippy::expect_used)]
+
 use bingo_sdk::{
     Answer, AnswerSpec, Event, Frame, Interaction, InteractionId, InteractionKind, Item, ItemBody,
     ItemId, ItemStatus, ResolvedBy, Seq, SessionId, SessionState, SessionSummary, TurnId,

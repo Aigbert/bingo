@@ -10,6 +10,7 @@
 //! layer commits. The typing of a secret is not echoed and the value is never
 //! printed back, here or by `doctor`.
 
+use bingo_channel_adapter::{Platform, Platforms, secret::Requirement};
 use bingo_sdk::{Env, ErrorCode, KernelError};
 use serde_json::Value;
 
@@ -18,26 +19,39 @@ use crate::provider::unechoed;
 
 /// Ask for everything the adapter needs — the app id in the clear (it is
 /// public), the secret unechoed — and write each where it belongs.
-pub async fn add(env: &Env, adapter: &str) -> Result<String, KernelError> {
-    let wanted = signing(adapter)?;
-    eprint!("App id for {adapter} (public, goes to the settings): ");
-    let app_id = line().await?;
-    if app_id.is_empty() {
-        return Err(invalid("an app id is what the platform knows you as"));
+pub async fn add(env: &Env, adapter: &str, platforms: &Platforms) -> Result<String, KernelError> {
+    let (platform, wanted) = signing(adapter, platforms)?;
+    let prompts = platform.prompts();
+    let mut slice = serde_json::Map::new();
+    for prompt in prompts.settings {
+        eprint!("{}", prompt.label);
+        let value = line().await?;
+        if value.is_empty() {
+            return Err(invalid(prompt.missing));
+        }
+        slice.insert(prompt.key.into(), Value::String(value));
     }
-    eprint!("Paste the {adapter} app secret (not shown): ");
+    let slice = Value::Object(slice);
+    platform.parse(&slice).map_err(invalid)?;
+    eprint!("{}", prompts.secret);
     let secret = unechoed().await?;
     if secret.is_empty() {
         return Err(invalid(
             "nothing was pasted; neither file was touched".to_string(),
         ));
     }
-    let settings = configured(env, adapter, &app_id)?;
+    let settings = configured(env, adapter, slice)?;
+    let names = prompts
+        .settings
+        .iter()
+        .map(|prompt| prompt.name)
+        .collect::<Vec<_>>()
+        .join(", ");
     let auth = bingo_channels::secret::store(env, wanted.id, secret)
         .map_err(|e| KernelError::new(ErrorCode::Internal, e))?;
     Ok([
         format!(
-            "{adapter} is configured: its app id is in {}, its secret in {} \
+            "{adapter} is configured: its {names} is in {}, its secret in {} \
              under `{}`, mode 0600.",
             settings.display(),
             auth.display(),
@@ -48,14 +62,15 @@ pub async fn add(env: &Env, adapter: &str) -> Result<String, KernelError> {
     .join("\n"))
 }
 
-/// The app id into the user settings layer, through the same round trip
-/// `provider add` uses; the spelling of the key is the plugin's
-/// (`from_flags`), so this file never learns how a channel is written down.
-fn configured(env: &Env, adapter: &str, app_id: &str) -> Result<std::path::PathBuf, KernelError> {
+/// Public settings into the user layer through the same round trip as
+/// `provider add`; the platform's prompts own the keys inside its slice.
+fn configured(env: &Env, adapter: &str, slice: Value) -> Result<std::path::PathBuf, KernelError> {
     let path = bingo_core::settings::user_path(env);
     let mut document = crate::provider::read(&path)?;
-    let layer = bingo_channels::from_flags(&[format!("{adapter}={app_id}")])
-        .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e))?;
+    let layer = serde_json::Map::from_iter([(
+        bingo_channels::SETTING.into(),
+        serde_json::json!({adapter: slice}),
+    )]);
     merge(&mut document, layer)?;
     crate::provider::write(&path, &document)?;
     Ok(path)
@@ -87,10 +102,14 @@ fn merge(
 }
 
 /// Ask for the secret, refuse an adapter that signs with nothing, and write it.
-pub async fn secret(env: &Env, adapter: &str) -> Result<String, KernelError> {
-    let wanted = signing(adapter)?;
+pub async fn secret(
+    env: &Env,
+    adapter: &str,
+    platforms: &Platforms,
+) -> Result<String, KernelError> {
+    let (platform, wanted) = signing(adapter, platforms)?;
     let variable = wanted.variable.unwrap_or_default();
-    eprint!("Paste the {adapter} app secret (not shown): ");
+    eprint!("{}", platform.prompts().secret);
     let pasted = unechoed().await?;
     if pasted.is_empty() {
         return Err(invalid(
@@ -103,20 +122,23 @@ pub async fn secret(env: &Env, adapter: &str) -> Result<String, KernelError> {
 }
 
 /// The adapter, if it is one that signs with anything at all.
-fn signing(adapter: &str) -> Result<bingo_channels::secret::Requirement, KernelError> {
-    let signing = bingo_channels::secret::signing();
-    signing
+fn signing<'a>(
+    adapter: &str,
+    platforms: &'a Platforms,
+) -> Result<(&'a dyn Platform, Requirement), KernelError> {
+    if let Some(platform) = platforms.iter().find(|platform| platform.id() == adapter)
+        && let Some(wanted) = platform.secret()
+    {
+        return Ok((platform.as_ref(), wanted));
+    }
+    let names = bingo_channels::secret::signing(platforms)
         .iter()
-        .find(|wanted| wanted.id == adapter)
-        .copied()
-        .ok_or_else(|| {
-            let names: Vec<&str> = signing.iter().map(|wanted| wanted.id).collect();
-            invalid(format!(
-                "`{adapter}` is not a channel that signs with a secret. \
-                 These are: {}",
-                names.join(", ")
-            ))
-        })
+        .map(|wanted| wanted.id)
+        .collect::<Vec<_>>()
+        .join(", ");
+    Err(invalid(format!(
+        "`{adapter}` is not a channel that signs with a secret. These are: {names}"
+    )))
 }
 
 fn receipt(adapter: &str, variable: &str, path: &std::path::Path) -> String {
@@ -144,10 +166,18 @@ mod tests {
 
     #[test]
     fn only_an_adapter_that_signs_is_accepted_and_the_refusal_lists_the_ones_that_do() {
-        assert_eq!(signing("feishu").expect("feishu signs").id, "feishu");
-        let refused = signing("loopback").expect_err("a loopback signs with nothing");
+        let platforms: Platforms = vec![std::sync::Arc::new(bingo_channel_feishu::Platform)];
+        assert_eq!(
+            signing("feishu", &platforms).expect("feishu signs").1.id,
+            "feishu"
+        );
+        let refused = signing("loopback", &platforms)
+            .err()
+            .expect("a loopback signs with nothing");
         assert!(refused.message.contains("feishu"), "{}", refused.message);
-        let refused = signing("telegram").expect_err("no such adapter");
+        let refused = signing("telegram", &platforms)
+            .err()
+            .expect("no such adapter");
         assert!(
             refused.message.contains("`telegram`"),
             "{}",

@@ -1,141 +1,29 @@
-//! The `channels` settings key: which platforms this bingo listens on.
-//!
-//! A credential never lives here. The settings' project layer is committed,
-//! and an app secret in a committed file is an app secret that is gone
-//! (ADR-0012's reason for `auth.json`, applied one level out): what a chat
-//! app is called is settings, what it signs with is the environment — or,
-//! for a gateway that inherits no shell, the credential store (ADR-0020 §8).
-
-use std::collections::BTreeMap;
-use std::sync::Arc;
-
+//! The surface owns coalescing and access; each platform owns its settings.
+use crate::{access::Access, adapter::ChannelAdapter, gate::Gate};
+use bingo_channel_adapter::{
+    Platforms,
+    platform::{self, platform_slice},
+};
 use bingo_sdk::Env;
 use schemars::JsonSchema;
 use serde::Deserialize;
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
+use std::{collections::BTreeMap, sync::Arc};
 
-use crate::access::Access;
-use crate::adapter::ChannelAdapter;
-use crate::feishu::{self, Feishu};
-use crate::gate::Gate;
-use crate::limits::{Dialect, Encoding, Limits};
-use crate::loopback::{self, Loopback};
-
-/// The top-level key this plugin owns.
 pub const SETTING: &str = "channels";
 
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct Settings {
     #[serde(default)]
     pub channels: Channels,
 }
 
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct Channels {
-    /// The in-process adapter: a test's platform, and the shape of the wire.
-    #[serde(default)]
-    pub loopback: Option<LoopbackChannel>,
-    /// A self-built (企业自建) Feishu app. The long connection is not offered
-    /// to marketplace apps.
-    #[serde(default)]
-    pub feishu: Option<FeishuChannel>,
-    /// How often a streaming answer is redrawn.
     #[serde(default)]
     pub coalesce: Coalesce,
-}
-
-#[derive(Clone, Debug, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct LoopbackChannel {
-    /// `host:port` to speak NDJSON with. Without one it records and says
-    /// nothing, which is what an in-process test wants.
-    #[serde(default)]
-    pub peer: Option<String>,
-    #[serde(default = "yes")]
-    pub edits: bool,
-    #[serde(default = "yes")]
-    pub buttons: bool,
-    #[serde(default = "yes")]
-    pub typing: bool,
-    #[serde(default = "yes")]
-    pub threads: bool,
-    /// Whether this chat will carry a file out.
-    #[serde(default = "yes")]
-    pub files: bool,
-    /// Whether a message gets a sign while it is being worked on.
-    #[serde(default = "yes")]
-    pub acknowledge: bool,
-    /// What a group message must contain for the bot to be addressed.
-    #[serde(default = "mention")]
-    pub mention: String,
-    /// How long one message may be, in characters.
-    #[serde(default = "four_thousand")]
-    pub max_text: usize,
-    #[serde(default = "three")]
-    pub max_actions: usize,
-    /// Who may speak to this bot here (ADR-0051 §4). Absent, it is open and
-    /// a group engages on a mention, which is what ran before.
-    #[serde(default)]
-    pub access: Access,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct FeishuChannel {
-    /// The app id, which is public. The secret is not: it comes from
-    /// `BINGO_FEISHU_APP_SECRET`, else the credential store, because a project
-    /// settings file is a committed file.
-    #[serde(default)]
-    pub app_id: Option<String>,
-    /// Where the API lives. Lark International is a different host, and the
-    /// long connection there is unverified (ADR-0016 consequences).
-    #[serde(default)]
-    pub base: Option<String>,
-    /// Who may speak to this bot here (ADR-0051 §4).
-    #[serde(default)]
-    pub access: Access,
-    /// Platform commands mapped to terminal controls, such as `/new` to
-    /// `/clear` and `/stop` to `esc`.
-    #[serde(default)]
-    pub command_mappings: BTreeMap<String, String>,
-}
-
-/// Where an attachment a Feishu message carried lands, under the data
-/// directory this adapter already keeps its lock in (ADR-0051 §2).
-const ATTACHMENTS: &str = "attachments";
-
-/// The environment variables a Feishu app is signed with.
-pub const APP_ID: &str = "BINGO_FEISHU_APP_ID";
-pub const APP_SECRET: &str = "BINGO_FEISHU_APP_SECRET";
-
-impl FeishuChannel {
-    /// The settings' app id, else the environment's. The secret is never the
-    /// settings': it is the environment's, else the credential store's
-    /// (ADR-0020 §8), because a gateway started at boot inherits no shell.
-    fn config(&self, env: &Env) -> feishu::Config {
-        feishu::Config {
-            app_id: self
-                .app_id
-                .clone()
-                .or_else(|| std::env::var(APP_ID).ok())
-                .unwrap_or_default(),
-            app_secret: crate::secret::find(env, Feishu::ID, APP_SECRET)
-                .map(|found| found.secret)
-                .unwrap_or_default(),
-            base: self
-                .base
-                .clone()
-                .unwrap_or_else(|| feishu::api::BASE.to_string()),
-            attachments: env
-                .data_dir
-                .join(crate::lock::DIRECTORY)
-                .join(Feishu::ID)
-                .join(ATTACHMENTS),
-            command_mappings: self.command_mappings.clone(),
-        }
-    }
+    #[serde(flatten)]
+    pub slices: Map<String, Value>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, JsonSchema)]
@@ -158,22 +46,6 @@ impl Default for Coalesce {
     }
 }
 
-fn yes() -> bool {
-    true
-}
-
-fn mention() -> String {
-    "@bingo".into()
-}
-
-fn four_thousand() -> usize {
-    4000
-}
-
-fn three() -> usize {
-    3
-}
-
 fn forty_eight() -> usize {
     48
 }
@@ -183,94 +55,62 @@ fn seven_hundred() -> u64 {
 }
 
 impl Channels {
-    /// Every adapter these settings ask for, in a fixed order. `env` is what
-    /// an adapter's secret may be read from when the environment has none.
-    pub fn adapters(&self, env: &Env) -> Vec<Arc<dyn ChannelAdapter>> {
-        let mut adapters: Vec<Arc<dyn ChannelAdapter>> = Vec::new();
-        if let Some(settings) = &self.loopback {
-            adapters.push(Arc::new(Loopback::new(settings.config())));
-        }
-        if let Some(settings) = &self.feishu {
-            adapters.push(Arc::new(Feishu::new(settings.config(env))));
-        }
-        adapters
+    pub fn adapters(
+        &self,
+        env: &Env,
+        platforms: &Platforms,
+    ) -> Result<Vec<Arc<dyn ChannelAdapter>>, String> {
+        platform::configured(&self.slices, platforms)?;
+        self.slices
+            .iter()
+            .filter(|(_, slice)| !slice.is_null())
+            .map(|(id, slice)| platform::find(platforms, id)?.build(&platform_slice(slice), env))
+            .collect()
     }
 
-    /// Each adapter's policy, by the id the arrivals carry. An adapter with
-    /// no entry runs the default, which is what ran before there was a policy.
-    pub fn access(&self) -> BTreeMap<String, Access> {
-        [
-            self.loopback
-                .as_ref()
-                .map(|settings| (Loopback::ID, settings.access.clone())),
-            self.feishu
-                .as_ref()
-                .map(|settings| (Feishu::ID, settings.access.clone())),
-        ]
-        .into_iter()
-        .flatten()
-        .map(|(id, access)| (id.to_string(), access))
-        .collect()
+    pub fn access(&self, platforms: &Platforms) -> Result<BTreeMap<String, Access>, String> {
+        platform::configured(&self.slices, platforms)?;
+        self.slices
+            .iter()
+            .filter(|(_, slice)| !slice.is_null())
+            .map(|(id, slice)| {
+                let access = match slice.get("access") {
+                    Some(value) => {
+                        serde_json::from_value(value.clone()).map_err(|e| e.to_string())?
+                    }
+                    None => Access::default(),
+                };
+                Ok((id.clone(), access))
+            })
+            .collect()
     }
 
-    pub fn gate(&self) -> Gate {
-        Gate {
+    pub fn gate(&self, platforms: &Platforms) -> Result<Gate, String> {
+        platform::configured(&self.slices, platforms)?;
+        Ok(Gate {
             min_chars: self.coalesce.min_chars,
             interval: std::time::Duration::from_millis(self.coalesce.interval_ms),
-        }
+        })
     }
 }
 
-impl LoopbackChannel {
-    fn config(&self) -> loopback::Config {
-        loopback::Config {
-            limits: Limits {
-                max_text: (self.max_text, Encoding::Chars),
-                dialect: Dialect::Markdown,
-                max_actions: self.max_actions,
-                max_label: 40,
-            },
-            edits: self.edits,
-            buttons: self.buttons,
-            typing: self.typing,
-            threads: self.threads,
-            files: self.files,
-            acknowledge: self.acknowledge,
-            mention: self.mention.clone(),
-            peer: self.peer.clone(),
-        }
-    }
+pub fn wanted(settings: &Value, platforms: &Platforms) -> Result<bool, String> {
+    let parsed: Settings = serde_json::from_value(settings.clone()).map_err(|e| e.to_string())?;
+    parsed.channels.access(platforms)?;
+    Ok(!crate::secret::configured(settings, platforms)?.is_empty())
 }
 
-/// Whether a merged settings object asks for a channel at all. The bin needs
-/// the answer before a host exists, so it reads it here rather than keeping a
-/// second spelling of the key.
-///
-/// It is the same answer `secret::configured` gives, and deliberately the same
-/// code path: two ways of deciding "is a channel configured" would eventually
-/// disagree, and the day they did, a bingo would listen on a channel it had
-/// just told the bin it had none of.
-pub fn wanted(settings: &Value) -> bool {
-    !crate::secret::configured(settings).is_empty()
-}
-
-/// `--channels <adapter>[=<peer>]`, as the settings layer it stands for. The
-/// spelling of the key is this plugin's, so the bin never learns it.
-pub fn from_flags(flags: &[String]) -> Result<Map<String, Value>, String> {
+pub fn from_flags(flags: &[String], platforms: &Platforms) -> Result<Map<String, Value>, String> {
     if flags.is_empty() {
         return Ok(Map::new());
     }
     let mut channels = Map::new();
     for flag in flags {
-        let (adapter, peer) = match flag.split_once('=') {
-            Some((adapter, peer)) => (adapter, Some(peer)),
+        let (id, value) = match flag.split_once('=') {
+            Some((id, value)) => (id, Some(value)),
             None => (flag.as_str(), None),
         };
-        match adapter {
-            Loopback::ID => channels.insert(adapter.into(), json!({ "peer": peer })),
-            Feishu::ID => channels.insert(adapter.into(), json!({ "appId": peer })),
-            other => return Err(format!("no such channel adapter: {other}")),
-        };
+        channels.insert(id.into(), platform::find(platforms, id)?.flag(value));
     }
     Ok(Map::from_iter([(SETTING.to_string(), channels.into())]))
 }
@@ -282,6 +122,11 @@ pub fn schema() -> schemars::Schema {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    fn platforms() -> Platforms {
+        vec![Arc::new(crate::loopback::Platform)]
+    }
 
     fn parse(value: Value) -> Settings {
         serde_json::from_value(value).expect("the settings parse")
@@ -296,20 +141,32 @@ mod tests {
     #[test]
     fn nothing_configured_is_no_adapters_and_the_default_gate() {
         let settings = parse(json!({}));
-        assert!(settings.channels.adapters(&env()).is_empty());
-        assert_eq!(settings.channels.gate(), Gate::default());
-        assert!(!wanted(&json!({})));
-        assert!(!wanted(&json!({ "channels": {} })));
+        assert!(
+            settings
+                .channels
+                .adapters(&env(), &platforms())
+                .expect("adapters")
+                .is_empty()
+        );
+        assert_eq!(
+            settings.channels.gate(&platforms()).expect("gate"),
+            Gate::default()
+        );
+        assert!(!wanted(&json!({}), &platforms()).expect("valid"));
+        assert!(!wanted(&json!({ "channels": {} }), &platforms()).expect("valid"));
     }
 
     #[test]
     fn a_named_adapter_is_built_with_its_defaults() {
         let settings = parse(json!({ "channels": { "loopback": {} } }));
-        let adapters = settings.channels.adapters(&env());
+        let adapters = settings
+            .channels
+            .adapters(&env(), &platforms())
+            .expect("adapters");
         assert_eq!(adapters.len(), 1);
         assert_eq!(adapters[0].id(), "loopback");
         assert!(adapters[0].edit().is_some(), "on unless turned off");
-        assert!(wanted(&json!({ "channels": { "loopback": {} } })));
+        assert!(wanted(&json!({ "channels": { "loopback": {} } }), &platforms()).expect("valid"));
     }
 
     #[test]
@@ -317,7 +174,10 @@ mod tests {
         let settings = parse(json!({
             "channels": { "loopback": { "edits": false, "buttons": false } }
         }));
-        let adapters = settings.channels.adapters(&env());
+        let adapters = settings
+            .channels
+            .adapters(&env(), &platforms())
+            .expect("adapters");
         assert!(adapters[0].edit().is_none());
         assert!(adapters[0].buttons().is_none());
         assert!(adapters[0].typing().is_some());
@@ -330,21 +190,23 @@ mod tests {
             "channels": { "loopback": { "access": { "group": { "policy": "off" } } } }
         }))
         .channels
-        .access();
+        .access(&platforms())
+        .expect("access");
         assert_eq!(access["loopback"].group.policy, crate::access::Policy::Off);
         assert_eq!(
             access["loopback"].direct,
             crate::access::Rule::default(),
             "what a policy does not say keeps the default"
         );
-        assert!(!access.contains_key("feishu"));
+        assert!(!access.contains_key("sample"));
     }
 
     #[test]
     fn an_adapter_that_says_nothing_about_access_runs_todays_rule() {
         let access = parse(json!({ "channels": { "loopback": {} } }))
             .channels
-            .access();
+            .access(&platforms())
+            .expect("access");
         assert_eq!(access["loopback"], Access::default());
     }
 
@@ -354,7 +216,7 @@ mod tests {
             "channels": { "coalesce": { "minChars": 1, "intervalMs": 5 } }
         }));
         assert_eq!(
-            settings.channels.gate(),
+            settings.channels.gate(&platforms()).expect("gate"),
             Gate {
                 min_chars: 1,
                 interval: std::time::Duration::from_millis(5),
@@ -365,16 +227,18 @@ mod tests {
     #[test]
     fn a_flag_becomes_the_layer_the_plugin_would_have_read_from_a_file() {
         assert_eq!(
-            Value::Object(from_flags(&["loopback=127.0.0.1:9".into()]).expect("a layer")),
+            Value::Object(
+                from_flags(&["loopback=127.0.0.1:9".into()], &platforms()).expect("a layer")
+            ),
             json!({ "channels": { "loopback": { "peer": "127.0.0.1:9" } } })
         );
         assert_eq!(
-            Value::Object(from_flags(&["loopback".into()]).expect("a layer")),
+            Value::Object(from_flags(&["loopback".into()], &platforms()).expect("a layer")),
             json!({ "channels": { "loopback": { "peer": null } } })
         );
-        assert!(from_flags(&[]).expect("no flags").is_empty());
+        assert!(from_flags(&[], &platforms()).expect("no flags").is_empty());
         assert_eq!(
-            from_flags(&["telegram".into()]),
+            from_flags(&["telegram".into()], &platforms()),
             Err("no such channel adapter: telegram".into())
         );
     }

@@ -27,8 +27,8 @@ use super::content::Resource;
 use super::event::{Seen, heard};
 use super::frame::{self, Frame, Method, header, kind};
 use super::{attachments, merged};
-use crate::adapter::{Inbox, Incoming};
-use crate::error::ChannelError;
+use bingo_channel_adapter::adapter::{Inbox, Incoming};
+use bingo_channel_adapter::error::ChannelError;
 
 /// How a connection ended, and what the ladder should do about it.
 enum Ended {

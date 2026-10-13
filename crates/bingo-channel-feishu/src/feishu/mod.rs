@@ -11,6 +11,9 @@
 //! The credentials never come from the settings file: the app id is public and
 //! lives there, the secret comes from the environment.
 
+pub mod platform;
+pub use platform::{APP_ID, APP_SECRET, FeishuChannel, Platform};
+
 pub mod api;
 pub mod attachments;
 pub mod bootstrap;
@@ -36,15 +39,15 @@ use async_trait::async_trait;
 use bingo_sdk::{CancellationToken, SessionState};
 use serde_json::{Value, json};
 
-use crate::adapter::{
+use api::{Api, ApiError};
+use bingo_channel_adapter::adapter::{
     Acknowledge, Buttons, ChannelAdapter, ChannelCommand, Edit, Files, Inbox, Mark, Mode, Outcome,
     Outgoing, Threads,
 };
-use crate::conversation::{Conversation, Posted};
-use crate::error::ChannelError;
-use crate::limits::{Dialect, Encoding, Limits};
-use crate::question::Question;
-use api::{Api, ApiError};
+use bingo_channel_adapter::conversation::{Conversation, Posted};
+use bingo_channel_adapter::error::ChannelError;
+use bingo_channel_adapter::limits::{Dialect, Encoding, Limits};
+use bingo_channel_adapter::question::Question;
 use posted::Handle;
 use send::Queue;
 use upload::{Endpoint, Route};
@@ -447,8 +450,7 @@ impl ChannelAdapter for Feishu {
         if self.api.app_id().is_empty() || self.app_secret.is_empty() {
             return Err(ChannelError::Refused(format!(
                 "the feishu channel needs an app: set {} and {}",
-                crate::settings::APP_ID,
-                crate::settings::APP_SECRET
+                APP_ID, APP_SECRET
             )));
         }
         let me = self.whoami().await?;
@@ -487,7 +489,7 @@ impl ChannelAdapter for Feishu {
 
     /// None: a card that is visibly writing itself is the affordance, and
     /// Feishu has no typing indicator for a bot anyway.
-    fn typing(&self) -> Option<&dyn crate::adapter::Typing> {
+    fn typing(&self) -> Option<&dyn bingo_channel_adapter::adapter::Typing> {
         None
     }
 

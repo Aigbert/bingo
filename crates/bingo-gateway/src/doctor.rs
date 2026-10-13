@@ -83,6 +83,7 @@ pub struct Patient<'a> {
     pub env: &'a Env,
     pub cwd: &'a Path,
     pub settings: Option<&'a Path>,
+    pub platforms: &'a bingo_channel_adapter::Platforms,
 }
 
 pub fn doctor(patient: &Patient<'_>, probe: &dyn Probe, fix: bool) -> Result<String, KernelError> {
@@ -112,16 +113,21 @@ pub fn preflight(patient: &Patient<'_>) -> Result<(), KernelError> {
     if settings_row.verdict == Verdict::Bad {
         return refuse(settings_row.line());
     }
-    let merged = merged_channels(&layers);
-    if bingo_channels::secret::configured(&merged).is_empty() {
-        return refuse(
-            "no channel is configured: `bingo channels add feishu` asks for the \
-             app id and the secret and writes both where the next run reads \
-             them (or name one under `channels` in the settings by hand). A \
-             gateway with no channel would only crash-loop under its supervisor."
-                .into(),
-        );
+    let merged = merged_channels(&layers, patient.platforms)
+        .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e))?;
+    if !bingo_channels::wanted(&merged, patient.platforms)
+        .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e))?
+    {
+        let commands = bingo_channels::secret::signing(patient.platforms)
+            .iter()
+            .map(|wanted| format!("`bingo channels add {}`", wanted.id))
+            .collect::<Vec<_>>()
+            .join(" or ");
+        return refuse(format!(
+            "no channel is configured: {commands} asks for the platform settings and the secret and writes both where the next run reads them (or name one under `channels` in the settings by hand). A gateway with no channel would only crash-loop under its supervisor."
+        ));
     }
+
     let bad: Vec<String> = credential_checks(patient, &layers)
         .into_iter()
         .filter(|row| row.verdict == Verdict::Bad)
@@ -416,8 +422,13 @@ fn log_check(patient: &Patient<'_>) -> Row {
 /// The names come from the channels plugin, so this file never learns how a
 /// channel is spelled — and no value is read into the report.
 fn credential_checks(patient: &Patient<'_>, layers: &[settings::Layer]) -> Vec<Row> {
-    let merged = merged_channels(layers);
-    bingo_channels::secret::configured(&merged)
+    let configured = merged_channels(layers, patient.platforms)
+        .and_then(|merged| bingo_channels::secret::configured(&merged, patient.platforms));
+    let wanted = match configured {
+        Ok(wanted) => wanted,
+        Err(error) => return vec![Row::new("channels", Verdict::Bad, error)],
+    };
+    wanted
         .into_iter()
         .map(|wanted| credential_row(patient, wanted))
         .collect()
@@ -449,7 +460,10 @@ fn credential_row(patient: &Patient<'_>, wanted: bingo_channels::secret::Require
 
 /// The `channels` key as every layer together names it. `Merge::ByName` is
 /// what the kernel does with this key, so a channel named in any layer counts.
-fn merged_channels(layers: &[settings::Layer]) -> Value {
+fn merged_channels(
+    layers: &[settings::Layer],
+    platforms: &bingo_channel_adapter::Platforms,
+) -> Result<Value, String> {
     let mut channels = Map::new();
     for layer in layers {
         if let Some(Value::Object(named)) = layer.value.get(bingo_channels::SETTING) {
@@ -458,10 +472,12 @@ fn merged_channels(layers: &[settings::Layer]) -> Value {
             }
         }
     }
-    Value::Object(Map::from_iter([(
+    let merged = Value::Object(Map::from_iter([(
         bingo_channels::SETTING.to_string(),
         Value::Object(channels),
-    )]))
+    )]));
+    bingo_channels::wanted(&merged, platforms)?;
+    Ok(merged)
 }
 
 /// A Linux user service stops at logout unless lingering is on. The command is
@@ -509,12 +525,17 @@ mod tests {
 
     struct Case {
         home: tempfile::TempDir,
+        platforms: bingo_channel_adapter::Platforms,
     }
 
     impl Case {
         fn new() -> Self {
             Self {
                 home: tempfile::tempdir().expect("a temporary home"),
+                platforms: vec![
+                    std::sync::Arc::new(bingo_channel_feishu::Platform),
+                    std::sync::Arc::new(bingo_channel_adapter::loopback::Platform),
+                ],
             }
         }
 
@@ -552,6 +573,7 @@ mod tests {
                     env: &env,
                     cwd: self.home.path(),
                     settings: None,
+                    platforms: &self.platforms,
                 },
                 probe,
                 fix,
@@ -715,6 +737,7 @@ mod tests {
             env,
             cwd: case.home.path(),
             settings: None,
+            platforms: &case.platforms,
         }
     }
 

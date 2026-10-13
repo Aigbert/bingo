@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use super::bootstrap::{self, ClientConfig};
 use super::token::Tokens;
-use crate::error::ChannelError;
+use bingo_channel_adapter::error::ChannelError;
 
 pub const BASE: &str = "https://open.feishu.cn";
 

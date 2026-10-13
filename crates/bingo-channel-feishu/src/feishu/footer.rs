@@ -2,7 +2,7 @@
 
 use bingo_sdk::{Effort, SessionState, Usage};
 
-use crate::limits::Limits;
+use bingo_channel_adapter::limits::Limits;
 
 const SEPARATOR: &str = "\n\n---\n";
 
@@ -129,8 +129,8 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::fixtures;
-    use crate::limits::{Dialect, Encoding};
+    use bingo_channel_adapter::fixtures;
+    use bingo_channel_adapter::limits::{Dialect, Encoding};
 
     fn limits(max: usize) -> Limits {
         Limits {

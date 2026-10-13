@@ -19,6 +19,7 @@ async fn a_live_channel_host_excludes_another_and_a_killed_one_releases() {
             .arg(home.path())
             .args(["--channels", &format!("loopback={address}")])
             .envs(support::home::home_env(home.path()))
+            .env(bingo_channel_adapter::loopback::ENABLE_ENV, "1")
             .env_remove("BINGO_FAKE_SCRIPT")
             .env_remove("OPENAI_API_KEY")
             .env_remove("ANTHROPIC_API_KEY")

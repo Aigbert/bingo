@@ -688,7 +688,7 @@ fn command_results_obey_the_platform_length_and_dialect() {
 }
 
 #[test]
-fn a_large_memory_table_fits_the_feishu_budget() {
+fn a_large_memory_table_fits_a_byte_budget() {
     let limits = Limits {
         max_text: (20_000, Encoding::Utf8Bytes),
         ..limits()

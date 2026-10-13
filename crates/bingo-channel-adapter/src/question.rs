@@ -33,12 +33,14 @@ pub struct Question {
     /// Set only for a form (M53): a chat asks a set of questions one message
     /// at a time, so each ladder carries what has been answered and what is
     /// still to come. `None` is a question that stands alone.
-    pub(crate) rest: Option<Rest>,
+    #[doc(hidden)]
+    pub rest: Option<Rest>,
 }
 
 /// A form part-answered: the slots given so far, and the questions left.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Rest {
+#[doc(hidden)]
+pub struct Rest {
     given: Vec<Answer>,
     left: Vec<bingo_sdk::Question>,
 }

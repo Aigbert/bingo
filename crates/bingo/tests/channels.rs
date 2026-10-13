@@ -112,6 +112,7 @@ impl Chat {
             .arg(&settings_path)
             .env("BINGO_FAKE_SCRIPT", &script_path)
             .envs(support::home::home_env(home.path()))
+            .env(bingo_channel_adapter::loopback::ENABLE_ENV, "1")
             .stdin(Stdio::null())
             .kill_on_drop(true)
             .spawn()
@@ -640,6 +641,7 @@ fn a_legacy_channel_pid_file_refuses_loudly() {
             .arg("--settings")
             .arg(&settings)
             .envs(support::home::home_env(home.path()))
+            .env(bingo_channel_adapter::loopback::ENABLE_ENV, "1")
             .env_remove("BINGO_FAKE_SCRIPT")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -707,5 +709,34 @@ async fn a_path_that_is_not_there_is_refused_in_words_the_model_reads() {
     assert!(
         !ops.iter().any(|op| is(op, "file")),
         "nothing was posted: {ops:#?}"
+    );
+}
+
+#[tokio::test]
+async fn loopback_without_the_switch_is_refused_before_listening() {
+    let home = tempfile::tempdir().unwrap();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_bingo"));
+    command
+        .args(["channels", "--channels", "loopback=127.0.0.1:9", "--cwd"])
+        .arg(home.path())
+        .envs(support::home::home_env(home.path()))
+        .env_remove(bingo_channel_adapter::loopback::ENABLE_ENV)
+        .env_remove("BINGO_FAKE_SCRIPT")
+        .stdin(Stdio::null())
+        .kill_on_drop(true);
+    let output = tokio::time::timeout(LIMIT, command.output())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(bingo_channel_adapter::loopback::ENABLE_ENV),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("no such channel adapter: loopback"),
+        "{stderr}"
     );
 }

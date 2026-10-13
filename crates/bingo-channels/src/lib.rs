@@ -14,33 +14,31 @@
 //! - [`directory`] — which chat a session sits in, for whoever asks later.
 //! - [`tool`] — `SendFile`, the one way a file goes out (ADR-0051 §3).
 //! - [`loopback`] — the adapter that is the contract fixture.
-//! - [`feishu`] — the first real platform, wire bricks and all.
 //!
 //! Nothing here reaches the sdk: a channel is a client of the one event
 //! stream like every other surface, folding frames with `SessionState::apply`
 //! and deriving what to say from the fold.
 
 pub mod access;
-pub mod adapter;
-pub mod conversation;
+pub use bingo_channel_adapter::adapter;
+pub use bingo_channel_adapter::conversation;
 pub mod deliver;
 pub mod directory;
-pub mod error;
-pub mod feishu;
+pub use bingo_channel_adapter::error;
 pub mod gate;
 pub mod guide;
 pub mod host;
-pub mod limits;
+pub use bingo_channel_adapter::limits;
 pub mod lock;
-pub mod loopback;
-pub mod question;
+pub use bingo_channel_adapter::loopback;
+pub use bingo_channel_adapter::question;
 pub mod runner;
-pub mod secret;
+pub use bingo_channel_adapter::secret;
 pub mod settings;
 pub mod tool;
 
 #[cfg(test)]
-mod fixtures;
+use bingo_channel_adapter::fixtures;
 
 use std::sync::Arc;
 
@@ -58,7 +56,6 @@ pub use conversation::{Conversation, Posted};
 pub use deliver::{Deliverer, Op};
 pub use directory::{Directory, Seat};
 pub use error::ChannelError;
-pub use feishu::Feishu;
 pub use gate::Gate;
 pub use host::ChannelsSurface;
 pub use limits::{Dialect, Encoding, Limits};
@@ -91,8 +88,16 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
 /// and the tool that posts a file into one of its chats. With none named the
 /// surface still registers and refuses when run, so `bingo channels` says
 /// what is missing rather than doing nothing.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct ChannelsPlugin;
+#[derive(Clone)]
+pub struct ChannelsPlugin {
+    platforms: bingo_channel_adapter::Platforms,
+}
+
+impl ChannelsPlugin {
+    pub fn new(platforms: bingo_channel_adapter::Platforms) -> Self {
+        Self { platforms }
+    }
+}
 
 #[async_trait]
 impl Plugin for ChannelsPlugin {
@@ -102,11 +107,20 @@ impl Plugin for ChannelsPlugin {
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
         let settings: Settings = registrar.config()?;
-        let adapters = settings.channels.adapters(registrar.env());
+        let adapters = settings
+            .channels
+            .adapters(registrar.env(), &self.platforms)
+            .map_err(PluginError::Config)?;
         let surface = ChannelsSurface::new(
             adapters,
-            settings.channels.gate(),
-            settings.channels.access(),
+            settings
+                .channels
+                .gate(&self.platforms)
+                .map_err(PluginError::Config)?,
+            settings
+                .channels
+                .access(&self.platforms)
+                .map_err(PluginError::Config)?,
         );
         // The same directory on both sides: the surface fills it as its
         // conversations open, and the tool reads it to find the chat a
@@ -129,7 +143,9 @@ mod plugin_tests {
     fn contributions(config: serde_json::Value) -> Vec<bingo_sdk::Contribution> {
         let mut registrar =
             Registrar::new(MANIFEST.id, config, Env::rooted("/tmp"), Default::default());
-        ChannelsPlugin.register(&mut registrar).expect("register");
+        ChannelsPlugin::new(vec![Arc::new(loopback::Platform)])
+            .register(&mut registrar)
+            .expect("register");
         registrar.into_contributions()
     }
 
@@ -213,5 +229,29 @@ mod plugin_tests {
             error.message.contains("no channel is configured"),
             "{error}"
         );
+    }
+    #[test]
+    fn registration_refuses_unknown_and_platform_rejected_slices() {
+        for (config, expected) in [
+            (
+                serde_json::json!({"channels": {"telegram": {}}}),
+                "no such channel adapter: telegram",
+            ),
+            (
+                serde_json::json!({"channels": {"sample": {"refuse": true}}}),
+                "sample refuses this slice",
+            ),
+        ] {
+            let mut registrar = Registrar::new(
+                MANIFEST.id,
+                config,
+                Env::rooted("/nonexistent-channel-test"),
+                Default::default(),
+            );
+            let plugin =
+                ChannelsPlugin::new(vec![Arc::new(bingo_channel_adapter::testing::TestPlatform)]);
+            let error = plugin.register(&mut registrar).expect_err("a refusal");
+            assert_eq!(error.to_string(), format!("configuration: {expected}"));
+        }
     }
 }

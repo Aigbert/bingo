@@ -54,6 +54,7 @@ impl Server {
             .args(extra)
             .env("BINGO_FAKE_SCRIPT", &path)
             .envs(home::home_env(home.path()))
+            .env(bingo_channel_adapter::loopback::ENABLE_ENV, "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
