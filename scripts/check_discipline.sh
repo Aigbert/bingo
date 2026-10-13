@@ -153,6 +153,33 @@ if bad:
 print("shared service declarations ok")
 PYSERVICES
 
+# 4f. A TUI draws placements and library records, never a producer's private contract.
+python3 - <<'PYTUI' || fail=1
+import pathlib, re, sys
+root = pathlib.Path("crates/bingo-surface-tui/src")
+lib = (root / "lib.rs").read_text()
+test_modules = set(re.findall(r"#\[cfg\(test\)\]\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+(\w+)", lib))
+tools = set("SpawnAgent SendMessage ListAgents ListModels Listen Seat Unseat CloseRoom TaskCreate TaskUpdate TaskGet TaskList AskUserQuestion WebFetch WebSearch Bash Glob Grep Skill Read Write Edit".split())
+bad = []
+for path in root.rglob("*.rs"):
+    relative = path.relative_to(root)
+    if relative.parts[0].removesuffix(".rs") in test_modules or "tests" in relative.parts or path.name == "acp.rs":
+        continue
+    source = re.sub(r"#\[cfg\(test\)\]\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+;", "", path.read_text())
+    source = source.split("#[cfg(test)]")[0]
+    for number, line in enumerate(source.splitlines(), 1):
+        if line.lstrip().startswith("//"):
+            continue
+        for literal in re.findall(r'"([^"\n]*)"', line):
+            if literal in tools or (literal.startswith(("bingo.", "_bingo.")) and not (path.name == "lib.rs" and literal == "bingo.surface.tui")):
+                bad.append(f"{path}:{number}: {literal}")
+if bad:
+    print("TUI names a plugin or tool:")
+    print("\n".join("  " + finding for finding in bad))
+    sys.exit(1)
+print("TUI names no plugin or tool")
+PYTUI
+
 # 5. Struct field count ≤ 16 and inherent impl spread ≤ 3 files per type (best effort, grep-based;
 #    the third file is ADR-0011 §4: the session actor is its loop, its interactions and its inputs).
 python3 - <<'PY' || fail=1

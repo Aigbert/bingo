@@ -78,7 +78,6 @@ mod late;
 mod layers;
 mod markdown;
 mod matching;
-mod memory;
 mod mentions;
 /// The opening (M72): the welcome box drawing itself, out of the motions the
 /// product already has.
@@ -102,7 +101,6 @@ mod select;
 pub mod settings;
 /// The shells the session has running in the background (M75): a word under
 /// the row that started one, a count on the status line, and no card.
-mod skill;
 mod status;
 /// The session's task list, under the activity row and in its place between
 /// turns (M74): where Claude Code keeps it.

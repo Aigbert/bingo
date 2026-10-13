@@ -988,3 +988,7 @@ pub fn busy_child(title: &str) -> Vec<Frame> {
     }
     frames
 }
+
+pub use crate::transcript::slots::fixtures::{
+    with_promotions, with_row, with_skill_row, with_skill_tool_rows,
+};

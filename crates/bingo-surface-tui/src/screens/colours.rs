@@ -83,6 +83,7 @@ fn a_skill_rows_mark_wears_the_state_and_spends_the_only_colour() {
     let (mut ui, now) = scene();
     ui.catalogs.commands = skills::skills_in_the_catalogue();
     for state in [called, typed] {
+        let state = with_skill_row(state, "itm_1", "guide", "the wire format");
         let painted = painted(80, 24, &solo(&state), &ui, now);
         assert_row_styled(
             &painted,

@@ -1,7 +1,7 @@
 use bingo_sdk::{Item, ItemBody};
 use ratatui::text::{Line, Span};
 
-use super::{Block, Rows, returns, speaks};
+use super::{Block, Cue, Landing, Rows, live_bullet, returns, signature, speaks};
 use crate::theme;
 
 /// Apply only the fields a producer replaces; absent fields keep the item's drawing.
@@ -9,12 +9,14 @@ pub(super) fn placed_row(
     item: &Item,
     slot: &bingo_sdk::slot::Slot,
     rows: &Rows<'_>,
+    cue: Cue,
     mut block: Block,
 ) -> Block {
     let bingo_sdk::slot::Slot::Row {
         mark,
         title,
         badge,
+        caption,
         body,
         actions,
         ..
@@ -32,15 +34,16 @@ pub(super) fn placed_row(
     }
     if !quiet {
         if let Some(title) = title {
-            let heading = speaks(
-                theme::text(),
-                vec![Line::from(Span::styled(title.clone(), theme::bold()))],
-                rows,
-            );
+            let heading = replacement_heading(item, title, badge.as_deref(), rows, cue);
             block.lines.splice(..block.lines.len().min(1), heading);
         }
         if let Some(heading) = block.lines.first_mut() {
-            placed_heading(heading, *mark, badge.as_deref());
+            placed_heading(heading, *mark, badge.as_deref().filter(|_| title.is_none()));
+            if let Some(caption) = caption.as_deref().filter(|caption| !caption.is_empty()) {
+                heading
+                    .spans
+                    .push(Span::styled(format!(" {caption}"), theme::text()));
+            }
         }
     }
     if !actions.is_empty() {
@@ -54,12 +57,33 @@ pub(super) fn placed_row(
     block
 }
 
+fn replacement_heading(
+    item: &Item,
+    title: &str,
+    badge: Option<&str>,
+    rows: &Rows<'_>,
+    cue: Cue,
+) -> Vec<Line<'static>> {
+    let failed = match &item.body {
+        ItemBody::ToolCall { output, .. } => item.status.failed(output.as_ref()),
+        _ => false,
+    };
+    let landing = match item.body {
+        ItemBody::User { .. } => Landing::Settled,
+        _ => Landing::of(cue, failed, rows),
+    };
+    speaks(
+        live_bullet(item.status, failed, rows),
+        vec![signature(title, badge.unwrap_or_default(), rows, landing)],
+        rows,
+    )
+}
+
 fn placed_heading(heading: &mut Line<'static>, mark: Option<char>, badge: Option<&str>) {
-    use unicode_width::UnicodeWidthChar;
-    if let Some(mark) = mark.filter(|mark| mark.width() == Some(1))
+    if let Some(mark) = mark
         && let Some(bullet) = heading.spans.first_mut()
     {
-        bullet.content = format!("{mark} ").into();
+        bullet.content = format!("{} ", theme::row_mark(mark)).into();
     }
     if let Some(badge) = badge {
         heading
@@ -90,5 +114,138 @@ impl Rows<'_> {
                 bingo_sdk::slot::Slot::Row { item: id, .. } if id == item => Some(&placed.slot),
                 _ => None,
             })
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod fixtures {
+    use crate::test_support::*;
+    use bingo_sdk::{ItemBody, ItemId, SessionState};
+    use serde_json::json;
+
+    /// A producer's journaled replacement for a transcript row.
+    pub fn with_row(mut state: SessionState, slot: bingo_sdk::slot::Slot) -> SessionState {
+        let bingo_sdk::slot::Slot::Row { item, .. } = &slot else {
+            panic!("row fixture")
+        };
+        let kind = format!("row:{item}");
+        state.apply(&frame(
+            state.seq.0 + 1,
+            extended(
+                "fixture.rows",
+                &kind,
+                bingo_sdk::slot::with(serde_json::json!({}), [slot]),
+            ),
+        ));
+        state
+    }
+
+    pub fn with_skill_row(state: SessionState, item: &str, name: &str, args: &str) -> SessionState {
+        with_row(
+            state,
+            bingo_sdk::slot::Slot::Row {
+                item: ItemId::from_raw(item),
+                mark: Some('❖'),
+                title: Some("Skill".into()),
+                badge: Some(name.into()),
+                caption: (!args.is_empty()).then(|| args.into()),
+                body: None,
+                actions: vec![],
+            },
+        )
+    }
+
+    pub fn with_skill_tool_rows(mut state: SessionState) -> SessionState {
+        let rows: Vec<_> = state
+            .transcript
+            .items()
+            .iter()
+            .filter_map(|item| match &item.body {
+                ItemBody::ToolCall { name, input, .. } if name == "Skill" => Some((
+                    item.id.to_string(),
+                    input["name"].as_str()?.to_string(),
+                    input["arguments"].as_str().unwrap_or_default().to_string(),
+                )),
+                _ => None,
+            })
+            .collect();
+        for (id, name, args) in rows {
+            state = with_skill_row(state, &id, &name, &args);
+        }
+        state
+    }
+
+    pub fn with_promotions(mut state: SessionState) -> SessionState {
+        let rows: Vec<_> = state
+            .transcript
+            .items()
+            .iter()
+            .filter_map(|item| match &item.body {
+                ItemBody::ToolCall { name, call_id, .. } if name == "Bash" => {
+                    Some(bingo_sdk::slot::Slot::Row {
+                        item: item.id.clone(),
+                        mark: None,
+                        title: None,
+                        badge: None,
+                        caption: None,
+                        body: None,
+                        actions: vec![bingo_sdk::ActionItem {
+                            label: "background".into(),
+                            action: bingo_sdk::Action {
+                                name: "bash.promote".into(),
+                                args: serde_json::json!(call_id),
+                            },
+                            key: Some('b'),
+                        }],
+                    })
+                }
+                _ => None,
+            })
+            .collect();
+        for row in rows {
+            state = with_row(state, row);
+        }
+        state
+    }
+    #[test]
+    fn a_stranger_places_a_row_with_a_title_badge_and_action() {
+        let state = folded(vec![
+            frame(
+                1,
+                bingo_sdk::Event::ItemStarted {
+                    item: running_tool("itm_1", "Inspect", "checking"),
+                },
+            ),
+            frame(
+                2,
+                extended(
+                    "stranger",
+                    "row:itm_1",
+                    bingo_sdk::slot::with(
+                        json!({}),
+                        [bingo_sdk::slot::Slot::Row {
+                            caption: Some("details".into()),
+                            item: bingo_sdk::ItemId::from_raw("itm_1"),
+                            mark: Some('❖'),
+                            title: Some("Review".into()),
+                            badge: Some("sample".into()),
+                            body: None,
+                            actions: vec![bingo_sdk::ActionItem {
+                                label: "open".into(),
+                                action: bingo_sdk::Action {
+                                    name: "stranger.open".into(),
+                                    args: json!("sample"),
+                                },
+                                key: Some('b'),
+                            }],
+                        }],
+                    ),
+                ),
+            ),
+        ]);
+        let (ui, now) = scene();
+        let screen = draw_tree(80, 24, &solo(&state), &ui, now);
+        assert!(screen.contains("❖ Review(sample) details"), "{screen}");
+        assert!(screen.contains("open"), "{screen}");
     }
 }

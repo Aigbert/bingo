@@ -40,7 +40,6 @@ pub const NOTHING_RUNNING: &str = "no shell command is running";
 /// The command the shell plugin registers for backgrounding a running one
 /// (ADR-0018 §6). A surface may not import a plugin (ADR-0001), so the name is
 /// the whole of the contract between them.
-const PROMOTE: &str = "bash.promote";
 
 pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     if key.kind == KeyEventKind::Release {
@@ -201,31 +200,32 @@ fn deepen(ui: &mut Ui, tree: &Tree, now: Now) {
 /// (ADR-0018 §6). The plugin does the rest — the call returns early with a job
 /// id, and the rail draws the job from the signal it already publishes.
 fn background(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
-    let Some(call) = running_shell(tree.viewed()) else {
+    let Some(action) = placed_action(tree.viewed(), 'b') else {
         ui.notify(Level::Info, NOTHING_RUNNING, now.instant);
         return Vec::new();
     };
-    vec![Effect::Submit(Input::Action {
-        action: bingo_sdk::Action {
-            name: PROMOTE.into(),
-            args: serde_json::Value::String(call),
-        },
-    })]
+    vec![Effect::Submit(Input::Action { action })]
 }
 
-/// The call id of the shell command in flight, the newest first.
-fn running_shell(state: &SessionState) -> Option<String> {
+/// The newest unfinished item owns a key only when its producer places it.
+fn placed_action(state: &SessionState, key: char) -> Option<bingo_sdk::Action> {
+    let slots = bingo_sdk::slot::placed(state);
     state
         .transcript
         .items()
         .iter()
         .rev()
         .filter(|item| !item.is_terminal())
-        .find_map(|item| match &item.body {
-            bingo_sdk::ItemBody::ToolCall { call_id, name, .. } if name == "Bash" => {
-                Some(call_id.clone())
-            }
-            _ => None,
+        .find_map(|item| {
+            slots.iter().rev().find_map(|placed| match &placed.slot {
+                bingo_sdk::slot::Slot::Row {
+                    item: id, actions, ..
+                } if id == &item.id => actions
+                    .iter()
+                    .find(|action| action.key == Some(key))
+                    .map(|action| action.action.clone()),
+                _ => None,
+            })
         })
 }
 
@@ -3320,7 +3320,7 @@ mod tests {
 
     /// A turn with a shell command in flight.
     fn running_bash() -> SessionState {
-        folded(vec![
+        crate::test_support::with_promotions(folded(vec![
             frame(1, started("trn_1")),
             frame(
                 2,
@@ -3328,7 +3328,7 @@ mod tests {
                     item: running_tool("itm_1", "Bash", "compiling…"),
                 },
             ),
-        ])
+        ]))
     }
 
     #[test]
@@ -3353,7 +3353,7 @@ mod tests {
             state(),
             busy(),
             // A finished call is not a running one.
-            folded(vec![
+            crate::test_support::with_promotions(folded(vec![
                 frame(1, started("trn_1")),
                 frame(
                     2,
@@ -3367,9 +3367,9 @@ mod tests {
                         ),
                     },
                 ),
-            ]),
+            ])),
             // Another tool's call is not the shell's.
-            folded(vec![
+            crate::test_support::with_promotions(folded(vec![
                 frame(1, started("trn_1")),
                 frame(
                     2,
@@ -3377,7 +3377,7 @@ mod tests {
                         item: running_tool("itm_1", "Read", "reading…"),
                     },
                 ),
-            ]),
+            ])),
         ] {
             let (mut ui, now) = scene();
             assert!(press(&mut ui, &state, ctrl('b'), now).is_empty());

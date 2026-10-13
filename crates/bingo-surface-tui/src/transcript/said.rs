@@ -13,14 +13,13 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{OUTPUT_ROWS, Rows, bullet_style, kept, plain, returns, speaks, under};
 use crate::fold::Fold;
-use crate::skill;
 use crate::{seats, theme};
 
 /// Frozen compatibility for origins recorded before producers stamped voices.
 const LEGACY_VOICES: &[(&str, bingo_sdk::Voice)] = &[
     ("agent", bingo_sdk::Voice::Quiet),
     ("bash", bingo_sdk::Voice::Quiet),
-    ("command", bingo_sdk::Voice::Quiet),
+    (crate::commands::SURFACE, bingo_sdk::Voice::Quiet),
     ("schedule", bingo_sdk::Voice::Quiet),
     ("room", bingo_sdk::Voice::Aside),
     ("wake", bingo_sdk::Voice::Note),
@@ -28,8 +27,11 @@ const LEGACY_VOICES: &[(&str, bingo_sdk::Voice)] = &[
 
 pub(crate) fn voice(origin: &Origin) -> bingo_sdk::Voice {
     origin.voice.unwrap_or_else(|| {
-        LEGACY_VOICES.iter().find(|(surface, _)| *surface == origin.surface)
-            .map(|(_, voice)| *voice).unwrap_or(bingo_sdk::Voice::Said)
+        LEGACY_VOICES
+            .iter()
+            .find(|(surface, _)| *surface == origin.surface)
+            .map(|(_, voice)| *voice)
+            .unwrap_or(bingo_sdk::Voice::Said)
     })
 }
 
@@ -135,24 +137,15 @@ fn notice(
     // text — a command's prompt puts one there — and under a `⎿` it would be
     // a row spent on nothing.
     let rest = rest.trim_start_matches('\n');
-    // A skill is one row however it was asked for, so the typed line gives the
-    // headline up to the run's own signature. The line itself stays in the
-    // item, which is where a rewind reads it back.
-    let style = bullet_style(item.status, false);
-    let mut out = match skill::of(item, rows.commands) {
-        // A person's own `/skill` line is not a call coming back, so its
-        // words are at rest.
-        Some(run) => super::skill_row(run, style, rows, super::Landing::Settled),
-        None => speaks(
-            style,
-            vec![headline(
-                head,
-                origin.principal.as_deref(),
-                elsewhere(origin, rows),
-            )],
-            rows,
-        ),
-    };
+    let mut out = speaks(
+        bullet_style(item.status, false),
+        vec![headline(
+            head,
+            origin.principal.as_deref(),
+            elsewhere(origin, rows),
+        )],
+        rows,
+    );
     if !rest.trim().is_empty() {
         out.extend(returns(kept(plain(rest), fold, OUTPUT_ROWS, None), rows));
     }
@@ -251,9 +244,15 @@ mod voice_contract {
 
     #[test]
     fn stamped_voice_wins_and_legacy_words_are_frozen() {
-        for (surface, legacy) in [("agent", Voice::Quiet), ("bash", Voice::Quiet),
-            ("command", Voice::Quiet), ("schedule", Voice::Quiet),
-            ("room", Voice::Aside), ("wake", Voice::Note), ("stranger", Voice::Said)] {
+        for (surface, legacy) in [
+            ("agent", Voice::Quiet),
+            ("bash", Voice::Quiet),
+            ("command", Voice::Quiet),
+            ("schedule", Voice::Quiet),
+            ("room", Voice::Aside),
+            ("wake", Voice::Note),
+            ("stranger", Voice::Said),
+        ] {
             let origin = Origin::surface(surface);
             assert_eq!(voice(&origin), legacy);
             for stamped in [Voice::Said, Voice::Note, Voice::Quiet, Voice::Aside] {

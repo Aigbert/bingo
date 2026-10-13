@@ -1,9 +1,9 @@
 //! The room columns a session carries in the switcher.
-use bingo_sdk::SessionState;
+use crate::tree::{self, Status, Tree};
+use bingo_collab::name::same;
 pub use bingo_collab::room::{HOLDER, Hearing as Ear, Owes, members_of as members};
 use bingo_collab::room::{hearing as ear, unread_count as unread};
-use bingo_collab::name::same;
-use crate::tree::{self, Status, Tree};
+use bingo_sdk::SessionState;
 
 /// Where a session sits, as the room it sits in has it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
