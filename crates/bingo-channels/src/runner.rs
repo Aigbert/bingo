@@ -451,7 +451,7 @@ impl Runner {
                         text,
                         images,
                         origin: Origin {
-                            voice: None,
+                            voice: Some(bingo_sdk::Voice::Said),
                             surface: SURFACE_ID.into(),
                             principal: Some(principal.to_string()),
                             conversation: Some(self.key.clone()),

@@ -165,7 +165,7 @@ impl Invocation {
         Self {
             line: parsed.typed(),
             origin: Origin {
-                voice: None,
+                voice: Some(bingo_sdk::Voice::Quiet),
                 surface: SURFACE.into(),
                 ..submitted
             },
@@ -490,7 +490,7 @@ mod tests {
         assert_eq!(
             invocation.origin,
             Origin {
-                voice: None,
+                voice: Some(bingo_sdk::Voice::Quiet),
                 surface: SURFACE.into(),
                 principal: Some("ou_person".into()),
                 conversation: Some("loopback/oc_1".into()),

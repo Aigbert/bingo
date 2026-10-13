@@ -295,7 +295,7 @@ pub async fn wake(host: &HostHandle, to: &SessionId, text: String) -> Result<(),
     host.deliver(
         to,
         IntentId::mint(),
-        Input::text(text, Origin::surface(SURFACE)),
+        Input::text(text, Origin::surface(SURFACE).voiced(bingo_sdk::Voice::Quiet)),
         Delivery::Wake,
     )
     .await

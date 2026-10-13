@@ -220,7 +220,7 @@ fn waits(entry: &QueueEntry) -> &'static str {
 /// quiet notice it is. The boundary is the transcript's own set, so an unknown
 /// surface fails to the loud, person's side in both places alike.
 fn pending(origin: &Origin) -> bool {
-    !transcript::quiet(origin)
+    matches!(transcript::voice(origin), bingo_sdk::Voice::Said | bingo_sdk::Voice::Note)
 }
 
 /// `✻ Simmering… (esc to interrupt · 4s · ↓ 1.2k tokens)` — but only once the

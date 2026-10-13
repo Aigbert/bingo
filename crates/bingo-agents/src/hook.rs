@@ -29,8 +29,9 @@ pub struct AtNameHook;
 /// The line as the agent should read it: the address is for the router, not
 /// for the reader.
 fn strip(input: &mut Input, rest: String) {
-    if let Input::Text { text, .. } = input {
+    if let Input::Text { text, origin, .. } = input {
         *text = rest;
+        origin.voice = Some(bingo_sdk::Voice::Said);
     }
 }
 
@@ -101,6 +102,7 @@ mod tests {
             "{outcome:?}"
         );
         assert_eq!(text_of(&input), "look at the diff again");
+        assert!(matches!(input, Input::Text { origin: Origin { voice: Some(bingo_sdk::Voice::Said), .. }, .. }));
     }
 
     #[tokio::test]

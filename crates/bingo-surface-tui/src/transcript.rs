@@ -42,7 +42,7 @@ use output::{folded, kept, plain, tail};
 pub use ran::whole as shell_whole;
 pub use thinking::thought;
 
-pub(crate) use said::quiet;
+pub(crate) use said::voice;
 
 /// How long the comet tail of a block still arriving takes to cool (§6).
 pub const COMET: Duration = Duration::from_millis(180);
@@ -1325,9 +1325,7 @@ mod tests {
     /// else — so it is the one member of the set that draws no row here.
     #[test]
     fn every_quiet_surface_is_a_marked_line_and_nothing_else_is() {
-        for surface in said::QUIET_SURFACES
-            .iter()
-            .filter(|surface| **surface != said::ROOMS)
+        for surface in ["agent", "bash", "command", "schedule"]
         {
             assert_eq!(
                 drawn(vec![delivered("itm_1", surface, None, "it ended")]),
@@ -1336,7 +1334,7 @@ mod tests {
             );
         }
         assert!(
-            drawn(vec![delivered("itm_1", said::ROOMS, None, "it ended")]).is_empty(),
+            drawn(vec![delivered("itm_1", "room", None, "it ended")]).is_empty(),
             "and the room's own is not drawn in a member at all"
         );
         for loud in ["tui", "print", "rpc", "acp", "channels", "brand-new"] {
@@ -1356,7 +1354,7 @@ mod tests {
         assert_eq!(
             drawn(vec![delivered(
                 "itm_1",
-                said::WAKE,
+                "wake",
                 None,
                 "check the build again\nand say what you find",
             )]),
