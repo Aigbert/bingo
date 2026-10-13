@@ -18,3 +18,5 @@ mod contract;
 
 #[cfg(test)]
 mod chain_contract;
+
+mod scope;
