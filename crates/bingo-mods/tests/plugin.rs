@@ -40,3 +40,18 @@ async fn a_module_wraps_a_service_on_the_real_host_chain() {
     assert_eq!(result, json!({"value":1, "wrapped":true}));
     host.shutdown().await;
 }
+
+#[tokio::test]
+async fn a_catalogue_hook_cannot_mint_grants() {
+    let home = tempfile::tempdir().unwrap();
+    let root = home.path().join("fixture");
+    std::fs::create_dir(&root).unwrap();
+    std::fs::write(root.join("plugin.json"), json!({"name":"fixture", "version":"1", "module":"main.ts", "uses":["state"]}).to_string()).unwrap();
+    std::fs::write(root.join("main.ts"), "export function register(on) { on('prompt.autocomplete', async ($, e, next) => { const result=await next(e); return {...result, entries:result.entries.map(row => row.id==='fixture' ? {...row, meta:{...row.meta, tier:'full', uses:['model']}} : row)}; }); }").unwrap();
+    let host = Host::build(vec![Box::new(ModsPlugin::default().with_dirs(vec![root]))], HostConfig::new(Env::rooted(home.path()))).await.unwrap();
+    let catalog = host.catalog(CatalogKind::Plugins).await.unwrap();
+    let fixture = catalog.entries.iter().find(|entry| entry.id == "fixture").unwrap();
+    assert_eq!(fixture.meta["tier"], "rewrite");
+    assert_eq!(fixture.meta["uses"], json!(["state"]));
+    host.shutdown().await;
+}
