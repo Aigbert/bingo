@@ -1,5 +1,4 @@
 # M140 — Elements and pulled views
-
 ## Goal
 
 ADR-0079 §1–3, §5, §6 (components are M141). `View` grows nine elements
@@ -9,11 +8,9 @@ table. A pulled pane is asked for at its drawn width (`HostApi::render`,
 (`host/ui/invalidate`). Handlers return through `Input::Action` as
 `ui.press`/`input`/`select`. The TUI draws the terminal table, seats
 panes, stacks toasts. After M121, M123–M125, M137, M138.
-
 ## Bricks, in build order
 
-1. **Contract: the elements, tests first.** `view.rs` (699 lines, two
-   nouns) → `view/{mod,read,fold,table,tests}.rs`. Serde names are Claude
+1. **Contract: the elements, tests first.** `view.rs` (699 lines) → `view/{mod,read,fold,table,tests}.rs`. Serde names are Claude
    Code's, so the nodes M137's `h` builds arrive unmapped. Golden JSON per
    node; "Every node once" gains the nine; `every_node_folds_to_text`
    pins each fold (`Engine` folds to nothing). `Text` and `Button` hold
@@ -31,17 +28,13 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
    options, value, onSelect. `Link`: href, label. `Image`: source, alt,
    columns, rows. `Raster`: columns, rows, cells. `Svg`: source, alt,
    width, height. `Code`: source, language. `Markdown`: text, dimColor.
-   Out: positions, hover, flexShrink, alignSelf, row/column gaps, minimum
-   sizes, per-side spacing, backgroundColor, overflow, reversed
-   directions, autoFocus, role, action, Code's path/startLine/format,
-   Markdown's link presses.
+   Props outside this table are ignored (including position, background, overflow and Code paths).
 3. **The old words read as `Box`.** `stack` is a column `Box`; `columns`
    a wrapping row whose n children each take `flexGrow: 1, width:
-   NARROW / n`, so they stack below `NARROW` (moved here from the TUI) as
-   before. `View::Stack`/`Columns` are deleted; `KNOWN` = the schema's
+   NARROW / n`, with the existing two-cell gutters included in that budget,
+   so they stack below `NARROW = 60` as before. `View::Stack`/`Columns` are deleted; `KNOWN` = the schema's
    kinds + `READ_ONLY = ["stack", "columns"]`. Writers move to `Box`:
-   `bingo-experience/command.rs`, `bingo-schedule/{render,tools/list}.rs`,
-   `bingo-demo-ui/board.rs`.
+   experience/command, schedule/render and tools/list, demo-ui/board, tasks/journal.
 4. **Tables and the structural check.** `TERMINAL`, `DESKTOP`, `TEXT` as
    data; pure `outside(table, &View) -> Vec<Path>`, which a surface folds
    (§2). `answer_ok(component, &View)` checks structure only: `Engine`
@@ -101,24 +94,27 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
 11. **The black box.** Fixture mod `counter` (a pane, a `Button`, an
     `Input`); `tests/mods_ui.rs` over `bingo serve --stdio`, fake provider:
     `ui/render`, a press by `session/input`, `Invalidated`, the new count.
-
 ## Files
 
 - `crates/bingo-sdk/src/view.rs` → `view/…`; `{render.rs (new),slot,host,event,state,command,catalogue…}`
 - `crates/bingo-core/src/{chain/render,host/throttle}.rs`, `crates/bingo-plugin-host/src/subscribed.rs`,
-  `crates/bingo-mods/src/handlers.rs` (new), `$.ui`; plugin-rpc's bridge; `sdk/typescript/src/ui.ts` (new)
+  `crates/bingo-mods/src/{handlers,ui}.rs` (new), runtime/chain/JS integration;
+  plugin-host state/host and plugin-rpc bridge integration; `sdk/typescript/src/ui.ts` (new)
 - `crates/bingo-surface-rpc/src/methods.rs` + dispatch; `schema/{rpc,plugin,events}.json`; brick 3's writers
 - `crates/bingo-surface-tui/src/views/{flex,button,input,select,link,image,raster}.rs`, `{pane,toast,pulled}.rs`
   (new), `views/{stack,columns}.rs` (deleted), `views/{mod,text,tests}.rs`, `focus,layout,activity,status,terminal.rs`
 - `crates/bingo/tests/{mods_ui.rs,fixtures/mods/counter/}` (new); `scripts/tui-smoke.sh`
-
+- Module declarations, host/session wiring, TUI `ui,run,input,pointer,view,layout/deadline,transcript/output`,
+  command catalog filtering and TypeScript exports/transport wiring for these bricks.
+- Mechanical `Text`/`Code`/`Stack` and `CommandSpec.hidden` constructor updates in existing
+  producers (including tasks, tools, permissions, rooms and agents), fixtures and schema generators.
+  No changes to M139 world nouns, grant.rs, or MCP/agents service rows.
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-sdk view:: table:: slot:: render::`: each node
-      round-trips and folds (snapshot diff pasted); `stack`, `columns`,
-      old `Text` and `Code` read; each `answer_ok` refusal. `rg -n
-      'View::(Stack|Columns)' crates` prints nothing.
-- [ ] `cargo test -p bingo-core chain::render host::throttle`: the kernel
+- [ ] `cargo test -p bingo-sdk`: each node
+      round-trips/folds; legacy Stack/Columns/Text/Code read; every `answer_ok` refusal.
+      `rg -n 'View::(Stack|Columns)' crates` prints nothing.
+- [ ] `cargo test -p bingo-core chain::render` and `cargo test -p bingo-core host::throttle`: the kernel
       link answers `Engine`; a throwing hook and a bad tree each answer
       `Engine` with one notice; 100 invalidations send ≤30 frames a second.
 - [ ] `cargo test -p bingo-plugin-host subscribed::`, `-p bingo-mods`,
@@ -132,19 +128,24 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
 - [ ] `scripts/tui-smoke.sh` passes with `counter`, a tmux drive pasted;
       every gate; the Windows check of `bingo-surface-tui` and
       `bingo-mods`; budget output pasted with the taffy decision.
-
 ## Non-goals
 
-- Components and `$.ui.log` (M141); the desktop table (ADR-0080); a pane
-  placed other than `above` (M151); `Client`, `blit`, styling beyond the subset; OSC 8
-  links; `isPlaced`, `$.ui.copy`/`scroll`/`focus`/`selection` (design §8).
-
+- Components/`$.ui.log` (M141), desktop rendering, non-above placement (M151),
+  Client/blit, extra styling, OSC 8, isPlaced, copy/scroll/focus/selection (design §8).
 ## Risks
 
 - **Spans in `Text`.** Every Rust writer of `Text` uses a constructor.
   **`Input` traffic.** `onInput` per keystroke is a command, a hook, a
   write and a render; if the drive feels slow, coalesce to one per frame.
-- Re-verify at start: `Slot`/`placed` (M121); `layout()`, `next_frame`
-  (M124); `Focus`/`Render` (M125); the runner (M131); the catalogue
-  (M136); `h`'s node shape, the loader (M137); the read log and state
-  face (M138); `view.rs`, `KNOWN`, `CommandSpec`; what `Image.source` names.
+- Re-verified at `5581b978` (2026-10-14): `Slot::Activity` still holds `View`;
+  `layout::{layout,Layout.next_frame}`, `layout/deadline`, `Focus`, `Render` exist.
+  M148 removed the rail/sheet; panes integrate through the existing canvas and input owners.
+  `chain::run`/`chain::json::dispatch` and `catalogue::ALL` are the runner and catalogue.
+  M137 `globals.js` emits `{type,props,children}`; update the JSX construction seam to the
+  canonical serde node shape. `thread.js` and `chain::stage` own each hook invocation.
+  M138 `Call.reads`/`state::ReadLog` record reads; `host::Operations::set` has no render guard.
+  `CommandSpec` has no hidden field. `KNOWN` is schema-pinned. Several production callers
+  construct Text directly; their mechanical migrations are included above.
+  `Image.source` must use the existing image/blob representation, never surface-local paths.
+  No new dependency is planned. Gates run sequentially; no live/credential tests.
+  Only this task's isolated tmux socket may be driven; no terminal app or foreign signals.
