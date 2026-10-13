@@ -65,3 +65,5 @@ read. Across processes that form is a schema, not a type.
 Refs: ADR-0001, ADR-0011 §1, ADR-0015, ADR-0030.
 Non-goals: hooks or policies as services; kernel authority over the
 wire; per-service types in the sdk; a second service registry.
+
+Amended 2026-10-13 by ADR-0069 §1–4 (M119): §2 uses one `bingo-services` library with a module per contract; §5 adds optional `uses` beside disabling `requires`. Typed keys bind both registration and lookup; external wire routing is unchanged.

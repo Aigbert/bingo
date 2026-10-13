@@ -71,3 +71,5 @@ always in hand, and one file per topic read on demand.
 
 Nothing. ADR-0021's non-goal "a rooms-listing tool" is unaffected; ADR-0031
 gains a use, not a rule.
+
+Amended 2026-10-13 by ADR-0069 §1 (M119): `Pages::key` returns `ServiceKey<Pages>` and owners use `Contribution::service`; the registry validates the declared capability.

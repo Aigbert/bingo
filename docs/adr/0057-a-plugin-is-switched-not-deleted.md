@@ -25,3 +25,5 @@ The kernel door this opens: an external process is a plugin the kernel has never
 ## Supersedes
 
 —
+
+Amended 2026-10-13 by ADR-0069 §3 (M119): the headless listing reports missing optional service uses without disabling the consumer. Settings/composition changes in ADR-0069 §5–6 remain M126 work.

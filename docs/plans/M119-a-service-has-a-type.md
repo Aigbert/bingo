@@ -2,130 +2,146 @@
 
 ## Goal
 
-ADR-0069 §1–4. A service lookup names a typed key, so a key or type
-mismatch is a compile error. The two services plugins share today
-(`agents.team`, `mcp.servers`) get one spelling each, in a new
-library crate, `bingo-services`. A manifest says which services it uses
-without being switched off when they are missing. `PluginManifest.sdk`,
-read nowhere, goes. No kernel door, no behaviour change a person can see,
-no new external dependency.
+Implement ADR-0069 §1–4: typed service lookup and registration, shared team/MCP
+contracts in `bingo-services`, optional manifest `uses`, and removal of the
+unread `sdk` field. No kernel door or new external dependency.
 
 ## Bricks, in build order
 
-1. **Contract tests first** (sdk, `service.rs`). A value registered under
-   `ServiceKey<dyn Trait>` is found by the same key and not by a key of
-   another type with the same name. A family key
-   (`ServiceKey::<Pages>::named`) is found under its computed name. Both
-   fail to compile or fail against today's `&str` lookup.
-2. **`ServiceKey<T: ?Sized>`**: `const fn new`, `named(String)`,
-   `name()`. `HostHandle::service(&ServiceKey<T>)` and
-   `ToolContext::service` do the same downcast of an `Arc<T>` stored in
-   the `Any`. `Contribution::service(&KEY, Arc<T>, wire)` builds the
-   variant. `Pages::key(id)` returns `ServiceKey<Pages>`. The `&str` form
-   of `HostHandle::service` is deleted. `service_any`, `service_wire` and
-   `open_service` are unchanged.
-3. **The registry refuses an undeclared service.** A test registers a
-   `Contribution::Service` whose key is missing from `provides` and
-   expects a registration error naming both. The per-plugin tests that
-   checked the same thing by hand (`agents`, `mcp`, `context`,
-   `experience`, `hooks-shell`, `surface-tui`, `channels`) are deleted.
-4. **`bingo-services`** (`tier = "library"`, depends on `bingo-sdk`,
-   `async-trait`, `serde`, `serde_json`, all already in the tree). Two
-   modules, each holding a key, a trait, typed→wire and wire→typed
-   adapters, and `find(host)`, which tries the typed face and then the
-   wire face. Each module gets golden JSON for its one method, taken from
-   today's wire answers so plugin-rpc callers see no change.
-   - `team`: `TeamFile::section(&Path, &str) -> Result<Value, TeamError>`.
-   - `mcp`: `Servers::servers() -> Map<String, Value>`.
-5. **Owners move.** `bingo-agents/src/team/service.rs` implements
-   `TeamFile` and registers both faces through the adapters.
-   `bingo-mcp/src/rows.rs` does the same for `Servers`.
-6. **Consumers move.** `bingo-rooms/src/team.rs` calls
-   `team::find(host)` and loses `TEAM`, `SECTION`, the JSON round trip
-   and `TeamError::Unnameable`. `bingo-provider-acp/src/crossing.rs`
-   calls `mcp::find(host)` and loses `ROWS`/`SERVERS`. Their existing
-   tests pass unchanged, and a new test checks each against the other
-   side's real owner.
-7. **`uses`.** Add `uses: &'static [&'static str]` to `PluginManifest`.
-   Rooms says `uses: &[team::KEY.name()]`, the ACP provider
-   `uses: &[mcp::KEY.name()]`, every other manifest `uses: &[]`. A
-   `standing()` test shows a missing used service leaves the plugin up.
-   `bingo plugins` prints a used service nobody provides; its black-box
-   test is in `crates/bingo/tests/cli`.
-8. **`sdk` deleted** from `PluginManifest` and from every manifest, a
-   mechanical edit across 39 files. The doc line that says it is checked
-   at boot goes with it.
-9. **The check.** `scripts/check_discipline.sh` gains 4e. It reads each
-   `ServiceKey::new("…")` in `crates/bingo-services/src`, finds the crates
-   that import that module, and fails when such a crate's manifest lists
-   the key nowhere among `provides`, `requires` or `uses`. Seed a
-   violation by hand to watch it fail.
-10. **Records.** ADR-0001 §5 gets a dated note that `bingo-services`
-    exists and that `bingo-teams` and `bingo-acp` never did.
-    ADR-0031 §2 and §5 and ADR-0054 §1 get dated notes. ARCHITECTURE.md
-    lists the crate.
+1. **Contracts first.** SDK tests register a trait object under a typed key,
+   reject a different type under the same name, and find a computed page key.
+   A compile-fail doctest pins lookup's result type. See failing evidence below.
+2. **Typed keys.** `ServiceKey<T: ?Sized>` has `const fn new`, `named(String)`
+   and `name()`. `HostHandle::service`, `ToolContext::service` and
+   `Contribution::service` take typed keys; the erased value holds `Arc<T>`.
+   `Pages::key` returns `ServiceKey<Pages>`. Delete the string lookup;
+   `service_any`, `service_wire` and `open_service` keep their wire contract.
+3. **Registry declarations.** Refuse a contributed service absent from its
+   owner's `provides`, naming plugin and key. Delete redundant owner-side
+   provides assertions; retain their independent configuration/behavior checks.
+4. **Shared contracts.** Add `bingo-services`, library tier, depending on
+   `bingo-sdk`, `async-trait`, `serde`, `serde_json` (all already in the tree).
+   Each module owns its key, trait, both adapters, golden wire fixture and
+   `find(host)` (typed first, wire fallback):
+   - `team::TeamFile::section(&Path, &str) -> Result<Value, TeamError>`.
+   - `mcp::Servers::servers() -> Map<String, Value>`.
+5. **Owners.** Agents' team-file service and MCP's live rows implement the
+   shared traits and register both faces through the adapters.
+6. **Consumers.** Rooms uses `team::find`, losing private key/method strings,
+   its JSON round trip and `TeamError::Unnameable`. ACP uses `mcp::find`,
+   losing `ROWS`/`SERVERS`. Test each with its real owner at the binary layer.
+7. **Optional use.** `PluginManifest.uses: &'static [&'static str]` names raw
+   service keys: rooms uses `team::KEY.name()`, ACP uses `mcp::KEY.name()`;
+   others use `&[]`. Missing optional services leave `standing()` unchanged;
+   `bingo plugins` names missing used services, with black-box coverage.
+8. **Delete sdk.** Remove the unused field, all manifest initializers and its
+   claim of boot-time validation. The re-verified count is 39 files.
+9. **Discipline 4e.** Discover keys from `ServiceKey::new` in the shared
+   modules; importing crates must declare them in provides/requires/uses.
+   Seed an undeclared consumer, observe failure, restore and observe success.
+10. **Records.** List the library in ARCHITECTURE.md; accept ADR-0069 §1–4
+    and annotate amended ADRs. §§5–6 remain proposed for M126.
 
 ## Files
 
-- `crates/bingo-sdk/src/{service.rs,host.rs,tool.rs,plugin.rs,page.rs,lib.rs,testing.rs}`
-  and `testing/tests.rs` (M111 service fixtures).
-- `crates/bingo-core/src/host/registry.rs` and
-  `crates/bingo-core/src/host/tests/services.rs`
-- `crates/bingo-services/{Cargo.toml,src/lib.rs,src/team.rs,src/mcp.rs,fixtures/}` (new)
-- `crates/bingo-agents/src/{team/service.rs,lib.rs}`; `team.rs` and
-  `team/seat.rs` mechanically reuse the shared name/re-export.
-- `crates/bingo-rooms/src/{team.rs,lib.rs,tests.rs,hook.rs}` (service fixtures).
-- `crates/bingo-mcp/src/{rows.rs,lib.rs}`
-- `crates/bingo-provider-acp/src/{crossing.rs,lib.rs}`
-- `crates/bingo-skills/src/pages.rs`, every `src/guide.rs` that registers
-  pages
-- Every `PluginManifest` (`rg -l 'sdk: "' crates`)
-- `crates/bingo-plugin-rpc/tests/plugin/{service.rs,doors.rs,hooks.rs}`
-- `crates/bingo/src/plugins.rs` and `crates/bingo/tests/cli/`
-  (real-owner integration at the composition layer; no plugin dependency).
-- The four owners/consumers' `Cargo.toml`, `Cargo.lock`, `scripts/budget.toml`
-  (+1 member, 347 → 348); no new external dependencies.
-- Mechanical page-key assertions in owners' `lib.rs`, SDK page tests, and
-  `bingo-skills/src/tests.rs`, `bingo-plugin-rpc/src/service.rs` fixtures (protocol §6).
-- `Cargo.toml` (workspace member), `scripts/check_discipline.sh`,
-  `ARCHITECTURE.md`, `docs/adr/{0001,0031,0054,0069}-*.md`
+- SDK: `src/{service,host,tool,plugin,page,lib,testing}.rs`, `testing/tests.rs`.
+- Core: `src/host/registry.rs`, `src/host/tests/services.rs`.
+- New `crates/bingo-services/{Cargo.toml,src/{lib,team,mcp}.rs,fixtures/}`.
+- Agents: `src/{lib,team,team/service,team/seat}.rs`; MCP: `src/{lib,rows}.rs`.
+- Rooms: `src/{lib,team,tests,hook}.rs`; ACP: `src/{lib,crossing}.rs`.
+- Those four crates' Cargo.toml; workspace Cargo.toml and Cargo.lock.
+- Every PluginManifest initializer; every page-registering `src/guide.rs`;
+  skills `src/{pages,tests}.rs`; mechanical page-key assertions in owner libs.
+- Plugin-RPC: `src/service.rs` fixture; `tests/plugin/{service,doors,hooks}.rs`.
+- Binary: `src/plugins.rs`, `tests/cli/{plugins,rooms,acp/bridge}.rs`.
+- `scripts/{budget.toml,check_discipline.sh}`, ARCHITECTURE.md,
+  `docs/adr/{0001,0031,0054,0057,0069}-*.md`.
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-sdk service` passes the typed-key contract tests.
-- [ ] `rg 'service::<' crates --glob '!**/tests/**'` finds no `&str` lookup.
-- [ ] `rg '"agents\.team"|"mcp\.servers"' crates` finds one match each,
-      in `bingo-services`.
-- [ ] `rg 'sdk: "' crates` finds nothing.
-- [ ] Registry test: an undeclared service key is refused.
-- [ ] `standing()` test: a missing `uses` entry leaves the plugin standing.
-- [ ] `bingo plugins` black-box test names the missing used service.
-- [ ] `scripts/check_discipline.sh` fails on a seeded undeclared lookup
-      (output pasted) and passes on the tree.
-- [ ] `cargo deny check` and `scripts/budget.sh` pass with the new crate.
-- [ ] All gates of the upgrade protocol, plus the Windows cross-check for
-      `bingo-services`, `bingo-rooms` and `bingo-provider-acp`.
+- [x] `cargo test -p bingo-sdk service` passes typed-key contracts.
+- [x] `rg 'service::<' crates --glob '!**/tests/**'` finds no string lookup.
+- [x] `rg '"agents\.team"|"mcp\.servers"' crates` finds one spelling each,
+  both in the shared modules; `rg 'sdk: "' crates` finds nothing.
+- [x] Registry refuses undeclared services; missing `uses` leaves plugins up.
+- [x] CLI black-box test names the missing service; real-owner tests pass.
+- [x] Discipline rejects a seeded violation and passes the restored tree.
+- [x] Budget (+1 member, 347 → 348), dependency audit and all local gates pass.
+- [x] Windows checks pass for services, rooms, ACP and 16 other touched crates.
+- [ ] Eleven C-dependent Windows builds are left to Windows CI under protocol §7;
+  the exact crates and failing C dependencies are recorded below.
 
 ## Non-goals
 
-- `RoomPost` and the collaboration types (M122).
-- Typed surface options and one settings resolution (M126).
-- `uses` in external `plugin.json` (protocol 2, M132).
-- Changing what a service answers. The wire shapes are pinned unchanged.
+RoomPost/collaboration (M122), typed surface options/settings (M126), external
+manifest `uses` (M132), and changes to service wire answers.
 
-## Risks
+## Risks and re-verification
 
-- `Arc<T>` inside the `Any` costs one pointer hop per lookup; no lookup is per token.
-- plugin-rpc's external services are `ServiceHandle`s under string keys.
-  `find`'s wire fallback must keep an external `agents.team` owner
-  working. The `doors.rs` test pins that.
-- The 4e check is grep-based, like 4c. A consumer that renames the
-  import (`use bingo_services::team as t`) evades it. That is accepted:
-  the registry still answers `None` safely.
-- Re-verified at `7265cfec`: M111 supplies `ServiceHost`; migrate its typed
-  holding helper and the rooms scripted wire face. M130 adds manifests but
-  the total remains 39 files. Existing manual provides assertions are mixed
-  with config/registration tests; delete only redundant declaration checks.
-- Checked: the `&str` lookup sites (`rg 'service::<|\.service\('`),
-  the manifest count, the per-plugin `provides` tests named in brick 3,
-  and that M111's test host has not changed `HostHandle`.
+- Re-verified against `7265cfec`, committed before code as `baf9385c`.
+  M111's ServiceHost needs the same typed storage; rooms' scripted fixture
+  needs its wire face. M130 does not change the 39-file manifest count.
+- Protocol §6 permits mechanical fixtures outside the original Files: page
+  assertions, SDK/skills shared-host fixtures, hook key names and re-exports.
+  Real-owner tests live in the binary, avoiding plugin-to-plugin dependencies.
+- The extra Arc hop is not per token. External owners use wire fallback,
+  covered by shared golden tests plus the existing plugin-RPC process tests.
+- The declaration check remains textual; unusual import forms can evade it.
+- A non-Unicode fixture originally assumed the filesystem could create such
+  a name. It now passes the native path to an existing ancestor's file.
+
+## Verified (2026-10-13)
+
+Contracts were committed before implementation; failing output:
+```text
+$ cargo test -p bingo-sdk service
+error[E0433]: cannot find type `ServiceKey` in this scope
+$ cargo test -p bingo-core an_undeclared_service_is_refused_with_its_plugin_and_key
+an undeclared service must be refused; test result: FAILED. 0 passed; 1 failed
+$ cargo test -p bingo-services
+test result: FAILED. 0 passed; 4 failed (adapter scaffolds: not implemented)
+$ cargo test -p bingo-core a_missing_used_service
+error[E0560]: PluginManifest has no field named `uses`
+```
+Targeted green output: SDK service 6 passed; registry services 3 passed;
+shared service contracts 4 passed; standing 1 passed; three new CLI tests
+(missing use, real team owner, real MCP owner) each `1 passed; 0 failed`.
+```text
+$ cargo fmt --all -- --check
+exit 0; no output
+$ cargo check --workspace --all-targets --locked
+Finished `dev` profile ... in 12.78s
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished `dev` profile ... in 12.92s
+$ cargo test --workspace --locked -- --skip a_token_may_be_dialled_again_once_its_stream_has_closed --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing
+PTY picture test: FAILED (a terminator); 313 passed before the stop
+$ cargo test -p bingo --test pty --locked a_picture_an_answer_named_in_markdown_is_read_in_and_sent -- --exact --test-threads=1
+1 passed; 0 failed
+$ cargo test --workspace --exclude bingo --locked -- --skip a_token_may_be_dialled_again_once_its_stream_has_closed
+4682 passed; 0 failed; 3 ignored (summed result lines, including doctests)
+$ cargo test -p bingo --test rooms --test rpc --test thinking --test views --locked
+22 passed; 0 failed (summed result lines)
+$ cargo test -p bingo-provider-acp --test bridge --locked a_token_may_be_dialled_again_once_its_stream_has_closed -- --exact --test-threads=1
+1 passed; 0 failed
+$ cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1
+1 passed; 0 failed
+```
+Total: 5020 passed, 3 existing ignored; PTY flake passed alone, unchanged.
+The native-path fixture correction also passed alone before the final rerun.
+```text
+$ scripts/check_discipline.sh # seeded by removing rooms' uses, then restored
+bingo-rooms: agents.team is used but absent from provides, requires and uses
+restored: shared service declarations ok; discipline ok
+$ scripts/budget.sh
+dependencies: 348 (max 348); warm core: 1s; relink: 0 crates; budget ok
+soft warning: target/debug 6 GB (soft max 5)
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+$ cargo check -p <each touched crate> --all-targets --target x86_64-pc-windows-msvc --locked
+19 PASS; 11 WINDOWS_C_HEADERS; no Rust compile errors; no toolchain installed
+```
+Windows CI deferrals: `bingo`, channels, mcp, plugin-rpc, provider-anthropic,
+provider-openai, surface-print, surface-tui, tool-fs, tool-web: `aws-lc-sys`;
+permissions: `tree-sitter` and `tree-sitter-bash` (all shorthand names use
+`bingo-`). All failures name missing Windows SDK C headers, per protocol §7.
+No TUI-byte change; workspace PTY coverage ran, with the one isolated rerun.
