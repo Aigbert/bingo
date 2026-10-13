@@ -97,8 +97,7 @@ Audit §6.
 - A non-ACP agent; ACP modes, plans, slash commands; `fs/*`, `terminal/*`.
 - Checkpointing an agent's unasked edits; a new kernel word for them.
 - Changing `HostApi::ask` or `InteractionKind::Question` for other askers.
-- Splitting the ACP crate's 8.7k lines further than the rename and the
-  two files above.
+- Splitting the ACP crate beyond the planned rename and files.
 
 ## Risks
 
@@ -120,19 +119,32 @@ Audit §6.
   one Info notice at load naming the plugin and explaining that an endpoint
   holding its own conversation is an agent. Fixture tests pin absent/true.
 
+- **STOP (2026-10-13, protocol step 6): bridge offer missing from seam.**
+  ADR-0076 §1's `AgentTurn { session, cwd, input, model, reasoning, judge }`
+  lacks the exact session tool offer that unchanged ADR-0036 §1 requires.
+  `provider.rs::Asking::ready` passes `ModelRequest.tools` to `Link::observe`
+  and `Shared::observe`; `Shared::offer` then uses it, not the global catalogue.
+  `turn/late.rs::ToolSet::gather` owns filtering, sources and deduplication;
+  rereading the catalogue changes the offer, and repeating selection duplicates
+  authority. HostApi has no reader for the running turn's resolved offer.
+  Recommended: add `tools: Vec<ToolSpec>` to `AgentTurn`, from the resolved
+  turn set, passed to the unchanged bridge. It carries no conversation history.
+  Alternative: a session-scoped host reader adds a new sdk door and changes
+  the bridge. Await a decision on ADR-0076 §1 before brick 1.
+
 ## Re-verified (2026-10-13, e9e45bb9)
 
 - Clean branch `m134-an-agent-is-not-a-model`; M108–M123, M127–M132 landed.
   M131 uses `chain/tool.rs` (`tool.check`/`tool.call`), not the old names;
   the observer path still needs to restrict every link to tighten rights.
-- M112 folds through `accumulator.rs` and sdk `Transcript`; M116 owns the
-  supervised turn in `session/running.rs`. M111 supplies sdk test hosts.
-  M115 hydrates persisted pictures in store `record.rs`; the agent input
-  can keep live `ContentPart` images without another picture representation.
+- M112: `accumulator.rs`/sdk `Transcript`; M116: `session/running.rs`.
+  M111 supplies sdk test hosts; M115 hydrates live pictures in store `record.rs`.
 - Parallel M124: intended TUI changes only delete the ACP parser/screens
   and remove their references in the TUI Files above; no layout changes.
   Actual TUI files changed: none. M133-owned code is unchanged.
 
 ## Verification evidence
 
-The initial stop was resolved by the person’s delegate on 2026-10-13.
+The protocol freeze stop was resolved by the person's delegate on 2026-10-13.
+Stopped before brick 1: no code/schema/TUI/fixture changes or gates; `git diff --check` passed.
+All exit criteria remain unticked; ADR-0076 remains proposed.
