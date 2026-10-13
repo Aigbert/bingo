@@ -849,6 +849,9 @@ fn receipt(
     previous: Option<&Item>,
     rows: &Rows<'_>,
 ) -> Vec<Line<'static>> {
+    if decision == DecisionKind::Allow && feedback.is_none() {
+        return Vec::new();
+    }
     let verdict = match decision {
         DecisionKind::Allow => "allowed",
         DecisionKind::AllowSession => "allowed for this session",
@@ -930,6 +933,39 @@ fn rule(text: &str, width: usize) -> Line<'static> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_a_plain_allow_has_no_receipt_row() {
+        assert!(
+            drawn(vec![receipt_item(
+                "itm_1",
+                "Bash",
+                DecisionKind::Allow,
+                None
+            )])
+            .is_empty()
+        );
+        assert!(
+            drawn(vec![receipt_item(
+                "itm_1",
+                "Bash",
+                DecisionKind::AllowSession,
+                None
+            )])
+            .join("\n")
+            .contains("allowed for this session")
+        );
+        assert!(
+            drawn(vec![receipt_item(
+                "itm_1",
+                "Bash",
+                DecisionKind::Deny,
+                Some("keep it")
+            )])
+            .join("\n")
+            .contains("denied — keep it")
+        );
+    }
+
     use super::*;
     use crate::test_support::{
         agent_call, assistant, completed, delivered, extended, folded, frame, item, post,
@@ -2045,10 +2081,10 @@ mod tests {
             drawn(vec![receipt_item(
                 "itm_1",
                 "Edit",
-                DecisionKind::Allow,
+                DecisionKind::AllowSession,
                 None
             )]),
-            vec!["  ⎿  Edit allowed".to_string()],
+            vec!["  ⎿  Edit allowed for this session".to_string()],
         );
     }
 

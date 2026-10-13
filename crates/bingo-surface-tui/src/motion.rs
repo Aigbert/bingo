@@ -452,7 +452,7 @@ fn the_activity_row_says_a_verb_a_clock_and_what_the_turn_has_said() {
     let mut row = |ms| row(&tree, &mut ui, later(now, ms), "esc to interrupt");
     assert_eq!(
         row(4_000),
-        "✻ Rummaging… (esc to interrupt · 4s · ↓ 1.2k tokens)",
+        "✻ Rummaging… (esc to interrupt · 4s · ↓ 1.2k)",
         "the verb is drawn from the turn's own id, so the row never changes its mind"
     );
     assert!(

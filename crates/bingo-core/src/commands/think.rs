@@ -17,7 +17,7 @@ impl Command for ThinkCommand {
     fn spec(&self) -> CommandSpec {
         super::spec(
             "think",
-            &levels(),
+            "set the reasoning effort",
             ArgSpec::Words {
                 values: Effort::words().map(str::to_string).collect(),
                 then: None,

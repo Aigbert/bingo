@@ -96,7 +96,11 @@ fn elide(path: &str, max: usize) -> String {
     if path.width() <= max {
         return path.to_string();
     }
-    let (head, rest) = path.split_once('/').unwrap_or(("", path));
+    let from = usize::from(path.starts_with('/'));
+    let (head, rest) = match path[from..].find('/') {
+        Some(at) => (&path[..from + at], &path[from + at + 1..]),
+        None => ("", path),
+    };
     let mut kept = String::new();
     for segment in rest.rsplit('/') {
         let candidate = match kept.is_empty() {
@@ -142,6 +146,11 @@ fn clip(chars: impl Iterator<Item = char>, cells: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_an_absolute_path_keeps_its_first_segment() {
+        assert_eq!(elide("/var/folders/x/T/tmp.a/cwd", 16), "/var/…/tmp.a/cwd");
+    }
+
     use super::*;
 
     const CWD: &str = "/tmp/project";

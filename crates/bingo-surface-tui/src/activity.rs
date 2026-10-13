@@ -230,11 +230,11 @@ fn pending(origin: &Origin) -> bool {
     )
 }
 
-/// `✻ Simmering… (esc to interrupt · 4s · ↓ 1.2k tokens)` — but only once the
+/// `✻ Simmering… (esc to interrupt · 4s · ↓ 1.2k)` — but only once the
 /// turn has been at it for [`ACTIVITY_AFTER`]: a turn that answers at once
 /// says nothing at all, because a row that flashes reports nothing (§6).
 ///
-/// A turn a person has asked to stop reads `✻ Stopping… (4s · ↓ 1.2k tokens)`
+/// A turn a person has asked to stop reads `✻ Stopping… (4s · ↓ 1.2k)`
 /// from the frame the key was pressed and keeps its sparkle and its clock
 /// until `TurnCompleted` takes the row away. The hint goes with the asking:
 /// `esc` has been pressed, and there is nothing further to press.
@@ -269,7 +269,7 @@ fn working(
     )];
     spans.extend(beamed(format!("{verb}{}", theme::ellipsis()), now));
     spans.push(Span::styled(
-        format!(" ({hint}{}s{})", elapsed.as_secs(), spent(turn)),
+        format!(" ({hint}{}s{})", elapsed.as_secs(), written(turn)),
         theme::dim(),
     ));
     if let Some(retry) = turn.retrying {
@@ -345,10 +345,10 @@ fn beamed(word: String, now: Now) -> Vec<Span<'static>> {
 
 /// What the turn has said so far, in the thousands §6 writes it in — and
 /// nothing at all before it has said anything.
-fn spent(turn: &LiveTurn) -> String {
+fn written(turn: &LiveTurn) -> String {
     match turn.usage.output_tokens {
         0 => String::new(),
-        tokens => format!(" · ↓ {:.1}k tokens", tokens as f64 / 1000.0),
+        tokens => format!(" · ↓ {}", crate::count::count(tokens)),
     }
 }
 
@@ -426,6 +426,28 @@ fn blocking(item: &bingo_sdk::Item) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn twelve_tokens_are_visible_early_in_a_turn() {
+        let state = folded(vec![
+            frame(1, started("trn_1")),
+            frame(
+                2,
+                bingo_sdk::Event::TurnUsage {
+                    turn: bingo_sdk::TurnId::from_raw("trn_1"),
+                    usage: bingo_sdk::Usage {
+                        output_tokens: 12,
+                        ..Default::default()
+                    },
+                    context: Default::default(),
+                },
+            ),
+        ]);
+        let (mut ui, now) = scene();
+        let screen = draw_tree(80, 24, &solo(&state), &mut ui, later(now, 4_000));
+        assert!(screen.contains("↓ 12"), "{screen}");
+        assert!(!screen.contains("0.0k"), "{screen}");
+    }
+
     use super::*;
     use crate::test_support::*;
 

@@ -20,7 +20,7 @@ expression: asleep
 "                                                                                "
 "⏺ reviewer(review the diff)                                                     "
 "  ⏺ project   idle · have it reviewed                                           "
-"  ⏺ reviewer  working · 0 tools · 0 tokens                                      "
+"  ⏺ reviewer  working · 0 tools · ↓ 0                                           "
 "❯ ⏺ scout     stored                                                            "
 "╭──────────────────────────────────────────────────────────────────────────────╮"
 "│ > ask anything · / for commands · ! for shell                                │"

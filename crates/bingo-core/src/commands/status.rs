@@ -15,7 +15,7 @@ pub(super) struct StatusCommand {
 #[async_trait]
 impl Command for StatusCommand {
     fn spec(&self) -> CommandSpec {
-        super::spec("status", "", ArgSpec::None, true)
+        super::spec("status", "show session details", ArgSpec::None, true)
     }
 
     async fn run(&self, _args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
@@ -45,7 +45,8 @@ fn rows(state: &SessionState) -> Vec<(String, String)> {
             "tokens".into(),
             format!(
                 "{} in · {} out",
-                s.usage.input_tokens, s.usage.output_tokens
+                grouped(s.usage.input_tokens),
+                grouped(s.usage.output_tokens)
             ),
         ),
     ];
@@ -69,17 +70,45 @@ fn context(context: Option<ContextUsage>) -> String {
     match context {
         Some(c) => format!(
             "{} of {} tokens ({} %) · compacts at {}",
-            c.used,
-            c.window,
+            grouped(c.used),
+            grouped(c.window),
             c.percent(),
-            c.trigger
+            grouped(c.trigger)
         ),
         None => "not measured yet".into(),
     }
 }
 
+fn grouped(n: u64) -> String {
+    let digits = n.to_string();
+    let mut out = String::new();
+    for (i, digit) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(digit);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_status_groups_digits() {
+        assert_eq!(
+            context(Some(ContextUsage {
+                used: 13_812,
+                window: 191_808,
+                trigger: 172_627
+            })),
+            "13,812 of 191,808 tokens (7 %) · compacts at 172,627"
+        );
+        let mut state = SessionState::new(crate::test_support::summary("ses_status"));
+        state.summary.usage.input_tokens = 54_811;
+        state.summary.usage.output_tokens = 139;
+        assert!(rows(&state).contains(&("tokens".into(), "54,811 in · 139 out".into())));
+    }
+
     use super::*;
 
     #[test]
@@ -109,7 +138,7 @@ mod tests {
         };
         assert_eq!(
             context(Some(usage)),
-            "42000 of 100000 tokens (42 %) · compacts at 80000"
+            "42,000 of 100,000 tokens (42 %) · compacts at 80,000"
         );
     }
 }

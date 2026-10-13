@@ -22,9 +22,9 @@ impl Command for RenameCommand {
     fn spec(&self) -> CommandSpec {
         super::spec(
             "rename",
-            "<title>",
+            "name this session",
             ArgSpec::Free {
-                hint: "a name for this session".into(),
+                hint: "<title>".into(),
             },
             true,
         )

@@ -437,24 +437,20 @@ fn named(interaction: &Interaction) -> String {
 /// summarised; a question and a confirmation carry their own words.
 fn question(interaction: &Interaction, cwd: &str) -> Option<Line<'static>> {
     let text = match &interaction.kind {
-        InteractionKind::Permission { summary, .. } => {
-            format!("Do you want to {}?", opening(&shorten(summary, cwd)))
-        }
+        InteractionKind::Permission {
+            summary, preview, ..
+        } => match preview {
+            Some(Preview::Command { .. }) => "Do you want to run this command?".into(),
+            Some(Preview::Url { .. }) => "Do you want to fetch this page?".into(),
+            Some(Preview::Diff { .. }) => format!("Do you want to {}?", shorten(summary, cwd)),
+            None => format!("Do you want to allow {}?", shorten(summary, cwd)),
+        },
         InteractionKind::Question(Question { question, .. }) => question.clone(),
         InteractionKind::Form { .. } => return None,
         InteractionKind::Confirm { detail, .. } => detail.clone(),
         InteractionKind::Login { .. } => return None,
     };
     Some(Line::from(Span::styled(text, theme::text())))
-}
-
-/// The kernel's summary opens a sentence here, so its first letter joins it.
-fn opening(summary: &str) -> String {
-    let mut chars = summary.chars();
-    match chars.next() {
-        Some(first) => first.to_lowercase().chain(chars).collect(),
-        None => String::new(),
-    }
 }
 
 fn shorten(text: &str, cwd: &str) -> String {
@@ -550,4 +546,21 @@ fn indent(line: Line<'static>) -> Line<'static> {
     let mut spans = vec![Span::raw("  ")];
     spans.extend(line.spans);
     Line::from(spans)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rough_edges_questions_are_sentences_for_the_preview() {
+        for (preview, expected) in [
+            (Some(serde_json::from_value(serde_json::json!({"kind":"command","command":"echo hi","cwd":"/work","description":"Print a greeting"})).unwrap()), "Do you want to run this command?"),
+            (Some(Preview::Url { url: "https://example.test".into() }), "Do you want to fetch this page?"),
+            (None, "Do you want to allow Edit src/lib.rs?"),
+        ] {
+            let interaction = crate::test_support::permission(None, preview);
+            assert_eq!(question(&interaction, "/work").unwrap().to_string(), expected);
+        }
+    }
 }

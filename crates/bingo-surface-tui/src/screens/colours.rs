@@ -114,7 +114,7 @@ fn a_card_spends_its_colour_on_the_row_the_keyboard_is_on() {
         "the rows it is not on carry the border and nothing else"
     );
     // Inside the border the question runs to the box's edge, in `text`.
-    let question = format!(" {:<77}", "Do you want to edit src/lib.rs?");
+    let question = format!(" {:<77}", "Do you want to allow Edit src/lib.rs?");
     assert_row_styled(
         &painted,
         "Do you want to",

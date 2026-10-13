@@ -24,7 +24,7 @@ impl Command for ModelCommand {
     fn spec(&self) -> CommandSpec {
         super::spec(
             "model",
-            "[<provider>/]<model>",
+            "choose the model for this session",
             ArgSpec::Catalog {
                 source: "models".into(),
             },

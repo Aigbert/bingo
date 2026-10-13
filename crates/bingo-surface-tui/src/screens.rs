@@ -320,6 +320,7 @@ fn permission_with_the_feedback_row_open() {
         None,
         Some(Preview::Command {
             command: "rm -rf build".into(),
+            description: None,
             cwd: "/tmp/project".into(),
         }),
     );

@@ -3399,7 +3399,7 @@ mod tests {
             .iter()
             .find(|binding| binding.keys == "ctrl+b")
             .expect("a row for ctrl+b");
-        assert_eq!(row.description, "background the running command");
+        assert_eq!(row.description, "background running command");
     }
 
     // ---- the plugin-state panel -----------------------------------------

@@ -361,7 +361,7 @@ fn says(
     if row.attention {
         said.push(Span::styled("needs you".to_string(), theme::attention(now)));
     }
-    said.push(Span::styled(spent(row, state), theme::dim()));
+    said.push(Span::styled(work(row, state), theme::dim()));
     gap(dotted(said))
 }
 
@@ -376,17 +376,17 @@ fn doing(row: &Row<'_>, state: Option<&SessionState>) -> String {
     )
 }
 
-/// `3 tools · 1.2k tokens · 40s`: what a session has spent on its work. A
+/// `3 tools · ↓ 140 · 40s`: what a session has spent on its work. A
 /// session that has not started spent nothing worth a column, and the clock is
 /// left out where it has not moved — nothing is learned from `0s`.
-fn spent(row: &Row<'_>, state: Option<&SessionState>) -> String {
+fn work(row: &Row<'_>, state: Option<&SessionState>) -> String {
     let Some(state) = state.filter(|state| {
         matches!(row.status, Some(Lifecycle::Working))
             || (row.status == Some(Lifecycle::Idle) && state.last_status().is_some())
     }) else {
         return String::new();
     };
-    let mut said = tree::spent(state);
+    let mut said = tree::work(state);
     let seconds = tree::seconds(state);
     if seconds > 0 {
         said.push_str(&format!(" · {seconds}s"));
@@ -547,7 +547,7 @@ mod tests {
             vec![
                 "Agents",
                 "❯ ⏺ project   idle · what is in this workspace?",
-                "  ~ reviewer  working · in #design · live · owes an answer · 22m · 3 tools · 1.…",
+                "  ~ reviewer  working · in #design · live · owes an answer · 22m · 3 tools · ↓ …",
                 "  ⏺ watcher   idle · in #design · listening · 600s",
                 "Rooms",
                 "  #design  2 seats · 1 owed",
@@ -621,7 +621,7 @@ mod tests {
         );
         assert!(
             drawn[2].contains(
-                "reviewer  working · in #design · live · owes an answer · 22m · 3 tools · 1.2k tokens"
+                "reviewer  working · in #design · live · owes an answer · 22m · 3 tools · ↓ 140"
             ),
             "one that has run says what it is doing, then where it sits and what \
              it owes, and only then what it has spent: {drawn:#?}"
@@ -691,7 +691,7 @@ mod tests {
         assert_eq!(
             drawn,
             vec![
-                "❯ ~ reviewer  working · in #design · live · owes an answer · 22m · 3 tools · 1.…",
+                "❯ ~ reviewer  working · in #design · live · owes an answer · 22m · 3 tools · ↓ …",
             ],
             "one row, no label over the only run left, and no line of its own: {drawn:#?}"
         );
@@ -706,7 +706,7 @@ mod tests {
             drawn,
             vec![
                 "Agents",
-                "❯ ~ reviewer  working · in #design · live · owes an answer · 22m · 3 tools · 1.2k tokens",
+                "❯ ~ reviewer  working · in #design · live · owes an answer · 22m · 3 tools · ↓ 140",
                 "  ⏺ watcher   idle · in #design · listening · 600s",
                 "Rooms",
                 "  #design  2 seats · 1 owed",

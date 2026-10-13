@@ -25,11 +25,10 @@ pub enum Local {
 
 /// Name and hint of each local command, in dropdown order.
 const LOCAL: &[(&str, &str)] = &[
-    ("help", "shortcuts and commands"),
+    ("help", "keyboard shortcuts"),
     ("clear", "start a fresh session here"),
     ("resume", "reopen a session"),
     ("exit", "leave bingo"),
-    ("quit", "leave bingo"),
 ];
 
 /// The local commands as specs, so the dropdown ranks one kind of thing.
@@ -38,7 +37,11 @@ pub fn local_specs() -> Vec<CommandSpec> {
         .iter()
         .map(|(name, hint)| CommandSpec {
             name: (*name).to_string(),
-            aliases: Vec::new(),
+            aliases: if *name == "exit" {
+                vec!["quit".into()]
+            } else {
+                Vec::new()
+            },
             hint: (*hint).to_string(),
             args: if *name == "resume" {
                 ArgSpec::Free {
@@ -245,6 +248,21 @@ fn offered(head: &str, partial: &str, args: &ArgSpec, catalogues: &Catalogues) -
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_quit_is_an_alias_not_a_second_row() {
+        let specs = local_specs();
+        assert!(!specs.iter().any(|s| s.name == "quit"));
+        assert!(
+            specs
+                .iter()
+                .find(|s| s.name == "exit")
+                .unwrap()
+                .aliases
+                .contains(&"quit".into())
+        );
+        assert_eq!(local("/quit"), Some(Local::Exit));
+    }
+
     use super::*;
     use bingo_sdk::{CatalogEntry, CatalogKind};
 

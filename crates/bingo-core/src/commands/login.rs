@@ -22,7 +22,7 @@ impl Command for LoginCommand {
     fn spec(&self) -> CommandSpec {
         super::spec(
             "login",
-            "<provider> [browser|device|paste]",
+            "sign in to a provider",
             ArgSpec::Catalog {
                 source: "providers".into(),
             },
@@ -52,7 +52,7 @@ impl Command for LogoutCommand {
     fn spec(&self) -> CommandSpec {
         super::spec(
             "logout",
-            "<provider>",
+            "sign out of a provider",
             ArgSpec::Catalog {
                 source: "providers".into(),
             },

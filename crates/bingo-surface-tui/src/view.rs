@@ -203,7 +203,7 @@ fn layer(
             let lines = switcher_lines(tree, ui, switcher, now, above, frame);
             over(frame, above, lines)
         }
-        Open::Help => sheet(frame, above, help(ui, width), reveal),
+        Open::Help => sheet(frame, above, help(width), reveal),
         Open::Panel => sheet(
             frame,
             above,
@@ -503,20 +503,14 @@ fn lined(area: Rect, padding: usize) -> Rect {
     }
 }
 
-/// The `?` panel: the one binding table, then the commands this session can
-/// run — the surface's own and the kernel's, from the same list the dropdown
-/// ranks.
-fn help(ui: &Ui, width: usize) -> Vec<Line<'static>> {
-    let commands = ui.commands();
-    let column = commands.iter().map(|c| c.name.width()).max().unwrap_or(0);
+/// The binding table answers keys; the command menu answers commands.
+fn help(width: usize) -> Vec<Line<'static>> {
     let mut out = keys::help_lines(width);
     out.push(Line::default());
-    out.extend(commands.iter().map(|spec| {
-        Line::from(Span::styled(
-            format!("/{:<column$}  {}", spec.name, spec.hint, column = column),
-            theme::dim(),
-        ))
-    }));
+    out.push(Line::from(Span::styled(
+        "/ for commands · ! for a shell line",
+        theme::dim(),
+    )));
     out
 }
 
@@ -975,6 +969,7 @@ mod tests {
                 None,
                 Some(Preview::Command {
                     command: "rm -rf build".into(),
+                    description: None,
                     cwd: "/tmp/project".into(),
                 }),
             )),

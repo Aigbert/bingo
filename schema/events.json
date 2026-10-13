@@ -6602,6 +6602,7 @@
             "default": []
           },
           "hint": {
+            "description": "A one-line description for the command menu; argument syntax belongs in `args`.",
             "type": "string"
           },
           "args": {
@@ -6730,6 +6731,7 @@
                 "default": []
               },
               "hint": {
+                "description": "A one-line description for the command menu; argument syntax belongs in `args`.",
                 "type": "string"
               },
               "args": {

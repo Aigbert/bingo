@@ -193,9 +193,8 @@ impl Search {
     }
 
     /// One file's matches, rendered as the mode asks for them.
-    fn search_file(&self, file: &Path, out: &mut Vec<String>) {
+    fn search_file(&self, file: &Path, out: &mut Vec<(PathBuf, String)>) {
         let mut hits = Hits {
-            path: file.display().to_string(),
             mode: self.mode,
             line_numbers: self.line_numbers,
             count: 0,
@@ -213,14 +212,15 @@ impl Search {
         if hits.count == 0 {
             return;
         }
-        match self.mode {
-            OutputMode::FilesWithMatches => out.push(hits.path),
-            OutputMode::Count => out.push(format!("{}:{}", hits.path, hits.count)),
-            OutputMode::Content => out.extend(hits.lines),
-        }
+        let lines = match self.mode {
+            OutputMode::FilesWithMatches => vec![String::new()],
+            OutputMode::Count => vec![format!(":{}", hits.count)],
+            OutputMode::Content => hits.lines,
+        };
+        out.extend(lines.into_iter().map(|line| (file.to_path_buf(), line)));
     }
 
-    fn run(&self) -> Vec<String> {
+    fn run(&self) -> Vec<(PathBuf, String)> {
         let mut walk = path::walker(&self.root);
         if let Some(types) = &self.types {
             walk.types(types.clone());
@@ -244,7 +244,6 @@ impl Search {
 
 /// One file's worth of matches, collected straight into the rendered form.
 struct Hits {
-    path: String,
     mode: OutputMode,
     line_numbers: bool,
     count: usize,
@@ -257,9 +256,9 @@ impl Hits {
         let text = text.trim_end_matches('\n').trim_end_matches('\r');
         let rendered = match line {
             Some(n) if self.line_numbers => {
-                format!("{}{separator}{n}{separator}{text}", self.path)
+                format!("{separator}{n}{separator}{text}")
             }
-            _ => format!("{}{separator}{text}", self.path),
+            _ => format!("{separator}{text}"),
         };
         self.lines.push(rendered);
     }
@@ -338,16 +337,54 @@ impl Tool for GrepTool {
         if found.is_empty() {
             return Ok(ToolOutput::text(format!("No matches for {}", args.pattern)));
         }
-        Ok(ToolOutput::text(output::join(
-            &found,
-            usize::MAX,
-            noun(mode),
-        )))
+        let lines = found
+            .iter()
+            .map(|(path, suffix)| format!("{}{suffix}", path.display()))
+            .collect::<Vec<_>>();
+        let display = found
+            .iter()
+            .map(|(file, suffix)| format!("{}{suffix}", path::display(file, &cx.cwd, &cx.env.home)))
+            .collect::<Vec<_>>();
+        let mut result = ToolOutput::text(output::join(&lines, usize::MAX, noun(mode)));
+        result.display = Some(bingo_sdk::View::Text {
+            text: output::join(&display, usize::MAX, noun(mode)),
+        });
+        Ok(result)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn rough_edges_grep_display_preserves_content_and_shortens_only_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let content = format!("needle {}", dir.path().display());
+        write(dir.path(), "a.rs", &content);
+        for (mode, suffix) in [
+            ("files_with_matches", String::new()),
+            ("count", ":1".into()),
+            ("content", format!(":1:{content}")),
+        ] {
+            let out = GrepTool
+                .call(
+                    serde_json::json!({"pattern":"needle", "output_mode":mode,"-n":true}),
+                    &context(dir.path()),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                out.parts[0].as_text(),
+                Some(format!("{}{suffix}", dir.path().join("a.rs").display()).as_str())
+            );
+            assert_eq!(
+                out.display,
+                Some(bingo_sdk::View::Text {
+                    text: format!("a.rs{suffix}")
+                })
+            );
+        }
+    }
+
     use super::*;
     use crate::tests::{context, write};
 

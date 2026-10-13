@@ -39,16 +39,16 @@ without a change of taste:
 
 | # | seen | tui.md says |
 |---|---|---|
-| R1 | `Glob` answers `/var/folders/…/cwd/src/main.rs` | paths relative inside the cwd |
-| R2 | `Bash` repeats `$ <command>` under its own heading and ends `[Exited with code 0]` | a clean exit says nothing |
-| R3 | `⎿  allowed` after the output of a call the person approved once | the card was the record |
-| R4 | `Do you want to bash sleep 3; echo done?`; the call's `description` unshown; no preview | `Do you want to…?` over a preview |
-| R5 | `↓ 0.0k tokens`; three formatters for one kind of count | — |
-| R6 | `drawing took 157ms; a debug build or a slow terminal does this`, in the accent, to every person | a notice is what is true for the person |
-| R7 | `/status`: `13812 of 191808 tokens` | numbers are read, not parsed |
-| R8 | `?` lists every command again, with `[mode]` and `<command>` in the description column, `/exit` and `/quit` both, and a clipped key | one list per question |
-| R9 | the welcome's cwd is `/…/T/tmp.X/cwd`: an absolute path loses its first segment | middle-elided paths |
-| R10 | the session list says `55.0k tokens` (every request's input, cache reads included) where the status line says `13k/191k` (the window) | one number, one meaning |
+| [x] R1 | `Glob` answers `/var/folders/…/cwd/src/main.rs` | paths relative inside the cwd |
+| [x] R2 | `Bash` repeats `$ <command>` under its own heading and ends `[Exited with code 0]` | a clean exit says nothing |
+| [x] R3 | `⎿  allowed` after the output of a call the person approved once | the card was the record |
+| [x] R4 | `Do you want to bash sleep 3; echo done?`; the call's `description` unshown; no preview | `Do you want to…?` over a preview |
+| [x] R5 | `↓ 0.0k tokens`; three formatters for one kind of count | — |
+| [x] R6 | `drawing took 157ms; a debug build or a slow terminal does this`, in the accent, to every person | a notice is what is true for the person |
+| [x] R7 | `/status`: `13812 of 191808 tokens` | numbers are read, not parsed |
+| [x] R8 | `?` lists every command again, with `[mode]` and `<command>` in the description column, `/exit` and `/quit` both, and a clipped key | one list per question |
+| [x] R9 | the welcome's cwd is `/…/T/tmp.X/cwd`: an absolute path loses its first segment | middle-elided paths |
+| [x] R10 | the session list says `55.0k tokens` (every request's input, cache reads included) where the status line says `13k/191k` (the window) | one number, one meaning |
 
 Inline code keeps its backticks in a table cell as it does in prose: that
 is M73's choice (`markdown.rs`, `an_inline_code_span_keeps_its_backticks…`),

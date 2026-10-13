@@ -22,10 +22,22 @@ const COMMAND_ROWS: usize = 6;
 pub fn lines(preview: &Preview, expanded: bool) -> (Vec<Line<'static>>, usize) {
     match preview {
         Preview::Diff { unified } => bound(diff(unified), DIFF_ROWS, expanded),
-        Preview::Command { command, cwd } => {
+        Preview::Command {
+            command,
+            cwd,
+            description,
+        } => {
             let mut rows = vec![Line::from(Span::styled(cwd.clone(), theme::dim()))];
+            if let Some(description) = description {
+                rows.extend(
+                    description
+                        .lines()
+                        .map(|line| Line::from(Span::styled(line.to_string(), theme::dim()))),
+                );
+            }
+            let metadata = rows.len();
             rows.extend(command.lines().map(command_line));
-            bound(rows, COMMAND_ROWS + 1, expanded)
+            bound(rows, COMMAND_ROWS + metadata, expanded)
         }
         Preview::Url { url } => (
             vec![Line::from(Span::styled(url.clone(), theme::link()))],
@@ -163,6 +175,24 @@ fn bound(rows: Vec<Line<'static>>, limit: usize, expanded: bool) -> (Vec<Line<'s
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_description_is_dim_above_the_command() {
+        let (rows, hidden) = lines(
+            &Preview::Command {
+                command: "echo hi".into(),
+                cwd: "/work".into(),
+                description: Some("Print a greeting".into()),
+            },
+            false,
+        );
+        assert_eq!(hidden, 0);
+        assert_eq!(
+            rows[1],
+            Line::from(Span::styled("Print a greeting", theme::dim()))
+        );
+        assert_eq!(rows[2].to_string(), "$ echo hi");
+    }
+
     use super::*;
 
     fn unified(rows: usize) -> String {
@@ -271,6 +301,7 @@ mod tests {
         let (rows, _) = lines(
             &Preview::Command {
                 command: "ls -la".into(),
+                description: None,
                 cwd: "/tmp".into(),
             },
             false,

@@ -376,6 +376,15 @@ impl Tool for BashTool {
             .unwrap_or_default()
     }
 
+    fn preview(&self, input: &Value, cwd: &Path) -> Option<bingo_sdk::Preview> {
+        let args: BashArgs = serde_json::from_value(input.clone()).ok()?;
+        Some(bingo_sdk::Preview::Command {
+            command: args.command,
+            cwd: cwd.display().to_string(),
+            description: args.description,
+        })
+    }
+
     async fn call(&self, input: Value, cx: &ToolContext) -> Result<ToolOutput, ToolError> {
         let args: BashArgs =
             serde_json::from_value(input).map_err(|e| ToolError::InvalidInput(e.to_string()))?;
@@ -487,6 +496,16 @@ impl bingo_sdk::Hook for MissingShell {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    #[test]
+    fn rough_edges_command_preview_carries_the_description() {
+        let tool = BashTool::new(Arc::new(Jobs::default()));
+        let input = serde_json::json!({"command":"echo hi", "description":"Print a greeting"});
+        assert_eq!(
+            serde_json::to_value(tool.preview(&input, Path::new("/work"))).unwrap(),
+            serde_json::json!({"kind":"command","command":"echo hi","cwd":"/work","description":"Print a greeting"})
+        );
+    }
+
     use super::*;
 
     use std::path::PathBuf;
@@ -925,7 +944,10 @@ pub(crate) mod tests {
             let out = tool.call(input, &cx).await.expect("the call ran");
             assert_eq!(text(&out), "$ echo hi\nhi\n[Exited with code 0]");
             assert!(!out.is_error);
-            assert!(out.display.is_none(), "no background job display");
+            assert_eq!(
+                out.display,
+                Some(bingo_sdk::View::Text { text: "hi".into() })
+            );
             assert!(jobs.find("").is_err(), "no job was filed");
         }
     }
@@ -944,7 +966,12 @@ pub(crate) mod tests {
                 text(&out),
                 "$ echo failed >&2; exit 7\nfailed\n[Exited with code 7]"
             );
-            assert!(out.display.is_none(), "no background job display");
+            assert_eq!(
+                out.display,
+                Some(bingo_sdk::View::Text {
+                    text: "failed\nexit 7".into()
+                })
+            );
             assert!(jobs.find("").is_err(), "no job was filed");
         }
     }

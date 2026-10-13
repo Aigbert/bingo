@@ -120,10 +120,27 @@ pub fn shape(command: &str, output: &str, ended: Ended) -> ToolOutput {
     };
     let body = output.strip_suffix('\n').unwrap_or(output);
     let text = format!("$ {command}\n{body}\n{footer}");
-    if ended == Ended::Exited(0) {
+    let mut result = if ended == Ended::Exited(0) {
         ToolOutput::text(text)
     } else {
         ToolOutput::error(text)
+    };
+    result.display = Some(bingo_sdk::View::Text {
+        text: display(body, ended),
+    });
+    result
+}
+
+fn display(body: &str, ended: Ended) -> String {
+    let footer = match ended {
+        Ended::Exited(0) => None,
+        Ended::Exited(code) => Some(format!("exit {code}")),
+        other => unfinished(other),
+    };
+    match footer {
+        Some(footer) if body.is_empty() => footer,
+        Some(footer) => format!("{body}\n{footer}"),
+        None => body.to_string(),
     }
 }
 
@@ -151,6 +168,32 @@ fn seconds(ms: u64) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rough_edges_display_reports_only_output_and_an_abnormal_end() {
+        for (end, expected) in [
+            (Ended::Exited(0), "hi"),
+            (Ended::Exited(7), "hi\nexit 7"),
+            (
+                Ended::Timeout { after_ms: 200 },
+                "hi\n[timed out after 0.2s]",
+            ),
+            (Ended::Interrupted, "hi\n[interrupted]"),
+        ] {
+            assert_eq!(
+                shape("echo hi", "hi\n", end).display,
+                Some(bingo_sdk::View::Text {
+                    text: expected.into()
+                })
+            );
+        }
+        assert_eq!(
+            shape("true", "", Ended::Exited(0)).display,
+            Some(bingo_sdk::View::Text {
+                text: String::new()
+            })
+        );
+    }
+
     use super::*;
 
     fn collect(max: usize, text: &str) -> Bounded {

@@ -128,15 +128,43 @@ impl Tool for GlobTool {
         }
         newest_first(&mut found);
         let paths: Vec<String> = found
-            .into_iter()
+            .iter()
             .map(|(_, path)| path.display().to_string())
             .collect();
-        Ok(ToolOutput::text(output::join(&paths, MAX_RESULTS, "files")))
+        let display = found
+            .iter()
+            .map(|(_, file)| path::display(file, &cx.cwd, &cx.env.home))
+            .collect::<Vec<_>>();
+        let mut result = ToolOutput::text(output::join(&paths, MAX_RESULTS, "files"));
+        result.display = Some(bingo_sdk::View::Text {
+            text: output::join(&display, MAX_RESULTS, "files"),
+        });
+        Ok(result)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn rough_edges_glob_display_is_relative() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "a.rs", "");
+        let out = GlobTool
+            .call(serde_json::json!({"pattern":"*.rs"}), &context(dir.path()))
+            .await
+            .unwrap();
+        assert_eq!(
+            out.parts[0].as_text(),
+            Some(dir.path().join("a.rs").to_str().unwrap())
+        );
+        assert_eq!(
+            out.display,
+            Some(bingo_sdk::View::Text {
+                text: "a.rs".into()
+            })
+        );
+    }
+
     use super::*;
     use crate::tests::{context, write};
     use std::time::Duration;
