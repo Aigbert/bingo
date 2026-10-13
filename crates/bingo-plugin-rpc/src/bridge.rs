@@ -121,6 +121,7 @@ pub struct Bridge {
     /// services it declares are published (ADR-0031 §4).
     host: HostHandle,
     state: Mutex<State>,
+    pub(crate) store: crate::state::Store,
 }
 
 impl std::fmt::Debug for Bridge {
@@ -141,8 +142,10 @@ impl Bridge {
         call_timeout: Option<std::num::NonZeroU64>,
         setting: Setting,
     ) -> Self {
+        let name = name.into();
         Self {
-            name: name.into(),
+            store: crate::state::Store::new(&setting.data_dir, &name),
+            name,
             root,
             entry,
             config,
@@ -439,7 +442,7 @@ impl Bridge {
             &self.entry,
             &self.root,
             &self.data_dir,
-            Some(Arc::new(crate::host::Server::new(&self.name, self.host.clone(), hub))),
+            Some(Arc::new(crate::host::Server::new(&self.name, self.host.clone(), hub, self.store.clone()))),
         )?);
         let answered =
             tokio::time::timeout(deadline::HANDSHAKE, self.initialize(&connection)).await;

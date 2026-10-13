@@ -614,6 +614,7 @@ dependencies = [
  "bingo-pictures",
  "bingo-process",
  "bingo-sdk",
+ "bingo-shelf",
  "futures",
  "schemars 1.2.2",
  "serde",

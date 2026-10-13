@@ -15,6 +15,7 @@ use bingo_sdk::{
     Provider, SWITCHED_OFF, Tool,
 };
 use serde_json::Value;
+use futures::StreamExt;
 
 use crate::bridge::{Bridge, Setting};
 use crate::discovery::{self, Found};
@@ -65,6 +66,7 @@ pub struct Manager {
     /// Stops the one notice drain when the host does.
     stop: CancellationToken,
     installed: OnceLock<Vec<Installed>>,
+    cleanup: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 impl std::fmt::Debug for Manager {
@@ -90,6 +92,7 @@ impl Manager {
             notices,
             stop: CancellationToken::new(),
             installed: OnceLock::new(),
+            cleanup: Default::default(),
         }
     }
 
@@ -130,6 +133,7 @@ impl Manager {
         if self.installed.set(installed).is_err() {
             return;
         }
+        self.watch_removed(&host);
         self.open_doors(&host);
         self.say(host);
         let mut connecting = tokio::task::JoinSet::new();
@@ -188,8 +192,33 @@ impl Manager {
         hooks
     }
 
+    fn watch_removed(&self, host: &HostHandle) {
+        let mut events = host.gateway_events();
+        let stores: Vec<_> = self.bridges().map(|bridge| bridge.store.clone()).collect();
+        let stop = self.stop.clone();
+        let task = tokio::spawn(async move {
+            loop {
+                let event = tokio::select! {
+                    _ = stop.cancelled() => return,
+                    event = events.next() => event,
+                };
+                let Some(event) = event else { return; };
+                if let bingo_sdk::GatewayEvent::SessionRemoved { session } = event {
+                    for store in &stores {
+                        if let Err(error) = store.remove(session.to_string()).await {
+                            tracing::warn!(?error, "removing plugin session state");
+                        }
+                    }
+                }
+            }
+        });
+        *self.cleanup.lock().unwrap_or_else(|e| e.into_inner()) = Some(task);
+    }
+
     pub async fn shutdown(&self) {
         self.stop.cancel();
+        let task = self.cleanup.lock().unwrap_or_else(|e| e.into_inner()).take();
+        if let Some(task) = task { let _ = task.await; }
         for bridge in self.bridges() {
             bridge.stop().await;
         }

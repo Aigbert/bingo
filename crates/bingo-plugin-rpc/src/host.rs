@@ -76,12 +76,13 @@ pub struct Server {
     plugin: String,
     host: HostHandle,
     service: Arc<dyn ServiceCalls>,
+    state: crate::state::Store,
     capabilities: tokio::sync::watch::Sender<Option<BTreeSet<Cap>>>,
 }
 
 impl Server {
-    pub fn new(plugin: &str, host: HostHandle, service: Arc<dyn ServiceCalls>) -> Self {
-        Self { plugin: plugin.into(), host, service,
+    pub fn new(plugin: &str, host: HostHandle, service: Arc<dyn ServiceCalls>, state: crate::state::Store) -> Self {
+        Self { plugin: plugin.into(), host, service, state,
             capabilities: tokio::sync::watch::channel(None).0 }
     }
 
@@ -111,8 +112,17 @@ impl Server {
             name::HOST_PLACE => self.place(parse(params)?).await,
             name::HOST_EXTEND => self.extend(parse(params)?).await,
             name::HOST_DELIVER => self.deliver(parse(params)?).await,
+            name::STATE_GET => self.get(parse(params)?).await,
+            name::STATE_SET => self.set(parse(params)?).await,
             _ => Err(unknown(method)),
         }
+    }
+
+    async fn get(&self, params: StateGet) -> Result<Value, RpcError> {
+        serde_json::to_value(self.state.get(params.scope, params.key).await?).map_err(failed)
+    }
+    async fn set(&self, params: StateSet) -> Result<Value, RpcError> {
+        serde_json::to_value(self.state.set(params.scope, params.key, params.value, params.if_version).await?).map_err(failed)
     }
 
     async fn place(&self, params: Place) -> Result<Value, RpcError> {
