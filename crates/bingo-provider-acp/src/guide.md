@@ -101,12 +101,14 @@ reaches it: the catalogue moving is `tools/list_changed`.
   sends — and honestly zero where an adapter reports none. ACP's plans, modes
   and slash commands are unmapped, and `fs/*` and `terminal/*` are declared
   unsupported — the agent reaches the disk as itself.
-- **Permission questions are the adapter's own.** One that asks anyway is put
-  to whoever is at the session, in the agent's own words. Where nobody answers
-  it fails closed with one of the reject options the agent itself offered, or
-  is cancelled where it offered none, and a notice names the row to configure.
-  A free-form `elicitation/create` is declined the same way.
+- **Permission requests pass bingo's tool checks.** Rules and hooks can deny
+  them or ask the person. An unanswered request selects the agent's reject
+  option; without a reject option, the turn fails with a reason. Even a
+  session-wide approval selects `allow_once`: bingo retains its scope and
+  the adapter asks again. Free-form `elicitation/create` remains declined.
 
-Interrupting is `session/cancel`. A child that dies between turns is replaced
-rather than asked, with a notice, and every child ends with the process that
-spawned it.
+Interrupting is `session/cancel`. A child that dies before saying anything can
+be replaced and asked again within the run. A child that stops mid-answer
+fails the turn: its journaled speech and work stay, and nothing is retried.
+The dead child is buried with one notice; the next prompt uses a new child.
+Every child ends with the process that spawned it.

@@ -74,3 +74,5 @@ adapter's or the settings'; the agent's own compaction is shown properly.
 - Amends ADR-0035's first consequence (the ruler shapes nothing for a held
   context) and ADR-0006 §2 (a reading replaces the anchor where the
   endpoint holds the context).
+
+*2026-10-13 amendment — §1: ADR-0076 removes holds_context: an Agent owns its context by being an Agent. §2–§4 move to the agent turn: reported readings and compactions retain their meaning; the core keeps reported windows for later sessions.*
