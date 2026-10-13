@@ -673,35 +673,6 @@ pub fn extended(plugin: &str, kind: &str, payload: Value) -> Event {
     }
 }
 
-/// The kernel's projection of one plugin's per-session setting (ADR-0009 §5).
-pub fn plugin_view(plugin: &str, value: Value) -> Event {
-    let value = if plugin == "bingo.permissions" {
-        let current = value["mode"].as_str().unwrap_or("default").to_string();
-        let modes = value["modes"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .map(|mode| bingo_sdk::ActionItem {
-                label: mode.as_str().unwrap().into(),
-                key: None,
-                action: bingo_sdk::Action {
-                    name: "permission".into(),
-                    args: mode.clone(),
-                },
-            })
-            .collect();
-        bingo_sdk::slot::with(value, [bingo_sdk::slot::Slot::Mode { current, modes }])
-    } else {
-        value
-    };
-    Event::ConfigChanged {
-        config: bingo_sdk::ConfigView {
-            plugins: std::collections::BTreeMap::from([(plugin.to_string(), value)]),
-            ..Default::default()
-        },
-    }
-}
-
 /// What the schedules plugin publishes for a session that has a wake
 /// standing on it (ADR-0019 §8): when it comes, and what it will say.
 pub fn pending_wake(at: &str) -> Event {
