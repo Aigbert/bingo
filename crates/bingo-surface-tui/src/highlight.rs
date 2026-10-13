@@ -140,6 +140,7 @@ impl Block {
 /// One line: syntect says where the scopes change, the token table says what
 /// each run between two of them is drawn in.
 fn row(line: &str, parse: &mut ParseState, stack: &mut ScopeStack) -> Line<'static> {
+    record_parse();
     // The syntaxes are the newline-terminated set: a line without its ending
     // would leave a rule half-matched.
     let source = format!("{line}\n");
@@ -185,10 +186,18 @@ fn ink(stack: &ScopeStack) -> Ink {
         .unwrap_or(Ink::Plain)
 }
 
+fn record_parse() {
+    #[cfg(test)]
+    tests::PARSED.with(|count| count.set(count.get() + 1));
+}
+
 #[cfg(test)]
 mod tests {
+    thread_local! {
+        pub(super) static PARSED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    }
+
     use super::*;
-    use std::time::{Duration, Instant};
 
     fn text(lines: &[Line<'static>]) -> Vec<String> {
         lines.iter().map(ToString::to_string).collect()
@@ -205,6 +214,7 @@ mod tests {
     /// Nothing kept from another test: the memo is this thread's.
     fn fresh() {
         BLOCKS.with_borrow_mut(Vec::clear);
+        PARSED.with(|count| count.set(0));
     }
 
     /// The memo is of a drawing, and a drawing is in one look: a terminal that
@@ -305,48 +315,22 @@ mod tests {
         );
     }
 
-    /// The quickest of a few runs. A debug build under a parallel suite is
-    /// noisy, and the question is what the work costs, not what the scheduler
-    /// did that millisecond.
-    fn quickest(runs: usize, mut once: impl FnMut()) -> Duration {
-        (0..runs)
-            .map(|_| {
-                let at = Instant::now();
-                once();
-                at.elapsed()
-            })
-            .min()
-            .unwrap_or_default()
-    }
-
-    /// The budget of §6: a block that grew by one line costs one line to
-    /// highlight. What every frame costs either way — handing the rows back —
-    /// is measured first and taken off, because that is not the re-highlight.
     #[test]
-    fn one_delta_re_highlights_in_under_a_millisecond() {
+    fn one_delta_parses_only_the_added_line() {
         fresh();
-        let block: String = (0..400)
+        let mut block: String = (0..400)
             .map(|i| format!("    let x{i} = {i}; // row {i}\n"))
             .collect();
-        assert_eq!(lines("rust", &block).len(), 400);
-
-        let handing_back = quickest(20, || {
-            lines("rust", &block);
-        });
-        let mut grown = block.clone();
-        let with_a_delta = quickest(20, || {
-            grown.push_str("    let last = 1;\n");
-            lines("rust", &grown);
-        });
-        let delta = with_a_delta.saturating_sub(handing_back);
-        assert!(
-            delta < Duration::from_millis(1),
-            "one delta took {delta:?} over the {handing_back:?} every frame costs"
-        );
-        assert!(
-            with_a_delta < crate::clock::FRAME,
-            "and the whole call still fits in a frame: {with_a_delta:?}"
-        );
+        let first = lines("rust", &block);
+        assert_eq!(first.len(), 400);
+        assert_eq!(PARSED.get(), 400);
+        assert_eq!(lines("rust", &block), first);
+        assert_eq!(PARSED.get(), 400, "an unchanged block is not parsed again");
+        block.push_str("    let last = 1;\n");
+        let grown = lines("rust", &block);
+        assert_eq!(&grown[..400], first);
+        assert_eq!(grown.len(), 401);
+        assert_eq!(PARSED.get(), 401, "only the added line reaches the parser");
     }
 
     #[test]

@@ -186,7 +186,6 @@ async fn read_capped(pipe: Option<impl AsyncRead + Unpin>) -> Vec<u8> {
 mod tests {
     use super::*;
     use serde_json::json;
-    use std::time::Instant;
 
     const NO_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -288,10 +287,12 @@ mod tests {
     async fn a_hook_that_never_reads_a_large_stdin_still_finishes() {
         // 64 KB is past every pipe buffer: writing before waiting would hang here.
         let input = json!({"tool_input": {"content": "x".repeat(64 * 1024)}});
-        let started = Instant::now();
-        let out = ok(hook("exit 0", &input).await);
+        let out = ok(
+            tokio::time::timeout(Duration::from_secs(5), hook("exit 0", &input))
+                .await
+                .expect("it hung"),
+        );
         assert_eq!(out.code, 0);
-        assert!(started.elapsed() < Duration::from_secs(5), "it hung");
     }
 
     #[tokio::test]
@@ -304,20 +305,21 @@ mod tests {
         );
         let cwd = std::env::temp_dir();
 
-        let started = Instant::now();
-        let error = run(Request {
-            command: &command,
-            input: &json!({}),
-            cwd: &cwd,
-            timeout: Duration::from_millis(200),
-            env: BTreeMap::new(),
-        })
+        let error = tokio::time::timeout(
+            Duration::from_secs(1),
+            run(Request {
+                command: &command,
+                input: &json!({}),
+                cwd: &cwd,
+                timeout: Duration::from_millis(200),
+                env: BTreeMap::new(),
+            }),
+        )
         .await
+        .expect("the hook deadline did not finish")
         .expect_err("it timed out");
-        let elapsed = started.elapsed();
 
         assert!(matches!(error, RunError::Timeout(_)), "{error:?}");
-        assert!(elapsed < Duration::from_secs(1), "took {elapsed:?}");
 
         let after_kill = std::fs::metadata(&ticks).map(|m| m.len()).unwrap_or(0);
         tokio::time::sleep(Duration::from_millis(300)).await;

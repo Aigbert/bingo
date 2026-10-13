@@ -169,14 +169,15 @@ impl Drop for Gateway {
 
 /// Poll until something is there, or fail saying what never happened.
 fn until<T>(what: &str, mut look: impl FnMut() -> Option<T>) -> T {
-    let started = Instant::now();
-    loop {
-        if let Some(found) = look() {
-            return found;
+    super::wait_within(PATIENCE, async {
+        loop {
+            if let Some(found) = look() {
+                return found;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
         }
-        assert!(started.elapsed() < PATIENCE, "{what} never happened");
-        std::thread::sleep(Duration::from_millis(50));
-    }
+    })
+    .unwrap_or_else(|_| panic!("{what} never happened"))
 }
 
 #[test]

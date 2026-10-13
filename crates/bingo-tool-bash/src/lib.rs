@@ -486,8 +486,8 @@ pub(crate) mod tests {
 
     use bingo_sdk::{
         Answer, AnswerSpec, CancellationToken, CommandContext, Contribution, Delivery, Env,
-        HostApi, HostHandle, Input, IntentId, InteractionKind, ItemBody, ItemId, KernelError,
-        Prompter, SessionId, ToolHost, TurnId,
+        HostHandle, Input, InteractionKind, ItemBody, ItemId, KernelError, Prompter, SessionId,
+        ToolHost, TurnId,
     };
 
     #[tokio::test]
@@ -543,7 +543,7 @@ pub(crate) mod tests {
                 hook.on_session(bingo_sdk::Phase::End, &cx).await;
             }
         }
-        let notices = kernel.notices.lock().expect("notices");
+        let notices = kernel.notices();
         assert_eq!(notices.len(), 1);
         assert_eq!(notices[0].0, bingo_sdk::Level::Warn);
         assert_eq!(notices[0].1, "SHELL_MISSING");
@@ -590,143 +590,83 @@ pub(crate) mod tests {
         }
     }
 
-    /// The host as this crate's tests need it: what a job delivered, and what
-    /// it published. Everything else is the sdk's `NoHost`, which answers with
-    /// an error, because nothing here asks it anything.
+    /// The shared host records the messages and live state a job publishes.
     #[derive(Debug, Default)]
     pub(crate) struct Kernel {
-        delivered: Mutex<Vec<(SessionId, String, Delivery)>>,
-        signals: Mutex<Vec<(SessionId, String, Value)>>,
-        notices: Mutex<Vec<(bingo_sdk::Level, String, String)>>,
+        host: bingo_sdk::testing::TestHost,
         /// Every delivery fails, as it does when the session has gone.
         pub(crate) closed: bool,
     }
 
     impl Kernel {
-        pub(crate) fn handle(self: &Arc<Self>) -> HostHandle {
-            HostHandle(self.clone())
+        pub(crate) fn handle(&self) -> HostHandle {
+            let closed = self.closed;
+            self.host.on_deliver(move |_, _, input, _| async move {
+                if closed {
+                    return Err(KernelError::new(
+                        bingo_sdk::ErrorCode::SessionClosed,
+                        "the session is closed",
+                    ));
+                }
+                if !matches!(input, Input::Text { .. }) {
+                    return Err(KernelError::new(
+                        bingo_sdk::ErrorCode::InvalidInput,
+                        "a peer delivers text",
+                    ));
+                }
+                Ok(())
+            });
+            self.host.on_signal(|_, _, _, _| async { Ok(()) });
+            self.host.on_notice(|_, _, _| async { Ok(()) });
+            self.host.handle()
         }
 
         pub(crate) fn delivered(&self) -> Vec<(SessionId, String, Delivery)> {
-            self.delivered.lock().expect("the deliveries").clone()
+            if self.closed {
+                return Vec::new();
+            }
+            self.host
+                .calls()
+                .into_iter()
+                .filter_map(|call| match call {
+                    bingo_sdk::testing::HostCall::Deliver {
+                        to,
+                        input: Input::Text { text, .. },
+                        delivery,
+                        ..
+                    } => Some((to, text, delivery)),
+                    _ => None,
+                })
+                .collect()
         }
 
         pub(crate) fn signals(&self) -> Vec<(SessionId, String, Value)> {
-            self.signals.lock().expect("the signals").clone()
-        }
-    }
-
-    #[async_trait]
-    impl HostApi for Kernel {
-        async fn notice(
-            &self,
-            level: bingo_sdk::Level,
-            code: &str,
-            text: &str,
-        ) -> Result<(), KernelError> {
-            self.notices
-                .lock()
-                .expect("notices")
-                .push((level, code.into(), text.into()));
-            Ok(())
+            self.host
+                .calls()
+                .into_iter()
+                .filter_map(|call| match call {
+                    bingo_sdk::testing::HostCall::Signal {
+                        session,
+                        kind,
+                        payload,
+                        ..
+                    } => Some((session, kind, payload)),
+                    _ => None,
+                })
+                .collect()
         }
 
-        async fn sessions(
-            &self,
-            filter: bingo_sdk::SessionFilter,
-        ) -> Result<Vec<bingo_sdk::SessionSummary>, KernelError> {
-            bingo_sdk::testing::NoHost.sessions(filter).await
-        }
-
-        async fn open(
-            &self,
-            selector: bingo_sdk::SessionSelector,
-            who: bingo_sdk::ClientIdentity,
-            options: bingo_sdk::OpenOptions,
-        ) -> Result<bingo_sdk::Attachment, KernelError> {
-            bingo_sdk::testing::NoHost
-                .open(selector, who, options)
-                .await
-        }
-
-        async fn close(
-            &self,
-            session: &SessionId,
-            reason: bingo_sdk::CloseReason,
-        ) -> Result<(), KernelError> {
-            bingo_sdk::testing::NoHost.close(session, reason).await
-        }
-
-        async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
-            bingo_sdk::testing::NoHost.delete(session).await
-        }
-
-        async fn deliver(
-            &self,
-            to: &SessionId,
-            _intent: IntentId,
-            input: Input,
-            delivery: Delivery,
-        ) -> Result<(), KernelError> {
-            if self.closed {
-                return Err(KernelError::new(
-                    bingo_sdk::ErrorCode::SessionClosed,
-                    "the session is closed",
-                ));
-            }
-            let Input::Text { text, .. } = input else {
-                return Err(KernelError::new(
-                    bingo_sdk::ErrorCode::InvalidInput,
-                    "a peer delivers text",
-                ));
-            };
-            self.delivered
-                .lock()
-                .expect("the deliveries")
-                .push((to.clone(), text, delivery));
-            Ok(())
-        }
-
-        async fn extend(
-            &self,
-            session: &SessionId,
-            plugin: &str,
-            kind: &str,
-            payload: Value,
-        ) -> Result<(), KernelError> {
-            bingo_sdk::testing::NoHost
-                .extend(session, plugin, kind, payload)
-                .await
-        }
-
-        async fn signal(
-            &self,
-            session: &SessionId,
-            _plugin: &str,
-            kind: &str,
-            payload: Value,
-        ) -> Result<(), KernelError> {
-            self.signals.lock().expect("the signals").push((
-                session.clone(),
-                kind.to_string(),
-                payload,
-            ));
-            Ok(())
-        }
-
-        async fn catalog(
-            &self,
-            kind: bingo_sdk::CatalogKind,
-        ) -> Result<bingo_sdk::Catalog, KernelError> {
-            bingo_sdk::testing::NoHost.catalog(kind).await
-        }
-
-        fn gateway_events(&self) -> bingo_sdk::GatewayStream {
-            bingo_sdk::testing::NoHost.gateway_events()
-        }
-
-        fn service_any(&self, _key: &str) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
-            None
+        fn notices(&self) -> Vec<(bingo_sdk::Level, String, String)> {
+            self.host
+                .calls()
+                .into_iter()
+                .filter_map(|call| match call {
+                    bingo_sdk::testing::HostCall::Notice { level, code, text } => {
+                        Some((level, code, text))
+                    }
+                    _ => None,
+                })
+                .collect()
         }
     }
 
@@ -1449,18 +1389,16 @@ pub(crate) mod tests {
             }
         });
 
-        let started = std::time::Instant::now();
-        let out = tool
-            .call(
+        let out = tokio::time::timeout(
+            Duration::from_secs(10),
+            tool.call(
                 serde_json::json!({"command": "echo before; sleep 30", "timeout": 30000}),
                 &cx,
-            )
-            .await
-            .expect("the call answered early");
-        assert!(
-            started.elapsed() < Duration::from_secs(10),
-            "the call waited for the command anyway"
-        );
+            ),
+        )
+        .await
+        .expect("the call waited for the command anyway")
+        .expect("the call answered early");
         assert!(!out.is_error, "{}", text(&out));
         let job = only_job(&jobs);
         assert!(text(&out).contains(&job.id), "{}", text(&out));

@@ -1,6 +1,6 @@
-//! Doubles a plugin's tests share, behind the `testing` feature: the host
-//! that is not there, for a context that must carry one, and the host that is
-//! nothing but the services opened in it.
+//! Shared test hosts, behind the `testing` feature. `TestHost` records and
+//! scripts every host verb; `NoHost` refuses calls and `ServiceHost` only
+//! keeps services.
 
 use std::any::Any;
 use std::sync::Arc;
@@ -182,3 +182,15 @@ impl HostApi for ServiceHost {
             .map_err(|why| KernelError::new(ErrorCode::InvalidInput, why))
     }
 }
+
+#[cfg(test)]
+mod tests;
+
+mod api;
+mod calls;
+mod host;
+mod scripts;
+mod table;
+
+pub use calls::HostCall;
+pub use host::TestHost;

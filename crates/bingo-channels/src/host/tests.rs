@@ -5,8 +5,8 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 
 use bingo_sdk::{
-    Activation, Answer, Env, ErrorCode, Event, HostApi, HostHandle, InteractionId, ItemStatus,
-    KernelError, ResolvedBy, SessionSelector, SurfaceOptions, TurnStatus, Usage,
+    Activation, Answer, Env, ErrorCode, Event, InteractionId, ItemStatus, KernelError, ResolvedBy,
+    SessionSelector, SurfaceOptions, TurnStatus, Usage,
 };
 
 use super::*;
@@ -103,7 +103,7 @@ impl Chat {
             BTreeMap::from([(Loopback::ID.to_string(), access)]),
         );
         let host = Arc::new(TestHost::default());
-        let handle = HostHandle(Arc::clone(&host) as Arc<dyn HostApi>);
+        let handle = host.scripted().handle();
         let options = SurfaceOptions {
             env: Arc::new(Env::rooted(home.path())),
             ..options("/tmp")

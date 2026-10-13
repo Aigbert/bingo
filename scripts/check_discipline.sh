@@ -193,4 +193,36 @@ long_records() { # directory, name glob, limit
 long_records docs/plans 'M*.md' 150
 long_records docs/adr '0*.md' 120
 
+# 8. Advisory test discipline: new hosts should use the SDK double, and
+#    liveness should time out while waiting rather than assert machine speed.
+python3 - <<'PYTEST'
+import pathlib, re
+allowed = {
+    "crates/bingo-core/src/host.rs",
+    "crates/bingo-core/src/host/unavailable.rs",
+    "crates/bingo-core/src/session/commands.rs",
+    "crates/bingo-core/src/test_support.rs",
+    "crates/bingo-core/src/test_support/peers.rs",
+    "crates/bingo-surface-rpc/src/client.rs",
+    "crates/bingo-surface-rpc/tests/wire/host.rs",
+    "crates/bingo-sdk/src/testing.rs",
+    "crates/bingo-sdk/src/testing/api.rs",
+}
+for path in sorted(pathlib.Path("crates").rglob("*.rs")):
+    source = path.read_text(encoding="utf-8")
+    if str(path) not in allowed:
+        for match in re.finditer(r"impl\s+(?:\w+::)*HostApi\s+for\b", source):
+            line = source.count("\n", 0, match.start()) + 1
+            print(f"warn {path}:{line}: use bingo_sdk::testing::TestHost or explain the retained host")
+    is_test_file = any("test" in part for part in path.parts)
+    start = 0 if is_test_file else source.find("#[cfg(test)]")
+    if start < 0:
+        continue
+    for match in re.finditer(r"assert!\s*\([^;]*?\);", source[start:], re.S):
+        if re.search(r"elapsed\(\)(?:\.as_\w+\(\))?\s*<", match.group()):
+            line = source.count("\n", 0, start + match.start()) + 1
+            print(f"warn {path}:{line}: assert behavior or wrap the wait in a timeout")
+print("test host and wall-clock advisory checks complete")
+PYTEST
+
 [ "$fail" -eq 0 ] && say "discipline ok" || { say "discipline FAILED"; exit 1; }

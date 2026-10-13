@@ -248,18 +248,15 @@ const STARTS_AND_LEAVES: &str = r#"{"responses":[
 fn a_one_shot_run_ends_at_its_turn_and_the_job_ends_with_it() {
     let dir = tempfile::tempdir().unwrap();
     let script = script(STARTS_AND_LEAVES);
-    let started = std::time::Instant::now();
-    let out = scripted_run(
+    let out = scripted_run_within(
         dir.path(),
         &script,
         &["--dangerously-skip-permissions"],
         "start it and leave it running",
+        Duration::from_secs(20),
+        "the run waited for the job it left running",
     );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
-    assert!(
-        started.elapsed() < std::time::Duration::from_secs(20),
-        "the run waited for the job it left running"
-    );
     assert_eq!(logs(dir.path()).len(), 1, "the job never started");
 
     let log = log_text(dir.path());
@@ -299,7 +296,6 @@ fn a_running_command_is_promoted_mid_turn_and_the_call_returns_early() {
     let script = script(PROMOTED);
     let mut host = Host::start(&mut allowed(dir.path(), &script));
 
-    let started = std::time::Instant::now();
     host.prompt("run the slow thing");
     // The call is announced as the assistant asking for it, which is how a
     // surface knows which call `ctrl+b` is about.
@@ -311,10 +307,10 @@ fn a_running_command_is_promoted_mid_turn_and_the_call_returns_early() {
         .to_string();
 
     host.prompt(&format!("/bash.promote {call}"));
-    let result = host.until("result");
-    assert!(
-        started.elapsed() < std::time::Duration::from_secs(25),
-        "the call waited for the command anyway"
+    let result = host.until_within(
+        "result",
+        Duration::from_secs(25),
+        "the call waited for the command anyway",
     );
     assert_eq!(result["result"], "it is in the background now");
     let ended = host.finish();
@@ -581,18 +577,15 @@ fn a_bare_foreground_sleep_is_refused_and_starts_nothing() {
             {"steps":[{"text":"I will end my turn instead"}]}
         ]}"#,
     );
-    let started = std::time::Instant::now();
-    let out = scripted_run(
+    let out = scripted_run_within(
         dir.path(),
         &script,
         &["--dangerously-skip-permissions"],
         "wait for the build",
+        Duration::from_secs(20),
+        "the sleep ran anyway",
     );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
-    assert!(
-        started.elapsed() < std::time::Duration::from_secs(20),
-        "the sleep ran anyway"
-    );
 
     let (is_error, text) = completed(&out, "Bash");
     assert!(is_error);

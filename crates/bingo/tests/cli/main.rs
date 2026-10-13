@@ -50,38 +50,65 @@ fn run(cmd: &mut Command) -> Output {
 /// a developer's box and a run here spawns real subprocesses.
 const PATIENCE: Duration = Duration::from_secs(30);
 
+/// Run an asynchronous wait under a timer from a synchronous test.
+fn wait_within<T>(
+    limit: Duration,
+    future: impl std::future::Future<Output = T>,
+) -> Result<T, tokio::time::error::Elapsed> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .expect("a timer runtime")
+        .block_on(async { tokio::time::timeout(limit, future).await })
+}
+
 /// Poll until something is there, or fail saying what never happened.
 ///
 /// The one shape a test waits in: no test sleeps for a guess at how long a
 /// machine takes, because that guess is the machine it was written on.
 fn until<T>(what: &str, mut look: impl FnMut() -> Option<T>) -> T {
-    let started = Instant::now();
-    loop {
-        if let Some(found) = look() {
-            return found;
+    wait_within(PATIENCE, async {
+        loop {
+            if let Some(found) = look() {
+                return found;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        assert!(started.elapsed() < PATIENCE, "{what} never happened");
-        std::thread::sleep(Duration::from_millis(20));
-    }
+    })
+    .unwrap_or_else(|_| panic!("{what} never happened"))
+}
+
+fn exit_within(
+    child: &mut std::process::Child,
+    limit: Duration,
+    failure: &str,
+) -> std::process::ExitStatus {
+    let result = wait_within(limit, async {
+        loop {
+            if let Some(status) = child.try_wait().expect("wait") {
+                return status;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    });
+    result.unwrap_or_else(|_| {
+        let _ = child.kill();
+        let _ = child.wait();
+        panic!("{failure}")
+    })
 }
 
 /// `run`, for a scenario whose failure is a hang: past `limit` the process is
 /// killed and the test fails, instead of the suite waiting on it. The output
 /// is read once the process has exited, so it must fit the pipe.
 fn run_within(cmd: &mut Command, limit: Duration) -> Output {
+    run_before(cmd, limit, &format!("bingo did not exit within {limit:?}"))
+}
+
+fn run_before(cmd: &mut Command, limit: Duration, failure: &str) -> Output {
     let mut child = cmd.spawn().expect("the binary runs");
-    let started = Instant::now();
-    loop {
-        if child.try_wait().expect("wait").is_some() {
-            return child.wait_with_output().expect("output");
-        }
-        if started.elapsed() > limit {
-            let _ = child.kill();
-            let _ = child.wait();
-            panic!("bingo did not exit within {limit:?}");
-        }
-        std::thread::sleep(Duration::from_millis(20));
-    }
+    exit_within(&mut child, limit, failure);
+    child.wait_with_output().expect("output")
 }
 
 /// The binary with a person at the keyboard: every line is answered in order,
@@ -697,19 +724,44 @@ fn frames_of(out: &Output) -> Vec<Frame> {
         .collect()
 }
 
+fn scripted_command(
+    home: &std::path::Path,
+    script: &tempfile::NamedTempFile,
+    extra: &[&str],
+    prompt: &str,
+) -> Command {
+    let mut cmd = bingo();
+    cmd.env("BINGO_FAKE_SCRIPT", script.path())
+        .envs(home_env(home))
+        .args(["--print", "--output-format", "json", "--cwd"])
+        .arg(home)
+        .args(extra)
+        .arg(prompt);
+    cmd
+}
+
 fn scripted_run(
     home: &std::path::Path,
     script: &tempfile::NamedTempFile,
     extra: &[&str],
     prompt: &str,
 ) -> Output {
-    run(bingo()
-        .env("BINGO_FAKE_SCRIPT", script.path())
-        .envs(home_env(home))
-        .args(["--print", "--output-format", "json", "--cwd"])
-        .arg(home)
-        .args(extra)
-        .arg(prompt))
+    run(&mut scripted_command(home, script, extra, prompt))
+}
+
+fn scripted_run_within(
+    home: &std::path::Path,
+    script: &tempfile::NamedTempFile,
+    extra: &[&str],
+    prompt: &str,
+    limit: Duration,
+    failure: &str,
+) -> Output {
+    run_before(
+        &mut scripted_command(home, script, extra, prompt),
+        limit,
+        failure,
+    )
 }
 
 #[path = "../support/home.rs"]

@@ -6,7 +6,6 @@
 //! `target/<profile>/deps/<test>`), with no build script and no second
 //! manifest. Everything here dials it as a person's settings would.
 
-use std::any::Any;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -15,10 +14,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use bingo_mcp::{Manager, McpCommand, McpSource, Server, Status};
 use bingo_sdk::{
-    Answer, AnswerSpec, Attachment, CancellationToken, Catalog, CatalogKind, ClientIdentity,
-    CloseReason, Command, CommandContext, CommandOutcome, Delivery, Env, GatewayStream, HostApi,
-    HostHandle, Input, IntentId, InteractionKind, ItemBody, ItemId, KernelError, OpenOptions,
-    Prompter, SessionFilter, SessionId, SessionSelector, SessionSummary, Tool, ToolContext,
+    Answer, AnswerSpec, CancellationToken, Command, CommandContext, CommandOutcome, Env,
+    InteractionKind, ItemBody, ItemId, KernelError, Prompter, SessionId, Tool, ToolContext,
     ToolHost, ToolOutput, ToolSource, TurnId, View,
 };
 use proptest::prelude::*;
@@ -157,69 +154,27 @@ impl ToolHost for NullHost {
 /// `/mcp` asks the host nothing, so every answer here would be a bug.
 struct UnusedHost;
 
-#[async_trait]
-impl HostApi for UnusedHost {
-    async fn sessions(&self, _filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        unreachable!("/mcp reads no session list")
-    }
-
-    async fn open(
-        &self,
-        _selector: SessionSelector,
-        _who: ClientIdentity,
-        _options: OpenOptions,
-    ) -> Result<Attachment, KernelError> {
-        unreachable!("/mcp opens no session")
-    }
-
-    async fn close(&self, _session: &SessionId, _reason: CloseReason) -> Result<(), KernelError> {
-        unreachable!("/mcp closes no session")
-    }
-
-    async fn delete(&self, _session: &SessionId) -> Result<(), KernelError> {
-        unreachable!("/mcp deletes no session")
-    }
-
-    async fn deliver(
-        &self,
-        _to: &SessionId,
-        _intent: IntentId,
-        _input: Input,
-        _delivery: Delivery,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double delivers nothing")
-    }
-
-    async fn extend(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double extends nothing")
-    }
-
-    async fn signal(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this double signals nothing")
-    }
-
-    async fn catalog(&self, _kind: CatalogKind) -> Result<Catalog, KernelError> {
-        unreachable!("/mcp reads no catalog")
-    }
-
-    fn gateway_events(&self) -> GatewayStream {
-        unreachable!("/mcp watches no gateway")
-    }
-
-    fn service_any(&self, _key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
-        None
+impl UnusedHost {
+    fn scripted(&self) -> bingo_sdk::testing::TestHost {
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_sessions(|_filter| async move { unreachable!("/mcp reads no session list") });
+        host.on_open(
+            |_selector, _who, _options| async move { unreachable!("/mcp opens no session") },
+        );
+        host.on_close(|_session, _reason| async move { unreachable!("/mcp closes no session") });
+        host.on_delete(|_session| async move { unreachable!("/mcp deletes no session") });
+        host.on_deliver(|_to, _intent, _input, _delivery| async move {
+            unreachable!("this double delivers nothing")
+        });
+        host.on_extend(|_session, _plugin, _kind, _payload| async move {
+            unreachable!("this double extends nothing")
+        });
+        host.on_signal(|_session, _plugin, _kind, _payload| async move {
+            unreachable!("this double signals nothing")
+        });
+        host.on_catalog(|_kind| async move { unreachable!("/mcp reads no catalog") });
+        host.on_gateway_events(|| unreachable!("/mcp watches no gateway"));
+        host
     }
 }
 
@@ -285,7 +240,7 @@ fn command_context() -> CommandContext {
     CommandContext {
         session: SessionId::from_raw("ses_test"),
         cwd: PathBuf::from("/work"),
-        host: HostHandle(Arc::new(UnusedHost)),
+        host: UnusedHost.scripted().handle(),
     }
 }
 

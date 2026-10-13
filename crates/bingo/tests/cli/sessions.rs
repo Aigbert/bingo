@@ -166,14 +166,12 @@ fn a_session_another_process_holds_cannot_be_continued() {
             .flatten()
             .any(|entry| entry.path().join(".lock").is_file())
     };
-    let started = std::time::Instant::now();
-    while !locked(&sessions) {
-        assert!(
-            started.elapsed().as_secs() < 10,
-            "the holder never took its session"
-        );
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
+    wait_within(Duration::from_secs(10), async {
+        while !locked(&sessions) {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .expect("the holder never took its session");
     std::thread::sleep(std::time::Duration::from_millis(100));
     let second = scripted_run(
         home.path(),

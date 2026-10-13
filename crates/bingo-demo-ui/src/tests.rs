@@ -3,18 +3,16 @@
 //! one more frame into it with the kernel's own reducer — plus the list of
 //! what was signalled, which the reducer coalesces away on purpose.
 
-use std::any::Any;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Activation, Answer, AnswerSpec, Attachment, CancellationToken, Catalog, CatalogKind,
-    ClientIdentity, CloseReason, CommandContext, Delivery, Env, ErrorCode, Event, Frame,
-    FrameStream, GatewayStream, HistoryChunk, HistoryPage, HostApi, HostHandle, Input, IntentId,
-    InteractionId, InteractionKind, InterruptScope, ItemBody, ItemId, KernelError, OpenOptions,
-    Prompter, Seq, SessionFilter, SessionHandle, SessionId, SessionPort, SessionSelector,
-    SessionState, SessionSummary, ToolContext, ToolHost, TurnId, Usage,
+    Activation, Answer, AnswerSpec, Attachment, CancellationToken, CommandContext, Env, ErrorCode,
+    Event, Frame, FrameStream, HistoryChunk, HistoryPage, HostHandle, Input, IntentId,
+    InteractionId, InteractionKind, InterruptScope, ItemBody, ItemId, KernelError, Prompter, Seq,
+    SessionHandle, SessionId, SessionPort, SessionSelector, SessionState, SessionSummary,
+    ToolContext, ToolHost, TurnId, Usage,
 };
 use jiff::Timestamp;
 use serde_json::Value;
@@ -41,7 +39,7 @@ impl Journals {
     }
 
     pub(crate) fn handle(&self) -> HostHandle {
-        HostHandle(Arc::new(self.clone()))
+        self.scripted().handle()
     }
 
     /// A session with an empty journal, as a surface opens one.
@@ -99,107 +97,96 @@ impl Journals {
     }
 }
 
-#[async_trait]
-impl HostApi for Journals {
-    async fn sessions(&self, _filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        unreachable!("this plugin reads no session list")
+impl Journals {
+    fn scripted(&self) -> bingo_sdk::testing::TestHost {
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_sessions(
+            |_filter| async move { unreachable!("this plugin reads no session list") },
+        );
+        self.script_open(&host);
+        host.on_close(
+            |_session, _reason| async move { unreachable!("this plugin closes no session") },
+        );
+        host.on_delete(|_session| async move { unreachable!("this plugin deletes no session") });
+        host.on_deliver(|_to, _intent, _input, _delivery| async move {
+            unreachable!("this plugin delivers nothing")
+        });
+        self.script_extend(&host);
+        self.script_signal(&host);
+        host.on_catalog(|_kind| async move { unreachable!("this plugin reads no catalog") });
+        host.on_gateway_events(|| unreachable!("this plugin watches no gateway"));
+        host
     }
 
-    /// The session's own state, cut as an attachment: what a command reads.
-    async fn open(
-        &self,
-        selector: SessionSelector,
-        _who: ClientIdentity,
-        _options: OpenOptions,
-    ) -> Result<Attachment, KernelError> {
-        let SessionSelector::ById { id } = selector else {
-            unreachable!("this plugin opens a session by id")
-        };
-        let states = self.states();
-        let snapshot = states
-            .iter()
-            .find(|state| state.summary.id == id)
-            .ok_or_else(|| KernelError::new(ErrorCode::SessionNotFound, "no such session"))?
-            .clone();
-        Ok(Attachment {
-            session: id,
-            snapshot,
-            history: None,
-            events: Box::pin(futures::stream::empty()),
-            handle: SessionHandle(Arc::new(Deaf)),
-        })
+    fn script_open(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_open(move |selector, _who, _options| {
+            let fixture = fixture.clone();
+            async move {
+                let SessionSelector::ById { id } = selector else {
+                    unreachable!("this plugin opens a session by id")
+                };
+                let states = fixture.states();
+                let snapshot = states
+                    .iter()
+                    .find(|state| state.summary.id == id)
+                    .ok_or_else(|| KernelError::new(ErrorCode::SessionNotFound, "no such session"))?
+                    .clone();
+                Ok(Attachment {
+                    session: id,
+                    snapshot,
+                    history: None,
+                    events: Box::pin(futures::stream::empty()),
+                    handle: SessionHandle(Arc::new(Deaf)),
+                })
+            }
+        });
     }
 
-    async fn close(&self, _session: &SessionId, _reason: CloseReason) -> Result<(), KernelError> {
-        unreachable!("this plugin closes no session")
+    fn script_extend(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_extend(move |session, plugin, kind, payload| {
+            let fixture = fixture.clone();
+            async move {
+                let session = &session;
+                let plugin = &plugin;
+                let kind = &kind;
+                fixture.fold(
+                    session,
+                    Event::Extension {
+                        plugin: plugin.to_string(),
+                        kind: kind.to_string(),
+                        payload,
+                    },
+                )
+            }
+        });
     }
 
-    async fn delete(&self, _session: &SessionId) -> Result<(), KernelError> {
-        unreachable!("this plugin deletes no session")
-    }
-
-    async fn deliver(
-        &self,
-        _to: &SessionId,
-        _intent: IntentId,
-        _input: Input,
-        _delivery: Delivery,
-    ) -> Result<(), KernelError> {
-        unreachable!("this plugin delivers nothing")
-    }
-
-    /// A durable frame into the session's journal, folded as the kernel folds it.
-    async fn extend(
-        &self,
-        session: &SessionId,
-        plugin: &str,
-        kind: &str,
-        payload: Value,
-    ) -> Result<(), KernelError> {
-        self.fold(
-            session,
-            Event::Extension {
-                plugin: plugin.to_string(),
-                kind: kind.to_string(),
-                payload,
-            },
-        )
-    }
-
-    /// An ephemeral frame: folded into `signals`, and written down here so a
-    /// test can watch every frame the reducer coalesced.
-    async fn signal(
-        &self,
-        session: &SessionId,
-        plugin: &str,
-        kind: &str,
-        payload: Value,
-    ) -> Result<(), KernelError> {
-        self.0
-            .signals
-            .lock()
-            .unwrap_or_else(|held| held.into_inner())
-            .push((kind.to_string(), payload.clone()));
-        self.fold(
-            session,
-            Event::Signal {
-                plugin: plugin.to_string(),
-                kind: kind.to_string(),
-                payload,
-            },
-        )
-    }
-
-    async fn catalog(&self, _kind: CatalogKind) -> Result<Catalog, KernelError> {
-        unreachable!("this plugin reads no catalog")
-    }
-
-    fn gateway_events(&self) -> GatewayStream {
-        unreachable!("this plugin watches no gateway")
-    }
-
-    fn service_any(&self, _key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
-        None
+    fn script_signal(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_signal(move |session, plugin, kind, payload| {
+            let fixture = fixture.clone();
+            async move {
+                let session = &session;
+                let plugin = &plugin;
+                let kind = &kind;
+                fixture
+                    .0
+                    .signals
+                    .lock()
+                    .unwrap_or_else(|held| held.into_inner())
+                    .push((kind.to_string(), payload.clone()));
+                fixture.fold(
+                    session,
+                    Event::Signal {
+                        plugin: plugin.to_string(),
+                        kind: kind.to_string(),
+                        payload,
+                    },
+                )
+            }
+        });
     }
 }
 
