@@ -19,7 +19,8 @@ decision taken early (its status line says so).
      WouldBlock, Legacy, Io }`, the staging-file-plus-hard-link publish.
      Parameterise by a `Protocol { file: &str, marker: &str }`; schedule
      passes `runner.lock` and its existing `MARKER` byte-for-byte, so its
-     files on disk do not change.
+     files on disk do not change. Replace the publisher's `ulid` staging
+     name with a PID/counter `create_new` retry, keeping std-only code.
    - Tests move with the code; schedule keeps one test that its protocol
      constants are unchanged.
 2. **Channels move onto it.** `bingo-channels/src/lock.rs` `Claim::take`
@@ -79,11 +80,13 @@ decision taken early (its status line says so).
 
 ## Files
 
-- `crates/bingo-claim/**` (new), `Cargo.toml` (workspace member)
-- `crates/bingo-schedule/src/{lock.rs,lock/*}` → re-export or callers
-- `crates/bingo-channels/src/lock.rs`, `crates/bingo-channels/src/host.rs`
-- `crates/bingo-gateway/src/doctor.rs` and tests
-- `crates/bingo-agents/src/names.rs` and tests; `crates/bingo/tests/`
+- `crates/bingo-claim/**` (new), `Cargo.toml` (workspace dependency),
+  `Cargo.lock`, `scripts/budget.toml` (+1 member; no new external crate)
+- `crates/bingo-schedule/{Cargo.toml,src/lock.rs,src/lock/*}` → wrappers
+- `crates/bingo-channels/{Cargo.toml,src/lock.rs,src/host.rs,src/guide.md}`
+- `crates/bingo-gateway/{Cargo.toml,src/doctor.rs}` and tests
+- `crates/bingo-agents/src/{names.rs,lib.rs}` and tests; `crates/bingo/tests/`
+- `crates/bingo-rooms/src/lib.rs` (export the existing name comparison)
 - `crates/bingo-provider-acp/src/provider.rs` and tests
 - `crates/bingo-plugin-rpc/{Cargo.toml,src/tool.rs}` and tests
 - `docs/adr/{0001,0004,0035,0072}*.md`, `crates/bingo/src/env.rs`,
@@ -113,4 +116,6 @@ decision taken early (its status line says so).
   commit body and the channels guide.
 - `bingo-claim` must build on Windows (`File::try_lock` is std);
   cross-check it and the channels crate.
-- Re-verify at start: names and paths above, by symbol.
+- Re-verified at `82e78d22`: all named bug sites remain; workspace members
+  already use `crates/*`, both name modules are private, and the guide is
+  `crates/bingo-channels/src/guide.md`. No Decision changes are needed.
