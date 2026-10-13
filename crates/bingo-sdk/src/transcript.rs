@@ -24,6 +24,16 @@ pub struct Transcript {
 }
 
 impl Transcript {
+    pub fn drop_before_cut(&mut self) {}
+
+    pub fn history(&self) -> crate::OpenHistory {
+        crate::OpenHistory {
+            before: self.items().first().map(|item| item.id.clone()),
+            has_more: false,
+            generation: self.generation,
+        }
+    }
+
     pub fn new() -> Self {
         Self::default()
     }
