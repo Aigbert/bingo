@@ -636,19 +636,15 @@ async fn an_mcp_server_from_mcp_config_offers_its_tool_through_the_gate() {
         attachment.snapshot.last_status(),
         Some(&TurnStatus::Completed)
     );
-    let echoed = attachment
-        .snapshot
-        .transcript
-        .items()
-        .iter()
-        .find_map(|item| match &item.body {
-            bingo_sdk::ItemBody::ToolCall {
-                name,
-                output: Some(output),
-                ..
-            } if name == "mcp__test__echo" => output.parts[0].as_text().map(str::to_owned),
-            _ => None,
-        });
+    let items = attachment.snapshot.transcript.items();
+    let echoed = items.iter().find_map(|item| match &item.body {
+        bingo_sdk::ItemBody::ToolCall {
+            name,
+            output: Some(output),
+            ..
+        } if name == "mcp__test__echo" => output.parts[0].as_text().map(str::to_owned),
+        _ => None,
+    });
     assert_eq!(echoed.as_deref(), Some("over mcp"));
     kernel.shutdown().await.unwrap();
 }
@@ -900,10 +896,8 @@ async fn a_background_agent_wakes_the_root_and_says_who_it_is() {
         })
         .nth(1)
         .expect("a second turn on the root");
-    let (turn, origin, text) = attachment
-        .snapshot
-        .transcript
-        .items()
+    let items = attachment.snapshot.transcript.items();
+    let (turn, origin, text) = items
         .iter()
         .find_map(|item| match &item.body {
             bingo_sdk::ItemBody::User { parts, origin } if origin.principal.is_some() => Some((

@@ -816,7 +816,7 @@ fn a_highlighted_code_block() {
 #[test]
 fn the_rewind_picker() {
     let mut state = folded(answered());
-    let items: Vec<_> = state
+    state.transcript = state
         .transcript
         .items()
         .iter()
@@ -826,14 +826,11 @@ fn the_rewind_picker() {
             item
         })
         .collect();
-    state.transcript = items.into_iter().collect();
-    state.transcript.apply(&bingo_sdk::Event::ItemCompleted {
-        item: {
-            let mut asked = user("itm_3", "now write me a note and run the tests");
-            asked.turn = Some(TurnId::from_raw("trn_2"));
-            asked
-        },
-    });
+    let mut asked = user("itm_3", "now write me a note and run the tests");
+    asked.turn = Some(TurnId::from_raw("trn_2"));
+    state
+        .transcript
+        .apply(&bingo_sdk::Event::ItemCompleted { item: asked });
     let (mut ui, now) = scene();
     shown(
         &mut ui,
