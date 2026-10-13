@@ -1,15 +1,15 @@
-use bingo_sdk::{LinkPoint, Next, Tier};
+use bingo_sdk::{Next, Tier};
 
 #[test]
 fn the_seven_points_use_the_catalogue_names() {
     let points = [
-        LinkPoint::PromptSubmit,
-        LinkPoint::ToolCheck,
-        LinkPoint::ToolCall,
-        LinkPoint::TurnStep,
-        LinkPoint::PromptCompose,
-        LinkPoint::SessionCompact,
-        LinkPoint::TurnStop,
+        bingo_sdk::catalogue::PROMPT_SUBMIT,
+        bingo_sdk::catalogue::TOOL_CHECK,
+        bingo_sdk::catalogue::TOOL_CALL,
+        bingo_sdk::catalogue::TURN_STEP,
+        bingo_sdk::catalogue::PROMPT_COMPOSE,
+        bingo_sdk::catalogue::SESSION_COMPACT,
+        bingo_sdk::catalogue::TURN_STOP,
     ];
     assert_eq!(
         serde_json::to_value(points).unwrap(),
@@ -20,7 +20,7 @@ fn the_seven_points_use_the_catalogue_names() {
             "turn.step",
             "prompt.compose",
             "session.compact",
-            "turn.complete"
+            "turn.stop"
         ])
     );
     assert_eq!(serde_json::to_value(Tier::default()).unwrap(), "tighten");

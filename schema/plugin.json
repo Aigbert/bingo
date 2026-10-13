@@ -15,20 +15,46 @@
     "host/state/get",
     "host/state/set",
     "intercept/cancel",
+    "intercept/command.describe",
+    "intercept/command.describe/after",
+    "intercept/command.run",
+    "intercept/command.run/after",
+    "intercept/config.describe",
+    "intercept/config.describe/after",
+    "intercept/config.set",
+    "intercept/config.set/after",
+    "intercept/prompt.autocomplete",
+    "intercept/prompt.autocomplete/after",
     "intercept/prompt.compose",
     "intercept/prompt.compose/after",
     "intercept/prompt.submit",
     "intercept/prompt.submit/after",
+    "intercept/session.append",
+    "intercept/session.append/after",
     "intercept/session.compact",
     "intercept/session.compact/after",
+    "intercept/session.receive",
+    "intercept/session.receive/after",
+    "intercept/session.send",
+    "intercept/session.send/after",
     "intercept/tool.call",
     "intercept/tool.call/after",
     "intercept/tool.check",
     "intercept/tool.check/after",
+    "intercept/tool.describe",
+    "intercept/tool.describe/after",
     "intercept/turn.complete",
     "intercept/turn.complete/after",
     "intercept/turn.step",
     "intercept/turn.step/after",
+    "intercept/turn.stop",
+    "intercept/turn.stop/after",
+    "observe/session.attach",
+    "observe/session.detach",
+    "observe/session.end",
+    "observe/session.measure",
+    "observe/session.start",
+    "observe/turn.start",
     "provider/cancel",
     "provider/delta",
     "provider/stream",
@@ -87,6 +113,132 @@
         },
         "result": {
           "$ref": "#/$defs/SubmitResult"
+        }
+      },
+      "required": [
+        "chain",
+        "result"
+      ]
+    },
+    "After10": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/Catalog"
+        }
+      },
+      "required": [
+        "chain",
+        "result"
+      ]
+    },
+    "After11": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "chain",
+        "result"
+      ]
+    },
+    "After12": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/Input"
+        }
+      },
+      "required": [
+        "chain",
+        "result"
+      ]
+    },
+    "After13": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/Append"
+        }
+      },
+      "required": [
+        "chain",
+        "result"
+      ]
+    },
+    "After14": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/CommandOutcome"
+        }
+      },
+      "required": [
+        "chain",
+        "result"
+      ]
+    },
+    "After15": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "chain"
+      ]
+    },
+    "After16": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/ConfigSet"
+        }
+      },
+      "required": [
+        "chain",
+        "result"
+      ]
+    },
+    "After17": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/ConfigView"
         }
       },
       "required": [
@@ -182,6 +334,44 @@
       "required": [
         "chain",
         "result"
+      ]
+    },
+    "After8": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "chain"
+      ]
+    },
+    "After9": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "chain"
       ]
     },
     "Answer": {
@@ -348,6 +538,23 @@
         "form"
       ]
     },
+    "Append": {
+      "type": "object",
+      "properties": {
+        "plugin": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "payload": true
+      },
+      "required": [
+        "plugin",
+        "kind",
+        "payload"
+      ]
+    },
     "ArgSpec": {
       "oneOf": [
         {
@@ -479,6 +686,121 @@
         "input"
       ]
     },
+    "Before10": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": {
+          "$ref": "#/$defs/Append"
+        }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
+    },
+    "Before11": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": {
+          "$ref": "#/$defs/CommandRun"
+        }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
+    },
+    "Before12": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": {
+          "$ref": "#/$defs/CommandSpec"
+        }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
+    },
+    "Before13": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": {
+          "$ref": "#/$defs/ConfigSet"
+        }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
+    },
+    "Before14": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": {
+          "$ref": "#/$defs/ConfigView"
+        }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
+    },
     "Before2": {
       "type": "object",
       "properties": {
@@ -571,6 +893,98 @@
         "input"
       ]
     },
+    "Before6": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": {
+          "$ref": "#/$defs/Turn"
+        }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
+    },
+    "Before7": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": {
+          "$ref": "#/$defs/ToolSpec"
+        }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
+    },
+    "Before8": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": {
+          "$ref": "#/$defs/Catalog"
+        }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
+    },
+    "Before9": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": {
+          "$ref": "#/$defs/Send"
+        }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
+    },
     "Cancel": {
       "type": "object",
       "properties": {
@@ -599,6 +1013,52 @@
           "const": "commandEnded",
           "description": "The holding command that asked has finished (ADR-0012 §5)."
         }
+      ]
+    },
+    "Catalog": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/CatalogKind"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CatalogEntry"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "entries"
+      ]
+    },
+    "CatalogEntry": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "meta": {
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ]
+    },
+    "CatalogKind": {
+      "type": "string",
+      "enum": [
+        "models",
+        "providers",
+        "tools",
+        "commands",
+        "plugins"
       ]
     },
     "CheckResult": {
@@ -742,6 +1202,21 @@
           ],
           "description": "One completed item the kernel records in the transcript (a shell\nline's output, a login's receipt); the ack carries its id."
         }
+      ]
+    },
+    "CommandRun": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "args": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "args"
       ]
     },
     "CommandRunParams": {
@@ -1132,6 +1607,19 @@
       },
       "required": [
         "events"
+      ]
+    },
+    "ConfigSet": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": true
+      },
+      "required": [
+        "key",
+        "value"
       ]
     },
     "ConfigView": {
@@ -2308,6 +2796,16 @@
     "HookObserveParams": {
       "type": "object",
       "properties": {
+        "event": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LinkPoint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "id": {
           "type": "string",
           "description": "Which of the hooks the handshake declared is watching."
@@ -2321,6 +2819,20 @@
         "site"
       ],
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "point": {
+              "type": "string",
+              "const": "catalogue"
+            },
+            "payload": true
+          },
+          "required": [
+            "point",
+            "payload"
+          ]
+        },
         {
           "type": "object",
           "properties": {
@@ -3472,7 +3984,23 @@
         "turn.step",
         "prompt.compose",
         "session.compact",
-        "turn.complete"
+        "turn.stop",
+        "tool.describe",
+        "prompt.autocomplete",
+        "session.send",
+        "session.receive",
+        "session.append",
+        "turn.complete",
+        "command.run",
+        "command.describe",
+        "config.set",
+        "config.describe",
+        "turn.start",
+        "session.measure",
+        "session.start",
+        "session.end",
+        "session.attach",
+        "session.detach"
       ]
     },
     "LinkSpec": {
@@ -4288,6 +4816,237 @@
         }
       ]
     },
+    "Proceed10": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/Catalog"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "$ref": "#/$defs/Catalog"
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Proceed11": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/Send"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Proceed12": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/Input"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "$ref": "#/$defs/Input"
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Proceed13": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/Append"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "$ref": "#/$defs/Append"
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Proceed14": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/CommandRun"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "$ref": "#/$defs/CommandOutcome"
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Proceed15": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/CommandSpec"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CommandSpec"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Proceed16": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/ConfigSet"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "$ref": "#/$defs/ConfigSet"
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Proceed17": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/ConfigView"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "$ref": "#/$defs/ConfigView"
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "Proceed2": {
       "oneOf": [
         {
@@ -4447,6 +5206,72 @@
           "properties": {
             "answer": {
               "$ref": "#/$defs/StopResult"
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Proceed8": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/Turn"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Proceed9": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/ToolSpec"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolSpec"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -4995,6 +5820,98 @@
         "result"
       ]
     },
+    "ResultValue10": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/Catalog"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "ResultValue11": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "ResultValue12": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/Input"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "ResultValue13": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/Append"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "ResultValue14": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/CommandOutcome"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "ResultValue15": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ResultValue16": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/ConfigSet"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "ResultValue17": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/ConfigView"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
     "ResultValue2": {
       "type": "object",
       "properties": {
@@ -5061,6 +5978,32 @@
         "result"
       ]
     },
+    "ResultValue8": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ResultValue9": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
     "Result_of_Array_of_ModelEvent_or_ProviderError": {
       "oneOf": [
         {
@@ -5123,6 +6066,25 @@
         "assistant"
       ]
     },
+    "Send": {
+      "type": "object",
+      "properties": {
+        "to": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "input": {
+          "$ref": "#/$defs/Input"
+        },
+        "delivery": {
+          "$ref": "#/$defs/Delivery"
+        }
+      },
+      "required": [
+        "to",
+        "input",
+        "delivery"
+      ]
+    },
     "Seq": {
       "type": "integer",
       "format": "uint64",
@@ -5157,9 +6119,35 @@
       },
       "description": "What the service answered. A service with nothing to say answers `null`,\nwhich is an answer; a service that could not answer fails the call."
     },
+    "ServiceMethod": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "input": true,
+            "result": true,
+            "unsafe": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "input",
+            "result"
+          ]
+        },
+        true
+      ]
+    },
     "ServiceSpec": {
       "type": "object",
       "properties": {
+        "noun": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "methods": {
           "type": "object",
           "additionalProperties": true,
@@ -5716,8 +6704,7 @@
         "tool",
         "tool_use_id"
       ],
-      "additionalProperties": true,
-      "description": "Catalogue spelling: tool input fields live beside the pinned identity."
+      "additionalProperties": true
     },
     "ToolOutput": {
       "type": "object",
@@ -5825,6 +6812,29 @@
       },
       "required": [
         "label"
+      ]
+    },
+    "Turn": {
+      "type": "object",
+      "properties": {
+        "turn": {
+          "$ref": "#/$defs/TurnId"
+        },
+        "outcome": {
+          "$ref": "#/$defs/TurnStatus"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        },
+        "answer": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "turn",
+        "outcome",
+        "usage",
+        "answer"
       ]
     },
     "TurnId": {
@@ -6386,7 +7396,7 @@
         "$ref": "#/$defs/ResultValue6"
       }
     },
-    "intercept/turn.complete": {
+    "intercept/turn.stop": {
       "params": {
         "$ref": "#/$defs/Before5"
       },
@@ -6394,7 +7404,7 @@
         "$ref": "#/$defs/Proceed7"
       }
     },
-    "intercept/turn.complete/after": {
+    "intercept/turn.stop/after": {
       "params": {
         "$ref": "#/$defs/After7"
       },
@@ -6511,6 +7521,166 @@
       },
       "result": {
         "$ref": "#/$defs/ServiceCallResult"
+      }
+    },
+    "intercept/turn.complete": {
+      "params": {
+        "$ref": "#/$defs/Before6"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed8"
+      }
+    },
+    "intercept/turn.complete/after": {
+      "params": {
+        "$ref": "#/$defs/After8"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue8"
+      }
+    },
+    "intercept/tool.describe": {
+      "params": {
+        "$ref": "#/$defs/Before7"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed9"
+      }
+    },
+    "intercept/tool.describe/after": {
+      "params": {
+        "$ref": "#/$defs/After9"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue9"
+      }
+    },
+    "intercept/prompt.autocomplete": {
+      "params": {
+        "$ref": "#/$defs/Before8"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed10"
+      }
+    },
+    "intercept/prompt.autocomplete/after": {
+      "params": {
+        "$ref": "#/$defs/After10"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue10"
+      }
+    },
+    "intercept/session.send": {
+      "params": {
+        "$ref": "#/$defs/Before9"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed11"
+      }
+    },
+    "intercept/session.send/after": {
+      "params": {
+        "$ref": "#/$defs/After11"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue11"
+      }
+    },
+    "intercept/session.receive": {
+      "params": {
+        "$ref": "#/$defs/Before"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed12"
+      }
+    },
+    "intercept/session.receive/after": {
+      "params": {
+        "$ref": "#/$defs/After12"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue12"
+      }
+    },
+    "intercept/session.append": {
+      "params": {
+        "$ref": "#/$defs/Before10"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed13"
+      }
+    },
+    "intercept/session.append/after": {
+      "params": {
+        "$ref": "#/$defs/After13"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue13"
+      }
+    },
+    "intercept/command.run": {
+      "params": {
+        "$ref": "#/$defs/Before11"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed14"
+      }
+    },
+    "intercept/command.run/after": {
+      "params": {
+        "$ref": "#/$defs/After14"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue14"
+      }
+    },
+    "intercept/command.describe": {
+      "params": {
+        "$ref": "#/$defs/Before12"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed15"
+      }
+    },
+    "intercept/command.describe/after": {
+      "params": {
+        "$ref": "#/$defs/After15"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue15"
+      }
+    },
+    "intercept/config.set": {
+      "params": {
+        "$ref": "#/$defs/Before13"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed16"
+      }
+    },
+    "intercept/config.set/after": {
+      "params": {
+        "$ref": "#/$defs/After16"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue16"
+      }
+    },
+    "intercept/config.describe": {
+      "params": {
+        "$ref": "#/$defs/Before14"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed17"
+      }
+    },
+    "intercept/config.describe/after": {
+      "params": {
+        "$ref": "#/$defs/After17"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue17"
       }
     }
   },

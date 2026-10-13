@@ -1,3 +1,4 @@
+import type { EventInputs, EventResults } from './events.ts';
 import type { Dollar } from './dollar.ts';
 
 // Transport-independent matching and hook composition; the catalogue may grow.
@@ -8,7 +9,11 @@ export type Next = ((event: any) => Promise<any>) & {
   readonly origin: unknown;
 };
 export type Hook = ($: Dollar, event: any, next: Next) => any;
+export type EventNext<N extends keyof EventInputs> = ((event: EventInputs[N]) => Promise<EventResults[N]>) & Omit<Next, keyof Function>;
+export type EventHook<N extends keyof EventInputs> = ($: Dollar, event: EventInputs[N], next: EventNext<N>) => EventResults[N] | void | Promise<EventResults[N] | void>;
 export type On = {
+  <N extends keyof EventInputs>(pattern: N, hook: EventHook<N>): void;
+  <N extends keyof EventInputs>(pattern: N, matcher: Partial<EventInputs[N]>, hook: EventHook<N>): void;
   (pattern: string, hook: Hook): void;
   (pattern: string, matcher: Matcher, hook: Hook): void;
 };
@@ -120,6 +125,11 @@ export class Hooks {
     const answer = await entry.hook(dollar as Dollar, frozen(input), next);
     // A fire-and-forget next still owns the downstream result and its lifetime.
     return answer === undefined && continuation ? await continuation : answer;
+  }
+
+  async observe(name: string, payload: unknown, dollar: unknown): Promise<void> {
+    const entries = this.entries.filter(entry => patternMatches(entry.pattern, name));
+    await this.dispatch(entries, 0, payload, dollar, undefined, new AbortController().signal, async () => null);
   }
 
   async after(request: { chain: string; result: unknown }): Promise<unknown> {

@@ -25,8 +25,17 @@ pub fn find(host: &HostHandle) -> Option<Arc<dyn Servers>> {
 
 struct ToWire(Arc<dyn Servers>);
 
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+struct Answer {
+    servers: Map<String, Value>,
+}
+
 #[async_trait]
 impl WireService for ToWire {
+    fn face(&self) -> Option<bingo_sdk::Face> {
+        Some(bingo_sdk::Face::new("mcp").method::<(), Answer>("servers", false))
+    }
+
     async fn call(&self, method: &str, _params: Value) -> Result<Value, bingo_sdk::ServiceError> {
         if method != "servers" {
             return Err(bingo_sdk::ServiceError(format!(

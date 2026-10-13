@@ -59,6 +59,12 @@ pub fn capabilities() -> BTreeSet<Cap> {
         .chain(NOTIFICATIONS.iter().map(|note| note.0))
         .filter(|method| *method != name::INITIALIZE)
         .map(str::to_owned)
+        .chain(
+            bingo_sdk::catalogue::ALL
+                .iter()
+                .filter(|entry| entry.kind == bingo_sdk::catalogue::Kind::Observation)
+                .map(|entry| format!("observe/{}", entry.name)),
+        )
         .collect()
 }
 
@@ -184,8 +190,29 @@ pub struct InitializeResult {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceSpec {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub noun: Option<String>,
     #[serde(default)]
-    pub methods: BTreeMap<String, Value>,
+    // Legacy accepts any JSON, so the union is still the original open schema.
+    #[schemars(with = "BTreeMap<String, Value>")]
+    pub methods: BTreeMap<String, ServiceMethod>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum ServiceMethod {
+    Described {
+        input: Value,
+        result: Value,
+        #[serde(default, rename = "unsafe")]
+        unsafe_call: bool,
+    },
+    Legacy(Value),
+}
+impl From<Value> for ServiceMethod {
+    fn from(value: Value) -> Self {
+        Self::Legacy(value)
+    }
 }
 
 /// A contributor a process says it has. Placement is handshake data: which of
@@ -487,6 +514,7 @@ impl From<&HookContext> for HookSite {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "point", content = "payload", rename_all = "camelCase")]
 pub enum HookObservation {
+    Catalogue(Value),
     Turn {
         phase: Phase,
         turn: TurnId,
@@ -508,6 +536,8 @@ pub enum HookObservation {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct HookObserveParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<bingo_sdk::LinkPoint>,
     /// Which of the hooks the handshake declared is watching.
     pub id: String,
     pub site: HookSite,
@@ -613,12 +643,12 @@ pub static METHODS: &[Method] = &[
         schema_of::<crate::intercept::ResultValue<Result<Compaction, bingo_sdk::CompactError>>>,
     ),
     (
-        "intercept/turn.complete",
+        "intercept/turn.stop",
         schema_of::<crate::intercept::Before<()>>,
         schema_of::<crate::intercept::Proceed<(), bingo_sdk::StopResult>>,
     ),
     (
-        "intercept/turn.complete/after",
+        "intercept/turn.stop/after",
         schema_of::<crate::intercept::After<bingo_sdk::StopResult>>,
         schema_of::<crate::intercept::ResultValue<bingo_sdk::StopResult>>,
     ),
@@ -686,6 +716,113 @@ pub static METHODS: &[Method] = &[
         name::SERVICE_CALL,
         schema_of::<ServiceCallParams>,
         schema_of::<ServiceCallResult>,
+    ),
+    (
+        "intercept/turn.complete",
+        schema_of::<crate::intercept::Before<bingo_sdk::catalogue::Turn>>,
+        schema_of::<crate::intercept::Proceed<bingo_sdk::catalogue::Turn, Option<String>>>,
+    ),
+    (
+        "intercept/turn.complete/after",
+        schema_of::<crate::intercept::After<Option<String>>>,
+        schema_of::<crate::intercept::ResultValue<Option<String>>>,
+    ),
+    (
+        "intercept/tool.describe",
+        schema_of::<crate::intercept::Before<ToolSpec>>,
+        schema_of::<crate::intercept::Proceed<ToolSpec, Option<ToolSpec>>>,
+    ),
+    (
+        "intercept/tool.describe/after",
+        schema_of::<crate::intercept::After<Option<ToolSpec>>>,
+        schema_of::<crate::intercept::ResultValue<Option<ToolSpec>>>,
+    ),
+    (
+        "intercept/prompt.autocomplete",
+        schema_of::<crate::intercept::Before<bingo_sdk::Catalog>>,
+        schema_of::<crate::intercept::Proceed<bingo_sdk::Catalog, bingo_sdk::Catalog>>,
+    ),
+    (
+        "intercept/prompt.autocomplete/after",
+        schema_of::<crate::intercept::After<bingo_sdk::Catalog>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::Catalog>>,
+    ),
+    (
+        "intercept/session.send",
+        schema_of::<crate::intercept::Before<bingo_sdk::catalogue::Send>>,
+        schema_of::<crate::intercept::Proceed<bingo_sdk::catalogue::Send, ()>>,
+    ),
+    (
+        "intercept/session.send/after",
+        schema_of::<crate::intercept::After<()>>,
+        schema_of::<crate::intercept::ResultValue<()>>,
+    ),
+    (
+        "intercept/session.receive",
+        schema_of::<crate::intercept::Before<Input>>,
+        schema_of::<crate::intercept::Proceed<Input, Input>>,
+    ),
+    (
+        "intercept/session.receive/after",
+        schema_of::<crate::intercept::After<Input>>,
+        schema_of::<crate::intercept::ResultValue<Input>>,
+    ),
+    (
+        "intercept/session.append",
+        schema_of::<crate::intercept::Before<bingo_sdk::catalogue::Append>>,
+        schema_of::<
+            crate::intercept::Proceed<bingo_sdk::catalogue::Append, bingo_sdk::catalogue::Append>,
+        >,
+    ),
+    (
+        "intercept/session.append/after",
+        schema_of::<crate::intercept::After<bingo_sdk::catalogue::Append>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::catalogue::Append>>,
+    ),
+    (
+        "intercept/command.run",
+        schema_of::<crate::intercept::Before<bingo_sdk::catalogue::CommandRun>>,
+        schema_of::<crate::intercept::Proceed<bingo_sdk::catalogue::CommandRun, CommandOutcome>>,
+    ),
+    (
+        "intercept/command.run/after",
+        schema_of::<crate::intercept::After<CommandOutcome>>,
+        schema_of::<crate::intercept::ResultValue<CommandOutcome>>,
+    ),
+    (
+        "intercept/command.describe",
+        schema_of::<crate::intercept::Before<CommandSpec>>,
+        schema_of::<crate::intercept::Proceed<CommandSpec, Option<CommandSpec>>>,
+    ),
+    (
+        "intercept/command.describe/after",
+        schema_of::<crate::intercept::After<Option<CommandSpec>>>,
+        schema_of::<crate::intercept::ResultValue<Option<CommandSpec>>>,
+    ),
+    (
+        "intercept/config.set",
+        schema_of::<crate::intercept::Before<bingo_sdk::catalogue::ConfigSet>>,
+        schema_of::<
+            crate::intercept::Proceed<
+                bingo_sdk::catalogue::ConfigSet,
+                bingo_sdk::catalogue::ConfigSet,
+            >,
+        >,
+    ),
+    (
+        "intercept/config.set/after",
+        schema_of::<crate::intercept::After<bingo_sdk::catalogue::ConfigSet>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::catalogue::ConfigSet>>,
+    ),
+    (
+        "intercept/config.describe",
+        schema_of::<crate::intercept::Before<bingo_sdk::ConfigView>>,
+        schema_of::<crate::intercept::Proceed<bingo_sdk::ConfigView, bingo_sdk::ConfigView>>,
+    ),
+    (
+        "intercept/config.describe/after",
+        schema_of::<crate::intercept::After<bingo_sdk::ConfigView>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::ConfigView>>,
     ),
 ];
 
@@ -1179,7 +1316,10 @@ mod tests {
             ["get", "set"],
             "a method the declaration never named is one the host refuses"
         );
-        assert_eq!(kv.methods["get"]["required"], json!(["key"]));
+        assert_eq!(
+            serde_json::to_value(&kv.methods["get"]).unwrap()["required"],
+            json!(["key"])
+        );
     }
 
     /// A process that declares no services declares none: the field is absent
@@ -1281,6 +1421,7 @@ mod tests {
     #[test]
     fn an_observation_carries_the_phase_and_the_turn_it_watched() {
         let params = HookObserveParams {
+            event: None,
             id: "watch".into(),
             site: site(),
             observation: HookObservation::Turn {

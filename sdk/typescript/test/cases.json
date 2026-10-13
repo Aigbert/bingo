@@ -1,0 +1,14 @@
+{
+  "patterns": [
+    ["*", "future.verb", true], ["tool.*", "tool.call", true],
+    ["tool.*", "tools.call", false], ["!tool.*", "turn.complete", true],
+    ["!tool.call", "tool.call", false], ["future.verb", "future.verb", true]
+  ],
+  "matchers": [
+    [{"tool":"Read"}, {"tool":"Read","path":"a"}, true],
+    [{"tool":["Read","Bash"]}, {"tool":"Write"}, false],
+    [{"input":{"force":false}}, {"input":{"force":false,"count":2}}, true],
+    [{"input":null}, {"input":{}}, false],
+    [{"missing":true}, {}, false]
+  ]
+}

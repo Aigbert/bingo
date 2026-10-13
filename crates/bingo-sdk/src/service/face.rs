@@ -15,13 +15,21 @@ pub struct Method {
 }
 impl Face {
     pub fn new(noun: impl Into<String>) -> Self {
-        Self { noun: noun.into(), methods: Vec::new() }
+        Self {
+            noun: noun.into(),
+            methods: Vec::new(),
+        }
     }
     pub fn method<I: JsonSchema + DeserializeOwned, O: JsonSchema + DeserializeOwned>(
-        mut self, method: &str, unsafe_call: bool,
+        mut self,
+        method: &str,
+        unsafe_call: bool,
     ) -> Self {
-        let mut entry = Entry::face(format!("{}.{method}", self.noun),
-            schemars::schema_for!(I), schemars::schema_for!(O));
+        let mut entry = Entry::face(
+            format!("{}.{method}", self.noun),
+            schemars::schema_for!(I),
+            schemars::schema_for!(O),
+        );
         entry.input = Shape::Rust(|| schemars::schema_for!(I));
         entry.result = Shape::Rust(|| schemars::schema_for!(O));
         entry.valid_input = |v| serde_json::from_value::<I>(v.clone()).is_ok();

@@ -247,9 +247,10 @@ fn declared(options: &Options) -> BTreeMap<String, ServiceSpec> {
     BTreeMap::from([(
         "kv".to_string(),
         ServiceSpec {
+            noun: None,
             methods: methods
                 .into_iter()
-                .map(|(name, schema)| (name.to_string(), schema))
+                .map(|(name, schema)| (name.to_string(), schema.into()))
                 .collect(),
         },
     )])

@@ -288,4 +288,28 @@ for path in sorted(pathlib.Path("crates").rglob("*.rs")):
 print("test host and wall-clock advisory checks complete")
 PYTEST
 
+# Kernel catalogue entries have one declaration site (ADR-0078).
+python3 - <<'PYCATALOGUE' || fail=1
+import pathlib, re, sys
+bad = []
+for path in pathlib.Path("crates").rglob("*.rs"):
+    if str(path) == "crates/bingo-sdk/src/catalogue.rs":
+        continue
+    source = path.read_text()
+    uses_entry = re.search(r"use\s+[^;]*catalogue[^;]*\bEntry\b", source)
+    for match in re.finditer(r"(?:(?:bingo_sdk::)?catalogue::)?\bEntry\s*\{", source):
+        if "catalogue::" not in match.group() and not uses_entry:
+            continue
+        prefix = source[max(0, match.start() - 80):match.start()]
+        if re.search(r"(?:struct|impl|->\s*&?(?:\s*'\w+)?)\s*$", prefix):
+            continue
+        line = source.count("\n", 0, match.start()) + 1
+        bad.append(f"{path}:{line}: declare catalogue Entry literals in bingo-sdk/src/catalogue.rs")
+for problem in bad:
+    print(problem)
+if bad:
+    sys.exit(1)
+print("catalogue entry declarations ok")
+PYCATALOGUE
+
 [ "$fail" -eq 0 ] && say "discipline ok" || { say "discipline FAILED"; exit 1; }

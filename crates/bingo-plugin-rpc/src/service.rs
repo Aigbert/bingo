@@ -124,6 +124,28 @@ impl RemoteService {
 
 #[async_trait]
 impl WireService for RemoteService {
+    fn face(&self) -> Option<bingo_sdk::Face> {
+        let noun = self.spec.noun.as_ref()?;
+        let mut face = bingo_sdk::Face::new(noun);
+        for (name, spec) in &self.spec.methods {
+            let crate::wire::ServiceMethod::Described {
+                input,
+                result,
+                unsafe_call,
+            } = spec
+            else {
+                continue;
+            };
+            let input = schemars::Schema::try_from(input.clone()).ok()?;
+            let result = schemars::Schema::try_from(result.clone()).ok()?;
+            face.methods.push(bingo_sdk::service::Method {
+                entry: bingo_sdk::catalogue::Entry::face(format!("{noun}.{name}"), input, result),
+                unsafe_call: *unsafe_call,
+            });
+        }
+        Some(face)
+    }
+
     async fn call(&self, method: &str, params: Value) -> Result<Value, ServiceError> {
         self.speaks(method)?;
         self.ask(method, params).await
@@ -207,9 +229,10 @@ mod tests {
 
     fn declared(methods: &[&str]) -> ServiceSpec {
         ServiceSpec {
+            noun: None,
             methods: methods
                 .iter()
-                .map(|method| ((*method).to_string(), json!({ "type": "object" })))
+                .map(|method| ((*method).to_string(), json!({ "type": "object" }).into()))
                 .collect(),
         }
     }

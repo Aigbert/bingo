@@ -27,9 +27,11 @@ export function runtime(peer: Peer, register: Register) {
   peer.handlers.set('initialize', async (params: InitializeParams): Promise<InitializeResult> => {
     if (params.protocol !== 2) throw new Error(`plugin protocol 2 required; host speaks ${params.protocol}`);
     await register(hooks.on, params.config);
+    const observed = hooks.names(params.capabilities.filter(name => name.startsWith('observe/')).map(name => name.slice(8)));
     const hooked = hooks.names(points(params.capabilities));
     const capabilities = ['host/place', 'host/extend', 'host/deliver', 'host/state/get',
-      'host/state/set', 'host/model/complete', 'service/call', 'tools/changed', 'intercept/cancel',
+      'host/state/set', 'host/model/complete', 'service/call', 'tools/changed', 'intercept/cancel', 'hook/observe',
+      ...observed.map(name => `observe/${name}`),
       ...hooked.flatMap(name => [`intercept/${name}`, `intercept/${name}/after`])]
       .filter(name => params.capabilities.includes(name));
     negotiated = new Set(capabilities);
@@ -38,8 +40,9 @@ export function runtime(peer: Peer, register: Register) {
       peer.handlers.set(`intercept/${name}/after`, request => hooks.after(request));
     }
     return { protocol: 2, name: params.pluginName, version: '0.1.0', capabilities,
-      links: hooked.map(point => ({ point, after: true })) } as InitializeResult;
+      links: [...hooked, ...observed].map(point => ({ point, after: true })) } as InitializeResult;
   });
+  peer.handlers.set('hook/observe', request => hooks.observe(request.event, request.payload, dollar(rpc, request.site)));
   peer.handlers.set('intercept/cancel', params => hooks.cancel(params.chain));
   return {
     close: () => hooks.close(),

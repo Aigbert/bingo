@@ -56,7 +56,7 @@ pub use policy::{Decision, PermissionPolicy, PolicyInput, Reason, Stance, Verdic
 pub use provider::{AuthStatus, LoginMethod, ModelInfo, Provider};
 /// `Service` and `Services` stay behind `service::`: the kernel has a bundle
 /// of its own by that name, and a glob import must not make either ambiguous.
-pub use service::{ServiceError, ServiceHandle, ServiceKey, WireService};
+pub use service::{Face, ServiceError, ServiceHandle, ServiceKey, WireService};
 pub use state::{Applied, LastTurn, LiveTurn, Retry, SessionState};
 pub use store::{Checkpoint, Resumed, SessionStore};
 pub use surface::{Exit, Surface, SurfaceKind, SurfaceOptions};

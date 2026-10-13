@@ -29,6 +29,8 @@
     "intercept/turn.complete/after",
     "intercept/turn.step",
     "intercept/turn.step/after",
+    "intercept/turn.stop",
+    "intercept/turn.stop/after",
     "provider/cancel",
     "provider/delta",
     "provider/stream",
@@ -182,6 +184,23 @@
       "required": [
         "chain",
         "result"
+      ]
+    },
+    "After8": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "chain"
       ]
     },
     "Answer": {
@@ -562,6 +581,29 @@
         },
         "input": {
           "type": "null"
+        }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
+    },
+    "Before6": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": {
+          "$ref": "#/$defs/Turn"
         }
       },
       "required": [
@@ -3456,6 +3498,7 @@
         "turn.step",
         "prompt.compose",
         "session.compact",
+        "turn.stop",
         "turn.complete"
       ]
     },
@@ -4430,6 +4473,37 @@
         }
       ]
     },
+    "Proceed8": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/Turn"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "ProviderCancelParams": {
       "type": "object",
       "properties": {
@@ -5034,6 +5108,17 @@
       "required": [
         "result"
       ]
+    },
+    "ResultValue8": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
     },
     "Result_of_Array_of_ModelEvent_or_ProviderError": {
       "oneOf": [
@@ -5795,6 +5880,29 @@
         "label"
       ]
     },
+    "Turn": {
+      "type": "object",
+      "properties": {
+        "turn": {
+          "$ref": "#/$defs/TurnId"
+        },
+        "outcome": {
+          "$ref": "#/$defs/TurnStatus"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        },
+        "answer": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "turn",
+        "outcome",
+        "usage",
+        "answer"
+      ]
+    },
     "TurnId": {
       "type": "string",
       "description": "One run of the turn loop, closed exactly once."
@@ -6344,7 +6452,7 @@
         "$ref": "#/$defs/ResultValue6"
       }
     },
-    "intercept/turn.complete": {
+    "intercept/turn.stop": {
       "params": {
         "$ref": "#/$defs/Before5"
       },
@@ -6352,7 +6460,7 @@
         "$ref": "#/$defs/Proceed7"
       }
     },
-    "intercept/turn.complete/after": {
+    "intercept/turn.stop/after": {
       "params": {
         "$ref": "#/$defs/After7"
       },
@@ -6469,6 +6577,22 @@
       },
       "result": {
         "$ref": "#/$defs/ServiceCallResult"
+      }
+    },
+    "intercept/turn.complete": {
+      "params": {
+        "$ref": "#/$defs/Before6"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed8"
+      }
+    },
+    "intercept/turn.complete/after": {
+      "params": {
+        "$ref": "#/$defs/After8"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue8"
       }
     }
   },

@@ -76,7 +76,9 @@ pub struct ServiceError(pub String);
 /// that lives in another process. A caller cannot tell which.
 #[async_trait]
 pub trait WireService: Send + Sync {
-    fn face(&self) -> Option<Face> { None }
+    fn face(&self) -> Option<Face> {
+        None
+    }
 
     /// A method this service does not speak is refused with the set it does
     /// (ADR-0031 §5); the params and the answer are whatever the service's
@@ -124,17 +126,25 @@ pub struct Service {
 /// can know until its handshake answered — after that, which is why this is
 /// locked rather than built once.
 #[derive(Default)]
-pub struct Services(Mutex<HashMap<String, Service>>);
+pub struct Services(Mutex<HashMap<String, Registered>>);
+struct Registered {
+    service: Service,
+    face: Option<Face>,
+}
 
 impl Services {
     /// Both faces, from the plugin that owns them. A key that is taken stays
     /// its first owner's, and this says so.
     pub fn add(&self, key: String, service: Service) -> Result<(), String> {
+        let face = service.wire.as_ref().and_then(|wire| wire.face());
         let mut services = self.held();
         if services.contains_key(&key) {
             return Err(format!("service {key} is already registered"));
         }
-        services.insert(key, service);
+        if let Some(face) = &face {
+            check_face(&key, face, &services)?;
+        }
+        services.insert(key, Registered { service, face });
         Ok(())
     }
 
@@ -155,13 +165,17 @@ impl Services {
     pub fn value(&self, key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
         self.held()
             .get(key)
-            .map(|service| Arc::clone(&service.value))
+            .map(|service| Arc::clone(&service.service.value))
     }
 
     pub fn wire(&self, key: &str) -> Option<Arc<dyn WireService>> {
         self.held()
             .get(key)
-            .and_then(|service| service.wire.clone())
+            .and_then(|service| service.service.wire.clone())
+    }
+
+    pub fn face(&self, key: &str) -> Option<Face> {
+        self.held().get(key).and_then(|s| s.face.clone())
     }
 
     pub fn keys(&self) -> Vec<String> {
@@ -170,9 +184,41 @@ impl Services {
         keys
     }
 
-    fn held(&self) -> MutexGuard<'_, HashMap<String, Service>> {
+    fn held(&self) -> MutexGuard<'_, HashMap<String, Registered>> {
         self.0.lock().unwrap_or_else(|held| held.into_inner())
     }
+}
+
+fn check_face(
+    owner: &str,
+    face: &Face,
+    services: &HashMap<String, Registered>,
+) -> Result<(), String> {
+    let mut names = std::collections::HashSet::new();
+    for method in &face.methods {
+        let name = method.entry.name.as_ref();
+        if !name.starts_with(&format!("{}.", face.noun)) || !names.insert(name) {
+            return Err(format!("{owner}: invalid or repeated face method {name}"));
+        }
+        let prior = if crate::catalogue::find(name).is_some() {
+            Some("kernel")
+        } else {
+            services.iter().find_map(|(key, service)| {
+                service.face.as_ref().and_then(|face| {
+                    face.methods
+                        .iter()
+                        .any(|m| m.entry.name == name)
+                        .then_some(key.as_str())
+                })
+            })
+        };
+        if let Some(prior) = prior {
+            return Err(format!(
+                "event {name} is owned by {prior}; {owner} cannot register it"
+            ));
+        }
+    }
+    Ok(())
 }
 
 impl std::fmt::Debug for Services {
@@ -237,7 +283,9 @@ mod tests {
         fn face(&self) -> Option<Face> {
             Some(Face::new(self.0).method::<(), String>("servers", false))
         }
-        async fn call(&self, _: &str, _: Value) -> Result<Value, ServiceError> { Ok(Value::Null) }
+        async fn call(&self, _: &str, _: Value) -> Result<Value, ServiceError> {
+            Ok(Value::Null)
+        }
     }
     #[test]
     fn face_names_cannot_be_claimed_twice() {
