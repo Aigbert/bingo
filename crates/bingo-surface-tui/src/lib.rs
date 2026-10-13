@@ -85,6 +85,7 @@ mod pager;
 mod paths;
 mod pictures;
 mod pointer;
+mod pulled;
 mod preview;
 mod render;
 mod rewind;
