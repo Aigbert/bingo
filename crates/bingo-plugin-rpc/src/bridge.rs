@@ -557,6 +557,9 @@ impl Bridge {
             .request(name::INITIALIZE, value)
             .await
             .map_err(|e| e.message)?;
+        if let Some(notice) = crate::legacy::notice(&self.name, &answer) {
+            self.notices.push(notice);
+        }
         let result: InitializeResult =
             serde_json::from_value(answer).map_err(|e| format!("initialize: {e}"))?;
         check_protocol(&result)?;

@@ -199,6 +199,15 @@ mod tests {
                 std::fs::create_dir_all(parent).expect("the schema directory");
             }
             std::fs::write(&path, rendered()).expect("the schema is writable");
+            // Authorized pre-release removal: ADR-0075/0076, 2026-10-13.
+            let baseline = frozen();
+            if baseline["$defs"]["EndpointCapabilities"]["properties"]
+                .get("holdsContext")
+                .is_some()
+            {
+                std::fs::write(path.with_file_name("plugin-2.json"), rendered())
+                    .expect("the unreleased baseline is writable");
+            }
             return;
         }
         let committed = std::fs::read_to_string(&path).unwrap_or_default();

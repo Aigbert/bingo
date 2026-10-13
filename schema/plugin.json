@@ -1573,11 +1573,6 @@
           "type": "boolean",
           "default": false
         },
-        "holdsContext": {
-          "type": "boolean",
-          "description": "The conversation lives on the endpoint's side, and so does the ruler\nover it: the kernel sends the newest turn, measures nothing and cuts\nnothing (ADR-0055 §1).",
-          "default": false
-        },
         "contextWindow": {
           "type": [
             "integer",
@@ -3634,11 +3629,6 @@
         "caching": {
           "type": "boolean",
           "default": false
-        },
-        "holdsContext": {
-          "type": "boolean",
-          "description": "The endpoint holds this conversation and measures it itself\n(ADR-0055 §1): the kernel draws no line in a window it does not own.",
-          "default": false
         }
       },
       "required": [
@@ -4679,8 +4669,7 @@
           "default": {
             "images": false,
             "countTokens": false,
-            "caching": false,
-            "holdsContext": false
+            "caching": false
           }
         }
       },
