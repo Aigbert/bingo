@@ -241,8 +241,23 @@ impl Renderer {
 
     /// A tool call announces its input when it starts; its verdict comes at completion.
     fn started(&mut self, item: &Item, err: &mut (impl Write + ?Sized)) -> io::Result<()> {
-        if let ItemBody::ToolCall { name, input, .. } = &item.body {
-            self.diagnostic(&format!("[tool] {name} {}", compact(input)), err)?;
+        if let ItemBody::ToolCall {
+            call_id,
+            name,
+            input,
+            ..
+        } = &item.body
+        {
+            let external = bingo_sdk::ExternalCall::from_input(&bingo_sdk::ToolCall {
+                call_id: call_id.clone(),
+                name: name.clone(),
+                input: input.clone(),
+            });
+            let line = match external.filter(|_| item.external()) {
+                Some(call) => format!("[tool] {}", call.title),
+                None => format!("[tool] {name} {}", compact(input)),
+            };
+            self.diagnostic(&line, err)?;
         }
         Ok(())
     }
@@ -265,11 +280,24 @@ impl Renderer {
                 }
             }
             ItemBody::ToolCall {
+                call_id,
                 name,
+                input,
                 output,
                 duration_ms,
                 ..
-            } => self.tool_done(item, name, output.as_ref(), *duration_ms, err)?,
+            } => {
+                let external = bingo_sdk::ExternalCall::from_input(&bingo_sdk::ToolCall {
+                    call_id: call_id.clone(),
+                    name: name.clone(),
+                    input: input.clone(),
+                })
+                .filter(|_| item.external());
+                let title = external
+                    .as_ref()
+                    .map_or(name.as_str(), |c| c.title.as_str());
+                self.tool_done(item, title, output.as_ref(), *duration_ms, err)?;
+            }
             ItemBody::Shell {
                 command,
                 output,
@@ -314,6 +342,16 @@ impl Renderer {
         if let Some(view) = output.and_then(|o| o.display.as_ref()) {
             for line in view.fold().lines() {
                 self.diagnostic(&format!("  {line}"), err)?;
+            }
+        } else if item.external()
+            && let Some(output) = output
+        {
+            for part in &output.parts {
+                if let Some(text) = part.as_text() {
+                    for line in text.lines() {
+                        self.diagnostic(&format!("  {line}"), err)?;
+                    }
+                }
             }
         }
         Ok(())
@@ -412,6 +450,22 @@ pub(crate) mod tests {
     use bingo_sdk::{
         ContentPart, ItemStatus, KernelError, Level, Origin, SessionId, TurnId, TurnOrigin, Usage,
     };
+
+    #[test]
+    fn an_upgraded_historical_agent_call_prints_as_a_tool() {
+        let frame: Frame = serde_json::from_str(include_str!(
+            "../../bingo-store-jsonl/fixtures/agent/upgraded.json"
+        ))
+        .unwrap();
+        let sinks = play(Mode::Text, &[frame]);
+        assert!(sinks.out().is_empty());
+        assert!(
+            sinks.err().contains("[tool] Read note.md ok"),
+            "{}",
+            sinks.err()
+        );
+        assert!(sinks.err().contains("hello"));
+    }
 
     pub(crate) struct Sinks {
         out: Vec<u8>,

@@ -46,7 +46,6 @@ pub fn resolve(
         reasoning: declared.reasoning.unwrap_or(facts.reasoning),
         count_tokens: endpoint.count_tokens,
         caching: endpoint.caching,
-        holds_context: endpoint.holds_context,
     }
 }
 
@@ -133,17 +132,11 @@ mod tests {
             ..Declared::default()
         };
         let held = EndpointCapabilities {
-            holds_context: true,
             context_window: Some(1_000_000),
             ..endpoint(true)
         };
         let caps = resolve(Some(&declared), Some(150_000), None, held);
         assert_eq!(caps.context_window, 1_000_000);
-        assert!(caps.holds_context);
-        assert!(
-            !resolve(Some(&declared), None, None, endpoint(true)).holds_context,
-            "an endpoint that holds nothing says so"
-        );
         assert_eq!(
             resolve(Some(&declared), None, None, endpoint(true)).context_window,
             200_000,
@@ -226,12 +219,11 @@ mod tests {
         ) {
             let endpoint = EndpointCapabilities {
                 context_window: Some(named),
-                holds_context: true,
+
                 ..endpoint(true)
             };
             let caps = resolve(declared.as_ref(), learned, facts, endpoint);
             prop_assert_eq!(caps.context_window, named);
-            prop_assert!(caps.holds_context);
             let guessed = resolve(declared.as_ref(), learned, facts, self::endpoint(true));
             prop_assert_eq!(caps.max_output, guessed.max_output);
             prop_assert_eq!(caps.reasoning, guessed.reasoning);

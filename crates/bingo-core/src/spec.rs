@@ -31,7 +31,7 @@ pub(crate) fn stated(
         // A rename wins; an absent name never takes back one the actor minted.
         title: title.clone().or(became.title),
         driver: *driver,
-        provider: choice.map(|c| c.provider.id().to_string()),
+        provider: choice.map(|c| c.endpoint.id().to_string()),
         model: choice.map(|c| c.id.clone()),
         system_extra: system_extra.clone(),
         tools: tools.clone(),

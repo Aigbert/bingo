@@ -130,38 +130,77 @@ fn a_child_that_dies_at_the_prompt_is_replaced_and_asked_again() {
     );
 }
 
-/// The other half of the same rule: a child that dies *after* it has spoken is
-/// not replaced inside the turn. Half an answer is on the stream, and asking
-/// again would say that half twice — so the failure is the turn's, and it is
-/// the kernel's open retry that withdraws the half and tries again (ADR-0009
-/// §6), not this plugin quietly.
+/// An agent may already have acted before the pipe dies (ADR-0076). Its
+/// partial speech and external work stay journaled, with no open retry. The
+/// dead child is buried once; the person's next prompt starts a new child.
 #[test]
 fn a_child_that_dies_mid_stream_fails_the_turn_it_was_answering() {
     let Some(agent) = fake_agent() else { return };
     let adapter = Scripted::new(
         agent,
         json!({
-            "sessionId": "acp-9",
-            "capabilities": { "resume": true },
-            "turns": [{ "updates": [chunk("Half a")], "diesAtPromptOnce": true }]
+            "sessionId": "acp-9", "capabilities": { "resume": true },
+            "turns": [{ "updates": [chunk("Half a"), tool_call()], "diesAtPromptOnce": true }]
         }),
     );
     let mut host = stream_json::Host::start(&mut adapter.driven("agent"));
     host.prompt("one");
-    let ended = host.finish();
-    assert_eq!(ended.code, Some(0), "stderr: {}", ended.err);
-
-    let reasons = retried(&ended);
-    assert_eq!(
-        reasons.len(),
-        1,
-        "the turn failed and was tried again where a person can see it: {:?}",
-        ended.types()
+    let first = host.until_event("turnCompleted");
+    let first: Frame = serde_json::from_value(first).unwrap();
+    assert!(
+        matches!(first.event, Event::TurnCompleted { status: bingo_sdk::TurnStatus::Failed { error }, .. }
+        if error.message.contains("agent stopped mid-answer"))
     );
-    let all = notices(frames(&ended));
+    adapter.obeys(json!({
+        "sessionId": "acp-9", "capabilities": { "resume": true },
+        "turns": [one_turn(vec![chunk("Second prompt answered.")])]
+    }));
+    host.prompt("two");
+    let second: Frame = serde_json::from_value(host.until_event("turnCompleted")).unwrap();
+    assert!(matches!(
+        second.event,
+        Event::TurnCompleted {
+            status: bingo_sdk::TurnStatus::Completed,
+            ..
+        }
+    ));
+    let ended = host.finish();
+    assert_eq!(ended.code, Some(1), "the first turn failed: {}", ended.err);
+    assert!(retried(&ended).is_empty());
+    assert_eq!(said(frames(&ended)), ["Half a", "Second prompt answered."]);
+    let all = frames(&ended);
+    let external: Vec<_> = all
+        .iter()
+        .filter_map(|frame| match &frame.event {
+            Event::ItemCompleted { item } if item.external() => Some(item),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(external.len(), 1);
+    assert!(
+        matches!(&external[0].body, ItemBody::ToolCall { name, output: Some(_), .. } if name == "scripted:read")
+    );
+    let mut transcript = bingo_sdk::Transcript::default();
+    for frame in &all {
+        transcript.apply(&frame.event);
+    }
+    assert!(transcript.items().iter().any(|i| i.id == external[0].id));
+    assert!(
+        transcript
+            .items()
+            .iter()
+            .any(|i| matches!(&i.body, ItemBody::Assistant { text } if text == "Half a"))
+    );
+    assert_eq!(coded(&notices(all), "ACP_RESPAWN").len(), 1);
     assert_eq!(
-        coded(&all, "ACP_RESPAWN").len(),
-        1,
-        "the dead child was still buried, once: {all:?}"
+        adapter.methods(),
+        [
+            "initialize",
+            "session/new",
+            "session/prompt",
+            "initialize",
+            "session/resume",
+            "session/prompt"
+        ]
     );
 }

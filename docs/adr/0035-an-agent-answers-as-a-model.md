@@ -109,3 +109,5 @@ Refs: docs/design/horizons.md §2, docs/design/research/acp-provider.md
 survives while it answers `session/cancel` within 10 s; after that the link
 is retired and its process tree killed. The link owns this wait even when
 the kernel drops the turn; the next prompt follows §3's fresh-child path.*
+
+*2026-10-13 amendment — §1, §4 and §5: ADR-0076 replaces the provider adapter with an Agent seam, journals external ToolCall items, and routes permission requests through the turn's judge. The ACP restore ladder and bridge remain.*

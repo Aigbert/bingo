@@ -1,0 +1,1 @@
+{"protocol": 2, "providers": [{"id": "old-agent", "endpoint": {"images": true, "holdsContext": true}}, {"id": "another", "endpoint": {"holdsContext": true}}], "name": "example", "version": "1"}

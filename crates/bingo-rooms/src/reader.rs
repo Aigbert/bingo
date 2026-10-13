@@ -245,7 +245,6 @@ mod tests {
                     reasoning: false,
                     count_tokens: false,
                     caching: false,
-                    holds_context: false,
                 },
                 items: Vec::new(),
             }

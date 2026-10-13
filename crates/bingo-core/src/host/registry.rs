@@ -43,6 +43,7 @@ pub struct Sources {
 pub struct Registry {
     pub tools: Vec<Arc<dyn Tool>>,
     pub providers: Vec<Arc<dyn Provider>>,
+    pub agents: Vec<Arc<dyn Agent>>,
     pub policy: Option<Arc<dyn PermissionPolicy>>,
     pub hooks: Vec<Arc<dyn Hook>>,
     pub links: Vec<crate::chain::Link>,
@@ -154,6 +155,7 @@ impl Registry {
                 self.sources.tools.push(source);
                 Ok(())
             }
+            Contribution::Agent(agent) => self.add_agent(agent),
             Contribution::Provider(provider) => self.add_provider(provider),
             Contribution::Providers(source) => {
                 self.sources.providers.push(source);
@@ -226,10 +228,22 @@ impl Registry {
     }
 
     fn add_provider(&mut self, provider: Arc<dyn Provider>) -> Result<(), String> {
-        if self.providers.iter().any(|p| p.id() == provider.id()) {
+        if self.providers.iter().any(|p| p.id() == provider.id())
+            || self.agents.iter().any(|a| a.id() == provider.id())
+        {
             return Err(format!("provider {} is already registered", provider.id()));
         }
         self.providers.push(provider);
+        Ok(())
+    }
+
+    fn add_agent(&mut self, agent: Arc<dyn Agent>) -> Result<(), String> {
+        if self.providers.iter().any(|p| p.id() == agent.id())
+            || self.agents.iter().any(|a| a.id() == agent.id())
+        {
+            return Err(format!("endpoint {} is already registered", agent.id()));
+        }
+        self.agents.push(agent);
         Ok(())
     }
 

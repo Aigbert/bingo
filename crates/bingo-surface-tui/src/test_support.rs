@@ -12,8 +12,11 @@ use bingo_sdk::{
 use jiff::Timestamp;
 use serde_json::{Value, json};
 
+mod external;
 mod pressed;
 mod rendered;
+
+pub use external::agent_call;
 
 pub use crate::test_lanes::*;
 pub use pressed::*;
@@ -432,28 +435,6 @@ pub fn running_command(id: &str, command: &str) -> Item {
             quiet: false,
         },
     )
-}
-
-/// A call an ACP agent ran on its own side, as `bingo-provider-acp` journals
-/// one (ADR-0035 §4): a reasoning item whose text is the heading a person
-/// reads and whose `acp` provider metadata is the whole call. `acp` is that
-/// object, written out at each call site the way the wire spells it — the
-/// shape is the contract, and `Call::metadata` in that crate is where it is
-/// written and its fixtures are where it is pinned.
-pub fn agent_call(id: &str, text: &str, acp: Value) -> Item {
-    let Value::Object(map) = acp else {
-        panic!("an acp mark is an object");
-    };
-    let mut call = item(
-        id,
-        ItemStatus::Completed,
-        ItemBody::Reasoning {
-            text: text.into(),
-            provider_metadata: [("acp".to_string(), map)].into_iter().collect(),
-        },
-    );
-    call.completed_at = Some(ts() + jiff::SignedDuration::from_secs(1));
-    call
 }
 
 pub fn diff_output() -> ToolOutput {

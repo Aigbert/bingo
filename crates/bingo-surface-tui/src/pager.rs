@@ -18,7 +18,7 @@ use crate::effect::Effect;
 use crate::search::Search;
 use crate::tree::Tree;
 use crate::ui::{Open, Ui};
-use crate::{acp, markdown, search, theme, thoughts, transcript, wrap};
+use crate::{markdown, search, theme, thoughts, transcript, wrap};
 
 /// The rows the sheet spends on itself: what it is, and the air under it.
 pub const HEAD: usize = 2;
@@ -118,12 +118,6 @@ pub fn lines(state: &SessionState, item: &Item, width: usize) -> Vec<Line<'stati
 /// thought that came back empty is a row and nothing else, and so is a call
 /// that said nothing — `⏎` on either opens no sheet.
 fn reasoning(state: &SessionState, item: &Item, width: usize) -> Vec<Line<'static>> {
-    if let Some(call) = acp::call(item) {
-        return call
-            .output
-            .map(|output| transcript::whole(&output, width))
-            .unwrap_or_default();
-    }
     let text = thoughts::text(&thoughts::run_of(state, &item.id));
     match text.is_empty() {
         true => Vec::new(),
@@ -154,12 +148,23 @@ pub fn title(item: &Item, state: &SessionState) -> String {
         };
     }
     match &item.body {
-        ItemBody::Reasoning { .. } => match acp::call(item) {
-            Some(call) => format!("{}({})", call.name, call.about),
-            None => "Thinking".to_string(),
-        },
+        ItemBody::Reasoning { .. } => "Thinking".to_string(),
         ItemBody::Assistant { .. } => "Answer".to_string(),
-        ItemBody::ToolCall { name, input, .. } => {
+        ItemBody::ToolCall {
+            call_id,
+            name,
+            input,
+            ..
+        } => {
+            if item.external()
+                && let Some(call) = bingo_sdk::ExternalCall::from_input(&bingo_sdk::ToolCall {
+                    call_id: call_id.clone(),
+                    name: name.clone(),
+                    input: input.clone(),
+                })
+            {
+                return call.title;
+            }
             let about = transcript::summarize(input);
             format!("{name}({about})")
         }
@@ -490,7 +495,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["42 passed".to_string()],
         );
-        assert_eq!(title(&call, &state()), "Run(npm test)");
+        assert_eq!(title(&call, &state()), "npm test");
     }
 
     /// And a call that said nothing shows everything it has on its row, so
@@ -506,7 +511,7 @@ mod tests {
             }),
         );
         assert!(sheet_of(&call, 60).is_empty());
-        assert_eq!(title(&call, &state()), "Mode(plan)");
+        assert_eq!(title(&call, &state()), "plan");
     }
 
     /// A table never wraps: it folds to the width it is laid out in (design

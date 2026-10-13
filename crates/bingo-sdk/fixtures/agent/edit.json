@@ -1,0 +1,1 @@
+{"callId":"edit-1","name":"fake:edit","input":{"title":"Edit note.md","locations":[{"path":"note.md","line":3}],"raw":{"patch":"hello"}}}

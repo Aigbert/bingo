@@ -30,12 +30,12 @@ fn a_newer_version_line_is_refused_even_at_the_tail_or_before_since() {
     for tail in [false, true] {
         let mut lines = clean();
         let at = if tail { lines.len() } else { 2 };
-        lines.insert(at, r#"{"format":"bingo-journal","version":3}"#.into());
+        lines.insert(at, r#"{"format":"bingo-journal","version":4}"#.into());
         let dir = planted(&lines);
         let error = replay(dir.path(), Seq(99)).expect_err("newer format must be refused");
         assert_eq!(error.code, ErrorCode::Storage);
-        assert!(error.message.contains("journal version 3"), "{error}");
-        assert!(error.message.contains("this build reads 2"), "{error}");
+        assert!(error.message.contains("journal version 4"), "{error}");
+        assert!(error.message.contains("this build reads 3"), "{error}");
     }
 }
 
@@ -58,7 +58,7 @@ fn the_version_writer_only_appends_the_marker() {
     let after = std::fs::read_to_string(layout::journal(dir.path())).unwrap();
     assert_eq!(
         after,
-        before + "{\"format\":\"bingo-journal\",\"version\":2}\n"
+        before + "{\"format\":\"bingo-journal\",\"version\":3}\n"
     );
     assert_eq!(replay(dir.path(), Seq::ZERO).unwrap().len(), 2);
 }
@@ -79,8 +79,29 @@ async fn releasing_the_claim_forgets_the_prepared_version() {
     store.append(&summary.id, &frame).await.unwrap();
     store.release(&summary.id).await.unwrap();
     let dir = layout::session_dir(store.root(), &summary.id);
-    append_line(&dir, r#"{"format":"bingo-journal","version":3}"#).unwrap();
+    append_line(&dir, r#"{"format":"bingo-journal","version":4}"#).unwrap();
     store.acquire(&summary.id).await.unwrap();
     let error = store.append(&summary.id, &frame).await.unwrap_err();
     assert!(error.message.contains("newer bingo"), "{error}");
+}
+
+#[test]
+fn historical_agent_calls_upgrade_to_external_tool_items() {
+    let lines = include_str!("../../fixtures/agent/979a6d27.jsonl")
+        .lines()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let dir = planted(&lines);
+    let frames = replay(dir.path(), Seq::ZERO).unwrap();
+    let bingo_sdk::Event::ItemCompleted { item } = &frames[0].event else {
+        panic!("completed")
+    };
+    let expected: bingo_sdk::Frame =
+        serde_json::from_str(include_str!("../../fixtures/agent/upgraded.json")).unwrap();
+    assert_eq!(frames[0], expected);
+    assert!(item.external());
+    assert!(
+        matches!(&item.body, bingo_sdk::ItemBody::ToolCall { name, input, .. }
+        if name == "acp:read" && input["title"] == "Read note.md")
+    );
 }

@@ -114,6 +114,18 @@ impl Link {
         self.inbox.listen().await
     }
 
+    pub async fn judge(
+        &self,
+        judge: Arc<dyn bingo_sdk::Judge>,
+        errors: mpsc::UnboundedSender<Result<bingo_sdk::AgentEvent, ProviderError>>,
+        cancel: bingo_sdk::CancellationToken,
+    ) {
+        self.inbox.judge(judge, errors, cancel).await;
+    }
+    pub async fn clear_judge(&self) {
+        self.inbox.clear_judge().await;
+    }
+
     /// What the agent must be told first, said once and then forgotten.
     pub async fn take_preamble(&self) -> Option<String> {
         self.preamble.lock().await.take()
@@ -252,7 +264,7 @@ impl Sessions {
             // This is where most of those deaths are found, not all of them:
             // a child can go between this check and the write, and the turn
             // that discovers it there buries it and asks here again
-            // (`provider::Asking::afresh`).
+            // (`agent::Asking::afresh`).
             Some(_) => self.bury(name, session).await,
             None => {}
         }
@@ -263,6 +275,58 @@ impl Sessions {
             .await
             .insert((name.to_string(), session.clone()), link.clone());
         Ok(link)
+    }
+
+    pub async fn prepare_turn(
+        &self,
+        name: &str,
+        adapter: &Adapter,
+        session: &SessionId,
+    ) -> Result<Arc<Link>, ProviderError> {
+        if let Some(link) = self
+            .link(name, session)
+            .await
+            .filter(|l| l.connection.is_alive())
+        {
+            return Ok(link);
+        }
+        let history = self.past(session).await;
+        self.prepare(name, adapter, session, &history).await
+    }
+
+    async fn past(&self, session: &SessionId) -> Vec<Message> {
+        let Some(host) = self.host.lock().await.clone() else {
+            return Vec::new();
+        };
+        let Ok(attached) = host
+            .open(
+                bingo_sdk::SessionSelector::ById {
+                    id: session.clone(),
+                },
+                bingo_sdk::ClientIdentity {
+                    name: "acp-restore".into(),
+                    surface: "acp".into(),
+                },
+                Default::default(),
+            )
+            .await
+        else {
+            return Vec::new();
+        };
+        let mut messages: Vec<Message> = attached
+            .snapshot
+            .transcript
+            .items()
+            .iter()
+            .filter_map(|item| past_item(item))
+            .collect();
+        if messages
+            .last()
+            .is_some_and(|m| m.role == bingo_sdk::Role::User)
+        {
+            messages.pop();
+        }
+        messages
     }
 
     /// Let go of a dead adapter — dropping the link takes what is left of its
@@ -752,4 +816,41 @@ fn prelude(transcript: Option<&Path>, bridged: bool) -> Option<String> {
         said.push(crossing::SAYS.to_string());
     }
     (!said.is_empty()).then(|| said.join("\n\n"))
+}
+
+/// Restoration projects the journal only when the adapter has lost its context.
+fn past_item(item: &bingo_sdk::Item) -> Option<Message> {
+    use bingo_sdk::{ItemBody, Role};
+    match &item.body {
+        ItemBody::User { parts, origin } if !origin.is_context() => {
+            Some(Message::user(parts.clone()))
+        }
+        ItemBody::Assistant { text } => Some(Message::text(Role::Assistant, text)),
+        ItemBody::Compaction { summary, .. } if !summary.is_empty() => {
+            Some(Message::text(Role::Assistant, summary))
+        }
+        ItemBody::ToolCall {
+            call_id,
+            name,
+            input,
+            output,
+            ..
+        } => {
+            let mut message = Message::text(Role::Assistant, "");
+            message.parts = vec![bingo_sdk::ContentPart::ToolUse {
+                id: call_id.clone(),
+                name: name.clone(),
+                input: input.clone(),
+            }];
+            if let Some(output) = output {
+                message.parts.push(bingo_sdk::ContentPart::ToolResult {
+                    tool_use_id: call_id.clone(),
+                    parts: output.parts.clone(),
+                    is_error: output.is_error,
+                });
+            }
+            Some(message)
+        }
+        _ => None,
+    }
 }

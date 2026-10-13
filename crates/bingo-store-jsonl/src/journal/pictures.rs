@@ -48,7 +48,7 @@ fn two_picture_appends_keep_one_blob_and_upgrade_the_journal() {
     );
     let text = std::fs::read_to_string(layout::journal(dir.path())).unwrap();
     assert_eq!(text.matches("\"blob\"").count(), 2);
-    assert_eq!(text.matches("\"version\":2").count(), 1);
+    assert_eq!(text.matches("\"version\":3").count(), 1);
     assert_eq!(replay(dir.path(), Seq::ZERO).unwrap().len(), 3);
 }
 

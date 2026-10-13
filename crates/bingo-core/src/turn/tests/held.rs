@@ -8,9 +8,9 @@ use super::*;
 /// window is the one it named, and the kernel draws no line in it
 /// (ADR-0055 §1).
 fn held(provider: Arc<ScriptedProvider>, window: u64) -> TurnConfig {
-    let mut cfg = config(provider, vec![]);
+    let mut cfg = config(provider.clone(), vec![]);
     let model = cfg.model.as_mut().expect("a model");
-    model.capabilities.holds_context = true;
+    model.endpoint = Endpoint::Agent(provider);
     model.capabilities.context_window = window;
     cfg
 }

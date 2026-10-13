@@ -340,7 +340,6 @@ impl Asked {
                 reasoning: false,
                 count_tokens: false,
                 caching: false,
-                holds_context: false,
             },
             cwd: PathBuf::from("/work/project"),
             host: journals.handle(),

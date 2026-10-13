@@ -11,7 +11,7 @@
 //! prompt, the frames that came out, and the log the agent wrote of the answer
 //! it was actually sent.
 
-use bingo_sdk::{AnswerRole, InteractionKind, Question};
+use bingo_sdk::InteractionKind;
 
 use super::*;
 
@@ -128,42 +128,14 @@ fn a_headless_run_puts_the_question_and_falls_closed_when_nobody_answers() {
     assert_eq!(said(frames_of(&out)), ["Done."], "the turn went on");
 
     let asked = interactions(frames_of(&out));
-    let [
-        InteractionKind::Question(Question {
-            question,
-            header,
-            options,
-            ..
-        }),
-    ] = asked.as_slice()
-    else {
-        panic!("one question, and it is the agent's: {asked:?}");
+    let [InteractionKind::Permission { tool, summary, .. }] = asked.as_slice() else {
+        panic!("one permission: {asked:?}");
     };
-    assert_eq!(question, "Edit src/lib.rs", "the agent's own title");
-    assert_eq!(header.as_deref(), Some("scripted"), "and its own name");
-    assert_eq!(
-        options
-            .iter()
-            .map(|option| (option.id.as_str(), option.label.as_str(), option.role))
-            .collect::<Vec<_>>(),
-        [
-            ("allow-once", "Yes", Some(AnswerRole::Allowing)),
-            ("allow-always", "Yes, and stop asking", None),
-            ("reject", "No", Some(AnswerRole::Refusing))
-        ],
-        "its ids and labels verbatim; the standing yes is a person's alone"
-    );
+    assert_eq!(tool, "scripted:edit");
+    assert!(summary.contains("Edit src/lib.rs"));
 
     assert_eq!(answered(&adapter)["outcome"], "selected");
     assert_eq!(answered(&adapter)["optionId"], "reject");
-    let all = notices(frames_of(&out));
-    let told = coded(&all, "ACP_ASKED");
-    assert_eq!(told.len(), 1, "said once: {all:?}");
-    assert!(
-        told[0].contains("acp.adapters.scripted") && told[0].contains("got no answer"),
-        "the notice says what happened and names the row: {}",
-        told[0]
-    );
 }
 
 /// The other door stays declined (ADR-0039 §3): free-form input is another
@@ -200,4 +172,40 @@ fn an_elicitation_is_still_declined_and_said_once() {
         "and nobody was asked anything"
     );
     assert_eq!(coded(&notices(frames_of(&out)), "ACP_ASKED").len(), 1);
+}
+
+#[test]
+fn a_project_deny_rule_rejects_the_agents_execute() {
+    let Some(agent) = fake_agent() else { return };
+    let mut script = asks_first();
+    script["turns"][0]["permission"]["toolCall"] = json!({
+        "toolCallId":"exec-1", "title":"Run rm", "kind":"execute",
+        "rawInput":{"command":"rm important.txt"}
+    });
+    let adapter = Scripted::configured(
+        agent,
+        script,
+        json!({}),
+        json!({"permissions":{"deny":["scripted:execute(rm:*)"]}}),
+    );
+    let out = run_asking(&adapter, &[]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert_eq!(answered(&adapter)["optionId"], "reject");
+    assert!(
+        interactions(frames_of(&out)).is_empty(),
+        "the rule answered without a person"
+    );
+}
+
+#[test]
+fn an_agent_without_a_reject_option_fails_in_words() {
+    let Some(agent) = fake_agent() else { return };
+    let mut script = asks_first();
+    script["turns"][0]["permission"]["options"] = json!([
+        {"optionId":"yes", "name":"Yes", "kind":"allow_once"}
+    ]);
+    let adapter = Scripted::new(agent, script);
+    let out = run_asking(&adapter, &["--permission-mode", "dontAsk"]);
+    assert_ne!(out.status.code(), Some(0));
+    assert!(stderr(&out).contains("reject"), "{}", stderr(&out));
 }

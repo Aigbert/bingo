@@ -11,7 +11,7 @@ use agent_client_protocol_schema::v1::{
 };
 use bingo_provider_acp::error::AcpError;
 use bingo_provider_acp::events::Mapper;
-use bingo_sdk::{ModelEvent, UnifiedFinish};
+use bingo_sdk::{AgentEvent, ModelEvent, UnifiedFinish};
 use harness::{Collector, Fake, connect};
 use serde_json::{Value, json};
 
@@ -93,7 +93,7 @@ async fn a_scripted_agent_answers_a_turn_over_real_pipes() {
         .unwrap();
 
     let mut mapper = Mapper::default();
-    let mut events: Vec<ModelEvent> = Vec::new();
+    let mut events: Vec<AgentEvent> = Vec::new();
     for note in collector.updates.lock().await.drain(..) {
         events.extend(mapper.update(note.update));
     }
@@ -102,32 +102,20 @@ async fn a_scripted_agent_answers_a_turn_over_real_pipes() {
     let said: String = events
         .iter()
         .filter_map(|e| match e {
-            ModelEvent::TextDelta { delta, .. } => Some(delta.as_str()),
+            AgentEvent::Said(ModelEvent::TextDelta { delta, .. }) => Some(delta.as_str()),
             _ => None,
         })
         .collect();
     assert_eq!(said, "Hello there.");
-    let marked = events.iter().any(|e| {
-        matches!(
-            e,
-            ModelEvent::ReasoningEnd { provider_metadata, .. }
-                if provider_metadata
-                    .get("acp")
-                    .is_some_and(|m| m["external"] == Value::Bool(true))
-        )
-    });
-    assert!(marked, "the agent's own call wears the mark");
+    assert!(events.iter().any(|e| matches!(e, AgentEvent::Done { .. })));
     assert!(
         !events
             .iter()
-            .any(|e| matches!(e, ModelEvent::ToolCall { .. })),
-        "and asks the loop to run nothing"
+            .any(|e| matches!(e, AgentEvent::Said(ModelEvent::ToolCall { .. })))
     );
-    assert!(matches!(
-        events.last(),
-        Some(ModelEvent::Finish { usage, finish_reason })
-            if usage.output_tokens == 3 && finish_reason.unified == UnifiedFinish::Stop
-    ));
+    assert!(
+        matches!(events.last(), Some(AgentEvent::Said(ModelEvent::Finish { usage, finish_reason })) if usage.output_tokens == 3 && finish_reason.unified == UnifiedFinish::Stop)
+    );
 
     assert_eq!(
         fake.methods(),

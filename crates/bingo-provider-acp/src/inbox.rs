@@ -1,13 +1,9 @@
 //! The client half of one conversation: where a turn's stream goes, and what
 //! the agent is told when it asks this client something.
 //!
-//! An ACP agent brings its own permission machinery and the row that spawned it
-//! says what it may do, so a well-configured adapter never knocks here
-//! (ADR-0039 §4). One that knocks anyway is not refused on principle any more:
-//! its question is put to whoever is at the session, in the agent's own words,
-//! and the answer is one of the agent's own option ids (ADR-0039 §3). The
-//! refusal — and the one line that says so — is what is left when there was
-//! nobody to put it to.
+//! The adapter's row speaks first. Permission requests that reach bingo pass
+//! the running turn's judge; only its verdict selects an ACP option. Outside
+//! a turn they fail closed. Free-form elicitation remains unsupported.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -20,12 +16,21 @@ use bingo_sdk::{HostHandle, SessionId};
 use tokio::sync::{Mutex, mpsc};
 
 use crate::connection::Client;
-use crate::{question, refusal};
+use crate::{permission, refusal};
+use bingo_sdk::{AgentEvent, CancellationToken, Judge, ProviderError, Verdict};
+use std::sync::Arc;
 
 /// Where a running turn's stream goes.
 type Sink = mpsc::UnboundedSender<SessionNotification>;
 
+struct Judging {
+    judge: Arc<dyn Judge>,
+    errors: mpsc::UnboundedSender<Result<AgentEvent, ProviderError>>,
+    cancel: CancellationToken,
+}
+
 pub struct Inbox {
+    judging: Mutex<Option<Judging>>,
     adapter: String,
     sink: Mutex<Option<Sink>>,
     /// True while `session/load` replays. The journal already holds those
@@ -35,21 +40,17 @@ pub struct Inbox {
     /// nobody could answer.
     told: AtomicBool,
     host: Option<HostHandle>,
-    /// Whose conversation this is. A cold ask has none (`crate::probe`): it is
-    /// nobody's session, so a question put during one reaches nobody and falls
-    /// closed like any other unanswerable one.
-    session: Option<SessionId>,
 }
 
 impl Inbox {
-    pub fn new(adapter: &str, host: Option<HostHandle>, session: Option<&SessionId>) -> Self {
+    pub fn new(adapter: &str, host: Option<HostHandle>, _session: Option<&SessionId>) -> Self {
         Inbox {
+            judging: Mutex::new(None),
             adapter: adapter.to_string(),
             sink: Mutex::new(None),
             loading: AtomicBool::new(false),
             told: AtomicBool::new(false),
             host,
-            session: session.cloned(),
         }
     }
 
@@ -73,17 +74,37 @@ impl Inbox {
     /// The question, put to whoever is at this session. `None` when nothing
     /// chose an option: no session behind this conversation, a door that
     /// refused it, or a surface that declined what it was handed.
+    pub async fn judge(
+        &self,
+        judge: Arc<dyn Judge>,
+        errors: mpsc::UnboundedSender<Result<AgentEvent, ProviderError>>,
+        cancel: CancellationToken,
+    ) {
+        *self.judging.lock().await = Some(Judging {
+            judge,
+            errors,
+            cancel,
+        });
+    }
+    pub async fn clear_judge(&self) {
+        self.judging.lock().await.take();
+    }
+
     async fn put(&self, request: &RequestPermissionRequest) -> Option<RequestPermissionResponse> {
-        let (host, session) = (self.host.as_ref()?, self.session.as_ref()?);
-        let answer = host
-            .ask(
-                session,
-                question::asked(&self.adapter, request),
-                question::answers(),
-            )
-            .await
-            .ok()?;
-        question::picked(request, &answer)
+        let judging = self.judging.lock().await;
+        let judging = judging.as_ref()?;
+        let verdict = tokio::select! {
+            biased;
+            _ = judging.cancel.cancelled() => Verdict::Deny { feedback: None },
+            verdict = judging.judge.judge(permission::call(request)) => verdict,
+        };
+        let option = permission::narrowest(request, &verdict);
+        if option.is_none() {
+            let _ = judging.errors.send(Err(ProviderError::Request {
+                message: "agent permission request offered no reject option".into(),
+            }));
+        }
+        option.map(permission::selected)
     }
 
     /// The one thing this plugin must not do silently: an agent asked, and the

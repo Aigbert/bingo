@@ -143,7 +143,6 @@ mod tests {
             reasoning: true,
             count_tokens: false,
             caching: true,
-            holds_context: false,
         };
         let summary = request(&parent, &caps, Some("keep SQL")).expect("headroom");
         assert_eq!(summary.system, parent.system);
@@ -205,7 +204,6 @@ mod tests {
             reasoning: false,
             count_tokens: false,
             caching: false,
-            holds_context: false,
         };
         assert!(request(&parent(), &caps, None).is_none());
     }

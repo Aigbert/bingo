@@ -821,7 +821,6 @@ mod tests {
             reasoning: false,
             count_tokens: false,
             caching: false,
-            holds_context: false,
         }
     }
 
@@ -1102,8 +1101,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&spec).expect("it serialises"),
             json!({ "id": "quiet", "models": [], "endpoint": {
-                "images": false, "countTokens": false, "caching": false,
-                "holdsContext": false
+                "images": false, "countTokens": false, "caching": false
             }}),
             "an absent family is absent on the wire, never the id repeated"
         );

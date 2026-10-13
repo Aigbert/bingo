@@ -116,7 +116,7 @@ fn config(provider: Arc<ScriptedProvider>, tools: Vec<Arc<dyn Tool>>) -> TurnCon
         session: summary(),
         cwd: "/tmp".into(),
         model: Some(ModelChoice {
-            provider,
+            endpoint: crate::turn::Endpoint::Provider(provider),
             id: "m".into(),
             capabilities: capabilities(),
             max_tokens: 1000,
@@ -982,3 +982,5 @@ mod hook_contract;
 
 #[path = "../chain/turn_tests.rs"]
 mod chain;
+
+mod agent_turn;

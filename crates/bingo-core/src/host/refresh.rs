@@ -13,6 +13,7 @@ use bingo_sdk::{CatalogKind, GatewayEvent, Provider};
 use jiff::Timestamp;
 
 use super::Host;
+use crate::turn::Endpoint;
 
 /// What one provider's refresh came to: how many ids it answered with, or why
 /// it could not be asked.
@@ -28,7 +29,8 @@ pub(super) fn in_background(host: &Arc<Host>) {
     tokio::spawn(async move {
         let Some(host) = weak.upgrade() else { return };
         let now = Timestamp::now();
-        let stale: Vec<Arc<dyn Provider>> = usable(&host.providers().await)
+        let stale: Vec<Endpoint> = endpoints(&host)
+            .await
             .into_iter()
             .filter(|p| host.served.stale(p.id(), now))
             .collect();
@@ -44,7 +46,7 @@ pub(super) fn in_background(host: &Arc<Host>) {
 /// Ask every usable provider now, however fresh its list is, and say what each
 /// answered: `/models refresh`, which waits because a person asked it to.
 pub(super) async fn now(host: &Arc<Host>) -> Vec<Refreshed> {
-    let providers = usable(&host.providers().await);
+    let providers = endpoints(host).await;
     let weak = Arc::downgrade(host);
     futures::future::join_all(
         providers
@@ -67,7 +69,7 @@ fn usable(providers: &[Arc<dyn Provider>]) -> Vec<Arc<dyn Provider>> {
 /// One provider's list, kept if it came and announced if it changed. A failure
 /// keeps whatever was cached: an endpoint that could not be reached has not
 /// withdrawn its models.
-async fn ask(host: Weak<Host>, provider: Arc<dyn Provider>) -> Refreshed {
+async fn ask(host: Weak<Host>, provider: Endpoint) -> Refreshed {
     let answer = provider.models().await;
     let refreshed = |answer| Refreshed {
         provider: provider.id().to_string(),
@@ -90,4 +92,12 @@ async fn ask(host: Weak<Host>, provider: Arc<dyn Provider>) -> Refreshed {
         });
     }
     refreshed(Ok(count))
+}
+
+async fn endpoints(host: &Host) -> Vec<Endpoint> {
+    usable(&host.providers().await)
+        .into_iter()
+        .map(Endpoint::Provider)
+        .chain(host.registry.agents.iter().cloned().map(Endpoint::Agent))
+        .collect()
 }

@@ -203,7 +203,7 @@ async fn checkpoint_writes_cannot_regress_to_an_older_sequence() {
 }
 
 #[tokio::test]
-async fn a_version_one_checkpoint_is_replayed_after_the_bump() {
+async fn a_version_two_checkpoint_is_replayed_after_the_bump() {
     let (_root, store) = root_with();
     let state = journal_with_cut(&store).await;
     store
@@ -214,7 +214,7 @@ async fn a_version_one_checkpoint_is_replayed_after_the_bump() {
     let path = dir.join("checkpoint.json");
     let mut saved: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    saved["version"] = 1.into();
+    saved["version"] = 2.into();
     std::fs::write(path, serde_json::to_vec(&saved).unwrap()).unwrap();
     assert!(store.resume(&session()).await.unwrap().state.is_none());
     assert!(store.resume(&session()).await.unwrap().state.is_some());

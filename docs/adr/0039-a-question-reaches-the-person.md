@@ -98,3 +98,5 @@ a second representation.)
   does instead of being refused for naming no allowing option.
 
 Refs: ADR-0035 §5, ADR-0036 §2, ADR-0011; Plans: M43, M53
+
+*2026-10-13 amendment — §3: ADR-0076 moves ACP session/request_permission to Judge and the ordinary tool permission chain. Other HostApi::ask clients and Question interactions are unchanged; elicitation remains declined.*

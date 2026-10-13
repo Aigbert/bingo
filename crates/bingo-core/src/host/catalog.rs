@@ -20,13 +20,33 @@ pub(super) async fn entries(
     served: &ServedModels,
     kind: CatalogKind,
 ) -> Vec<CatalogEntry> {
-    match kind {
+    let mut entries = match kind {
         CatalogKind::Models => models(resolved, model, served),
         CatalogKind::Providers => providers(resolved),
         CatalogKind::Tools => tools(registry).await,
         CatalogKind::Commands => commands(registry).await,
         CatalogKind::Plugins => plugins(registry).await,
+    };
+    for agent in &registry.agents {
+        match kind {
+            CatalogKind::Providers => entries.push(CatalogEntry {
+                id: agent.id().into(),
+                label: agent.id().into(),
+                meta: json!({"auth": AuthStatus::NotApplicable}),
+            }),
+            CatalogKind::Models => {
+                for offer in served::merge(served.get(agent.id()).as_ref(), &[], model) {
+                    entries.push(CatalogEntry {
+                        id: format!("{}/{}", agent.id(), offer.id),
+                        label: offer.id,
+                        meta: json!({"provider": agent.id(), "source": offer.source.as_str()}),
+                    });
+                }
+            }
+            _ => {}
+        }
     }
+    entries
 }
 
 /// Each provider's ids — the ones its endpoint answered with if it has ever

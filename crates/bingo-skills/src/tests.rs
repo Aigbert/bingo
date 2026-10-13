@@ -212,7 +212,6 @@ pub(crate) fn asked(cwd: &Path) -> Asked {
             reasoning: false,
             count_tokens: false,
             caching: false,
-            holds_context: false,
         },
         cwd: cwd.to_path_buf(),
         host: host_with_pages(&[]),

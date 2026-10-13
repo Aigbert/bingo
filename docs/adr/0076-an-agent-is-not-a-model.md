@@ -1,6 +1,6 @@
 # ADR-0076 — An agent is not a model
 
-Status: proposed · 2026-10-13 · Plan: M134 · Amends: ADR-0035 §1, §4, §5; ADR-0039 §3; ADR-0055 §1
+Status: accepted · 2026-10-13 · Plan: M134 · Amends: ADR-0035 §1, §4, §5; ADR-0039 §3; ADR-0055 §1
 
 ## Context
 
@@ -90,3 +90,22 @@ ADR-0068, ADR-0074, audit-2026-10 §6.
 Non-goals: ACP plans, modes and slash commands; `fs/*` and `terminal/*`
 served to the agent; rewinding an agent's unasked edits; an agent
 speaking anything but ACP (the trait allows it; nothing builds it).
+
+*2026-10-13, §6 clarification by the person's delegate: protocol 2 has
+not shipped; remove `holdsContext` from both sdk types and regenerate
+both schemas before the freeze starts at its first release (ADR-0075).
+Unknown legacy fields deserialize without effect. A legacy `true` emits
+one Info notice at plugin load naming the plugin: an endpoint holding
+its own conversation is an agent. Fixtures pin absent and legacy true.*
+
+*2026-10-13, §1 clarification by the person's delegate: `AgentTurn` also
+carries `tools: Vec<ToolSpec>`, the turn's already resolved offer. ADR-0036
+§1 requires the unchanged bridge to offer exactly those tools; this adds
+no history, host reader or second selection.*
+
+*2026-10-13, §1 clarification by the person's delegate: ADR-0009 §6's open
+retry is a model's, not an agent's: the agent may already have acted. A child
+stopping mid-answer fails the turn without withdrawing speech or work and
+without `TurnRetrying`. It is buried with one `ACP_RESPAWN`; the next prompt
+uses a new child. Before anything was said, the plugin may still replace a
+dead child and ask again inside the same run.*

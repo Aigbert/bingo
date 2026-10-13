@@ -197,6 +197,7 @@ pub enum Contribution {
     /// Tools resolved late, from a source that does its I/O elsewhere.
     Tools(Arc<dyn ToolSource>),
     Provider(Arc<dyn Provider>),
+    Agent(Arc<dyn crate::Agent>),
     /// Providers resolved late, from a source that does its I/O elsewhere.
     Providers(Arc<dyn ProviderSource>),
     Policy(Arc<dyn PermissionPolicy>),
@@ -252,6 +253,7 @@ impl fmt::Debug for Contribution {
         match self {
             Contribution::Tool(t) => write!(f, "Tool({})", t.spec().name),
             Contribution::Tools(s) => write!(f, "Tools({})", s.id()),
+            Contribution::Agent(a) => write!(f, "Agent({})", a.id()),
             Contribution::Provider(p) => write!(f, "Provider({})", p.id()),
             Contribution::Providers(s) => write!(f, "Providers({})", s.id()),
             Contribution::Policy(p) => write!(f, "Policy({})", p.id()),
@@ -361,6 +363,10 @@ impl Registrar {
 
     pub fn provider(&mut self, provider: Arc<dyn Provider>) {
         self.add(Contribution::Provider(provider));
+    }
+
+    pub fn agent(&mut self, agent: Arc<dyn crate::Agent>) {
+        self.add(Contribution::Agent(agent));
     }
 
     pub fn surface(&mut self, surface: Arc<dyn Surface>) {

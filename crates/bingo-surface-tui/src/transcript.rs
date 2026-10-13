@@ -18,7 +18,7 @@ use crate::clock::{self, Anim, Now};
 use crate::fold::{self, Fold, Folds};
 use crate::graphics::{Decoded, Linked, Picture};
 use crate::tree::{self, Agents};
-use crate::{acp, markdown, paths, theme, thoughts, worked, wrap};
+use crate::{markdown, paths, theme, thoughts, worked, wrap};
 
 /// What was said into a session: a person's line, a subsystem's notice, a
 /// room's conversation.
@@ -361,15 +361,7 @@ fn default_item_lines(
         ItemBody::Unknown { .. } => Block::default(),
         ItemBody::User { parts, origin } => said::lines(item, parts, origin, fold, rows).into(),
         ItemBody::Assistant { text } => assistant(text, item.status, fold, rows, cue),
-        // An agent that runs its own tools journals each finished call as a
-        // reasoning item whose metadata is the whole call (ADR-0035 §4), so
-        // what a reasoning item draws is the one question of whether it is a
-        // thought or a call ([`crate::acp`]).
-        ItemBody::Reasoning { .. } => match acp::call(item) {
-            Some(call) => agent_call(call, fold, rows, cue),
-            None => thinking::lines(item, place, fold, rows),
-        }
-        .into(),
+        ItemBody::Reasoning { .. } => thinking::lines(item, place, fold, rows).into(),
         ItemBody::ToolCall { .. } => called(item, agents, fold, rows, cue).into(),
         ItemBody::Shell {
             command,
@@ -433,6 +425,7 @@ fn called(
     cue: Cue,
 ) -> Vec<Line<'static>> {
     let ItemBody::ToolCall {
+        call_id,
         name,
         input,
         output,
@@ -459,7 +452,20 @@ fn called(
             })
             .unwrap_or_default();
     }
-    let about = summarize(input);
+    let external = item
+        .external()
+        .then(|| {
+            bingo_sdk::ExternalCall::from_input(&bingo_sdk::ToolCall {
+                call_id: call_id.clone(),
+                name: name.clone(),
+                input: input.clone(),
+            })
+        })
+        .flatten();
+    let (name, about) = match &external {
+        Some(call) => (call.title.as_str(), String::new()),
+        None => (name.as_str(), summarize(input)),
+    };
     match agents.get(&item.id) {
         Some(child) => child_row(child, input, rows),
         None => tool_call(
@@ -475,35 +481,6 @@ fn called(
             cue,
         ),
     }
-}
-
-/// One of the agent's own calls, as the row every other call wears: the same
-/// bullet, the same signature, the same folded result. The heading lines the
-/// provider wrote into the item's text are what this row replaces — drawn as
-/// well as the row, the two would say the same thing twice.
-///
-/// A call still running has no metadata to read (the provider writes it when
-/// the block closes), so it never reaches here: it draws as the thought it
-/// looks like, which is what it did before this row existed.
-fn agent_call(call: acp::Call, fold: Fold, rows: &Rows<'_>, cue: Cue) -> Vec<Line<'static>> {
-    let acp::Call {
-        name,
-        about,
-        status,
-        output,
-    } = call;
-    tool_call(
-        Call {
-            status,
-            name,
-            about,
-            output: output.as_ref(),
-            progress: None,
-            fold,
-        },
-        rows,
-        cue,
-    )
 }
 
 // ---- the two marks ------------------------------------------------------
@@ -653,7 +630,7 @@ struct Call<'a> {
     name: &'a str,
     /// What the row says the call is about, in the words whoever built it
     /// reads the call in: a tool's input as [`summarize`] spells it, an ACP
-    /// agent's own input or title ([`crate::acp`]).
+    /// agent's own title.
     about: String,
     output: Option<&'a ToolOutput>,
     progress: Option<&'a str>,
@@ -955,6 +932,32 @@ mod tests {
         receipt_item, running_tool, scene, started, started_tool, tool, ts, user as person,
     };
     use bingo_sdk::{Event, ItemId};
+
+    #[test]
+    fn an_upgraded_historical_agent_call_draws_a_tool_row() {
+        let frame: bingo_sdk::Frame = serde_json::from_str(include_str!(
+            "../../bingo-store-jsonl/fixtures/agent/upgraded.json"
+        ))
+        .unwrap();
+        let Event::ItemCompleted { item } = frame.event else {
+            panic!("completed call")
+        };
+        let rows = drawn(vec![item]).join("\n");
+        let backend = ratatui::backend::TestBackend::new(80, 12);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| f.render_widget(ratatui::widgets::Paragraph::new(rows.as_str()), f.area()))
+            .unwrap();
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|c| c.symbol())
+            .collect();
+        assert!(text.contains("⏺ Read note.md"), "{text}");
+        assert!(text.contains("hello"), "{text}");
+    }
 
     /// A member's own transcript: a session a model answers.
     fn drawn(items: Vec<Item>) -> Vec<String> {
@@ -1895,7 +1898,7 @@ mod tests {
                 }),
             )]),
             vec![
-                "⏺ Read(src/lib.rs)".to_string(),
+                "⏺ Read src/lib.rs (1 - 50)".to_string(),
                 "  ⎿  pub mod wire;".to_string(),
             ],
         );
@@ -1975,7 +1978,7 @@ mod tests {
         assert_eq!(
             rendered(&state),
             vec![
-                "⏺ Tool(toolu_04Bash)".to_string(),
+                "⏺ toolu_04Bash".to_string(),
                 "  ⎿  no such file".to_string(),
             ],
         );

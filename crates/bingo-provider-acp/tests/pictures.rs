@@ -4,10 +4,8 @@ mod harness;
 #[path = "harness/prompt_host.rs"]
 mod prompt_host;
 
-use bingo_provider_acp::{provider::AcpProvider, session::Sessions};
-use bingo_sdk::{
-    CancellationToken, ContentPart, Env, Image, Message, ModelRequest, Provider, Role, SessionId,
-};
+use bingo_provider_acp::{agent::AcpAgent, session::Sessions};
+use bingo_sdk::{Agent, ContentPart, Env, Image, Message, ModelRequest, Role, SessionId};
 use futures::StreamExt;
 use harness::{Fake, LIMIT, agent_binary};
 use serde_json::{Value, json};
@@ -36,7 +34,7 @@ async fn prompt(images: bool) -> (Value, Image) {
     sessions.set_host(prompt_host::host(fake.cwd())).await;
     let adapter =
         serde_json::from_value(json!({ "command": agent_binary(), "env": fake.env() })).unwrap();
-    let provider = AcpProvider::new("scripted".into(), adapter, sessions.clone());
+    let provider = AcpAgent::new("scripted".into(), adapter, sessions.clone());
     let image = Image::from_bytes("image/png", b"picture bytes preserved on the wire").unwrap();
     let parts = vec![
         ContentPart::text("before"),
@@ -46,10 +44,7 @@ async fn prompt(images: bool) -> (Value, Image) {
         ContentPart::text("after"),
     ];
     tokio::time::timeout(LIMIT, async {
-        let mut stream = provider
-            .stream(request(parts), CancellationToken::new())
-            .await
-            .unwrap();
+        let mut stream = provider.run(harness::turn(request(parts))).await.unwrap();
         while let Some(event) = stream.next().await {
             event.unwrap();
         }
@@ -97,4 +92,58 @@ async fn an_acp_agent_without_images_receives_one_note_per_picture() {
             {"type":"text", "text":"after"}
         ])
     );
+}
+
+/// The bridge must consume AgentTurn.tools, not reconstruct a catalogue offer.
+#[tokio::test]
+async fn the_bridge_offers_exactly_the_turns_resolved_tools() {
+    let fake = Fake::new(json!({"turns":[{"updates":[],"stopReason":"end_turn"}]}));
+    let sessions = Sessions::new(Env::rooted(fake.cwd()));
+    sessions.set_host(prompt_host::host(fake.cwd())).await;
+    let adapter = serde_json::from_value(
+        json!({"command":agent_binary(),"env":fake.env(),"tools":["Resolved","Absent"]}),
+    )
+    .unwrap();
+    let agent = AcpAgent::new("scripted".into(), adapter, sessions.clone());
+    let mut turn = harness::turn(request(vec![ContentPart::text("list")]));
+    turn.tools = vec![bingo_sdk::ToolSpec {
+        name: "Resolved".into(),
+        description: "the turn resolved this".into(),
+        input_schema: json!({"type":"object"}),
+        meta: Default::default(),
+    }];
+    tokio::time::timeout(LIMIT, async {
+        let mut stream = agent.run(turn).await.unwrap();
+        while let Some(event) = stream.next().await {
+            event.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    use bingo_provider_acp::bridge::{ADDRESS_VAR, Address, TOKEN_VAR, handshake, socket};
+    use rmcp::ServiceExt;
+    let opened = fake.first("session/new").unwrap();
+    let env = opened["mcpServers"][0]["env"].as_array().unwrap();
+    let value = |name| {
+        env.iter().find(|v| v["name"] == name).unwrap()["value"]
+            .as_str()
+            .unwrap()
+    };
+    let address = Address::from_raw(value(ADDRESS_VAR));
+    tokio::time::timeout(LIMIT, async {
+        let mut wire = socket::dial(&address).await.unwrap();
+        handshake::write(&mut wire, value(TOKEN_VAR)).await.unwrap();
+        let client = ().serve(wire).await.unwrap();
+        let listed = client.list_tools(None).await.unwrap();
+        assert_eq!(listed.tools.len(), 1, "{listed:?}");
+        assert_eq!(listed.tools[0].name, "Resolved");
+        assert_eq!(
+            listed.tools[0].description.as_deref(),
+            Some("the turn resolved this")
+        );
+        client.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+    sessions.close().await;
 }

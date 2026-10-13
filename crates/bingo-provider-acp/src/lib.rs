@@ -33,6 +33,7 @@ use bingo_sdk::{
 use futures::StreamExt;
 use tokio::task::JoinHandle;
 
+pub mod agent;
 pub mod bridge;
 pub mod child;
 pub mod config;
@@ -50,16 +51,14 @@ pub mod ladder;
 pub mod legacy;
 pub mod method;
 pub mod options;
+pub mod permission;
 pub mod probe;
-pub mod provider;
-pub mod question;
 pub mod refusal;
 pub mod render;
 pub mod servers;
 pub mod session;
 pub mod shared;
 pub mod transcript;
-pub mod windows;
 pub mod wire;
 
 /// No provider is promised: which ones exist is the person's configuration to
@@ -116,8 +115,8 @@ impl Plugin for AcpPlugin {
         registrar.add(Contribution::Hook(Arc::new(ear::Ear::new(
             sessions.clone(),
         ))));
-        for instance in provider::providers(rows, &sessions) {
-            registrar.provider(instance);
+        for instance in agent::agents(rows, &sessions) {
+            registrar.agent(instance);
         }
         Ok(())
     }
@@ -221,11 +220,11 @@ mod tests {
             }}
         }));
         assert!(
-            contributions.contains(&"Provider(claude)".to_string()),
+            contributions.contains(&"Agent(claude)".to_string()),
             "{contributions:?}"
         );
         assert!(
-            contributions.contains(&"Provider(codex-acp)".to_string()),
+            contributions.contains(&"Agent(codex-acp)".to_string()),
             "{contributions:?}"
         );
         assert!(

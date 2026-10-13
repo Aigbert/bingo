@@ -4,7 +4,7 @@ use crate::{Seq, SessionState};
 use serde::{Deserialize, Serialize};
 
 pub const CHECKPOINT_FORMAT: &str = "bingo-checkpoint";
-pub const CHECKPOINT_VERSION: u32 = 2;
+pub const CHECKPOINT_VERSION: u32 = 3;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

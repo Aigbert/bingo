@@ -10,6 +10,7 @@ pub mod executor;
 pub mod gate;
 pub mod host;
 pub mod journal;
+pub mod judge;
 pub mod models;
 pub mod plugins;
 pub mod prompt;

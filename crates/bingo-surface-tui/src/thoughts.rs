@@ -19,9 +19,9 @@ use jiff::SignedDuration;
 
 /// Whether this item is a thought: a reasoning item that is not one of an ACP
 /// agent's own calls, which is a reasoning item too (ADR-0035 §4) and draws as
-/// a tool row ([`crate::acp`]).
+/// a tool row.
 pub fn is_thought(item: &Item) -> bool {
-    matches!(item.body, ItemBody::Reasoning { .. }) && !crate::acp::is_call(item)
+    matches!(item.body, ItemBody::Reasoning { .. })
 }
 
 /// The thoughts adjacent before `at`: the run the item there ends, itself left

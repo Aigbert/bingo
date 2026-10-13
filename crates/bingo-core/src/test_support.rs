@@ -142,7 +142,7 @@ impl Provider for ScriptedProvider {
         &self.id
     }
     fn family(&self) -> &str {
-        self.family.as_deref().unwrap_or_else(|| self.id())
+        self.family.as_deref().unwrap_or_else(|| &self.id)
     }
     fn auth(&self) -> AuthStatus {
         self.auth.lock().unwrap().clone()
@@ -150,7 +150,6 @@ impl Provider for ScriptedProvider {
     fn endpoint(&self, _: &str) -> EndpointCapabilities {
         let held = *self.holds.lock().unwrap();
         EndpointCapabilities {
-            holds_context: held.is_some(),
             context_window: held,
             ..EndpointCapabilities::default()
         }
@@ -355,7 +354,6 @@ pub fn capabilities() -> ModelCapabilities {
         reasoning: false,
         count_tokens: false,
         caching: false,
-        holds_context: false,
     }
 }
 
@@ -400,7 +398,7 @@ pub fn config(
         session: summary("ses_1"),
         cwd: "/tmp".into(),
         model: Some(crate::turn::ModelChoice {
-            provider,
+            endpoint: crate::turn::Endpoint::Provider(provider),
             id: "m".into(),
             capabilities: capabilities(),
             max_tokens: 1000,
@@ -736,5 +734,33 @@ impl Hook for RecordingHook {
         let mut open = self.open.subscribe();
         let _ = open.wait_for(|o| *o).await;
         self.note(format!("event:{}", frame.seq.0));
+    }
+}
+
+#[async_trait]
+impl Agent for ScriptedProvider {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    async fn models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        Provider::models(self).await
+    }
+    async fn run(&self, turn: AgentTurn) -> Result<AgentStream, ProviderError> {
+        let stream = Provider::stream(
+            self,
+            ModelRequest {
+                model: turn.model,
+                max_tokens: 1,
+                system: vec![],
+                messages: vec![Message::user(turn.input)],
+                tools: turn.tools,
+                reasoning: turn.reasoning,
+                session: Some(turn.session),
+                provider_options: Default::default(),
+            },
+            CancellationToken::new(),
+        )
+        .await?;
+        Ok(Box::pin(stream.map(|event| event.map(AgentEvent::Said))))
     }
 }

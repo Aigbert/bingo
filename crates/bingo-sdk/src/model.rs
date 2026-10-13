@@ -446,11 +446,6 @@ pub struct EndpointCapabilities {
     pub count_tokens: bool,
     #[serde(default)]
     pub caching: bool,
-    /// The conversation lives on the endpoint's side, and so does the ruler
-    /// over it: the kernel sends the newest turn, measures nothing and cuts
-    /// nothing (ADR-0055 §1).
-    #[serde(default)]
-    pub holds_context: bool,
     /// The window this endpoint last named for this model. A server's word on
     /// itself outranks every guess at it (ADR-0055 §2).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -474,10 +469,6 @@ pub struct ModelCapabilities {
     pub count_tokens: bool,
     #[serde(default)]
     pub caching: bool,
-    /// The endpoint holds this conversation and measures it itself
-    /// (ADR-0055 §1): the kernel draws no line in a window it does not own.
-    #[serde(default)]
-    pub holds_context: bool,
 }
 
 /// Provider stream events. Never published; the accumulator folds them into items.
@@ -869,15 +860,13 @@ mod tests {
         let capabilities: EndpointCapabilities =
             serde_json::from_value(serde_json::json!({ "images": true })).unwrap();
         assert!(capabilities.images);
-        assert!(!capabilities.holds_context);
         assert_eq!(capabilities.context_window, None);
         let held = EndpointCapabilities {
-            holds_context: true,
             context_window: Some(1_000_000),
             ..EndpointCapabilities::default()
         };
         let json = serde_json::to_value(held).unwrap();
-        assert_eq!(json["holdsContext"], Value::Bool(true));
+        assert!(json.get("holdsContext").is_none());
         assert_eq!(json["contextWindow"], Value::from(1_000_000));
         assert_eq!(
             serde_json::from_value::<EndpointCapabilities>(json).unwrap(),

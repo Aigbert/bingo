@@ -1,14 +1,12 @@
 # ACP
 
-Another coding agent, driving as a model. An adapter that speaks the Agent
-Client Protocol — Claude Code, Codex, Gemini, whatever ships next — is spawned
-as a child process and answers `session/prompt` the way a provider answers a
-request. What comes back is journaled as model events, so the transcript, every
-surface and every replay read one record whoever produced it.
+Another coding agent, with its own conversation. An adapter speaking the Agent
+Client Protocol is spawned as a child process. Bingo sends the newest input,
+including pictures where supported, and journals its speech and external tool
+calls on the same stream every surface reads.
 
-The agent brings its own hands: its own tools, its own login, its own
-permission machinery. What bingo adds is a session to hang it on and, over the
-bridge below, the tools this house has that it does not.
+The agent brings its own tools and login. Bingo adds a session, permission
+checks when the agent asks, and its shared tools over the bridge below.
 
 ## Configuring an adapter
 
@@ -65,10 +63,15 @@ One ACP session per bingo session, kept on the agent's side. Reopening climbs:
 `session/load` whose replay is swallowed rather than journaled twice, else a
 fresh session whose first prompt names a file holding the transcript so far.
 
-The agent's own tool calls arrive as finished work, not as instructions: the
-call, its status and its output ride the item's provider metadata and are
-journaled whole, never executed here. A surface that wants tool rows for them
-reads that metadata; the terminal does.
+The agent's own tool calls are journaled as external tool rows with their titles,
+locations and reported outputs. Bingo does not execute them. When the agent
+asks permission, the call passes bingo's tool checks, hooks, policy and person.
+Rules use names such as `claude-acp:execute(rm:*)`; a `Bash` rule does not grant
+permission to an agent's execute call. The adapter's own configuration still
+speaks first: an agent told not to ask never reaches bingo's checks.
+
+`/rewind` can restore an asked-for edit, delete or move at its reported locations.
+Edits the agent makes without asking are outside those checkpoints.
 
 ## The bridge
 
@@ -98,12 +101,14 @@ reaches it: the catalogue moving is `tools/list_changed`.
   sends — and honestly zero where an adapter reports none. ACP's plans, modes
   and slash commands are unmapped, and `fs/*` and `terminal/*` are declared
   unsupported — the agent reaches the disk as itself.
-- **Permission questions are the adapter's own.** One that asks anyway is put
-  to whoever is at the session, in the agent's own words. Where nobody answers
-  it fails closed with one of the reject options the agent itself offered, or
-  is cancelled where it offered none, and a notice names the row to configure.
-  A free-form `elicitation/create` is declined the same way.
+- **Permission requests pass bingo's tool checks.** Rules and hooks can deny
+  them or ask the person. An unanswered request selects the agent's reject
+  option; without a reject option, the turn fails with a reason. Even a
+  session-wide approval selects `allow_once`: bingo retains its scope and
+  the adapter asks again. Free-form `elicitation/create` remains declined.
 
-Interrupting is `session/cancel`. A child that dies between turns is replaced
-rather than asked, with a notice, and every child ends with the process that
-spawned it.
+Interrupting is `session/cancel`. A child that dies before saying anything can
+be replaced and asked again within the run. A child that stops mid-answer
+fails the turn: its journaled speech and work stay, and nothing is retried.
+The dead child is buried with one notice; the next prompt uses a new child.
+Every child ends with the process that spawned it.

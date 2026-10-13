@@ -1,0 +1,42 @@
+{
+  "seq": 1,
+  "ts": "2026-10-13T00:00:00Z",
+  "session": "ses_legacy",
+  "event": {
+    "type": "itemCompleted",
+    "item": {
+      "id": "itm_external",
+      "turn": "trn_1",
+      "status": "completed",
+      "startedAt": "2026-10-13T00:00:00Z",
+      "body": {
+        "kind": "toolCall",
+        "callId": "call-1",
+        "name": "acp:read",
+        "input": {
+          "title": "Read note.md",
+          "locations": [
+            {
+              "path": "note.md"
+            }
+          ],
+          "raw": {
+            "path": "note.md"
+          }
+        },
+        "output": {
+          "parts": [
+            {
+              "type": "text",
+              "text": "hello"
+            }
+          ],
+          "isError": false
+        }
+      },
+      "meta": {
+        "external": true
+      }
+    }
+  }
+}

@@ -60,8 +60,8 @@ async fn set(
     cx: &CommandContext,
     wanted: &str,
 ) -> Result<CommandOutcome, KernelError> {
-    let known = host.providers().await;
-    let (provider, model) = split(wanted, |id| known.iter().any(|p| p.id() == id));
+    let known = host.catalog(CatalogKind::Providers).await?.entries;
+    let (provider, model) = split(wanted, |id| known.iter().any(|p| p.id == id));
     host.reconfigure(
         &cx.session,
         SessionChange::Model {
@@ -73,7 +73,7 @@ async fn set(
     let choice = running_on(host, cx).await?;
     let mut message = said(&choice);
     let keys = [
-        ("provider", json!(choice.provider.id())),
+        ("provider", json!(choice.endpoint.id())),
         ("model", json!(choice.id)),
     ];
     if let Some(refused) = super::remember(host, &keys) {
@@ -97,7 +97,7 @@ async fn running_on(host: &Arc<Host>, cx: &CommandContext) -> Result<ModelChoice
 /// the third. The effort is the one the turn will ask for, so a model that
 /// does not reason shows none rather than a level no request carries.
 fn said(choice: &ModelChoice) -> String {
-    let mut text = format!("model: {}/{}", choice.provider.id(), choice.id);
+    let mut text = format!("model: {}/{}", choice.endpoint.id(), choice.id);
     if let Some(effort) = choice.reasoning {
         text.push_str(&format!("\nthinking: {}", effort.name()));
     }

@@ -113,11 +113,9 @@ async fn a_named_instance_reads_its_family_s_shelf_then_the_id_s_own() {
 async fn an_endpoint_that_holds_the_context_names_the_window_the_session_uses() {
     let (host, provider) = host_fronting("openai").await;
     let guessed = host.resolve_model(provider.as_ref(), "gpt-5.5-pro");
-    assert!(!guessed.holds_context);
 
     let provider = provider.clone().holding(1_000_000);
     let held = host.resolve_model(provider.as_ref(), "gpt-5.5-pro");
-    assert!(held.holds_context);
     assert_eq!(held.context_window, 1_000_000);
     assert_eq!(
         held.max_output, guessed.max_output,
@@ -316,4 +314,57 @@ async fn a_provider_that_cannot_sign_in_is_not_asked() {
     let refreshed = host.refresh_models().await;
     let asked: Vec<&str> = refreshed.iter().map(|r| r.provider.as_str()).collect();
     assert_eq!(asked, ["scripted"]);
+}
+
+#[tokio::test]
+async fn an_agent_is_resolved_and_catalogued_under_its_own_id() {
+    let agent = ScriptedProvider::new(vec![]);
+    agent.serves(&["agent"]);
+    let plugins = vec![TestPlugin::boxed(
+        &PROVIDER,
+        vec![Contribution::Agent(agent)],
+    )];
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::build(plugins, HostConfig::new(env_in(dir.path())))
+        .await
+        .unwrap();
+    let choice = host.choose_model(&SessionSpec::default()).await.unwrap();
+    assert!(choice.endpoint.agent().is_some());
+    assert_eq!(choice.endpoint.id(), "scripted");
+    super::super::refresh::now(&host).await;
+    assert!(
+        host.catalog(CatalogKind::Providers)
+            .await
+            .unwrap()
+            .entries
+            .iter()
+            .any(|e| e.id == "scripted")
+    );
+    assert!(
+        host.catalog(CatalogKind::Models)
+            .await
+            .unwrap()
+            .entries
+            .iter()
+            .any(|e| e.id == format!("scripted/{}", choice.id))
+    );
+}
+
+#[tokio::test]
+async fn registering_one_id_as_agent_and_provider_is_a_composition_error() {
+    for agent_first in [false, true] {
+        let endpoint = ScriptedProvider::new(vec![]);
+        let mut contributions = vec![
+            Contribution::Agent(endpoint.clone()),
+            Contribution::Provider(endpoint),
+        ];
+        if !agent_first {
+            contributions.reverse();
+        }
+        let plugins = vec![TestPlugin::boxed(&PROVIDER, contributions)];
+        let Err(error) = Host::build(plugins, HostConfig::new(env())).await else {
+            panic!("conflicting seams must fail composition");
+        };
+        assert!(error.to_string().contains("scripted"), "{error}");
+    }
 }

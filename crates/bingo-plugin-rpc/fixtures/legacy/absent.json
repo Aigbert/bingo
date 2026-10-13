@@ -1,0 +1,1 @@
+{"protocol": 2, "providers": [{"id": "model", "endpoint": {"images": true}}], "name": "example", "version": "1"}

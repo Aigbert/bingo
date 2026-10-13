@@ -44,12 +44,18 @@ pub(crate) async fn dispatch(
     cancel: CancellationToken,
     report: Report,
 ) -> Result<Compaction, CompactError> {
+    let provider = model.endpoint.provider().ok_or_else(|| {
+        CompactError::from(KernelError::new(
+            ErrorCode::InvalidInput,
+            "an agent compacts its own context",
+        ))
+    })?;
     let kernel = Next::new(|input| {
         Box::pin(kernel(
             input,
             compactor,
             &model.capabilities,
-            model.provider.clone(),
+            provider,
             cancel,
         ))
     });
