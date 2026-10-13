@@ -197,6 +197,74 @@ fn chat() -> crate::tree::Tree {
 }
 
 #[test]
+fn a_child_permission_and_room_posts_keep_the_selected_room_in_front() {
+    let mut tree = crew();
+    let (mut ui, now) = scene();
+    tree.show(&log_id());
+    assert_eq!(
+        crate::focus::owner(&ui, &tree),
+        crate::focus::Owner::Composer
+    );
+    let steps = [
+        child_frame(20, opened(child_permission())),
+        child_frame(
+            21,
+            Event::InteractionResolved {
+                id: child_permission().id,
+                answer: bingo_sdk::Answer::AllowOnce,
+                by: bingo_sdk::ResolvedBy::Kernel,
+            },
+        ),
+        child_frame(22, completed("trn_9", bingo_sdk::TurnStatus::Completed)),
+        child_frame(23, started("trn_next")),
+        posted(3, "itm_p1", "reviewer", "First review post"),
+        posted(4, "itm_p2", "reviewer", "@parent consult @scout in #design"),
+        child_frame(24, completed("trn_next", bingo_sdk::TurnStatus::Completed)),
+    ];
+    for (step, event) in steps.iter().enumerate() {
+        assert_ne!(tree.fold.apply(event), bingo_sdk::Applied::Stale);
+        ui.dialog
+            .focus_on(tree.open_interaction().map(|(_, ask)| ask));
+        assert_eq!(tree.view(), &log_id(), "step {step}");
+        let screen = draw_tree(120, 40, &tree, &mut ui, now);
+        assert!(screen.contains("in #design"), "step {step}: {screen}");
+        assert_eq!(tree.open_interaction().is_some(), step == 0);
+        assert_eq!(
+            crate::focus::owner(&ui, &tree),
+            if step == 0 {
+                crate::focus::Owner::Interaction
+            } else {
+                crate::focus::Owner::Composer
+            },
+            "step {step}"
+        );
+        if step >= 4 {
+            assert!(screen.contains("First review post"), "{screen}");
+        }
+    }
+}
+
+#[test]
+fn a_room_query_also_matches_its_members_and_keeps_the_cursor() {
+    let mut tree = crew();
+    let (mut ui, now) = scene();
+    tree.show(&child_id());
+    let keys = std::iter::once(ctrl('g')).chain("#design".chars().map(typed));
+    for key in keys {
+        for effect in crate::input::on_key(&mut ui, &tree, key, now) {
+            if let crate::effect::Effect::View(id) = effect {
+                tree.show(&id);
+            }
+        }
+    }
+    assert_eq!(tree.view(), &child_id());
+    let screen = draw_tree(120, 40, &tree, &mut ui, later(now, 200));
+    let selected = screen.lines().find(|line| line.contains('❯')).unwrap();
+    assert!(selected.contains("reviewer"), "{screen}");
+    assert!(selected.contains("#design"), "{screen}");
+}
+
+#[test]
 fn room_groups_authors_marks_the_reader_and_lists_members() {
     let (mut ui, now) = scene();
     let screen = draw_tree(120, 40, &chat(), &mut ui, now);
