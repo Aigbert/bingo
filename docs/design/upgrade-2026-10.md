@@ -1,7 +1,7 @@
 # Architecture upgrade — 2026-10
 
-> The work [audit-2026-10.md](audit-2026-10.md) leads to: 39 milestones
-> (M108–M146) in seven phases, 18 proposed ADRs (0063–0080), and the protocol
+> The work [audit-2026-10.md](audit-2026-10.md) leads to: 43 milestones
+> (M108–M150) in eight phases, 19 proposed ADRs (0063–0081), and the protocol
 > an executing agent follows. Phase 7 was added the same day, at the
 > person's request for mods at Claude Code's capability and a desktop app
 > rebuilt as a surface ([mods-parity-2026-10.md](mods-parity-2026-10.md)). Each milestone has a plan in `docs/plans/`;
@@ -44,6 +44,13 @@ kit, and the desktop app rebuilt in this repository as a surface that
 draws what the TUI draws. The acceptance test: Claude Code's example
 mods, ported by their imports, run in the TUI and on the desktop.
 Phases 6 and 7 are independent; M143 can start once M113, M123 and M133 land.
+
+**Phase 8 — bingo's own face.** Added 2026-10-13 at the person's request
+([tui-identity-2026-10.md](tui-identity-2026-10.md)): the defects a live
+drive found, the rail and the panel sheet given back to the person, the
+ember look (the caret, embers, the wordmark, an accent of its own) and the
+crew (agents with faces, a crew strip, rooms read as chats). It rides on
+Phase 3's TUI work and is independent of Phases 4–7.
 
 ## Milestones
 
@@ -88,6 +95,10 @@ Phases 6 and 7 are independent; M143 can start once M113, M123 and M133 land.
 | 144 | The desktop app draws what mods draw | 0079, 0080 | 140, 141, 143 |
 | 145 | Rei's features as views | 0080 | 144 |
 | 146 | Parity: Claude Code's examples run in both | — | 139, 141, 142, 144 |
+| 147 | The rough edges | — | 123 |
+| 148 | The screen is the person's | 0081 | 124, 147 |
+| 149 | bingo's own light | — | 125, 148 |
+| 150 | The crew on screen | — | 135, 149 |
 
 Run in table order. "After" is the hard dependency; anything not listed is
 ordered only so that two milestones do not edit the same files at once.
