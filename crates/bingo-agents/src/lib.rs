@@ -86,6 +86,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "tool:DismissAgent",
         "hook:agents",
         "hook:team",
+        "hook:agents.reports",
         "command:agents",
         "command:team",
         team_service::CAPABILITY,
@@ -124,8 +125,10 @@ pub(crate) fn traits() -> ToolTraits {
 
 /// Registers the seven tools, the two hooks and the two commands. Nothing here
 /// holds the host: a tool reads it from its call, a hook from its context.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct AgentsPlugin;
+#[derive(Debug, Default)]
+pub struct AgentsPlugin {
+    reports: Arc<report::Reports>,
+}
 
 #[async_trait]
 impl Plugin for AgentsPlugin {
@@ -134,7 +137,7 @@ impl Plugin for AgentsPlugin {
     }
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
-        registrar.tool(Arc::new(SpawnAgentTool) as Arc<dyn Tool>);
+        registrar.tool(Arc::new(SpawnAgentTool::new(self.reports.clone())) as Arc<dyn Tool>);
         registrar.tool(Arc::new(MessageTool) as Arc<dyn Tool>);
         registrar.tool(Arc::new(ListAgentsTool) as Arc<dyn Tool>);
         registrar.tool(Arc::new(ListModelsTool) as Arc<dyn Tool>);
@@ -151,8 +154,15 @@ impl Plugin for AgentsPlugin {
         registrar.add(Contribution::Command(
             Arc::new(TeamCommand) as Arc<dyn Command>
         ));
+        registrar.add(Contribution::Hook(Arc::new(report::ReportHook(
+            self.reports.clone(),
+        ))));
         registrar.add(team_file());
         registrar.add(guide::contribution(registrar));
+        Ok(())
+    }
+    async fn stop(&self) -> Result<(), PluginError> {
+        self.reports.stop();
         Ok(())
     }
 }
@@ -184,7 +194,9 @@ mod plugin_tests {
     #[test]
     fn registering_reads_nothing_and_contributes_what_the_manifest_promises() {
         let mut registrar = registrar();
-        AgentsPlugin.register(&mut registrar).expect("register");
+        AgentsPlugin::default()
+            .register(&mut registrar)
+            .expect("register");
         let contributions = registrar.into_contributions();
         assert_eq!(contributions.len(), MANIFEST.provides.len());
         let tools: Vec<String> = contributions
@@ -213,7 +225,10 @@ mod plugin_tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(hooks, ["agents.at-name", team_service::KEY.name()]);
+        assert_eq!(
+            hooks,
+            ["agents.at-name", team_service::KEY.name(), "agents.reports"]
+        );
         let commands: Vec<String> = contributions
             .iter()
             .filter_map(|c| match c {
@@ -243,7 +258,9 @@ mod plugin_tests {
         assert!(traits.read_only && traits.trusted);
         assert!(!traits.concurrency_safe && !traits.destructive && !traits.edit);
         let mut registrar = registrar();
-        AgentsPlugin.register(&mut registrar).expect("register");
+        AgentsPlugin::default()
+            .register(&mut registrar)
+            .expect("register");
         for contribution in registrar.into_contributions() {
             let Contribution::Tool(tool) = contribution else {
                 continue;

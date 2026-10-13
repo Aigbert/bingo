@@ -228,12 +228,14 @@ impl Fleet {
 
     /// A post in a room's journal, as a member's own `SendMessage` left it.
     /// A post nobody signed came from the session the room hangs under.
+    #[allow(dead_code)]
     pub(crate) fn post(&self, room: &SessionId, text: &str, who: Option<&str>) {
         self.remember(room, [posted(text, who)]);
     }
 
     /// A call this session already made, with what it was handed back: what a
     /// journal holds of a call whose result the model has read.
+    #[allow(dead_code)]
     pub(crate) fn called(
         &self,
         session: &SessionId,
@@ -338,8 +340,13 @@ impl Fleet {
         self.script_delete(&host);
         self.script_deliver(&host);
         self.script_reconfigure(&host);
-        host.on_extend(|_session, _plugin, _kind, _payload| async move {
-            unreachable!("this plugin extends no session")
+        let fixture = self.clone();
+        host.on_extend(move |session, plugin, kind, payload| {
+            let fixture = fixture.clone();
+            async move {
+                fixture.extended(&session, &plugin, &kind, payload);
+                Ok(())
+            }
         });
         host.on_signal(|_session, _plugin, _kind, _payload| async move {
             unreachable!("this plugin signals no session")
@@ -652,6 +659,7 @@ pub(crate) fn assistant(text: &str) -> Event {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn called(name: &str, input: serde_json::Value, output: ToolOutput) -> Event {
     Event::ItemCompleted {
         item: Item {
@@ -676,6 +684,7 @@ pub(crate) fn called(name: &str, input: serde_json::Value, output: ToolOutput) -
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn posted(text: &str, who: Option<&str>) -> Event {
     Event::ItemCompleted {
         item: Item {

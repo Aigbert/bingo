@@ -3,24 +3,32 @@
 #[path = "../../bingo-agents/src/tests.rs"]
 mod support;
 
-fn tool_context(session: &bingo_sdk::SessionId, call: std::sync::Arc<support::Recorder>) -> bingo_sdk::ToolContext {
+fn tool_context(
+    session: &bingo_sdk::SessionId,
+    call: std::sync::Arc<support::Recorder>,
+) -> bingo_sdk::ToolContext {
     let cx = support::tool_context(session, call);
     let writer = std::sync::Arc::new(bingo_rooms::RoomWriter::new(cx.host.clone()));
-    cx.host.open_service(bingo_services::room_post::KEY.name(), bingo_services::room_post::wire(writer)).unwrap();
+    cx.host
+        .open_service(
+            bingo_services::room_post::KEY.name(),
+            bingo_services::room_post::wire(writer),
+        )
+        .unwrap();
     cx
 }
 
 #[cfg(test)]
 mod tests {
     use bingo_agents::MessageTool;
-use bingo_sdk::{Delivery, Input, SessionId, Subject, Tool, ToolError, ToolOutput, View};
-use serde_json::Value;
-use std::path::Path;
-use bingo_collab::{name as names, room as rooms};
-const SEND_MESSAGE: &str = "SendMessage";
-const NOT_A_ROOM: &str = "`again` repeats a bounced room post; write to an agent with `text`";
+    use bingo_collab::{name as names, room as rooms};
+    use bingo_sdk::{Delivery, Input, SessionId, Subject, Tool, ToolError, ToolOutput, View};
+    use serde_json::Value;
+    use std::path::Path;
+    const SEND_MESSAGE: &str = "SendMessage";
+    const NOT_A_ROOM: &str = "`again` repeats a bounced room post; write to an agent with `text`";
+    use super::tool_context;
     use crate::support::{Fleet, Recorder};
-use super::tool_context;
     use bingo_sdk::ContentPart;
     use serde_json::json;
     use std::sync::Arc;
@@ -157,8 +165,8 @@ use super::tool_context;
     /// §6), where the model reads them.
     #[test]
     fn the_description_says_a_direct_message_owes_nothing() {
-let description = MessageTool.spec().description;
-let description = description.as_str();
+        let description = MessageTool.spec().description;
+        let description = description.as_str();
         assert!(description.contains("Beside you"), "{description}");
         assert!(description.contains("@name"), "{description}");
         assert!(

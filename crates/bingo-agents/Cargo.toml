@@ -12,6 +12,8 @@ description = "Sub-agents plugin for bingo: an agent is a child session, four to
 workspace = true
 
 [dependencies]
+# M122: a report is owned under the same keyed task primitive as timers.
+bingo-alarm.workspace = true
 bingo-collab.workspace = true
 bingo-services.workspace = true
 bingo-sdk.workspace = true

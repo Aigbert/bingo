@@ -10,8 +10,8 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Delivery, Driver, Input, IntentId, Origin, Subject,
-    Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, View, input_schema,
+    Delivery, Driver, Input, IntentId, Origin, Subject, Tool, ToolContext, ToolError, ToolOutput,
+    ToolSpec, ToolTraits, View, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -105,15 +105,15 @@ pub struct MessageArgs {
 /// bounced (ADR-0053 §6). One or the other — a call that says both says two
 /// different things, and a call that says neither says nothing at all.
 fn said(text: Option<String>, again: Option<bool>) -> Result<Said, ToolError> {
-        match (text, again.unwrap_or(false)) {
-            (Some(_), true) => Err(refused("give `text` or `again`, not both")),
-            (Some(text), false) => Ok(Said::Text(text)),
-            (None, true) => Ok(Said::Again),
-            (None, false) => Err(refused(
-                "say what to write in `text`, or repeat what a room bounced with `again: true`",
-            )),
-        }
+    match (text, again.unwrap_or(false)) {
+        (Some(_), true) => Err(refused("give `text` or `again`, not both")),
+        (Some(text), false) => Ok(Said::Text(text)),
+        (None, true) => Ok(Said::Again),
+        (None, false) => Err(refused(
+            "say what to write in `text`, or repeat what a room bounced with `again: true`",
+        )),
     }
+}
 
 /// An input the caller is asked to correct and call again with.
 fn refused(said: &str) -> ToolError {
@@ -162,19 +162,30 @@ impl Tool for MessageTool {
         match (to.driver, said) {
             (Driver::Log, said) => {
                 let Some(writer) = room_post::find(&cx.host) else {
-                    return Ok(ToolOutput::error("rooms are unavailable: no room post service"));
+                    return Ok(ToolOutput::error(
+                        "rooms are unavailable: no room post service",
+                    ));
                 };
-                let result = writer.post(Request {
-                    room: to.id.clone(), caller: cx.session.clone(), author: from.clone(), said, cut: cx.item.clone(),
-                }).await.map_err(|error| ToolError::Failed(error.to_string()))?;
+                let result = writer
+                    .post(Request {
+                        room: to.id.clone(),
+                        caller: cx.session.clone(),
+                        author: from.clone(),
+                        said,
+                        cut: cx.item.clone(),
+                    })
+                    .await
+                    .map_err(|error| ToolError::Failed(error.to_string()))?;
                 if let Posted::Bounced(text) = result {
                     return Ok(ToolOutput::error(text));
                 }
             }
             (Driver::Model, Said::Text(text)) => {
                 let input = Input::text(text, origin(Some(from.clone())));
-                cx.host.deliver(&to.id, IntentId::mint(), input, Delivery::Wake)
-                    .await.map_err(|error| ToolError::Failed(error.message))?;
+                cx.host
+                    .deliver(&to.id, IntentId::mint(), input, Delivery::Wake)
+                    .await
+                    .map_err(|error| ToolError::Failed(error.message))?;
             }
             (Driver::Model, Said::Again) => return Err(refused(NOT_A_ROOM)),
         }
@@ -184,4 +195,3 @@ impl Tool for MessageTool {
         Ok(out)
     }
 }
-
