@@ -139,3 +139,70 @@ pub(crate) async fn operation(
 pub(crate) fn failed(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::Internal, error.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    struct Held;
+    #[async_trait]
+    impl WireService for Held {
+        async fn call(&self, _: &str, _: Value) -> Result<Value, ServiceError> {
+            futures::future::pending().await
+        }
+    }
+    #[tokio::test(start_paused = true)]
+    async fn a_dollar_await_has_a_wall_bound_while_own_time_is_paused() {
+        let home = tempfile::tempdir().unwrap();
+        let found = bingo_plugin_host::discovery::Found {
+            name: "fixture".into(),
+            root: home.path().into(),
+            origin: PluginOrigin::Explicit,
+            manifest: serde_json::from_value(
+                json!({"name":"fixture","version":"1","module":"main.ts"}),
+            )
+            .unwrap(),
+        };
+        let module = Module::load(
+            found,
+            Value::Null,
+            crate::engine::Limits::default(),
+            &Env::rooted(home.path()),
+            true,
+        )
+        .await;
+        let host = testing::TestHost::default();
+        host.on_catalog(|kind| async move {
+            Ok(Catalog {
+                kind,
+                entries: vec![CatalogEntry {
+                    id: "fixture".into(),
+                    label: "fixture".into(),
+                    meta: json!({"enabled":true,"tier":"rewrite","uses":["held"]}),
+                }],
+            })
+        });
+        host.handle().open_service("held", Arc::new(Held)).unwrap();
+        let cx = HookContext {
+            item: None,
+            session: SessionId::from_raw("host"),
+            turn: None,
+            cwd: home.path().into(),
+            provider: None,
+            model: None,
+            host: host.handle(),
+        };
+        let start = tokio::time::Instant::now();
+        let error = operation(
+            &module,
+            &cx,
+            0,
+            "service/call",
+            json!({"key":"held","method":"wait","params":null}),
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains("deadline exceeded"), "{error}");
+        assert_eq!(tokio::time::Instant::now() - start, HOOK_DEADLINE);
+    }
+}
