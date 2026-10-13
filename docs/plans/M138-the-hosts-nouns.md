@@ -1,0 +1,150 @@
+# M138 — The host's nouns
+
+## Goal
+
+ADR-0078's `$`, part I (mods-parity §3). The nouns the host already has
+doors for reach a mod: `session`, `turn`, `prompt`, `tool`, `command`,
+`config`, `model`, `state`, `store`, `clock` and `plugin`. Each method is
+raised as `<noun>.<method>` before the host performs it, so a link may
+rewrite, deny or answer it. Every method translates onto an existing door,
+and none opens a new one. One table defines `$`, and both transports read
+it: natives in process, and M133's `dollar.ts` under node.
+
+## Bricks, in build order
+
+1. **The table, as a contract.** `bingo-mods/src/dollar/table.rs` has one
+   row per method: `(noun, method, door, unsafe, input, result)`. A door
+   is `Kernel(&'static Entry)`, whose door already raises a chain of this
+   meaning, so `$` calls it and raises nothing more; or `Face`, a method
+   of a face the runtime registers, raised through the service-wire door
+   by M136's wrapper (ADR-0078 §1). M136's one-namespace rule keeps a
+   name to one owner. A `BINGO_UPDATE_SCHEMA` test writes
+   `schema/dollar.json`, and M133's `render` turns it into
+   `sdk/typescript/src/dollar-types.ts`. Failing test: on M111's test
+   host, a fixture mod calls every row once, a link hooked at each name
+   sees exactly one call, and a row raised twice fails it.
+2. **Kernel doors.** `prompt.submit` is `submit`; `session.append` is
+   `extend`; `session.send` is `HostApi::deliver`, which raises it, and
+   the target's actor then raises `session.receive` (M136);
+   `session.compact` and `command.run` submit `Input::Action`; `tool.call`
+   is `HostApi::invoke`, which runs `tool.check` and `AfterTool` (M131).
+   `config.set` is `HostApi::reconfigure`, routed through M136's
+   `config::set`, so the chain is raised once wherever a setting changes.
+   `model.complete` joins the catalogue as a chain at `HostApi::complete`,
+   so a process plugin's `host/model/complete` and a mod's call raise it
+   alike, inside a turn or outside one (M132).
+3. **Reads from the fold.** The runtime is a client (ADR-0002). For each
+   session it serves, it opens the stream lazily as `ClientIdentity`
+   `mods` and folds it with `SessionState::apply`. A pure `read(&state,
+   method) -> Value` answers, with table tests:
+   - `session.id`, `cwd`, `model`, `turns`, `usage` (the context reading
+     and the last turn's usage);
+   - `config.list` and `config.read` (`ConfigView`);
+   - `prompt.read` (the queue and the last submitted text).
+
+   `session.messages` pages through `history`. `session.surfaces` folds
+   `session.attach` and `session.detach`. `session.root` is discovery's
+   project directory. `session.version` is the workspace version. Nothing
+   is kept beside the fold.
+4. **Face writes.** `session.authorize` asks through `HostApi::ask`;
+   `tool.list` and `command.list` are `catalog(Tools)` and
+   `catalog(Commands)`. `turn.abort` interrupts; a person's `esc` raises
+   nothing and waits on no link (ADR-0068), only a mod's abort is an event.
+5. **`$.plugin`.** `{ name, root }`, from the mod's manifest, frozen and
+   set at load. It is a property, not a method: it has no row and raises
+   nothing. Under node, `dollar.ts` builds it from `initialize`, whose
+   params gain `plugin_name` beside `plugin_root`, additively.
+6. **`tool.register` and `command.register`.** The runtime's `ToolSource`
+   names each tool with `bingo-plugin-host`'s `tool_name`
+   (`plugin__<mod>__<name>`); an undeclared property fails closed (not
+   read-only, not concurrency-safe). A call runs M137's reload check, then
+   the handler on the mod's thread under the hook budget; a throw is the
+   tool's error. The `CommandSource` registers commands unprefixed, as
+   plugin-rpc's are; the later duplicate drop and its notice stay.
+7. **`state` and `store` (ADR-0078 §6).**
+   - A face over the library's store (M137): `state` at session scope,
+     `store` at global scope, versioned, with `ifVersion` answering the
+     held version on a conflict. A plugin's store holds 4 MiB in all.
+   - `plugin` is pinned. It is bound by the door a call comes through:
+     the runtime binds it for its mods, and plugin-rpc's bridge binds it
+     for its processes. A link may rewrite another plugin's `state.set`;
+     a mod may not write another plugin's key itself.
+   - M132's `host/state/*` handler calls this face whenever it stands, so
+     both transports raise `state.*`.
+   - Each read is logged per hook invocation as `(plugin, scope, key,
+     version)`. M140 subscribes renders with this log.
+8. **`clock`.** `now` is `jiff`'s timestamp; `sleep`, `after` and `every`
+   run on tokio time, paused in tests (M111). A callback runs as a hook
+   under the budget; timers drop at a reload and at `session.end`;
+   `every` has a floor of 1 s, a setting.
+9. **`model.classify` and `model.fork`**, pure bricks over `complete`:
+   `classify_request(text, labels)` and `pick(answer, labels) ->
+   Option<label>` (no label is refused in words); `fork_request(history,
+   prompt)` from `history`. Like `complete`, both need the `model` grant
+   through `admits` and are billed by `UsageCharged` (M132): to the
+   running turn, or to the session when none runs.
+10. **Node parity.** `dollar.ts` calls each `Face` row as `service/call`
+    to the runtime's face keys, and each `Kernel` row by its protocol-2
+    verb. A fixture mod calls one method of every noun, and gives the
+    same output under both transports.
+
+## Files
+
+- `crates/bingo-mods/src/dollar/{mod,table,read,session,tool,command,config,model,state,clock,plugin}.rs`
+- `crates/bingo-mods/src/{link.rs,reload.rs}`, `tests/mods/nouns/*` (new)
+- `crates/bingo-sdk/src/catalogue.rs` (`model.complete`); `crates/bingo-core/src/{host.rs,config.rs}`
+- `crates/bingo-plugin-host/src/state.rs` (scope sizes, the read log)
+- `crates/bingo-plugin-rpc/src/{host.rs,service.rs,bridge.rs}` (`host/state` onto the face; bind `plugin`; `plugin_name`)
+- `schema/dollar.json` (new), `schema/plugin.json`, `sdk/typescript/src/{dollar.ts,dollar-types.ts (generated)}`
+- `crates/bingo/tests/plugin_kit.rs`
+
+## Exit criteria
+
+- [ ] `cargo test -p bingo-mods dollar::`: every row answers on M111's
+      test host, and a link at each name sees exactly one call. A row
+      raised twice fails the test (shown once, pasted).
+- [ ] Drift tests fail on a hand edit of `dollar.json` or `dollar-types.ts`.
+- [ ] Every `read` answer equals the field of the same `SessionState`.
+- [ ] A mod's `$.session.send` is seen once at `session.send` and once at
+      `session.receive`. `$.plugin` names the fixture and its root under
+      both transports, and assigning to it throws.
+- [ ] A registered mod tool is offered to the fake model as
+      `plugin__<mod>__<name>` and runs. When the mod is stale, it reloads
+      first.
+- [ ] A stale `ifVersion` gets the held version; a foreign key's write is
+      refused; the read log names each key a hook read.
+- [ ] Clock: under paused time, `every` fires once per period, and no
+      timer survives a reload.
+- [ ] `model.classify` and `model.fork` show as `UsageCharged` in the
+      turn's usage; called from a timer, in the session's. Without the
+      `model` grant, each is refused in words.
+- [ ] `cargo test -p bingo --test plugin_kit`: the nouns fixture gives
+      the same output in process and under node.
+- [ ] All gates pass, including `cargo check --target
+      x86_64-pc-windows-msvc` for core and plugin-rpc.
+
+## Non-goals
+
+- `fs`, `http`, `process`, `env`, `mcp` and `agent` (M139). `ui` and
+  `prompt.fill`/`suggest` (M140, M141).
+- The gaps of mods-parity §8, each kept out by ADR-0078's ratchet with its
+  reason: `tool.check` without a run (no door judges a call without making
+  it; a mod hooks `tool.check`); `prompt.compose` as a read (no composed
+  prompt is published); `prompt.edit` and unsent text (the surface's);
+  `session.repo` (no VCS fact is kept; `$.process` asks git).
+
+## Risks
+
+- `model.fork` lacks the session's contributor pieces (no door hands them
+  out), so its answer can differ from the session's; the guide says so.
+- A timer may spend on the model with no turn to show it: the `model`
+  grant gates it, and the session's usage and `bingo plugins list` show it.
+- The runtime opens one stream per session it serves, lazily on the first
+  read; its `session.attach` names it, so a link tells it from a person.
+- While `bingo-mods` is off, plugin-rpc reaches the library's store
+  directly and `state.*` is not raised: nobody in process could hook it.
+- Re-verify at start: M137's link, budget, reload check and `admits`;
+  M136's face wrapper, one-namespace rule and `session.send`; M132's
+  `complete`, `UsageCharged` and `host/state`; M133's `dollar.ts`; M131's
+  `invoke` with `AfterTool`; M118's `SessionChange`, if `reconfigure`
+  moved; M111's test host and paused time.
