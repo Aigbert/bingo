@@ -144,8 +144,8 @@ struct Cli {
     no_print_on_exit: bool,
 
     /// Register the demo plugin: `/board`, `DemoProgress`, and the three
-    /// lanes of ADR-0013 to look at. Off unless this or the `demoUi` setting
-    /// says otherwise.
+    /// lanes of ADR-0013 to look at. Off unless this or
+    /// `enabledPlugins["bingo.demo.ui"]` says otherwise.
     #[arg(long, global = true)]
     demo_ui: bool,
 

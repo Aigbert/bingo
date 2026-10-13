@@ -81,5 +81,6 @@ could not be read. It runs while a turn is busy.
 
 The plugin is on until a project says otherwise. Off, it contributes nothing:
 no tools, no index, no recall, no `/experience`. The switch takes effect at the
-next start. `experience.enabled` remains readable for one release and reports
-a notice naming `enabledPlugins`.
+next start. Legacy `[experience]` with `enabled = false` remains readable for
+one release and reports a notice naming `enabledPlugins`; replace it with the
+example above.
