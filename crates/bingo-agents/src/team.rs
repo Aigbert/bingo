@@ -14,4 +14,4 @@ mod service;
 
 pub use command::TeamCommand;
 pub use seat::SeatHook;
-pub use service::{TEAM, TeamFile};
+pub use service::TeamFile;

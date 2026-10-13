@@ -1,0 +1,1 @@
+{"method":"servers","params":null,"answer":{"servers":{"files":{"type":"stdio","command":"npx","args":["-y","files"],"env":{"TOKEN":"s3cret"},"cwd":null},"remote":{"type":"http","url":"https://mcp.example.com/mcp","headers":{}}}}}

@@ -63,6 +63,22 @@ pub struct Registry {
     pub notices: Vec<(String, String)>,
 }
 
+fn declared_service(
+    manifest: &PluginManifest,
+    contribution: &Contribution,
+) -> Result<(), HostError> {
+    if let Contribution::Service { key, .. } = contribution {
+        let capability = format!("service:{key}");
+        if !manifest.provides.contains(&capability.as_str()) {
+            return Err(HostError::Conflict {
+                plugin: manifest.id.to_string(),
+                what: format!("service {key} is not declared in provides"),
+            });
+        }
+    }
+    Ok(())
+}
+
 impl Registry {
     /// Load plugins in the order given, standing or disabled by
     /// [`standing`]'s verdict. A disabled plugin is a warning and a status,
@@ -115,6 +131,7 @@ impl Registry {
                 source,
             })?;
         for contribution in registrar.into_contributions() {
+            declared_service(manifest, &contribution)?;
             self.add(manifest.id, contribution)?;
         }
         Ok(())
@@ -350,10 +367,20 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_missing_used_service_leaves_the_plugin_standing() {
+        static USES: PluginManifest = PluginManifest {
+            uses: &["test.optional"],
+            ..GIVES
+        };
+        let plugins: Vec<Box<dyn Plugin>> = vec![Box::new(Paper(&USES))];
+        assert_eq!(standing(&plugins, &BTreeSet::new()), [None]);
+    }
+
     static NEEDS: PluginManifest = PluginManifest {
         id: "test.needs",
         version: "0.0.0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &[],
         requires: &["service:x"],
         config: None,
@@ -361,7 +388,7 @@ mod tests {
     static GIVES: PluginManifest = PluginManifest {
         id: "test.gives",
         version: "0.0.0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &["service:x"],
         requires: &[],
         config: None,
@@ -369,7 +396,7 @@ mod tests {
     static CHAIN: PluginManifest = PluginManifest {
         id: "test.chain",
         version: "0.0.0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &["service:y"],
         requires: &["service:missing"],
         config: None,
@@ -377,7 +404,7 @@ mod tests {
     static LEANS: PluginManifest = PluginManifest {
         id: "test.leans",
         version: "0.0.0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &[],
         requires: &["service:y"],
         config: None,
@@ -385,7 +412,7 @@ mod tests {
     static STORE: PluginManifest = PluginManifest {
         id: "test.store",
         version: "0.0.0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &["store:memory"],
         requires: &[],
         config: None,

@@ -58,7 +58,7 @@ impl SeatHook {
 #[async_trait]
 impl Hook for SeatHook {
     fn id(&self) -> &str {
-        "agents.team"
+        bingo_services::team::KEY.name()
     }
 
     fn matcher(&self) -> HookMatcher {
@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn it_asks_for_the_session_point_only() {
         let hook = SeatHook::new(Env::rooted("/nowhere"));
-        assert_eq!(hook.id(), "agents.team");
+        assert_eq!(hook.id(), bingo_services::team::KEY.name());
         assert_eq!(hook.matcher().points, [HookPoint::Session]);
         assert!(hook.matcher().tool.is_none());
     }

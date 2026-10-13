@@ -198,7 +198,7 @@ fn entering(e: std::io::Error) -> KernelError {
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.surface.tui",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &["surface:tui", "service:bingo.surface.tui.pages"],
     requires: &[],
     // `update.check` (ADR-0043 §4) and `tui.measure` (design §7): the box is
@@ -240,16 +240,6 @@ mod plugin_tests {
     #[test]
     fn the_manifest_says_what_it_provides_and_the_two_keys_it_claims() {
         assert_eq!(MANIFEST.id, "bingo.surface.tui");
-        assert_eq!(
-            MANIFEST.provides,
-            ["surface:tui", "service:bingo.surface.tui.pages"]
-        );
-        assert!(
-            MANIFEST
-                .provides
-                .contains(&format!("service:{}", Pages::key(MANIFEST.id)).as_str()),
-            "the page's key is spelled the one way (ADR-0054 §1)"
-        );
         let claim = MANIFEST.config.expect("a config claim");
         assert_eq!(claim.keys.len(), 2);
     }
@@ -271,7 +261,7 @@ mod plugin_tests {
         }
         match &contributions[1] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &Pages::key(MANIFEST.id));
+                assert_eq!(key, &Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

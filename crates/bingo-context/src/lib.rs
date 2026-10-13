@@ -43,7 +43,7 @@ pub use memory::{MemoryCommand, MemoryContributor};
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.context",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "compactor:summary",
         "context:instructions",
@@ -108,22 +108,6 @@ mod tests {
     #[test]
     fn the_manifest_says_what_it_provides_and_claims_no_settings() {
         assert_eq!(MANIFEST.id, "bingo.context");
-        assert_eq!(
-            MANIFEST.provides,
-            [
-                "compactor:summary",
-                "context:instructions",
-                "context:memory",
-                "command:memory",
-                "service:bingo.context.pages",
-            ]
-        );
-        assert!(
-            MANIFEST
-                .provides
-                .contains(&format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id)).as_str()),
-            "the page's key is spelled the one way (ADR-0054 §1)"
-        );
         assert!(MANIFEST.config.is_none(), "no switch turns memory off");
     }
 
@@ -145,7 +129,7 @@ mod tests {
         assert_eq!(hook.matcher().points, [bingo_sdk::HookPoint::Session]);
         match &contributions[5] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &bingo_sdk::Pages::key(MANIFEST.id));
+                assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

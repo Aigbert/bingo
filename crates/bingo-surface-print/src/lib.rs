@@ -612,7 +612,7 @@ fn refuse(interaction: &Interaction, why: &str) -> Answer {
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.surface.print",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &["surface:print"],
     requires: &[],
     config: None,

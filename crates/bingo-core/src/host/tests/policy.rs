@@ -8,7 +8,7 @@ use super::*;
 static POLICY: PluginManifest = PluginManifest {
     id: "test.policy",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["policy:counting"],
     requires: &[],
     config: None,

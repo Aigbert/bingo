@@ -55,7 +55,7 @@ const BRAVE_KEY_ENV: &str = "BRAVE_API_KEY";
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.tools.web",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &["tool:WebFetch", "tool:WebSearch", "tool:ShowPage"],
     requires: &[],
     config: Some(ConfigClaim {

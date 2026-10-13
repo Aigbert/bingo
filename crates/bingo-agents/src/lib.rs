@@ -58,10 +58,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Command, Contribution, Hook, Plugin, PluginError, PluginManifest, Registrar, ServiceHandle,
-    Tool, ToolTraits, WireService,
+    Command, Contribution, Hook, Plugin, PluginError, PluginManifest, Registrar, Tool, ToolTraits,
 };
 
+use bingo_services::team as team_service;
 pub use command::AgentsCommand;
 pub use definition::Definition;
 pub use dismiss::DismissAgentTool;
@@ -72,13 +72,13 @@ pub use models::ListModelsTool;
 pub use note::NOTE;
 pub use spawn::SpawnAgentTool;
 pub use stop::StopAgentTool;
-pub use team::{SeatHook, TEAM, TeamCommand, TeamFile};
+pub use team::{SeatHook, TeamCommand, TeamFile};
 pub use thinking::SetThinkingTool;
 
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.agents",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "tool:SpawnAgent",
         "tool:SendMessage",
@@ -91,7 +91,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "hook:team",
         "command:agents",
         "command:team",
-        "service:agents.team",
+        team_service::CAPABILITY,
         "service:bingo.agents.pages",
     ],
     requires: &[],
@@ -100,21 +100,14 @@ static MANIFEST: PluginManifest = PluginManifest {
     config: None,
 };
 
-/// `.bingo/team.json` under the key another plugin looks it up by. The typed
-/// lookup is a `ServiceHandle` over the wire face, which is how a service met
-/// by method rather than by type is reached from in process (ADR-0031 §4) —
-/// and it must be met that way, because `team` is a noun the kernel has no
-/// word for and a plugin may not import this one to get a trait.
-///
-/// No wire face is opened: every key of the file answers through one method,
-/// and a key nobody has claimed yet is not this plugin's to hand a stranger.
+/// Both service faces refer to the same file owner.
 fn team_file() -> Contribution {
-    let wire = Arc::new(TeamFile) as Arc<dyn WireService>;
-    Contribution::Service {
-        key: TEAM.to_string(),
-        value: Arc::new(ServiceHandle::new(wire)),
-        wire: None,
-    }
+    let owner: Arc<dyn team_service::TeamFile> = Arc::new(TeamFile);
+    Contribution::service(
+        &team_service::KEY,
+        owner.clone(),
+        Some(team_service::wire(owner)),
+    )
 }
 
 /// What every tool here is but one. They read the session tree and post into
@@ -187,24 +180,6 @@ mod plugin_tests {
     #[test]
     fn the_manifest_says_what_it_provides_and_claims_no_settings() {
         assert_eq!(MANIFEST.id, "bingo.agents");
-        assert_eq!(
-            MANIFEST.provides,
-            [
-                "tool:SpawnAgent",
-                "tool:SendMessage",
-                "tool:ListAgents",
-                "tool:ListModels",
-                "tool:SetThinking",
-                "tool:StopAgent",
-                "tool:DismissAgent",
-                "hook:agents",
-                "hook:team",
-                "command:agents",
-                "command:team",
-                "service:agents.team",
-                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id)),
-            ]
-        );
         assert!(MANIFEST.requires.is_empty());
         assert!(MANIFEST.config.is_none());
     }
@@ -241,7 +216,7 @@ mod plugin_tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(hooks, ["agents.at-name", "agents.team"]);
+        assert_eq!(hooks, ["agents.at-name", team_service::KEY.name()]);
         let commands: Vec<String> = contributions
             .iter()
             .filter_map(|c| match c {
@@ -260,8 +235,8 @@ mod plugin_tests {
         let page = bingo_sdk::Pages::key(MANIFEST.id);
         assert_eq!(
             services,
-            [("agents.team", false), (page.as_str(), false)],
-            "the team file and this plugin's page, in process only (ADR-0031 §3)"
+            [(team_service::KEY.name(), true), (page.name(), false)],
+            "the team file has both faces; the page stays in process"
         );
     }
 

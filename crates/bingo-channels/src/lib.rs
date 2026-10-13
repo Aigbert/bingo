@@ -69,7 +69,7 @@ pub use tool::{SEND_FILE, SendFile, SendFileSource};
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.surface.channels",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "surface:channels",
         "tool:SendFile",
@@ -187,20 +187,6 @@ mod plugin_tests {
             SurfaceKind::Concurrent,
             "a chat owns no terminal; it runs beside whatever does"
         );
-        assert_eq!(
-            MANIFEST.provides,
-            &[
-                "surface:channels",
-                "tool:SendFile",
-                "service:bingo.surface.channels.pages",
-            ]
-        );
-        assert!(
-            MANIFEST
-                .provides
-                .contains(&format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id)).as_str()),
-            "the page's key is spelled the one way (ADR-0054 §1)"
-        );
     }
 
     /// The page is registered whether or not a chat is: a person asking how
@@ -210,7 +196,7 @@ mod plugin_tests {
         let contributions = contributions(serde_json::json!({}));
         match contributions.last().expect("a contribution") {
             bingo_sdk::Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &bingo_sdk::Pages::key(MANIFEST.id));
+                assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

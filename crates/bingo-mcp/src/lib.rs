@@ -29,26 +29,27 @@ use std::sync::{Arc, OnceLock};
 use async_trait::async_trait;
 use bingo_sdk::{
     Command, ConfigClaim, Contribution, HostHandle, Merge, Plugin, PluginError, PluginManifest,
-    Registrar, ServiceHandle, ToolSource, WireService,
+    Registrar, ToolSource,
 };
 
+use bingo_services::mcp;
 pub use client::{Asker, Client};
 pub use command::McpCommand;
 pub use config::{Server, Settings};
 pub use dial::CONNECT_TIMEOUT;
 pub use manager::{Line, Manager, Status};
-pub use rows::{Rows, SERVERS};
+pub use rows::Rows;
 pub use source::McpSource;
 pub use tool::{McpTool, tool_name};
 
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.mcp",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "tools:mcp",
         "command:mcp",
-        "service:mcp.servers",
+        mcp::CAPABILITY,
         "service:bingo.mcp.pages",
     ],
     requires: &[],
@@ -116,21 +117,10 @@ impl Plugin for McpPlugin {
     }
 }
 
-/// The rows, under the key another plugin looks them up by. The typed lookup
-/// is a `ServiceHandle` over the wire face, which is how a service met by
-/// method rather than by type is reached from in process (ADR-0031 §4).
-///
-/// No wire face is opened: a row carries a person's `env` and `headers`, so
-/// the answer stays inside this process. Opening one would put those keys
-/// within reach of every out-of-process plugin, and nothing asks for them
-/// there.
+/// Both faces read the same live manager.
 fn service(manager: Arc<Manager>) -> Contribution {
-    let wire = Arc::new(Rows::new(manager)) as Arc<dyn WireService>;
-    Contribution::Service {
-        key: SERVERS.to_string(),
-        value: Arc::new(ServiceHandle::new(wire)),
-        wire: None,
-    }
+    let owner: Arc<dyn mcp::Servers> = Arc::new(Rows::new(manager));
+    Contribution::service(&mcp::KEY, owner.clone(), Some(mcp::wire(owner)))
 }
 
 #[cfg(test)]
@@ -194,15 +184,6 @@ pub(crate) mod tests {
     #[test]
     fn the_manifest_says_what_it_provides_and_what_it_claims() {
         assert_eq!(MANIFEST.id, "bingo.mcp");
-        assert_eq!(
-            MANIFEST.provides,
-            [
-                "tools:mcp",
-                "command:mcp",
-                "service:mcp.servers",
-                "service:bingo.mcp.pages",
-            ]
-        );
         assert!(MANIFEST.requires.is_empty());
         let claim = MANIFEST.config.expect("a config claim");
         assert_eq!(claim.keys[0], ("mcpServers", Merge::ByName));
@@ -229,17 +210,17 @@ pub(crate) mod tests {
         }
         match &contributions[2] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, SERVERS);
+                assert_eq!(key, mcp::KEY.name());
                 assert!(
-                    wire.is_none(),
-                    "a row carries env and headers: no face across a process line"
+                    wire.is_some(),
+                    "the typed and wire faces share one live owner"
                 );
             }
             other => panic!("expected the rows service, got {other:?}"),
         }
         match &contributions[3] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &bingo_sdk::Pages::key(MANIFEST.id));
+                assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

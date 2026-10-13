@@ -117,6 +117,42 @@ if [ -n "$modes" ]; then
   say "a permission mode named in kernel/sdk code:"; say "$modes" | head; fail=1
 fi
 
+# 4e. Shared service users declare their dependency (ADR-0069 §3).
+python3 - <<'PYSERVICES' || fail=1
+import pathlib, re, sys
+contracts = {}
+for path in pathlib.Path("crates/bingo-services/src").glob("*.rs"):
+    match = re.search(r'ServiceKey::new\("([^"\n]+)"\)', path.read_text())
+    if match:
+        contracts[path.stem] = match.group(1)
+bad = []
+for crate in pathlib.Path("crates").iterdir():
+    if crate.name == "bingo-services" or not (crate / "src").is_dir():
+        continue
+    sources = []
+    for path in (crate / "src").rglob("*.rs"):
+        if "tests" in path.parts or "test" in path.name:
+            continue
+        # A test-only module declaration can precede the production manifest.
+        text = re.sub(r"#\[cfg\(test\)\]\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+;", "", path.read_text())
+        sources.append(text.split("#[cfg(test)]")[0])
+    source = "\n".join(sources)
+    declarations = " ".join(re.findall(r"(?:provides|requires|uses):\s*&\[([^]]*)\]", source, re.S))
+    for module, key in contracts.items():
+        if not re.search(r"bingo_services::(?:" + module + r"\b|\{[^}]*\b" + module + r"\b)", source):
+            continue
+        aliases = {module} | set(re.findall(r"bingo_services::" + module + r"\s+as\s+(\w+)", source))
+        declared = any(re.search(r"\b" + alias + r"::(?:KEY\.name\(\)|CAPABILITY)", declarations) for alias in aliases)
+        declared |= f'"{key}"' in declarations or f'"service:{key}"' in declarations
+        if not declared:
+            bad.append(f"{crate.name}: {key} is used but absent from provides, requires and uses")
+if bad:
+    print("undeclared shared service lookups:")
+    print("\n".join("  " + line for line in bad))
+    sys.exit(1)
+print("shared service declarations ok")
+PYSERVICES
+
 # 5. Struct field count ≤ 16 and inherent impl spread ≤ 3 files per type (best effort, grep-based;
 #    the third file is ADR-0011 §4: the session actor is its loop, its interactions and its inputs).
 python3 - <<'PY' || fail=1

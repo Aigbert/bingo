@@ -107,7 +107,7 @@ mod tests {
         PluginManifest {
             id: "test.plugin",
             version: "0",
-            sdk: "^0.1",
+            uses: &[],
             provides,
             requires: &[],
             config: None,

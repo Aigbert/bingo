@@ -9,7 +9,7 @@ use crate::test_support::ScriptedProviderSource;
 static LATE: PluginManifest = PluginManifest {
     id: "test.late-provider",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["provider:late"],
     requires: &[],
     config: None,

@@ -57,3 +57,5 @@ The naming examples above are historical; `bingo-teams`, `bingo-acp` and
 
 `bingo-claim` shares the scheduler/channel OS claim (ADR-0072 §5); it
 registers nothing and depends only on std and `thiserror`.
+
+Amended 2026-10-13 by ADR-0069 §1–4 (M119): `bingo-services` now exists in the library tier and owns shared typed contracts; `bingo-teams` and `bingo-acp` never shipped as crates.

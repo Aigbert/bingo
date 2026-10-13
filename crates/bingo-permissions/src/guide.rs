@@ -20,13 +20,7 @@ pub static PAGES: Pages = Pages(&[Page {
 
 /// The page under the key every plugin registers its pages by.
 pub fn contribution(registrar: &Registrar) -> Contribution {
-    Contribution::Service {
-        key: Pages::key(registrar.plugin_id()),
-        value: Arc::new(PAGES),
-        // A page is data in this binary; nothing across a process line reads
-        // it, and the gathering that does is in process (ADR-0031 §3).
-        wire: None,
-    }
+    Contribution::service(&Pages::key(registrar.plugin_id()), Arc::new(PAGES), None)
 }
 
 #[cfg(test)]

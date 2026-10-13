@@ -501,7 +501,7 @@ fn settings_schema() -> schemars::Schema {
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.provider.openai",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &["provider:openai", "provider:codex"],
     requires: &[],
     config: Some(ConfigClaim {

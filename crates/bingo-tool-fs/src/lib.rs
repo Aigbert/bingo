@@ -25,7 +25,7 @@ pub use write::{WriteArgs, WriteTool};
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.tools.fs",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "tool:Read",
         "tool:Glob",

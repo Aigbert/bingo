@@ -95,6 +95,7 @@
 # M109 (ADR-0072 §5): bingo-claim adds one member, no external crate.
 # M129 (ADR-0072 §6): bingo-shelf adds one member, no external crate.
 # M130 (ADR-0073): the channel contract and platform add two members.
-max_dependencies = 347
+# M119 (ADR-0069 §2): bingo-services adds one member, no external crate.
+max_dependencies = 348
 max_core_check_seconds = 20
 max_target_gb = 5

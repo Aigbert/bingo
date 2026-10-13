@@ -9,7 +9,7 @@ use super::*;
 static SIGNING: PluginManifest = PluginManifest {
     id: "test.signing",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["provider:signing"],
     requires: &[],
     config: None,

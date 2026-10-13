@@ -69,7 +69,7 @@ pub fn wanted(settings: &serde_json::Value) -> bool {
 static MANIFEST: PluginManifest = PluginManifest {
     id: PLUGIN,
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "tool:DemoProgress",
         "command:board",

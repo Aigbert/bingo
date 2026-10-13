@@ -69,7 +69,7 @@ pub mod wire;
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: session::PLUGIN,
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.4",
+    uses: &[bingo_services::mcp::KEY.name()],
     provides: &["service:bingo.acp.pages"],
     requires: &[],
     config: Some(ConfigClaim {
@@ -251,9 +251,9 @@ mod tests {
         assert_eq!(MANIFEST.id, "bingo.acp");
         assert_eq!(MANIFEST.provides, ["service:bingo.acp.pages"]);
         assert!(
-            MANIFEST
-                .provides
-                .contains(&format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id)).as_str()),
+            MANIFEST.provides.contains(
+                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()).as_str()
+            ),
             "the page's key is spelled the one way (ADR-0054 §1)"
         );
         assert!(MANIFEST.requires.is_empty());

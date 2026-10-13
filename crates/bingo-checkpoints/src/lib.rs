@@ -38,7 +38,7 @@ pub use store::Checkpoints;
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.checkpoints",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "hook:checkpoints",
         "command:rewind",
@@ -134,7 +134,7 @@ mod plugin_tests {
             [
                 "hook:checkpoints",
                 "command:rewind",
-                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id)),
+                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
             ]
         );
         assert!(MANIFEST.requires.is_empty());
@@ -150,7 +150,7 @@ mod plugin_tests {
         assert!(matches!(contributions[1], Contribution::Command(_)));
         match &contributions[2] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &bingo_sdk::Pages::key(MANIFEST.id));
+                assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

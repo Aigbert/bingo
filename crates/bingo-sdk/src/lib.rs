@@ -24,7 +24,7 @@ pub mod state;
 pub mod store;
 pub mod surface;
 /// Doubles for a plugin's tests; `features = ["testing"]` in dev-dependencies.
-#[cfg(feature = "testing")]
+#[cfg(any(test, feature = "testing"))]
 pub mod testing;
 pub mod tokens;
 pub mod tool;
@@ -52,7 +52,7 @@ pub use policy::{Decision, PermissionPolicy, PolicyInput, Reason, Stance, Verdic
 pub use provider::{AuthStatus, LoginMethod, ModelInfo, Provider};
 /// `Service` and `Services` stay behind `service::`: the kernel has a bundle
 /// of its own by that name, and a glob import must not make either ambiguous.
-pub use service::{ServiceError, ServiceHandle, WireService};
+pub use service::{ServiceError, ServiceHandle, ServiceKey, WireService};
 pub use state::{Applied, LastTurn, LiveTurn, Retry, SessionState};
 pub use store::SessionStore;
 pub use surface::{Exit, Surface, SurfaceKind, SurfaceOptions};

@@ -1,59 +1,34 @@
-//! `mcp.servers`: the one door another plugin has onto the configured rows.
-//!
-//! A plugin cannot read a settings key another plugin claimed — the kernel
-//! refuses a second claim on one key — and it must not keep a copy of the
-//! shape either. So the rows cross the way ADR-0031 says a fact crosses a
-//! plugin line: a service under a key, met by method and JSON.
-//!
-//! One method, `servers`, answering what [`Manager::rows`] holds now. Live,
-//! not a snapshot: `/mcp disable files` takes a server out of the answer the
-//! same moment it takes it out of bingo's own hands.
-//!
-//! The rows carry a person's own env and headers, which is where their tokens
-//! live. That is the point — whoever asks is dialling those servers instead of
-//! us (ADR-0036 §4) — and it is why the answer never reaches a log: nothing
-//! here formats a row, and the wire face is `wire: Some`, in process, rather
-//! than a face another process may call.
-
-use std::sync::Arc;
-
-use async_trait::async_trait;
-use bingo_sdk::{ServiceError, WireService};
-use serde_json::{Value, json};
-
+//! The live MCP configuration behind the shared service contract.
 use crate::manager::Manager;
-
-/// The key the service is registered under, and the one the manifest declares.
-pub const SERVERS: &str = "mcp.servers";
-
-/// The method it speaks.
-const METHOD: &str = "servers";
+use async_trait::async_trait;
+use bingo_services::mcp::Servers;
+use serde_json::{Map, Value};
+use std::sync::Arc;
 
 pub struct Rows {
     manager: Arc<Manager>,
 }
-
 impl Rows {
     pub fn new(manager: Arc<Manager>) -> Self {
         Self { manager }
     }
 }
-
 #[async_trait]
-impl WireService for Rows {
-    async fn call(&self, method: &str, _params: Value) -> Result<Value, ServiceError> {
-        if method != METHOD {
-            return Err(ServiceError(format!(
-                "{SERVERS} speaks `{METHOD}`, not `{method}`"
-            )));
-        }
-        Ok(json!({ METHOD: self.manager.rows().await }))
+impl Servers for Rows {
+    async fn servers(&self) -> Map<String, Value> {
+        self.manager.rows().await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bingo_services::mcp;
+    use serde_json::{Value, json};
+    const METHOD: &str = "servers";
+    fn wire(manager: Arc<Manager>) -> Arc<dyn bingo_sdk::WireService> {
+        mcp::wire(Arc::new(Rows::new(manager)))
+    }
     use crate::config::Server;
     use std::collections::BTreeMap;
 
@@ -67,7 +42,7 @@ mod tests {
     /// with what dialling each server takes.
     #[tokio::test]
     async fn the_service_answers_the_rows_as_a_person_wrote_them() {
-        let rows = Rows::new(manager(
+        let rows = wire(manager(
             json!({
                 "files": { "command": "npx", "args": ["-y", "files"], "env": { "TOKEN": "s3cret" } },
                 "remote": { "type": "http", "url": "https://mcp.example.com/mcp" }
@@ -94,7 +69,7 @@ mod tests {
             json!({ "files": { "command": "npx" }, "web": { "command": "npx" } }),
             &["web".to_string()],
         );
-        let rows = Rows::new(Arc::clone(&manager));
+        let rows = wire(Arc::clone(&manager));
         let answered = rows.call(METHOD, Value::Null).await.expect("it answers");
         assert!(answered["servers"]["files"].is_object());
         assert!(answered["servers"].get("web").is_none());
@@ -110,7 +85,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_method_this_service_does_not_speak_says_which_one_it_does() {
-        let refused = Rows::new(manager(json!({}), &[]))
+        let refused = wire(manager(json!({}), &[]))
             .call("tools", Value::Null)
             .await
             .expect_err("a refusal");

@@ -278,7 +278,7 @@ async fn a_service_has_one_owner_and_both_faces() {
     let handle = host.handle();
     assert_eq!(
         handle
-            .service::<ServiceHandle>("echo")
+            .service::<ServiceHandle>(&crate::ServiceKey::new("echo"))
             .expect("typed")
             .call("echo", json!(42))
             .await

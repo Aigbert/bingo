@@ -283,6 +283,7 @@ version = "0.6.6"
 dependencies = [
  "async-trait",
  "bingo-sdk",
+ "bingo-services",
  "futures",
  "jiff",
  "schemars 1.2.2",
@@ -526,6 +527,7 @@ dependencies = [
  "bingo-auth-oauth",
  "bingo-pictures",
  "bingo-sdk",
+ "bingo-services",
  "insta",
  "proptest",
  "reqwest",
@@ -617,6 +619,7 @@ dependencies = [
  "async-trait",
  "base64 0.23.1",
  "bingo-sdk",
+ "bingo-services",
  "futures",
  "getrandom 0.4.3",
  "jiff",
@@ -695,6 +698,7 @@ version = "0.6.6"
 dependencies = [
  "async-trait",
  "bingo-sdk",
+ "bingo-services",
  "futures",
  "jiff",
  "schemars 1.2.2",
@@ -743,6 +747,17 @@ dependencies = [
  "tokio",
  "tokio-util",
  "ulid",
+]
+
+[[package]]
+name = "bingo-services"
+version = "0.6.6"
+dependencies = [
+ "async-trait",
+ "bingo-sdk",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

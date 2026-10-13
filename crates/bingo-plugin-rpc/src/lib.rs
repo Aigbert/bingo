@@ -73,7 +73,7 @@ pub use wire::PROTOCOL;
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.plugin-rpc",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "tools:plugin-rpc",
         "commands:plugin-rpc",

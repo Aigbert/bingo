@@ -6,7 +6,7 @@ use super::*;
 static ASKING: PluginManifest = PluginManifest {
     id: "test.asking",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["policy:asking"],
     requires: &[],
     config: None,

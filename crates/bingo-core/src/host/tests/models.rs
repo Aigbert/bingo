@@ -254,7 +254,7 @@ async fn a_changed_list_is_announced_and_an_unchanged_one_is_not() {
 static LOCKED: PluginManifest = PluginManifest {
     id: "test.locked",
     version: "0",
-    sdk: "^0.1",
+    uses: &[],
     provides: &["provider:locked"],
     requires: &[],
     config: None,

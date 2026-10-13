@@ -3,29 +3,20 @@
 //! nouns, and the plugin that owns `roles` owns the file — where it is, and
 //! that it is JSON.
 //!
-//! So nothing here opens it. The key is asked for through the service that
-//! plugin registers (ADR-0031): a key string, a method name and JSON, which
-//! is the whole of the lane a plugin has onto another plugin's fact. A trait
-//! would need one of them to import the other (ADR-0001) or `team` to become
-//! a word the kernel knows, and it is neither.
+//! The shared typed service finds the owner in process or through its wire face.
 //!
 //! What the value *means* is still this plugin's: a roster is deserialized
 //! here, from the value as a person wrote it, and refused here when it is not
 //! one.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use bingo_sdk::{HostHandle, KernelError, ServiceError, ServiceHandle};
+use bingo_sdk::{HostHandle, KernelError};
+use bingo_services::team;
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::ear::{self, Listener, Seat};
-
-/// The service the team file answers under, and the method it speaks. A key
-/// and a method are the whole of the contract, so they are written down as
-/// the two words they are.
-pub(crate) const TEAM: &str = "agents.team";
-const SECTION: &str = "section";
 
 /// This plugin's key in that file.
 const ROOMS: &str = "rooms";
@@ -58,14 +49,8 @@ impl Entry {
 
 #[derive(Debug, thiserror::Error)]
 pub enum TeamError {
-    /// A directory JSON cannot name, so the file could not even be asked
-    /// about: a path is bytes on unix and UTF-16 on Windows, and neither is
-    /// a JSON string. It is refused here rather than at the `json!` that
-    /// would otherwise panic on it.
-    #[error("{0} is not a directory name this can ask about")]
-    Unnameable(PathBuf),
     #[error("the team file: {0}")]
-    Unreadable(#[from] ServiceError),
+    Unreadable(#[from] team::TeamError),
     #[error("the team file's `{ROOMS}`: {0}")]
     Malformed(#[from] serde_json::Error),
 }
@@ -79,16 +64,10 @@ pub enum TeamError {
 /// (ADR-0031 §5). `/room` and `OpenRoom` are unaffected: a declared room is
 /// the only thing that file was ever asked about.
 pub async fn rooms(host: &HostHandle, cwd: &Path) -> Result<Vec<Entry>, TeamError> {
-    let Some(file) = host.service::<ServiceHandle>(TEAM) else {
+    let Some(file) = team::find(host) else {
         return Ok(Vec::new());
     };
-    let Some(cwd) = cwd.to_str() else {
-        return Err(TeamError::Unnameable(cwd.to_path_buf()));
-    };
-    let answered = file
-        .call(SECTION, json!({ "cwd": cwd, "key": ROOMS }))
-        .await?;
-    declared(&answered[SECTION])
+    declared(&file.section(cwd, ROOMS).await?)
 }
 
 /// The roster a section declares. A project that wrote nothing under `rooms`
@@ -105,6 +84,7 @@ mod tests {
     use super::*;
     use crate::tests::{Fleet, Stub};
     use serde_json::json;
+    use std::path::PathBuf;
 
     /// What the service answers for a project that declared these rooms.
     fn section(source: Value) -> Result<Vec<Entry>, TeamError> {
@@ -204,11 +184,11 @@ mod tests {
     #[tokio::test]
     async fn a_directory_json_cannot_name_is_refused_rather_than_panicked_on() {
         let file = Stub::declaring(json!([]));
-        let host = crate::tests::service_host(TEAM, file.clone());
+        let host = crate::tests::service_host(team::KEY.name(), file.clone());
         let refused = rooms(&host, &unnameable())
             .await
             .expect_err("a directory with no name JSON can carry");
-        assert!(matches!(refused, TeamError::Unnameable(_)), "{refused}");
+        assert!(matches!(refused, TeamError::Unreadable(_)), "{refused}");
         assert!(file.asked().is_empty(), "and the owner was never asked");
     }
 
@@ -230,7 +210,7 @@ mod tests {
     #[tokio::test]
     async fn the_rooms_key_is_asked_for_by_key_method_and_directory() {
         let file = Stub::declaring(json!([{"name": "design"}]));
-        let host = crate::tests::service_host(TEAM, file.clone());
+        let host = crate::tests::service_host(team::KEY.name(), file.clone());
         let declared = rooms(&host, Path::new("/work/project"))
             .await
             .expect("a roster");
@@ -238,7 +218,7 @@ mod tests {
         assert_eq!(
             file.asked(),
             [(
-                SECTION.to_string(),
+                "section".to_string(),
                 json!({ "cwd": "/work/project", "key": "rooms" })
             )]
         );
@@ -256,7 +236,10 @@ mod tests {
     /// plugin has none of its own to add, because it never opened the file.
     #[tokio::test]
     async fn a_team_file_the_owner_refused_is_refused_here_in_its_own_words() {
-        let host = crate::tests::service_host(TEAM, Stub::refusing("/w/team.json: { not json"));
+        let host = crate::tests::service_host(
+            team::KEY.name(),
+            Stub::refusing("/w/team.json: { not json"),
+        );
         let refused = rooms(&host, Path::new("/w"))
             .await
             .expect_err("a file that will not parse");

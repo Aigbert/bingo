@@ -89,7 +89,7 @@ pub const SURFACE: &str = "room";
 static MANIFEST: PluginManifest = PluginManifest {
     id: PLUGIN,
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[bingo_services::team::KEY.name()],
     provides: &[
         "command:room",
         "hook:rooms",
@@ -168,7 +168,7 @@ mod plugin_tests {
                 "tool:CloseRoom",
                 "tool:Listen",
                 "context:rooms",
-                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id)),
+                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
             ]
         );
         assert!(MANIFEST.requires.is_empty());
@@ -198,7 +198,7 @@ mod plugin_tests {
         assert!(matches!(&contributions[7], Contribution::Context(c) if c.id() == "rooms"));
         match &contributions[8] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &bingo_sdk::Pages::key(MANIFEST.id));
+                assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

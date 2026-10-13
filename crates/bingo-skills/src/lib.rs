@@ -82,7 +82,7 @@ pub use tool::{SkillArgs, SkillTool};
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.skills",
     version: env!("CARGO_PKG_VERSION"),
-    sdk: "^0.1",
+    uses: &[],
     provides: &[
         "command:skills",
         "tool:Skill",
@@ -180,7 +180,7 @@ mod plugin_tests {
         assert!(matches!(contributions[2], Contribution::Context(_)));
         match &contributions[3] {
             Contribution::Service { key, wire, .. } => {
-                assert_eq!(key, &bingo_sdk::Pages::key(MANIFEST.id));
+                assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
             }
             other => panic!("expected the page service, got {other:?}"),

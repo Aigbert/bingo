@@ -28,8 +28,8 @@ pub struct PluginManifest {
     /// Reverse-dotted, e.g. `bingo.tools.fs`.
     pub id: &'static str,
     pub version: &'static str,
-    /// Semver requirement on `bingo-sdk`, checked at boot.
-    pub sdk: &'static str,
+    /// Optional service keys. Missing ones do not disable this plugin.
+    pub uses: &'static [&'static str],
     /// Capabilities offered, as `kind:name` (`tool:Read`, `provider:anthropic`, `service:bingo.checkpoint`).
     pub provides: &'static [&'static str],
     /// Capabilities needed. Missing ones disable the plugin with a notice; they never crash.
@@ -228,6 +228,20 @@ pub enum Contribution {
     },
 }
 
+impl Contribution {
+    pub fn service<T: ?Sized + Any + Send + Sync>(
+        key: &crate::ServiceKey<T>,
+        value: Arc<T>,
+        wire: Option<Arc<dyn WireService>>,
+    ) -> Self {
+        Self::Service {
+            key: key.name().to_string(),
+            value: Arc::new(value),
+            wire,
+        }
+    }
+}
+
 impl fmt::Debug for Contribution {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -328,7 +342,7 @@ mod tests {
     static MANIFEST: PluginManifest = PluginManifest {
         id: "test.plugin",
         version: "0.2.0",
-        sdk: "^0.1",
+        uses: &[],
         provides: &[],
         requires: &[],
         config: None,
