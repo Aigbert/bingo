@@ -674,11 +674,11 @@ fn what_wants_a_person_alternates_on_the_second() {
         child_frame(2, opened(child_permission())),
     ]);
     // The beat is the wall clock's own second, so the samples start on one.
-    let (mut ui, now) = scene();
+    let (ui, now) = scene();
     // The status line itself: a card is up over the screen, and everything
     // behind it is dim by then (§3), so the slot is read where it is written.
-    let mut at = |ms| {
-        crate::status::styles(&crate::status::line(&tree, &mut ui, 80, later(now, ms)))
+    let at = |ms| {
+        crate::status::styles(&crate::status::line(&tree, &ui, 80, later(now, ms)))
             .into_iter()
             .find(|(text, _)| text.contains("needs you"))
             .map(|(_, style)| style)

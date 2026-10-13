@@ -334,7 +334,7 @@ fn the_foot_row_is_a_bar_with_the_count_in_text_and_the_hint_in_dim() {
         crate::input::on_key(&mut ui, &tree, key(KeyCode::PageUp), now);
         let settled = later(now, 100);
         let painted = painted(80, 24, &tree, &mut ui, settled);
-        let below = crate::foot::below(&mut ui, settled).expect("held");
+        let below = crate::foot::below(&ui, settled).expect("held");
         let count = format!(" ↓ {below} lines below");
         let hint = " · end or click to follow ";
         let air = " ".repeat((80 - count.width() - hint.width()) / 2);

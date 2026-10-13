@@ -8,6 +8,9 @@ pub fn begin() {}
 pub fn finish(_: &mut super::Layout) {}
 
 #[cfg(test)]
+pub use measured::*;
+
+#[cfg(test)]
 mod measured {
     use std::cell::Cell;
     thread_local! { static COUNTS: Cell<Option<[usize; 5]>> = const { Cell::new(None) }; }
@@ -26,5 +29,3 @@ mod measured {
         layout.renders = COUNTS.with(|counts| counts.take().unwrap_or_default());
     }
 }
-#[cfg(test)]
-pub use measured::*;

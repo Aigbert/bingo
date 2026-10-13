@@ -450,6 +450,7 @@ impl Run {
     fn grumble(&mut self, took: Duration) {
         if let Some(text) = slow_draw(took, self.sluggish) {
             self.sluggish = true;
+            self.behind = true;
             self.ui.notify(Level::Warn, text, Instant::now());
         }
     }
