@@ -754,18 +754,22 @@ fn result(call: &Call<'_>, rows: &Rows<'_>) -> Vec<Line<'static>> {
 /// A sub-session is a row where it began: what it is, what it was asked, and
 /// what it is doing — read from its own state, never copied into this one.
 fn child_row(child: &SessionState, input: &Value, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let mut out = speaks(
-        tree::bullet_style(
-            bingo_collab::lifecycle::Lifecycle::of_state(child),
-            tree::asking(child),
-            child.last_status(),
-        ),
-        vec![signature(
-            &tree::name(child),
-            &summarize(input),
-            rows,
-            Landing::Settled,
-        )],
+    let name = tree::name(child);
+    let mut heading = signature(&name, &summarize(input), rows, Landing::Settled);
+    if let Some(span) = heading.spans.first_mut() {
+        span.style = crate::face::style(&name).patch(theme::bold());
+    }
+    let live = matches!(
+        bingo_collab::lifecycle::Lifecycle::of_state(child),
+        Some(
+            bingo_collab::lifecycle::Lifecycle::Working
+                | bingo_collab::lifecycle::Lifecycle::Asking
+        )
+    );
+    let mut out = marked(
+        crate::face::face(&name).sigil,
+        crate::face::pulse(&name, live, rows.now),
+        vec![heading],
         rows,
     );
     if let Some(activity) = tree::activity(child) {

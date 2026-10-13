@@ -37,6 +37,7 @@ use unicode_width::UnicodeWidthStr;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Palette {
     pub raised: Color,
+    pub crew: [Color; 5],
     pub presence: Color,
     pub glow: Color,
     pub good: Color,
@@ -50,6 +51,13 @@ pub struct Palette {
 
 /// The accents over a terminal's own dark ground.
 pub const DARK: Palette = Palette {
+    crew: [
+        Color::Rgb(0xc2, 0xd8, 0x6a),
+        Color::Rgb(0x5c, 0xc8, 0xb4),
+        Color::Rgb(0xb3, 0x9c, 0xf2),
+        Color::Rgb(0xdc, 0x8c, 0xf0),
+        Color::Rgb(0xf0, 0x8c, 0xc0),
+    ],
     raised: Color::Rgb(0x21, 0x1d, 0x17),
     presence: Color::Rgb(0xf0, 0x88, 0x3e),
     glow: Color::Rgb(0xff, 0xc2, 0x78),
@@ -65,6 +73,13 @@ pub const DARK: Palette = Palette {
 /// `raised` is one step *down* from the background rather than one step up —
 /// the tint is what gives the frame depth either way (design §4).
 pub const LIGHT: Palette = Palette {
+    crew: [
+        Color::Rgb(0x56, 0x6d, 0x0f),
+        Color::Rgb(0x1d, 0x75, 0x66),
+        Color::Rgb(0x6a, 0x4f, 0xc2),
+        Color::Rgb(0x8e, 0x3a, 0xa8),
+        Color::Rgb(0xb0, 0x3a, 0x7a),
+    ],
     raised: Color::Rgb(0xee, 0xe8, 0xdd),
     presence: Color::Rgb(0xa8, 0x4d, 0x12),
     glow: Color::Rgb(0xe0, 0x7a, 0x2a),
@@ -396,6 +411,13 @@ pub fn with<R>(theme: Theme, f: impl FnOnce() -> R) -> R {
 /// is why Codex and Claude Code both draw their prose with no colour at all.
 /// It is spelled `Reset` rather than left unsaid so that it can be patched
 /// over a colour — the end of a ramp, a bold name a light has left.
+pub fn crew(index: usize) -> Style {
+    match current().colors {
+        Colors::True(palette) => Style::new().fg(palette.crew[index % 5]),
+        _ => text(),
+    }
+}
+
 pub fn text() -> Style {
     Style::new().fg(Color::Reset)
 }
@@ -711,6 +733,9 @@ pub fn spendable() -> std::collections::HashSet<Color> {
     };
     for style in [presence(), glow(), good(), bad(), mode()] {
         keep(style);
+    }
+    for index in 0..5 {
+        keep(crew(index));
     }
     for step in 0..=SAMPLES {
         let t = step as f32 / SAMPLES as f32;

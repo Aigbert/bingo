@@ -17,7 +17,11 @@ fn crew() -> crate::tree::Tree {
         ),
     ));
     frames.extend([
-        agent_frame(3, 1, agent_announced(3, "scout")),
+        agent_frame(3, 1, {
+            let mut summary = agent_summary(3, "scout");
+            summary.parent.as_mut().unwrap().item = None;
+            Event::SessionUpdated { summary }
+        }),
         agent_frame(3, 2, started("trn_scout")),
         log_frame(1, log_announced("#design")),
         log_frame(

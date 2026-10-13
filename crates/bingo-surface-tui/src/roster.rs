@@ -282,15 +282,12 @@ fn windowed(listed: Vec<(Line<'static>, Option<Cursor>)>, at: usize, room: usize
 fn session_line(tree: &Tree, row: &Row<'_>, name: usize, on: bool, now: Now) -> Line<'static> {
     let state = tree.state(row.session);
     let seat = state.and_then(|state| seats::seat(tree, state));
-    let mut spans = vec![
-        theme::cursor_span(on),
-        dot(
-            row,
-            seat.as_ref(),
-            state.and_then(SessionState::last_status),
-        ),
-    ];
-    spans.extend(named(&row.name, name, on));
+    let mut spans = vec![theme::cursor_span(on), dot(row, seat.as_ref(), now)];
+    let mut name = named(&row.name, name, on);
+    for span in &mut name {
+        span.style = crate::face::style(&row.name);
+    }
+    spans.extend(name);
     spans.extend(says(row, state, seat, now));
     Line::from(spans)
 }
@@ -320,16 +317,16 @@ fn named(name: &str, column: usize, on: bool) -> Vec<Span<'static>> {
 /// The dot a session's row wears, and the sigil a live seat wears instead. The
 /// colour is the roster's own either way, so the glyph adds a fact rather than
 /// replacing one.
-fn dot(row: &Row<'_>, seat: Option<&Seat>, last: Option<&bingo_sdk::TurnStatus>) -> Span<'static> {
-    let live = matches!(seat.map(|seat| seat.ear), Some(Ear::Live));
-    let glyph = match live {
-        true => LIVE,
-        false => theme::bullet(),
+fn dot(row: &Row<'_>, seat: Option<&Seat>, now: Now) -> Span<'static> {
+    let ear = if matches!(seat.map(|seat| seat.ear), Some(Ear::Live)) {
+        LIVE
+    } else {
+        " "
     };
-    let cell = theme::bullet().width().max(LIVE.width());
+    let live = matches!(row.status, Some(Lifecycle::Working | Lifecycle::Asking));
     Span::styled(
-        format!("{glyph}{} ", " ".repeat(cell.saturating_sub(glyph.width()))),
-        tree::bullet_style(row.status, row.attention, last),
+        format!("{}{ear} ", crate::face::face(&row.name).sigil),
+        crate::face::pulse(&row.name, live, now),
     )
 }
 
@@ -571,7 +568,7 @@ mod tests {
         let glyph = dot(
             reviewer,
             seats::seat(&tree, tree.state(reviewer.session).expect("it")).as_ref(),
-            None,
+            scene().1,
         );
         assert!(glyph.content.starts_with('~'), "{glyph:?}");
         assert_eq!(
