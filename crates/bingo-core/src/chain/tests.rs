@@ -182,3 +182,15 @@ async fn dynamic_links_are_read_again_and_receive_only_the_user_grant() {
     source.0.store(false, std::sync::atomic::Ordering::Relaxed);
     assert!(hooks.links().await.is_empty());
 }
+
+#[tokio::test(start_paused = true)]
+async fn an_external_links_deadline_excludes_its_continuation() {
+    let kernel = Next::new(|_| Box::pin(async {
+        tokio::time::sleep(HOOK_DEADLINE * 3).await;
+        Ok(ToolOutput::text("kernel"))
+    }));
+    let report = Report::default();
+    let result = run::<tool::Call>(&[link("observer", Tier::Tighten)], kernel, &cx(), call(), report.clone()).await.unwrap();
+    assert_eq!(result, ToolOutput::text("kernel"));
+    assert!(report.take().is_empty(), "waiting for next is not plugin time");
+}
