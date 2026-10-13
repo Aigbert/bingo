@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use bingo_sdk::{Event, ItemBody};
 
 fn fixture_name(value: &Event) -> (&'static str, &'static str) {

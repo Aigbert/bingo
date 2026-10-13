@@ -1025,7 +1025,7 @@ async fn a_journal_with_unknown_records_resumes_with_known_history() {
             .transcript
             .items()
             .iter()
-            .any(|item| format!("{:?}", item.body).starts_with("Unknown"))
+            .any(|item| matches!(item.body, ItemBody::Unknown { .. }))
     );
     assert!(
         opened.snapshot.transcript.items().iter().any(

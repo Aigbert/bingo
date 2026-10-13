@@ -754,7 +754,7 @@
       ]
     },
     "Event": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "object",
           "properties": {
@@ -1283,6 +1283,11 @@
             "to"
           ],
           "description": "Ephemeral, transport only: this subscriber missed `from..=to`; re-read the journal."
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "A payload this build cannot read, carried without interpretation."
         }
       ]
     },
@@ -2231,7 +2236,7 @@
       ]
     },
     "ItemBody": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "object",
           "properties": {
@@ -2570,6 +2575,11 @@
             "kind",
             "asset"
           ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "A payload this build cannot read, carried without interpretation."
         }
       ]
     },
