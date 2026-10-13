@@ -15,6 +15,8 @@ mod invoke;
 mod log;
 mod naming;
 mod peers;
+mod retry;
+mod storage;
 
 fn who() -> ClientIdentity {
     ClientIdentity {

@@ -252,6 +252,51 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
+    async fn summary_failure_counting_a_message_keeps_the_journal_line() {
+        let (_root, store) = root_with();
+        store.create(&summary()).await.unwrap();
+        let head = frame(1, Event::SessionUpdated { summary: summary() });
+        store.append(&session(), &head).await.unwrap();
+        let path = layout::summary(&layout::session_dir(store.root(), &session()));
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        let item = bingo_sdk::Item {
+            id: bingo_sdk::ItemId::mint(),
+            turn: None,
+            round: 0,
+            status: bingo_sdk::ItemStatus::Completed,
+            started_at: stamp(),
+            completed_at: Some(stamp()),
+            intent: None,
+            meta: Default::default(),
+            body: bingo_sdk::ItemBody::Assistant {
+                text: "answer".into(),
+            },
+        };
+        let message = frame(2, Event::ItemCompleted { item });
+        assert!(store.append(&session(), &message).await.is_ok());
+        assert_eq!(
+            store.replay(&session(), Seq::ZERO).await.unwrap(),
+            vec![head, message]
+        );
+    }
+
+    #[tokio::test]
+    async fn summary_failure_does_not_reject_a_written_journal_line() {
+        let (_root, store) = root_with();
+        store.create(&summary()).await.unwrap();
+        let path = layout::summary(&layout::session_dir(store.root(), &session()));
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        let head = frame(1, Event::SessionUpdated { summary: summary() });
+        assert!(store.append(&session(), &head).await.is_ok());
+        assert_eq!(
+            store.replay(&session(), Seq::ZERO).await.unwrap(),
+            vec![head]
+        );
+    }
+
+    #[tokio::test]
     async fn a_created_session_replays_what_it_appended() {
         let (_root, store) = root_with();
         store.create(&summary()).await.expect("create");

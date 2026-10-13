@@ -840,6 +840,36 @@ mod tests {
             .collect()
     }
 
+    #[test]
+    fn retry_withdraws_partial_text_from_the_journal_view() {
+        let lost = item(
+            "lost",
+            ItemBody::Assistant {
+                text: "withdrawn".into(),
+            },
+        );
+        let answer = item(
+            "answer",
+            ItemBody::Assistant {
+                text: "kept".into(),
+            },
+        );
+        let mut frames = frames_of(&[lost.clone()]);
+        frames[1].event = Event::ItemUpdated { item: lost.clone() };
+        let mut retry = frames[1].clone();
+        retry.event = Event::TurnRetrying {
+            turn: TurnId::mint(),
+            attempt: 1,
+            max: 2,
+            delay_ms: 0,
+            dropped: vec![lost.id],
+            reason: "overloaded".into(),
+        };
+        frames.push(retry);
+        frames.extend(frames_of(&[answer.clone()]));
+        assert_eq!(ContextView::items(&frames), vec![answer]);
+    }
+
     proptest::proptest! {
         #[test]
         fn every_projection_is_legal_for_the_api(
