@@ -185,6 +185,27 @@ mod plugin_tests {
     }
 
     #[test]
+    fn agent_noun_declares_spawn_list_and_register() {
+        let mut registrar = registrar();
+        AgentsPlugin::default().register(&mut registrar).unwrap();
+        let face = registrar
+            .into_contributions()
+            .into_iter()
+            .find_map(|contribution| {
+                if let Contribution::Service {
+                    wire: Some(wire), ..
+                } = contribution
+                {
+                    return wire.face().filter(|face| face.noun == "agent");
+                }
+                None
+            })
+            .expect("agent noun");
+        assert!(face.find("spawn").unwrap().unsafe_call);
+        assert!(face.find("list").is_some());
+        assert!(face.find("register").is_some());
+    }
+    #[test]
     fn the_manifest_says_what_it_provides_and_claims_no_settings() {
         assert_eq!(MANIFEST.id, "bingo.agents");
         assert!(MANIFEST.requires.is_empty());
