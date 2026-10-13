@@ -1,6 +1,6 @@
 //! Where a `BINGO_*` variable is spelled: never in this binary.
 //!
-//! Each of the twenty-one this tree reads is a named const beside the code
+//! Each variable this tree reads is a named const beside the code
 //! that acts on it, in the crate that owns the behaviour —
 //! `bingo_provider_acp::bridge::{ADDRESS_VAR, TOKEN_VAR}`,
 //! `bingo_provider_fake::SCRIPT_ENV`, the channels' in
