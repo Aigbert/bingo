@@ -10,96 +10,62 @@ table. A pulled pane is asked for at its drawn width (`HostApi::render`,
 panes, stacks toasts. After M121, M123–M125, M137, M138.
 ## Bricks, in build order
 
-1. **Contract: the elements, tests first.** `view.rs` (699 lines) → `view/{mod,read,fold,table,tests}.rs`. Serde names are Claude
-   Code's, so the nodes M137's `h` builds arrive unmapped. Golden JSON per
-   node; "Every node once" gains the nine; `every_node_folds_to_text`
-   pins each fold (`Engine` folds to nothing). `Text` and `Button` hold
-   `children` as JSX gives them (strings and nested `Text`: styled spans);
-   old `Text { text }` reads as one child; `Code` writes `source`/
-   `language` and still reads `text`/`lang` (ADR-0065). All fail first.
-2. **The drawn subset, as data.** `table.rs` names per element the props
-   bingo draws; surface tests and M142's `validate` read this one list; a
-   surface ignores any other prop. `Box`: key, flexDirection (row|column),
-   flexGrow, flexWrap, alignItems, justifyContent, gap, width, height,
-   margin[X|Y], padding[X|Y], borderStyle, borderColor, display. `Text`:
-   color, dimColor, bold, italic, underline, strikethrough, inverse, wrap.
-   `Button`: key, label, hotkey, dimColor, variant, onPress. `Input`: key,
-   label, placeholder, value, onInput, onSubmit. `Select`: key, label,
-   options, value, onSelect. `Link`: href, label. `Image`: source, alt,
-   columns, rows. `Raster`: columns, rows, cells. `Svg`: source, alt,
-   width, height. `Code`: source, language. `Markdown`: text, dimColor.
-   Props outside this table are ignored (including position, background, overflow and Code paths).
-3. **The old words read as `Box`.** `stack` is a column `Box`; `columns`
-   a wrapping row whose n children each take `flexGrow: 1, width:
-   NARROW / n`, with the existing two-cell gutters included in that budget,
-   so they stack below `NARROW = 60` as before. `View::Stack`/`Columns` are deleted; `KNOWN` = the schema's
-   kinds + `READ_ONLY = ["stack", "columns"]`. Writers move to `Box`:
+1. **Elements, tests first.** Split sdk `view.rs` into `view/{mod,read,fold,table,tests}.rs`.
+   Add nine nodes and golden JSON/folds (Engine folds empty). Text/Button have children
+   (strings or nested styled Text); legacy Text.text and Code.text/lang still read;
+   Code writes source/language. Canonical JSX names reach serde unmapped.
+2. **Drawn props, one table.** Box: key, flexDirection(row|column), flexGrow, flexWrap,
+   alignItems, justifyContent, gap, width, height, margin[X|Y], padding[X|Y], borderStyle,
+   borderColor, display. Text: color, dimColor, bold, italic, underline, strikethrough,
+   inverse, wrap. Button: key, label, hotkey, dimColor, variant, onPress.
+   Input: key, label, placeholder, value, onInput, onSubmit. Select: key, label,
+   options, value, onSelect. Link: href, label. Image: source, alt, columns, rows.
+   Raster: columns, rows, cells. Svg: source, alt, width, height. Code: source,
+   language. Markdown: text, dimColor. Props outside the table are ignored.
+3. **Legacy containers.** Stack reads as column Box; Columns as wrapping row Box,
+   children with flexGrow 1 and widths sharing NARROW=60 including two-cell gutters.
+   Delete Stack/Columns variants; schema kinds plus READ_ONLY pin KNOWN. Writers:
    experience/command, schedule/render and tools/list, demo-ui/board, tasks/journal.
-4. **Tables and the structural check.** `TERMINAL`, `DESKTOP`, `TEXT` as
-   data; pure `outside(table, &View) -> Vec<Path>`, which a surface folds
-   (§2). `answer_ok(component, &View)` checks structure only: `Engine`
-   only as the asked component, every handler `<plugin>:ui` of the
-   answering mod, at most 4 096 nodes. `published_ok` refuses `Engine`.
-5. **Pulled places.** In `bingo_sdk::slot` a slot's view is `Shown::View`
-   or `Shown::Pull { request }`; old JSON reads as `View`. New:
-   `Slot::Pane { id, title, focus, close_on_escape, hold_toasts, asked,
-   rows, view }`, `Slot::Toast { text, until, alert }`; `Activity.view`
-   may pull. Golden fixtures; `published_ok` over each.
-6. **The render pair.** Sdk `render.rs`: `Component` (§4's fifteen, no
-   permission variant), `Viewport`, `SurfaceName`, `RenderRequest {
-   component, requestId, surface, props, viewport }`. `HostApi::render`
-   defaults to `Engine { component, props }`, `invalidate` to nothing.
-   Core's `chain/render.rs` raises `ui.render` through M131's runner (the
-   kernel link answers `Engine`; a failed hook or `answer_ok` answers
-   `Engine` plus one notice naming the plugin), off the actor's mailbox,
-   four in flight per session, a newer ask for one `(component,
-   requestId)` replacing a queued one. `invalidate` passes the pure
-   `host/throttle.rs` (30/s per request) and sends the ephemeral
-   `Event::Invalidated`, which `SessionState` folds into a generation per
-   request for the surface's memo. `UI_RENDER` is additive: `PROTOCOL` 1.
-7. **Who calls `invalidate`.** Pure `bingo-plugin-host/subscribed.rs`:
-   `subscribe(requestId, reads)` from M138's read log of the render
-   invocation, `changed(scope, key) -> requests`, `forget`. The answering
-   runtime keeps one and calls `invalidate` on a write M138's state face
-   reports, or on `$.ui.invalidate`; it binds "in render" on that face,
-   so `$.state.set` in a `ui.render` hook is refused in words. plugin-rpc
-   does the same for a process (the node SDK's `ui.ts` mints handlers;
-   `host/ui/invalidate` joins `schema/plugin.json`).
-8. **Handlers through the door.** `CommandSpec.hidden` (default `false`):
-   never listed, never completed. M137's runtime contributes
-   `<plugin>:ui`, `instant` and `hidden`. `handlers.rs` mints `Action {
-   name: "<plugin>:ui", args: { handler: "<generation>:<n>", event } }`,
-   keyed by request and replaced by each answer. A surface adds `value`
-   and fires `Input::Action`; the command raises `ui.press`, `ui.input`
-   or `ui.select` in that mod alone; an old generation answers a notice.
-   Escape on a `close_on_escape` pane fires `event: "close"`.
-9. **`$.ui`, the pulled half**, each an op event (M138), `ui.*` in M136's
-   catalogue: `status` → `Status`; `toast(text, ms = 4000)` and `notify`
-   (`alert`) → `Slot::Toast`; `open(…)` → `Slot::Pane` pulling its own
-   `id` as `requestId`, resolving `{}`, `asked` set when the opening hook
-   ran under the person's own input (a command, a key, a press); `close`,
-   `panes`, `invalidate`, `resolve`; `notice`/`ask` via `HostApi`.
-10. **The TUI draws the terminal table.** `views/flex.rs` lays out a
-    `Box` by hand, pure in tree and width; a wrapping row whose children
-    do not fit becomes a column; taffy only if a fixture needs it (budget
-    pasted either way). `views/{button,input,select,link,image,raster}.rs`;
-    `text.rs` draws spans; `Button` uses the `Actions` marks, `Input` the
-    composer's editor. Pure `pane.rs` (ADR-0081 §7): `asked` sits above
-    the composer at a third of the height at every width (M151 adds the
-    other places); unasked waits (`1 pane waiting` in `status`, a click opens). `toast.rs` stacks toasts above
-    the status line (`until` feeds `next_frame`; held while a `hold_toasts`
-    pane shows; a new `alert` notifies the unfocused terminal).
-    `pulled.rs` memoises on `(component, requestId, props, columns,
-    generation)`, drawing `…` until answered; `Focus::Pane(id)`.
-11. **The black box.** Fixture mod `counter` (a pane, a `Button`, an
-    `Input`); `tests/mods_ui.rs` over `bingo serve --stdio`, fake provider:
-    `ui/render`, a press by `session/input`, `Invalidated`, the new count.
+4. **Tables/validation.** TERMINAL, DESKTOP, TEXT and pure outside(table, view) paths.
+   answer_ok checks only structure: Engine matches requested component, handlers name
+   the answering mod's `<plugin>:ui`, at most 4096 nodes. published_ok refuses Engine.
+5. **Places.** Shown::View or Pull{request}; old JSON reads View. Pane{id,title,focus,
+   close_on_escape,hold_toasts,asked,rows,view}; Toast{text,until,alert}; Activity can pull.
+   Golden fixtures and published_ok cover each.
+6. **Render pair.** sdk Component (ADR-0079's fifteen, no permission), Viewport,
+   SurfaceName, RenderRequest{component,requestId,surface,props,viewport}.
+   HostApi::render defaults Engine; invalidate defaults no-op. Core raises ui.render
+   through M131's runner off the mailbox, four in flight/session; latest queued ask
+   replaces the same (component,requestId). Bad tree/hook: Engine plus one plugin notice.
+   Pure throttle limits invalidations to 30/s/request; ephemeral Invalidated folds
+   a generation per request. ui/render is additive to surface RPC PROTOCOL 1.
+7. **Subscriptions.** plugin-host/subscribed: subscribe(requestId,reads), changed(scope,key),
+   forget. Both runtimes invalidate on writes to reads or $.ui.invalidate. Bind render
+   scope to M138's state face: state.set while rendering is refused in words.
+   Node ui.ts mints handlers; plugin schema adds host/ui/invalidate.
+8. **Handlers.** CommandSpec.hidden defaults false, excluded from listing/completion.
+   Each runtime contributes instant hidden `<plugin>:ui`. Per-request generations mint
+   Action args {handler:"<generation>:<n>",event}; surface adds value via Input::Action.
+   Raise ui.press/input/select in that mod alone; stale generation notices; Escape
+   fires event close for a close_on_escape pane.
+9. **$.ui.** All methods raise op events: status, toast(default 4000ms), notify(alert),
+   open(pulled Pane, id=requestId, resolves {}, asked only under person input), close,
+   panes, invalidate, resolve(table), notice/ask(existing HostApi). Components/log: M141.
+10. **TUI.** Pure flex layout handles the drawn Box props; wrapping rows stack when
+    they do not fit. Hand layout unless a fixture justifies taffy; paste budget either way.
+    Dedicated button/input/select/link/image/raster renderers; text draws styled spans;
+    Button uses Actions marks, Input the composer editor. Asked panes sit above composer
+    at one-third height at every width; unasked waits in status, click opens (M151
+    adds placements). Toast stack above status; until feeds next_frame, hold_toasts
+    pauses it, new alert notifies an unfocused terminal. Focus::Pane(id).
+    Pulled memo: (component,requestId,props,columns,generation), ellipsis until answer.
+11. **Black box.** Counter mod (pane, Button, Input); serve --stdio with fake provider:
+    ui/render, session/input press, Invalidated, incremented count. Isolated tmux drive.
 ## Files
 
 - `crates/bingo-sdk/src/view.rs` → `view/…`; `{render.rs (new),slot,host,event,state,command,catalogue…}`
 - `crates/bingo-core/src/{chain/render,host/throttle}.rs`, `crates/bingo-plugin-host/src/subscribed.rs`,
-  `crates/bingo-mods/src/{handlers,ui}.rs` (new), runtime/chain/JS integration;
-  plugin-host state/host and plugin-rpc bridge integration; `sdk/typescript/src/ui.ts` (new)
+  `crates/bingo-mods/src/{handlers,ui}.rs`, runtime/chain/JS; plugin-host state/host and plugin-rpc bridge; `sdk/typescript/src/ui.ts` (new)
 - `crates/bingo-surface-rpc/src/methods.rs` + dispatch; `schema/{rpc,plugin,events}.json`; brick 3's writers
 - `crates/bingo-surface-tui/src/views/{flex,button,input,select,link,image,raster}.rs`, `{pane,toast,pulled}.rs`
   (new), `views/{stack,columns}.rs` (deleted), `views/{mod,text,tests}.rs`, `focus,layout,activity,status,terminal.rs`
@@ -107,8 +73,7 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
 - Module declarations, host/session wiring, TUI `ui,run,input,pointer,view,layout/deadline,transcript/output`,
   command catalog filtering and TypeScript exports/transport wiring for these bricks.
 - Mechanical `Text`/`Code`/`Stack` and `CommandSpec.hidden` constructor updates in existing
-  producers (including tasks, tools, permissions, rooms and agents), fixtures and schema generators.
-  No changes to M139 world nouns, grant.rs, or MCP/agents service rows.
+  producers, fixtures and generators; exclude M139 world nouns, grant.rs, MCP/agents service rows.
 ## Exit criteria
 
 - [ ] `cargo test -p bingo-sdk`: each node
@@ -122,7 +87,7 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
       `set` in a render is refused, brick 11 passes.
 - [ ] `cargo test -p bingo-surface-tui`: a `TestBackend` test per element;
       panes asked (inline at 200 and 80) and unasked (waiting at 200,
-      opened by a click); a toast held by `hold_toasts`, gone at `until`.
+      clicked open); toasts held by `hold_toasts`, gone at `until`.
 - [ ] The `schedule`, `experience` and `demo-ui` narrow snapshots are
       unchanged; any diff is pasted and driven in tmux.
 - [ ] `scripts/tui-smoke.sh` passes with `counter`, a tmux drive pasted;
@@ -134,18 +99,52 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
   Client/blit, extra styling, OSC 8, isPlaced, copy/scroll/focus/selection (design §8).
 ## Risks
 
-- **Spans in `Text`.** Every Rust writer of `Text` uses a constructor.
-  **`Input` traffic.** `onInput` per keystroke is a command, a hook, a
-  write and a render; if the drive feels slow, coalesce to one per frame.
-- Re-verified at `5581b978` (2026-10-14): `Slot::Activity` still holds `View`;
-  `layout::{layout,Layout.next_frame}`, `layout/deadline`, `Focus`, `Render` exist.
-  M148 removed the rail/sheet; panes integrate through the existing canvas and input owners.
-  `chain::run`/`chain::json::dispatch` and `catalogue::ALL` are the runner and catalogue.
-  M137 `globals.js` emits `{type,props,children}`; update the JSX construction seam to the
-  canonical serde node shape. `thread.js` and `chain::stage` own each hook invocation.
-  M138 `Call.reads`/`state::ReadLog` record reads; `host::Operations::set` has no render guard.
-  `CommandSpec` has no hidden field. `KNOWN` is schema-pinned. Several production callers
-  construct Text directly; their mechanical migrations are included above.
-  `Image.source` must use the existing image/blob representation, never surface-local paths.
-  No new dependency is planned. Gates run sequentially; no live/credential tests.
-  Only this task's isolated tmux socket may be driven; no terminal app or foreign signals.
+- `onInput` per keystroke crosses command/hook/write/render; coalesce per frame if slow.
+- Re-verified at `5581b978`: M148 layout/canvas replaces rail/sheet; M131's
+  runner/catalogue and M138's `Call.reads`/`ReadLog` exist; render guard does not.
+  `globals.js` still emits `{type,props,children}`. Direct Text writers need migration.
+- **Stopped (2026-10-14), protocol step 6:** ADR-0075 §1 freezes protocol 2.
+  `schema::tests::protocol_two_keeps_every_frozen_shape` fails after the element change.
+  The only frozen definition failing `preserves` is View: text, markdown, code,
+  stack and columns alternatives. Legacy reads pass; canonical writes change.
+  ADR-0079 §1 requires the new vocabulary but does not amend ADR-0075's freeze.
+  Options: authorize a narrowly scoped pre-release View/Shown baseline amendment
+  (as prior milestones did for their named changes), or retain the freeze and
+  design protocol-3/N−1 compatibility. Do not change plugin-2.json or weaken the test.
+- Partial work preserves the SDK elements/legacy reader/folds and mechanical callers;
+  TUI additions currently use text fallback. Tables, render pair, subscriptions,
+  handlers, pulled UI, full TUI drawing and counter acceptance remain unfinished.
+  No ADR/exit criterion is accepted; after stopping only formatting/artifact regeneration ran.
+  Remaining gates (clippy, workspace tests, discipline, budget, deny, Windows, PTY)
+  were not run. No live/credential tests, terminal app, push, merge or PR.
+## Verified (2026-10-14)
+```text
+cargo fmt --all -- --check
+exit_code: 0
+cargo test -p bingo-sdk view::contract --locked
+unlearned: {"kind":"Box","children":[{"kind":"Text","children":["one"]},{"kind":"Text","children":["two"]}]}
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 137 filtered out
+cargo test -p bingo-sdk view::contract --locked
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 137 filtered out
+BINGO_UPDATE_SCHEMA=1 INSTA_UPDATE=always cargo test -p bingo-sdk --lib --locked
+test result: ok. 139 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+cargo check --workspace --all-targets --locked
+error[E0164]: expected tuple struct or tuple variant, found associated function `View::text`
+cargo check --workspace --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.15s
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --test record --locked
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema:: --locked
+protocol 2 removed or retyped a frozen shape
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc schema::tests::the_committed_schema_is_this_document --locked
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc wire_ts:: --locked
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc events_ts:: --locked
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods dollar::tests::schema_and_types_are_generated_from_the_same_rows --locked
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema::tests::the_committed_schema_is_this_document --locked
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out
+```
