@@ -71,8 +71,10 @@ mail; the actor never awaits it" — half of what is needed.
    per-plugin setting: MCP `call_tool` 10 min; plugin-rpc `tool/call`
    and `command/run` 10 min; an ACP agent gets 10 s after
    `session/cancel` before its process tree is killed; every HTTP client
-   has a connect and a total timeout. Expiry is a tool error, not a
-   hang.
+   has a connect timeout; a request/response client also has a total
+   timeout; a stream client keeps ADR-0056's idle bound instead of a
+   total one, since a total bound would cut a long answer. Expiry is a
+   tool error, not a hang.
 6. **Non-goal: a bounded mailbox.** The actor sends to itself (commands
    and turns mail it back); a bounded mailbox would deadlock it on
    itself. Backpressure stays ADR-0002 §6's.
@@ -91,5 +93,5 @@ mail; the actor never awaits it" — half of what is needed.
   does not exist (`bingo-sdk/src/tool.rs`).
 - ADR-0008 §2 gains a dated note: the actor owns the command's task.
 
-Refs: ADR-0002, ADR-0008, ADR-0032, ADR-0064; Plans: M108, M116, M117;
+Refs: ADR-0002, ADR-0008, ADR-0032, ADR-0064, ADR-0056; Plans: M108, M116, M117;
 audit-2026-10 §3

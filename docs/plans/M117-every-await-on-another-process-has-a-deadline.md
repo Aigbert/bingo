@@ -67,24 +67,26 @@ tool error the model reads, never a hang.
    existing `ToolError::Failed`, a command error through
    `KernelError`.
 7. ADR-0068 §5 accepted, with a dated note that §1–4 landed in M116.
-   Add ADR-0035 §6 to ADR-0068's Amends line.
+   ADR-0035 §6 is already on ADR-0068's Amends line after M116.
 
 ## Files
 
 - `crates/bingo-plugin-rpc/src/{deadline,manifest,tool,command,
-  schema}.rs`, its fixtures and `tests/plugin/**`
-- `crates/bingo-mcp/src/{tool,config,dial,auth}.rs`, `guide.md`, tests
-- `crates/bingo-provider-acp/src/{provider,connection,child}.rs`,
-  fixtures
-- `crates/bingo-auth-oauth/src/lib.rs` (or a new `http.rs`),
+  schema,bridge}.rs`, its fixtures, examples and `tests/plugin/**`
+- `crates/bingo-mcp/src/{tool,config,dial,auth,manager}.rs`, `src/guide.md`, examples, tests
+- `crates/bingo-provider-acp/src/{provider,connection,child,session}.rs`,
+  `src/bin/fake_agent/**`, fixtures and tests
+- `crates/bingo-auth-oauth/src/{lib,http,discover,error}.rs`, tests,
   `crates/bingo-provider-openai/src/lib.rs`, `crates/bingo/src/mcp.rs`
-- the settings schema snapshot; `docs/adr/{0068,0035}*.md`
+- touched crates' dev `Cargo.toml` (`test-util`); mechanical constructor fixtures;
+- `schema/plugin.json`, the settings schema snapshot; `docs/adr/{0068,0035}*.md`
 
 ## Exit criteria
 
 - [ ] Each test in brick 1 fails before and passes after (pasted).
 - [ ] `rg -n 'reqwest::Client::new\(\)' crates --glob '!**/tests/**'`
-      shows only `#[cfg(test)]` modules (pasted with the line ranges).
+      shows only `#[cfg(test)]` modules plus the OpenAI, Anthropic and
+      Feishu builder fallbacks, each annotated "M127 brick 6" (pasted).
 - [ ] `rg -n '\.request\(' crates/bingo-plugin-rpc/src` — every hit is
       inside a `timeout` or a `select!` with a deadline arm (pasted,
       one line of reasoning per hit).
@@ -112,38 +114,8 @@ tool error the model reads, never a hang.
   fresh child resumes with `session/load` where the agent supports it
   (existing path).
 - M116 landed; MCP `call`, plugin-rpc `Abandons`, and ACP's cancel arm exist.
-- **Stopped during re-verification, 2026-10-13, at `9bb55f07`
-  (execution protocol steps 2 and 6).** ADR-0068 §5 requires that
-  "every HTTP client has a connect and a total timeout". Brick 5 above
-  and ADR-0056 §1 require provider streams to retain connect and idle
-  bounds without a total bound. The production stream clients in
-  `bingo-provider-openai/src/lib.rs:490` and
-  `bingo-provider-anthropic/src/lib.rs:261` implement the latter.
-  Accepting §5 literally would change those decided stream semantics;
-  implementing brick 5 would leave §5's universal requirement unmet.
-- The workspace-wide `Client::new()` exit criterion also cannot follow
-  from replacing the three sites in brick 5: production builder-failure
-  fallbacks remain in OpenAI `lib.rs:494`, Anthropic `lib.rs:265`, and
-  `bingo-channel-feishu/src/feishu/api.rs:96`. Anthropic and Feishu are
-  outside Files. These are production behavior, not mechanical fixtures.
-- **Options requiring a decision:** (A) qualify ADR-0068 §5 to preserve
-  ADR-0056's stream exception, then explicitly scope the client search
-  and assign the unbounded fallbacks to this milestone or M127;
-  (B) retain §5 literally and revise ADR-0056 and this plan to impose
-  total stream bounds and include the remaining production clients.
-
-## Verified (2026-10-13)
-
-Re-verification stopped before contracts, failing tests or implementation.
-No exit criterion is complete; the build/test gates and Windows check were
-not run. ADR-0068 §5 remains proposed. Read-only evidence (production hits
-trimmed from `rg -n 'reqwest::Client::new\(\)' crates --glob '!**/tests/**'`):
-
-```text
-crates/bingo-provider-openai/src/lib.rs:120:            reqwest::Client::new(),
-crates/bingo-provider-openai/src/lib.rs:494:        .unwrap_or_else(|_| reqwest::Client::new())
-crates/bingo-provider-anthropic/src/lib.rs:265:        .unwrap_or_else(|_| reqwest::Client::new())
-crates/bingo-channel-feishu/src/feishu/api.rs:96:                .unwrap_or_else(|_| reqwest::Client::new()),
-crates/bingo-mcp/src/auth.rs:31:    let http = reqwest::Client::new();
-crates/bingo/src/mcp.rs:369:    bingo_mcp::auth::handle(name, server, store, reqwest::Client::new()).ok_or_else(|| {
-```
+- 2026-10-13 decision: preserve ADR-0056 stream bounds; only brick 5's three clients change; the three builder-failure fallbacks remain for M127 brick 6.
+- Re-verified at `2e3d9065`: bridge/manager pass settings to tools; ACP
+  `session::Link` owns the adapter; OAuth discovery currently hides transport
+  errors, so its timeout must propagate. Dev tokio needs `test-util` in ACP
+  and auth-oauth. No new dependency; M113/M120 implementation files untouched.
