@@ -158,3 +158,102 @@ mod tests {
         assert_eq!(swap(Some(u64::MAX), None), Err(Conflict(Some(u64::MAX))));
     }
 }
+
+#[cfg(test)]
+mod quota_contract {
+    use super::*;
+    #[tokio::test]
+    async fn the_four_mib_limit_counts_every_scope_and_preserves_the_old_value() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::new(root.path(), "owner");
+        let large = json!("x".repeat(2 * 1024 * 1024));
+        store
+            .set("global".into(), "large".into(), large.clone(), None)
+            .await
+            .unwrap();
+        store
+            .set("session".into(), "small".into(), json!(1), None)
+            .await
+            .unwrap();
+        let error = store
+            .set("session".into(), "small".into(), large, Some(1))
+            .await
+            .err()
+            .expect("4 MiB budget was not enforced");
+        assert!(error.message.contains("4 MiB"), "{}", error.message);
+        assert_eq!(
+            store.get("session".into(), "small".into()).await.unwrap(),
+            Some(StateValue {
+                version: 1,
+                value: json!(1)
+            })
+        );
+        let error = store
+            .set("session".into(), "small".into(), json!(2), Some(0))
+            .await
+            .unwrap_err();
+        assert_eq!(error.data, Some(json!({"version":1})));
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Read {
+    pub plugin: String,
+    pub scope: String,
+    pub key: String,
+    pub version: Option<Version>,
+}
+#[derive(Clone, Default)]
+pub struct ReadLog(Arc<std::sync::Mutex<Vec<Read>>>);
+tokio::task_local! { static READS: ReadLog; }
+impl ReadLog {
+    pub async fn scope<T>(&self, future: impl std::future::Future<Output = T>) -> T {
+        READS.scope(self.clone(), future).await
+    }
+    pub fn entries(&self) -> Vec<Read> {
+        self.0
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone()
+    }
+    pub fn record(read: Read) {
+        let _ = READS.try_with(|log| {
+            log.0
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .push(read)
+        });
+    }
+}
+#[cfg(test)]
+mod read_contract {
+    use super::*;
+    #[tokio::test]
+    async fn a_hook_read_log_names_the_owner_scope_key_and_held_version() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::new(root.path(), "owner");
+        store
+            .set("global".into(), "key".into(), json!(1), None)
+            .await
+            .unwrap();
+        let host = bingo_sdk::testing::NoHost::handle();
+        let ops = crate::host::Operations {
+            plugin: "owner",
+            host: &host,
+            state: &store,
+        };
+        let log = ReadLog::default();
+        log.scope(ops.answer("host/state/get", json!({"scope":"global","key":"key"})))
+            .await
+            .unwrap();
+        assert_eq!(
+            log.entries(),
+            vec![Read {
+                plugin: "owner".into(),
+                scope: "global".into(),
+                key: "key".into(),
+                version: Some(1)
+            }]
+        );
+    }
+}
