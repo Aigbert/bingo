@@ -730,7 +730,7 @@ impl Run {
             } => self.answer(interaction, answer, activation),
             Effect::View(session) => self.show(session),
             Effect::Open(selector) => self.open(selector),
-            Effect::ListSessions => self.list_sessions(),
+            Effect::ListSessions => opening::list_sessions(self),
             Effect::ListStored => self.list_stored(),
             Effect::Copy(text) => self.clipboard = Some(text),
             Effect::PasteImage => self.paste_image(),
@@ -826,34 +826,6 @@ impl Run {
                 .await
                 .map(|a| Reply::Attached(Box::new(a)))
         });
-    }
-
-    /// The `/resume` picker's candidates. The cut to the card's size happens
-    /// after the roots are kept, not in the filter: a project full of agents
-    /// must not crowd the person's own sessions off the card.
-    fn list_sessions(&mut self) {
-        let host = self.host.clone();
-        let filter = SessionFilter {
-            cwd: Some(std::path::PathBuf::from(
-                &self.session.tree.root().summary.cwd,
-            )),
-            parent: None,
-            limit: None,
-        };
-        self.spawn(async move {
-            host.sessions(filter)
-                .await
-                .map(|sessions| Reply::Sessions(Self::recent_roots(sessions)))
-        });
-    }
-
-    /// The person's own sessions, newest first as the host answers: a child
-    /// or a room hangs under a root and is reached through it — the switcher
-    /// (M31) — never resumed on its own.
-    fn recent_roots(mut sessions: Vec<SessionSummary>) -> Vec<SessionSummary> {
-        sessions.retain(|session| session.parent.is_none());
-        sessions.truncate(RECENT);
-        sessions
     }
 
     /// What the switcher lists besides the tree: everything the host knows of,
@@ -1354,7 +1326,7 @@ mod tests {
             id: SessionId::from_raw(format!("ses_r{at}")),
             ..summary()
         }));
-        let offered = Run::recent_roots(sessions);
+        let offered = opening::recent_roots(sessions);
         assert_eq!(offered.len(), RECENT, "the cut comes after the keep");
         assert!(
             offered.iter().all(|s| s.parent.is_none()),
