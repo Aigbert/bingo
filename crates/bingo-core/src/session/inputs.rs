@@ -298,6 +298,7 @@ impl Actor {
             turn: serving.turn,
             cancel: serving.cancel,
             stopped: serving.stopped,
+            door: serving.door,
             tool: serving.tool,
             item,
             call,
@@ -309,9 +310,12 @@ impl Actor {
     /// The pieces this call would be served with, or why there are none. Fail
     /// closed twice: no turn in flight is a refusal, and so is a name the
     /// running turn's own offer does not carry — the tools the model was
-    /// given are the whole of what may be called.
+    /// given are the whole of what may be called. A turn whose model stream
+    /// is not open is no turn in flight to a caller: before it the turn has
+    /// not asked anything, and after it the turn is deciding on what it heard
+    /// and will serve no call from outside again.
     fn serving(&self, name: &str) -> Result<invoke::Serving, KernelError> {
-        let Some(running) = &self.running else {
+        let Some(running) = self.running.as_ref().filter(|r| r.door.is_open()) else {
             return Err(KernelError::new(
                 ErrorCode::NotReady,
                 "no turn is in flight in this session",
@@ -332,6 +336,7 @@ impl Actor {
             turn: running.turn.clone(),
             cancel: running.cancel.child_token(),
             stopped: running.stopped.clone(),
+            door: running.door.clone(),
             config: Arc::clone(&running.config),
             tool,
         })

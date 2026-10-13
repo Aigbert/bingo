@@ -469,6 +469,10 @@ impl SessionPort for Port {
 /// The turn loop's view of the actor: publish, ask, absorb — all by mail.
 pub(super) struct TurnMail {
     pub(super) stopped: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// The running turn's own door ([`super::running::Running`]): set here,
+    /// not mailed, so a call the actor reads after the stream ended finds it
+    /// shut however much mail is queued ahead of it.
+    pub(super) door: super::running::Door,
     pub(super) mailbox: Mailbox,
     pub(super) turn: TurnId,
 }
@@ -477,6 +481,10 @@ pub(super) struct TurnMail {
 impl TurnHost for TurnMail {
     fn stopped(&self) -> bool {
         self.stopped.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    fn streaming(&self, open: bool) {
+        self.door.set(open);
     }
 
     fn offered(&self, tools: Vec<Arc<dyn Tool>>) {

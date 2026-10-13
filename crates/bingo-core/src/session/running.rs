@@ -5,6 +5,7 @@
 
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use bingo_sdk::*;
 use futures::FutureExt;
@@ -35,10 +36,50 @@ pub(super) async fn supervised<T>(
     }
 }
 
+/// The door into the running turn (ADR-0036 §2): open while the model's
+/// stream is and shut the moment it ends, because a turn deciding on what it
+/// heard runs no call handed in from outside again. The turn sets it from its
+/// own task; the actor reads it when a call knocks.
+///
+/// It also keeps how the turn ended for the calls it let in: one still running
+/// when its turn completed on its own is dropped with the turn, and was not
+/// interrupted by anybody.
+#[derive(Clone, Default)]
+pub(super) struct Door(Arc<DoorState>);
+
+#[derive(Default)]
+struct DoorState {
+    open: AtomicBool,
+    completed: AtomicBool,
+}
+
+impl Door {
+    pub(super) fn set(&self, open: bool) {
+        self.0.open.store(open, Ordering::Release);
+    }
+
+    pub(super) fn is_open(&self) -> bool {
+        self.0.open.load(Ordering::Acquire)
+    }
+
+    /// Set before the turn's token is cancelled, so a call that sees the
+    /// cancel already sees why.
+    fn complete(&self) {
+        self.0.completed.store(true, Ordering::Release);
+    }
+
+    /// Whether the turn ended on its own rather than by a person's `esc` or
+    /// the session closing.
+    pub(super) fn completed(&self) -> bool {
+        self.0.completed.load(Ordering::Acquire)
+    }
+}
+
 pub(super) struct Running {
     pub(super) turn: TurnId,
     pub(super) cancel: CancellationToken,
     pub(super) stopped: Arc<std::sync::atomic::AtomicBool>,
+    pub(super) door: Door,
     task: JoinHandle<()>,
     /// The config this turn started under; the session's may have been
     /// rebuilt since, and a call is judged by the turn's own.
@@ -62,8 +103,10 @@ impl Running {
         let cfg = Arc::clone(&actor.config);
         let mailbox = actor.mailbox.clone();
         let stopped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let door = Door::default();
         let host = TurnMail {
             stopped: stopped.clone(),
+            door: door.clone(),
             mailbox: mailbox.clone(),
             turn: turn.clone(),
         };
@@ -83,12 +126,23 @@ impl Running {
         });
         Self {
             stopped,
+            door,
             turn,
             cancel,
             task,
             config,
             tools: Vec::new(),
         }
+    }
+
+    /// The turn is over and gone from the actor: whatever still runs under its
+    /// token is dropped. A token nobody had cancelled is a turn that ended on
+    /// its own, and the door says so to the calls it let in.
+    pub(super) fn finish(self) {
+        if !self.cancel.is_cancelled() {
+            self.door.complete();
+        }
+        self.cancel.cancel();
     }
 
     /// Drop the turn where it stands: the loop is told to stop and the task is

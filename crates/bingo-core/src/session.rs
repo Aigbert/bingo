@@ -820,7 +820,7 @@ impl Actor {
             ),
         };
         if let Some(running) = self.running.take() {
-            running.cancel.cancel();
+            running.finish();
         }
         let usage = self
             .state

@@ -10,17 +10,18 @@
 
 mod config;
 mod contributors;
+mod host;
 mod late;
 mod ruler;
 mod stream;
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use bingo_sdk::*;
 use jiff::Timestamp;
 
 pub use config::{Breaker, ModelChoice, TurnBudget, TurnConfig};
+pub use host::TurnHost;
 use late::Late;
 pub use late::{CompactorSet, ContributorSet, HookSet, ProviderSet, ToolSet};
 use ruler::Ruler;
@@ -38,29 +39,6 @@ pub const INTERRUPTED_MARKER: &str = "[Request interrupted by user]";
 pub const CONTINUE_PROMPT: &str = "Continue from where you left off.";
 pub const MAX_LENGTH_RECOVERIES: u32 = 3;
 const MAX_THRESHOLD_COMPACTIONS: u32 = 2;
-
-/// The session actor as the turn sees it: a place to publish, a way to ask, a queue to absorb.
-#[async_trait]
-pub trait TurnHost: Send + Sync {
-    /// A bridged after-tool observer requested completion at this round's boundary.
-    fn stopped(&self) -> bool {
-        false
-    }
-    fn emit(&self, event: Event);
-    /// The tools this turn resolved when it started (ADR-0009 §1): the offer
-    /// every one of its requests carries. The session keeps them so that a
-    /// call handed in from outside the turn is served by the very set the
-    /// model was given (ADR-0036 §2).
-    fn offered(&self, tools: Vec<Arc<dyn Tool>>);
-    async fn ask(
-        &self,
-        item: Option<ItemId>,
-        kind: InteractionKind,
-        answers: Vec<AnswerSpec>,
-    ) -> Result<Answer, KernelError>;
-    /// Queued inputs eligible for steering, removed from the queue.
-    async fn absorb(&self) -> Vec<(IntentId, Input)>;
-}
 
 #[derive(Debug)]
 pub struct TurnRun {
@@ -468,7 +446,10 @@ impl Turn<'_> {
             Some(Assembled::Compacted) => return Step::Assembling,
             None => return self.interrupted(),
         };
-        let finished = match self.stream(request.clone()).await {
+        self.host.streaming(true);
+        let streamed = self.stream(request.clone()).await;
+        self.host.streaming(false);
+        let finished = match streamed {
             Streamed::Done(f) => f,
             Streamed::Cancelled => return self.interrupted(),
             Streamed::Failed(error, dropped) => {
