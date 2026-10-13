@@ -26,8 +26,8 @@ use serde_json::{Map, Value, json};
 use crate::login::Terminal;
 
 /// The plugin whose slice of the settings this reads and writes.
-const PLUGIN: &str = "bingo.mcp";
-const KEY: &str = "mcpServers";
+const PLUGIN: &str = bingo_mcp::MANIFEST.id;
+use bingo_mcp::SETTING as KEY;
 
 /// What one `bingo mcp` line asks for. This is clap's own shape: the words a
 /// person types and the values this acts on are one thing, so there is no

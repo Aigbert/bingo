@@ -42,7 +42,9 @@ pub use rows::Rows;
 pub use source::McpSource;
 pub use tool::{McpTool, tool_name};
 
-pub(crate) static MANIFEST: PluginManifest = PluginManifest {
+pub const SETTING: &str = "mcpServers";
+
+pub static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.mcp",
     version: env!("CARGO_PKG_VERSION"),
     uses: &[],
@@ -55,7 +57,7 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     requires: &[],
     config: Some(ConfigClaim {
         keys: &[
-            ("mcpServers", Merge::ByName),
+            (SETTING, Merge::ByName),
             ("disabledMcpServers", Merge::Accumulate),
         ],
         schema,
@@ -188,7 +190,7 @@ pub(crate) mod tests {
         assert_eq!(MANIFEST.id, "bingo.mcp");
         assert!(MANIFEST.requires.is_empty());
         let claim = MANIFEST.config.expect("a config claim");
-        assert_eq!(claim.keys[0], ("mcpServers", Merge::ByName));
+        assert_eq!(claim.keys[0], (SETTING, Merge::ByName));
         assert_eq!(claim.keys[1], ("disabledMcpServers", Merge::Accumulate));
     }
 

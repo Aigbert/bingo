@@ -55,6 +55,9 @@ use crate::variant::{ORIGINATOR, Variant};
 
 pub use crate::settings::{CodexConfig, CodexEndpoint, OpenAiConfig, OpenAiEndpoint, Settings};
 
+pub const SETTING: &str = "openai";
+pub const CODEX_SETTING: &str = "codex";
+
 /// The endpoint every OpenAI API key shares.
 pub const DEFAULT_BASE_URL: &str = "https://api.openai.com";
 
@@ -495,7 +498,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         // One endpoint at a time: a project that names its own key and base
         // url replaces the user's trio rather than half-overriding it — its
         // instances with it (ADR-0017).
-        keys: &[("openai", Merge::Replace), ("codex", Merge::Replace)],
+        keys: &[(SETTING, Merge::Replace), (CODEX_SETTING, Merge::Replace)],
         schema: settings_schema,
     }),
 };
@@ -720,7 +723,7 @@ pub(crate) mod tests {
         let claim = MANIFEST.config.expect("the plugin claims settings");
         assert_eq!(
             claim.keys,
-            &[("openai", Merge::Replace), ("codex", Merge::Replace)]
+            &[(SETTING, Merge::Replace), (CODEX_SETTING, Merge::Replace)]
         );
         let schema = serde_json::to_value((claim.schema)()).expect("a json schema");
         let schema = schema.to_string();

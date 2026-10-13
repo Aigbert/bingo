@@ -34,6 +34,8 @@ use bingo_http::metered::Clock;
 
 pub use crate::settings::{AnthropicConfig, AnthropicEndpoint, Settings};
 
+pub const SETTING: &str = "anthropic";
+
 /// The endpoint every Claude account shares.
 pub const DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
 
@@ -260,7 +262,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         // One endpoint at a time: a project that names its own key and base
         // url replaces the user's pair whole rather than half-overriding it —
         // its instances with it (ADR-0017).
-        keys: &[("anthropic", Merge::Replace)],
+        keys: &[(SETTING, Merge::Replace)],
         schema: settings_schema,
     }),
 };
@@ -384,7 +386,7 @@ pub(crate) mod tests {
     #[test]
     fn the_claimed_key_merges_by_replacement_and_has_a_schema() {
         let claim = MANIFEST.config.expect("the plugin claims settings");
-        assert_eq!(claim.keys, &[("anthropic", Merge::Replace)]);
+        assert_eq!(claim.keys, &[(SETTING, Merge::Replace)]);
         let schema = serde_json::to_value((claim.schema)()).expect("a json schema");
         let schema = schema.to_string();
         for key in ["apiKey", "baseUrl", "images", "instances"] {
