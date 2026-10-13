@@ -119,7 +119,7 @@ impl Manager {
             .settings
             .get(&found.name)
             .cloned()
-            .unwrap_or(Value::Null);
+            .unwrap_or_else(|| serde_json::json!({}));
         let module = Module::load(
             found,
             config,

@@ -23,6 +23,11 @@ impl Module {
         let engine = if switched_off {
             admission.refuse(SWITCHED_OFF.into());
             None
+        } else if let Some(schema) = &found.manifest.config
+            && let Err(reason) = bingo_plugin_host::config::validate(schema, &config)
+        {
+            admission.refuse(format!("{}: {reason}", found.name));
+            None
         } else if let Launch::Module(module) = &found.manifest.launch {
             match Engine::start(&found.root, module, config, limits).await {
                 Ok(engine) => Some(engine),

@@ -80,7 +80,7 @@ impl Manager {
                 .settings
                 .get(&found.name)
                 .cloned()
-                .unwrap_or(Value::Null);
+                .unwrap_or_else(|| serde_json::json!({}));
             let off = self.switched_off.contains(&found.name);
             let module = Module::load(found, config, self.limits.clone(), &self.env, off).await;
             if !off && let Err(reason) = module.admission.decision() {
