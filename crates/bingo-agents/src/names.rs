@@ -14,7 +14,7 @@ pub const ROOM: char = '#';
 
 /// Two names, compared by the agent roster.
 pub fn same(a: &str, b: &str) -> bool {
-    a == b
+    a.to_lowercase() == b.to_lowercase()
 }
 
 /// How many names one base may take before a caller is asked to pick another.
@@ -31,7 +31,7 @@ pub fn candidates(base: &str) -> impl Iterator<Item = String> + '_ {
 
 /// The first name of a base that nothing in `taken` holds.
 pub fn free(base: &str, taken: &[String]) -> Option<String> {
-    candidates(base).find(|name| !taken.iter().any(|held| held == name))
+    candidates(base).find(|name| !taken.iter().any(|held| same(held, name)))
 }
 
 /// A name that can be a title and a key segment both. Whitespace and `/`
@@ -48,7 +48,7 @@ pub fn check(name: &str) -> Result<&str, KernelError> {
             format!("{name:?} is not a name: one word, no slashes"),
         ));
     }
-    if name == PARENT {
+    if same(name, PARENT) {
         return Err(KernelError::new(
             ErrorCode::InvalidInput,
             format!("{PARENT:?} is what a child calls whoever spawned it; pick another name"),
@@ -106,7 +106,7 @@ pub async fn resolve(
     to: &str,
 ) -> Result<SessionSummary, KernelError> {
     let to = addressed(to);
-    if to == PARENT {
+    if same(to, PARENT) {
         return parent(host, caller).await;
     }
     if to.starts_with(ROOM) {
@@ -210,7 +210,7 @@ async fn room(
 
 /// The one of these sessions that answers to `name`.
 pub fn named(sessions: &[SessionSummary], name: &str) -> Option<SessionSummary> {
-    sessions.iter().find(|s| name_of(s) == name).cloned()
+    sessions.iter().find(|s| same(name_of(s), name)).cloned()
 }
 
 /// The session that spawned this one.
