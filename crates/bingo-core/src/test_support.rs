@@ -396,6 +396,7 @@ pub fn config(
     tool_host: Arc<dyn ToolHost>,
 ) -> crate::turn::TurnConfig {
     crate::turn::TurnConfig {
+        spec: Arc::new(crate::spec::spec_of(&SessionState::new(summary("ses_1")))),
         session: summary("ses_1"),
         cwd: "/tmp".into(),
         model: Some(crate::turn::ModelChoice {

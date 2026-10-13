@@ -79,12 +79,12 @@ impl Host {
     ) -> Result<Mailbox, KernelError> {
         let resumed = store.resume(id).await?;
         let replayed = session::fold_resumed(&resumed)?;
-        let mut spec = spec_of(&replayed.summary);
+        let mut spec = crate::spec::spec_of(&replayed);
         self.check_key_free(spec.key.as_deref())?;
-        spec.thinking = Some(thinking_of(&replayed).unwrap_or(self.settings.kernel.thinking));
+        spec.thinking = spec.thinking.or(Some(self.settings.kernel.thinking));
         let last = replayed.summary;
         let choice = self.model_for(&spec).await?;
-        let summary = crate::turn::runs_on(last, choice.as_ref());
+        let summary = crate::spec::stated(&spec, choice.as_ref(), last);
         let mailbox =
             session::resume_checkpoint(resumed, Some(store.clone()), self.services(), |mailbox| {
                 Arc::new(self.turn_config(&spec, &summary, choice, mailbox))
@@ -97,14 +97,6 @@ impl Host {
         report_lost_turns(store.as_ref(), &live.mailbox).await;
         Ok(live.mailbox)
     }
-}
-
-/// The level the session was thinking at when it was last live, from its own
-/// config view: a resumed session goes on as it was, and only a journal from
-/// before the view carried the level falls back to the settings.
-fn thinking_of(state: &SessionState) -> Option<Option<Effort>> {
-    let level = state.config.kernel.get("thinking")?;
-    serde_json::from_value(level.clone()).ok()
 }
 
 /// The code a client reads a lost child's line by.
@@ -171,27 +163,4 @@ fn lost_line(child: &SessionSummary) -> String {
          and the report it owed will not arrive. Wake it to take the work up again.",
         child.id
     )
-}
-
-/// A resumed session runs as it last was: same cwd, key, parent, provider
-/// and model; the tools and the policy are the running host's.
-///
-/// *Last*, not first — this reads the journal's fold, never its head frame.
-/// `/model` rewrites the spec mid-session (ADR-0008 §4) and writes the new
-/// one into the journal, so a resume off the head frame would quietly put the
-/// session back on the model the person moved away from.
-fn spec_of(summary: &SessionSummary) -> SessionSpec {
-    SessionSpec {
-        driver: summary.driver,
-        cwd: std::path::PathBuf::from(&summary.cwd),
-        key: summary.key.clone(),
-        parent: summary.parent.clone(),
-        title: summary.title.clone(),
-        provider: summary.provider.clone(),
-        model: summary.model.clone(),
-        system_extra: summary.system_extra.clone(),
-        tools: summary.tools.clone(),
-        // The level is not on the summary; the config view carries it back.
-        thinking: None,
-    }
 }

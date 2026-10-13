@@ -305,19 +305,14 @@ impl Actor {
     /// head of a segment carries it, so a resumed session names the model
     /// that will answer it rather than the one that answered it last time.
     fn restated(&self) -> SessionSummary {
-        SessionSummary {
-            key: self.config.session.key.clone(),
-            // A rename reaches the actor as a config, like a model does; a
-            // name the session already earned is never taken back by one.
-            title: self
-                .config
-                .session
-                .title
-                .clone()
-                .or_else(|| self.state.summary.title.clone()),
-            updated_at: Timestamp::now(),
-            ..crate::turn::runs_on(self.state.summary.clone(), self.config.model.as_ref())
-        }
+        crate::spec::stated(
+            &self.config.spec,
+            self.config.model.as_ref(),
+            SessionSummary {
+                updated_at: Timestamp::now(),
+                ..self.state.summary.clone()
+            },
+        )
     }
 
     /// The head of this segment of the journal: what the session is now.

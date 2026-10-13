@@ -145,7 +145,7 @@ async fn assert_round_trip(host: &Host, store: &crate::journal::MemoryStore, spe
     close_session(host, &a.session).await;
     let frames = store.replay(&a.session, Seq::ZERO).await.unwrap();
     let folded = session::replayed(&frames).unwrap();
-    // Before the pair exists, exercise the current resume conversion.
+    assert_eq!(crate::spec::spec_of(&folded), expected);
     let b = host
         .open(
             SessionSelector::ById { id: a.session },
