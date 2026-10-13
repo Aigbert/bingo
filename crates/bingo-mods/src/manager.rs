@@ -3,7 +3,6 @@ use crate::{engine::Limits, module::Module};
 use async_trait::async_trait;
 use bingo_plugin_host::{
     discovery,
-    manifest::Launch,
     notice::{self, Notice, Notices},
 };
 use bingo_sdk::*;
@@ -11,16 +10,22 @@ use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex, OnceLock, RwLock, Weak},
 };
 
+mod reload;
 pub(crate) struct Manager {
     env: Env,
     directories: Vec<PathBuf>,
     settings: BTreeMap<String, Value>,
     switched_off: BTreeSet<String>,
     limits: Limits,
-    modules: OnceLock<Vec<Arc<Module>>>,
+    modules: RwLock<Vec<Arc<Module>>>,
+    host: OnceLock<HostHandle>,
+    this: OnceLock<Weak<Manager>>,
+    watches: Mutex<BTreeMap<PathBuf, reload::Watch>>,
+    reloading: tokio::sync::Mutex<()>,
+    subscriptions: Mutex<BTreeSet<SessionId>>,
     notices: Arc<Notices>,
     stop: CancellationToken,
     tasks: Mutex<Vec<tokio::task::JoinHandle<()>>>,
@@ -39,13 +44,20 @@ impl Manager {
             settings,
             switched_off,
             limits,
-            modules: OnceLock::new(),
+            modules: RwLock::new(Vec::new()),
+            host: OnceLock::new(),
+            this: OnceLock::new(),
+            watches: Mutex::new(BTreeMap::new()),
+            reloading: tokio::sync::Mutex::new(()),
+            subscriptions: Mutex::new(BTreeSet::new()),
             notices: Arc::new(Notices::default()),
             stop: CancellationToken::new(),
             tasks: Mutex::new(Vec::new()),
         }
     }
-    pub async fn start(&self, cwd: &Path, host: HostHandle) {
+    pub async fn start(self: &Arc<Self>, cwd: &Path, host: HostHandle) {
+        let _ = self.host.set(host.clone());
+        let _ = self.this.set(Arc::downgrade(self));
         self.tasks
             .lock()
             .unwrap_or_else(|error| error.into_inner())
@@ -60,10 +72,10 @@ impl Manager {
             &self.notices,
         );
         let mut modules = Vec::new();
-        for found in found
-            .into_iter()
-            .filter(|found| matches!(found.manifest.launch, Launch::Module(_)))
-        {
+        for found in found.into_iter().filter(|found| {
+            bingo_plugin_host::runtime::runtime_of(&found.manifest, true)
+                == Ok(PluginRuntime::Module)
+        }) {
             let config = self
                 .settings
                 .get(&found.name)
@@ -76,10 +88,17 @@ impl Manager {
             }
             modules.push(module);
         }
-        let _ = self.modules.set(modules);
+        *self
+            .modules
+            .write()
+            .unwrap_or_else(|error| error.into_inner()) = modules;
+        self.watch();
     }
-    fn modules(&self) -> &[Arc<Module>] {
-        self.modules.get().map(Vec::as_slice).unwrap_or_default()
+    fn modules(&self) -> Vec<Arc<Module>> {
+        self.modules
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone()
     }
     pub async fn stop(&self) {
         self.stop.cancel();
@@ -143,13 +162,21 @@ impl InterceptorSource for Manager {
         "bingo.mods"
     }
     async fn interceptors(&self) -> Vec<ExternalInterceptor> {
-        self.modules()
-            .iter()
-            .filter(|module| module.admission.allowed())
-            .map(|module| ExternalInterceptor {
-                plugin: module.found.name.clone(),
-                link: Arc::new(crate::link::Link(module.clone())),
-            })
-            .collect()
+        let mut links = vec![ExternalInterceptor {
+            plugin: "bingo.mods".into(),
+            link: Arc::new(reload::Boundary(
+                self.this.get().cloned().unwrap_or_default(),
+            )),
+        }];
+        links.extend(
+            self.modules()
+                .iter()
+                .filter(|module| module.admission.allowed())
+                .map(|module| ExternalInterceptor {
+                    plugin: module.found.name.clone(),
+                    link: Arc::new(crate::link::Link(module.clone())),
+                }),
+        );
+        links
     }
 }

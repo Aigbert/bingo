@@ -17,13 +17,12 @@ pub struct ModsPlugin {
     manager: Arc<OnceLock<Arc<Manager>>>,
 }
 impl ModsPlugin {
-    pub async fn reload(&self, _root: &std::path::Path) -> Result<(), KernelError> {
-        Err(KernelError::new(
-            ErrorCode::Unsupported,
-            "module reload is not implemented",
-        ))
+    pub async fn reload(&self, root: &std::path::Path) -> Result<(), KernelError> {
+        let manager = self.manager.get().ok_or_else(|| {
+            KernelError::new(ErrorCode::NotReady, "module runtime has not started")
+        })?;
+        manager.reload_root(root).await
     }
-
     pub fn with_dirs(mut self, directories: Vec<PathBuf>) -> Self {
         self.directories = directories;
         self

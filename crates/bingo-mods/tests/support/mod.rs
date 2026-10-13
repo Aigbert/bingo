@@ -45,7 +45,11 @@ impl Fixture {
                 SessionSelector::Create {
                     spec: SessionSpec {
                         cwd: home.path().into(),
-                        driver: if agent { Driver::default() } else { Driver::Log },
+                        driver: if agent {
+                            Driver::default()
+                        } else {
+                            Driver::Log
+                        },
                         ..Default::default()
                     },
                 },
