@@ -210,11 +210,28 @@ impl PermissionPolicy for PermissionsPolicy {
     /// The mode this session runs in and the rules its person accepted, as a
     /// client may show them (ADR-0009 §5).
     fn describe(&self, session: &SessionId) -> serde_json::Value {
-        serde_json::json!({
+        let payload = serde_json::json!({
             "mode": self.mode_for(session),
             "modes": Mode::ALL,
             "rules": self.sessions.rules(session).iter().map(Rule::raw).collect::<Vec<_>>(),
-        })
+        });
+        bingo_sdk::slot::with(
+            payload,
+            [bingo_sdk::slot::Slot::Mode {
+                current: self.mode_for(session).to_string(),
+                modes: Mode::ALL
+                    .iter()
+                    .map(|mode| bingo_sdk::ActionItem {
+                        label: mode.to_string(),
+                        key: None,
+                        action: bingo_sdk::Action {
+                            name: "permission".into(),
+                            args: serde_json::json!(mode),
+                        },
+                    })
+                    .collect(),
+            }],
+        )
     }
 
     async fn on_verdict(&self, input: PolicyInput<'_>, verdict: &Verdict) {
@@ -278,6 +295,25 @@ mod tests {
                 cwd: Path::new("/work/project"),
             })
             .await
+    }
+
+    #[test]
+    fn slots_place_the_mode_and_each_action() {
+        let policy = PermissionsPolicy::new(Permissions::default(), None).unwrap();
+        let session = SessionId::from_raw("ses_slots");
+        let payload = policy.describe(&session);
+        let slots: Vec<bingo_sdk::slot::Slot> =
+            serde_json::from_value(payload["slots"].clone()).unwrap();
+        let bingo_sdk::slot::Slot::Mode { current, modes } = &slots[0] else {
+            panic!("mode")
+        };
+        assert_eq!(current, "default");
+        assert_eq!(modes.len(), Mode::ALL.len());
+        for (item, mode) in modes.iter().zip(Mode::ALL) {
+            assert_eq!(item.label, mode.as_str());
+            assert_eq!(item.action.name, "permission");
+            assert_eq!(item.action.args, json!(mode));
+        }
     }
 
     #[test]
@@ -472,13 +508,21 @@ mod tests {
             "dontAsk"
         ]);
         assert_eq!(
-            policy.describe(&session),
+            {
+                let mut payload = policy.describe(&session);
+                payload.as_object_mut().unwrap().remove("slots");
+                payload
+            },
             json!({ "mode": "default", "modes": modes, "rules": [] })
         );
         policy.choose_mode(&session, Mode::AcceptEdits);
         assert!(policy.sessions.install(&session, "Bash(git status:*)"));
         assert_eq!(
-            policy.describe(&session),
+            {
+                let mut payload = policy.describe(&session);
+                payload.as_object_mut().unwrap().remove("slots");
+                payload
+            },
             json!({ "mode": "acceptEdits", "modes": modes, "rules": ["Bash(git status:*)"] })
         );
         assert_eq!(

@@ -23,14 +23,14 @@ use ratatui::text::Line;
 use crate::clock::Now;
 use crate::fold::{self, Fold};
 use crate::graphics::Picture;
+use crate::skill;
 use crate::transcript::{self, Cue, Place, Rows};
 use crate::tree::Agents;
 use crate::welcome;
-use crate::{shells, skill};
 
 /// What can change about an item's block while it is on the screen. A
 /// terminal item's revision never moves again, so its block is rendered once.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 struct Revision {
     status: ItemStatus,
     /// How much the body holds. Anything that grows a block grows this: the
@@ -52,11 +52,8 @@ struct Revision {
     /// arrived, and the arrival is the only thing that says so — it is not in
     /// the item, which has not changed a byte.
     linked: u64,
-    /// Whether the shell this call sent to the background is still running,
-    /// when it sent one (M75): the row under it is read from the running set
-    /// the shell's plugin signals, so the set's answer is the row's revision —
-    /// the item itself has not changed a byte when the shell ends.
-    shell: Option<bool>,
+    /// Live row placements revise a block even when the item itself is unchanged.
+    slots: Vec<bingo_sdk::slot::Slot>,
     /// How many thoughts of its run are above this one, and whether it is the
     /// last of them (M79). A run of thoughts draws as one block, hung on its
     /// last item, so the run growing by one is a different rendering of that
@@ -89,7 +86,7 @@ fn revision(
         last: !place.joined,
         skill: skill::of(item, rows.commands).is_some(),
         linked: rows.linked.answers(),
-        shell: shells::still(item, &rows.shells),
+        slots: rows.placed_on(&item.id).cloned().collect(),
         look: crate::theme::current(),
     }
 }
@@ -623,7 +620,14 @@ mod tests {
                     ),
                 },
             ),
-            frame(2, signalled("bingo.tools.bash", "jobs", set)),
+            frame(
+                2,
+                signalled(
+                    "bingo.tools.bash",
+                    "jobs",
+                    crate::test_lanes::shell_payload(set, "itm_1"),
+                ),
+            ),
         ]);
         let mut blocks = cache();
         sync(&mut blocks, &state, 80);

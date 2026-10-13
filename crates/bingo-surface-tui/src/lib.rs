@@ -25,7 +25,7 @@
 //!   [`rail`] derives the cards a plugin's panels and signals become, and
 //!   [`panel`] is the sheet they are pinned from.
 //! - [`transcript`], [`markdown`], [`dialog`], [`composer`], [`commands`],
-//!   [`keys`], [`permission`], [`paths`], [`welcome`] and [`wrap`] are the
+//!   [`keys`], [`paths`], [`welcome`] and [`wrap`] are the
 //!   bricks those stand on, and [`theme`] is the one table of tokens and
 //!   glyphs they draw with.
 //! - [`status`] is the one line of furniture, and [`roster`] is the one list
@@ -86,7 +86,6 @@ mod opening;
 mod pager;
 mod panel;
 mod paths;
-mod permission;
 mod pictures;
 mod pointer;
 mod preview;
@@ -103,12 +102,10 @@ mod select;
 pub mod settings;
 /// The shells the session has running in the background (M75): a word under
 /// the row that started one, a count on the status line, and no card.
-mod shells;
 mod skill;
 mod status;
 /// The session's task list, under the activity row and in its place between
 /// turns (M74): where Claude Code keeps it.
-mod tasks;
 mod terminal;
 mod theme;
 /// What a run of thoughts is (M79): consecutive reasoning items, which the
@@ -121,7 +118,6 @@ mod view;
 /// Handing a picture to whatever this system opens pictures with (M56).
 mod viewer;
 mod views;
-mod wake;
 mod welcome;
 mod window;
 mod worked;

@@ -435,14 +435,14 @@ fn drop_unknown(line: &mut Value, key: &str) {
 
 /// The session's permission mode as the policy describes it (ADR-0009 §5);
 /// `default` until a policy has said otherwise.
-fn permission_mode(state: &SessionState) -> &str {
-    state
-        .config
-        .plugins
-        .get("bingo.permissions")
-        .and_then(|p| p.get("mode"))
-        .and_then(Value::as_str)
-        .unwrap_or("default")
+fn permission_mode(state: &SessionState) -> String {
+    bingo_sdk::slot::placed(state)
+        .into_iter()
+        .find_map(|placed| match placed.slot {
+            bingo_sdk::slot::Slot::Mode { current, .. } => Some(current),
+            _ => None,
+        })
+        .unwrap_or_else(|| "default".into())
 }
 
 #[cfg(test)]

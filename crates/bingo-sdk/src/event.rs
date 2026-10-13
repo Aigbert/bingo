@@ -415,6 +415,8 @@ pub enum ItemBody {
         progress: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         duration_ms: Option<u64>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        quiet: bool,
     },
     /// A shell line a person ran themselves (`!<command>`, ADR-0008 §5): no
     /// turn was spent on it and no model asked for it. `exit` is the code the
@@ -1160,6 +1162,7 @@ mod tests {
                                 output: None,
                                 progress: None,
                                 duration_ms: None,
+                                quiet: false,
                             },
                         )
                     },
@@ -1204,6 +1207,7 @@ mod tests {
                                 output: None,
                                 progress: Some("writing…".into()),
                                 duration_ms: None,
+                                quiet: false,
                             },
                         )
                     },

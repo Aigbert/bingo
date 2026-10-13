@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use serde_json::json;
 
 use super::*;
+
 use crate::gate::DefaultPolicy;
 use crate::test_support::*;
 
@@ -643,6 +644,7 @@ mod attribution;
 mod budget;
 mod held;
 mod pictures;
+mod quiet;
 mod racing;
 mod snapshots;
 

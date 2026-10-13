@@ -1133,7 +1133,7 @@ mod tests {
             (
                 "text",
                 &[
-                    // The working word at rest, where nothing may move.
+                    // The working word and neutral activity nodes.
                     "activity.rs",
                     "composer.rs",
                     "dialog.rs",
@@ -1153,14 +1153,13 @@ mod tests {
                     "roster.rs",
                     "search.rs",
                     "status.rs",
-                    // A task still to do, and the mark before one.
-                    "tasks.rs",
                     "transcript.rs",
                     // The line of a shell command a person ran themselves.
                     "transcript/ran.rs",
                     // What was said into a session, and who by: the name a
                     // post carries and the words after it.
                     "transcript/said.rs",
+                    "transcript/slots.rs",
                     "view.rs",
                     "views/actions.rs",
                     "views/keyvalue.rs",
@@ -1176,7 +1175,7 @@ mod tests {
             (
                 "dim",
                 &[
-                    // The verb row's clock and count, and a queued line.
+                    // The verb clock, queued lines, and activity titles, badges and completed nodes.
                     "activity.rs",
                     "composer.rs",
                     "dialog.rs",
@@ -1198,11 +1197,7 @@ mod tests {
                     "rewind.rs",
                     "roster.rs",
                     "search.rs",
-                    "shells.rs",
                     "status.rs",
-                    // The summary between turns, a task that is done, its
-                    // owner, and the line that counts what was cut.
-                    "tasks.rs",
                     "transcript.rs",
                     // A folded result's own rows and its `+N lines` line.
                     "transcript/output.rs",
@@ -1212,6 +1207,7 @@ mod tests {
                     // The `$` a shell line the person ran is written under.
                     "transcript/ran.rs",
                     "transcript/said.rs",
+                    "transcript/slots.rs",
                     // The `✻` of a thinking row and everything under it: a
                     // thought is working, and working is read past (§4).
                     "transcript/thinking.rs",
@@ -1247,7 +1243,7 @@ mod tests {
             (
                 "presence",
                 &[
-                    // A turn that is retrying.
+                    // A retrying turn and an activity node in progress.
                     "activity.rs",
                     // Which session asked, named after a card's own title —
                     // every card's head is written in one place (ADR-0010 §3).
@@ -1255,9 +1251,6 @@ mod tests {
                     "panel.rs",
                     "search.rs",
                     "select.rs",
-                    // The mark before the task being done: what the model
-                    // is on, in the colour of its working.
-                    "tasks.rs",
                     "transcript.rs",
                     "tree.rs",
                     "views/actions.rs",
@@ -1269,11 +1262,23 @@ mod tests {
             // A task that is done wears the mark a finished call does.
             (
                 "good",
-                &["tasks.rs", "transcript.rs", "tree.rs", "views/badge.rs"],
+                &[
+                    "activity.rs",
+                    "status.rs",
+                    "transcript.rs",
+                    "tree.rs",
+                    "views/badge.rs",
+                ],
             ),
             (
                 "bad",
-                &["transcript.rs", "transcript/ran.rs", "views/badge.rs"],
+                &[
+                    "activity.rs",
+                    "status.rs",
+                    "transcript.rs",
+                    "transcript/ran.rs",
+                    "views/badge.rs",
+                ],
             ),
             ("mode", &["status.rs"]),
             ("breath", &["activity.rs"]),

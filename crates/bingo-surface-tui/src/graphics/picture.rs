@@ -329,6 +329,7 @@ mod tests {
             }),
             progress: None,
             duration_ms: None,
+            quiet: false,
         };
         assert_eq!(pictures_of(&read), vec![&image("shot")]);
 
@@ -346,6 +347,7 @@ mod tests {
                 output: None,
                 progress: None,
                 duration_ms: None,
+                quiet: false,
             })
             .is_empty(),
             "a call still running answered with nothing"

@@ -72,7 +72,7 @@ fn board_payload(home: &Path, key: &str) -> serde_json::Value {
                 plugin,
                 kind,
                 payload,
-            } if plugin == "bingo.tasks" && kind == "tasks" => Some(payload.clone()),
+            } if plugin == "bingo.tasks" && kind == "tasks" => Some(payload["tasks"].clone()),
             _ => None,
         })
         .next_back()

@@ -78,8 +78,9 @@ static MANIFEST: PluginManifest = PluginManifest {
 /// concurrency-safe: the list is one value, and two calls running at once —
 /// on one board, two of them — would each publish it without the other's
 /// change (ADR-0023 §4).
-pub(crate) fn traits() -> ToolTraits {
+pub(crate) fn traits(input: &serde_json::Value) -> ToolTraits {
     ToolTraits {
+        quiet: input.get("in").is_none_or(serde_json::Value::is_null),
         read_only: true,
         trusted: true,
         concurrency_safe: false,
@@ -145,6 +146,21 @@ mod plugin_tests {
     use bingo_sdk::Env;
 
     #[test]
+    fn all_four_tools_are_quiet_only_on_the_local_board() {
+        let tools: Vec<Box<dyn bingo_sdk::Tool>> = vec![
+            Box::new(create::TaskCreateTool),
+            Box::new(update::TaskUpdateTool),
+            Box::new(get::TaskGetTool),
+            Box::new(list::TaskListTool),
+        ];
+        for tool in tools {
+            assert!(tool.traits(&serde_json::json!({})).quiet);
+            assert!(tool.traits(&serde_json::json!({"in": null})).quiet);
+            assert!(!tool.traits(&serde_json::json!({"in": "#design"})).quiet);
+        }
+    }
+
+    #[test]
     fn the_manifest_says_what_it_provides_and_claims_no_settings() {
         assert_eq!(MANIFEST.id, "bingo.tasks");
         assert_eq!(
@@ -195,7 +211,7 @@ mod plugin_tests {
 
     #[test]
     fn every_tool_is_read_only_trusted_and_alone() {
-        let traits = traits();
+        let traits = traits(&serde_json::Value::Null);
         assert!(traits.read_only && traits.trusted);
         assert!(!traits.concurrency_safe && !traits.destructive && !traits.edit);
     }

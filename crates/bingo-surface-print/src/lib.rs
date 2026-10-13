@@ -708,6 +708,7 @@ pub(crate) mod tests {
                 output,
                 progress: None,
                 duration_ms: Some(12),
+                quiet: false,
             },
         )
     }

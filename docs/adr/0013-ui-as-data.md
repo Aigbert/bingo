@@ -22,6 +22,15 @@ A command answers `View::{Text, List, Table}` and the TUI's `ctrl+t` panel draws
 - `bingo-demo-ui` (2026-08-31) is the reference implementation of the three lanes and the one workspace crate this ADR adds; the dependency ceiling moves 268 → 269 for it and for nothing else.
 - Rate is the publisher's discipline: a signal is coalesced by the reducer, not throttled by the kernel; a plugin that publishes at 1 kHz makes its own subscribers lag (`Lagged` exists for that).
 
+## Amendment — 2026-10-13 (M121; ADR-0070 §§1–3,6)
+
+Sections 2 and 4 now let a plugin choose a place through `slot::Slot`,
+carried in its existing signal, extension or policy-description payload.
+A payload with `slots` draws only in those places; a payload without them
+keeps the generic fold. The surface owns appearance, focus, keys and folding.
+Quiet tool calls omit their own row unless failed, but still draw a display;
+the kernel stamps the trait in the item when the call opens for replay.
+
 ## Supersedes
 
 Plan §2.10's "`View` generic rendering plus a `Widget` extension point; plugin widgets in their own `*-tui` crates". ADR-0011 §2's generic fold stands as the fallback.

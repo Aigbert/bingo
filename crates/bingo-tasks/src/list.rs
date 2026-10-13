@@ -41,8 +41,8 @@ impl Tool for TaskListTool {
         }
     }
 
-    fn traits(&self, _input: &Value) -> ToolTraits {
-        crate::traits()
+    fn traits(&self, input: &Value) -> ToolTraits {
+        crate::traits(input)
     }
 
     /// A listing asks for at most a board: a model that sends a null, an

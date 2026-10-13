@@ -2880,6 +2880,9 @@
               "format": "uint64",
               "minimum": 0
             },
+            "quiet": {
+              "type": "boolean"
+            },
             "kind": {
               "type": "string",
               "const": "toolCall"

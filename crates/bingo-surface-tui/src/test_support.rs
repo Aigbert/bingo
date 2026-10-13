@@ -389,6 +389,8 @@ pub fn tool(
         ItemBody::ToolCall {
             call_id: "call_1".into(),
             name: name.into(),
+            quiet: ["TaskCreate", "TaskUpdate", "TaskGet", "TaskList"].contains(&name)
+                && input.get("in").is_none_or(Value::is_null),
             input,
             output,
             progress: None,
@@ -408,6 +410,7 @@ pub fn running_tool(id: &str, name: &str, progress: &str) -> Item {
             output: None,
             progress: Some(progress.into()),
             duration_ms: None,
+            quiet: false,
         },
     )
 }
@@ -425,6 +428,7 @@ pub fn running_command(id: &str, command: &str) -> Item {
             output: None,
             progress: None,
             duration_ms: None,
+            quiet: false,
         },
     )
 }
@@ -657,20 +661,15 @@ pub fn resolved() -> Event {
 
 /// A plugin publishing the whole of one kind of its state (ADR-0011 §2).
 pub fn extended(plugin: &str, kind: &str, payload: Value) -> Event {
+    let payload = if plugin == "bingo.tasks" && kind == "tasks" && payload.is_array() {
+        crate::test_lanes::task_payload(payload)
+    } else {
+        payload
+    };
     Event::Extension {
         plugin: plugin.into(),
         kind: kind.into(),
         payload,
-    }
-}
-
-/// The kernel's projection of one plugin's per-session setting (ADR-0009 §5).
-pub fn plugin_view(plugin: &str, value: Value) -> Event {
-    Event::ConfigChanged {
-        config: bingo_sdk::ConfigView {
-            plugins: std::collections::BTreeMap::from([(plugin.to_string(), value)]),
-            ..Default::default()
-        },
     }
 }
 
@@ -680,7 +679,14 @@ pub fn pending_wake(at: &str) -> Event {
     Event::Extension {
         plugin: "bingo.schedule".into(),
         kind: "wake".into(),
-        payload: json!({ "at": at, "note": "look at the build again" }),
+        payload: bingo_sdk::slot::with(
+            json!({ "at": at, "note": "look at the build again" }),
+            [bingo_sdk::slot::Slot::Status {
+                text: "wake".into(),
+                tone: bingo_sdk::Tone::Neutral,
+                until: Some(at.parse().unwrap()),
+            }],
+        ),
     }
 }
 

@@ -368,6 +368,7 @@ mod tests {
         assert_eq!(
             reads.meta["traits"],
             json!({
+                "quiet": false,
                 "concurrencySafe": true,
                 "readOnly": true,
                 "destructive": false,

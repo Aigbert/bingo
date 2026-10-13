@@ -3,8 +3,8 @@
 //! that parses as a `View` is drawn as one (ADR-0013 §2) and any other is
 //! drawn for its shape alone, so a plugin that ships tomorrow shows up here
 //! with nothing added. It is derived from `SessionState` at render time, so it
-//! follows the view wherever it goes. The one kind it leaves out is the task
-//! list, which the activity band draws ([`crate::tasks`], M74).
+//! follows the view wherever it goes. A payload with slots is drawn only
+//! where it places itself.
 //!
 //! It is also where a panel is pinned into the rail: `⏎` on a row pins it,
 //! `⏎` again takes it back. Where a panel sits is the surface's answer, not
@@ -19,7 +19,7 @@ use serde_json::Value;
 use crate::clock::Now;
 use crate::rail::{CardId, Pin};
 use crate::views::{self, MISSING};
-use crate::{tasks, theme, window};
+use crate::{theme, window};
 
 /// What a session with no plugin state says.
 pub const NOTHING: &str = "nothing to show";
@@ -29,21 +29,25 @@ const PINNED: &str = "pinned";
 const INDENT: usize = 2;
 
 /// What the sheet is showing, in the order it draws them: one row per kind a
-/// plugin published, whether or not anybody pinned it — but the task list,
-/// which has its own place on the screen.
+/// plugin published without slots, plus every explicit panel placement.
 pub fn rows(state: &SessionState) -> Vec<CardId> {
-    state
+    let mut out: Vec<_> = state
         .extensions
         .iter()
         .filter(|(plugin, _)| !bingo_sdk::is_internal_extension(plugin))
         .flat_map(|(plugin, kinds)| {
-            kinds.keys().map(|kind| CardId {
-                plugin: plugin.clone(),
-                kind: kind.clone(),
-            })
+            kinds
+                .iter()
+                .filter(|(_, payload)| payload.get("slots").is_none())
+                .map(|(kind, _)| CardId {
+                    plugin: plugin.clone(),
+                    kind: kind.clone(),
+                    slot: None,
+                })
         })
-        .filter(|id| !tasks::is_list(&id.plugin, &id.kind))
-        .collect()
+        .collect();
+    out.extend(crate::rail::placed_cards(state, true).map(|card| card.id));
+    out
 }
 
 /// The sheet: every kind, its view under it, and the cursor on the one `⏎`
@@ -71,7 +75,15 @@ pub fn lines(
         if at == cursor {
             at_cursor = out.len();
         }
-        out.push(heading(id, at == cursor, is_pinned(pinned, session, id)));
+        let title = crate::rail::placed_cards(state, true)
+            .find(|card| &card.id == id)
+            .map(|card| card.title);
+        out.push(heading(
+            id,
+            title.as_deref(),
+            at == cursor,
+            is_pinned(pinned, session, id),
+        ));
         out.extend(body(state, id, width, now));
     }
     window::onward(out, at_cursor, room)
@@ -82,7 +94,11 @@ fn body(state: &SessionState, id: &CardId, width: usize, now: Now) -> Vec<Line<'
         .extensions
         .get(&id.plugin)
         .and_then(|kinds| kinds.get(&id.kind));
-    let view = payload.map(view_of).unwrap_or_else(|| View::text(MISSING));
+    let view = crate::rail::placed_cards(state, true)
+        .find(|card| &card.id == id)
+        .map(|card| card.body)
+        .or_else(|| payload.map(view_of))
+        .unwrap_or_else(|| View::text(MISSING));
     views::marked(&view, width.saturating_sub(INDENT), &views::Marks::at(now))
         .into_iter()
         .map(|line| views::indent(line, INDENT))
@@ -96,11 +112,13 @@ fn is_pinned(pinned: &BTreeSet<Pin>, session: &SessionId, card: &CardId) -> bool
     })
 }
 
-fn heading(id: &CardId, focused: bool, pinned: bool) -> Line<'static> {
+fn heading(id: &CardId, title: Option<&str>, focused: bool, pinned: bool) -> Line<'static> {
     let mut spans = vec![
         theme::cursor_span(focused),
         Span::styled(
-            format!("{} · {}", id.plugin, id.kind),
+            title
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("{} · {}", id.plugin, id.kind)),
             theme::text().patch(theme::bold()),
         ),
     ];
@@ -336,6 +354,7 @@ mod tests {
             let visible = CardId {
                 plugin: "bingo.demo.ui".into(),
                 kind: "board".into(),
+                slot: None,
             };
             assert_eq!(rows(&state), vec![visible.clone()]);
             let session = SessionId::from_raw("ses_1");
@@ -345,6 +364,7 @@ mod tests {
                     card: CardId {
                         plugin: private.into(),
                         kind: "capture".into(),
+                        slot: None,
                     },
                 },
                 Pin {
@@ -412,6 +432,7 @@ mod tests {
             card: CardId {
                 plugin: "bingo.demo.ui".into(),
                 kind: "board".into(),
+                slot: None,
             },
         }]);
         let here = lines(

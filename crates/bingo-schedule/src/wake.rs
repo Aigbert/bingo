@@ -78,7 +78,14 @@ pub fn set(now: Timestamp, after: SignedDuration, note: String) -> Wake {
 /// which is how a kind is taken back (ADR-0011 §2).
 pub fn payload(pending: Option<&Wake>) -> Value {
     match pending {
-        Some(wake) => json!({ AT: wake.at.to_string(), NOTE: wake.note }),
+        Some(wake) => bingo_sdk::slot::with(
+            json!({ AT: wake.at.to_string(), NOTE: wake.note }),
+            [bingo_sdk::slot::Slot::Status {
+                text: "wake".into(),
+                tone: bingo_sdk::Tone::Neutral,
+                until: Some(wake.at),
+            }],
+        ),
         None => Value::Null,
     }
 }
@@ -100,6 +107,28 @@ pub fn origin() -> Origin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slots_place_the_wake_countdown_with_its_record() {
+        let wake = set(
+            Timestamp::UNIX_EPOCH,
+            SignedDuration::from_mins(5),
+            "check".into(),
+        );
+        let payload = payload(Some(&wake));
+        let slots: Vec<bingo_sdk::slot::Slot> =
+            serde_json::from_value(payload["slots"].clone()).unwrap();
+        assert_eq!(
+            slots,
+            vec![bingo_sdk::slot::Slot::Status {
+                text: "wake".into(),
+                tone: bingo_sdk::Tone::Neutral,
+                until: Some(wake.at),
+            }]
+        );
+        assert_eq!(payload[AT], wake.at.to_string());
+        assert_eq!(payload[NOTE], "check");
+    }
 
     #[test]
     fn an_interval_inside_the_bounds_is_the_one_that_was_asked_for() {
@@ -152,7 +181,14 @@ mod tests {
         );
         assert_eq!(
             payload(Some(&wake)),
-            json!({ "at": "1970-01-01T00:05:00Z", "note": "look at the build again" })
+            bingo_sdk::slot::with(
+                json!({ "at": "1970-01-01T00:05:00Z", "note": "look at the build again" }),
+                [bingo_sdk::slot::Slot::Status {
+                    text: "wake".into(),
+                    tone: bingo_sdk::Tone::Neutral,
+                    until: Some(wake.at)
+                }]
+            )
         );
         assert_eq!(
             payload(None),

@@ -183,6 +183,7 @@ impl Accumulator {
                 output: None,
                 progress: None,
                 duration_ms: None,
+                quiet: false,
             },
             ItemStatus::Pending,
         );

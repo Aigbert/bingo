@@ -17,7 +17,7 @@ use ratatui::text::{Line, Span};
 use serde_json::Value;
 
 use crate::views::{self, Marks};
-use crate::{panel, shells, theme};
+use crate::{panel, theme};
 
 /// How many rows one plugin may take before the rest of it folds away.
 const ROWS: usize = 8;
@@ -31,6 +31,7 @@ const GUTTER: usize = 2;
 pub struct CardId {
     pub plugin: String,
     pub kind: String,
+    pub slot: Option<usize>,
 }
 
 impl CardId {
@@ -38,6 +39,7 @@ impl CardId {
         Self {
             plugin: plugin.to_string(),
             kind: kind.to_string(),
+            slot: None,
         }
     }
 }
@@ -76,12 +78,43 @@ pub fn cards(state: &SessionState, session: &SessionId, pinned: &BTreeSet<Pin>) 
             })
         })
         .collect();
-    // The one signal that is not a card: the shells' running set, which the
-    // rows that started them and the status line already say (M75).
-    out.extend(
-        published(&state.signals).filter(|card| !shells::is_set(&card.id.plugin, &card.id.kind)),
-    );
+    out.extend(published(&state.signals));
+    out.extend(placed_cards(state, false));
+    out.extend(placed_cards(state, true).filter(|card| {
+        pinned.contains(&Pin {
+            session: session.clone(),
+            card: card.id.clone(),
+        })
+    }));
     out
+}
+
+/// Card identity is local to its publisher, unaffected by other plugins' slots.
+pub fn placed_cards(state: &SessionState, panel: bool) -> impl Iterator<Item = Card> {
+    let mut indices = std::collections::BTreeMap::new();
+    bingo_sdk::slot::placed(state)
+        .into_iter()
+        .filter_map(move |placed| {
+            let (is_panel, title, body) = match placed.slot {
+                bingo_sdk::slot::Slot::Panel { title, view } => (true, title, view),
+                bingo_sdk::slot::Slot::Rail { title, view } => (false, title, view),
+                _ => return None,
+            };
+            let index = indices
+                .entry((placed.plugin.clone(), placed.kind.clone()))
+                .or_insert(0);
+            let slot = Some(*index);
+            *index += 1;
+            (panel == is_panel).then_some(Card {
+                id: CardId {
+                    plugin: placed.plugin,
+                    kind: placed.kind,
+                    slot,
+                },
+                title,
+                body,
+            })
+        })
 }
 
 /// Every kind a plugin published in one lane, as a card.
@@ -94,6 +127,7 @@ fn published(
         .flat_map(|(plugin, kinds)| {
             kinds
                 .iter()
+                .filter(|(_, payload)| payload.get("slots").is_none())
                 .map(|(kind, payload)| card(plugin, kind, payload))
         })
 }
@@ -256,18 +290,20 @@ mod tests {
         );
     }
 
-    /// The shells' running set is the one signal with no card: the transcript
-    /// and the status line are where it is read (M75).
+    /// A payload that places itself is not also drawn in a legacy lane.
     #[test]
-    fn the_running_shells_are_the_one_signal_that_is_not_a_card() {
+    fn a_signal_with_slots_is_drawn_only_in_its_places() {
         let state = folded(vec![
             frame(
                 1,
                 signalled(
                     "bingo.tools.bash",
                     "jobs",
-                    json!({"kind": "table", "headers": ["job", "command", "since"],
+                    crate::test_lanes::shell_payload(
+                        json!({"kind": "table", "headers": ["job", "command", "since"],
                            "rows": [["job_ab12cd34", "sleep 45", "10:22:07"]]}),
+                        "itm_1",
+                    ),
                 ),
             ),
             frame(

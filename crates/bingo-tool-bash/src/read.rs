@@ -133,6 +133,7 @@ mod tests {
             "cargo test".into(),
             log.path().to_path_buf(),
             SessionId::from_raw("ses_test"),
+            bingo_sdk::ItemId::from_raw("itm_test"),
         ));
         jobs.file(job.clone());
         (dir, jobs, job)
@@ -218,6 +219,7 @@ mod tests {
             "true".into(),
             std::path::PathBuf::from("/no/such/job.log"),
             SessionId::from_raw("ses_test"),
+            bingo_sdk::ItemId::from_raw("itm_test"),
         ));
         jobs.file(job.clone());
         let out = read(&jobs, json!({ "id": &job.id })).await;

@@ -13,11 +13,14 @@ const COMMAND: &str = "cargo test --workspace";
 
 /// The set as the shell's plugin signals it while the one shell runs.
 fn set() -> serde_json::Value {
-    json!({
-        "kind": "table",
-        "headers": ["job", "command", "since"],
-        "rows": [[ID, COMMAND, "10:22:07"]],
-    })
+    crate::test_lanes::shell_payload(
+        json!({
+            "kind": "table",
+            "headers": ["job", "command", "since"],
+            "rows": [[ID, COMMAND, "10:22:07"]],
+        }),
+        "itm_2",
+    )
 }
 
 /// The call that went to the background, already come back: the text the
@@ -102,16 +105,30 @@ fn shell_running() {
     both("shell_running", &solo(&state), &ui, now);
 }
 
-/// The same row reads `Ran in the background` once the set no longer lists
+/// The same row reads the display fold once the set no longer lists
 /// the shell, the count is gone, and the completion is a turn of its own.
 #[test]
 fn shell_ran() {
     let (ui, now) = scene();
     let state = ran();
     let screen = draw_tree(80, 24, &solo(&state), &ui, now);
-    assert!(screen.contains("⎿  Ran in the background"), "{screen}");
+    assert!(
+        screen.contains("⎿  Started in the background as job_ab12cd34"),
+        "{screen}"
+    );
     assert!(!screen.contains("Running in the background"), "{screen}");
     assert!(!screen.contains("1 shell"), "{screen}");
     assert!(screen.contains("⏺ Background job job_ab12cd34"), "{screen}");
     both("shell_ran", &solo(&state), &ui, now);
+}
+
+#[test]
+fn shell_and_wake_follow_plugin_order() {
+    let (ui, now) = scene();
+    let mut state = running();
+    let at = now.wall + jiff::SignedDuration::from_secs(240);
+    state.apply(&frame(5, pending_wake(&at.to_string())));
+    let screen = draw_tree(120, 40, &solo(&state), &ui, now);
+    assert!(screen.find("wake in 4m").unwrap() < screen.find("1 shell").unwrap());
+    both("shell_and_wake", &solo(&state), &ui, now);
 }

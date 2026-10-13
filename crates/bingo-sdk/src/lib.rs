@@ -20,6 +20,7 @@ pub mod plugin;
 pub mod policy;
 pub mod provider;
 pub mod service;
+pub mod slot;
 pub mod state;
 pub mod store;
 pub mod surface;

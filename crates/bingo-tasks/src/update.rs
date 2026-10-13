@@ -58,8 +58,8 @@ impl Tool for TaskUpdateTool {
         }
     }
 
-    fn traits(&self, _input: &Value) -> ToolTraits {
-        crate::traits()
+    fn traits(&self, input: &Value) -> ToolTraits {
+        crate::traits(input)
     }
 
     async fn call(&self, input: Value, cx: &ToolContext) -> Result<ToolOutput, ToolError> {
@@ -293,7 +293,10 @@ mod tests {
     fn a_board_write_is_gated_no_differently_than_a_private_one() {
         assert_eq!(
             TaskUpdateTool.traits(&json!({"id": 1, "in": "#design", "claim": true})),
-            TaskUpdateTool.traits(&json!({"id": 1}))
+            ToolTraits {
+                quiet: false,
+                ..TaskUpdateTool.traits(&json!({"id": 1}))
+            }
         );
     }
 }

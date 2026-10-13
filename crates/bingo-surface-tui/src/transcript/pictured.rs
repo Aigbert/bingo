@@ -270,6 +270,7 @@ mod tests {
                 }),
                 progress: None,
                 duration_ms: Some(3),
+                quiet: false,
             },
         )
     }

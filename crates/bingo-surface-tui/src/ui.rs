@@ -429,7 +429,7 @@ pub struct Ui {
     /// `ctrl+t` took the task list off the band (M74). The verb row keeps
     /// the task being done either way: hiding the list is about rows, not
     /// about what the turn is doing.
-    pub tasks_hidden: bool,
+    pub activity_hidden: bool,
     /// The rail card the keyboard talks to; `tab` cycles it, a click takes it.
     pub focus: Option<CardId>,
     /// The panel sheet's cursor: the row `⏎` would pin.
@@ -515,7 +515,7 @@ impl Ui {
             notices: Vec::new(),
             block: None,
             pinned: BTreeSet::new(),
-            tasks_hidden: false,
+            activity_hidden: false,
             focus: None,
             panel: 0,
             pending: None,
