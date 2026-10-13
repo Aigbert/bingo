@@ -103,20 +103,7 @@ panes, stacks toasts. After M121, M123–M125, M137, M138.
 - Re-verified at `5581b978`: M148 layout/canvas replaces rail/sheet; M131's
   runner/catalogue and M138's `Call.reads`/`ReadLog` exist; render guard does not.
   `globals.js` still emits `{type,props,children}`. Direct Text writers need migration.
-- **Stopped (2026-10-14), protocol step 6:** ADR-0075 §1 freezes protocol 2.
-  `schema::tests::protocol_two_keeps_every_frozen_shape` fails after the element change.
-  The only frozen definition failing `preserves` is View: text, markdown, code,
-  stack and columns alternatives. Legacy reads pass; canonical writes change.
-  ADR-0079 §1 requires the new vocabulary but does not amend ADR-0075's freeze.
-  Options: authorize a narrowly scoped pre-release View/Shown baseline amendment
-  (as prior milestones did for their named changes), or retain the freeze and
-  design protocol-3/N−1 compatibility. Do not change plugin-2.json or weaken the test.
-- Partial work preserves the SDK elements/legacy reader/folds and mechanical callers;
-  TUI additions currently use text fallback. Tables, render pair, subscriptions,
-  handlers, pulled UI, full TUI drawing and counter acceptance remain unfinished.
-  No ADR/exit criterion is accepted; after stopping only formatting/artifact regeneration ran.
-  Remaining gates (clippy, workspace tests, discipline, budget, deny, Windows, PTY)
-  were not run. No live/credential tests, terminal app, push, merge or PR.
+- 2026-10-14, person's delegate: authorize the scoped pre-release View/Shown/place/ui-render baseline amendment; protocol 2 freezes at its first release (ADR-0075).
 ## Verified (2026-10-14)
 ```text
 cargo fmt --all -- --check
