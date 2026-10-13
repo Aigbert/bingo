@@ -25,17 +25,16 @@ async fn a_live_channel_host_excludes_another_and_a_killed_one_releases() {
             .env_remove("ANTHROPIC_API_KEY")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
+            .stderr(Stdio::piped());
         command
     };
     let limit = Duration::from_secs(30);
-    let mut first = command().spawn().unwrap();
+    let mut first = bingo_process::tree(command()).unwrap();
     let (_peer, _) = tokio::time::timeout(limit, listener.accept())
         .await
         .unwrap()
         .unwrap();
-    let second = tokio::time::timeout(limit, command().output())
+    let second = tokio::time::timeout(limit, support::process::output(command()))
         .await
         .unwrap()
         .unwrap();
@@ -43,7 +42,7 @@ async fn a_live_channel_host_excludes_another_and_a_killed_one_releases() {
     assert!(second.stdout.is_empty());
     let stderr = String::from_utf8_lossy(&second.stderr);
     assert!(stderr.contains("another bingo already runs"), "{stderr}");
-    first.kill().await.unwrap();
+    first.start_kill().unwrap();
     first.wait().await.unwrap();
     let locks = home.path().join(".bingo/data/channels");
     let path = std::fs::read_dir(locks)
@@ -53,14 +52,14 @@ async fn a_live_channel_host_excludes_another_and_a_killed_one_releases() {
         .unwrap()
         .path();
     let marker = std::fs::read(&path).unwrap();
-    let mut next = command().spawn().unwrap();
+    let mut next = bingo_process::tree(command()).unwrap();
     let connected = tokio::select! {
         connection = listener.accept() => connection.is_ok(),
         status = next.wait() => panic!("successor exited instead of taking the claim: {status:?}"),
         () = tokio::time::sleep(limit) => panic!("successor never connected"),
     };
     assert!(connected);
-    next.kill().await.unwrap();
+    next.start_kill().unwrap();
     next.wait().await.unwrap();
     assert_eq!(marker, b"bingo-channel-claim-v1\n");
     assert_eq!(std::fs::read(path).unwrap(), marker);

@@ -9,23 +9,25 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, dead_code)]
 
 pub mod home;
+pub mod process;
 
 use std::io::Write;
 use std::process::Stdio;
 use std::time::Duration;
 
+use bingo_process::Tree;
 use bingo_sdk::{
     Attachment, ClientIdentity, Event, Frame, IntentId, IntentOutcome, SessionSelector, SessionSpec,
 };
 use bingo_surface_rpc::RemoteKernel;
 use futures::StreamExt;
-use tokio::process::{Child, Command};
+use tokio::process::Command;
 
 /// How long any one wait may take before the scenario is called stalled.
 pub const LIMIT: Duration = Duration::from_secs(20);
 
 pub struct Server {
-    pub child: Child,
+    pub child: Tree,
     home: tempfile::TempDir,
 }
 
@@ -48,7 +50,8 @@ impl Server {
             .unwrap()
             .write_all(script.as_bytes())
             .unwrap();
-        let child = Command::new(env!("CARGO_BIN_EXE_bingo"))
+        let mut command = Command::new(env!("CARGO_BIN_EXE_bingo"));
+        command
             .args(["serve", "--stdio", "--cwd"])
             .arg(home.path())
             .args(extra)
@@ -57,17 +60,15 @@ impl Server {
             .env(bingo_channel_adapter::loopback::ENABLE_ENV, "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            .spawn()
-            .unwrap();
+            .stderr(Stdio::piped());
+        let child = bingo_process::tree(command).unwrap();
         Server { child, home }
     }
 
     pub fn kernel(&mut self) -> RemoteKernel {
         RemoteKernel::connect(
-            self.child.stdout.take().unwrap(),
-            self.child.stdin.take().unwrap(),
+            self.child.take_stdout().unwrap(),
+            self.child.take_stdin().unwrap(),
         )
     }
 

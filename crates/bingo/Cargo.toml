@@ -65,6 +65,7 @@ async-trait.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+bingo-process.workspace = true
 bingo-sdk = { workspace = true, features = ["testing"] }
 tempfile.workspace = true
 # A schedule entry written by hand carries timestamps, and the black-box

@@ -1,5 +1,8 @@
 //! Consecutive wire requests through the real binary and built-in contributors.
 
+#[path = "../support/process.rs"]
+mod support;
+
 use super::*;
 use bingo_sdk::{ContentPart, ItemBody};
 use serde_json::{Value, json};
@@ -123,9 +126,7 @@ fn assert_prefixes(requests: &[Value]) {
 async fn complete(command: Command) -> std::process::Output {
     tokio::time::timeout(
         std::time::Duration::from_secs(60),
-        tokio::process::Command::from(command)
-            .kill_on_drop(true)
-            .output(),
+        support::output(tokio::process::Command::from(command)),
     )
     .await
     .expect("CLI did not finish; possible actor deadlock")

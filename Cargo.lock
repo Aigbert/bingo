@@ -245,6 +245,7 @@ dependencies = [
  "bingo-persona",
  "bingo-pictures",
  "bingo-plugin-rpc",
+ "bingo-process",
  "bingo-provider-acp",
  "bingo-provider-anthropic",
  "bingo-provider-fake",

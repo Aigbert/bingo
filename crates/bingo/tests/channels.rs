@@ -15,6 +15,7 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use base64::Engine;
+use bingo_process::Tree;
 use bingo_sdk::{
     Activation, Answer, ClientIdentity, HostApi, IntentId, OpenOptions, Origin, SessionSelector,
 };
@@ -23,7 +24,7 @@ use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
 use tokio::net::TcpListener;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::process::{Child, Command};
+use tokio::process::Command;
 
 use support::{Server, ready};
 
@@ -90,7 +91,7 @@ fn is(op: &Value, name: &str) -> bool {
 /// `bingo channels` with nothing else running, its loopback dialling us.
 struct Chat {
     peer: Peer,
-    _child: Child,
+    _child: Tree,
     /// The session's working directory as well as its home: what a path the
     /// model names is resolved against.
     home: tempfile::TempDir,
@@ -105,7 +106,8 @@ impl Chat {
         std::fs::write(&script_path, script).unwrap();
         let settings_path = home.path().join("channels.json");
         std::fs::write(&settings_path, with_peer(settings, &peer).to_string()).unwrap();
-        let child = Command::new(env!("CARGO_BIN_EXE_bingo"))
+        let mut command = Command::new(env!("CARGO_BIN_EXE_bingo"));
+        command
             .args(["channels", "--cwd"])
             .arg(home.path())
             .arg("--settings")
@@ -113,10 +115,8 @@ impl Chat {
             .env("BINGO_FAKE_SCRIPT", &script_path)
             .envs(support::home::home_env(home.path()))
             .env(bingo_channel_adapter::loopback::ENABLE_ENV, "1")
-            .stdin(Stdio::null())
-            .kill_on_drop(true)
-            .spawn()
-            .unwrap();
+            .stdin(Stdio::null());
+        let child = bingo_process::tree(command).unwrap();
         Chat {
             peer: Peer::accept(&listener).await,
             _child: child,
@@ -722,9 +722,8 @@ async fn loopback_without_the_switch_is_refused_before_listening() {
         .envs(support::home::home_env(home.path()))
         .env_remove(bingo_channel_adapter::loopback::ENABLE_ENV)
         .env_remove("BINGO_FAKE_SCRIPT")
-        .stdin(Stdio::null())
-        .kill_on_drop(true);
-    let output = tokio::time::timeout(LIMIT, command.output())
+        .stdin(Stdio::null());
+    let output = tokio::time::timeout(LIMIT, support::process::output(command))
         .await
         .unwrap()
         .unwrap();

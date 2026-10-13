@@ -13,9 +13,10 @@
 
 use std::process::Stdio;
 
+use bingo_process::Tree;
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
-use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::process::{ChildStdin, ChildStdout, Command};
 
 type Failed = Box<dyn std::error::Error>;
 
@@ -28,7 +29,7 @@ const VERSION: &str = "2025-06-18";
 pub struct Server {
     /// Held so the child lives as long as the conversation does; dropping this
     /// closes its pipes.
-    _child: Child,
+    _child: Tree,
     stdin: ChildStdin,
     lines: Lines<BufReader<ChildStdout>>,
     next: u64,
@@ -41,8 +42,8 @@ impl Server {
     /// arguments, its environment — and shake hands.
     pub async fn dial(row: &Value) -> Result<Self, Failed> {
         let mut child = spawned(row)?;
-        let stdin = child.stdin.take().ok_or("the server has no stdin")?;
-        let stdout = child.stdout.take().ok_or("the server has no stdout")?;
+        let stdin = child.take_stdin().ok_or("the server has no stdin")?;
+        let stdout = child.take_stdout().ok_or("the server has no stdout")?;
         let mut server = Server {
             _child: child,
             stdin,
@@ -128,7 +129,7 @@ fn answered(message: Value) -> Value {
     }
 }
 
-fn spawned(row: &Value) -> Result<Child, Failed> {
+fn spawned(row: &Value) -> Result<Tree, Failed> {
     let mut command = Command::new(row["command"].as_str().ok_or("a row names a command")?);
     for arg in strings(&row["args"]) {
         command.arg(arg);
@@ -138,12 +139,11 @@ fn spawned(row: &Value) -> Result<Child, Failed> {
             command.env(name, value);
         }
     }
-    Ok(command
+    command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(true)
-        .spawn()?)
+        .stderr(Stdio::inherit());
+    Ok(bingo_process::tree(command)?)
 }
 
 fn strings(value: &Value) -> Vec<String> {
