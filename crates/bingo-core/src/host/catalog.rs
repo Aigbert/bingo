@@ -13,6 +13,28 @@ use serde_json::{Map, Value, json};
 use super::Registry;
 use crate::models::{ModelCatalog, ModelFacts, Offer, ServedModels, Source, served};
 
+pub(super) async fn model_granted(host: &super::Host, plugin: &str) -> bool {
+    let status = crate::plugins::listing(&host.registry)
+        .await
+        .into_iter()
+        .find(|status| status.id == plugin);
+    match status.and_then(|status| {
+        status
+            .execution
+            .map(|execution| (status.enabled, execution.grant))
+    }) {
+        Some((enabled, grant)) => {
+            enabled && grant.tier != Tier::Tighten && grant.uses.contains("model")
+        }
+        None => host
+            .settings
+            .kernel
+            .plugin_trust
+            .get(plugin)
+            .is_some_and(|grant| grant.uses.iter().any(|noun| noun == "model")),
+    }
+}
+
 pub(super) async fn entries(
     registry: &Registry,
     resolved: &[Arc<dyn Provider>],
