@@ -30,7 +30,10 @@ every later milestone's tests stand on.
    `bingo-skills`, `bingo-checkpoints`, `bingo-permissions`,
    `bingo-tool-bash`, `bingo-context`, `bingo-demo-ui`, the channels'
    `host/tests/kernel.rs`, the TUI's `doubles.rs`, `bingo-surface-print`'s
-   test host. A fake whose behaviour `TestHost` cannot express without a
+   test host; also MCP's `tests/server.rs` and plugin-RPC's
+   `tests/plugin/harness.rs` (found on re-verification). Migrate agents
+   and channels last, in separate commits touching only the fake and uses.
+   A fake whose behaviour `TestHost` cannot express without a
    feature noun stays, with one line saying why.
 3. **Leave the real ones.** `bingo-core/src/host.rs`, `host/unavailable.rs`,
    `session/commands.rs`, `bingo-surface-rpc/src/client.rs` are
@@ -56,10 +59,16 @@ every later milestone's tests stand on.
 ## Files
 
 - `crates/bingo-sdk/src/testing.rs` (or `testing/` if it splits)
+- `crates/bingo-checkpoints/src/lib.rs` qualified `OneSession` test fake
 - the test modules named in brick 2 and their `Cargo.toml`
   dev-dependencies
 - `crates/bingo-surface-tui/src/{blocks.rs,highlight.rs,view.rs}` tests
-- tests with `elapsed() <` assertions across the workspace
+- `crates/bingo-{mcp,plugin-rpc}/tests/` host fakes
+- `crates/bingo-core/src/test_support{.rs,/peers.rs}` and RPC wire
+  host: reason comments only; leave core session/context test bodies alone
+- tests with `elapsed() <` assertions across the workspace, including
+  shell-hook tests and CLI/RPC integration tests
+- `crates/bingo-schedule/src/wakes.rs` timer tests
 - `scripts/check_discipline.sh`
 
 ## Exit criteria
@@ -86,3 +95,17 @@ every later milestone's tests stand on.
   revertible. Run that crate's tests per commit, the full gates at the
   end.
 - Re-verify at start: recount the impls and the wall-clock assertions.
+
+## Re-verification (2026-10-13, `3d53863d`)
+
+- All named paths and host symbols exist. `rg -l "impl HostApi for"
+  crates` still finds 23 files; MCP and plugin-RPC fakes were absent from
+  the original migration list. No new dependency is needed.
+- The three TUI speed bounds remain (`warm`, `delta`, per-draw `each`).
+  Liveness bounds also remain in Bash, shell hooks and CLI/RPC tests.
+- Chase/deadline and core retry tests already use paused Tokio time;
+  schedule wakes still poll real time. Preserve existing paused tests.
+- Baseline and final workspace runs run the ACP token reconnect test
+  separately; all cargo commands are sequential.
+- The new advisory scan also finds qualified impls: checkpoints has one
+  `impl bingo_sdk::HostApi for OneSession` in `src/lib.rs`; migrate it too.
