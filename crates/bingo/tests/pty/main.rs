@@ -428,6 +428,27 @@ impl Terminal {
         );
     }
 
+    /// Wait for `needle` to leave the screen. A redraw reaches the pty in
+    /// pieces, so a screen read right after one marker can be mid-frame.
+    fn wait_gone(&self, needle: &str) {
+        self.wait_count(needle, 0);
+    }
+
+    /// Wait for the screen to show `needle` exactly `times` times.
+    fn wait_count(&self, needle: &str, times: usize) {
+        let deadline = Instant::now() + LIMIT;
+        while Instant::now() < deadline {
+            if self.screen().matches(needle).count() == times {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        panic!(
+            "timed out waiting for {needle:?} {times} times\n--- screen ---\n{}",
+            self.screen()
+        );
+    }
+
     /// Let it finish and answer with the screen the shell is left looking at.
     fn leave(mut self) -> String {
         let deadline = Instant::now() + LIMIT;
@@ -484,12 +505,9 @@ fn a_bang_line_runs_the_shell_and_leaves_its_output_in_the_transcript() {
     terminal.wait_for("? for shortcuts");
     terminal.send(b"!echo landed\r");
     terminal.wait_for("$ echo landed");
+    // The line, and under it what it wrote.
+    terminal.wait_count("landed", 2);
     let screen = terminal.screen();
-    assert_eq!(
-        screen.matches("landed").count(),
-        2,
-        "the line, and under it what it wrote:\n{screen}"
-    );
     assert!(
         !screen.contains("Hello from the pty."),
         "the model was never asked:\n{screen}"
@@ -588,11 +606,8 @@ fn esc_twice_rewinds_the_turn_and_the_file_it_wrote() {
         "a file the turn created is gone again:\n{}",
         terminal.screen()
     );
-    let screen = terminal.screen();
-    assert!(
-        !screen.contains("Wrote the note."),
-        "and the turn is out of the transcript:\n{screen}"
-    );
+    // And the turn is out of the transcript.
+    terminal.wait_gone("Wrote the note.");
     terminal.send(&[0x04]);
     terminal.leave();
 }
