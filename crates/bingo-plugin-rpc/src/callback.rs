@@ -47,7 +47,9 @@ pub(crate) async fn restart(
     connection: &crate::connection::Connection,
     host: &bingo_sdk::HostHandle,
 ) -> Result<(), String> {
-    if !connection.permits("callback/start") {
+    if !connection.permits("callback/start")
+        || host.service(&bingo_plugin_host::callback::KEY).is_none()
+    {
         return Ok(());
     }
     for session in host
