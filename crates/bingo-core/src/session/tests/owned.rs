@@ -266,3 +266,51 @@ async fn close_rejects_the_gate_head_and_every_waiting_input() {
         .collect();
     assert_eq!(rejected, [head, tail]);
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_turn_ending_during_submit_does_not_let_prose_overtake_a_command() {
+    let slow = Arc::new(crate::test_support::owned::SlowSubmit::default());
+    let provider = ScriptedProvider::new(vec![
+        Script::Hang(vec![ModelEvent::TextStart { id: "first".into() }]),
+        Script::Events(text("last")),
+    ]);
+    let mut cfg = config(provider, vec![], Arc::new(NoHost));
+    cfg.hooks = HookSet::fixed(vec![slow.clone()]);
+    let command =
+        ScriptedCommand::new("echo", false, Ok(CommandOutcome::Applied { message: None }));
+    let mailbox = configured(cfg, vec![command.clone()]);
+    let (mut state, mut events) = mailbox.attach().await.unwrap();
+    mailbox.submit(IntentId::mint(), input("first"));
+    bounded(drive(&mut events, &mut state, |f| {
+        matches!(f.event, Event::ItemStarted { .. })
+    }))
+    .await;
+    let middle = IntentId::mint();
+    mailbox.submit(middle.clone(), input("/echo middle"));
+    bounded(drive(&mut events, &mut state, |f| {
+        matches!(&f.event,
+        Event::IntentAck { intent, outcome: IntentOutcome::Queued { .. } } if intent == &middle)
+    }))
+    .await;
+    let last = IntentId::mint();
+    mailbox.submit(last.clone(), input("slow"));
+    bounded(slow.entered.notified()).await;
+    mailbox.interrupt(IntentId::mint(), InterruptScope::Head);
+    bounded(drive(&mut events, &mut state, turn_completed)).await;
+    slow.release.notify_one();
+    let frames = bounded(frames_until(&mut events, &mut state, turn_completed)).await;
+    let applied: Vec<_> = frames
+        .iter()
+        .filter_map(|frame| match &frame.event {
+            Event::IntentAck {
+                intent,
+                outcome: IntentOutcome::Applied { .. } | IntentOutcome::TurnStarted { .. },
+            } => Some(intent.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(applied, [middle, last]);
+    assert_eq!(command.calls(), ["middle"]);
+    mailbox.close(CloseReason::Client);
+    bounded(mailbox.wait_closed()).await;
+}

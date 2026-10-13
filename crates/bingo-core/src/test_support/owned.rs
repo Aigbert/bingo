@@ -82,3 +82,29 @@ impl Command for Hung {
         self.wait().await
     }
 }
+
+#[derive(Default)]
+pub struct SlowSubmit {
+    pub entered: Notify,
+    pub release: Notify,
+}
+
+#[async_trait]
+impl Hook for SlowSubmit {
+    fn id(&self) -> &str {
+        "slow-submit"
+    }
+    fn matcher(&self) -> HookMatcher {
+        HookMatcher {
+            points: vec![HookPoint::Submit],
+            tool: None,
+        }
+    }
+    async fn on_submit(&self, input: &mut Input, _: &HookContext) -> HookOutcome {
+        if matches!(input, Input::Text { text, .. } if text == "slow") {
+            self.entered.notify_one();
+            self.release.notified().await;
+        }
+        HookOutcome::Continue
+    }
+}
