@@ -43,10 +43,13 @@ representation, and these types remove it. No `HostApi` verb is added.
      entry in the panel sheet.
    - `Mode { current, modes: Vec<ActionItem> }`: the mode a person
      cycles. The surface's cycle key fires the item after `current`.
-   - `Row { item: ItemId, mark: Option<char>, title, badge,
+   - `Row { item: ItemId, mark: Option<char>, title, badge, caption: Option<String>,
      body: Option<View>, actions: Vec<ActionItem> }`: what one
      transcript item's row says. `mark` stands in the item's bullet; a
      surface draws it only when it is one cell wide, else the bullet.
+     2026-10-13 (M123): optional `caption` is drawn after the badge on
+     the heading, defaulting to absent and omitted when absent on the wire;
+     `body` keeps replacement semantics.
 
    `ActionItem { label, action: Action, key: Option<char> }` is
    ADR-0013 §1's `Actions` item, named. A slot a surface cannot parse

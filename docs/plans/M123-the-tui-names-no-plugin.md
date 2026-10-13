@@ -47,7 +47,7 @@ No new host verb or external dependency.
    name rule move from `memory.rs` with its tests. The `memory`
    directories record stays for the model's prompt and the guide.
 7. **Skill places.** Both doors place the same `Row { mark: '❖',
-   title: "Skill", badge: name, body: args }` under `row:<item>`: the
+   title: "Skill", badge: name, caption: args, body: None }` under `row:<item>`: the
    `Skill` tool on `ToolContext.item` when it runs, and a new skills
    hook at `on_turn(Start)` on the prompt item when its first line is
    one of the plugin's own `/name`s. Both doors keep today's `❖`; the
@@ -78,7 +78,7 @@ No new host verb or external dependency.
 
 ## Files
 
-- `crates/bingo-sdk/src/{event.rs,hook.rs,slot.rs}`, `fixtures/`
+- `crates/bingo-sdk/src/{event.rs,hook.rs,slot.rs}`, `fixtures/`; generated `schema/{plugin,rpc}.json`
 - `crates/bingo-core/src/{gate.rs,turn.rs,chain/tool.rs,session.rs,session/commands.rs,session/invoke.rs}`
 - `crates/bingo-context/src/{lib.rs,memory/mod.rs}`, a new `memory/row.rs`
 - `crates/bingo-skills/src/{lib.rs,tool.rs}`, a new `hook.rs`
@@ -113,15 +113,11 @@ No new host verb or external dependency.
 
 ## Risks
 
-- **Stopped 2026-10-13, protocol step 6.** M121's contract in
-  `bingo-surface-tui/src/test_lanes.rs:201` requires `Row.body` to replace
-  the original body (`assert!(!screen.contains("old body"))`). Brick 7
-  specifies skill `body: args`, but unchanged skill snapshots retain the
-  original expanded result and put arguments on the heading. Treating
-  `Row.body` as a caption violated that contract; the experiment was removed.
-- Decision needed: add an optional row caption field (amend the fixed plan
-  and ADR-0070; coordinate M132 schemas), or retain replacement semantics
-  and revise skill presentation/snapshots. The M121 assertion is not a mechanical update.
+- Resolved 2026-10-13 by the user: add optional `Row.caption`, defaulted
+  and omitted when absent. Draw it after the badge on the heading;
+  `Row.body` keeps replacement semantics. Keep `test_lanes.rs:201` unchanged.
+- Contract first: pin rows with/without caption and its optional schema;
+  regenerate plugin/RPC schemas only through the repository generator.
 - Remaining: TUI rows/input, discipline, integration tests, records, snapshots, tmux and gates.
 - Re-verified at `e415e97e`: M131 dispatch is in `chain/tool.rs`; M122's
   bounce is a tool result and its holder constant is `name::PARENT`;
