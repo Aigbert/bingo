@@ -6,7 +6,7 @@
 //! stands; one that asked the kernel for anything else fails loudly here.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use bingo_sdk::{
@@ -38,7 +38,7 @@ impl Fixture {
     }
 
     pub(crate) fn handle(&self) -> HostHandle {
-        HostHandle(self.host.clone())
+        self.host.host.handle()
     }
 
     pub(crate) fn cwd(&self) -> PathBuf {
@@ -104,139 +104,93 @@ impl ToolHost for Silent {
     }
 }
 
-/// A host that writes down what it was told and answers everything else the
-/// way [`NoHost`] does: what a wake reaches for is a delivery and a published
-/// kind, and both are read back here.
-#[derive(Debug, Default)]
+/// The shared host plus a gate a dispatch test can hold open.
+#[derive(Debug)]
 pub(crate) struct Listening {
-    delivered: Mutex<Vec<(SessionId, Input, Delivery)>>,
-    extended: Mutex<Vec<(SessionId, String, String, Value)>>,
-    block_open: std::sync::atomic::AtomicBool,
-    opened: tokio::sync::Notify,
+    host: bingo_sdk::testing::TestHost,
+    opening: Arc<Opening>,
+}
+
+#[derive(Debug, Default)]
+struct Opening {
+    blocked: std::sync::atomic::AtomicBool,
+    entered: tokio::sync::Notify,
     proceed: tokio::sync::Notify,
+}
+
+impl Default for Listening {
+    fn default() -> Self {
+        let host = bingo_sdk::testing::TestHost::default();
+        let opening = Arc::new(Opening::default());
+        host.on_deliver(|_, _, _, _| async { Ok(()) });
+        host.on_extend(|_, _, _, _| async { Ok(()) });
+        host.on_open({
+            let opening = opening.clone();
+            move |selector, who, options| {
+                let opening = opening.clone();
+                async move {
+                    if opening.blocked.load(std::sync::atomic::Ordering::SeqCst) {
+                        opening.entered.notify_one();
+                        opening.proceed.notified().await;
+                    }
+                    NoHost.open(selector, who, options).await
+                }
+            }
+        });
+        Self { host, opening }
+    }
 }
 
 impl Listening {
     pub(crate) fn hold_opens(&self) {
-        self.block_open
+        self.opening
+            .blocked
             .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     pub(crate) async fn wait_for_open(&self) {
-        tokio::time::timeout(std::time::Duration::from_secs(10), self.opened.notified())
-            .await
-            .expect("the dispatch reaches open");
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            self.opening.entered.notified(),
+        )
+        .await
+        .expect("the dispatch reaches open");
     }
 
     pub(crate) fn release_opens(&self) {
-        self.proceed.notify_one();
+        self.opening.proceed.notify_one();
     }
 
     pub(crate) fn delivered(&self) -> Vec<(SessionId, Input, Delivery)> {
-        self.delivered
-            .lock()
-            .unwrap_or_else(|held| held.into_inner())
-            .clone()
+        self.host
+            .calls()
+            .into_iter()
+            .filter_map(|call| match call {
+                bingo_sdk::testing::HostCall::Deliver {
+                    to,
+                    input,
+                    delivery,
+                    ..
+                } => Some((to, input, delivery)),
+                _ => None,
+            })
+            .collect()
     }
 
     pub(crate) fn extended(&self) -> Vec<(SessionId, String, String, Value)> {
-        self.extended
-            .lock()
-            .unwrap_or_else(|held| held.into_inner())
-            .clone()
-    }
-}
-
-#[async_trait]
-impl HostApi for Listening {
-    async fn sessions(
-        &self,
-        filter: bingo_sdk::SessionFilter,
-    ) -> Result<Vec<bingo_sdk::SessionSummary>, KernelError> {
-        NoHost.sessions(filter).await
-    }
-
-    async fn open(
-        &self,
-        selector: bingo_sdk::SessionSelector,
-        who: bingo_sdk::ClientIdentity,
-        options: bingo_sdk::OpenOptions,
-    ) -> Result<bingo_sdk::Attachment, KernelError> {
-        if self.block_open.load(std::sync::atomic::Ordering::SeqCst) {
-            self.opened.notify_one();
-            self.proceed.notified().await;
-        }
-        NoHost.open(selector, who, options).await
-    }
-
-    async fn close(
-        &self,
-        session: &SessionId,
-        reason: bingo_sdk::CloseReason,
-    ) -> Result<(), KernelError> {
-        NoHost.close(session, reason).await
-    }
-
-    async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
-        NoHost.delete(session).await
-    }
-
-    async fn deliver(
-        &self,
-        to: &SessionId,
-        _intent: IntentId,
-        input: Input,
-        delivery: Delivery,
-    ) -> Result<(), KernelError> {
-        self.delivered
-            .lock()
-            .unwrap_or_else(|held| held.into_inner())
-            .push((to.clone(), input, delivery));
-        Ok(())
-    }
-
-    async fn extend(
-        &self,
-        session: &SessionId,
-        plugin: &str,
-        kind: &str,
-        payload: Value,
-    ) -> Result<(), KernelError> {
-        self.extended
-            .lock()
-            .unwrap_or_else(|held| held.into_inner())
-            .push((
-                session.clone(),
-                plugin.to_string(),
-                kind.to_string(),
-                payload,
-            ));
-        Ok(())
-    }
-
-    async fn signal(
-        &self,
-        session: &SessionId,
-        plugin: &str,
-        kind: &str,
-        payload: Value,
-    ) -> Result<(), KernelError> {
-        NoHost.signal(session, plugin, kind, payload).await
-    }
-
-    async fn catalog(
-        &self,
-        kind: bingo_sdk::CatalogKind,
-    ) -> Result<bingo_sdk::Catalog, KernelError> {
-        NoHost.catalog(kind).await
-    }
-
-    fn gateway_events(&self) -> bingo_sdk::GatewayStream {
-        NoHost.gateway_events()
-    }
-
-    fn service_any(&self, key: &str) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
-        NoHost.service_any(key)
+        self.host
+            .calls()
+            .into_iter()
+            .filter_map(|call| match call {
+                bingo_sdk::testing::HostCall::Extend {
+                    session,
+                    plugin,
+                    kind,
+                    payload,
+                } => Some((session, plugin, kind, payload)),
+                _ => None,
+            })
+            .collect()
     }
 }
 
