@@ -1,4 +1,18 @@
 //! Read obsolete handshake claims before serde discards the unknown field.
+pub(crate) fn notice(plugin: &str, answer: &serde_json::Value) -> Option<crate::notice::Notice> {
+    let legacy = answer.get("providers")?.as_array()?.iter().any(|provider| {
+        provider
+            .pointer("/endpoint/holdsContext")
+            .and_then(serde_json::Value::as_bool)
+            == Some(true)
+    });
+    legacy.then(|| crate::notice::Notice {
+        level: bingo_sdk::Level::Info,
+        code: "PLUGIN_AGENT_REQUIRED".into(),
+        text: format!("{plugin}: ignored legacy holdsContext; an endpoint that holds its own conversation is an agent (ADR-0076)"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -27,18 +41,4 @@ mod tests {
             }
         }
     }
-}
-
-pub(crate) fn notice(plugin: &str, answer: &serde_json::Value) -> Option<crate::notice::Notice> {
-    let legacy = answer.get("providers")?.as_array()?.iter().any(|provider| {
-        provider
-            .pointer("/endpoint/holdsContext")
-            .and_then(serde_json::Value::as_bool)
-            == Some(true)
-    });
-    legacy.then(|| crate::notice::Notice {
-        level: bingo_sdk::Level::Info,
-        code: "PLUGIN_AGENT_REQUIRED".into(),
-        text: format!("{plugin}: ignored legacy holdsContext; an endpoint that holds its own conversation is an agent (ADR-0076)"),
-    })
 }

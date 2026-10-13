@@ -430,10 +430,6 @@ pub fn kind(kind: ToolKind) -> CallKind {
     }
 }
 
-#[cfg(test)]
-#[path = "events_tests.rs"]
-mod tests;
-
 /// What an update names about a call nobody opened.
 fn bare_call(update: &ToolCallUpdate) -> ToolCall {
     ToolCall::new(
@@ -446,3 +442,7 @@ fn bare_call(update: &ToolCallUpdate) -> ToolCall {
     )
     .kind(update.fields.kind.unwrap_or(ToolKind::Other))
 }
+
+#[cfg(test)]
+#[path = "events_tests.rs"]
+mod tests;

@@ -343,13 +343,13 @@ impl Renderer {
             for line in view.fold().lines() {
                 self.diagnostic(&format!("  {line}"), err)?;
             }
-        } else if item.external() {
-            if let Some(output) = output {
-                for part in &output.parts {
-                    if let Some(text) = part.as_text() {
-                        for line in text.lines() {
-                            self.diagnostic(&format!("  {line}"), err)?;
-                        }
+        } else if item.external()
+            && let Some(output) = output
+        {
+            for part in &output.parts {
+                if let Some(text) = part.as_text() {
+                    for line in text.lines() {
+                        self.diagnostic(&format!("  {line}"), err)?;
                     }
                 }
             }

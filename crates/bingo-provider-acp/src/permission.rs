@@ -10,10 +10,10 @@ pub fn narrowest(
     request: &RequestPermissionRequest,
     verdict: &Verdict,
 ) -> Option<PermissionOptionId> {
-    if matches!(verdict, Verdict::Allow { .. }) {
-        if let Some(option) = offered(request, PermissionOptionKind::AllowOnce) {
-            return Some(option);
-        }
+    if matches!(verdict, Verdict::Allow { .. })
+        && let Some(option) = offered(request, PermissionOptionKind::AllowOnce)
+    {
+        return Some(option);
     }
     refusing(request)
 }

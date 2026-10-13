@@ -75,25 +75,6 @@ pub struct ExternalCall {
     pub raw: Value,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ToolCall;
-
-    #[test]
-    fn external_call_round_trips_the_journal_fixture() {
-        let fixture: ToolCall =
-            serde_json::from_str(include_str!("../fixtures/agent/edit.json")).unwrap();
-        let external = ExternalCall::from_input(&fixture).unwrap();
-        assert_eq!(external.kind, CallKind::Edit);
-        assert_eq!(external.id, "edit-1");
-        assert_eq!(external.title, "Edit note.md");
-        assert_eq!(external.locations[0].path, PathBuf::from("note.md"));
-        assert_eq!(external.to_input(), fixture.input);
-        assert_eq!(external.tool_call("fake"), fixture);
-    }
-}
-
 impl CallKind {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -136,5 +117,24 @@ impl ExternalCall {
             name: format!("{agent}:{}", self.kind.as_str()),
             input: self.to_input(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ToolCall;
+
+    #[test]
+    fn external_call_round_trips_the_journal_fixture() {
+        let fixture: ToolCall =
+            serde_json::from_str(include_str!("../fixtures/agent/edit.json")).unwrap();
+        let external = ExternalCall::from_input(&fixture).unwrap();
+        assert_eq!(external.kind, CallKind::Edit);
+        assert_eq!(external.id, "edit-1");
+        assert_eq!(external.title, "Edit note.md");
+        assert_eq!(external.locations[0].path, PathBuf::from("note.md"));
+        assert_eq!(external.to_input(), fixture.input);
+        assert_eq!(external.tool_call("fake"), fixture);
     }
 }

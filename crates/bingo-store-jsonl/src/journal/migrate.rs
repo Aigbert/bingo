@@ -28,39 +28,6 @@ pub(super) fn line(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn every_version_has_exactly_one_step_to_its_successor() {
-        assert_eq!(STEPS.len(), super::super::VERSION as usize - 1);
-    }
-
-    #[test]
-    fn steps_chain_from_the_lines_version_before_decoding() {
-        fn rename(mut value: Value) -> Value {
-            value["new"] = value.as_object_mut().unwrap().remove("old").unwrap();
-            value
-        }
-        fn wrap(value: Value) -> Value {
-            json!({"wrapped": value})
-        }
-        let steps: &[fn(Value) -> Value] = &[rename, wrap];
-        assert_eq!(
-            upgrade(json!({"old": 42}), 1, steps),
-            json!({"wrapped": {"new": 42}})
-        );
-        assert_eq!(
-            upgrade(json!({"new": 42}), 2, steps),
-            json!({"wrapped": {"new": 42}})
-        );
-        let current = json!({"wrapped": {"new": 42}});
-        assert_eq!(upgrade(current.clone(), 3, steps), current);
-    }
-}
-
 fn external_call(mut frame: Value) -> Value {
     let Some(item) = frame.pointer_mut("/event/item") else {
         return frame;
@@ -112,4 +79,37 @@ fn external_call(mut frame: Value) -> Value {
     }
     item["meta"]["external"] = Value::Bool(true);
     frame
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn every_version_has_exactly_one_step_to_its_successor() {
+        assert_eq!(STEPS.len(), super::super::VERSION as usize - 1);
+    }
+
+    #[test]
+    fn steps_chain_from_the_lines_version_before_decoding() {
+        fn rename(mut value: Value) -> Value {
+            value["new"] = value.as_object_mut().unwrap().remove("old").unwrap();
+            value
+        }
+        fn wrap(value: Value) -> Value {
+            json!({"wrapped": value})
+        }
+        let steps: &[fn(Value) -> Value] = &[rename, wrap];
+        assert_eq!(
+            upgrade(json!({"old": 42}), 1, steps),
+            json!({"wrapped": {"new": 42}})
+        );
+        assert_eq!(
+            upgrade(json!({"new": 42}), 2, steps),
+            json!({"wrapped": {"new": 42}})
+        );
+        let current = json!({"wrapped": {"new": 42}});
+        assert_eq!(upgrade(current.clone(), 3, steps), current);
+    }
 }

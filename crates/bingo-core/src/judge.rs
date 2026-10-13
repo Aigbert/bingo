@@ -52,12 +52,12 @@ impl Tool for StandIn {
                 },
             })
             .collect();
-        if self.call.kind == CallKind::Execute {
-            if let Some(command) = self.call.raw.get("command").and_then(Value::as_str) {
-                subjects.push(Subject::Command {
-                    command: command.into(),
-                });
-            }
+        if self.call.kind == CallKind::Execute
+            && let Some(command) = self.call.raw.get("command").and_then(Value::as_str)
+        {
+            subjects.push(Subject::Command {
+                command: command.into(),
+            });
         }
         subjects
     }

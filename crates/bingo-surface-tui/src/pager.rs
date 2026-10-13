@@ -156,14 +156,14 @@ pub fn title(item: &Item, state: &SessionState) -> String {
             input,
             ..
         } => {
-            if item.external() {
-                if let Some(call) = bingo_sdk::ExternalCall::from_input(&bingo_sdk::ToolCall {
+            if item.external()
+                && let Some(call) = bingo_sdk::ExternalCall::from_input(&bingo_sdk::ToolCall {
                     call_id: call_id.clone(),
                     name: name.clone(),
                     input: input.clone(),
-                }) {
-                    return call.title;
-                }
+                })
+            {
+                return call.title;
             }
             let about = transcript::summarize(input);
             format!("{name}({about})")

@@ -362,10 +362,9 @@ async fn registering_one_id_as_agent_and_provider_is_a_composition_error() {
             contributions.reverse();
         }
         let plugins = vec![TestPlugin::boxed(&PROVIDER, contributions)];
-        let error = Host::build(plugins, HostConfig::new(env()))
-            .await
-            .err()
-            .expect("conflicting seams");
+        let Err(error) = Host::build(plugins, HostConfig::new(env())).await else {
+            panic!("conflicting seams must fail composition");
+        };
         assert!(error.to_string().contains("scripted"), "{error}");
     }
 }
