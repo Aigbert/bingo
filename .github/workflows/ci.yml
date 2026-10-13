@@ -32,6 +32,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with: { components: clippy }
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: runner.os == 'Linux'
+        with: { node-version: '24.17.0' }
+      - run: node --test sdk/typescript/src/*.test.ts
+        if: runner.os == 'Linux'
+      - run: cargo test -p bingo --test plugin_kit --locked -- --nocapture
+        if: runner.os == 'Linux'
+        env: { BINGO_REQUIRE_NODE: '1' }
       - run: cargo check --workspace --all-targets --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       # Half the runner's vCPUs: the gateway and peers suites spawn real

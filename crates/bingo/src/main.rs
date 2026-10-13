@@ -515,7 +515,7 @@ async fn before_any_host(
         Some(Command::Provider { .. }) => Some(added_provider(&env, platforms).await),
         Some(Command::Mcp { action }) => Some(configured_mcp(cli, &env, cwd, action).await),
         Some(Command::Plugins { action }) => {
-            Some(switched_plugins(cli, &env, cwd, action, platforms))
+            Some(switched_plugins(cli, &env, cwd, action, platforms).await)
         }
         // An asked-for update always asks: the daily stamp is the start-up
         // check's discipline, not a person's.
@@ -552,13 +552,16 @@ async fn configured_mcp(
 /// `bingo plugins …`: which plugins the next start will run (ADR-0057 §6).
 /// It reads the layers a run would and composes the plugins a run would, so
 /// what it lists is what the next session loads.
-fn switched_plugins(
+async fn switched_plugins(
     cli: &Cli,
     env: &Env,
     cwd: &std::path::Path,
     action: &plugins::Action,
     platforms: &Platforms,
 ) -> Result<i32, KernelError> {
+    if let Some(result) = plugins::author(action).await {
+        return result;
+    }
     let layers = settings::load(env, cwd, cli.settings.as_deref())
         .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e.to_string()))?;
     let composed = plugins(demo_ui(cli, &layers), platforms)?;

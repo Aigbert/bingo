@@ -37,7 +37,7 @@ const CHARS_PER_TOKEN: usize = 4;
 pub const FAKE_MODEL: &str = "fake-1";
 
 /// Everything the provider will say, in order.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(schemars::JsonSchema, Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct Script {
     pub responses: Vec<Response>,
     /// What a side question — a plugin's, asked beside the conversation and
@@ -49,7 +49,7 @@ pub struct Script {
 }
 
 /// One provider response: what a single `stream()` call yields.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(schemars::JsonSchema, Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct Response {
     pub steps: Vec<Step>,
     /// Overrides the finish reason derived from the steps.
@@ -71,7 +71,7 @@ impl Response {
 /// What a response waits for: a way of recognising the request it was written
 /// for, so a script shared by several sessions can address a turn instead of
 /// racing for it.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(schemars::JsonSchema, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum Match {
     /// The request carries this text somewhere — its system prompt, a message,
@@ -89,7 +89,7 @@ impl Match {
 }
 
 /// One block of a response.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(schemars::JsonSchema, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum Step {
     Text(String),

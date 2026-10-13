@@ -12,6 +12,8 @@ description = "Scripted provider plugin for bingo tests and demos"
 workspace = true
 
 [dependencies]
+# M133: expose the script schema without copying its contract in the author kit.
+schemars.workspace = true
 bingo-sdk.workspace = true
 tokio.workspace = true
 futures.workspace = true
