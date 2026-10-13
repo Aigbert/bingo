@@ -42,13 +42,18 @@ mail; the actor never awaits it" — half of what is needed.
    `TurnCompleted { Interrupted }`. The actor can do this because every
    item the turn started reached it by mail. Esc reaches every await by
    construction, including ones nobody raced.
-2. **A command is owned like a turn.** `Commands` keeps a token and a
-   join handle per run, on a `JoinSet`. An interrupt with no turn
-   running cancels the command that holds the queue (the same grace,
-   then abort) and rejects its intent with a new code, `INTERRUPTED`
-   (a stopped command is not a failed one); with neither, it is
-   `NOT_READY` as today. Close cancels and joins every command, bounded by
-   `AFTER_TURN_DEADLINE` like the after-turn hooks.
+2. **A command is owned like a turn.** Commands run on the actor's existing
+   `TaskTracker`, with a child `CancellationToken` per run and an
+   intent-to-token map. Each run races like the turn: token, then
+   `INTERRUPT_GRACE`, then drop. Close cancels the root token and joins
+   through `tracker.wait()` under `AFTER_TURN_DEADLINE`.
+   Interrupt stops a running turn first; else the command holding the
+   queue; else the input in flight at the gate's head. A stopped command
+   or gate input has its intent rejected `INTERRUPTED` (the person
+   stopped it; not a failure), and inputs queued behind it proceed in
+   order. Only with none of these is the answer `NOT_READY`. One esc
+   always stops what the person is waiting on.
+   *(Revised 2026-10-13 at M116's start: TaskTracker, not JoinSet; the gate head is interruptible.)*
 3. **The actor awaits no plugin.** Work the actor needs from a plugin
    (`commands.find` on a source, the submit hooks, a redirect) runs on
    an owned task and reports back by mail, as

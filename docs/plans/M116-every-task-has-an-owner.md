@@ -141,10 +141,8 @@ these holds only where a `select!` was remembered.
 - Re-verification at `01789d66` (2026-10-13): M112's `Transcript` and the named session methods
   exist; M113's fixtures do not. The actor already has a `TaskTracker`; commands still use an
   untracked `tokio::spawn`.
-- **Stopped under execution protocol step 6, before implementation.** ADR-0068 §2 requires
-  `NOT_READY` with neither a running turn nor a holding command; brick 5 requires cancellation of
-  the gate head then. Options: amend §2 to allow gate cancellation, or retain §2 and revise brick 5
-  and its submit-hook interruption test. Neither is chosen here.
-- ADR-0068 §2 prescribes command join handles on a `JoinSet`; brick 4 prescribes the actor's
-  `TaskTracker` and token map. Resolve by aligning the plan to `JoinSet`, or explicitly amending the
-  ADR to `TaskTracker`. No ADR Decision was edited, and no implementation gates were run.
+- Decided by the user, 2026-10-13: ADR-0068 §2 now matches the plan.
+  Commands use the actor's `TaskTracker`, child tokens and an intent-to-token map;
+  close cancels the root and joins under `AFTER_TURN_DEADLINE`.
+  Interrupt priority is turn, holding command, gate head, then `NOT_READY`.
+  A stopped gate input is rejected `INTERRUPTED`; its FIFO then proceeds.
