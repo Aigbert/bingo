@@ -74,7 +74,7 @@ impl Plugin for ModsPlugin {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|error| PluginError::Failed(error.to_string()))?;
         if let Some(manager) = self.manager.get() {
-            manager.start(&cwd).await;
+            manager.start(&cwd, host).await;
         }
         Ok(())
     }

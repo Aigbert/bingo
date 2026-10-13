@@ -1,13 +1,17 @@
 //! Discovery supplies one shared source of module rows and links.
 use crate::{engine::Limits, module::Module};
 use async_trait::async_trait;
-use bingo_plugin_host::{discovery, manifest::Launch, notice::Notices};
+use bingo_plugin_host::{
+    discovery,
+    manifest::Launch,
+    notice::{self, Notice, Notices},
+};
 use bingo_sdk::*;
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
-    sync::{Arc, OnceLock},
+    sync::{Arc, Mutex, OnceLock},
 };
 
 pub(crate) struct Manager {
@@ -17,6 +21,9 @@ pub(crate) struct Manager {
     switched_off: BTreeSet<String>,
     limits: Limits,
     modules: OnceLock<Vec<Arc<Module>>>,
+    notices: Arc<Notices>,
+    stop: CancellationToken,
+    tasks: Mutex<Vec<tokio::task::JoinHandle<()>>>,
 }
 impl Manager {
     pub fn new(
@@ -33,14 +40,24 @@ impl Manager {
             switched_off,
             limits,
             modules: OnceLock::new(),
+            notices: Arc::new(Notices::default()),
+            stop: CancellationToken::new(),
+            tasks: Mutex::new(Vec::new()),
         }
     }
-    pub async fn start(&self, cwd: &Path) {
-        let notices = Notices::default();
+    pub async fn start(&self, cwd: &Path, host: HostHandle) {
+        self.tasks
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .push(tokio::spawn(notice::drain(
+                self.notices.clone(),
+                host,
+                self.stop.clone(),
+            )));
         let found = discovery::with_explicit(
             &discovery::dirs(&self.env, cwd),
             &self.directories,
-            &notices,
+            &self.notices,
         );
         let mut modules = Vec::new();
         for found in found
@@ -53,7 +70,11 @@ impl Manager {
                 .cloned()
                 .unwrap_or(Value::Null);
             let off = self.switched_off.contains(&found.name);
-            modules.push(Module::load(found, config, self.limits.clone(), &self.env, off).await);
+            let module = Module::load(found, config, self.limits.clone(), &self.env, off).await;
+            if !off && let Err(reason) = module.admission.decision() {
+                self.notices.push(Notice::warn("PLUGIN_UNREADABLE", reason));
+            }
+            modules.push(module);
         }
         let _ = self.modules.set(modules);
     }
@@ -61,6 +82,12 @@ impl Manager {
         self.modules.get().map(Vec::as_slice).unwrap_or_default()
     }
     pub async fn stop(&self) {
+        self.stop.cancel();
+        let tasks =
+            std::mem::take(&mut *self.tasks.lock().unwrap_or_else(|error| error.into_inner()));
+        for task in tasks {
+            let _ = task.await;
+        }
         for module in self.modules() {
             module.close().await;
         }

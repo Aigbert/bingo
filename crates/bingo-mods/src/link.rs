@@ -39,24 +39,37 @@ impl Interceptor for Link {
         let Some(engine) = &self.0.engine else {
             return next.run(input).await;
         };
-        let hooks = engine
-            .hooks()
-            .iter()
-            .enumerate()
-            .filter_map(|(index, hook)| {
-                let skipped = CALLING
-                    .try_with(|calling| {
-                        calling
-                            .iter()
-                            .any(|(name, hook)| name == self.id() && *hook == index)
-                    })
-                    .unwrap_or(false);
-                (!skipped
-                    && catalogue::Pattern::parse(&hook.pattern)
-                        .is_ok_and(|pattern| pattern.matches(&entry.name)))
-                .then_some(index)
-            })
-            .collect();
+        let mut hooks = Vec::new();
+        for (index, hook) in engine.hooks().iter().enumerate() {
+            if !catalogue::Pattern::parse(&hook.pattern)
+                .is_ok_and(|pattern| pattern.matches(&entry.name))
+            {
+                continue;
+            }
+            let skipped = CALLING
+                .try_with(|calling| {
+                    calling
+                        .iter()
+                        .any(|(name, hook)| name == self.id() && *hook == index)
+                })
+                .unwrap_or(false);
+            if skipped {
+                let _ = cx
+                    .host
+                    .notice(
+                        Level::Warn,
+                        "INTERCEPTOR_SKIPPED",
+                        &format!(
+                            "{} ({}): re-entry: calling hook skipped",
+                            self.id(),
+                            entry.name
+                        ),
+                    )
+                    .await;
+            } else {
+                hooks.push(index);
+            }
+        }
         let chain = Chain {
             module: self.0.clone(),
             engine: engine.clone(),
@@ -74,7 +87,15 @@ impl Interceptor for Link {
                 entry,
                 cx,
                 input.clone(),
-                Next::new(|_| Box::pin(async { Ok(Value::Null) })),
+                Next::at(
+                    self.0
+                        .admission
+                        .decision()
+                        .ok()
+                        .flatten()
+                        .map_or(Tier::Tighten, |grant| grant.tier),
+                    |_| Box::pin(async { Ok(Value::Null) }),
+                ),
             )
             .await
         {
