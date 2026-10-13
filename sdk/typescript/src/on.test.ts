@@ -62,3 +62,51 @@ test('short circuit answers without next and cancellation rejects next', async (
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(hooks.pending.size, 0);
 });
+
+test('an omitted matcher accepts null and scalar event inputs', async () => {
+  for (const input of [null, false, 0, 'complete']) {
+    const hooks = new Hooks();
+    hooks.on('future.verb', ($, e) => ({ observed: e }));
+    assert.deepEqual(await hooks.before('future.verb', { chain: '1', input }, {}),
+      { answer: { observed: input } });
+  }
+});
+
+test('cancel before next rejects before and clears the chain', async () => {
+  const hooks = new Hooks();
+  let entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  let continueHook!: () => void;
+  const held = new Promise<void>(resolve => { continueHook = resolve; });
+  hooks.on('future.verb', async ($, e, next) => {
+    entered();
+    await held;
+    assert.equal(next.signal.aborted, true);
+    await assert.rejects(next(e), /cancel/);
+  });
+  const before = hooks.before('future.verb', { chain: '1', input: {} }, {});
+  await started;
+  const rejected = assert.rejects(before, /cancel/);
+  hooks.cancel('1');
+  continueHook();
+  await rejected;
+  assert.equal(hooks.pending.size, 0);
+});
+
+test('cancel while the after hook is waiting rejects after', async () => {
+  const hooks = new Hooks();
+  let entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  hooks.on('future.verb', async ($, e, next) => {
+    await next(e);
+    entered();
+    await new Promise(() => {});
+  });
+  await hooks.before('future.verb', { chain: '1', input: {} }, {});
+  const after = hooks.after({ chain: '1', result: 'done' });
+  await started;
+  const rejected = assert.rejects(after, /cancel/);
+  hooks.cancel('1');
+  await rejected;
+  assert.equal(hooks.pending.size, 0);
+});
