@@ -65,7 +65,7 @@ and `Needs you` leave every surface and every model-facing text.
   record/checkpoint fixtures and their regeneration tests; mechanical
   summary constructors and vocabulary fixtures elsewhere (protocol step 6):
   agents `command.rs`; TUI `motion.rs`, `view.rs`, `screens/teams.rs`; SDK
-  `state.rs` wire bytes.
+  `state.rs` wire bytes; `scripts/tui-smoke.sh` lifecycle text fixture.
 
 ## Exit criteria
 

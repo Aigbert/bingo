@@ -266,7 +266,7 @@ start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys 'ask me' Enter
 await 'nothing to do'
 keys C-g
-await '❯ ⏺ ask me  done'
+await '❯ ⏺ ask me  idle · completed'
 keys Escape
 vanish '❯ ⏺ ask me'
 await '? for shortcuts'
