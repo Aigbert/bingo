@@ -814,3 +814,32 @@ async fn model_helpers_without_a_model_grant_are_refused_in_words() {
     );
     fixture.host.shutdown().await;
 }
+
+#[tokio::test]
+async fn surfaces_fold_duplicate_attachments_and_each_detach() {
+    use bingo_sdk::*;
+    let fixture = support::Fixture::new("export function register(on) { on('fixture.echo', ($, e) => $.session.surfaces({session:e.session})); }", &["session"], json!({})).await;
+    let identity = ClientIdentity {name:"duplicate".into(),surface:"test".into()};
+    let first = fixture.host.open(SessionSelector::ById{id:fixture.attachment.session.clone()},identity.clone(),OpenOptions::default()).await.unwrap();
+    let second = fixture.host.open(SessionSelector::ById{id:fixture.attachment.session.clone()},identity.clone(),OpenOptions::default()).await.unwrap();
+    async fn count(fixture: &support::Fixture, expected: u64) {
+        tokio::time::timeout(std::time::Duration::from_secs(10),async {
+            loop {
+                let state = fixture.host.session_state(&fixture.attachment.session).await.unwrap();
+                let held = state.signals.get("bingo.mods").into_iter().flat_map(|values|values.values()).find(|value|value["client"]["name"] == "duplicate").and_then(|value|value["count"].as_u64()).unwrap_or(0);
+                if held == expected {break;}
+                tokio::task::yield_now().await;
+            }
+        }).await.unwrap();
+    }
+    count(&fixture,2).await;
+    drop(first);
+    count(&fixture,1).await;
+    let answer = fixture.call("fixture","echo",json!({"session":fixture.attachment.session})).await;
+    assert_eq!(answer.as_array().unwrap().iter().filter(|value|value["name"] == "duplicate").count(),1);
+    drop(second);
+    count(&fixture,0).await;
+    let answer = fixture.call("fixture","echo",json!({"session":fixture.attachment.session})).await;
+    assert!(answer.as_array().unwrap().iter().all(|value|value["name"] != "duplicate"));
+    fixture.host.shutdown().await;
+}

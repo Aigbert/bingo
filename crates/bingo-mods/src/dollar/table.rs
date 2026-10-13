@@ -21,6 +21,7 @@ pub struct Row {
     pub unsafe_call: bool,
     pub input: Shape,
     pub result: Shape,
+    pub accepts: fn(&Value) -> bool,
 }
 fn shape<T: JsonSchema>(generator: &mut SchemaGenerator) -> Schema {
     generator.subschema_for::<T>()
@@ -28,7 +29,7 @@ fn shape<T: JsonSchema>(generator: &mut SchemaGenerator) -> Schema {
 macro_rules! rows {
     ($($noun:literal, $method:literal, $door:expr, $unsafe:literal, $input:ty => $result:ty;)*) => {
         pub static ROWS: &[Row] = &[$(Row {noun:$noun, method:$method, door:$door, unsafe_call:$unsafe,
-            input:shape::<$input>, result:shape::<$result>}),*];
+            input:shape::<$input>, result:shape::<$result>, accepts:|value| serde_json::from_value::<$result>(value.clone()).is_ok()}),*];
     };
 }
 use Door::{Face, Kernel};

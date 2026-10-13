@@ -12,3 +12,9 @@ pub(crate) mod callback;
 mod clock;
 mod model;
 mod register;
+
+#[cfg(test)]
+mod contract;
+
+#[cfg(test)]
+mod chain_contract;
