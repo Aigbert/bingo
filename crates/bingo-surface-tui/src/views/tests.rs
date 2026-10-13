@@ -385,3 +385,16 @@ fn box_padding_and_hidden_children_affect_drawn_geometry() {
     assert_eq!(drawn.len(), 3);
     assert_eq!(drawn[1].to_string(), " body   ");
 }
+
+#[test]
+fn fixed_boxes_distribute_space_on_their_main_axis() {
+    for (wire, expected) in [
+        (serde_json::json!({"kind":"Box","width":3,"height":5,"justifyContent":"space-between","children":[{"kind":"Text","children":["a"]},{"kind":"Text","children":["b"]}]}),vec!["a  ","   ","   ","   ","b  "]),
+        (serde_json::json!({"kind":"Box","width":3,"height":5,"children":[{"kind":"Box","flexGrow":1,"children":[{"kind":"Text","children":["a"]}]},{"kind":"Text","children":["b"]}]}),vec!["a  ","   ","   ","   ","b  "]),
+        (serde_json::json!({"kind":"Box","width":3,"height":3,"flexDirection":"row","alignItems":"flex-end","children":[{"kind":"Text","children":["a"]}]}),vec!["   ","   ","a  "]),
+    ] {
+        let view:View=serde_json::from_value(wire).unwrap();
+        let actual:Vec<_>=render(&view,3).into_iter().map(|line|line.to_string()).collect();
+        assert_eq!(actual,expected);
+    }
+}
