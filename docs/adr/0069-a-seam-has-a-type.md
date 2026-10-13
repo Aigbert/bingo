@@ -116,3 +116,5 @@ deletes spellings. Each item removes a second representation.
 
 Refs: ADR-0001, ADR-0003, ADR-0012, ADR-0031, ADR-0054, ADR-0057,
 ADR-0075; Plans: M119, M122, M126; audit-2026-10 §2, §Also
+
+Amended 2026-10-14 (M136, ADR-0078): optional `WireService::face()` declares noun/method schemas and unsafe metadata. Wire calls raise catalogue chains; typed lookup keeps its existing behaviour.

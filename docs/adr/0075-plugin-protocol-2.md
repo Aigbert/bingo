@@ -11,8 +11,8 @@ Pre-release amendment (2026-10-13, M136): protocol 2 has not shipped
 (v0.6.6 ships protocol 1). Its old `turn.complete` becomes `turn.stop`
 with unchanged shape and behaviour; `turn.complete` takes the catalogue's
 metadata-to-completion-text meaning. Amend the frozen baseline for these
-entries only. Any protocol-2 change after its first release that breaks
-its frozen contract still needs protocol 3. M134's `holds_context` note
+entries only. Any protocol-2 change after the first release that ships it
+still needs protocol 3. M134's `holds_context` note
 is on its parallel branch; both pre-release amendments apply.
 
 ## Context
@@ -113,3 +113,7 @@ plugin spawning agents (it delivers to a session, whose model may).
 Revised 2026-10-13 for ADR-0078: the embedded JS engine this record
 refused is ADR-0078's; the TypeScript SDK speaks ADR-0078 §2's
 `register(on)` so one module runs in either transport.
+
+Verified 2026-10-14 (M136): catalogue subscriptions and dynamic service-face
+chains cross protocol 2; generated schema and TypeScript drift tests pass,
+as does the additive-only test against the amended pre-release baseline.
