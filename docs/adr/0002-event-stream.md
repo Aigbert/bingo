@@ -30,6 +30,13 @@ consumed by the next layout pass and published only after painting, never
 another representation of session state. Every surface still reads the one
 reducer and event stream described above.
 
+## Surface input and render note — 2026-10-13 (M125)
+
+The TUI stores one focus owner; keys and pointer events resolve it through
+one function. Interactions remain derived from the tree. A run owns its
+terminal detection inputs and builds a `Render` for each layout/paint pass;
+scoped style reads share that value in production and tests.
+
 ## Consequences
 
 - Any client's view equals `apply(snapshot, frames since snapshot.seq)`; a GUI store is the generated twin of the same reducer, pinned by shared fixtures.

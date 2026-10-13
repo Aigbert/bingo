@@ -140,6 +140,13 @@ What it still does not do: show a room's roster without being asked for (sketch 
 
 ## 4. Tokens
 
+The look belongs to the run (M125). Pure detection builds a `Render` from
+the environment and probe answers, including late graphics and background
+replies. Layout and painting enter its scope; style helpers, the block memo
+and highlighting read that same value. There is no process-wide palette or
+graphics answer. Motion belongs to this render context, and ASCII is derived
+from its glyph table.
+
 **The terminal owns the ink** (M73). Body text draws in the terminal's own foreground and secondary text in its own dim — SGR 39 and SGR 2, in every look, the native one included. Nothing about prose is bingo's to choose, so a terminal that flips its scheme remaps every line of it itself, at once and in its scrollback, with no question asked and no frame redrawn. Codex draws prose with no foreground SGR at all and bans `Color::Rgb` in its lints ("use ANSI colors, which work better in various terminal themes"); Claude Code draws it as a bare Ink `<Text>`; that is why the words in both follow a system theme flip on the instant. Colour is spent only where colour is the meaning.
 
 What is left is the **accent palette**. Truecolor is the native look, chosen after the terminal's background is read (OSC 10/11) and derived for light and dark alike; the eight ANSI colours are the fallback and every rule below holds in both. The body background is never painted — the terminal's stays — but cards, sheets and the rail sit on a **raised tint** one step from it, which is what gives the frame depth. The palette is not chosen once: the terminal is asked again while the run lasts, so a terminal that follows the system's appearance is followed in turn (**the look that follows**, below) — and what that following governs is exactly the accents and the tints, because the ink has nothing to follow.
@@ -162,7 +169,7 @@ Gradients exist in two places only: a progress bar's fill (`presence` → its gl
 
 Since M73 this governs the accents, the tints and the grounds, and nothing else: prose and secondary text are the terminal's own ink and its own dim, so they follow a flip on their own, ahead of any question and in the scrollback too. What is left below is how the part that *cannot* be "default" — a background, a tint, a blend — is kept in step.
 
-Which of the two palettes is the terminal's own to say, and a terminal set to follow the system's appearance says something different an hour later. So the ground is one fact read at render time and **may change**: the environment settles everything else once, the ground sits in a slot, and every frame after a new answer wears the other palette. `BINGO_THEME=light|dark` pins the look and turns the following off — a person who named one is not asked again — and so do `NO_COLOR` and a terminal of eight colours, which have no ground to follow.
+Which of the two palettes is the terminal's own to say, and a terminal set to follow the system's appearance says something different an hour later. So the ground is one fact read at render time and **may change**: the environment settles everything else once, the run owns the probe answers as a value, and every frame after a new answer wears the other palette. `BINGO_THEME=light|dark` pins the look and turns the following off — a person who named one is not asked again — and so do `NO_COLOR` and a terminal of eight colours, which have no ground to follow.
 
 Two doors lead in, and one of them is nailed shut.
 
@@ -270,6 +277,15 @@ cues use this same contract.
 Budget: an animation tick of 33 ms while continuous motion runs, none otherwise; a full draw under 4 ms at 120×40; a keystroke echoes on the next frame. Every frame is written between the two halves of DEC mode 2026 (2026-09-04), so the terminal composites it whole instead of painting it as it arrives — not through a multiplexer, which consumes the mode rather than passing it on. Smoothness is the absence of flicker, tearing, jumps and dropped keys — the motion above sits on top of that, never instead of it.
 
 ## 7. Ergonomics
+
+Keys and pointer events resolve one `Ui.focus` owner (M125): composer,
+opening, selection, search, layer or rail card. An open interaction and the
+composer's menu are derived only when no explicit owner captures input; the
+interaction wins over the menu. A closing layer still draws but has given
+input back. Help allows typing through its own handler. Exit and escape
+gestures remain gestures. A pointer cannot activate transcript targets behind
+an opening, search, layer or interaction; the switcher keeps its row clicks.
+
 
 - **Hands on the keys, the mouse welcome.** Every card answers to one key (`1-9`, `y/a/n`, `⏎`, `esc`); every sheet closes with `esc`; `?` shows the whole table; `ctrl+o` opens the latest fold one rung further — a result, a thought, an action's receipt, whichever is newest or focused — until it is whole and the next press takes the sheet; `ctrl+g` — or `↓` on an empty box — opens the one list of sessions; `ctrl+t` hides and shows the task list, `ctrl+p` opens the plugin-state sheet (M74); `shift+tab` cycles the mode. The mouse scrolls, clicks a child's row, a card row or a row of the list, opens a fold, drags a selection; it is never required.
 - **Questions asked together are answered together** (landed 2026-09-04, M53; aligned with Claude Code's own card the same day, M57). A form is the same card, not a second one: `tab` / `←` / `→` walk the headers, `↑` `↓` and the digits move the cursor, `space` toggles in a multi-select, `⏎` fixes an answer and steps to the next question still unanswered. **The walk ends at a `Submit` tab**: `⏎` there sends every answer at once, and with a question still open it says how many are left and walks to the first of them rather than sending — nothing leaves the card until a person has been past every question. **Every question's last two rows are the ways out of it**: `Type something.` answers in the person's own words where the question takes them, and `Chat about this`, under the band's rule, cancels the form and gives the caret back to the composer — the outcome `esc` already had, named as a choice so it is not a key to know. One `esc` still cancels the whole set. Nothing to learn that one question did not teach.

@@ -2,133 +2,98 @@
 
 ## Goal
 
-Audit-2026-10 §4, its second half. Two things in the TUI are answered
-by order and by process globals instead of by a value:
-
-- **Who owns a key.** `input::on_key` tries about ten pieces of state in
-  a fixed order: `intro`, `block`, `esc_armed`, the leaving gesture,
-  `select.run`, `search`, the captured layer (`Open::Picker`, `Pager`,
-  `Rewind`), the chords, the panel and switcher, `esc`, the session's
-  open interaction, `Tab`, the menu, then editing. `pointer::on_mouse`
-  tries a different order (card option, listed row, rail card, foot,
-  picture, block). Nothing stops two of them being set at once, and a
-  click and a key can disagree about who is in front.
-- **What a frame is drawn in.** The palette (`theme.rs`: `ASK`
-  `OnceLock`, `GROUND` `AtomicU8`) and the graphics answer
-  (`graphics/mod.rs`: `HEARD` `RwLock`, `notice`, `late`) are process
-  globals with 19 `cfg(not(test))` twins (theme 10, graphics 8, lib 1).
-  The test build swaps in a `thread_local` `OVERRIDE` and `saying`, so
-  production detection never runs under test.
-
-After this milestone `Ui.focus: Focus` is one enum, and both `on_key`
-and `on_mouse` ask one function who owns the event. A `Render` value
-holds the look, the graphics answer and the motion switch; `run.rs`
-builds it from pure detection and hands it to M124's `layout()`. No
-visible change, no new dependency, no sdk change.
+Audit-2026-10 §4's second half: replace independent input owners and
+process-global theme/graphics detection with values. Both keys and pointer
+resolve `Ui.focus` through one function. A run builds `Render` from its
+probe inputs and hands it to M124's layout/paint boundary. No dependency,
+sdk change or redesign of the rail/panel that M148 removes (ADR-0081).
 
 ## Bricks, in build order
 
-1. **Contract tests first**, failing:
-   - `focus.rs`: a table of every `Focus` variant against each key class
-     (printable, `esc`, `Tab`, chord, arrow, `Enter`) and a left press,
-     naming the owner; the open interaction outranks the composer and
-     nothing else;
-   - `render.rs`: detection as a table, environment plus probe answers
-     (`OSC 11`, `XTVERSION`, the graphics query, a late reply) to a
-     `Render`, through the code production runs;
-   - two tests drawing in two looks on parallel threads do not see each
-     other's.
-2. **`Focus`**: `Composer`, `Intro(Playing)`, `Select(Run)`,
-   `Search(Search)`, `Layer(Layer)`, `Card(CardId)`. It replaces
-   `intro`, `select.run`, `search`, `layer` and the card `focus`,
-   so two owners cannot be set at once. `Layer` retains its reveal timing;
-   a closing layer is visual residue and derives the composer owner. Two owners stay derived, never
-   stored: the session's open interaction (read from the tree) and the
-   menu (read from the composer's line and `Menu.dismissed`), each the
-   owner only while `Focus` is `Composer`. `esc_armed`, `block` and the
-   armed exit are gestures, not owners, and stay where they are.
-3. **`focus::owner(&Ui, &Tree) -> Owner`** and one dispatch. `on_key`
-   and `on_mouse` each match on the owner, then on the event. Each
-   owner's handler is the function it is today. Where the mouse order
-   differed from the key order, brick 1's table chooses one, and the
-   commit body lists each case that changed.
-4. **`Render { look: Theme, graphics: Graphics, motion: bool, ascii: bool }`.**
-   `theme::detect` and `graphics::detect` become pure functions of what
-   the environment and the probe said. The probe's I/O stays in
-   `terminal.rs`, before the terminal is taken. `run/look.rs` (M71)
-   and a late graphics reply produce a new `Render` instead of writing
-   a slot.
-5. **One door into the pass.** `layout()` and `paint()` take `&Render`.
-   Inside them, style helpers read it through `render::current()`, a
-   scoped thread-local that `Render::scope` sets for the pass and that
-   falls back to the resting look outside one. That keeps the ~490
-   `theme::` call sites as they are. The block memo's look key and the
-   highlighter's memo read the `Render` they were drawn in.
-6. **Twins go.** `ASK`, `GROUND`, `HEARD`, `OVERRIDE`, `saying` and the
-   19 `cfg(not(test))` items are deleted. Tests build a `Render` as
-   production does. `PROBE_THROUGH` in `lib.rs` is exported in both
-   builds.
-7. **Records.** `docs/design/tui.md` §7 says one owner at a time and
-   how it is chosen; §4 says the look is a value of the run.
-   ADR-0002 gets a dated note beside M124's.
+1. Contract tests first: every focus variant owns all key classes and a
+   left press; interactions outrank only the composer, then its menu.
+   Detection covers environment, OSC 11, XTVERSION, graphics, late replies,
+   and parallel draws in two looks, through production code.
+2. `Focus`: `Composer`, `Intro(Playing)`, `Select(Run)`, `Search(Search)`,
+   `Layer(Layer)`, `Card(CardId)`. It replaces `intro`, `select.run`,
+   `search`, `layer` and the rail focus. Layer retains reveal timing;
+   closing gives input back while drawing its remaining frames.
+   The open interaction and menu stay derived, never stored owners.
+   Escape, exit, view dismissal and dragging remain gestures.
+3. Both `on_key` and `on_mouse` resolve `focus::owner(&Ui, &Tree)`.
+   Existing handlers retain bindings. Mouse-order changes are tested and
+   listed in commit bodies. Help's owner permits typing through it.
+4. `Render { look: Theme, graphics: Graphics, motion: bool }` derives
+   ASCII from its glyph table. Pure theme/graphics detection reads the
+   run's environment/probe inputs. I/O stays at `terminal.rs` and its probe
+   helper before taking the terminal. Late replies update run inputs.
+5. `layout()` and `paint()` take `&Render`; `Render::scope` supplies
+   `render::current()` to existing style helpers, restoring on unwind.
+   Outside a scope, both builds use the resting look. Block/highlighter
+   memo keys already read those helpers, so context changes invalidate them.
+6. Delete detection's `ASK`, `GROUND`, `HEARD`, `OVERRIDE`, `saying` and
+   production/test twins. Export `PROBE_THROUGH` in both builds. Fixtures
+   use render scopes and production detection rather than alternate logic.
+7. Update `docs/design/tui.md` §4/§7 and ADR-0002 beside M124's note.
 
 ## Files
 
-- `crates/bingo-surface-tui/src/{focus.rs,render.rs}` (new)
-- `crates/bingo-surface-tui/src/{ui,input,pointer,layers,composer,select,view,pager,clock}.rs`, `input/switcher.rs`
-- `crates/bingo-surface-tui/src/{theme,lib,terminal,run,blocks,highlight,layout}.rs`
-- `crates/bingo-surface-tui/src/graphics/mod.rs`, `run/{look,notices,opening}.rs`, `layout/{deadline,tests}.rs`
-- `crates/bingo-surface-tui/src/{test_support,screens,motion}.rs`, `screens/{colours,opening,windows}.rs`; mechanical fixture callers of changed types
-- `docs/design/tui.md`, `docs/adr/0002-*.md`
+All source paths below are under `crates/bingo-surface-tui/src/`:
+
+- New `focus.rs`, `render.rs`, `terminal/probe.rs`.
+- `ui.rs`, `input.rs`, `input/switcher.rs`, `pointer.rs`, `select.rs`,
+  `view.rs`, `pager.rs`, `layout.rs`, `layout/{deadline,tests}.rs`.
+- `theme.rs`, `graphics/{mod,tmux}.rs`, `clock.rs`, `terminal.rs`, `lib.rs`,
+  `run.rs`, `run/{look,notices,opening,showing}.rs`, `highlight.rs`.
+- Fixtures: `doubles.rs`, `painted.rs`, `test_support.rs`,
+  `test_support/rendered.rs`, `screens/{colours,opening}.rs`, `motion.rs`.
+- `docs/design/tui.md`, `docs/adr/0002-event-stream.md`, this plan.
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-surface-tui focus` and `cargo test -p bingo-surface-tui render` passes; the failing
-      first run is pasted.
-- [ ] Theme/graphics detection has no `cfg(not(test))` twins or
-      `ASK`, `GROUND`, `HEARD`, `OVERRIDE`, `graphics::saying` globals.
-      M124's `layout/count.rs` test instrumentation is unrelated and stays.
-- [ ] `rg 'search\.is_some\(\)|select\.run\.is_some\(\)|layer\.captures\(\)' crates/bingo-surface-tui/src/{input,pointer}.rs`
-      finds nothing; both dispatch on `focus::owner`.
-- [ ] The detection table runs the production path under `cargo test`,
-      including a late graphics reply and a background change.
-- [ ] `screens/` and `motion.rs` pass unchanged, apart from the
-      mouse-order cases the commit body names.
-- [ ] `scripts/tui-smoke.sh` passes, and a tmux drive opens and closes
-      each layer by key and by click, and starts with `BINGO_THEME`
-      light and dark.
-- [ ] All gates of the upgrade protocol, plus the Windows cross-check
-      for the TUI.
+- [ ] `cargo test -p bingo-surface-tui focus` and
+      `cargo test -p bingo-surface-tui render` pass; initial failures pasted.
+- [ ] No theme/graphics detection twins or process globals remain.
+      M124's `layout/count.rs` instrumentation and `transcript::saying`
+      are unrelated and stay. Both input paths call `focus::owner`.
+- [ ] Production detection tests cover late graphics and background changes;
+      parallel scoped draws do not leak looks.
+- [ ] Existing screens/motion assertions pass; fixture construction changes
+      mechanically. Pointer-order changes have regression coverage.
+- [ ] `scripts/tui-smoke.sh` passes. An isolated tmux drive exercises layers
+      and clicks with both light and dark startup.
+- [ ] All protocol gates, plus the TUI Windows cross-check.
 
 ## Non-goals
 
-- Changing a binding, a chord or a layer; configurable keys.
-- Passing `&Render` to every style helper by argument. The scope is
-  the one door; threading it through ~490 sites is not worth the diff.
-- Any change to what the probe asks or when (`run/look.rs`'s clock).
+New bindings or configurable keys; changing the probe questions or timing;
+passing `&Render` through hundreds of style helpers; redesigning the rail
+or panel; live or credential tests; another milestone; push, merge or PR.
 
 ## Risks
 
-- Some flags may be set together today on purpose (a search while the
-  pager is open). Brick 1's table finds them. If two must coexist, the
-  inner one nests in its owner's variant rather than becoming a flag.
-- A click that went to the transcript while a card was open may now go
-  to the card, or the reverse. Each change is named and tested.
-- A helper outside a scope uses the resting look in both builds; scope
-  restoration, nesting and parallel isolation must be tested.
-- Re-verify at start: `on_key`'s and `on_mouse`'s orders, `Ui`'s
-  fields, the twin count by file, and M124's `layout()` signature.
+- Old flags could coexist. One explicit focus replaces another; pager's
+  internal search remains nested within the pager. Closing is visual residue.
+- Pointer precedence changes must be named and tested; a stale last frame's
+  targets must not activate something behind today's owner.
+- Scope nesting, restoration and thread isolation need explicit coverage.
+- Existing layers do not all have click-to-open/close bindings: only the
+  switcher rows and interaction options act on clicks. The tmux drive checks
+  those actions and that other layers consume clicks; it adds no bindings.
+- Known unrelated ACP bridge refusal failure may be skipped if it occurs,
+  with the exact name and output recorded. Windows SDK C-header failures
+  are left to Windows CI per protocol step 7; Rust errors still stop.
 
 ## Re-verified — 2026-10-13 at f3ed55b9
 
 - Clean `m125-one-focus`; M124 `layout(previous, tree, ui, size, now)`
   returns `Layout`; `paint(layout, frame)` copies its canvas.
-- Keyboard precedence and mouse ordering still match the Goal. `Ui` still
-  owns all five independent owners; `Layer` also owns reveal/closing state.
-- Detection twins remain theme 10, graphics 8, lib 1. M124 adds three
-  unrelated instrumentation twins; `transcript::saying` is also unrelated.
-- Added actual consumers (selection, view, pager, opening, clock and layout
-  helpers) to Files. Shared M134 files receive only necessary local edits.
-- `Render` derives ASCII from its theme glyphs instead of duplicating it;
-  environment/probe inputs remain run-owned for late replies. No dependency.
-- Preserve the rail and panel until M148 (ADR-0081); no redesign here.
+- The audited keyboard/mouse orders and five independent owners remain.
+  Layer also owns closing/reveal state; preserve it inside `Focus`.
+- Detection twins remain theme 10, graphics 8, lib 1. M124 added three
+  unrelated instrumentation twins; the original broad grep was stale.
+- Added actual consumers/fixtures and the terminal probe's tmux helpers to
+  Files. M134-shared `lib.rs`, `pager.rs`, `test_support.rs` edits are local;
+  no edits to its `screens.rs`, transcript, fold, thoughts or ACP files.
+- The original two cargo test filters were invalid; run them separately.
+  ASCII is derived rather than duplicating theme glyphs. No new dependency.
