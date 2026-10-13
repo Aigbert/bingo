@@ -82,12 +82,14 @@ run is long.
   `crates/bingo-mcp/{Cargo.toml,src/dial.rs}`
 - `crates/bingo-plugin-rpc/src/{codec,connection}.rs`,
   `crates/bingo-surface-rpc/src/{codec,server,client}.rs`
-- `docs/adr/0015-*.md`, and each touched crate's `Cargo.toml`
+- `docs/adr/{0015,0072}-*.md`, `Cargo.lock`, and each touched crate's `Cargo.toml`
+- Consumer module declarations and protocol error conversions; new tests beside
+  each changed module. Mechanical fixture updates are listed when needed.
 
 ## Exit criteria
 
-- [ ] `rg -n 'ProcessGroup|JobObject|kill_on_drop' crates --type rust`
-      matches only `crates/bingo-process`.
+- [ ] Production tool/hook/MCP/plugin/ACP spawners use only `bingo-process`;
+      raw `kill_on_drop` in black-box harnesses and the fake agent is fixture code.
 - [ ] The grandchild test passes for tool-bash, MCP and plugin-rpc on
       macOS, and CI's Windows job runs it as a blocking test.
 - [ ] `cargo tree --workspace -e normal | rg 'process-wrap v9'` finds
@@ -117,4 +119,13 @@ run is long.
   largest plugin-rpc and ACP fixture before settling on 16 MiB.
 - On Windows, `npx.cmd` shims under a job object are a risk. Command
   resolution does not change, only the wrap.
-- Re-verify at start: M110's API, M117's deadlines here, every line named.
+- Re-verified at `ff21d03d`: M110 exports `shell::resolve`; rmcp 3.1
+  implements `IntoTransport` for `(AsyncRead, AsyncWrite)`.
+- Preserve M117's `Link::expire/stop`, adapter/prompt ownership and
+  `Connection::mark_dead`; no `session.rs` edit is needed. Preserve every
+  deadline test and plugin `callTimeout` / MCP `toolTimeout` behavior.
+- Surface codec conversions of `KernelError` must become protocol-local
+  functions when shared types make their old `From` impls orphan impls.
+- Existing harness/fake-agent spawns are not production spawners; the first
+  criterion now states the ADR's scope. M129 already accepted ADR-0072;
+  append M128's implementation note without overwriting that history.
