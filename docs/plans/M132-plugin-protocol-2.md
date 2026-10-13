@@ -65,6 +65,7 @@ M133's; this milestone makes every verb it needs answerable.
 
 ## Files
 
+- `crates/bingo-surface-print/src/{render.rs,stream_json.rs}` (authorized option A).
 - `schema/plugin.json`, `schema/plugin-2.json` (new), `schema/rpc.json`
 - `crates/bingo-plugin-rpc/src/{wire.rs,connection.rs,bridge.rs,hook.rs,source.rs,manager.rs,discovery.rs,config.rs,manifest.rs,schema.rs,testing.rs,lib.rs}`
 - `crates/bingo-plugin-rpc/src/{host.rs,state.rs,intercept.rs,reload.rs}` (new; one noun each)
@@ -126,16 +127,9 @@ M133's; this milestone makes every verb it needs answerable.
 - Re-verified at `32dcbfb1`: slots use `slot::with`; shelf uses `save`;
   dynamic sources belong in registry/late; side-call billing needs the actor
   mailbox and its existing usage tally; the default refusal is `Unsupported`.
-- **Stopped 2026-10-13 (execution protocol step 6):** the binary acceptance
-  test cannot compile `bingo-surface-print`. Its production exhaustive matches
-  at `src/render.rs:168` and `src/stream_json.rs:149` lack `UsageCharged`.
-  These files are outside Files. The step 6 exception permits mechanical
-  tests/fixtures, not production matches; the earlier broad Files note above
-  has been corrected. Neither production file was edited.
-  Options: authorize adding both files to M132, handling the additive charge
-  without incrementing model rounds; or land their handling separately before
-  resuming. No full gate run, schema freeze, reload implementation or final
-  verification has completed. ADR-0075 remains proposed.
+- Decision 2026-10-13 (delegate, option A): include both print matches.
+  Text draws nothing for `UsageCharged`; stream JSON emits the event.
+  Neither increments model rounds. Resume reload, freeze and all gates.
 
 ## Verified (partial, 2026-10-13; stopped)
 
