@@ -183,90 +183,27 @@ mod plugin_tests {
     }
 
     /// A host holding one session, for the sweep to measure the store against.
-    #[derive(Clone)]
-    struct OneSession(Option<SessionId>);
-
-    #[async_trait]
-    impl bingo_sdk::HostApi for OneSession {
-        async fn sessions(
-            &self,
-            _filter: bingo_sdk::SessionFilter,
-        ) -> Result<Vec<SessionSummary>, bingo_sdk::KernelError> {
-            Ok(self
-                .0
+    fn one_session(session: Option<SessionId>) -> HostHandle {
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_sessions(move |_| {
+            let summaries = session
                 .iter()
                 .map(|id| SessionSummary {
                     id: id.clone(),
                     ..crate::tests::summary()
                 })
-                .collect())
-        }
-
-        async fn open(
-            &self,
-            _selector: bingo_sdk::SessionSelector,
-            _who: bingo_sdk::ClientIdentity,
-            _options: bingo_sdk::OpenOptions,
-        ) -> Result<bingo_sdk::Attachment, bingo_sdk::KernelError> {
-            unreachable!("the sweep opens nothing")
-        }
-
-        async fn close(
-            &self,
-            _session: &SessionId,
-            _reason: bingo_sdk::CloseReason,
-        ) -> Result<(), bingo_sdk::KernelError> {
-            unreachable!("the sweep closes nothing")
-        }
-
-        async fn delete(&self, _session: &SessionId) -> Result<(), bingo_sdk::KernelError> {
-            unreachable!("the sweep deletes no session")
-        }
-
-        async fn deliver(
-            &self,
-            _to: &SessionId,
-            _intent: bingo_sdk::IntentId,
-            _input: bingo_sdk::Input,
-            _delivery: bingo_sdk::Delivery,
-        ) -> Result<(), bingo_sdk::KernelError> {
-            unreachable!("the sweep delivers nothing")
-        }
-
-        async fn extend(
-            &self,
-            _session: &SessionId,
-            _plugin: &str,
-            _kind: &str,
-            _payload: serde_json::Value,
-        ) -> Result<(), bingo_sdk::KernelError> {
-            unreachable!("the sweep publishes nothing")
-        }
-
-        async fn signal(
-            &self,
-            _session: &SessionId,
-            _plugin: &str,
-            _kind: &str,
-            _payload: serde_json::Value,
-        ) -> Result<(), bingo_sdk::KernelError> {
-            unreachable!("the sweep signals nothing")
-        }
-
-        async fn catalog(
-            &self,
-            _kind: bingo_sdk::CatalogKind,
-        ) -> Result<bingo_sdk::Catalog, bingo_sdk::KernelError> {
-            unreachable!("the sweep reads no catalog")
-        }
-
-        fn gateway_events(&self) -> bingo_sdk::GatewayStream {
-            unreachable!("the sweep watches no gateway")
-        }
-
-        fn service_any(&self, _key: &str) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
-            None
-        }
+                .collect();
+            async move { Ok(summaries) }
+        });
+        host.on_open(|_, _, _| async { unreachable!("the sweep opens nothing") });
+        host.on_close(|_, _| async { unreachable!("the sweep closes nothing") });
+        host.on_delete(|_| async { unreachable!("the sweep deletes no session") });
+        host.on_deliver(|_, _, _, _| async { unreachable!("the sweep delivers nothing") });
+        host.on_extend(|_, _, _, _| async { unreachable!("the sweep publishes nothing") });
+        host.on_signal(|_, _, _, _| async { unreachable!("the sweep signals nothing") });
+        host.on_catalog(|_| async { unreachable!("the sweep reads no catalog") });
+        host.on_gateway_events(|| unreachable!("the sweep watches no gateway"));
+        host.handle()
     }
 
     /// A plugin that registered, with one file kept for each of two sessions.
@@ -295,9 +232,7 @@ mod plugin_tests {
         let home = tempfile::tempdir().expect("a temp home");
         let plugin = planted(home.path());
         plugin
-            .start(HostHandle(Arc::new(OneSession(Some(SessionId::from_raw(
-                "ses_here",
-            ))))))
+            .start(one_session(Some(SessionId::from_raw("ses_here"))))
             .await
             .expect("start");
         assert_eq!(
@@ -313,10 +248,7 @@ mod plugin_tests {
     async fn a_host_that_lists_no_session_has_no_checkpoint_left_to_keep() {
         let home = tempfile::tempdir().expect("a temp home");
         let plugin = planted(home.path());
-        plugin
-            .start(HostHandle(Arc::new(OneSession(None))))
-            .await
-            .expect("start");
+        plugin.start(one_session(None)).await.expect("start");
         assert!(plugin.store.get().expect("a store").sessions().is_empty());
     }
 

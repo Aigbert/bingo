@@ -3,19 +3,16 @@
 //! `rewind` folds the cut into it with the kernel's own reducer, so a test
 //! sees what a run would.
 
-use std::any::Any;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Attachment, Catalog, CatalogKind, ClientIdentity, CloseReason, CommandContext, ContentPart,
-    Delivery, ErrorCode, Event, Frame, GatewayStream, HostApi, HostHandle, Input, IntentId, Item,
-    ItemBody, ItemId, ItemStatus, KernelError, OpenOptions, Origin, Seq, SessionFilter,
-    SessionHandle, SessionId, SessionSelector, SessionState, SessionSummary, TurnId, Usage,
+    Attachment, CommandContext, ContentPart, ErrorCode, Event, Frame, HostHandle, Input, IntentId,
+    Item, ItemBody, ItemId, ItemStatus, KernelError, Origin, Seq, SessionHandle, SessionId,
+    SessionState, SessionSummary, TurnId, Usage,
 };
 use jiff::Timestamp;
-use serde_json::Value;
 
 use crate::store::Checkpoints;
 
@@ -99,7 +96,7 @@ impl Journal {
     }
 
     pub(crate) fn handle(&self) -> HostHandle {
-        HostHandle(Arc::new(self.clone()))
+        self.scripted().handle()
     }
 
     /// Which turns anything asked the kernel to go back to.
@@ -133,118 +130,103 @@ impl Journal {
     }
 }
 
-#[async_trait]
-impl HostApi for Journal {
-    async fn sessions(&self, _filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        Ok(self
-            .state()
-            .as_ref()
-            .map(|state| vec![state.summary.clone()])
-            .unwrap_or_default())
-    }
-
-    async fn open(
-        &self,
-        _selector: SessionSelector,
-        _who: ClientIdentity,
-        _options: OpenOptions,
-    ) -> Result<Attachment, KernelError> {
-        let snapshot = self
-            .state()
-            .clone()
-            .ok_or_else(|| KernelError::new(ErrorCode::SessionNotFound, "no such session"))?;
-        Ok(Attachment {
-            session: snapshot.summary.id.clone(),
-            snapshot,
-            history: None,
-            events: Box::pin(futures::stream::empty()),
-            handle: SessionHandle(Arc::new(Deaf)),
-        })
-    }
-
-    /// The kernel's own cut, folded with the kernel's own reducer: the items
-    /// from that turn's first onward go, and the count comes back.
-    async fn rewind(&self, session: &SessionId, to_turn: &TurnId) -> Result<u32, KernelError> {
-        let seq = self.next_seq();
-        let mut held = self.state();
-        let state = held
-            .as_mut()
-            .ok_or_else(|| KernelError::new(ErrorCode::SessionNotFound, "no such session"))?;
-        let at = state
-            .items
-            .iter()
-            .position(|item| item.turn.as_ref() == Some(to_turn))
-            .ok_or_else(|| KernelError::new(ErrorCode::InvalidInput, "no such turn"))?;
-        let dropped: Vec<ItemId> = state.items[at..].iter().map(|i| i.id.clone()).collect();
-        let count = dropped.len() as u32;
-        state.apply(&Frame {
-            seq,
-            ts: Timestamp::UNIX_EPOCH,
-            session: session.clone(),
-            cause: None,
-            event: Event::Rewound {
-                generation: state.history_generation + 1,
-                to_turn: to_turn.clone(),
-                dropped,
-                files_restored: Vec::new(),
-            },
+impl Journal {
+    fn scripted(&self) -> bingo_sdk::testing::TestHost {
+        let host = bingo_sdk::testing::TestHost::default();
+        self.script_sessions(&host);
+        self.script_open(&host);
+        self.script_rewind(&host);
+        host.on_close(
+            |_session, _reason| async move { unreachable!("this plugin closes no session") },
+        );
+        host.on_delete(|_session| async move { unreachable!("this plugin deletes no session") });
+        host.on_deliver(|_to, _intent, _input, _delivery| async move {
+            unreachable!("this plugin delivers nothing")
         });
-        self.0
-            .rewound
-            .lock()
-            .unwrap_or_else(|held| held.into_inner())
-            .push(to_turn.clone());
-        Ok(count)
+        host.on_extend(|_session, _plugin, _kind, _payload| async move {
+            unreachable!("this plugin publishes no state")
+        });
+        host.on_signal(|_session, _plugin, _kind, _payload| async move {
+            unreachable!("this plugin signals nothing")
+        });
+        host.on_catalog(|_kind| async move { unreachable!("this plugin reads no catalog") });
+        host.on_gateway_events(|| unreachable!("this plugin watches no gateway"));
+        host
     }
 
-    async fn close(&self, _session: &SessionId, _reason: CloseReason) -> Result<(), KernelError> {
-        unreachable!("this plugin closes no session")
+    fn script_sessions(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_sessions(move |_filter| {
+            let fixture = fixture.clone();
+            async move {
+                Ok(fixture
+                    .state()
+                    .as_ref()
+                    .map(|state| vec![state.summary.clone()])
+                    .unwrap_or_default())
+            }
+        });
     }
 
-    async fn delete(&self, _session: &SessionId) -> Result<(), KernelError> {
-        unreachable!("this plugin deletes no session")
+    fn script_open(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_open(move |_selector, _who, _options| {
+            let fixture = fixture.clone();
+            async move {
+                let snapshot = fixture.state().clone().ok_or_else(|| {
+                    KernelError::new(ErrorCode::SessionNotFound, "no such session")
+                })?;
+                Ok(Attachment {
+                    session: snapshot.summary.id.clone(),
+                    snapshot,
+                    history: None,
+                    events: Box::pin(futures::stream::empty()),
+                    handle: SessionHandle(Arc::new(Deaf)),
+                })
+            }
+        });
     }
 
-    async fn deliver(
-        &self,
-        _to: &SessionId,
-        _intent: IntentId,
-        _input: Input,
-        _delivery: Delivery,
-    ) -> Result<(), KernelError> {
-        unreachable!("this plugin delivers nothing")
-    }
-
-    async fn extend(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this plugin publishes no state")
-    }
-
-    async fn signal(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("this plugin signals nothing")
-    }
-
-    async fn catalog(&self, _kind: CatalogKind) -> Result<Catalog, KernelError> {
-        unreachable!("this plugin reads no catalog")
-    }
-
-    fn gateway_events(&self) -> GatewayStream {
-        unreachable!("this plugin watches no gateway")
-    }
-
-    fn service_any(&self, _key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
-        None
+    fn script_rewind(&self, host: &bingo_sdk::testing::TestHost) {
+        let fixture = self.clone();
+        host.on_rewind(move |session, to_turn| {
+            let fixture = fixture.clone();
+            async move {
+                let session = &session;
+                let to_turn = &to_turn;
+                let seq = fixture.next_seq();
+                let mut held = fixture.state();
+                let state = held.as_mut().ok_or_else(|| {
+                    KernelError::new(ErrorCode::SessionNotFound, "no such session")
+                })?;
+                let at = state
+                    .items
+                    .iter()
+                    .position(|item| item.turn.as_ref() == Some(to_turn))
+                    .ok_or_else(|| KernelError::new(ErrorCode::InvalidInput, "no such turn"))?;
+                let dropped: Vec<ItemId> = state.items[at..].iter().map(|i| i.id.clone()).collect();
+                let count = dropped.len() as u32;
+                state.apply(&Frame {
+                    seq,
+                    ts: Timestamp::UNIX_EPOCH,
+                    session: session.clone(),
+                    cause: None,
+                    event: Event::Rewound {
+                        generation: state.history_generation + 1,
+                        to_turn: to_turn.clone(),
+                        dropped,
+                        files_restored: Vec::new(),
+                    },
+                });
+                fixture
+                    .0
+                    .rewound
+                    .lock()
+                    .unwrap_or_else(|held| held.into_inner())
+                    .push(to_turn.clone());
+                Ok(count)
+            }
+        });
     }
 }
 
