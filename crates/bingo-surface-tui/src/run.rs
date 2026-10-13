@@ -1,12 +1,6 @@
-//! The loop. It selects over four things — the terminal, the frame stream, a
-//! tick, and the results of the few host calls it makes — and it never awaits
-//! the kernel: `submit`, `interrupt` and `answer` return nothing, and `open`,
-//! `events_since`, `sessions` and `catalog` are spawned and mailed back. A key
-//! press can therefore never wait for a turn.
-//!
-//! The attachment carries the whole tree (ADR-0010 §3): one stream, every
-//! frame stamped with its own session, folded into one reducer state each by
-//! [`crate::tree::Tree`].
+//! Terminal input never waits for a turn: host calls are spawned and mailed
+//! back while the loop selects over input, frames, ticks and replies.
+//! One attachment carries the tree, folded by [`bingo_sdk::TreeState`].
 
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -499,7 +493,7 @@ impl Run {
         frame: &bingo_sdk::Frame,
         screen: &mut dyn Screen,
     ) -> Result<(), KernelError> {
-        if self.session.tree.apply(frame) == bingo_sdk::Applied::Stale {
+        if !self.fold(frame) {
             return Ok(());
         }
         self.refocus();
@@ -517,10 +511,36 @@ impl Run {
                 self.ui.notify(*level, text.clone(), Instant::now())
             }
             Event::IntentAck { intent, outcome } => self.ack(intent, outcome),
-            Event::SessionClosed { reason } => self.closed(&frame.session, reason),
+            Event::SessionClosed { .. } => self.closed(&frame.session),
             _ => {}
         }
         Ok(())
+    }
+
+    fn fold(&mut self, frame: &bingo_sdk::Frame) -> bool {
+        let before: Vec<_> = if matches!(
+            frame.event,
+            Event::SessionClosed {
+                reason: CloseReason::Deleted
+            }
+        ) {
+            self.session
+                .tree
+                .sessions()
+                .map(|state| state.summary.id.clone())
+                .collect()
+        } else {
+            Vec::new()
+        };
+        if self.session.tree.fold.apply(frame) == bingo_sdk::Applied::Stale {
+            return false;
+        }
+        let removed: Vec<_> = before
+            .into_iter()
+            .filter(|id| self.session.tree.state(id).is_none())
+            .collect();
+        self.forget(&removed);
+        true
     }
 
     /// Say it where the desktop can see it — but only to a window nobody is
@@ -534,50 +554,49 @@ impl Run {
             .map_err(stdio)
     }
 
-    /// The root closing ends the run. A child deleted leaves the tree, and
-    /// the view comes back to the root with it; a child closed for any other
-    /// reason is still in the store with everything it said, and stays in
-    /// the tree as a stored session — the close its journal replays is the
-    /// end of the process that wrote it, and the summary that follows it in
-    /// the same stream is the child, open again. Either way its mailbox is
-    /// gone.
-    fn closed(&mut self, session: &SessionId, reason: &CloseReason) {
+    /// Even a child kept for replay loses its mailbox when it closes.
+    fn closed(&mut self, session: &SessionId) {
         if self.session.tree.is_root(session) {
             self.exit = Some(Exit { code: 0 });
             return;
         }
-        if matches!(reason, CloseReason::Deleted) {
-            self.session.tree.close(session);
-        }
         self.session.handles.remove(session);
     }
 
-    /// The host says a session is gone from the store. A live child says so
-    /// itself, with a `SessionClosed { Deleted }` on its own stream; one
-    /// that was only stored — replayed into the tree from its journal, or
-    /// listed by the switcher — has no stream to say it on, and this is the
-    /// one word that reaches it (ADR-0060 §2). The root is never removed
-    /// from under its own run.
+    /// Stored children have no stream: gateway removal is their only notice
+    /// of deletion (ADR-0060 §2).
     fn removed(&mut self, session: &SessionId) {
         if self.session.tree.is_root(session) {
             return;
         }
-        self.session.tree.close(session);
-        self.session.handles.remove(session);
+        let removed = self
+            .session
+            .tree
+            .fold
+            .removed(&GatewayEvent::SessionRemoved {
+                session: session.clone(),
+            });
+        self.forget(&removed);
+        self.forget(std::slice::from_ref(session));
+        self.refocus();
+    }
+
+    fn forget(&mut self, removed: &[SessionId]) {
+        self.session.tree.forget(removed);
+        for id in removed {
+            self.session.handles.remove(id);
+        }
         if let Open::Switcher(open) = &mut self.ui.layer.open {
-            open.stored.retain(|stored| &stored.id != session);
+            open.stored.retain(|stored| !removed.contains(&stored.id));
         }
     }
 
-    /// The dialog follows the tree's first open interaction, whosever it is.
     fn refocus(&mut self) {
         let open = self.session.tree.open_interaction().map(|(_, open)| open);
         self.ui.dialog.focus_on(open);
     }
 
-    /// An ack for an intent this client minted; another client's is its own
-    /// business. A refusal names the line it refused, so a person sees which
-    /// of theirs came back.
+    /// Only this client's intents have a line to restore on refusal.
     fn ack(&mut self, intent: &IntentId, outcome: &IntentOutcome) {
         let Some(about) = self.mine.remove(intent) else {
             return;
@@ -1133,7 +1152,10 @@ mod tests {
     fn a_view_whose_mailbox_has_not_landed_writes_nowhere() {
         let handle = bingo_sdk::SessionHandle(std::sync::Arc::new(TestSession::default()));
         let mut attached = Attached::new(state(), handle);
-        attached.tree.apply(&child_frame(1, announced("reviewer")));
+        attached
+            .tree
+            .fold
+            .apply(&child_frame(1, announced("reviewer")));
         attached.tree.show(&child_id());
         assert!(
             attached.writer().is_none(),
@@ -1341,8 +1363,9 @@ mod tests {
         let mut run = idle(Instant::now());
         run.session
             .tree
+            .fold
             .apply(&child_frame(1, announced("runtime-worker")));
-        run.session.tree.apply(&child_frame(
+        run.session.tree.fold.apply(&child_frame(
             2,
             Event::SessionClosed {
                 reason: CloseReason::Shutdown,
@@ -1365,6 +1388,49 @@ mod tests {
             1,
             "the root is never removed"
         );
+    }
+
+    #[test]
+    fn deleting_a_child_returns_its_viewed_descendant_and_drops_both_handles() {
+        for gateway in [false, true] {
+            let mut run = idle(Instant::now());
+            let mut recorder = Recorder::default();
+            run.frame(&child_frame(1, announced("child")), &mut recorder)
+                .unwrap();
+            let mut summary = agent_summary(3, "grandchild");
+            summary.parent.as_mut().unwrap().session = child_id();
+            run.frame(
+                &agent_frame(3, 1, Event::SessionUpdated { summary }),
+                &mut recorder,
+            )
+            .unwrap();
+            for id in [child_id(), agent_id(3)] {
+                run.session.handles.insert(
+                    id,
+                    SessionHandle(std::sync::Arc::new(TestSession::default())),
+                );
+            }
+            run.session.tree.show(&agent_id(3));
+            if gateway {
+                run.removed(&child_id());
+            } else {
+                run.frame(
+                    &child_frame(
+                        2,
+                        Event::SessionClosed {
+                            reason: CloseReason::Deleted,
+                        },
+                    ),
+                    &mut recorder,
+                )
+                .unwrap();
+            }
+            assert_eq!(run.session.tree.view(), run.session.tree.root_id());
+            assert_eq!(run.session.tree.sessions().count(), 1);
+            assert_eq!(run.session.handles.len(), 1);
+            assert!(run.session.handles.contains_key(run.session.tree.root_id()));
+            assert!(run.exit.is_none());
+        }
     }
 
     /// A resumed tree replays each child's journal, and a journal holds the

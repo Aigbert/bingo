@@ -72,9 +72,12 @@ impl Attached<'_> {
         if !self.concerns_the_run(frame) {
             return Ok(Next::Await);
         }
+        let Some(state) = self.tree.get(&frame.session) else {
+            return Ok(Next::Await);
+        };
         host.react(
             &frame.event,
-            &self.states[&frame.session],
+            state,
             &self.handle,
             &mut *self.out,
             &mut *self.err,

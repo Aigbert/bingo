@@ -1,8 +1,8 @@
 # ADR-0064 — One fold for the transcript, one for the tree
 
-Status: proposed · 2026-10-13 · Plans: M112 (transcript), M120 (tree) · Amends: ADR-0002 §3
+Status: accepted · 2026-10-13 · Plans: M112 (transcript), M120 (tree) · Amends: ADR-0002 §3
 
-2026-10-13: §1 (the transcript) landed in M112; the tree fold remains proposed for M120.
+2026-10-13: §1–4 landed in M112; §5–6 are implemented by M120.
 
 ## Context
 

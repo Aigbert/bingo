@@ -1637,7 +1637,7 @@ mod tests {
         assert!(asleep.contains("stored"), "{asleep}");
         insta::assert_snapshot!("switcher_row_stored", asleep);
 
-        tree.apply(&woken(1, scout));
+        tree.fold.apply(&woken(1, scout));
         let awake = render_tree(&tree, &ui, now);
         assert!(!awake.contains("stored"), "{awake}");
         assert!(awake.contains("⏺ scout"), "{awake}");

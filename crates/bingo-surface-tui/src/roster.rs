@@ -626,7 +626,8 @@ mod tests {
     #[test]
     fn a_member_behind_the_room_says_how_much_it_has_not_read() {
         let mut tree = team();
-        tree.apply(&log_frame(14, room_cursor("reviewer", "itm_p1")));
+        tree.fold
+            .apply(&log_frame(14, room_cursor("reviewer", "itm_p1")));
         let drawn = drawn_at(&tree, Cursor::default(), 120, 8);
         assert!(
             drawn[2].contains("in #design · 3 unread ·"),

@@ -17,8 +17,7 @@
 use std::collections::BTreeMap;
 
 use bingo_sdk::{
-    Applied, Driver, Event, Frame, Interaction, ItemBody, ItemId, SessionId, SessionState,
-    SessionSummary,
+    Driver, Interaction, ItemBody, ItemId, SessionId, SessionState, SessionSummary, TreeState,
 };
 
 use crate::theme;
@@ -82,9 +81,7 @@ pub struct Row<'a> {
 
 pub struct Tree {
     /// The session the surface attached to; its stream carries the tree.
-    root: SessionState,
-    /// Every live descendant, in id order.
-    children: BTreeMap<SessionId, SessionState>,
+    pub fold: TreeState,
     /// Which session `draw` paints; `None` is the root.
     view: Option<SessionId>,
 }
@@ -92,28 +89,30 @@ pub struct Tree {
 impl Tree {
     pub fn new(root: SessionState) -> Self {
         Self {
-            root,
-            children: BTreeMap::new(),
+            fold: TreeState::new(root),
             view: None,
         }
     }
 
     pub fn root(&self) -> &SessionState {
-        &self.root
+        self.fold.root()
     }
 
     pub fn root_id(&self) -> &SessionId {
-        &self.root.summary.id
+        &self.root().summary.id
     }
 
     /// The state `draw` paints.
     pub fn viewed(&self) -> &SessionState {
-        self.viewing().unwrap_or(&self.root)
+        self.viewing().unwrap_or_else(|| self.root())
     }
 
     /// The child on screen, or `None` while the root is.
     pub fn viewing(&self) -> Option<&SessionState> {
-        self.view.as_ref().and_then(|id| self.children.get(id))
+        self.view
+            .as_ref()
+            .filter(|id| !self.is_root(id))
+            .and_then(|id| self.fold.get(id))
     }
 
     /// The session the keyboard writes to: the one a person stepped into,
@@ -129,44 +128,18 @@ impl Tree {
 
     /// Root first, then the children in id order.
     pub fn sessions(&self) -> impl Iterator<Item = &SessionState> {
-        std::iter::once(&self.root).chain(self.children.values())
+        self.fold.sessions()
     }
 
     /// The state of one session this attachment carries. A row the store
     /// answered with names a session that is not here, and gets `None`.
     pub fn state(&self, session: &SessionId) -> Option<&SessionState> {
-        self.sessions().find(|state| &state.summary.id == session)
+        self.fold.get(session)
     }
 
-    /// Fold a frame into the session it names. A child announces itself with
-    /// the `SessionUpdated` at the head of its stream; anything else from a
-    /// session this tree has never heard of has nothing to fold into.
-    pub fn apply(&mut self, frame: &Frame) -> Applied {
-        if let Some(state) = self.state_mut(&frame.session) {
-            return state.apply(frame);
-        }
-        let Event::SessionUpdated { summary } = &frame.event else {
-            return Applied::Stale;
-        };
-        self.children
-            .entry(frame.session.clone())
-            .or_insert_with(|| SessionState::new(summary.clone()))
-            .apply(frame)
-    }
-
-    fn state_mut(&mut self, session: &SessionId) -> Option<&mut SessionState> {
-        if self.is_root(session) {
-            return Some(&mut self.root);
-        }
-        self.children.get_mut(session)
-    }
-
-    /// A child that is gone for good leaves the tree, and the view with it.
-    /// A child that merely closed is not: its state folds the close, and the
-    /// summary that reopens it folds into the same state.
-    pub fn close(&mut self, session: &SessionId) {
-        self.children.remove(session);
-        if self.view.as_ref() == Some(session) {
+    /// Forget only surface selection for sessions the fold removed.
+    pub fn forget(&mut self, removed: &[SessionId]) {
+        if self.view.as_ref().is_some_and(|id| removed.contains(id)) {
             self.view = None;
         }
     }
@@ -181,10 +154,13 @@ impl Tree {
 
     /// The person is looking at this one.
     pub fn mark_read(&mut self) {
-        match self.view.clone().and_then(|id| self.children.get_mut(&id)) {
-            Some(child) => child.mark_read(),
-            None => self.root.mark_read(),
-        }
+        let id = self
+            .viewing()
+            .unwrap_or_else(|| self.root())
+            .summary
+            .id
+            .clone();
+        self.fold.mark_read(&id);
     }
 
     /// Something, anywhere in the tree, needs a person.
@@ -203,12 +179,11 @@ impl Tree {
     /// The children the viewed session spawned, by the tool call that did it;
     /// a child no call spawned hangs under no row.
     pub fn agents(&self) -> Agents<'_> {
-        self.children
-            .values()
+        self.fold
+            .children_of(self.view())
             .filter_map(|child| {
                 let parent = child.summary.parent.as_ref()?;
-                let item = parent.item.clone()?;
-                (&parent.session == self.view()).then_some((item, child))
+                Some((parent.item.clone()?, child))
             })
             .collect()
     }
@@ -469,19 +444,20 @@ pub fn bullet_style(status: Option<Status>, attention: bool) -> ratatui::style::
 mod tests {
     use super::*;
     use crate::test_support::*;
+    use bingo_sdk::{Applied, Event};
 
     #[test]
     fn a_child_joins_the_tree_on_the_session_frame_at_the_head_of_its_stream() {
         let mut tree = Tree::new(state());
         assert_eq!(
-            tree.apply(&child_frame(1, started("trn_9"))),
+            tree.fold.apply(&child_frame(1, started("trn_9"))),
             Applied::Stale,
             "a session that never introduced itself has nothing to fold into"
         );
         assert_eq!(tree.rows().len(), 1);
 
-        tree.apply(&child_frame(1, announced("reviewer")));
-        tree.apply(&child_frame(2, started("trn_9")));
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
+        tree.fold.apply(&child_frame(2, started("trn_9")));
         let rows = tree.rows();
         assert_eq!(rows[1].name, "reviewer");
         assert_eq!(rows[1].status, Some(Status::Running));
@@ -491,12 +467,15 @@ mod tests {
     #[test]
     fn the_view_is_a_key_into_the_tree_and_falls_back_to_the_root() {
         let mut tree = Tree::new(state());
-        tree.apply(&child_frame(1, announced("reviewer")));
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
         tree.show(&child_id());
         assert_eq!(tree.view(), &child_id());
         assert_eq!(tree.viewing().map(name).as_deref(), Some("reviewer"));
 
-        tree.close(&child_id());
+        let removed = tree.fold.removed(&bingo_sdk::GatewayEvent::SessionRemoved {
+            session: child_id(),
+        });
+        tree.forget(&removed);
         assert!(
             tree.viewing().is_none(),
             "a closed child gives the view back"
@@ -517,7 +496,7 @@ mod tests {
         assert!(tree.viewing().is_none(), "there is nothing to paint yet");
         assert_eq!(tree.view(), &child_id(), "and the keyboard is already its");
 
-        tree.apply(&child_frame(1, announced("reviewer")));
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
         assert_eq!(
             tree.viewing().map(name).as_deref(),
             Some("reviewer"),
@@ -528,14 +507,14 @@ mod tests {
     #[test]
     fn the_tally_counts_who_is_waiting_and_the_dialog_takes_the_root_first() {
         let mut tree = Tree::new(state());
-        tree.apply(&child_frame(1, announced("reviewer")));
-        tree.apply(&child_frame(2, opened(child_permission())));
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
+        tree.fold.apply(&child_frame(2, opened(child_permission())));
         assert_eq!(tree.rows().iter().filter(|row| row.attention).count(), 1);
         assert!(tree.attention());
         let (owner, _) = tree.open_interaction().expect("the child's prompt");
         assert_eq!(owner.summary.id, child_id());
 
-        tree.apply(&frame(1, opened(permission(None, None))));
+        tree.fold.apply(&frame(1, opened(permission(None, None))));
         let (owner, _) = tree.open_interaction().expect("the root's prompt");
         assert_eq!(
             owner.summary.id,
@@ -547,7 +526,7 @@ mod tests {
     #[test]
     fn a_child_is_found_by_the_tool_call_that_spawned_it() {
         let mut tree = Tree::new(state());
-        tree.apply(&child_frame(1, announced("reviewer")));
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
         let agents = tree.agents();
         let spawned = ItemId::from_raw("itm_1");
         assert_eq!(
@@ -570,8 +549,8 @@ mod tests {
     #[test]
     fn a_session_nothing_answers_reports_no_status_at_all() {
         let mut tree = Tree::new(state());
-        tree.apply(&log_frame(1, log_announced("#design")));
-        tree.apply(&log_frame(
+        tree.fold.apply(&log_frame(1, log_announced("#design")));
+        tree.fold.apply(&log_frame(
             2,
             Event::ItemCompleted {
                 item: post("itm_5", "reviewer", "shipped"),
@@ -591,7 +570,8 @@ mod tests {
             session: tree.root_id().clone(),
             item: Some(ItemId::from_raw("itm_1")),
         });
-        tree.apply(&log_frame(1, Event::SessionUpdated { summary }));
+        tree.fold
+            .apply(&log_frame(1, Event::SessionUpdated { summary }));
         let agents = tree.agents();
         let opened = ItemId::from_raw("itm_1");
         assert_eq!(
@@ -609,26 +589,26 @@ mod tests {
     fn a_child_row_says_what_it_is_doing_and_what_it_has_spent() {
         let mut tree = Tree::new(state());
         for frame in busy_child("reviewer") {
-            tree.apply(&frame);
+            tree.fold.apply(&frame);
         }
-        let running = tree.children.values().next().expect("the child");
+        let running = tree.fold.sessions().nth(1).expect("the child");
         assert_eq!(
             activity(running).as_deref(),
             Some("Running… 3 tools · 1.2k tokens")
         );
 
-        tree.apply(&child_frame(
+        tree.fold.apply(&child_frame(
             6,
             completed("trn_9", bingo_sdk::TurnStatus::Completed),
         ));
-        let done = tree.children.values().next().expect("the child");
+        let done = tree.fold.sessions().nth(1).expect("the child");
         assert_eq!(
             activity(done).as_deref(),
             Some("Done (3 tools · 1.2k tokens · 0s)")
         );
 
-        tree.apply(&child_frame(7, opened(child_permission())));
-        let asking = tree.children.values().next().expect("the child");
+        tree.fold.apply(&child_frame(7, opened(child_permission())));
+        let asking = tree.fold.sessions().nth(1).expect("the child");
         assert_eq!(activity(asking).as_deref(), Some("Needs you"));
     }
 
@@ -662,9 +642,9 @@ mod tests {
     fn the_rows_are_the_root_first_and_the_rest_in_id_order() {
         let mut tree = Tree::new(state());
         for frame in busy_child("reviewer") {
-            tree.apply(&frame);
+            tree.fold.apply(&frame);
         }
-        tree.apply(&log_frame(9, log_announced("#design")));
+        tree.fold.apply(&log_frame(9, log_announced("#design")));
         let named: Vec<(String, Option<Status>)> = tree
             .rows()
             .into_iter()
@@ -687,9 +667,9 @@ mod tests {
     #[test]
     fn a_count_is_scoped_to_who_is_asking() {
         let mut tree = Tree::new(state());
-        tree.apply(&frame(1, started("trn_1")));
-        tree.apply(&child_frame(1, announced("reviewer")));
-        tree.apply(&child_frame(2, started("trn_9")));
+        tree.fold.apply(&frame(1, started("trn_1")));
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
+        tree.fold.apply(&child_frame(2, started("trn_9")));
         let under_the_child = SessionSummary {
             parent: Some(bingo_sdk::ParentLink {
                 session: child_id(),
@@ -697,14 +677,14 @@ mod tests {
             }),
             ..agent_summary(3, "scout")
         };
-        tree.apply(&agent_frame(
+        tree.fold.apply(&agent_frame(
             3,
             1,
             Event::SessionUpdated {
                 summary: under_the_child,
             },
         ));
-        tree.apply(&agent_frame(3, 2, started("trn_8")));
+        tree.fold.apply(&agent_frame(3, 2, started("trn_8")));
         tree.show(&child_id());
 
         assert_eq!(
@@ -737,7 +717,7 @@ mod tests {
     #[test]
     fn the_roster_puts_the_tree_first_and_the_stored_rows_after_it_by_id() {
         let mut tree = Tree::new(state());
-        tree.apply(&child_frame(1, announced("reviewer")));
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
         let stored = vec![
             stored_summary("ses_9", "scout"),
             stored_summary("ses_3", "archivist"),
@@ -760,8 +740,8 @@ mod tests {
     #[test]
     fn a_session_that_is_both_live_and_stored_is_one_row_and_the_live_one() {
         let mut tree = Tree::new(state());
-        tree.apply(&child_frame(1, announced("reviewer")));
-        tree.apply(&child_frame(2, started("trn_9")));
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
+        tree.fold.apply(&child_frame(2, started("trn_9")));
         let stored = vec![child_summary("reviewer"), summary()];
         let rows = roster(&tree, &stored);
         assert_eq!(rows.len(), 2, "the root and the child, once each");
@@ -774,14 +754,14 @@ mod tests {
     #[test]
     fn a_child_that_closed_is_stored_until_it_is_announced_again() {
         let mut tree = Tree::new(state());
-        tree.apply(&child_frame(1, announced("reviewer")));
-        tree.apply(&child_frame(
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
+        tree.fold.apply(&child_frame(
             2,
             Event::ItemCompleted {
                 item: assistant("itm_2", "reviewed it", bingo_sdk::ItemStatus::Completed),
             },
         ));
-        tree.apply(&child_frame(
+        tree.fold.apply(&child_frame(
             3,
             Event::SessionClosed {
                 reason: bingo_sdk::CloseReason::Shutdown,
@@ -789,7 +769,7 @@ mod tests {
         ));
         assert_eq!(tree.rows()[1].status, Some(Status::Stored));
         assert_eq!(activity(tree.state(&child_id()).unwrap()), None);
-        tree.apply(&child_frame(4, announced("reviewer")));
+        tree.fold.apply(&child_frame(4, announced("reviewer")));
         let child = tree.state(&child_id()).expect("still in the tree");
         assert_eq!(Status::of(child), Some(Status::Idle));
         assert_eq!(
