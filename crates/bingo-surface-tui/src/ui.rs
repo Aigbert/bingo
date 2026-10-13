@@ -263,7 +263,7 @@ pub struct Layer {
 }
 
 impl Layer {
-    fn shut(now: Instant) -> Self {
+    pub(crate) fn shut(now: Instant) -> Self {
         Self {
             open: Open::Nothing,
             since: now,

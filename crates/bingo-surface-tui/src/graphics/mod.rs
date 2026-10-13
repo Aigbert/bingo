@@ -151,10 +151,10 @@ fn unheard(heard: &Heard) -> Option<&'static str> {
 /// "never asked" cannot be mistaken for "asked and heard nothing" — and a
 /// reply that turns up late for a question nobody put has nothing to join.
 #[derive(Clone, Debug)]
-struct Heard {
-    probe: Probe,
-    transport: Transport,
-    passthrough: Passthrough,
+pub(crate) struct Heard {
+    pub probe: Probe,
+    pub transport: Transport,
+    pub passthrough: Passthrough,
 }
 
 impl Heard {

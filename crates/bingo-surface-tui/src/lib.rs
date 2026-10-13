@@ -72,6 +72,8 @@ pub mod guide;
 mod highlight;
 mod history;
 mod input;
+mod focus;
+mod render;
 mod keys;
 /// An answer that came back after the probe that asked for it gave up (M60).
 mod late;
