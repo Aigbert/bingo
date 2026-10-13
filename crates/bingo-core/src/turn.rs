@@ -8,6 +8,9 @@
 //!                 └ cancel → Closing
 //! ```
 
+mod agent;
+mod endpoint;
+pub use endpoint::Endpoint;
 mod config;
 mod contributors;
 mod late;
@@ -154,7 +157,7 @@ async fn racing<T>(cancel: &CancellationToken, work: impl Future<Output = T>) ->
 }
 
 /// One item as a turn mints it: now, in this round, under this turn.
-fn mint(turn: &TurnId, round: u32, body: ItemBody, status: ItemStatus) -> Item {
+pub(crate) fn mint(turn: &TurnId, round: u32, body: ItemBody, status: ItemStatus) -> Item {
     let now = Timestamp::now();
     Item {
         id: ItemId::mint(),
@@ -194,7 +197,7 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
         session: cfg.session.id.clone(),
         turn: Some(run.turn.clone()),
         cwd: cfg.cwd.clone(),
-        provider: Some(model.provider.clone()),
+        provider: model.endpoint.provider(),
         model: Some(model.id.clone()),
     };
     let Some(late) = racing(&run.cancel, Late::gather(cfg)).await else {
@@ -217,7 +220,7 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
         ruler: Ruler::new(
             model.capabilities.context_window,
             model.max_tokens,
-            model.capabilities.holds_context,
+            model.endpoint.agent().is_some(),
         ),
         model,
         host,
@@ -236,7 +239,10 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
     let started = turn.start_hooks().await;
     let status = match started {
         Some(()) => match run.kind {
-            TurnKind::Respond => turn.respond().await,
+            TurnKind::Respond => match turn.model.endpoint.agent() {
+                Some(agent) => turn.agent_turn(agent).await,
+                None => turn.respond().await,
+            },
             TurnKind::Compact { instructions } => turn.compact_only(instructions).await,
         },
         None => turn.interrupted_status(),
@@ -426,7 +432,7 @@ impl Turn<'_> {
             return Some(());
         }
         let counted = self
-            .racing(self.model.provider.count_tokens(request))
+            .racing(self.model.endpoint.count_tokens(request))
             .await?;
         match counted {
             Ok(counted) => self.ruler.counted(counted),

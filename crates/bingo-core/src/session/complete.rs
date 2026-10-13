@@ -84,7 +84,7 @@ async fn drain(
     // A side question must not enter a stateful provider's main conversation.
     completion.request.session = None;
     let mut stream = model
-        .provider
+        .endpoint
         .stream(completion.request, cancel)
         .await
         .map_err(provider_error)?;

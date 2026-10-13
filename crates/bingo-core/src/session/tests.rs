@@ -352,7 +352,7 @@ async fn compacting_a_held_session_is_refused_in_the_providers_name() {
     let mailbox = spawn(summary("ses_1"), None, Services::none(), |_| {
         let mut cfg = config(ScriptedProvider::new(vec![]), vec![], Arc::new(NoHost));
         if let Some(model) = cfg.model.as_mut() {
-            model.capabilities.holds_context = true;
+            model.endpoint = crate::turn::Endpoint::Agent(ScriptedProvider::new(vec![]));
         }
         Arc::new(cfg)
     });

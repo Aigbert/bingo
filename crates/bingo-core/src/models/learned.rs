@@ -61,6 +61,14 @@ impl Learned {
         true
     }
 
+    /// A context-owning endpoint reports its current window, which may grow.
+    pub fn reported(&self, provider: &str, model: &str, window: u64) {
+        let mut map = self.map.lock().unwrap_or_else(|p| p.into_inner());
+        if map.insert(key(provider, model), window) != Some(window) {
+            self.save(&map);
+        }
+    }
+
     pub fn window(&self, provider: &str, model: &str) -> Option<u64> {
         self.map
             .lock()

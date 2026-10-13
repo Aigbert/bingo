@@ -35,7 +35,9 @@ pub mod transcript;
 pub mod tree;
 pub mod view;
 
-pub use agent::{Agent, AgentEvent, AgentStream, AgentTurn, CallKind, CallLocation, ExternalCall, Judge};
+pub use agent::{
+    Agent, AgentEvent, AgentStream, AgentTurn, CallKind, CallLocation, ExternalCall, Judge,
+};
 pub use command::{ArgSpec, Command, CommandContext, CommandOutcome, CommandSpec};
 pub use compactor::{CompactContext, CompactError, CompactReason, Compaction, Compactor};
 pub use contributor::{

@@ -161,7 +161,11 @@ impl Bridged {
             session: self.config.session.id.clone(),
             turn: Some(self.turn.clone()),
             cwd: self.config.cwd.clone(),
-            provider: self.config.model.as_ref().map(|m| m.provider.clone()),
+            provider: self
+                .config
+                .model
+                .as_ref()
+                .and_then(|m| m.endpoint.provider()),
             model: self.config.model.as_ref().map(|m| m.id.clone()),
         }
     }

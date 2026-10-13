@@ -503,7 +503,7 @@ impl Host {
     fn system_blocks(&self, spec: &SessionSpec, choice: &ModelChoice) -> Vec<SystemBlock> {
         let mut system = prompt::system_blocks(&PromptInput {
             cwd: &spec.cwd,
-            provider: choice.provider.id(),
+            provider: choice.endpoint.id(),
             model: &choice.id,
             platform: std::env::consts::OS,
             date: jiff::Zoned::now().date(),

@@ -8,7 +8,7 @@ use bingo_sdk::*;
 
 use super::{Host, auth};
 use crate::models::{self, ModelCatalog};
-use crate::turn::{ModelChoice, ProviderSet};
+use crate::turn::{Endpoint, ModelChoice, ProviderSet};
 
 impl Host {
     /// Every provider this host can choose from, resolved at the one point
@@ -78,6 +78,25 @@ impl Host {
         &self,
         spec: &SessionSpec,
     ) -> Result<ModelChoice, KernelError> {
+        let named = spec
+            .provider
+            .as_ref()
+            .or(self.settings.kernel.provider.as_ref());
+        let agent = self
+            .registry
+            .agents
+            .iter()
+            .find(|a| named.is_some_and(|n| n == a.id()));
+        let agent = match agent {
+            Some(agent) => Some(agent),
+            None if named.is_none() && self.providers().await.is_empty() => {
+                self.registry.agents.first()
+            }
+            None => None,
+        };
+        if let Some(agent) = agent {
+            return self.choose_agent(agent.clone(), spec).await;
+        }
         let provider = self.provider(spec.provider.as_deref()).await?;
         auth::check(provider.as_ref())?;
         let model = self.model(provider.as_ref(), spec.model.as_deref()).await?;
@@ -86,9 +105,50 @@ impl Host {
             max_tokens: models::max_tokens(&capabilities, self.settings.kernel.max_tokens),
             reasoning: spec.thinking.flatten(),
             learned: self.learned.clone(),
-            provider,
+            endpoint: Endpoint::Provider(provider),
             id: model,
             capabilities,
+        })
+    }
+
+    async fn choose_agent(
+        &self,
+        agent: Arc<dyn Agent>,
+        spec: &SessionSpec,
+    ) -> Result<ModelChoice, KernelError> {
+        let id = match spec
+            .model
+            .clone()
+            .or_else(|| self.settings.kernel.model.clone())
+        {
+            Some(id) => id,
+            None => agent
+                .models()
+                .await
+                .map_err(|e| KernelError::new(ErrorCode::ProviderUnavailable, e.to_string()))?
+                .first()
+                .map(|m| m.id.clone())
+                .ok_or_else(|| {
+                    KernelError::new(ErrorCode::InvalidInput, "the agent named no models")
+                })?,
+        };
+        let key = models::declared::key(agent.id(), &id);
+        let capabilities = models::resolve(
+            self.settings.kernel.models.get(&key),
+            self.learned.window(agent.id(), &id),
+            None,
+            EndpointCapabilities {
+                images: true,
+                ..Default::default()
+            },
+        );
+        Ok(ModelChoice {
+            endpoint: Endpoint::Agent(agent),
+            id,
+            max_tokens: models::max_tokens(&capabilities, None),
+            capabilities,
+            reasoning: spec.thinking.flatten(),
+            learned: self.learned.clone(),
         })
     }
 

@@ -38,7 +38,7 @@ impl TurnBudget {
 /// what it may assume, how much output it asks for.
 #[derive(Clone)]
 pub struct ModelChoice {
-    pub provider: Arc<dyn Provider>,
+    pub endpoint: super::Endpoint,
     pub id: String,
     pub capabilities: ModelCapabilities,
     pub max_tokens: u32,
@@ -51,7 +51,7 @@ pub struct ModelChoice {
 impl std::fmt::Debug for ModelChoice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ModelChoice")
-            .field("provider", &self.provider.id())
+            .field("provider", &self.endpoint.id())
             .field("id", &self.id)
             .field("reasoning", &self.reasoning)
             .field("max_tokens", &self.max_tokens)

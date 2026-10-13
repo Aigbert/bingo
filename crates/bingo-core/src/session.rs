@@ -507,13 +507,13 @@ impl Actor {
             .config
             .model
             .as_ref()
-            .filter(|m| m.capabilities.holds_context)
+            .filter(|m| m.endpoint.agent().is_some())
         {
             return Err(KernelError::new(
                 ErrorCode::InvalidInput,
                 format!(
                     "`{}` holds this context and compacts it itself; bingo does not",
-                    model.provider.id()
+                    model.endpoint.id()
                 ),
             ));
         }
@@ -536,7 +536,11 @@ impl Actor {
             session: self.id.clone(),
             turn: self.running.as_ref().map(|r| r.turn.clone()),
             cwd: self.config.cwd.clone(),
-            provider: self.config.model.as_ref().map(|m| m.provider.clone()),
+            provider: self
+                .config
+                .model
+                .as_ref()
+                .and_then(|m| m.endpoint.provider()),
             model: self.config.model.as_ref().map(|m| m.id.clone()),
         }
     }

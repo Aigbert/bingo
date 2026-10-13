@@ -26,7 +26,7 @@ impl Turn<'_> {
         // Establishing the request is an await of its own — on a long context
         // it is seconds of time to first byte — and the token the provider
         // carries only reaches the stream that does not exist yet.
-        let provider = self.model.provider.clone();
+        let provider = self.model.endpoint.clone();
         let cancel = self.cancel.child_token();
         let links = self.cfg.hooks.links().await;
         let kernel = Next::new(|request| {
@@ -100,7 +100,7 @@ impl Turn<'_> {
     }
 
     /// One fold result: into the turn's own transcript and out to the clients.
-    fn publish(&mut self, emit: Emit) {
+    pub(super) fn publish(&mut self, emit: Emit) {
         let event = match emit {
             Emit::Started(mut item) => {
                 if let ItemBody::ToolCall {
@@ -138,7 +138,7 @@ impl Turn<'_> {
         let Some(window) = window_from_overflow(message) else {
             return;
         };
-        let provider = self.model.provider.id();
+        let provider = self.model.endpoint.id();
         if self.model.learned.record(provider, &self.model.id, window) {
             emit_and_fold(
                 &mut self.transcript,
