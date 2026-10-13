@@ -12,6 +12,7 @@ description = "Agent Client Protocol adapters as model providers"
 workspace = true
 
 [dependencies]
+bingo-jsonrpc.workspace = true
 bingo-process.workspace = true
 bingo-services.workspace = true
 bingo-sdk.workspace = true

@@ -1,29 +1,17 @@
-//! The client half of an ACP conversation: one line in, one line out.
-//!
-//! Generic over the transport, so the tests drive it over an in-memory duplex
-//! and the child process is a separate concern ([`crate::child`]). Two tasks: a
-//! reader that turns lines into answers, updates and questions, and a writer
-//! that serialises everything going the other way. Nothing here knows what a
-//! session is — that is [`crate::pool`]'s job.
-
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
-
-use agent_client_protocol_schema::rpc::RequestId;
+//! ACP vocabulary over the shared JSON-RPC peer.
+use crate::error::AcpError;
+use crate::method::{self, Call, Incoming, Notify};
 use agent_client_protocol_schema::v1::{
     CreateElicitationRequest, CreateElicitationResponse, Error as RpcError,
     RequestPermissionRequest, RequestPermissionResponse, SessionNotification,
 };
 use async_trait::async_trait;
+use bingo_jsonrpc::codec::{Message, Response};
+use bingo_jsonrpc::{Handler, Peer, PeerError};
+use futures::FutureExt;
 use serde_json::Value;
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
-use tokio::sync::{Mutex, mpsc, oneshot};
-use tokio::task::JoinHandle;
-
-use crate::error::AcpError;
-use crate::method::{self, Call, Incoming, Notify};
-use crate::wire::{self, Body, Envelope, Reply};
+use std::sync::Arc;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 /// What the agent starts a line about. The connection answers nothing on its
 /// own: it hands the question over and writes back what it is told.
@@ -45,185 +33,95 @@ pub trait Client: Send + Sync + 'static {
     ) -> Result<CreateElicitationResponse, RpcError>;
 }
 
-type Pending = Arc<Mutex<HashMap<RequestId, oneshot::Sender<Result<Value, RpcError>>>>>;
-
-/// One adapter's conversation. Dropping it ends both tasks and, with the
-/// child's pipes, the child.
 pub struct Connection {
-    outgoing: mpsc::UnboundedSender<Body>,
-    pending: Pending,
-    next_id: AtomicI64,
-    /// False once the adapter's stdout has closed — the child is gone, or has
-    /// stopped speaking, and everything after this is a transport error.
-    alive: Arc<AtomicBool>,
-    tasks: Vec<JoinHandle<()>>,
-}
-
-impl Drop for Connection {
-    fn drop(&mut self) {
-        for task in &self.tasks {
-            task.abort();
-        }
-    }
+    peer: Peer,
 }
 
 impl Connection {
-    /// Start reading and writing. `client` answers what the agent asks.
     pub fn spawn<R, W>(reader: R, writer: W, client: Arc<dyn Client>) -> Self
     where
         R: AsyncRead + Unpin + Send + 'static,
         W: AsyncWrite + Unpin + Send + 'static,
     {
-        let (outgoing, queue) = mpsc::unbounded_channel();
-        let pending: Pending = Arc::new(Mutex::new(HashMap::new()));
-        let alive = Arc::new(AtomicBool::new(true));
-        let tasks = vec![
-            tokio::spawn(write_lines(writer, queue)),
-            tokio::spawn(read_lines(
-                reader,
-                pending.clone(),
-                client,
-                outgoing.clone(),
-                alive.clone(),
-            )),
-        ];
         Self {
-            outgoing,
-            pending,
-            next_id: AtomicI64::new(1),
-            alive,
-            tasks,
+            peer: Peer::spawn(reader, writer, Arc::new(Inbound(client))),
         }
     }
 
-    /// Whether this adapter is still there to be asked. A dead one is not
-    /// retried on: it is replaced (`crate::session`).
     pub fn is_alive(&self) -> bool {
-        self.alive.load(Ordering::Acquire)
+        self.peer.is_alive()
     }
 
-    /// A cancelled prompt exhausted its grace; never reuse this child.
     pub(crate) fn mark_dead(&self) {
-        self.alive.store(false, Ordering::Release);
+        self.peer.close();
     }
 
-    /// Send a request and wait for the answer that carries its id.
     pub async fn call<C: Call>(&self, params: C) -> Result<C::Response, AcpError> {
         self.call_seen(params).await.map(|(answer, _)| answer)
     }
 
-    /// The same call, with the body the agent actually sent kept beside the
-    /// type it fits. For the one door whose answer carries an extension this
-    /// plugin reads: a session opening, whose legacy model list is not a field
-    /// the schema knows (`crate::legacy`).
     pub async fn call_seen<C: Call>(&self, params: C) -> Result<(C::Response, Value), AcpError> {
-        let id = RequestId::Number(self.next_id.fetch_add(1, Ordering::Relaxed));
-        let body = serde_json::to_value(params).map_err(AcpError::protocol)?;
-        let answer = self.ask(id, C::METHOD, body).await?;
+        let params = serde_json::to_value(params).map_err(AcpError::protocol)?;
+        let answer = self
+            .peer
+            .request(C::METHOD, params)
+            .await
+            .map_err(transport)?;
         let parsed = serde_json::from_value(answer.clone())
             .map_err(|e| AcpError::protocol(format!("{}: {e}", C::METHOD)))?;
         Ok((parsed, answer))
     }
 
-    /// Send a notification. Nothing answers it, so nothing waits.
     pub fn notify<N: Notify>(&self, params: N) -> Result<(), AcpError> {
-        let body = serde_json::to_value(params).map_err(AcpError::protocol)?;
-        self.outgoing
-            .send(wire::notification(N::METHOD, body))
-            .map_err(|_| AcpError::transport("the adapter is gone"))
-    }
-
-    async fn ask(&self, id: RequestId, method: &str, params: Value) -> Result<Value, AcpError> {
-        let (answered, answer) = oneshot::channel();
-        self.pending.lock().await.insert(id.clone(), answered);
-        if self
-            .outgoing
-            .send(wire::request(id.clone(), method, params))
-            .is_err()
-        {
-            self.pending.lock().await.remove(&id);
-            return Err(AcpError::transport("the adapter is gone"));
-        }
-        match answer.await {
-            Ok(Ok(result)) => Ok(result),
-            Ok(Err(refusal)) => Err(AcpError::Refused(refusal)),
-            Err(_) => Err(AcpError::transport(format!("{method}: nothing answered"))),
-        }
+        let params = serde_json::to_value(params).map_err(AcpError::protocol)?;
+        self.peer.notify(N::METHOD, params).map_err(transport)
     }
 }
 
-async fn write_lines<W: AsyncWrite + Unpin>(
-    mut writer: W,
-    mut queue: mpsc::UnboundedReceiver<Body>,
-) {
-    while let Some(body) = queue.recv().await {
-        let Ok(line) = wire::line(body) else { continue };
-        if writer.write_all(line.as_bytes()).await.is_err()
-            || writer.write_all(b"\n").await.is_err()
-            || writer.flush().await.is_err()
-        {
-            return;
+fn transport(error: PeerError) -> AcpError {
+    match error {
+        PeerError::Remote(error) => {
+            let Ok(code) = i32::try_from(error.code) else {
+                return AcpError::protocol("ACP error code is outside i32");
+            };
+            let mut refusal = RpcError::new(code, error.message);
+            refusal.data = error.data;
+            AcpError::Refused(refusal)
         }
+        error => AcpError::transport(error),
     }
 }
 
-/// Every pending call is failed when the pipe closes, so a turn whose adapter
-/// died ends with a transport error instead of waiting for ever.
-async fn read_lines<R: AsyncRead + Unpin>(
-    reader: R,
-    pending: Pending,
-    client: Arc<dyn Client>,
-    outgoing: mpsc::UnboundedSender<Body>,
-    alive: Arc<AtomicBool>,
-) {
-    let mut lines = BufReader::new(reader).lines();
-    while let Ok(Some(line)) = lines.next_line().await {
-        if line.trim().is_empty() {
-            continue;
-        }
-        // A line that is not a message is the adapter's noise on stdout, not
-        // an answer to anything; dropping it keeps the conversation alive.
-        if let Ok(envelope) = serde_json::from_str::<Envelope>(&line) {
-            dispatch(envelope.into_inner(), &pending, &client, &outgoing).await;
-        }
-    }
-    alive.store(false, Ordering::Release);
-    pending.lock().await.clear();
-}
+struct Inbound(Arc<dyn Client>);
 
-async fn dispatch(
-    body: Body,
-    pending: &Pending,
-    client: &Arc<dyn Client>,
-    outgoing: &mpsc::UnboundedSender<Body>,
-) {
-    match body {
-        Body::Reply(reply) => settle(reply, pending).await,
-        Body::Notification(note) => {
-            observe(&note.method, note.params.unwrap_or(Value::Null), client).await;
+impl Handler for Inbound {
+    fn handle(
+        &self,
+        message: Message,
+        sender: bingo_jsonrpc::Sender,
+    ) -> futures::future::BoxFuture<'_, ()> {
+        async move {
+            match message {
+                Message::Notification(note) => observe(&note.method, note.params, &self.0).await,
+                Message::Request(request) => {
+                    let response =
+                        match answer(&request.method, request.params, self.0.clone()).await {
+                            Ok(result) => Response::ok(request.id, result),
+                            Err(error) => Response::failed(
+                                Some(request.id),
+                                bingo_jsonrpc::codec::RpcError {
+                                    code: i64::from(i32::from(error.code)),
+                                    message: error.message,
+                                    data: error.data,
+                                },
+                            ),
+                        };
+                    let _ = sender.send(Message::Response(response));
+                }
+                Message::Response(_) => {}
+            }
         }
-        Body::Request(asked) => {
-            let answer = answer(
-                &asked.method,
-                asked.params.unwrap_or(Value::Null),
-                client.clone(),
-            )
-            .await;
-            let _ = outgoing.send(match answer {
-                Ok(result) => wire::result(asked.id, result),
-                Err(error) => wire::failed(asked.id, error),
-            });
-        }
-    }
-}
-
-async fn settle(reply: Reply, pending: &Pending) {
-    let (id, outcome) = match reply {
-        Reply::Result { id, result } => (id, Ok(result)),
-        Reply::Error { id, error } => (id, Err(error)),
-    };
-    if let Some(waiting) = pending.lock().await.remove(&id) {
-        let _ = waiting.send(outcome);
+        .boxed()
     }
 }
 
@@ -260,7 +158,10 @@ mod tests {
     };
     use serde_json::json;
     use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
     use tokio::io::{DuplexStream, Lines, ReadHalf, WriteHalf};
+    use tokio::sync::Mutex;
 
     /// The far end of the duplex, standing in for a scripted agent.
     struct Agent {
@@ -339,6 +240,26 @@ mod tests {
             writer: their_write,
         };
         (connection, agent, watcher)
+    }
+
+    #[tokio::test]
+    async fn a_seventeen_mib_line_ends_the_connection_with_the_named_error() {
+        let (connection, mut agent, _) = pair();
+        let asking = tokio::spawn(async move {
+            let request: InitializeRequest =
+                serde_json::from_value(fixtures::initialize_request()).expect("request");
+            connection.call(request).await
+        });
+        agent.read().await;
+        let _ = agent.writer.write_all(&vec![b'x'; 17 * 1024 * 1024]).await;
+        let error = tokio::time::timeout(std::time::Duration::from_secs(10), asking)
+            .await
+            .expect("bounded reader")
+            .expect("call task")
+            .expect_err("oversized line");
+        assert!(
+            matches!(error, AcpError::Transport(message) if message == "JSON-RPC line too long")
+        );
     }
 
     #[tokio::test]

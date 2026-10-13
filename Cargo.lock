@@ -605,6 +605,7 @@ name = "bingo-plugin-rpc"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-jsonrpc",
  "bingo-pictures",
  "bingo-process",
  "bingo-sdk",
@@ -633,6 +634,7 @@ dependencies = [
  "agent-client-protocol-schema",
  "async-trait",
  "base64 0.23.1",
+ "bingo-jsonrpc",
  "bingo-process",
  "bingo-sdk",
  "bingo-services",
@@ -839,6 +841,7 @@ name = "bingo-surface-rpc"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-jsonrpc",
  "bingo-sdk",
  "futures",
  "jiff",
