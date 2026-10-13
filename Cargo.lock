@@ -554,6 +554,7 @@ name = "bingo-plugin-rpc"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-pictures",
  "bingo-sdk",
  "futures",
  "schemars 1.2.2",
