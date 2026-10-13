@@ -167,6 +167,9 @@ impl ServerHandler for EchoServer {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
+        if argument(&request, "text") == "never-answer" {
+            return std::future::pending().await;
+        }
         match request.name.as_ref() {
             "ask" => asked(context).await,
             _ => answer(request),

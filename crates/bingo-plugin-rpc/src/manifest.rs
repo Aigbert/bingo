@@ -88,6 +88,18 @@ mod tests {
     }
 
     #[test]
+    fn deadline_manifest_round_trips_the_override() {
+        let manifest: Manifest = serde_json::from_value(json!({
+            "name":"slow", "version":"1", "entry":{"command":"slow"}, "callTimeout":5
+        }))
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(manifest).unwrap()["callTimeout"],
+            json!(5)
+        );
+    }
+
+    #[test]
     fn a_manifest_is_the_four_keys_the_adr_names() {
         let manifest: Manifest = serde_json::from_value(json!({
             "name": "wordcount",

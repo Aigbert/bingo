@@ -709,3 +709,55 @@ async fn the_table_says_what_every_server_is_doing() {
     insta::assert_json_snapshot!(json!({ "headers": headers, "rows": rows }));
     dial.abort();
 }
+
+async fn deadline_call(seconds: Option<u64>) {
+    let mut row = json!({"command": echo_server()});
+    if let Some(seconds) = seconds {
+        row["toolTimeout"] = json!(seconds);
+    }
+    let server = serde_json::from_value(row).expect("toolTimeout is a server setting");
+    let (manager, _data) = manager(&[("slow", server)], &[]);
+    manager.dial_enabled().await;
+    let tool = tool_named(&manager, "mcp__slow__echo").await;
+    let cx = tool_context(CancellationToken::new());
+    tokio::time::pause();
+    let mut running = Box::pin(tool.call(json!({"text":"never-answer"}), &cx));
+    assert!(
+        std::future::poll_fn(|cx| std::task::Poll::Ready(running.as_mut().poll(cx)))
+            .await
+            .is_pending()
+    );
+    let bound = Duration::from_secs(seconds.unwrap_or(600));
+    tokio::time::advance(bound - Duration::from_secs(1)).await;
+    assert!(
+        std::future::poll_fn(|cx| std::task::Poll::Ready(running.as_mut().poll(cx)))
+            .await
+            .is_pending()
+    );
+    let result = tokio::time::timeout(Duration::from_secs(2), &mut running).await;
+    drop(running);
+    tokio::time::resume();
+    let error = result
+        .expect("MCP calls must have a deadline")
+        .expect_err("a timeout");
+    let bingo_sdk::ToolError::Failed(message) = error else {
+        panic!("{error}")
+    };
+    assert!(
+        message.contains("slow")
+            && message.contains("timed out")
+            && message.contains(&bound.as_secs().to_string())
+            && message.contains("toolTimeout"),
+        "{message}"
+    );
+    manager.shutdown().await;
+}
+
+#[tokio::test]
+async fn deadline_bounds_an_mcp_call() {
+    deadline_call(None).await;
+}
+#[tokio::test]
+async fn deadline_uses_the_server_override() {
+    deadline_call(Some(5)).await;
+}

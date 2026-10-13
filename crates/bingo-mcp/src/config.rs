@@ -236,6 +236,20 @@ mod tests {
     }
 
     #[test]
+    fn deadline_setting_is_positive_and_round_trips_on_both_transports() {
+        for mut entry in [
+            json!({"command":"slow"}),
+            json!({"type":"http", "url":"http://localhost"}),
+        ] {
+            entry["toolTimeout"] = json!(5);
+            let configured = server(entry.clone()).expect("a positive deadline");
+            assert_eq!(row(&configured)["toolTimeout"], json!(5));
+            entry["toolTimeout"] = json!(0);
+            assert!(server(entry).is_err(), "zero must not disable the deadline");
+        }
+    }
+
+    #[test]
     fn an_empty_slice_configures_no_servers() {
         let settings = settings(json!({})).expect("a readable slice");
         assert!(settings.mcp_servers.is_empty());

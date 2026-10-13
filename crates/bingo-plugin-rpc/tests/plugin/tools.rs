@@ -127,3 +127,92 @@ async fn a_dropped_call_tells_the_plugin_it_is_no_longer_waited_for() {
     assert_eq!(cancelled(&manager, project.path()).await, CALL_ID);
     manager.shutdown().await;
 }
+
+async fn deadline_tool(seconds: Option<u64>) {
+    let started = crate::harness::started_with_timeout(&[("stub", &[])], seconds).await;
+    let tool = only_tool(&started.manager).await;
+    let cx = context(
+        Arc::new(Recorder::default()),
+        started.project.path(),
+        CancellationToken::new(),
+    );
+    tokio::time::pause();
+    let mut running = Box::pin(tool.call(json!({"awaitCancel": true}), &cx));
+    assert!(futures::poll!(&mut running).is_pending());
+    let bound = Duration::from_secs(seconds.unwrap_or(600));
+    tokio::time::advance(bound - Duration::from_secs(1)).await;
+    assert!(
+        futures::poll!(&mut running).is_pending(),
+        "the deadline must not fire early"
+    );
+    let result = tokio::time::timeout(Duration::from_secs(2), &mut running).await;
+    drop(running);
+    tokio::time::resume();
+    let error = result
+        .expect("tool/call must have a deadline")
+        .expect_err("a timeout");
+    let bingo_sdk::ToolError::Failed(message) = error else {
+        panic!("{error}")
+    };
+    assert!(
+        message.contains("stub")
+            && message.contains("tool/call")
+            && message.contains(&bound.as_secs().to_string())
+            && message.contains("callTimeout"),
+        "{message}"
+    );
+    assert_eq!(
+        cancelled(&started.manager, started.project.path()).await,
+        CALL_ID
+    );
+    started.manager.shutdown().await;
+}
+
+async fn deadline_command(seconds: Option<u64>) {
+    let started = crate::harness::started_with_timeout(&[("stub", &[])], seconds).await;
+    let command = started.manager.commands().await.remove(0);
+    let cx = CommandContext {
+        cancel: CancellationToken::new(),
+        session: SessionId::from_raw("ses_test"),
+        cwd: started.project.path().into(),
+        host: bingo_sdk::testing::NoHost::handle(),
+    };
+    tokio::time::pause();
+    let mut running = Box::pin(command.run("never-answer", &cx));
+    assert!(futures::poll!(&mut running).is_pending());
+    let bound = Duration::from_secs(seconds.unwrap_or(600));
+    tokio::time::advance(bound - Duration::from_secs(1)).await;
+    assert!(futures::poll!(&mut running).is_pending());
+    let result = tokio::time::timeout(Duration::from_secs(2), &mut running).await;
+    drop(running);
+    tokio::time::resume();
+    let error = result
+        .expect("command/run must have a deadline")
+        .expect_err("a timeout");
+    assert_eq!(error.code, bingo_sdk::ErrorCode::ToolFailed);
+    assert!(
+        error.message.contains("stub")
+            && error.message.contains("command/run")
+            && error.message.contains(&bound.as_secs().to_string())
+            && error.message.contains("callTimeout"),
+        "{error}"
+    );
+    started.manager.shutdown().await;
+}
+
+#[tokio::test]
+async fn deadline_bounds_a_plugin_tool_and_abandons_it() {
+    deadline_tool(None).await;
+}
+#[tokio::test]
+async fn deadline_uses_the_manifest_for_a_plugin_tool() {
+    deadline_tool(Some(5)).await;
+}
+#[tokio::test]
+async fn deadline_bounds_a_plugin_command() {
+    deadline_command(None).await;
+}
+#[tokio::test]
+async fn deadline_uses_the_manifest_for_a_plugin_command() {
+    deadline_command(Some(5)).await;
+}

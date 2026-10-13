@@ -127,6 +127,8 @@ struct Turn {
     /// something to interrupt.
     #[serde(default)]
     await_cancel: bool,
+    #[serde(default)]
+    ignore_cancel: bool,
     /// The agent answers this turn and then goes, the way a crashed adapter
     /// does. The next turn must find a new child.
     #[serde(default)]
@@ -168,6 +170,10 @@ fn end_turn() -> String {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Failed> {
+    let _lifetime = match std::env::var("BINGO_FAKE_ACP_LIFETIME") {
+        Ok(address) => Some(tokio::net::TcpStream::connect(address).await?),
+        Err(_) => None,
+    };
     let path = std::env::var(SCRIPT).map_err(|_| format!("{SCRIPT} names no file"))?;
     let script: Script = serde_json::from_str(&std::fs::read_to_string(&path)?)?;
     let log = std::env::var(LOG).ok().map(PathBuf::from);
@@ -396,7 +402,7 @@ impl Agent {
             std::process::exit(0);
         }
         let stop = if turn.await_cancel {
-            self.wait_for_cancel(lines).await?
+            self.wait_for_cancel(lines, turn.ignore_cancel).await?
         } else {
             turn.stop_reason
         };
@@ -535,6 +541,7 @@ impl Agent {
     async fn wait_for_cancel(
         &mut self,
         lines: &mut Lines<BufReader<Stdin>>,
+        ignore: bool,
     ) -> Result<String, Failed> {
         while let Some(line) = lines.next_line().await? {
             let Ok(envelope) = serde_json::from_str::<Envelope>(&line) else {
@@ -543,7 +550,7 @@ impl Agent {
             if let Body::Notification(note) = envelope.into_inner() {
                 let params = note.params.unwrap_or(Value::Null);
                 self.record(&note.method, &params).await?;
-                if note.method.as_ref() == method::SESSION_CANCEL {
+                if note.method.as_ref() == method::SESSION_CANCEL && !ignore {
                     return Ok("cancelled".to_string());
                 }
             }
@@ -603,6 +610,7 @@ fn script_turn(turn: &Turn) -> Turn {
         stop_reason: turn.stop_reason.clone(),
         usage: turn.usage.clone(),
         await_cancel: turn.await_cancel,
+        ignore_cancel: turn.ignore_cancel,
         then_exit: turn.then_exit,
         dies_at_prompt_once: turn.dies_at_prompt_once,
         mcp_list: turn.mcp_list,
