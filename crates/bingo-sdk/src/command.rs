@@ -22,6 +22,7 @@ pub struct CommandSpec {
     pub name: String,
     #[serde(default)]
     pub aliases: Vec<String>,
+    /// A one-line description for the command menu; argument syntax belongs in `args`.
     pub hint: String,
     pub args: ArgSpec,
     /// May run while a turn is busy (read-only commands).

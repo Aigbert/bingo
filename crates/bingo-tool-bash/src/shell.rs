@@ -30,9 +30,9 @@ impl Command for ShellCommand {
         CommandSpec {
             name: "!".into(),
             aliases: Vec::new(),
-            hint: "<command>".into(),
+            hint: "run a shell command".into(),
             args: ArgSpec::Free {
-                hint: "shell command".into(),
+                hint: "<command>".into(),
             },
             // Nothing about a shell line waits on the turn: the person asked
             // for it now.

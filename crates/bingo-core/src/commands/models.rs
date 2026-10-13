@@ -22,7 +22,7 @@ impl Command for ModelsCommand {
     fn spec(&self) -> CommandSpec {
         super::spec(
             "models",
-            &format!("[{REFRESH}]"),
+            "list available models",
             ArgSpec::Words {
                 values: vec![REFRESH.into()],
                 then: None,

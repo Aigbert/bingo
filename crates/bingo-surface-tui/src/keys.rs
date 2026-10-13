@@ -10,58 +10,71 @@ pub struct Binding {
     /// The chord, lowercase and `+`-joined; ` · ` separates alternatives.
     pub keys: &'static str,
     pub description: &'static str,
+    pub group: &'static str,
 }
 
 /// In the order the panel lists them.
 pub const BINDINGS: &[Binding] = &[
     Binding {
         keys: "enter",
-        description: "send the message · open the focused block",
+        group: "write",
+        description: "send · open focused block",
     },
     Binding {
         keys: "shift+enter",
+        group: "write",
         description: "newline (ctrl+j · alt+enter · \\ enter)",
     },
     Binding {
         // The stack of [`ESCAPES`], in the order it is obeyed; a test holds
         // the two together.
         keys: "esc",
+        group: "turn",
         description: "sheet → card → dropdown → interrupt",
     },
     Binding {
         keys: "esc esc",
+        group: "turn",
         description: "rewind to an earlier turn",
     },
     Binding {
         keys: "ctrl+c",
-        description: "interrupt · clear input · twice to exit",
+        group: "turn",
+        description: "stop · clear · twice exits",
     },
     Binding {
         keys: "ctrl+d",
+        group: "turn",
         description: "exit on an empty input",
     },
     Binding {
         keys: "up/down",
-        description: "prompt history at the first and last line",
+        group: "move",
+        description: "history at first/last input line",
     },
     Binding {
         keys: "down",
-        description: "walk the sessions (empty box)",
+        group: "sessions",
+        description: "sessions (empty input)",
     },
     Binding {
         keys: "ctrl+a/e",
-        description: "start / end of the line (home · end)",
+        group: "write",
+        description: "line start/end (home · end)",
     },
     Binding {
         keys: "alt+b/f",
+        group: "write",
         description: "move one word",
     },
     Binding {
         keys: "ctrl+w/u/k",
-        description: "delete word · to line start · to line end",
+        group: "write",
+        description: "delete word · to start · to end",
     },
     Binding {
         keys: "pgup/pgdn",
+        group: "move",
         description: "scroll the transcript",
     },
     Binding {
@@ -71,59 +84,67 @@ pub const BINDINGS: &[Binding] = &[
         // whole transcript, reaching what has scrolled away — and the page
         // says what holding it past an edge does.
         keys: "v · drag",
-        description: "select · ↑↓←→ or a drag extend · y, ctrl+c or release copy",
+        group: "move",
+        description: "select; arrows/drag extend; y/ctrl+c/release copy",
     },
     Binding {
         keys: "ctrl+g",
-        description: "the same list · ↑↓ to walk it",
+        group: "sessions",
+        description: "sessions · ↑↓ to walk",
     },
     Binding {
         keys: "ctrl+t",
-        description: "show / hide the task list",
+        group: "turn",
+        description: "show/hide tasks",
     },
     Binding {
         keys: "ctrl+p",
-        description: "plugin state (rooms, panels to pin)",
+        group: "sessions",
+        description: "plugin panels · pin state",
     },
     Binding {
         // The stack of [`TABS`], in the order it is obeyed; a test holds the
         // two together.
         keys: "tab",
+        group: "turn",
         description: "complete → queue → next card",
     },
     Binding {
         keys: "shift+tab",
+        group: "turn",
         description: "cycle permission mode",
     },
     Binding {
         keys: "1-9 · y/a/n",
+        group: "turn",
         description: "answer the open dialog",
     },
     Binding {
         keys: "ctrl+e",
-        description: "expand the dialog's preview",
+        group: "turn",
+        description: "expand preview",
     },
     Binding {
         keys: "ctrl+o",
-        description: "expand the latest result · again for all of it",
+        group: "move",
+        description: "expand result · again for all",
     },
     Binding {
         keys: "ctrl+b",
-        description: "background the running command",
-    },
-    Binding {
-        keys: "/ · !",
-        description: "run a command · run a shell line",
+        group: "turn",
+        description: "background running command",
     },
     Binding {
         // Mouse reporting has to reach us for this to happen at all: inside
         // tmux it wants `set -g mouse on`, and without it a click is the
         // multiplexer's own (M56).
         keys: "click",
+        group: "move",
         description: "a picture · open it",
     },
     Binding {
         keys: "?",
+        group: "sessions",
         description: "toggle this panel",
     },
 ];
@@ -273,50 +294,59 @@ pub fn interrupt(at: Pressed) -> Interrupt {
 
 /// From this width the table pairs its rows; below it one column reads better
 /// than two cut-off ones.
-pub const TWO_COLUMNS: usize = 100;
+pub const TWO_COLUMNS: usize = 80;
 /// Cells between the two columns.
 const GUTTER: usize = 2;
 
-/// The panel: two columns from [`TWO_COLUMNS`], else one. A cell that does not
-/// fit its column is elided — a row that spilled would move every row below it.
+/// Pair groups on a wide screen; wrap words instead of clipping bindings.
 pub fn help_lines(width: usize) -> Vec<Line<'static>> {
-    let cells: Vec<String> = BINDINGS.iter().map(|b| cell(b, key_column())).collect();
-    let columns = if width >= TWO_COLUMNS { 2 } else { 1 };
-    let cell_width = (width - GUTTER * (columns - 1)) / columns;
-    let rows = cells.len().div_ceil(columns);
-    (0..rows)
+    if width < TWO_COLUMNS {
+        return group_lines(&["write", "move", "turn", "sessions"], width);
+    }
+    let cell_width = width.saturating_sub(GUTTER) / 2;
+    let left = group_lines(&["write", "move"], cell_width);
+    let right = group_lines(&["turn", "sessions"], cell_width);
+    (0..left.len().max(right.len()))
         .map(|row| {
-            let text = (0..columns)
-                .filter_map(|column| cells.get(row + column * rows))
-                .map(|cell| pad(&truncate(cell, cell_width), cell_width))
+            let first = left.get(row).map(ToString::to_string).unwrap_or_default();
+            let second = right.get(row).map(ToString::to_string).unwrap_or_default();
+            Line::from(Span::styled(
+                format!("{}{}{second}", pad(&first, cell_width), " ".repeat(GUTTER))
+                    .trim_end()
+                    .to_string(),
+                theme::dim(),
+            ))
+        })
+        .collect()
+}
+
+fn group_lines(groups: &[&str], width: usize) -> Vec<Line<'static>> {
+    groups
+        .iter()
+        .flat_map(|group| {
+            let heading = Line::from(Span::styled(group.to_string(), theme::dim()));
+            std::iter::once(heading)
+                .chain(
+                    BINDINGS
+                        .iter()
+                        .filter(|binding| binding.group == *group)
+                        .flat_map(|binding| {
+                            crate::wrap::wrap(
+                                &Line::from(Span::styled(
+                                    cell(binding, key_column()),
+                                    theme::dim(),
+                                )),
+                                width,
+                            )
+                        }),
+                )
                 .collect::<Vec<_>>()
-                .join(&" ".repeat(GUTTER));
-            Line::from(Span::styled(text.trim_end().to_string(), theme::dim()))
         })
         .collect()
 }
 
 fn pad(text: &str, width: usize) -> String {
     format!("{text}{}", " ".repeat(width.saturating_sub(text.width())))
-}
-
-/// Rows never wrap: a panel row that spilled would move every row below it.
-fn truncate(text: &str, width: usize) -> String {
-    if text.width() <= width {
-        return text.to_string();
-    }
-    let mut out = String::new();
-    let mut used = 0;
-    for c in text.chars() {
-        let w = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
-        if used + w > width.saturating_sub(1) {
-            break;
-        }
-        out.push(c);
-        used += w;
-    }
-    out.push('…');
-    out
 }
 
 fn key_column() -> usize {
@@ -363,23 +393,28 @@ mod tests {
     }
 
     #[test]
-    fn a_narrow_terminal_falls_back_to_one_column() {
-        assert_eq!(help_lines(40).len(), BINDINGS.len());
+    fn a_narrow_terminal_stacks_the_groups() {
+        let lines = help_lines(79);
+        assert_eq!(lines.first().unwrap().to_string(), "write");
+        assert!(lines.iter().any(|line| line.to_string() == "sessions"));
     }
 
     #[test]
-    fn a_wide_terminal_pairs_the_rows() {
-        assert_eq!(help_lines(160).len(), BINDINGS.len().div_ceil(2));
-    }
-
-    #[test]
-    fn a_hundred_columns_is_where_the_second_column_starts() {
-        assert_eq!(help_lines(TWO_COLUMNS - 1).len(), BINDINGS.len());
-        assert_eq!(
-            help_lines(TWO_COLUMNS).len(),
-            BINDINGS.len().div_ceil(2),
-            "the sheet pairs its rows at 100 columns"
-        );
+    fn a_wide_terminal_pairs_the_groups_without_losing_words() {
+        for width in [100, 120, 160] {
+            let lines = help_lines(width);
+            assert!(lines[0].to_string().contains("turn"));
+            assert!(lines.iter().all(|line| line.width() <= width));
+            let text = lines
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(" ");
+            for binding in BINDINGS {
+                assert!(text.contains(binding.keys), "missing {}", binding.keys);
+            }
+            assert!(!text.contains('…'));
+        }
     }
 
     /// The order `esc` is obeyed in is the order the help prints, because

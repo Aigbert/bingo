@@ -33,7 +33,7 @@ impl Command for PluginsCommand {
             aliases: vec!["modules".into()],
             ..super::spec(
                 "plugins",
-                &format!("[{ENABLE}|{DISABLE} <name>]"),
+                "list, enable or disable plugins",
                 ArgSpec::Words {
                     values: vec![ENABLE.into(), DISABLE.into()],
                     then: Some(Box::new(ArgSpec::Catalog {

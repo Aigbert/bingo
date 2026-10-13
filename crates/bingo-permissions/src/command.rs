@@ -53,7 +53,7 @@ impl Command for PermissionCommand {
         CommandSpec {
             name: "permission".into(),
             aliases: vec!["permissions".into()],
-            hint: "[mode]".into(),
+            hint: "show or change the permission mode".into(),
             args: ArgSpec::Words {
                 values: Mode::ALL.map(|mode| mode.as_str().to_string()).to_vec(),
                 then: None,
