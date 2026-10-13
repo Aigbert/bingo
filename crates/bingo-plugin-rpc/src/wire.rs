@@ -646,7 +646,14 @@ pub static METHODS: &[Method] = &[
     ),
 ];
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ToolsChanged { pub tools: Vec<ToolSpec> }
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct CommandsChanged { pub commands: Vec<CommandSpec> }
+
 pub static NOTIFICATIONS: &[Notification] = &[
+    (name::TOOLS_CHANGED, schema_of::<ToolsChanged>),
+    (name::COMMANDS_CHANGED, schema_of::<CommandsChanged>),
     (name::TOOL_PROGRESS, schema_of::<ToolProgressParams>),
     (name::TOOL_CANCEL, schema_of::<ToolCancelParams>),
     (name::PROVIDER_DELTA, schema_of::<ProviderDeltaParams>),

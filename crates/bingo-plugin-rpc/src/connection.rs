@@ -101,6 +101,8 @@ struct Router {
     running: Mutex<HashMap<String, Running>>,
     streaming: Mutex<HashMap<String, Sender<ModelEvent>>>,
     serving: Option<Serving>,
+    tools: Mutex<Vec<bingo_sdk::ToolSpec>>,
+    commands: Mutex<Vec<bingo_sdk::CommandSpec>>,
 }
 
 impl Router {
@@ -135,7 +137,20 @@ impl Router {
     }
 
     async fn notification(&self, plugin: &str, notification: Notification) {
+        if let Some(serving) = &self.serving {
+            if serving.calls.permits(&notification.method).is_err() { return; }
+        }
         match notification.method.as_str() {
+            name::TOOLS_CHANGED => {
+                if let Ok(params) = serde_json::from_value::<crate::wire::ToolsChanged>(notification.params) {
+                    *self.tools.lock().unwrap_or_else(|e| e.into_inner()) = params.tools;
+                }
+            }
+            name::COMMANDS_CHANGED => {
+                if let Ok(params) = serde_json::from_value::<crate::wire::CommandsChanged>(notification.params) {
+                    *self.commands.lock().unwrap_or_else(|e| e.into_inner()) = params.commands;
+                }
+            }
             name::TOOL_PROGRESS => match serde_json::from_value(notification.params) {
                 Ok(params) => self.progress(params),
                 Err(error) => tracing::warn!(plugin, %error, "a progress line that is not one"),
@@ -245,6 +260,17 @@ impl Connection {
             peer,
             router,
         }
+    }
+
+    pub fn initialize_lists(&self, tools: Vec<bingo_sdk::ToolSpec>, commands: Vec<bingo_sdk::CommandSpec>) {
+        *self.router.tools.lock().unwrap_or_else(|e| e.into_inner()) = tools;
+        *self.router.commands.lock().unwrap_or_else(|e| e.into_inner()) = commands;
+    }
+    pub fn tools(&self) -> Vec<bingo_sdk::ToolSpec> {
+        self.router.tools.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+    pub fn commands(&self) -> Vec<bingo_sdk::CommandSpec> {
+        self.router.commands.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     pub fn negotiate(&self, capabilities: &std::collections::BTreeSet<crate::wire::Cap>) {

@@ -19,8 +19,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bingo_sdk::{
-    Command as SdkCommand, CommandSpec, Compactor, ContextContributor, Hook, HostHandle, Provider,
-    Tool, ToolSpec,
+    Command as SdkCommand, Compactor, ContextContributor, Hook, HostHandle, Provider, Tool,
 };
 use serde_json::Value;
 use tokio::sync::Mutex;
@@ -62,8 +61,6 @@ pub fn backoff(failures: u32) -> Duration {
 /// What one process answered `initialize` with, and the pipe it answered on.
 struct Live {
     connection: Arc<Connection>,
-    tools: Vec<ToolSpec>,
-    commands: Vec<CommandSpec>,
     contributors: Vec<ContributorSpec>,
     compactors: Vec<CompactorSpec>,
     providers: Vec<ProviderSpec>,
@@ -220,7 +217,7 @@ impl Bridge {
         let Some(live) = self.ready().await else {
             return Vec::new();
         };
-        live.tools
+        live.connection.tools()
             .iter()
             .map(|spec| {
                 Arc::new(PluginTool::new(
@@ -241,7 +238,7 @@ impl Bridge {
         let Some(live) = self.ready().await else {
             return Vec::new();
         };
-        live.commands
+        live.connection.commands()
             .iter()
             .map(|spec| {
                 Arc::new(PluginCommand::new(
@@ -449,8 +446,6 @@ impl Bridge {
         match answered {
             Ok(Ok(result)) => Ok(Live {
                 connection,
-                tools: result.tools,
-                commands: result.commands,
                 contributors: result.contributors,
                 compactors: result.compactors,
                 providers: result.providers,
@@ -488,6 +483,7 @@ impl Bridge {
         let result: InitializeResult =
             serde_json::from_value(answer).map_err(|e| format!("initialize: {e}"))?;
         check_protocol(&result)?;
+        connection.initialize_lists(result.tools.clone(), result.commands.clone());
         connection.negotiate(&result.capabilities);
         Ok(result)
     }
@@ -519,8 +515,6 @@ impl Bridge {
         if let Ok(mut state) = bridge.state.try_lock() {
             state.live = Some(Arc::new(Live {
                 connection,
-                tools: Vec::new(),
-                commands: Vec::new(),
                 contributors: Vec::new(),
                 compactors: Vec::new(),
                 providers: Vec::new(),
