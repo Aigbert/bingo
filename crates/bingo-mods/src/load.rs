@@ -23,6 +23,13 @@ impl Root {
     }
 
     pub fn source(&self, name: &str) -> Result<String, String> {
+        if name == "__bingo_ui__" {
+            return crate::strip::strip(
+                Path::new("ui.ts"),
+                include_str!("../../../sdk/typescript/src/ui.ts"),
+            )
+            .map_err(|why| why.to_string());
+        }
         if name == "__bingo_callbacks__" {
             return crate::strip::strip(
                 Path::new("callbacks.ts"),
@@ -49,7 +56,7 @@ impl Root {
             )
             .map_err(|why| why.to_string())?;
             return Ok(format!(
-                "export {{ Callbacks }} from './callbacks.ts';\n{hooks}\n{dollar}"
+                "export {{ Handlers }} from './ui.ts';\nexport {{ Callbacks }} from './callbacks.ts';\n{hooks}\n{dollar}"
             ));
         }
         let path = self.path(name)?;
@@ -86,6 +93,9 @@ impl Resolver for Root {
         name: &str,
         _: Option<ImportAttributes<'js>>,
     ) -> rquickjs::Result<String> {
+        if base == "bingo" && name == "./ui.ts" {
+            return Ok("__bingo_ui__".into());
+        }
         if base == "bingo" && name == "./callbacks.ts" {
             return Ok("__bingo_callbacks__".into());
         }

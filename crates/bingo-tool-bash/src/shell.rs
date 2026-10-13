@@ -28,6 +28,7 @@ pub struct ShellCommand;
 impl Command for ShellCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "!".into(),
             aliases: Vec::new(),
             hint: "run a shell command".into(),

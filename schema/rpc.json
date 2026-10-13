@@ -472,6 +472,26 @@
         }
       ]
     },
+    "Component": {
+      "type": "string",
+      "enum": [
+        "AskUserQuestion",
+        "UserMessage",
+        "AssistantMessage",
+        "ToolUse",
+        "ToolResult",
+        "ToolGroup",
+        "ToolProgress",
+        "CommandOutput",
+        "Spinner",
+        "TurnDuration",
+        "InfoNotice",
+        "SessionMode",
+        "PromptHint",
+        "AbovePrompt",
+        "Pane"
+      ]
+    },
     "ConfigView": {
       "type": "object",
       "properties": {
@@ -1296,6 +1316,26 @@
         {
           "type": "object",
           "properties": {
+            "requests": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "invalidated"
+            }
+          },
+          "required": [
+            "type",
+            "requests"
+          ],
+          "description": "Ephemeral. A plugin's live state (ADR-0013 §2): the latest payload per\n`(plugin, kind)` is the whole of it; `Null` removes it; none survives a resume."
+        },
+        {
+          "type": "object",
+          "properties": {
             "plugin": {
               "type": "string"
             },
@@ -1313,8 +1353,7 @@
             "plugin",
             "kind",
             "payload"
-          ],
-          "description": "Ephemeral. A plugin's live state (ADR-0013 §2): the latest payload per\n`(plugin, kind)` is the whole of it; `Null` removes it; none survives a resume."
+          ]
         },
         {
           "type": "object",
@@ -3404,6 +3443,35 @@
       ],
       "description": "A ref-aware RPC client sees either a token backed by a real immutable pin\nor an explicit resource-limit reason. The strict variants make generated\nZod validators reject both a token and a reason in one value."
     },
+    "RenderParams": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "component": {
+          "$ref": "#/$defs/Component"
+        },
+        "requestId": {
+          "type": "string"
+        },
+        "surface": {
+          "$ref": "#/$defs/SurfaceName"
+        },
+        "props": true,
+        "viewport": {
+          "$ref": "#/$defs/Viewport"
+        }
+      },
+      "required": [
+        "session",
+        "component",
+        "requestId",
+        "surface",
+        "props",
+        "viewport"
+      ]
+    },
     "ResolvedBy": {
       "oneOf": [
         {
@@ -3803,13 +3871,21 @@
           },
           "description": "Plugin-owned state, by plugin then kind: the latest `Extension`\npayload is the whole of that kind (ADR-0011 §2)."
         },
+        "invalidated": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "description": "Plugin-owned live state, by plugin then kind: the latest `Signal`\npayload, gone on `Null` and after a resume (ADR-0013 §2)."
+        },
         "signals": {
           "type": "object",
           "additionalProperties": {
             "type": "object",
             "additionalProperties": true
-          },
-          "description": "Plugin-owned live state, by plugin then kind: the latest `Signal`\npayload, gone on `Null` and after a resume (ADR-0013 §2)."
+          }
         }
       },
       "required": [
@@ -4045,6 +4121,14 @@
         "busy"
       ],
       "description": "A safe, bounded summary projection for workspace ownership checks and\nsidebar discovery. A missing key is *not* a keyless session when an\nomission names `key`; callers must direct-open by trusted id to classify."
+    },
+    "SurfaceName": {
+      "type": "string",
+      "enum": [
+        "terminal",
+        "desktop",
+        "text"
+      ]
     },
     "TextChild": {
       "anyOf": [
@@ -5056,7 +5140,7 @@
           "type": "object",
           "properties": {
             "component": {
-              "type": "string"
+              "$ref": "#/$defs/Component"
             },
             "props": true,
             "kind": {
@@ -5092,6 +5176,27 @@
             "fold"
           ]
         }
+      ]
+    },
+    "Viewport": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "rows": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      },
+      "required": [
+        "columns",
+        "rows"
       ]
     },
     "Voice": {
@@ -5138,6 +5243,14 @@
     }
   },
   "methods": {
+    "ui/render": {
+      "params": {
+        "$ref": "#/$defs/RenderParams"
+      },
+      "result": {
+        "$ref": "#/$defs/View"
+      }
+    },
     "initialize": {
       "params": {
         "$ref": "#/$defs/InitializeParams"

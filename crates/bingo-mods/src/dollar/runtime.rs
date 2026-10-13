@@ -372,11 +372,17 @@ async fn store(caller: &Caller, method: &str, params: Value) -> Result<Value, St
         ));
     }
     let input: bingo_plugin_host::host::StateGet = parse(params)?;
-    Ok(json!(
+    let removed = caller
+        .state
+        .delete(input.scope.clone(), input.key.clone())
+        .await
+        .map_err(bingo_plugin_host::host::error_message)?;
+    if removed {
         caller
             .state
-            .delete(input.scope, input.key)
+            .changed(&caller.host, &input.scope, &input.key)
             .await
-            .map_err(bingo_plugin_host::host::error_message)?
-    ))
+            .map_err(bingo_plugin_host::host::error_message)?;
+    }
+    Ok(json!(removed))
 }

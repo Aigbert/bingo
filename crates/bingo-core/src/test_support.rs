@@ -523,6 +523,7 @@ impl ScriptedCommand {
 impl Command for ScriptedCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: self.name.into(),
             aliases: Vec::new(),
             hint: String::new(),

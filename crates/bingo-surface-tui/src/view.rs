@@ -1136,6 +1136,7 @@ mod tests {
         let state = state();
         let (mut ui, now) = scene();
         ui.catalogs.commands = vec![bingo_sdk::CommandSpec {
+            hidden: false,
             name: "model".into(),
             aliases: vec![],
             hint: "[provider/]model".into(),
@@ -1156,6 +1157,7 @@ mod tests {
         let state = state();
         let (mut ui, now) = scene();
         ui.catalogs.commands = vec![bingo_sdk::CommandSpec {
+            hidden: false,
             name: "plugins".into(),
             aliases: vec!["modules".into()],
             hint: "[enable|disable <name>]".into(),

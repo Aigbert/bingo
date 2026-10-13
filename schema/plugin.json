@@ -23,6 +23,7 @@
     "host/state/get",
     "host/state/set",
     "host/tool/call",
+    "host/ui/invalidate",
     "intercept/*",
     "intercept/*/after",
     "intercept/cancel",
@@ -1418,6 +1419,9 @@
     "CommandSpec": {
       "type": "object",
       "properties": {
+        "hidden": {
+          "type": "boolean"
+        },
         "name": {
           "type": "string"
         },
@@ -1769,6 +1773,26 @@
       },
       "required": [
         "events"
+      ]
+    },
+    "Component": {
+      "type": "string",
+      "enum": [
+        "AskUserQuestion",
+        "UserMessage",
+        "AssistantMessage",
+        "ToolUse",
+        "ToolResult",
+        "ToolGroup",
+        "ToolProgress",
+        "CommandOutput",
+        "Spinner",
+        "TurnDuration",
+        "InfoNotice",
+        "SessionMode",
+        "PromptHint",
+        "AbovePrompt",
+        "Pane"
       ]
     },
     "ConfigSet": {
@@ -2841,6 +2865,26 @@
         {
           "type": "object",
           "properties": {
+            "requests": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "invalidated"
+            }
+          },
+          "required": [
+            "type",
+            "requests"
+          ],
+          "description": "Ephemeral. A plugin's live state (ADR-0013 §2): the latest payload per\n`(plugin, kind)` is the whole of it; `Null` removes it; none survives a resume."
+        },
+        {
+          "type": "object",
+          "properties": {
             "plugin": {
               "type": "string"
             },
@@ -2858,8 +2902,7 @@
             "plugin",
             "kind",
             "payload"
-          ],
-          "description": "Ephemeral. A plugin's live state (ADR-0013 §2): the latest payload per\n`(plugin, kind)` is the whole of it; `Null` removes it; none survives a resume."
+          ]
         },
         {
           "type": "object",
@@ -3827,6 +3870,24 @@
         "budget"
       ]
     },
+    "Invalidate": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "requests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "session",
+        "requests"
+      ]
+    },
     "Invoke": {
       "type": "object",
       "properties": {
@@ -4320,6 +4381,10 @@
     "LinkPoint": {
       "type": "string",
       "enum": [
+        "ui.press",
+        "ui.input",
+        "ui.select",
+        "ui.render",
         "plugin.register",
         "prompt.submit",
         "tool.check",
@@ -6307,6 +6372,31 @@
         "callback"
       ]
     },
+    "RenderRequest": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "$ref": "#/$defs/Component"
+        },
+        "requestId": {
+          "type": "string"
+        },
+        "surface": {
+          "$ref": "#/$defs/SurfaceName"
+        },
+        "props": true,
+        "viewport": {
+          "$ref": "#/$defs/Viewport"
+        }
+      },
+      "required": [
+        "component",
+        "requestId",
+        "surface",
+        "props",
+        "viewport"
+      ]
+    },
     "ResolvedBy": {
       "oneOf": [
         {
@@ -6881,6 +6971,24 @@
         "value"
       ]
     },
+    "Shown": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "request": {
+              "$ref": "#/$defs/RenderRequest"
+            }
+          },
+          "required": [
+            "request"
+          ]
+        },
+        {
+          "$ref": "#/$defs/View"
+        }
+      ]
+    },
     "Slot": {
       "oneOf": [
         {
@@ -6919,7 +7027,7 @@
               ]
             },
             "view": {
-              "$ref": "#/$defs/View"
+              "$ref": "#/$defs/Shown"
             },
             "kind": {
               "type": "string",
@@ -6938,7 +7046,7 @@
               "type": "string"
             },
             "view": {
-              "$ref": "#/$defs/View"
+              "$ref": "#/$defs/Shown"
             },
             "kind": {
               "type": "string",
@@ -6958,7 +7066,7 @@
               "type": "string"
             },
             "view": {
-              "$ref": "#/$defs/View"
+              "$ref": "#/$defs/Shown"
             },
             "kind": {
               "type": "string",
@@ -6969,6 +7077,77 @@
             "kind",
             "title",
             "view"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "focus": {
+              "type": "boolean"
+            },
+            "closeOnEscape": {
+              "type": "boolean"
+            },
+            "holdToasts": {
+              "type": "boolean"
+            },
+            "asked": {
+              "type": "boolean"
+            },
+            "rows": {
+              "type": "integer",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "view": {
+              "$ref": "#/$defs/Shown"
+            },
+            "kind": {
+              "type": "string",
+              "const": "pane"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "title",
+            "focus",
+            "closeOnEscape",
+            "holdToasts",
+            "asked",
+            "rows",
+            "view"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "until": {
+              "type": "string"
+            },
+            "alert": {
+              "type": "boolean"
+            },
+            "kind": {
+              "type": "string",
+              "const": "toast"
+            }
+          },
+          "required": [
+            "kind",
+            "text",
+            "until",
+            "alert"
           ]
         },
         {
@@ -7210,6 +7389,14 @@
           ],
           "additionalProperties": false
         }
+      ]
+    },
+    "SurfaceName": {
+      "type": "string",
+      "enum": [
+        "terminal",
+        "desktop",
+        "text"
       ]
     },
     "SystemBlock": {
@@ -8446,7 +8633,7 @@
           "type": "object",
           "properties": {
             "component": {
-              "type": "string"
+              "$ref": "#/$defs/Component"
             },
             "props": true,
             "kind": {
@@ -8482,6 +8669,27 @@
             "fold"
           ]
         }
+      ]
+    },
+    "Viewport": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "rows": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      },
+      "required": [
+        "columns",
+        "rows"
       ]
     },
     "Voice": {
@@ -8700,6 +8908,14 @@
       },
       "result": {
         "$ref": "#/$defs/ResultValue7"
+      }
+    },
+    "host/ui/invalidate": {
+      "params": {
+        "$ref": "#/$defs/Invalidate"
+      },
+      "result": {
+        "type": "null"
       }
     },
     "host/place": {

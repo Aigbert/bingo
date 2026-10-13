@@ -177,13 +177,12 @@ async fn commands(registry: &Registry) -> Vec<CatalogEntry> {
         all.extend(source.commands(&here).await);
     }
     all.iter()
-        .map(|c| {
-            let spec = c.spec();
-            CatalogEntry {
-                id: spec.name.clone(),
-                label: spec.hint.clone(),
-                meta: serde_json::to_value(spec).unwrap_or(Value::Null),
-            }
+        .map(|c| c.spec())
+        .filter(|spec| !spec.hidden)
+        .map(|spec| CatalogEntry {
+            id: spec.name.clone(),
+            label: spec.hint.clone(),
+            meta: serde_json::to_value(spec).unwrap_or(Value::Null),
         })
         .collect()
 }

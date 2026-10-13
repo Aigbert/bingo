@@ -75,6 +75,7 @@ pub fn capabilities() -> BTreeSet<Cap> {
 
 /// Every name that travels on the wire, in one place.
 pub mod name {
+    pub const HOST_UI_INVALIDATE: &str = "host/ui/invalidate";
     pub const HOST_PLACE: &str = "host/place";
     pub const HOST_EXTEND: &str = "host/extend";
     pub const HOST_DELIVER: &str = "host/deliver";
@@ -672,6 +673,11 @@ pub static METHODS: &[Method] = &[
         "intercept/turn.stop/after",
         schema_of::<crate::intercept::After<bingo_sdk::StopResult>>,
         schema_of::<crate::intercept::ResultValue<bingo_sdk::StopResult>>,
+    ),
+    (
+        name::HOST_UI_INVALIDATE,
+        schema_of::<bingo_sdk::render::Invalidate>,
+        schema_of::<()>,
     ),
     (
         name::HOST_PLACE,

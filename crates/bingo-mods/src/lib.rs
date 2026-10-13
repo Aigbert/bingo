@@ -15,3 +15,5 @@ pub mod dollar;
 mod link;
 mod manager;
 mod module;
+
+mod handlers;

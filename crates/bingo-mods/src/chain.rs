@@ -22,6 +22,8 @@ pub(crate) struct Chain<'a> {
     pub cx: HookContext,
     pub tier: Tier,
     pub hooks: Vec<usize>,
+    pub reads: bingo_plugin_host::state::ReadLog,
+    pub generation: String,
     pub kernel: Arc<Mutex<Option<Next<'a, Value, Value>>>>,
 }
 #[derive(serde::Deserialize)]
@@ -107,7 +109,7 @@ impl Chain<'_> {
         };
         let site = json!({"session":self.cx.session, "turn":self.cx.turn, "item":self.cx.item, "cwd":self.cx.cwd,
             "plugin":{"name":self.module.found.name,"root":self.module.found.root},
-            "hook":hook, "recover":error.is_some(), "called":pending.is_some(), "budget":{"ms":ms,"remainingMs":ms},
+            "generation":self.generation, "hook":hook, "recover":error.is_some(), "called":pending.is_some(), "budget":{"ms":ms,"remainingMs":ms},
             "error":error.map(|error| json!({"kind":error.kind,"message":error.message})),
             "origin":{"plugin":self.module.found.name,"tier":self.tier}});
         let mut call = self.engine.call(&self.entry.name, input.clone(), site)?;
@@ -118,7 +120,8 @@ impl Chain<'_> {
                     let result = if operation.method == "next" {
                         self.continue_with(position, input, operation.params, pending).await
                     } else {
-                        call.reads.scope(link::operation(&self.module, &self.cx, hook, &operation.method, operation.params)).await
+                        bingo_plugin_host::state::rendering(self.entry == *catalogue::UI_RENDER,
+                            self.reads.scope(link::operation(&self.module, &self.cx, hook, &operation.method, operation.params))).await
                     };
                     let _ = operation.reply.send(result);
                 }

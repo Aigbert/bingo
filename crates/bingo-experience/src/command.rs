@@ -29,6 +29,7 @@ impl ExperienceCommand {
 impl Command for ExperienceCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "experience".into(),
             aliases: Vec::new(),
             hint: "what this project has taught the agent".into(),

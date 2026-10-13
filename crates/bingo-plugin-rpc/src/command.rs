@@ -66,3 +66,14 @@ impl Command for PluginCommand {
         Ok(result.outcome)
     }
 }
+
+pub(crate) struct UiCommand(pub String);
+#[async_trait]
+impl Command for UiCommand {
+    fn spec(&self) -> CommandSpec {
+        CommandSpec::ui(&self.0)
+    }
+    async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
+        bingo_plugin_host::host::handler(&self.0, args, cx).await
+    }
+}

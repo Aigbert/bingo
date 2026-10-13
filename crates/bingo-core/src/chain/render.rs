@@ -42,14 +42,48 @@ impl Point for Render {
 fn invalid(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::InvalidInput, error.to_string())
 }
+struct Owner(Link);
+#[async_trait::async_trait]
+impl Interceptor for Owner {
+    fn id(&self) -> &str {
+        self.0
+            .external
+            .as_deref()
+            .unwrap_or_else(|| self.0.interceptor.id())
+    }
+    fn matcher(&self) -> LinkMatcher {
+        self.0.interceptor.matcher()
+    }
+    fn owns_deadline(&self) -> bool {
+        self.0.interceptor.owns_deadline()
+    }
+    async fn chain(
+        &self,
+        entry: &catalogue::Entry,
+        cx: &HookContext,
+        input: serde_json::Value,
+        next: Next<'_, serde_json::Value, serde_json::Value>,
+    ) -> Result<serde_json::Value, KernelError> {
+        self.0.interceptor.chain(entry, cx, input, next).await
+    }
+}
+
 pub(crate) async fn dispatch(
     links: &[Link],
     cx: &HookContext,
     request: RenderRequest,
     report: Report,
 ) -> Result<View, KernelError> {
+    let owned: Vec<_> = links
+        .iter()
+        .map(|link| Link {
+            external: link.external.clone(),
+            tier: link.tier,
+            interceptor: Arc::new(Owner(link.clone())),
+        })
+        .collect();
     run::<Render>(
-        links,
+        &owned,
         Next::new(|request: RenderRequest| Box::pin(async move { Ok(request.engine()) })),
         cx,
         request,

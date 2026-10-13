@@ -110,7 +110,17 @@ impl Remote {
         O: Serialize + DeserializeOwned + Send,
     {
         let chain = self.connection.next_call();
-        let _context = self.connection.hold_chain(&chain);
+        let context = self.connection.hold_chain(&chain);
+        let request = if entry == catalogue::UI_RENDER {
+            if let Some(context) = &context {
+                context.render();
+            }
+            serde_json::to_value(&input)
+                .ok()
+                .and_then(|input| input["requestId"].as_str().map(str::to_string))
+        } else {
+            None
+        };
         let mut cancel = CancelOnDrop {
             connection: self.connection.clone(),
             chain: Some(chain.clone()),
@@ -144,6 +154,19 @@ impl Remote {
             }
         };
         cancel.chain = None;
+        if let Some(request) = request {
+            self.connection
+                .subscribe(
+                    cx.session.clone(),
+                    request,
+                    context
+                        .as_ref()
+                        .map(|context| context.reads())
+                        .unwrap_or_default(),
+                )
+                .await
+                .map_err(|error| failed(error.message))?;
+        }
         Ok(result)
     }
 }

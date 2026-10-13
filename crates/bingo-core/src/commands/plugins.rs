@@ -30,6 +30,7 @@ const PLUGINS: &str = "plugins";
 impl Command for PluginsCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             aliases: vec!["modules".into()],
             ..super::spec(
                 "plugins",

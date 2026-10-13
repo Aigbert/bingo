@@ -51,6 +51,7 @@ impl PermissionCommand {
 impl Command for PermissionCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "permission".into(),
             aliases: vec!["permissions".into()],
             hint: "show or change the permission mode".into(),

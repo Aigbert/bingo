@@ -70,12 +70,24 @@ impl Server {
             .map_err(failed)?
             .unwrap_or_default();
         let reads = self.contexts.reads(&context);
+        let rendering = self.contexts.rendering(&context);
         let calling = self.contexts.bind(&self.plugin, context).map_err(failed)?;
         reads
             .scope(bingo_plugin_host::invocation::scope(
                 calling,
-                self.answer_bound(method, params),
+                bingo_plugin_host::state::rendering(rendering, self.answer_bound(method, params)),
             ))
+            .await
+    }
+
+    pub(crate) async fn subscribe(
+        &self,
+        session: bingo_sdk::SessionId,
+        request: String,
+        reads: Vec<bingo_plugin_host::state::Read>,
+    ) -> Result<(), RpcError> {
+        self.state
+            .subscribe(&self.host, session, request, reads)
             .await
     }
 

@@ -22,6 +22,7 @@ pub struct Context {
 pub(crate) struct Chains(Arc<Mutex<BTreeMap<String, Invocation>>>);
 struct Invocation {
     calling: Vec<CallingHook>,
+    rendering: bool,
     reads: BTreeMap<Option<usize>, bingo_plugin_host::state::ReadLog>,
 }
 
@@ -31,6 +32,7 @@ impl Chains {
             chain.into(),
             Invocation {
                 calling: invocation::current(),
+                rendering: false,
                 reads: BTreeMap::new(),
             },
         );
@@ -38,6 +40,20 @@ impl Chains {
             chains: self.clone(),
             chain: chain.into(),
         }
+    }
+
+    pub fn rendering(&self, context: &Context) -> bool {
+        context
+            .parent
+            .as_ref()
+            .and_then(|parent| {
+                self.0
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .get(parent)
+                    .map(|invocation| invocation.rendering)
+            })
+            .unwrap_or(false)
     }
 
     pub fn reads(&self, context: &Context) -> bingo_plugin_host::state::ReadLog {
@@ -78,6 +94,34 @@ impl Chains {
 pub(crate) struct Held {
     chains: Chains,
     chain: String,
+}
+impl Held {
+    pub fn render(&self) {
+        if let Some(invocation) = self
+            .chains
+            .0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get_mut(&self.chain)
+        {
+            invocation.rendering = true;
+        }
+    }
+    pub fn reads(&self) -> Vec<bingo_plugin_host::state::Read> {
+        self.chains
+            .0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&self.chain)
+            .map(|invocation| {
+                invocation
+                    .reads
+                    .values()
+                    .flat_map(|log| log.entries())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
 }
 impl Drop for Held {
     fn drop(&mut self) {

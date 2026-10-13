@@ -1536,7 +1536,7 @@
           "type": "object",
           "properties": {
             "component": {
-              "type": "string"
+              "$ref": "#/$defs/Component"
             },
             "props": true,
             "kind": {
@@ -1717,6 +1717,26 @@
       "required": [
         "label",
         "value"
+      ]
+    },
+    "Component": {
+      "type": "string",
+      "enum": [
+        "AskUserQuestion",
+        "UserMessage",
+        "AssistantMessage",
+        "ToolUse",
+        "ToolResult",
+        "ToolGroup",
+        "ToolProgress",
+        "CommandOutput",
+        "Spinner",
+        "TurnDuration",
+        "InfoNotice",
+        "SessionMode",
+        "PromptHint",
+        "AbovePrompt",
+        "Pane"
       ]
     },
     "Level": {
@@ -2708,6 +2728,9 @@
     "CommandSpec": {
       "type": "object",
       "properties": {
+        "hidden": {
+          "type": "boolean"
+        },
         "name": {
           "type": "string"
         },

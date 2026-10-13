@@ -29,6 +29,7 @@ impl MemoryCommand {
 impl Command for MemoryCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "memory".into(),
             aliases: Vec::new(),
             hint: "what is remembered, about you and about this project".into(),

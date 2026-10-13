@@ -381,6 +381,22 @@ impl HostApi for RemoteKernel {
         Ok(())
     }
 
+    async fn render(
+        &self,
+        session: &SessionId,
+        request: bingo_sdk::render::RenderRequest,
+    ) -> Result<bingo_sdk::View, KernelError> {
+        self.connection
+            .call(
+                name::UI_RENDER,
+                &crate::methods::RenderParams {
+                    session: session.clone(),
+                    request,
+                },
+            )
+            .await
+    }
+
     async fn signal(
         &self,
         session: &SessionId,

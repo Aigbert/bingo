@@ -227,9 +227,20 @@ impl CommandSource for Manager {
         "bingo.mods"
     }
     async fn commands(&self, _: &Path) -> Vec<Arc<dyn Command>> {
-        self.dollar
+        let mut commands = self
+            .dollar
             .get()
             .map(|dollar| dollar.commands())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        commands.extend(
+            self.modules()
+                .iter()
+                .filter(|module| module.admission.allowed())
+                .map(|module| {
+                    Arc::new(crate::handlers::Command(module.found.name.clone()))
+                        as Arc<dyn Command>
+                }),
+        );
+        commands
     }
 }

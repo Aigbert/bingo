@@ -20,6 +20,7 @@ pub struct TasksCommand;
 impl Command for TasksCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "tasks".into(),
             aliases: Vec::new(),
             hint: "the tasks of this session, or of a room's board".into(),

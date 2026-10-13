@@ -267,6 +267,7 @@ impl TestHost {
                         id: "model".into(),
                         label: "model".into(),
                         meta: serde_json::to_value(CommandSpec {
+                            hidden: false,
                             name: "model".into(),
                             aliases: vec![],
                             hint: "[provider/]model".into(),

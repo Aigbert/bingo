@@ -9,12 +9,20 @@ export async function run(event, input, site, ask, cancelled, remaining) {
   };
   const location = JSON.parse(site);
   if (location.callback !== undefined) {
-    const api = dollar({request:(method, params) => request(method, params, 4294967295)}, location, location.plugin, callbacks);
-    return JSON.stringify(await callbacks.run(location.callback, api, JSON.parse(input)));
+    const port = {request:(method, params) => request(method, params, 4294967295)};
+    const api = dollar(port, location, location.plugin, callbacks);
+    const inputValue = JSON.parse(input);
+    if (location.callback === '__ui__') {
+      const dispatch = (event, value, next) => hooks.dispatch(hooks.entries.filter(entry => patternMatches(entry.pattern, event)),
+        0, value, api, location.origin, controller.signal, next);
+      return JSON.stringify(await handlers.fire(location.session, inputValue, port, dispatch));
+    }
+    return JSON.stringify(await callbacks.run(location.callback, api, inputValue));
   }
   if (location.hook !== undefined) {
     const entry = hooks.entries[location.hook];
-    const api = dollar({request:(method, params) => request(method, params, location.hook)}, location, location.plugin, callbacks);
+    const port = {request:(method, params) => request(method, params, location.hook)};
+    const api = dollar(port, location, location.plugin, callbacks);
     let called = !!location.called;
     let continuation;
     const next = Object.assign(async value => {
@@ -29,7 +37,10 @@ export async function run(event, input, site, ask, cancelled, remaining) {
     const invoke = location.recover ? entry.recover : entry.hook;
     const answer = !location.recover && entry.matcher !== undefined && !matches(entry.matcher, inputValue)
       ? await next(inputValue) : await invoke(api, inputValue, next);
-    const result = answer === undefined && continuation ? await continuation : answer;
+    let result = answer === undefined && continuation ? await continuation : answer;
+    if (event === 'ui.render' && result !== undefined) {
+      result = handlers.mint(location.plugin.name, location.session, inputValue.requestId, location.generation, result, port);
+    }
     return JSON.stringify({answered:result !== undefined, value:result ?? null});
   }
   const entries = hooks.entries.filter((entry, index) => patternMatches(entry.pattern, event) && !(location.skip ?? []).includes(index));

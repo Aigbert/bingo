@@ -357,6 +357,18 @@ impl Connection {
         !self.is_alive() && !self.router.announced.swap(true, Ordering::AcqRel)
     }
 
+    pub(crate) async fn subscribe(
+        &self,
+        session: bingo_sdk::SessionId,
+        request: String,
+        reads: Vec<bingo_plugin_host::state::Read>,
+    ) -> Result<(), RpcError> {
+        if let Some(serving) = &self.router.serving {
+            serving.calls.subscribe(session, request, reads).await?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn hold_chain(&self, chain: &str) -> Option<crate::context::Held> {
         self.router
             .serving

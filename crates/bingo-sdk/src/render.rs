@@ -58,6 +58,14 @@ pub struct Invalidate {
     pub requests: Vec<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct HandlerEvent {
+    pub handler: String,
+    pub event: String,
+    #[serde(default)]
+    pub value: Value,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

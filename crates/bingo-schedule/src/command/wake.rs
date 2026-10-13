@@ -72,6 +72,7 @@ fn applied(message: String) -> CommandOutcome {
 impl Command for WakeCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "wake".into(),
             aliases: Vec::new(),
             hint: "the wake the model set, and `off` to end it".into(),

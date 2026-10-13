@@ -324,7 +324,8 @@ impl Bridge {
         let Some(live) = self.ready().await else {
             return Vec::new();
         };
-        live.connection
+        let mut commands: Vec<Arc<dyn SdkCommand>> = live
+            .connection
             .commands()
             .iter()
             .map(|spec| {
@@ -340,7 +341,11 @@ impl Bridge {
                         .unwrap_or(deadline::COMMAND_RUN),
                 )) as Arc<dyn SdkCommand>
             })
-            .collect()
+            .collect();
+        if live.connection.permits("callback/run") {
+            commands.push(Arc::new(crate::command::UiCommand(self.name.clone())));
+        }
+        commands
     }
 
     /// The contributors of a living process, and nothing when there is none.

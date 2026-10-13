@@ -72,6 +72,7 @@ fn the_switcher_scrolls_under_the_row_the_keyboard_is_on() {
 
 fn spec(name: &str) -> bingo_sdk::CommandSpec {
     bingo_sdk::CommandSpec {
+        hidden: false,
         name: name.into(),
         aliases: vec![],
         hint: "what it does".into(),

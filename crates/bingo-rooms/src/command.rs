@@ -34,6 +34,7 @@ pub struct RoomCommand;
 impl Command for RoomCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "room".into(),
             aliases: Vec::new(),
             hint: "the rooms under this session, or open one".into(),

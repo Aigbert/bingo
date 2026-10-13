@@ -1,6 +1,9 @@
 ((native) => {
   delete globalThis.__bingo_native;
-  globalThis.h = (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) });
+  globalThis.h = (kind, props, ...children) => {
+    const flat = children.flat(Infinity).filter(child => child !== null && child !== undefined && typeof child !== 'boolean').map(child => typeof child === 'number' ? String(child) : child);
+    return kind === 'Fragment' ? flat : {kind, ...(props ?? {}), ...(flat.length ? {children:flat} : {})};
+  };
   globalThis.Fragment = 'Fragment';
   globalThis.TextEncoder = class TextEncoder {
     get encoding() { return 'utf-8'; }
