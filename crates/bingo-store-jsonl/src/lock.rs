@@ -49,8 +49,7 @@ impl Locks {
 /// Try the exclusive lock: `None` when another holder — in this process or
 /// another — has it. The caller owns the returned file and, with it, the lock.
 pub fn take(path: &Path) -> Result<Option<File>, KernelError> {
-    bingo_claim::lock(path)
-        .map_err(|e| storage(format!("lock {}: {e}", path.display())))
+    bingo_claim::lock(path).map_err(|e| storage(format!("lock {}: {e}", path.display())))
 }
 
 fn taken(session: &SessionId) -> KernelError {

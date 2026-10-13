@@ -26,7 +26,9 @@ use super::probe::{self, Probe};
 /// `Host::shutdown`.
 #[derive(Debug)]
 pub struct Resident {
-    _claim: pidfile::Claim,
+    // Fields drop in declaration order: remove the record while still holding the claim.
+    _record: pidfile::Published,
+    _claim: bingo_claim::Claim,
     leaving: Leaving,
 }
 
@@ -109,11 +111,14 @@ pub fn enter(paths: &Paths, probe: &dyn Probe) -> Result<Resident, KernelError> 
     // `Plugin::stop`, and a pidfile nobody gives back. The host is still being
     // built at that point, so the handlers cannot wait for it.
     let leaving = Leaving::registered()?;
+    let claim = bingo_claim::Claim::take(paths.data_dir(), pidfile::PROTOCOL)
+        .map_err(|e| internal(e.to_string()))?;
     let path = paths.pidfile();
     if let Some(old) = pidfile::read(&path).map_err(internal)? {
         replace(&path, &old, probe)?;
     }
-    let claim = pidfile::Claim::take(&path, &Record::here(Timestamp::now())).map_err(internal)?;
+    let record =
+        pidfile::Published::write(&path, &Record::here(Timestamp::now())).map_err(internal)?;
     tracing::info!(
         pid = std::process::id(),
         version = pidfile::version(),
@@ -121,6 +126,7 @@ pub fn enter(paths: &Paths, probe: &dyn Probe) -> Result<Resident, KernelError> 
         "the gateway is up"
     );
     Ok(Resident {
+        _record: record,
         _claim: claim,
         leaving,
     })
@@ -130,10 +136,10 @@ pub fn enter(paths: &Paths, probe: &dyn Probe) -> Result<Resident, KernelError> 
 /// the file over if it is not.
 ///
 /// A crash leaves the record behind, and a supervisor's respawn must not wedge
-/// on the corpse's file (ADR-0020 §3) — but a *live* pid is never stepped on,
-/// whatever it turns out to be running.
+/// on the corpse's file (ADR-0020 §3). A legacy live pid is never stepped
+/// on; a modern record is stale once this process holds the OS claim.
 fn replace(path: &std::path::Path, old: &Record, probe: &dyn Probe) -> Result<(), KernelError> {
-    if probe.alive(old.pid) {
+    if !old.claimed && probe.alive(old.pid) {
         return Err(KernelError::new(
             ErrorCode::InvalidInput,
             taken(path, old, probe),
@@ -248,6 +254,7 @@ mod tests {
     fn record(pid: u32) -> Record {
         Record {
             pid,
+            claimed: false,
             version: "0.1.0".into(),
             started: "2026-08-31T09:00:00Z".parse().expect("a timestamp"),
         }

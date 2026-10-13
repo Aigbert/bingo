@@ -199,8 +199,8 @@ fn gateway_check(patient: &Patient<'_>, probe: &dyn Probe) -> Row {
             "gateway.pid",
             Verdict::Bad,
             format!(
-                "pid {} is gone but its record is still here ({}). It did not \
-                 stop cleanly, and the next `start` will refuse until this goes.",
+                "gateway pid {} no longer owns this store but its record is still here ({}). \
+                 The next `start` can replace it.",
                 record.pid,
                 path.display()
             ),
@@ -248,8 +248,9 @@ fn lock_checks(patient: &Patient<'_>, probe: &dyn Probe) -> Vec<Row> {
 
 fn lock_check(root: &Path, path: PathBuf, probe: &dyn Probe) -> Option<Row> {
     let name = relative(&path, root);
-    if let Some(row) =
-        schedule_lock(root, &path, &name).or_else(|| channel_lock(root, &path, &name))
+    if let Some(row) = schedule_lock(root, &path, &name)
+        .or_else(|| channel_lock(root, &path, &name))
+        .or_else(|| gateway_lock(root, &path, &name))
     {
         return Some(row);
     }
@@ -281,6 +282,24 @@ fn lock_check(root: &Path, path: PathBuf, probe: &dyn Probe) -> Option<Row> {
         )
         .fixing(path),
     })
+}
+
+fn gateway_lock(root: &Path, path: &Path, name: &str) -> Option<Row> {
+    if path != root.join(pidfile::PROTOCOL.file) {
+        return None;
+    }
+    let (verdict, say) = match bingo_claim::probe(root, pidfile::PROTOCOL) {
+        Ok(true) => (
+            Verdict::Ok,
+            "gateway OS lock is held; never remove this file".into(),
+        ),
+        Ok(false) => (
+            Verdict::Ok,
+            "gateway OS lock is free; this permanent file is not a stale claim".into(),
+        ),
+        Err(error) => (Verdict::Bad, error.to_string()),
+    };
+    Some(Row::new(name, verdict, say))
 }
 
 fn schedule_lock(root: &Path, path: &Path, name: &str) -> Option<Row> {
@@ -512,6 +531,7 @@ mod tests {
             paths.ensure().expect("the directory");
             let record = pidfile::Record {
                 pid,
+                claimed: false,
                 version: pidfile::version().into(),
                 started: Timestamp::now(),
             };
@@ -749,6 +769,7 @@ mod tests {
         paths.ensure().expect("the directory");
         let record = pidfile::Record {
             pid: 4242,
+            claimed: false,
             version: "0.0.1-ancient".into(),
             started: Timestamp::now(),
         };

@@ -40,7 +40,7 @@ pub async fn stop(paths: &Paths, home: &Path, probe: &dyn Probe) -> Result<Strin
         )),
         State::Stale(record) => clear(paths, &record),
         State::Running(record) => {
-            signal(&record, probe)?;
+            signal(paths, &record, probe)?;
             gone(paths, &record, probe).await
         }
     }
@@ -96,8 +96,13 @@ fn clear(paths: &Paths, record: &Record) -> Result<String, KernelError> {
 /// alive but is not a bingo is never signalled: the alternative is `stop`
 /// killing a stranger's process because a stale file named its number
 /// (M17 R-liveness).
-fn signal(record: &Record, probe: &dyn Probe) -> Result<(), KernelError> {
-    if !probe::is_bingo(probe, record.pid) {
+fn signal(paths: &Paths, record: &Record, probe: &dyn Probe) -> Result<(), KernelError> {
+    if record.claimed {
+        let current = State::read(paths, probe)?;
+        if current.running() != Some(record) {
+            return Ok(());
+        }
+    } else if !probe::is_bingo(probe, record.pid) {
         return Err(KernelError::new(
             ErrorCode::InvalidInput,
             format!(
@@ -118,7 +123,8 @@ fn signal(record: &Record, probe: &dyn Probe) -> Result<(), KernelError> {
 async fn gone(paths: &Paths, record: &Record, probe: &dyn Probe) -> Result<String, KernelError> {
     let started = Instant::now();
     loop {
-        if matches!(State::read(paths, probe)?, State::Stopped) {
+        let state = State::read(paths, probe)?;
+        if state.running() != Some(record) {
             return Ok(format!(
                 "The gateway has stopped: pid {} gave back its pidfile and its locks.",
                 record.pid
@@ -150,6 +156,7 @@ mod tests {
     fn record(pid: u32) -> Record {
         Record {
             pid,
+            claimed: false,
             version: "0.1.0".into(),
             started: Timestamp::now(),
         }

@@ -1,15 +1,6 @@
-//! `<data_dir>/gateway/gateway.pid` (ADR-0020 §3).
-//!
-//! The record says which process is the gateway, what binary it is running and
-//! when it started. It is written with `create_new` — the shape the channels
-//! and schedule claims already use — and given back on drop, so an end that
-//! ran its `Drop`s leaves nothing behind.
-//!
-//! A record is proof that a process took the gateway, never proof that one
-//! still runs: a bingo that was killed leaves its file, so every verb that
-//! reads one asks the process table before believing it.
+//! The gateway's readable process record. Exclusion belongs to `bingo-claim`.
+//! Legacy records have no `claimed` field and still require a PID probe.
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use jiff::Timestamp;
@@ -20,6 +11,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct Record {
     pub pid: u32,
+    #[serde(default)]
+    pub claimed: bool,
     /// The binary that is running, so `status` can say when it is older than
     /// the one that would be started now.
     pub version: String,
@@ -31,6 +24,7 @@ impl Record {
     pub fn here(started: Timestamp) -> Self {
         Self {
             pid: std::process::id(),
+            claimed: true,
             version: version().to_string(),
             started,
         }
@@ -46,7 +40,7 @@ pub fn version() -> &'static str {
 /// A record as it is written: JSON, because a person reads this file when
 /// something has gone wrong and a bare number would answer none of it.
 pub fn render(record: &Record) -> String {
-    // A record is three owned scalars; the only way this fails is a bug, and
+    // A record contains only owned scalars; the only way this fails is a bug, and
     // an empty pidfile would be worse than the fallback line.
     match serde_json::to_string_pretty(record) {
         Ok(json) => format!("{json}\n"),
@@ -70,29 +64,26 @@ pub fn read(path: &Path) -> Result<Option<Record>, String> {
         .map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// The pidfile this process holds, given back when the value drops.
-#[derive(Debug)]
-pub struct Claim {
-    path: PathBuf,
-}
+/// The permanent claim protocol; the process record is stored separately.
+pub const PROTOCOL: bingo_claim::Protocol<'static> = bingo_claim::Protocol {
+    file: "gateway.lock",
+    marker: "bingo-gateway-v1\n",
+};
 
-impl Claim {
-    /// Take the pidfile, or say who got there first. `create_new` is the whole
-    /// exclusion: two gateways racing for one data dir, only one file.
-    pub fn take(path: &Path, record: &Record) -> Result<Self, String> {
-        let mut file =
-            std::fs::File::create_new(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        file.write_all(render(record).as_bytes())
-            .map_err(|e| format!("{}: {e}", path.display()))?;
-        Ok(Self {
-            path: path.to_path_buf(),
-        })
+/// Remove the record before releasing the resident's OS claim.
+#[derive(Debug)]
+pub struct Published(PathBuf);
+
+impl Published {
+    pub fn write(path: &Path, record: &Record) -> Result<Self, String> {
+        std::fs::write(path, render(record)).map_err(|e| format!("{}: {e}", path.display()))?;
+        Ok(Self(path.to_path_buf()))
     }
 }
 
-impl Drop for Claim {
+impl Drop for Published {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+        let _ = std::fs::remove_file(&self.0);
     }
 }
 
@@ -103,6 +94,7 @@ mod tests {
     fn record() -> Record {
         Record {
             pid: 4242,
+            claimed: false,
             version: "0.1.0".into(),
             started: "2026-08-31T09:00:00Z".parse().expect("a timestamp"),
         }
@@ -128,36 +120,6 @@ mod tests {
         std::fs::write(&path, "4242").expect("a bare pid, as an older tree wrote");
         let refused = read(&path).expect_err("a refusal");
         assert!(refused.contains("gateway.pid"), "{refused}");
-    }
-
-    #[test]
-    fn the_second_claim_on_one_data_dir_is_refused_and_the_first_is_intact() {
-        let dir = tempfile::tempdir().expect("a temporary directory");
-        let path = dir.path().join("gateway.pid");
-        let _first = Claim::take(&path, &record()).expect("the first claim");
-        let second = Record {
-            pid: 9999,
-            ..record()
-        };
-        let refused = Claim::take(&path, &second).expect_err("the second is refused");
-        assert!(refused.contains("gateway.pid"), "{refused}");
-        assert_eq!(
-            read(&path).expect("readable").expect("a record").pid,
-            4242,
-            "the loser did not overwrite the winner"
-        );
-    }
-
-    #[test]
-    fn a_claim_is_given_back_when_it_is_dropped() {
-        let dir = tempfile::tempdir().expect("a temporary directory");
-        let path = dir.path().join("gateway.pid");
-        {
-            let _claim = Claim::take(&path, &record()).expect("a claim");
-            assert!(path.exists());
-        }
-        assert!(!path.exists(), "a graceful end leaves no record behind");
-        Claim::take(&path, &record()).expect("the next gateway may have it");
     }
 
     #[test]

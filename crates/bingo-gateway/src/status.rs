@@ -124,6 +124,7 @@ mod tests {
     fn record(pid: u32, version: &str) -> Record {
         Record {
             pid,
+            claimed: false,
             version: version.into(),
             started: at("2026-08-31T09:00:00Z"),
         }
