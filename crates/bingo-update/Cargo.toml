@@ -19,6 +19,7 @@ tier = "library"
 workspace = true
 
 [dependencies]
+bingo-digest.workspace = true
 # The release the API answers with, and the stamp on disk.
 serde.workspace = true
 serde_json.workspace = true
