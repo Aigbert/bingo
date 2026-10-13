@@ -150,6 +150,21 @@ mod tests {
     }
 
     #[test]
+    fn protocol_two_can_describe_a_module_without_a_process_entry() {
+        let before = frozen();
+        let mut after = before.clone();
+        after["$defs"]["Manifest"]["properties"]["module"] = json!({"type": "string"});
+        after["$defs"]["Manifest"]["required"]
+            .as_array_mut()
+            .expect("the frozen manifest has required fields")
+            .retain(|field| field != "entry");
+        assert!(
+            preserves(&before, &after),
+            "ADR-0078 module-only manifests conflict with the ADR-0075 frozen required entry"
+        );
+    }
+
+    #[test]
     fn the_freeze_rejects_removal_and_retyping_but_allows_additions() {
         let before = frozen();
         for pointer in [
