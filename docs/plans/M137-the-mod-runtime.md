@@ -82,11 +82,14 @@ Current paths and required adapters replace the original plan's stale paths.
 - `crates/bingo-plugin-rpc/Cargo.toml`, `src/{manifest,discovery,notice,tool,
   reload,state,host,lib,manager,bridge,source,service,validate,schema,
   wire_ts,events_ts}.rs`: shared mechanisms and runtime/grant adapters.
+  `tests/plugin/{harness,host,reload,services,context,intercept,provider,
+  tools,commands,lifecycle}.rs` and other fixtures driven by that harness: 
+  register, publish grants and declare uses; preserve every assertion.
 - `crates/bingo-sdk/src/{lib,plugin,intercept,catalogue}.rs`, catalogue/payload.rs,
   tests/plugin_registration.rs;
   `crates/bingo-core/src/{plugins,host}.rs`, turn/late.rs, chain/*,
   host/{registry,catalog,interception}.rs: registration and granted catalogue.
-- `crates/bingo/{Cargo.toml,src/main.rs,src/plugins/*,tests/plugin_kit.rs}`:
+- `crates/bingo/{Cargo.toml,src/main.rs,src/composition.rs,src/plugins/*,tests/plugin_kit.rs}`:
   runtime selection, isolated scenario host and runtime listing column.
 - `sdk/typescript/src/{on,cross,plugin,index,events,wire}.ts`, on.test.ts;
   `examples/plugins/ts-status/{plugin.json,hooks/register.ts}`.
@@ -131,17 +134,10 @@ file-watcher dependencies, watching non-explicit directories; no live tests.
   Process reload fixture constructors change mechanically with Launch.
   Core commands/plugins.rs status constructors gain empty execution metadata.
 
-- Stop 2026-10-14, protocol step 6: `tests/plugin/harness.rs` in plugin-rpc
-  starts Manager over TestHost, never adjudicates registrations and exposes
-  no granted catalogue. Its `only_tool` now sees 0 instead of 1. Updating
-  that behavior is outside Files, beyond a mechanical constructor change.
-  Option A (recommended): include RPC integration fixtures in Files; make
-  the harness perform registration, publish grants and declare fixture uses,
-  preserving existing assertions, including the host's default refusal.
-  Option B: include those fixtures and run them over an isolated real kernel
-  instead of TestHost; justify its dev dependency and remeasure the budget.
-  Still pending: remaining grant/re-entry/interrupt contracts, mod reload,
-  binary composition and listing, ts-status parity, RSS and final gates.
+- Resolved 2026-10-14 by the person's delegate: Option A includes the
+  RPC integration harness and its fixtures, with registration, granted
+  catalogue and declared uses. Keep every assertion, including default
+  model refusal; no new dev dependency. Do not merge or rebase dev.
 
 ## Verified (2026-10-14)
 
