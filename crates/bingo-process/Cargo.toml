@@ -16,3 +16,5 @@ workspace = true
 
 [dependencies]
 thiserror.workspace = true
+tokio.workspace = true
+process-wrap.workspace = true

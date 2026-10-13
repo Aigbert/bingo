@@ -608,7 +608,9 @@ dependencies = [
 name = "bingo-process"
 version = "0.6.6"
 dependencies = [
+ "process-wrap 10.0.0",
  "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]
