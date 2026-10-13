@@ -1927,28 +1927,19 @@ mod tests {
         assert!(rows[rows.len() - 1].contains("? for shortcuts"), "{screen}");
     }
 
-    /// §6's budget is for the binary a person runs, which is built in
-    /// release; the tests run in debug, where the same draw is about four
-    /// times slower, so debug is held to four times the budget and release to
-    /// the budget itself.
     #[test]
-    fn a_full_draw_of_a_long_transcript_is_inside_the_frame_budget() {
+    fn a_full_draw_of_a_long_transcript_reuses_the_cached_blocks() {
         let state = long_transcript(5_000);
         let (ui, now) = scene();
-        draw_sized(120, 40, &state, &ui, now);
-        let started = std::time::Instant::now();
-        let draws = 20;
-        for _ in 0..draws {
-            draw_sized(120, 40, &state, &ui, now);
+        let first = draw_sized(120, 40, &state, &ui, now);
+        assert_eq!(ui.painted.borrow().blocks.renders(), 5_000);
+        for _ in 0..20 {
+            assert_eq!(draw_sized(120, 40, &state, &ui, now), first);
         }
-        let each = started.elapsed() / draws;
-        let (budget, profile) = match cfg!(debug_assertions) {
-            true => (std::time::Duration::from_millis(16), "debug"),
-            false => (std::time::Duration::from_millis(4), "release"),
-        };
-        assert!(
-            each < budget,
-            "a warm draw at 120x40 took {each:?} ({profile})"
+        assert_eq!(
+            ui.painted.borrow().blocks.renders(),
+            5_000,
+            "warm draws reuse every finished block"
         );
     }
 

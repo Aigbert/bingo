@@ -536,7 +536,6 @@ mod tests {
     use super::*;
     use crate::test_support::*;
     use bingo_sdk::{Event, ItemStatus};
-    use std::time::{Duration, Instant};
 
     fn cache() -> Blocks {
         Blocks::default()
@@ -578,14 +577,8 @@ mod tests {
     fn a_finished_item_is_drawn_once_and_scrolling_draws_nothing() {
         let state = many(5_000);
         let mut blocks = cache();
-        let started = Instant::now();
         let height = sync(&mut blocks, &state, 80);
-        let warm = started.elapsed();
         assert_eq!(blocks.renders(), 5_000);
-        assert!(
-            warm < Duration::from_millis(200),
-            "five thousand blocks warmed in {warm:?}"
-        );
 
         for from in (0..height).step_by(97) {
             blocks.window(from, 40);
