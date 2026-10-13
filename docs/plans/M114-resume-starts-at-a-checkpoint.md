@@ -19,7 +19,8 @@ kernel holds.
    use the same crate.
 2. **The record, with its test.** `bingo_sdk::store::Checkpoint { format,
    version, seq, offset, line_hash, state }` (`line_hash` is the SHA-256
-   hex of the line's bytes). A fixture and a round-trip test.
+   hex of the line's bytes, newline included). Its own state codec preserves
+   model order and window metadata; fixture and round-trip tests first.
 3. **Trait verbs with defaults.** `SessionStore::checkpoint(&id,
    &Checkpoint)` (default: `Ok(())`, a store without checkpoints) and
    `SessionStore::resume(&id) -> Resumed { state: Option<SessionState>,
@@ -49,7 +50,7 @@ kernel holds.
    a counting store wrapper), and its `SessionState` equals a full
    replay's (`PartialEq`).
 7. **The window.** `Transcript` gains `drop_before_cut()`, which removes
-   items before the compaction boundary and records `OpenHistory`'s
+   unneeded pre-boundary items, hides model-only items, and records `OpenHistory`'s
    `before`/`has_more`; the actor calls it after a checkpoint is written.
    `Actor::journal` keeps only frames after the checkpoint's seq.
 8. **The past is read from storage.**
@@ -68,10 +69,11 @@ kernel holds.
 ## Files
 
 - `crates/bingo-digest/**` (new), `crates/bingo-update/src/{sha256.rs,lib.rs,checksums.rs}`
-- `crates/bingo-sdk/src/{store.rs,transcript.rs,host.rs}`
+- `crates/bingo-sdk/src/{store,transcript}/**`, `{store.rs,transcript.rs,host.rs,lib.rs}`
 - `crates/bingo-store-jsonl/src/{lib.rs,journal.rs,checkpoint.rs}` (new)
 - `crates/bingo-core/src/{session.rs,session/*.rs,host/resume.rs}`
-- tests beside each; `docs/adr/{0066,0005}*.md`, `docs/plans/M107-*.md`
+- Workspace/crate `Cargo.toml`, `Cargo.lock`, `scripts/budget.toml` (+1 member)
+- tests/fixtures beside each, core host tests; `docs/adr/{0066,0005}*.md`, `docs/plans/M107-*.md`
 
 ## Exit criteria
 
@@ -79,8 +81,10 @@ kernel holds.
       rewrites a good one (tests pasted).
 - [ ] Resume after compaction reads the tail only; state equals full
       replay.
-- [ ] After a checkpoint the actor holds no frame and no item older than
-      the window (assert lengths in a test).
+- [ ] After a checkpoint the actor holds no covered frame and no item
+      outside both model order and the client tail at/after the boundary.
+- [ ] Four-item cut: model `[i1,i4,i3]`, client `[i3,i4]`, storage page
+      `[i1,i2]`; no gaps/duplicates, and model order survives the cut.
 - [ ] Catch-up from seq 0 and history paging past the window return
       what an un-windowed session returned (test pasted).
 - [ ] All gates, `scripts/tui-smoke.sh` included.
@@ -100,31 +104,10 @@ kernel holds.
 - Re-verify at start: M112 and M113 have landed; `resume_frames`,
   `subscribe`, `bounded_snapshot`, `HostApi::history` by name.
 
-- **STOP (2026-10-13, protocol steps 2/6): the literal window conflicts
-  with the existing compaction contract.** At `1335830b`, ADR-0064 §1,
-  `sdk/transcript.rs::splice_compaction`, `sdk/compactor.rs::Compaction`
-  and `core/context.rs`'s kept-item regression preserve `kept` ids before
-  `boundary`. ADR-0066 §4 and this plan's window exit criterion instead
-  require no item before that boundary. Example: client items
-  `[i1, i2, i3, i4]`, boundary `i3`, kept `[i1]`, summary `i4` produce
-  model order `[i1, i4, i3]`; a boundary-only window loses `i1`.
-  This is a Decision conflict, not mechanical fixture drift.
-- **Options requiring a decision:** (A, recommended) clarify ADR-0066 §4
-  and the window criterion to retain model-required pre-boundary items,
-  with history paging handling the resulting gaps; (B) keep the strict
-  boundary rule and change ADR-0064/the compaction contract to disallow
-  pre-boundary `kept` items, which changes existing model behavior.
-  Neither option is implemented; the supplied decisions remain unchanged.
-- **Checkpoint codec finding:** M112's `Transcript` serializer writes
-  only `historyGeneration` and client `items`; deserialization rebuilds
-  model order from client order. A plain `SessionState` round trip is
-  therefore not a checkpoint after compaction. Once the window decision
-  is resolved, brick 2 needs a checkpoint-specific state codec preserving
-  model order (and window metadata), without changing the client wire
-  promised by ADR-0064. Re-verify the complete Files list before coding;
-  manifests, lockfile and the dependency budget also need the new member.
+- 2026-10-13 decision: use ADR-0066 §4's clarified model/client window
+  invariant and a checkpoint-specific state codec; client wire unchanged.
 
-## Verified (2026-10-13; stopped at re-verification)
+## Verified (2026-10-13)
 
 - Branch `m114-resume-starts-at-a-checkpoint`, base `1335830b`; clean on
   entry. Read the execution protocol, audit and ADR-0066/0005, plus the
@@ -145,6 +128,4 @@ kernel holds.
   ```
   Exit 101; both failures demonstrate the findings, not a build failure.
   The temporary probes were removed; only this plan is changed.
-- All exit criteria remain unticked. Implementation gates, Windows checks
-  and PTY smoke were not run because protocol step 6 ends this run.
-  ADR-0066 remains proposed. No push, merge or PR.
+- The user resolved the initial stop with the dated decision above.
