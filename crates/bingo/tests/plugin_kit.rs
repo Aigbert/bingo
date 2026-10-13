@@ -171,3 +171,61 @@ fn scenario_refuses_a_plugin_that_did_not_start() {
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("missing-program"));
 }
+
+#[test]
+fn module_acceptance_runs_outside_the_workspace() {
+    let root = tempfile::tempdir().unwrap();
+    let plugin = fixture(root.path(), "ts-status");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(plugin.join("plugin.json")).unwrap())
+            .unwrap();
+    manifest.as_object_mut().unwrap().remove("entry");
+    manifest["module"] = serde_json::json!("hooks/register.ts");
+    manifest["uses"] = serde_json::json!(["store", "ui"]);
+    std::fs::write(plugin.join("plugin.json"), manifest.to_string()).unwrap();
+    let tested = success(&run(root.path(), "test", &plugin));
+    assert!(tested.starts_with("PASS ") && tested.contains("acceptance.json"));
+    assert!(!plugin.join("must-not-run").exists());
+}
+
+#[test]
+fn module_listing_names_the_runtime_and_its_disabled_reason() {
+    let root = tempfile::tempdir().unwrap();
+    let plugin = root.path().join(".bingo/plugins/hello");
+    std::fs::create_dir_all(&plugin).unwrap();
+    std::fs::write(
+        plugin.join("plugin.json"),
+        r#"{"name":"hello","version":"1","module":"main.ts"}"#,
+    )
+    .unwrap();
+    std::fs::write(plugin.join("main.ts"), "export function register(on) {}").unwrap();
+    let list = || {
+        Command::new(env!("CARGO_BIN_EXE_bingo"))
+            .args(["plugins", "list"])
+            .current_dir(root.path())
+            .envs(home::home_env(root.path()))
+            .env_remove("BINGO_FAKE_SCRIPT")
+            .output()
+            .unwrap()
+    };
+    let first = success(&list());
+    let row = first
+        .lines()
+        .find(|line| line.starts_with("hello\t"))
+        .unwrap();
+    assert!(row.ends_with("\tmodule"), "{row}");
+    std::fs::write(
+        root.path().join(".bingo/settings.json"),
+        r#"{"enabledPlugins":{"bingo.mods":false}}"#,
+    )
+    .unwrap();
+    let disabled = success(&list());
+    let row = disabled
+        .lines()
+        .find(|line| line.starts_with("hello\t"))
+        .unwrap();
+    assert!(
+        row.contains("\toff\t") && row.contains("module runtime is switched off"),
+        "{row}"
+    );
+}
