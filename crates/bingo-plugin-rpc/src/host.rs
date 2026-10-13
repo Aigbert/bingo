@@ -156,4 +156,38 @@ mod tests {
             .unwrap_err();
         assert!(error.message.contains("model grant"), "{}", error.message);
     }
+
+    #[tokio::test]
+    async fn host_operations_require_the_catalogues_granted_nouns() {
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_catalog(|kind| async move {
+            Ok(Catalog {
+                kind,
+                entries: vec![CatalogEntry {
+                    id: "stub".into(),
+                    label: "stub".into(),
+                    meta: json!({"enabled":true, "tier":"rewrite", "uses":[]}),
+                }],
+            })
+        });
+        let home = tempfile::tempdir().unwrap();
+        let server = Server::new(
+            "stub",
+            host.handle(),
+            Arc::new(NoServices),
+            crate::state::Store::new(home.path(), "stub"),
+        );
+        server.initialize(&crate::wire::capabilities());
+        for (method, params, noun) in [
+            ("host/state/get", json!({"scope":"ses_1", "key":"key"}), "state"),
+            ("host/state/set", json!({"scope":"global", "key":"key", "value":1}), "store"),
+            ("host/place", json!({"slot":"calls", "view":null}), "ui"),
+            ("host/extend", json!({"session":"ses_1", "key":"key", "value":1}), "session"),
+            ("host/deliver", json!({}), "session"),
+        ] {
+            let error = server.answer(method, params).await.expect_err(method);
+            assert!(error.message.contains(&format!("{noun} grant")), "{method}: {}", error.message);
+        }
+    }
+
 }
