@@ -155,3 +155,53 @@ async fn a_denied_setting_changes_neither_the_session_nor_the_file() {
     assert!(!path.exists());
     host.shutdown().await;
 }
+
+struct PausedObserver {
+    entered: Arc<tokio::sync::Notify>,
+    release: Arc<tokio::sync::Notify>,
+}
+#[async_trait]
+impl Interceptor for PausedObserver {
+    fn id(&self) -> &str {
+        "paused-observer"
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher::at(bingo_sdk::catalogue::SESSION_START)
+    }
+    async fn observe(&self, _: &bingo_sdk::catalogue::Entry, _: &HookContext, _: &Value) {
+        self.entered.notify_one();
+        self.release.notified().await;
+    }
+}
+
+#[tokio::test]
+async fn a_passive_observer_cannot_hold_a_command_acknowledgement() {
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let host = Host::build(
+        vec![TestPlugin::boxed(
+            &PROVIDER,
+            vec![
+                Contribution::Provider(ScriptedProvider::new(vec![])),
+                Contribution::Interceptor {
+                    external: None,
+                    link: Arc::new(PausedObserver {
+                        entered: entered.clone(),
+                        release: release.clone(),
+                    }),
+                },
+            ],
+        )],
+        HostConfig::new(env()).with_layer("cli", json!({"model":"m"})),
+    )
+    .await
+    .unwrap();
+    let mut client = super::commands::Client::open(&host).await;
+    tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified())
+        .await
+        .unwrap();
+    let ack = tokio::time::timeout(std::time::Duration::from_secs(5), client.ack("/status")).await;
+    release.notify_one();
+    host.shutdown().await;
+    assert!(matches!(ack.unwrap().0, IntentOutcome::Applied { .. }));
+}

@@ -4,7 +4,6 @@ use futures::FutureExt;
 use serde_json::Value;
 
 pub(crate) enum Work {
-    Task(BoxFuture<'static, ()>),
     Frame(Box<Frame>, HookContext),
     Named(LinkPoint, Value, HookContext),
 }
@@ -43,7 +42,6 @@ pub(crate) fn observed(event: &Event) -> Option<(LinkPoint, Value)> {
 
 pub(crate) async fn work(work: Work, hooks: &crate::turn::HookSet) {
     let (entry, value, cx) = match work {
-        Work::Task(task) => return task.await,
         Work::Frame(frame, cx) => {
             for hook in hooks.at(HookPoint::Event, None).await {
                 hook.on_event(&frame, &cx).await;

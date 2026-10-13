@@ -85,7 +85,7 @@ struct Actor {
     cancel: CancellationToken,
     /// Every frame but the deltas for the hooks that observe the session, in
     /// order, on a task of their own; `None` when no hook asked (ADR-0009 §4).
-    observed: Option<mpsc::UnboundedSender<crate::chain::observe::Work>>,
+    observed: Option<catalogue::Queues>,
     /// Flipped when the actor is done, for whoever waits on the mailbox.
     done: watch::Sender<bool>,
     pending: HashMap<InteractionId, Pending>,
@@ -197,8 +197,9 @@ impl Actor {
             Msg::Record { body, reply } => drop(reply.send(self.record(body).await?)),
             Msg::Progress { item, tail } => self.progress(item, tail).await?,
             Msg::CommandFinished { intent, outcome } => {
-                self.command_finished(intent, outcome).await?
+                catalogue::command_finished(self, intent, outcome).await?
             }
+            Msg::CommandReady { intent, outcome } => self.command_finished(intent, outcome).await?,
             Msg::Reconfigure { config } => self.reconfigure(config).await?,
             Msg::Offered { turn, tools } => self.turn_offers(&turn, tools),
             Msg::Complete {
@@ -449,7 +450,7 @@ impl Actor {
     /// observe the session; publishing never waits on them.
     fn observe_named(&self, entry: LinkPoint, payload: Value) {
         if let Some(observed) = &self.observed {
-            let _ = observed.send(crate::chain::observe::Work::Named(
+            let _ = observed.events.send(crate::chain::observe::Work::Named(
                 entry,
                 payload,
                 self.hook_context(),
@@ -461,14 +462,7 @@ impl Actor {
         if self.config.hooks.is_empty() {
             return;
         }
-        let set = self.config.hooks.clone();
-        let (tx, mut rx) = mpsc::unbounded_channel::<crate::chain::observe::Work>();
-        self.observed = Some(tx);
-        self.tracker.spawn(async move {
-            while let Some(work) = rx.recv().await {
-                crate::chain::observe::work(work, &set).await;
-            }
-        });
+        self.observed = Some(catalogue::start(self));
     }
 
     /// The next turn runs on a config the host rebuilt; the running one
@@ -693,7 +687,7 @@ impl Actor {
         if let Some(observed) = &self.observed
             && !matches!(frame.event, Event::ItemDelta { .. })
         {
-            let _ = observed.send(crate::chain::observe::Work::Frame(
+            let _ = observed.events.send(crate::chain::observe::Work::Frame(
                 Box::new(frame.clone()),
                 self.hook_context(),
             ));

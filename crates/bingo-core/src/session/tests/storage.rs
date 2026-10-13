@@ -100,7 +100,10 @@ async fn storage_failure_never_publishes_or_observes_the_failed_frame() {
     actor.open().await.unwrap().await;
     let events = actor.subscribe(actor.seq);
     let (observed, mut observations) = mpsc::unbounded_channel();
-    actor.observed = Some(observed);
+    actor.observed = Some(super::super::catalogue::Queues {
+        events: observed,
+        writes: mpsc::unbounded_channel().0,
+    });
     let cancel = CancellationToken::new();
     actor.running = Some(Running::spawn(
         &actor,

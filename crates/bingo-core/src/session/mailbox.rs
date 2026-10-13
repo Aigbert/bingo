@@ -123,6 +123,10 @@ pub(crate) enum Msg {
         item: ItemId,
         tail: String,
     },
+    CommandReady {
+        intent: IntentId,
+        outcome: Result<CommandOutcome, KernelError>,
+    },
     CommandFinished {
         intent: IntentId,
         outcome: Result<CommandOutcome, KernelError>,

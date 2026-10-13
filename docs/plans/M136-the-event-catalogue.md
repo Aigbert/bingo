@@ -159,3 +159,8 @@ TypeScript acceptance assertion. The previous step-6 stop is resolved.
 Do not rebase onto moved dev; the user owns merging and conflict resolution.
 Per the user's explicit request, append full gate output in Verified; this takes
 precedence over the plan's usual 150-line limit. No push, merge or PR.
+
+Resumed workspace testing exposed extension writes overtaking command acknowledgements.
+Keep mutations and observations on separate owned queues; acknowledge a command after
+its queued writes. This fix stays in the existing core Files, preserves the board
+assertions, and mechanically adapts the storage-test queue fixture to the new type.

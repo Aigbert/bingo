@@ -1,6 +1,47 @@
 //! Catalogue work is owned by the actor and returns through its mailbox.
 use super::*;
 
+pub(super) struct Queues {
+    pub events: mpsc::UnboundedSender<crate::chain::observe::Work>,
+    pub writes: mpsc::UnboundedSender<futures::future::BoxFuture<'static, ()>>,
+}
+
+pub(super) fn start(actor: &Actor) -> Queues {
+    let hooks = actor.config.hooks.clone();
+    let (events, mut observations) = mpsc::unbounded_channel();
+    actor.tracker.spawn(async move {
+        while let Some(work) = observations.recv().await {
+            crate::chain::observe::work(work, &hooks).await;
+        }
+    });
+    let (writes, mut pending) =
+        mpsc::unbounded_channel::<futures::future::BoxFuture<'static, ()>>();
+    actor.tracker.spawn(async move {
+        while let Some(work) = pending.recv().await {
+            work.await;
+        }
+    });
+    Queues { events, writes }
+}
+
+/// A command acknowledgement follows its writes without waiting for observers.
+pub(super) async fn command_finished(
+    actor: &mut Actor,
+    intent: IntentId,
+    outcome: Result<CommandOutcome, KernelError>,
+) -> Result<(), KernelError> {
+    if actor.config.hooks.has_links()
+        && let Some(queues) = &actor.observed
+    {
+        let mailbox = actor.mailbox.clone();
+        let _ = queues.writes.send(Box::pin(async move {
+            mailbox.send(Msg::CommandReady { intent, outcome });
+        }));
+        return Ok(());
+    }
+    actor.command_finished(intent, outcome).await
+}
+
 pub(crate) struct Completed {
     turn: TurnId,
     status: TurnStatus,
@@ -108,7 +149,7 @@ pub(super) fn rewrite(actor: &Actor, event: Event) {
     let hooks = actor.config.hooks.clone();
     let cx = actor.hook_context();
     let mailbox = actor.mailbox.clone();
-    let work = crate::chain::observe::Work::Task(Box::pin(async move {
+    let work = Box::pin(async move {
         let links = hooks.links().await;
         let report = crate::chain::Report::default();
         let changed = match event {
@@ -145,8 +186,8 @@ pub(super) fn rewrite(actor: &Actor, event: Event) {
         if let Ok(event) = changed {
             mailbox.send(Msg::CatalogueEvent(Box::new(event)));
         }
-    }));
+    });
     if let Some(queue) = &actor.observed {
-        let _ = queue.send(work);
+        let _ = queue.writes.send(work);
     }
 }
