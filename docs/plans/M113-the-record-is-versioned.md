@@ -23,7 +23,7 @@ to go (a version line and a raw-JSON step). Already-readable historical records 
    `event` is `Event::Unknown { raw }`; an item keeps id, turn and
    status with `ItemBody::Unknown { raw }`.
 3. **The implementation.** `Event` and `ItemBody` get a hand-written
-   `Deserialize`: deserialise into `serde_json::Value`, try the derived
+   `Deserialize`: capture raw JSON bytes, try the derived
    shape (the existing enum renamed behind a private `Known` type or via
    `#[serde(remote)]`, whichever keeps the schema derive working), and
    fall back to `Unknown`. `Serialize` writes `raw` back verbatim.
@@ -83,8 +83,8 @@ to go (a version line and a raw-JSON step). Already-readable historical records 
 - A hand-written `Deserialize` on a large tagged enum costs compile time
   and may disturb `schemars`; `scripts/budget.sh` checks the warm
   `cargo check -p bingo-core` time. If it breaks the budget, stop.
-- Trying the known shape on every line doubles parsing for unknown ones
-  only; known lines parse once from the `Value`.
+- Raw capture and serde buffering add decoding work; byte-preservation
+  tests and the warm-check budget cover the implementation tradeoff.
 - Re-verify at start: M112 has landed; variant counts; where `ItemBody`
   is defined.
 
@@ -105,16 +105,14 @@ read a known shape: enable the existing `serde_json` dependency's
 only deserialisation creates it. No duplicated live enum is needed.
 
 
-## Protocol stop (2026-10-13, test helper scope)
+## Scope decision (2026-10-13)
 
-The development workspace check needs `ItemBody::Unknown` in the exhaustive
-label match at `crates/bingo-core/src/test_support.rs:273`. This file is
-outside Files and overlaps M111's test-support work. Protocol step 6
-requires a stop before fixing it. Options: authorize this one match arm
-and add the file to Files, or wait for an agreed M111 helper update. Neither
-was applied. The SDK implementation is committed; version lines, reducer
-coverage, schema updates and remaining verification are still outstanding.
-ADR-0065 stays proposed and every exit criterion remains unticked.
+The user approved the standing M130 rule: mechanically update tests and
+fixtures outside Files that only construct/name a changed type. For M113,
+exhaustive matches anywhere may gain the ADR-0065 Unknown behavior; list
+every site here. Stop only when a site's behavior needs a new decision.
+The test-helper blocker is resolved. Additional sites so far:
+- `crates/bingo-core/src/test_support.rs::kind`: label Unknown in tests.
 
 Evidence collected so far (trimmed; these are not all milestone gates):
 
