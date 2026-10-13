@@ -1,6 +1,7 @@
 // Generated from JSON Schema. Do not edit.
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
 export type ActionItem = { "action": Action; "key"?: (string | null); "label": string; [key: string]: unknown; };
+export type Ancestors = { "name": string; "session": SessionId; [key: string]: unknown; };
 export type Answer = ({ "kind": "allowOnce"; [key: string]: unknown; } | { "kind": "allowSession"; "scope": string; [key: string]: unknown; } | { "feedback"?: (string | null); "kind": "deny"; [key: string]: unknown; } | { "ids": Array<string>; "kind": "choice"; "other"?: (string | null); [key: string]: unknown; } | { "kind": "text"; "text": string; [key: string]: unknown; } | { "kind": "confirm"; [key: string]: unknown; } | { "kind": "cancel"; [key: string]: unknown; } | { "answers": Array<Answer>; "kind": "form"; [key: string]: unknown; });
 export type AnswerRole = ("allowing" | "refusing");
 export type AnswerSpec = ("allowOnce" | "allowSession" | "deny" | "choice" | "text" | "confirm" | "cancel" | "form");
@@ -19,10 +20,21 @@ export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unkn
 export type ContextUsage = { "trigger": number; "used": number; "window": number; [key: string]: unknown; };
 export type DecisionKind = ("allow" | "allowSession" | "deny");
 export type Delivery = ("wake" | "hold");
-export type DollarInputs = { "clock.after": Timer; "clock.every": Timer; "clock.now": null; "clock.sleep": Millis; "command.list": null; "command.register": RegisterCommand; "command.run": Run; "config.list": Session; "config.read": Read; "config.set": Setting; "model.classify": Classify; "model.complete": Complete; "model.fork": Fork; "prompt.read": Session; "prompt.submit": Submit; "session.append": Extend; "session.authorize": Authorize; "session.compact": Session; "session.cwd": Session; "session.id": Session; "session.messages": Messages; "session.model": Session; "session.root": Session; "session.send": Send; "session.surfaces": Session; "session.turns": Session; "session.usage": Session; "session.version": null; "state.get": StateGet; "state.set": StateSet; "store.delete": StateGet; "store.get": StateGet; "store.keys": null; "store.set": StateSet; "tool.call": Invoke; "tool.list": null; "tool.register": RegisterTool; "turn.abort": Session; };
-export type DollarResults = { "clock.after": string; "clock.every": string; "clock.now": string; "clock.sleep": null; "command.list": Catalog; "command.register": string; "command.run": IntentId; "config.list": ConfigView; "config.read": unknown; "config.set": null; "model.classify": (string | null); "model.complete": Completed; "model.fork": Completed; "prompt.read": PromptView; "prompt.submit": IntentId; "session.append": null; "session.authorize": Answer; "session.compact": IntentId; "session.cwd": string; "session.id": SessionId; "session.messages": HistoryChunk; "session.model": (string | null); "session.root": string; "session.send": null; "session.surfaces": Array<ClientIdentity>; "session.turns": Array<TurnId>; "session.usage": UsageView; "session.version": string; "state.get": (StateValue | null); "state.set": StateValue; "store.delete": boolean; "store.get": (StateValue | null); "store.keys": Array<string>; "store.set": StateValue; "tool.call": ToolOutput; "tool.list": Catalog; "tool.register": string; "turn.abort": null; };
+export type DollarInputs = { "agent.list": Session; "agent.register": unknown; "agent.spawn": unknown; "clock.after": Timer; "clock.every": Timer; "clock.now": null; "clock.sleep": Millis; "command.list": null; "command.register": RegisterCommand; "command.run": Run; "config.list": Session; "config.read": Read; "config.set": Setting; "env.get": EnvGet; "env.set": EnvSet; "fs.ancestors": Ancestors; "fs.exists": FilePath; "fs.list": FileList; "fs.read": FileRead; "fs.stat": FilePath; "fs.write": FileWrite; "http.fetch": Fetch; "mcp.call": unknown; "mcp.connect": unknown; "model.classify": Classify; "model.complete": Complete; "model.fork": Fork; "process.kill": ProcessId; "process.read": ProcessId; "process.run": ProcessInput; "process.spawn": ProcessInput; "process.write": ProcessWrite; "prompt.read": Session; "prompt.submit": Submit; "session.append": Extend; "session.authorize": Authorize; "session.compact": Session; "session.cwd": Session; "session.id": Session; "session.messages": Messages; "session.model": Session; "session.root": Session; "session.send": Send; "session.surfaces": Session; "session.turns": Session; "session.usage": Session; "session.version": null; "state.get": StateGet; "state.set": StateSet; "store.delete": StateGet; "store.get": StateGet; "store.keys": null; "store.set": StateSet; "tool.call": Invoke; "tool.list": null; "tool.register": RegisterTool; "turn.abort": Session; };
+export type DollarResults = { "agent.list": Array<SessionSummary>; "agent.register": null; "agent.spawn": ToolOutput; "clock.after": string; "clock.every": string; "clock.now": string; "clock.sleep": null; "command.list": Catalog; "command.register": string; "command.run": IntentId; "config.list": ConfigView; "config.read": unknown; "config.set": null; "env.get": (string | null); "env.set": null; "fs.ancestors": Array<string>; "fs.exists": boolean; "fs.list": Array<string>; "fs.read": string; "fs.stat": FileStat; "fs.write": null; "http.fetch": Fetched; "mcp.call": ToolOutput; "mcp.connect": null; "model.classify": (string | null); "model.complete": Completed; "model.fork": Completed; "process.kill": null; "process.read": ProcessOutput; "process.run": ProcessOutput; "process.spawn": string; "process.write": null; "prompt.read": PromptView; "prompt.submit": IntentId; "session.append": null; "session.authorize": Answer; "session.compact": IntentId; "session.cwd": string; "session.id": SessionId; "session.messages": HistoryChunk; "session.model": (string | null); "session.root": string; "session.send": null; "session.surfaces": Array<ClientIdentity>; "session.turns": Array<TurnId>; "session.usage": UsageView; "session.version": string; "state.get": (StateValue | null); "state.set": StateValue; "store.delete": boolean; "store.get": (StateValue | null); "store.keys": Array<string>; "store.set": StateValue; "tool.call": ToolOutput; "tool.list": Catalog; "tool.register": string; "turn.abort": null; };
+export type Driver = ("model" | "log");
 export type Effort = ("minimal" | "low" | "medium" | "high" | "xHigh" | "max");
+export type Encoding = ("utf8" | "base64");
+export type EnvGet = { "name": string; "session": SessionId; [key: string]: unknown; };
+export type EnvSet = { "name": string; "session": SessionId; "value": string; [key: string]: unknown; };
 export type Extend = { "key": string; "session": SessionId; "value": unknown; [key: string]: unknown; };
+export type Fetch = { "body"?: (string | null); "headers"?: ({ [key: string]: string; } | null); "method"?: (string | null); "session": SessionId; "url": string; [key: string]: unknown; };
+export type Fetched = { "body": string; "headers": { [key: string]: string; }; "notice"?: (string | null); "status": number; "truncated": boolean; [key: string]: unknown; };
+export type FileList = { "limit"?: (number | null); "path": string; "session": SessionId; [key: string]: unknown; };
+export type FilePath = { "path": string; "session": SessionId; [key: string]: unknown; };
+export type FileRead = { "encoding"?: (Encoding | null); "path": string; "session": SessionId; [key: string]: unknown; };
+export type FileStat = { "directory": boolean; "file": boolean; "size": number; [key: string]: unknown; };
+export type FileWrite = { "body": string; "encoding"?: (Encoding | null); "path": string; "session": SessionId; [key: string]: unknown; };
 export type FinishReason = { "raw"?: (string | null); "unified": UnifiedFinish; [key: string]: unknown; };
 export type Fork = { "prompt": string; "session": SessionId; "turn"?: (TurnId | null); [key: string]: unknown; };
 export type HistoryChunk = { "generation": number; "items": Array<Item>; "next"?: (ItemId | null); "oversized"?: (OversizedItem | null); [key: string]: unknown; };
@@ -46,7 +58,12 @@ export type ModelEvent = ({ "type": "streamStart"; "warnings"?: Array<string>; [
 export type ModelRequest = { "maxTokens": number; "messages": Array<Message>; "model": string; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "reasoning"?: (Effort | null); "session"?: (SessionId | null); "system": Array<SystemBlock>; "tools": Array<ToolSpec>; [key: string]: unknown; };
 export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
 export type OversizedItem = { "checksum": string; "id": ItemId; "totalBytes": number; [key: string]: unknown; };
+export type ParentLink = { "item"?: (ItemId | null); "session": SessionId; [key: string]: unknown; };
 export type Preview = ({ "kind": "diff"; "unified": string; [key: string]: unknown; } | { "command": string; "cwd": string; "description"?: (string | null); "kind": "command"; [key: string]: unknown; } | { "kind": "url"; "url": string; [key: string]: unknown; });
+export type ProcessId = { "id": string; "session": SessionId; [key: string]: unknown; };
+export type ProcessInput = { "argv": Array<string>; "cwd"?: (string | null); "session": SessionId; "timeoutMs"?: (number | null); [key: string]: unknown; };
+export type ProcessOutput = { "code"?: (number | null); "stderr": string; "stdout": string; [key: string]: unknown; };
+export type ProcessWrite = { "body"?: (string | null); "id": string; "session": SessionId; [key: string]: unknown; };
 export type PromptView = { "last"?: (string | null); "queue": Array<QueueEntry>; [key: string]: unknown; };
 export type Question = { "freeText"?: boolean; "header"?: (string | null); "multi"?: boolean; "options": Array<QuestionOption>; "question": string; [key: string]: unknown; };
 export type QuestionOption = { "description"?: (string | null); "id": string; "label": string; "preview"?: (string | null); "role"?: (AnswerRole | null); [key: string]: unknown; };
@@ -59,6 +76,7 @@ export type Run = { "args": unknown; "name": string; "session": SessionId; [key:
 export type Send = { "delivery": Delivery; "input": Input; "to": SessionId; [key: string]: unknown; };
 export type Session = { "session": SessionId; [key: string]: unknown; };
 export type SessionId = string;
+export type SessionSummary = { "asking"?: boolean; "busy"?: boolean; "createdAt": string; "cwd": string; "driver"?: Driver; "id": SessionId; "key"?: (string | null); "messages"?: (number | null); "model"?: (string | null); "parent"?: (ParentLink | null); "provider"?: (string | null); "systemExtra"?: (string | null); "title"?: (string | null); "tools"?: (Array<string> | null); "updatedAt": string; "usage"?: Usage; [key: string]: unknown; };
 export type Setting = { "key": string; "session": SessionId; "value": unknown; [key: string]: unknown; };
 export type StateGet = { "key": string; "scope": string; [key: string]: unknown; };
 export type StateSet = { "ifVersion"?: (number | null); "key": string; "scope": string; "value": unknown; [key: string]: unknown; };
@@ -78,6 +96,125 @@ export type UsageView = { "context"?: (ContextUsage | null); "lastTurn"?: (Usage
 export type View = ({ "kind": "text"; "text": string; [key: string]: unknown; } | { "kind": "markdown"; "text": string; [key: string]: unknown; } | { "kind": "code"; "lang"?: (string | null); "text": string; [key: string]: unknown; } | { "kind": "diff"; "unified": string; [key: string]: unknown; } | { "items": Array<string>; "kind": "list"; [key: string]: unknown; } | { "headers": Array<string>; "kind": "table"; "rows": Array<Array<string>>; [key: string]: unknown; } | { "kind": "keyValue"; "rows": Array<[string, string, ...Array<unknown>]>; [key: string]: unknown; } | { "kind": "progress"; "label"?: (string | null); "total"?: (number | null); "value": number; [key: string]: unknown; } | { "kind": "badge"; "text": string; "tone"?: Tone; [key: string]: unknown; } | { "kind": "tree"; "nodes": Array<TreeNode>; [key: string]: unknown; } | { "children": Array<View>; "kind": "stack"; [key: string]: unknown; } | { "children": Array<View>; "kind": "columns"; [key: string]: unknown; } | { "child": View; "kind": "panel"; "title": string; [key: string]: unknown; } | { "items": Array<ActionItem>; "kind": "actions"; [key: string]: unknown; } | { "customKind": string; "data": unknown; "fold": string; "kind": "custom"; [key: string]: unknown; });
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export const dollarRoutes = {
+  "mcp.call": {
+    "face": "mcp",
+    "owner": true,
+    "site": [
+      "session"
+    ]
+  },
+  "mcp.connect": {
+    "face": "mcp",
+    "owner": true,
+    "site": [
+      "session"
+    ]
+  },
+  "agent.spawn": {
+    "face": "agent",
+    "owner": true,
+    "site": [
+      "session"
+    ]
+  },
+  "agent.list": {
+    "face": "agent",
+    "owner": true,
+    "site": [
+      "session"
+    ]
+  },
+  "agent.register": {
+    "face": "agent",
+    "owner": true,
+    "site": [
+      "session"
+    ]
+  },
+  "http.fetch": {
+    "face": "bingo.plugin.http",
+    "site": [
+      "session"
+    ]
+  },
+  "env.get": {
+    "face": "bingo.plugin.env",
+    "site": [
+      "session"
+    ]
+  },
+  "env.set": {
+    "face": "bingo.plugin.env",
+    "site": [
+      "session"
+    ]
+  },
+  "process.run": {
+    "face": "bingo.plugin.process",
+    "site": [
+      "session"
+    ]
+  },
+  "process.spawn": {
+    "face": "bingo.plugin.process",
+    "site": [
+      "session"
+    ]
+  },
+  "process.read": {
+    "face": "bingo.plugin.process",
+    "site": [
+      "session"
+    ]
+  },
+  "process.write": {
+    "face": "bingo.plugin.process",
+    "site": [
+      "session"
+    ]
+  },
+  "process.kill": {
+    "face": "bingo.plugin.process",
+    "site": [
+      "session"
+    ]
+  },
+  "fs.read": {
+    "face": "bingo.plugin.fs",
+    "site": [
+      "session"
+    ]
+  },
+  "fs.write": {
+    "face": "bingo.plugin.fs",
+    "site": [
+      "session"
+    ]
+  },
+  "fs.list": {
+    "face": "bingo.plugin.fs",
+    "site": [
+      "session"
+    ]
+  },
+  "fs.exists": {
+    "face": "bingo.plugin.fs",
+    "site": [
+      "session"
+    ]
+  },
+  "fs.stat": {
+    "face": "bingo.plugin.fs",
+    "site": [
+      "session"
+    ]
+  },
+  "fs.ancestors": {
+    "face": "bingo.plugin.fs",
+    "site": [
+      "session"
+    ]
+  },
   "session.messages": {
     "face": "bingo.plugin.session",
     "site": [

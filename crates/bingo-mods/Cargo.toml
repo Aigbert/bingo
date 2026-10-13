@@ -12,6 +12,12 @@ description = "Sandboxed in-process module plugins"
 workspace = true
 
 [dependencies]
+# M139: reuse the bounded HTTP client, process trees and canonical paths.
+bingo-http.workspace = true
+bingo-process.workspace = true
+dunce = "1"
+reqwest.workspace = true
+base64.workspace = true
 rquickjs.workspace = true
 oxc_allocator.workspace = true
 oxc_ast.workspace = true

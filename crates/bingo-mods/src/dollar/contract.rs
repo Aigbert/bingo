@@ -81,6 +81,7 @@ impl callback::Executor for Callback {
 }
 fn host() -> testing::TestHost {
     let host = testing::TestHost::default();
+    host.on_notice(|_, _, _| async { Ok(()) });
     host.on_catalog(|kind| async move {Ok(Catalog{kind,entries:if kind == CatalogKind::Plugins {vec![CatalogEntry{id:"fixture".into(),label:"fixture".into(),meta:json!({"enabled":true,"tier":"rewrite","uses":ROWS.iter().map(|row|row.noun).collect::<Vec<_>>()})}]}else{Vec::new()}})});
     host.on_open(|_,_,_| async {Ok(Attachment{session:SessionId::from_raw("s"),snapshot:SessionState::new(serde_json::from_value(json!({"id":"s","cwd":".","createdAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-01T00:00:00Z","usage":Usage::default()})).unwrap()),history:None,events:Box::pin(futures::stream::pending()),handle:SessionHandle(Arc::new(Port))})});
     host.on_complete(|_, _, _| async {
@@ -131,7 +132,7 @@ pub(super) async fn run(engine: &Engine, row: &Row, host: &HostHandle, state: &S
     }
 }
 #[tokio::test]
-async fn every_row_answers_on_the_test_host() {
+async fn host_rows_answer_on_the_test_host() {
     let host = host();
     let root = tempfile::tempdir().unwrap();
     let state = Store::new(root.path(), "fixture");
@@ -141,7 +142,7 @@ async fn every_row_answers_on_the_test_host() {
     let engine = Engine::start(&source, "all.ts", json!({}), Limits::default())
         .await
         .unwrap();
-    for row in ROWS {
+    for row in ROWS.iter().filter(|row| !row.world()) {
         let answer = run(&engine, row, &host.handle(), &state).await;
         assert!(
             (row.accepts)(&answer),

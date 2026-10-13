@@ -119,6 +119,9 @@ impl Manager {
         }
         found.origin = old.found.origin;
         old.close().await;
+        if let Some(dollar) = self.dollar.get() {
+            dollar.reload(&old.found.name).await;
+        }
         let config = self
             .settings
             .get(&found.name)
@@ -147,13 +150,16 @@ impl Manager {
             "PLUGIN_RELOADED",
             format!("the {} plugin reloaded", module.found.name),
         ));
+        self.mark_reloaded(&root)
+    }
+    fn mark_reloaded(&self, root: &Path) -> Result<(), KernelError> {
         if let Some(watch) = self
             .watches
             .lock()
             .unwrap_or_else(|error| error.into_inner())
-            .get_mut(&root)
+            .get_mut(root)
         {
-            watch.before = stamps(&root).map_err(failed)?;
+            watch.before = stamps(root).map_err(failed)?;
             watch.stale = false;
         }
         Ok(())

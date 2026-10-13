@@ -9,7 +9,7 @@ fn each_method_has_one_door_in_the_catalogue_namespace() {
         assert!(names.insert(name.clone()), "duplicate row: {name}");
         match row.door {
             Door::Kernel(entry) => assert_eq!(entry.name, name),
-            Door::Face => assert!(
+            Door::Face | Door::Service(_) => assert!(
                 bingo_sdk::catalogue::find(&name).is_none(),
                 "face duplicates {name}"
             ),
@@ -63,7 +63,8 @@ fn schema_and_types_are_generated_from_the_same_rows() {
             route["site"] = serde_json::json!(
                 ["session", "turn"]
                     .into_iter()
-                    .filter(|field| input["properties"].get(*field).is_some())
+                    .filter(|field| input["properties"].get(*field).is_some()
+                        || (*field == "session" && method["door"]["owner"] == true))
                     .collect::<Vec<_>>()
             );
             (name.clone(), route)
@@ -74,4 +75,29 @@ fn schema_and_types_are_generated_from_the_same_rows() {
         serde_json::to_string_pretty(&routes).unwrap()
     ));
     committed("sdk/typescript/src/dollar-types.ts", rendered);
+}
+
+#[test]
+fn world_methods_have_one_declared_door() {
+    for (noun, methods) in [
+        (
+            "fs",
+            &["read", "write", "list", "exists", "stat", "ancestors"][..],
+        ),
+        ("http", &["fetch"][..]),
+        ("process", &["run", "spawn", "read", "write", "kill"][..]),
+        ("env", &["get", "set"][..]),
+        ("mcp", &["call", "connect"][..]),
+        ("agent", &["spawn", "list", "register"][..]),
+    ] {
+        for method in methods {
+            assert_eq!(
+                ROWS.iter()
+                    .filter(|row| row.noun == noun && row.method == *method)
+                    .count(),
+                1,
+                "{noun}.{method}"
+            );
+        }
+    }
 }

@@ -26,7 +26,9 @@ struct Frontmatter {
 }
 
 /// A named persona `SpawnAgent` may ask for.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 pub struct Definition {
     pub name: String,
     pub description: String,

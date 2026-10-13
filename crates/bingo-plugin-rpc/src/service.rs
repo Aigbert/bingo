@@ -216,6 +216,7 @@ impl ServiceCalls for Hub {
                 &params.key,
                 &params.method,
                 wire.as_ref(),
+                &params.params,
             )
             .await
             .map_err(|error| RpcError::new(INTERNAL_ERROR, error))?;

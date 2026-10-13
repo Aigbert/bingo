@@ -129,3 +129,5 @@ as does the additive-only test against the amended pre-release baseline.
 Verified 2026-10-14 (M137): shared manifest/discovery/state serve process and module runtimes; both read adjudicated noun grants. Module reload registers a fresh runtime and replays open sessions while retaining host state. Generated schema freeze tests pass.
 
 Verified 2026-10-14 (M138, ADR-0078): process callbacks reload before dispatch and replay with the callback registry; Node and QuickJS share noun semantics and per-invocation hook identity.
+
+Verified 2026-10-14 (M139, ADR-0078): QuickJS and Node world fixtures agree through service/call; both transports bind caller identity and share unsafe grants and notices.
