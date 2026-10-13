@@ -67,12 +67,13 @@ no new external dependency.
 
 ## Files
 
-- `crates/bingo-sdk/src/{service.rs,host.rs,tool.rs,plugin.rs,page.rs,lib.rs}`
+- `crates/bingo-sdk/src/{service.rs,host.rs,tool.rs,plugin.rs,page.rs,lib.rs,testing.rs}`
+  and `testing/tests.rs` (M111 service fixtures).
 - `crates/bingo-core/src/host/registry.rs` and
   `crates/bingo-core/src/host/tests/services.rs`
 - `crates/bingo-services/{Cargo.toml,src/lib.rs,src/team.rs,src/mcp.rs,fixtures/}` (new)
 - `crates/bingo-agents/src/{team/service.rs,lib.rs}`
-- `crates/bingo-rooms/src/{team.rs,lib.rs}`
+- `crates/bingo-rooms/src/{team.rs,lib.rs,tests.rs,hook.rs}` (service fixtures).
 - `crates/bingo-mcp/src/{rows.rs,lib.rs}`
 - `crates/bingo-provider-acp/src/{crossing.rs,lib.rs}`
 - `crates/bingo-skills/src/pages.rs`, every `src/guide.rs` that registers
@@ -80,6 +81,11 @@ no new external dependency.
 - Every `PluginManifest` (`rg -l 'sdk: "' crates`)
 - `crates/bingo-plugin-rpc/tests/plugin/{service.rs,doors.rs,hooks.rs}`
 - `crates/bingo/src/plugins.rs` and `crates/bingo/tests/cli/`
+  (real-owner integration at the composition layer; no plugin dependency).
+- The four owners/consumers' `Cargo.toml`, `Cargo.lock`, `scripts/budget.toml`
+  (+1 member, 347 → 348); no new external dependencies.
+- Mechanical page-key assertions in owners' `lib.rs`, SDK page tests, and
+  `bingo-plugin-rpc/src/service.rs` test fixture (protocol §6).
 - `Cargo.toml` (workspace member), `scripts/check_discipline.sh`,
   `ARCHITECTURE.md`, `docs/adr/{0001,0031,0054,0069}-*.md`
 
@@ -115,6 +121,10 @@ no new external dependency.
 - The 4e check is grep-based, like 4c. A consumer that renames the
   import (`use bingo_services::team as t`) evades it. That is accepted:
   the registry still answers `None` safely.
-- Re-verify at start: the `&str` lookup sites (`rg 'service::<|\.service\('`),
+- Re-verified at `7265cfec`: M111 supplies `ServiceHost`; migrate its typed
+  holding helper and the rooms scripted wire face. M130 adds manifests but
+  the total remains 39 files. Existing manual provides assertions are mixed
+  with config/registration tests; delete only redundant declaration checks.
+- Checked: the `&str` lookup sites (`rg 'service::<|\.service\('`),
   the manifest count, the per-plugin `provides` tests named in brick 3,
   and that M111's test host has not changed `HostHandle`.
