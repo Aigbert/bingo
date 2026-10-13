@@ -322,3 +322,7 @@ mod screens;
 mod test_lanes;
 #[cfg(test)]
 mod test_support;
+
+#[cfg(test)]
+mod identity;
+mod embers;
