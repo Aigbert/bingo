@@ -28,11 +28,14 @@ pub fn parts(parts: &[ContentPart]) -> u64 {
             ContentPart::ToolUse { name, input, .. } => text(name) + text(&input.to_string()),
             ContentPart::ToolResult { parts: inner, .. } => self::parts(inner),
         })
-        .sum()
+        .fold(0, u64::saturating_add)
 }
 
 pub fn blocks(blocks: &[SystemBlock]) -> u64 {
-    blocks.iter().map(|b| text(&b.text)).sum()
+    blocks
+        .iter()
+        .map(|b| text(&b.text))
+        .fold(0, u64::saturating_add)
 }
 
 /// One item's own content, before the fold adds its wrappers.
@@ -47,7 +50,9 @@ pub fn item(item: &Item) -> u64 {
             ..
         } => {
             let result = output.as_ref().map(|o| parts(&o.parts)).unwrap_or(0);
-            text(name) + text(&input.to_string()) + result
+            text(name)
+                .saturating_add(text(&input.to_string()))
+                .saturating_add(result)
         }
         ItemBody::Compaction { summary, .. } => text(summary),
         ItemBody::Interruption { marker } => text(marker),
@@ -59,17 +64,19 @@ pub fn item(item: &Item) -> u64 {
 }
 
 pub fn items(items: &[Item]) -> u64 {
-    items.iter().map(item).sum()
+    items.iter().map(item).fold(0, u64::saturating_add)
 }
 
 /// A whole request as the provider would count it.
 pub fn estimate(system: &[SystemBlock], messages: &[Message], tools: &[ToolSpec]) -> u64 {
     let mut n = blocks(system);
     for m in messages {
-        n += parts(&m.parts);
+        n = n.saturating_add(parts(&m.parts));
     }
     for t in tools {
-        n += text(&t.name) + text(&t.description) + text(&t.input_schema.to_string());
+        n = n.saturating_add(
+            text(&t.name) + text(&t.description) + text(&t.input_schema.to_string()),
+        );
     }
     n
 }

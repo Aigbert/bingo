@@ -73,7 +73,8 @@ impl Anchor {
     /// The conversation as the server would count it now: its last count,
     /// plus whatever the estimate says was added since.
     pub fn used(&self, estimate: u64) -> u64 {
-        self.server + estimate.saturating_sub(self.estimate)
+        self.server
+            .saturating_add(estimate.saturating_sub(self.estimate))
     }
 
     pub fn recount_due(&self, estimate: u64) -> bool {
