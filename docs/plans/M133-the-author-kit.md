@@ -21,7 +21,7 @@ file unchanged.
    — `slot {slot, contains}`, `tool {name, contains}`, `denied {name}`,
    `notice {contains}`. A Rust type with its schema committed as
    `schema/plugin-scenario.json` (the `BINGO_UPDATE_SCHEMA` test of
-   `schema.rs`). A new library crate, `bingo-schema-ts`, renders
+   `the bin’s `plugins/schema.rs`). A new library crate, `bingo-schema-ts`, renders
    `sdk/typescript/src/wire.ts` from the plugin schema the same way, and a
    test fails when the committed file differs. Both fail first.
 2. **The TS renderer as a pure brick.** `render(schema: &Value) -> String`
@@ -80,10 +80,15 @@ file unchanged.
 - `crates/bingo-schema-ts/src/lib.rs` (new, `tier = "library"`, serde_json
   only; the catalogue (M136) renders with it too)
 - `crates/bingo-plugin-rpc/src/{wire_ts.rs,validate.rs}` (new; `wire_ts`
-  calls the renderer and owns the drift test), `lib.rs`, `schema.rs`
-- `crates/bingo/src/plugins.rs` → `plugins/{mod.rs,switch.rs,validate.rs,scenario.rs}`
+  owns drift tests), `lib.rs`, `manager.rs` (explicit reload wrapper)
+- `crates/bingo/src/plugins.rs` → `plugins/{mod.rs,switch.rs,validate.rs,scenario.rs,schema.rs,expect.rs}`
 - `crates/bingo/src/main.rs` (`plugins::Action::{Validate,Test}`)
 - `schema/plugin-scenario.json` (new)
+- Workspace and affected Cargo manifests/lock: the renderer uses existing
+  `serde_json`; bin adds existing `serde`, `schemars`, `futures`, `tempfile`
+  for scenarios and isolated homes. Fake script types derive `JsonSchema`
+  (existing `schemars` edge) so the scenario contract never copies them.
+- `crates/bingo-provider-fake/{Cargo.toml,src/lib.rs}` (schema derives only)
 - `examples/plugins/ts-status/{plugin.json,hooks/register.ts,main.ts,scenarios/acceptance.json,README.md}`
 - `crates/bingo/tests/plugin_kit.rs` (new)
 - `.github/workflows/ci.yml` — `actions/setup-node`, pinned, Linux job
@@ -99,7 +104,7 @@ file unchanged.
       `wordcount` and `ts-status`; `test` exits 0 on `ts-status`'s
       acceptance scenario from a temporary directory; a scenario with a
       wrong `expect` exits 1 naming the step.
-- [ ] CI's Linux job log shows the acceptance run ran, not skipped.
+- [ ] CI's Linux job log shows acceptance ran (pending CI; no push authorized).
 - [ ] `node sdk/typescript/src/index.ts` exits 0 with no output on the
       pinned node (the SDK parses under type stripping), pasted.
 - [ ] All gates of the protocol; `scripts/budget.sh` unchanged in crates.
@@ -129,3 +134,18 @@ file unchanged.
   M121/M123 built them (what `expect slot` reads off `SessionState`);
   M128's `bingo-process` for `validate`'s spawn; ADR-0068/M116 for the
   esc test of a pending `next`; M111's test host for the bin's unit tests.
+
+## Re-verified (2026-10-13, e9e45bb9)
+
+- M108–M123 and M127–M132 are present; protocol 2 is frozen in
+  `schema/plugin-2.json`. No wire shape changes are needed.
+- `Bridge::reload(Manifest)` is the poll's path; expose it through
+  `Manager` and `PluginRpcPlugin` for clock-free scenario steps.
+- Scenario types/schema live in the bin: plugin-rpc cannot depend on the
+  fake-provider plugin. `slot::placed` reads the folded `SessionState`.
+- `Connection::spawn` already uses `bingo-process`; validate reuses it.
+  Manifest names equal directory names; capabilities are method names.
+- The landed link spelling is `turn.complete`, with flat tool fields.
+  The renderer and matcher stay independent of the seven current points.
+- SDK runtime tests live beside sources; the CLI split may use submodules
+  for scenario host lifecycle and expectations. No new external crates.
