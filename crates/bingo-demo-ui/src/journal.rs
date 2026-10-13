@@ -126,3 +126,79 @@ fn view(board: &Board) -> Result<serde_json::Value, KernelError> {
     serde_json::to_value(board.view())
         .map_err(|e| KernelError::new(ErrorCode::Internal, format!("a view is json: {e}")))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{board::State, command::TICK_COMMAND, tests::{Journals, command_context}};
+    use bingo_sdk::Command;
+    use std::sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}};
+
+    #[tokio::test]
+    async fn a_placement_cannot_overwrite_a_command_after_its_read() {
+        let journals = Journals::new();
+        let session = journals.session();
+        write(&journals.handle(), &session, &Board::default()).await.unwrap();
+        let placement_host = journals.scripted();
+        let base = journals.handle();
+        let (resume, paused) = tokio::sync::oneshot::channel();
+        let paused = Arc::new(Mutex::new(Some(paused)));
+        let reads = Arc::new(AtomicUsize::new(0));
+        let observed = reads.clone();
+        placement_host.on_open(move |selector, who, options| {
+            let base = base.clone();
+            let read = observed.fetch_add(1, Ordering::SeqCst);
+            let pause = if read == 1 {paused.lock().unwrap().take()} else {None};
+            async move {
+                let attachment = base.open(selector, who, options).await?;
+                if let Some(pause) = pause {pause.await.unwrap();}
+                Ok(attachment)
+            }
+        });
+        let handle = placement_host.handle();
+        let placement = place(&handle, &session);
+        tokio::pin!(placement);
+        assert!(futures::poll!(&mut placement).is_pending());
+        assert_eq!(reads.load(Ordering::SeqCst), 2, "placement read the old board before pausing at its write");
+        let cx = command_context(&session, &journals);
+        let command = TICK_COMMAND.run("", &cx);
+        tokio::pin!(command);
+        // Run the newer command while placement still holds its old snapshot.
+        // A serialized owner may hold its write until placement is released.
+        let completed = match futures::poll!(&mut command) {
+            std::task::Poll::Ready(result) => {result.unwrap(); true}
+            std::task::Poll::Pending => false,
+        };
+        resume.send(()).unwrap();
+        placement.await.unwrap();
+        if !completed {command.await.unwrap();}
+        assert_eq!(read(&journals.handle(), &session).await.unwrap().rows[0].state, State::Running);
+    }
+    #[tokio::test]
+    async fn a_queued_write_keeps_the_owner_until_its_frame_is_published() {
+        let journals = Journals::new();
+        let session = journals.session();
+        let host = journals.scripted();
+        let (sent, mut received) = tokio::sync::mpsc::unbounded_channel();
+        host.on_extend(move |session, plugin, kind, value| {
+            sent.send((session, plugin, kind, value)).unwrap();
+            async {Ok(())}
+        });
+        let mut board = Board::default();
+        board.tick();
+        let handle = host.handle();
+        let writing = write(&handle, &session, &board);
+        tokio::pin!(writing);
+        assert!(futures::poll!(&mut writing).is_pending(), "enqueueing is not publication");
+        let base = journals.handle();
+        let placement = place(&base, &session);
+        tokio::pin!(placement);
+        assert!(futures::poll!(&mut placement).is_pending(), "placement must wait for the preceding board write");
+        let (id, plugin, kind, value) = received.try_recv().unwrap();
+        base.extend(&id, &plugin, &kind, value).await.unwrap();
+        writing.await.unwrap();
+        placement.await.unwrap();
+        assert_eq!(read(&base, &session).await.unwrap(), board);
+    }
+
+}

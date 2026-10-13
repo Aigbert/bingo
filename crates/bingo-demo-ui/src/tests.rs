@@ -98,7 +98,7 @@ impl Journals {
 }
 
 impl Journals {
-    fn scripted(&self) -> bingo_sdk::testing::TestHost {
+    pub(crate) fn scripted(&self) -> bingo_sdk::testing::TestHost {
         let host = bingo_sdk::testing::TestHost::default();
         host.on_sessions(
             |_filter| async move { unreachable!("this plugin reads no session list") },
