@@ -275,6 +275,29 @@ impl Host {
         }
     }
 
+    pub(crate) fn until_within(&mut self, kind: &str, limit: Duration, failure: &str) -> Value {
+        wait_within(limit, async {
+            loop {
+                match self.said.try_recv() {
+                    Ok(line) => {
+                        let value = parsed(&line);
+                        self.lines.push(value.clone());
+                        if value["type"] == kind {
+                            return value;
+                        }
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        panic!("stdout ended before a {kind} line")
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => {
+                        tokio::time::sleep(Duration::from_millis(20)).await
+                    }
+                }
+            }
+        })
+        .unwrap_or_else(|_| panic!("{failure}"))
+    }
+
     fn answer(&mut self, request: &Value, verdict: Value) {
         self.send(&json!({
             "type": "control_response",
@@ -306,6 +329,10 @@ impl Host {
 
     /// Close stdin and collect what the run had left to say.
     pub(crate) fn finish(self) -> Ended {
+        self.finish_within(PATIENCE, "the binary did not exit")
+    }
+
+    fn finish_within(self, limit: Duration, failure: &str) -> Ended {
         let Host {
             mut child,
             stdin,
@@ -314,6 +341,7 @@ impl Host {
             mut lines,
         } = self;
         drop(stdin);
+        let code = exit_within(&mut child, limit, failure).code();
         while let Some(value) = heard(&said, "the rest of the run") {
             lines.push(value);
         }
@@ -322,7 +350,6 @@ impl Host {
         if let Some(mut stderr) = child.stderr.take() {
             stderr.read_to_string(&mut err).expect("utf-8 stderr");
         }
-        let code = child.wait().expect("the binary exits").code();
         Ended { lines, err, code }
     }
 }
@@ -391,16 +418,14 @@ fn an_interrupt_ends_the_running_turn() {
     let script = script(
         r#"{"responses":[{"steps":[{"text":"working"},{"delay":{"ms":30000}},{"text":"late"}]}]}"#,
     );
-    let started = std::time::Instant::now();
     let mut host = Host::start(&mut hosted(dir.path(), &script, &[]));
     host.prompt("take your time");
     // The first message is out, so the turn is certainly running.
     host.until("assistant");
     host.interrupt();
-    let ended = host.finish();
-    assert!(
-        started.elapsed() < std::time::Duration::from_secs(20),
-        "the interrupt did not end the turn"
+    let ended = host.finish_within(
+        Duration::from_secs(20),
+        "the interrupt did not end the turn",
     );
     assert_eq!(ended.code, Some(130), "stderr: {}", ended.err);
     let acknowledged = ended.lines.iter().any(|line| {

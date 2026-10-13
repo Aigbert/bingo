@@ -148,15 +148,13 @@ async fn an_interrupt_reaches_a_running_turn() {
             break;
         }
     }
-    let started = std::time::Instant::now();
     attachment
         .handle
         .interrupt(IntentId::mint(), InterruptScope::Head);
-    let frames = until_completed(&mut attachment).await;
-    assert!(
-        started.elapsed() < Duration::from_secs(10),
-        "the interrupt did not wait for the delay"
-    );
+    let frames = tokio::time::timeout(Duration::from_secs(10), until_completed(&mut attachment))
+        .await
+        .expect("the interrupt did not wait for the delay");
+
     assert!(
         matches!(
             frames.last().map(|f| &f.event),
@@ -210,11 +208,12 @@ async fn one_interrupt_ends_the_turn_and_the_command_it_was_running() {
     let wrote = wait_for_file(&ticks).await;
     assert!(wrote > 0, "the command never started");
 
-    let started = std::time::Instant::now();
     attachment
         .handle
         .interrupt(IntentId::mint(), InterruptScope::Head);
-    let frames = until_completed(&mut attachment).await;
+    let frames = tokio::time::timeout(Duration::from_secs(10), until_completed(&mut attachment))
+        .await
+        .expect("the interrupt waited for the command");
     assert!(
         matches!(
             frames.last().map(|f| &f.event),
@@ -225,10 +224,6 @@ async fn one_interrupt_ends_the_turn_and_the_command_it_was_running() {
         ),
         "{:?}",
         frames.iter().map(|f| &f.event).collect::<Vec<_>>()
-    );
-    assert!(
-        started.elapsed() < Duration::from_secs(10),
-        "the interrupt waited for the command"
     );
 
     // Nothing in the group is writing any more, the loop the shell put in the

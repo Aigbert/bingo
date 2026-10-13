@@ -172,14 +172,11 @@ impl Running {
     }
 
     fn wait_for_exit(&mut self) {
-        let started = Instant::now();
-        while started.elapsed() < PATIENCE {
-            if self.child.try_wait().expect("wait").is_some() {
-                return;
-            }
-            std::thread::sleep(Duration::from_millis(20));
-        }
-        panic!("bingo serve did not exit when its stdin closed");
+        exit_within(
+            &mut self.child,
+            PATIENCE,
+            "bingo serve did not exit when its stdin closed",
+        );
     }
 }
 

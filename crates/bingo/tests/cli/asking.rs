@@ -10,7 +10,7 @@
 
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
@@ -114,18 +114,21 @@ impl AtTheTerminal {
 
     /// Everything written so far, once it holds `needle`.
     fn until(&self, needle: &str) -> String {
-        let started = Instant::now();
-        loop {
-            let so_far = String::from_utf8_lossy(&self.seen.lock().unwrap()).into_owned();
-            if so_far.contains(needle) {
-                return so_far;
+        super::wait_within(LIMIT, async {
+            loop {
+                let so_far = String::from_utf8_lossy(&self.seen.lock().unwrap()).into_owned();
+                if so_far.contains(needle) {
+                    return so_far;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
             }
-            assert!(
-                started.elapsed() < LIMIT,
-                "no {needle:?} within {LIMIT:?}: {so_far}"
-            );
-            std::thread::sleep(Duration::from_millis(20));
-        }
+        })
+        .unwrap_or_else(|_| {
+            panic!(
+                "no {needle:?} within {LIMIT:?}: {}",
+                String::from_utf8_lossy(&self.seen.lock().unwrap())
+            )
+        })
     }
 
     /// Answer, once the kernel's own guard against a keystroke that was

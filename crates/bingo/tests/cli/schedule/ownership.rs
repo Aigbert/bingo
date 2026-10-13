@@ -31,19 +31,17 @@ fn overdue(home: &Path, id: &str) {
 fn fired_by(home: &Path, id: &str, response: &str) -> String {
     // An external file write has no in-process notification. Allow the normal
     // sixty-second rescan without changing production timing for this test.
-    let started = Instant::now();
-    loop {
-        if let Some(journal) =
-            transcript(home, &format!("schedule/{id}")).filter(|j| j.contains(response))
-        {
-            return journal;
+    wait_within(Duration::from_secs(90), async {
+        loop {
+            if let Some(journal) =
+                transcript(home, &format!("schedule/{id}")).filter(|j| j.contains(response))
+            {
+                return journal;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        assert!(
-            started.elapsed() < Duration::from_secs(90),
-            "the expected runner never delivered {id}: {response}"
-        );
-        std::thread::sleep(Duration::from_millis(20));
-    }
+    })
+    .unwrap_or_else(|_| panic!("the expected runner never delivered {id}: {response}"))
 }
 
 #[test]
