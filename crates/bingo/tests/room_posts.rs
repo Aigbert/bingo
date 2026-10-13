@@ -1,4 +1,5 @@
 //! SendMessage against the rooms writer, across the real service seam.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 #[allow(dead_code)]
 #[path = "../../bingo-agents/src/tests.rs"]
 mod support;

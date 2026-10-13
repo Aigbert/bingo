@@ -36,6 +36,20 @@ impl Wakes {
         state.pending.remove(session)
     }
 
+    /// Session-start hooks must return before their actor accepts writes.
+    pub fn clear_stale(&self, host: HostHandle, session: SessionId) {
+        let mut state = self.held();
+        if state.pending.contains_key(&session) {
+            return;
+        }
+        state.alarms.arm(
+            session.clone(),
+            Alarm::new(tokio::time::Instant::now(), async move {
+                wake::publish(&host, &session, None).await;
+            }),
+        );
+    }
+
     pub fn pending(&self, session: &SessionId) -> Option<Wake> {
         self.held().pending.get(session).cloned()
     }

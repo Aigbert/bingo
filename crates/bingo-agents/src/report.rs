@@ -26,7 +26,8 @@ impl Obligation {
 type Key = (SessionId, SessionId);
 #[derive(Debug, Default)]
 pub(crate) struct Reports {
-    tasks: Mutex<Alarms<Key>>,
+    tasks: Arc<Mutex<Alarms<Key>>>,
+    starts: Mutex<Alarms<SessionId>>,
 }
 impl Reports {
     pub(crate) async fn promise(
@@ -73,33 +74,70 @@ impl Reports {
         );
     }
 
-    async fn resume(&self, host: &HostHandle, parent: &SessionId) {
-        let Some(state) = watch::snapshot(host, parent).await else {
-            return;
-        };
-        let Some(kinds) = state.extensions.get(PLUGIN) else {
-            return;
-        };
-        for (kind, payload) in kinds {
-            if !kind.starts_with(PREFIX) || payload.is_null() {
-                continue;
-            }
-            if let Ok(obligation) = serde_json::from_value::<Obligation>(payload.clone())
-                && kind == &obligation.kind()
-            {
-                self.arm(host.clone(), parent.clone(), obligation, None);
-            }
-        }
+    fn start(&self, host: HostHandle, parent: SessionId) {
+        let tasks = Arc::downgrade(&self.tasks);
+        self.starts
+            .lock()
+            .unwrap_or_else(|held| held.into_inner())
+            .arm(
+                parent.clone(),
+                Alarm::new(tokio::time::Instant::now(), async move {
+                    restore(host, parent, tasks).await;
+                }),
+            );
     }
 
     fn end(&self, parent: &SessionId) {
+        self.starts
+            .lock()
+            .unwrap_or_else(|held| held.into_inner())
+            .cancel(parent);
         self.tasks().retain(|(owner, _)| owner != parent);
     }
     pub(crate) fn stop(&self) {
+        self.starts
+            .lock()
+            .unwrap_or_else(|held| held.into_inner())
+            .clear();
         self.tasks().clear();
     }
     fn tasks(&self) -> MutexGuard<'_, Alarms<Key>> {
         self.tasks.lock().unwrap_or_else(|held| held.into_inner())
+    }
+}
+
+/// Attachments, like writes, wait until session-start hooks have returned.
+async fn restore(host: HostHandle, parent: SessionId, tasks: std::sync::Weak<Mutex<Alarms<Key>>>) {
+    let Some(state) = watch::snapshot(&host, &parent).await else {
+        return;
+    };
+    let Some(kinds) = state.extensions.get(PLUGIN) else {
+        return;
+    };
+    let Some(tasks) = tasks.upgrade() else {
+        return;
+    };
+    let mut tasks = tasks.lock().unwrap_or_else(|held| held.into_inner());
+    for (kind, payload) in kinds {
+        if !kind.starts_with(PREFIX) || payload.is_null() {
+            continue;
+        }
+        let Ok(obligation) = serde_json::from_value::<Obligation>(payload.clone()) else {
+            continue;
+        };
+        if kind != &obligation.kind() {
+            continue;
+        }
+        let key = (parent.clone(), obligation.child.clone());
+        if !tasks.pending(&key) {
+            tasks.arm(
+                key,
+                Alarm::new(
+                    tokio::time::Instant::now(),
+                    deliver(host.clone(), parent.clone(), obligation, None),
+                ),
+            );
+        }
     }
 }
 
@@ -164,7 +202,7 @@ impl Hook for ReportHook {
     }
     async fn on_session(&self, phase: Phase, cx: &HookContext) {
         match phase {
-            Phase::Start => self.0.resume(&cx.host, &cx.session).await,
+            Phase::Start => self.0.start(cx.host.clone(), cx.session.clone()),
             Phase::End => self.0.end(&cx.session),
         }
     }

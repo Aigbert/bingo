@@ -1,5 +1,5 @@
 //! A journal cannot promise a wake this process no longer owns.
-use crate::{wake, wakes::Wakes};
+use crate::wakes::Wakes;
 use async_trait::async_trait;
 use bingo_sdk::{Hook, HookContext, HookMatcher, HookPoint, Phase};
 use std::sync::Arc;
@@ -20,7 +20,7 @@ impl Hook for ScheduleHook {
     }
     async fn on_session(&self, phase: Phase, cx: &HookContext) {
         if phase == Phase::Start && self.0.pending(&cx.session).is_none() {
-            wake::publish(&cx.host, &cx.session, None).await;
+            self.0.clear_stale(cx.host.clone(), cx.session.clone());
         }
     }
 }
@@ -28,7 +28,7 @@ impl Hook for ScheduleHook {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::Fixture;
+    use crate::{tests::Fixture, wake};
     use bingo_sdk::SessionId;
     use jiff::{SignedDuration, Timestamp};
     use serde_json::Value;
@@ -56,6 +56,9 @@ mod tests {
             model: None,
         };
         second.on_session(Phase::Start, &cx).await;
+        for _ in 0..16 {
+            tokio::task::yield_now().await;
+        }
         let writes = fixture.host.extended();
         assert!(writes[0].3["slots"].is_array());
         assert_eq!(writes.last().unwrap().3, Value::Null);

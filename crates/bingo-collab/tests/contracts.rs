@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 use bingo_collab::{Name, room};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
