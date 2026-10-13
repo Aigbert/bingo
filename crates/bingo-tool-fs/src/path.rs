@@ -46,8 +46,48 @@ pub(crate) fn matches(matcher: &GlobMatcher, root: &Path, path: &Path) -> bool {
     }
 }
 
+/// The nearest familiar root, without rewriting any matched file content.
+pub(crate) fn display(path: &Path, cwd: &Path, home: &Path) -> String {
+    if let Ok(relative) = path.strip_prefix(cwd) {
+        return if relative.as_os_str().is_empty() {
+            ".".into()
+        } else {
+            relative.display().to_string()
+        };
+    }
+    if let Ok(relative) = path.strip_prefix(home) {
+        return if relative.as_os_str().is_empty() {
+            "~".into()
+        } else {
+            Path::new("~").join(relative).display().to_string()
+        };
+    }
+    path.display().to_string()
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn display_uses_component_boundaries_and_the_nearest_root() {
+        use std::path::Path;
+        let cwd = Path::new("/home/ada/work");
+        let home = Path::new("/home/ada");
+        for (path, expected) in [
+            ("/home/ada/work/src/lib.rs", Path::new("src").join("lib.rs")),
+            ("/home/ada/notes.txt", Path::new("~").join("notes.txt")),
+            ("/home/ada", Path::new("~").to_path_buf()),
+            (
+                "/home/adam/notes.txt",
+                Path::new("/home/adam/notes.txt").to_path_buf(),
+            ),
+        ] {
+            assert_eq!(
+                super::display(Path::new(path), cwd, home),
+                expected.display().to_string()
+            );
+        }
+    }
+
     use super::*;
 
     #[test]

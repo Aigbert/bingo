@@ -128,10 +128,18 @@ impl Tool for GlobTool {
         }
         newest_first(&mut found);
         let paths: Vec<String> = found
-            .into_iter()
+            .iter()
             .map(|(_, path)| path.display().to_string())
             .collect();
-        Ok(ToolOutput::text(output::join(&paths, MAX_RESULTS, "files")))
+        let display = found
+            .iter()
+            .map(|(_, file)| path::display(file, &cx.cwd, &cx.env.home))
+            .collect::<Vec<_>>();
+        let mut result = ToolOutput::text(output::join(&paths, MAX_RESULTS, "files"));
+        result.display = Some(bingo_sdk::View::Text {
+            text: output::join(&display, MAX_RESULTS, "files"),
+        });
+        Ok(result)
     }
 }
 

@@ -120,10 +120,27 @@ pub fn shape(command: &str, output: &str, ended: Ended) -> ToolOutput {
     };
     let body = output.strip_suffix('\n').unwrap_or(output);
     let text = format!("$ {command}\n{body}\n{footer}");
-    if ended == Ended::Exited(0) {
+    let mut result = if ended == Ended::Exited(0) {
         ToolOutput::text(text)
     } else {
         ToolOutput::error(text)
+    };
+    result.display = Some(bingo_sdk::View::Text {
+        text: display(body, ended),
+    });
+    result
+}
+
+fn display(body: &str, ended: Ended) -> String {
+    let footer = match ended {
+        Ended::Exited(0) => None,
+        Ended::Exited(code) => Some(format!("exit {code}")),
+        other => unfinished(other),
+    };
+    match footer {
+        Some(footer) if body.is_empty() => footer,
+        Some(footer) => format!("{body}\n{footer}"),
+        None => body.to_string(),
     }
 }
 
