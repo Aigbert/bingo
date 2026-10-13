@@ -12,3 +12,9 @@ pub mod fixtures;
 
 /// Directory shared by channel claims and platform attachments.
 pub const DIRECTORY: &str = "channels";
+
+pub mod platform;
+pub use platform::{Platform, Platforms};
+
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;

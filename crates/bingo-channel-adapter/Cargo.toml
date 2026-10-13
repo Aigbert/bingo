@@ -28,4 +28,5 @@ tokio.workspace = true
 jiff = { workspace = true, optional = true }
 
 [dev-dependencies]
+jiff.workspace = true
 tempfile.workspace = true
