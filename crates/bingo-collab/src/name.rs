@@ -40,14 +40,7 @@ pub const CLOSE: &str = "close";
 
 /// A name a room can be opened under.
 pub fn check_room(name: &str) -> Result<&str, KernelError> {
-    let name = name.trim();
-    let bad = name.is_empty() || name.contains('/') || name.chars().any(char::is_whitespace);
-    if bad {
-        return Err(KernelError::new(
-            ErrorCode::InvalidInput,
-            format!("{name:?} is not a room name: one word, no slashes"),
-        ));
-    }
+    let name = segment(name, "room name")?;
     if same(name, CLOSE) {
         return Err(KernelError::new(
             ErrorCode::InvalidInput,
@@ -66,7 +59,6 @@ pub fn title(name: &str) -> String {
     format!("#{name}")
 }
 
-
 pub const ROOM: char = '#';
 
 /// A validated agent name, retaining its display spelling.
@@ -77,10 +69,14 @@ impl Name {
     pub fn parse(value: &str) -> Result<Self, KernelError> {
         agent_name(value).map(|value| Self(value.to_owned()))
     }
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 impl PartialEq for Name {
-    fn eq(&self, other: &Self) -> bool { same(&self.0, &other.0) }
+    fn eq(&self, other: &Self) -> bool {
+        same(&self.0, &other.0)
+    }
 }
 impl Eq for Name {}
 impl std::fmt::Display for Name {
@@ -90,14 +86,7 @@ impl std::fmt::Display for Name {
 }
 
 fn agent_name(name: &str) -> Result<&str, KernelError> {
-    let name = name.trim();
-    let bad = name.is_empty() || name.contains('/') || name.chars().any(char::is_whitespace);
-    if bad {
-        return Err(KernelError::new(
-            ErrorCode::InvalidInput,
-            format!("{name:?} is not a name: one word, no slashes"),
-        ));
-    }
+    let name = segment(name, "name")?;
     if same(name, PARENT) {
         return Err(KernelError::new(
             ErrorCode::InvalidInput,
@@ -113,3 +102,13 @@ fn agent_name(name: &str) -> Result<&str, KernelError> {
     Ok(name)
 }
 
+fn segment<'a>(name: &'a str, noun: &str) -> Result<&'a str, KernelError> {
+    let name = name.trim();
+    if name.is_empty() || name.contains('/') || name.chars().any(char::is_whitespace) {
+        return Err(KernelError::new(
+            ErrorCode::InvalidInput,
+            format!("{name:?} is not a {noun}: one word, no slashes"),
+        ));
+    }
+    Ok(name)
+}

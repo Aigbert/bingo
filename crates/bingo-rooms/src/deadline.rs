@@ -1,49 +1,19 @@
-//! The patience deadline (ADR-0029 §3, ADR-0034 §3). A patient seat reads its
-//! room at its next turn — but nothing promises there will be one, so a seat
-//! left behind by a post is woken once when it has been behind for its whole
-//! patience. The wake is a nudge, and the turn it opens reads the room.
-//!
-//! What it watches is the one fact "behind" is derived from: the seat's cursor
-//! against the room's head, both of them in the room's own journal. A seat that
-//! read the room meanwhile is level when the timer fires, and is left alone.
-//! Nothing here opens a seat's own session to find out — a reader that opened
-//! one and let go would be its last client, and closing an idle seat is how a
-//! wake is lost.
-//!
-//! It keeps the chaser's discipline (ADR-0022 §3): one bounded timer per seat
-//! per room, timers die with the process, and a seat this process first finds
-//! already behind is nudged **once**.
-
-use std::collections::BTreeSet;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
-
-use bingo_sdk::{HostHandle, SessionId};
-
+//! Owned patience deadlines derived from room cursors.
 use crate::cursor::Unread;
 use crate::ear::Ear;
 use crate::post;
 use crate::room::{self, Room};
+use bingo_alarm::{Alarm, Alarms};
+use bingo_sdk::{HostHandle, SessionId};
+use std::sync::{Mutex, MutexGuard};
+use std::time::Duration;
 
-/// One seat's wait on one room.
-type Waiting = (SessionId, String);
-
-/// The waits this process is timing.
-type Timing = Arc<Mutex<BTreeSet<Waiting>>>;
-
-/// The seats this process is holding a deadline over. Machinery, never a
-/// record: what a seat has read is its own journal's to say, and this only
-/// remembers which waits are already being timed, so that a room that keeps
-/// talking does not start the patience over.
+type Waiting = (SessionId, SessionId);
 #[derive(Debug, Default)]
 pub struct Deadline {
-    waiting: Timing,
+    waiting: Mutex<Alarms<Waiting>>,
 }
-
 impl Deadline {
-    /// The seats a post left waiting. Each gets a timer at its own patience,
-    /// unless one is already running for it: the deadline is on the oldest post
-    /// a seat has not read, so a room that keeps talking is still bounded.
     pub async fn waiting(&self, host: &HostHandle, id: &SessionId, room: &Room, seats: &[&str]) {
         for member in seats {
             let Ear::Patient(patience) = room.ears.of(member) else {
@@ -56,23 +26,43 @@ impl Deadline {
         }
     }
 
-    /// A room this process had not seen before. Its patient seats may have been
-    /// behind since before this process started; a seat found behind waited out
-    /// a patience nobody was timing, so it is nudged once and at once, the rule
-    /// for an occurrence missed while nobody was running.
-    pub async fn overdue(&self, host: &HostHandle, id: &SessionId, room: &Room) {
-        for member in &room.members {
-            if room.ears.of(member).is_live() {
-                continue;
+    pub async fn reconcile(
+        &self,
+        host: &HostHandle,
+        id: &SessionId,
+        room: &Room,
+        now: jiff::Timestamp,
+    ) {
+        let Some(state) = room::read(host, id).await else {
+            return;
+        };
+        let mut wanted = Vec::new();
+        if !room.closed {
+            for member in &room.members {
+                let Ear::Patient(patience) = room.ears.of(member) else {
+                    continue;
+                };
+                let unread = Unread::of(&state, member);
+                let Some(first) = unread.posts.first() else {
+                    continue;
+                };
+                let Some(seat) = post::seat_of(host, room, member).await else {
+                    continue;
+                };
+                wanted.push((seat.clone(), id.clone()));
+                let left = patience.saturating_sub(crate::chase::waited(first.at, now));
+                self.arm(host, id, room, member, seat, left);
             }
-            let Some(seat) = post::seat_of(host, room, member).await else {
-                continue;
-            };
-            wake_if_behind(host, id, room, member, &seat).await;
         }
+        self.timed()
+            .retain(|key| &key.1 != id || wanted.contains(key));
     }
 
-    /// One timer for one seat's wait on one room.
+    #[cfg(test)]
+    pub async fn overdue(&self, host: &HostHandle, id: &SessionId, room: &Room) {
+        self.reconcile(host, id, room, jiff::Timestamp::now()).await;
+    }
+
     fn arm(
         &self,
         host: &HostHandle,
@@ -82,51 +72,26 @@ impl Deadline {
         seat: SessionId,
         patience: Duration,
     ) {
-        let key = (seat.clone(), room.title.clone());
-        if !self.timed().insert(key) {
+        let key = (seat.clone(), id.clone());
+        let mut alarms = self.timed();
+        if alarms.contains(&key) {
             return;
         }
-        tokio::spawn(wait(
-            Wait {
-                host: host.clone(),
-                room: (id.clone(), room.clone()),
-                seat: (seat, member.to_string()),
-                timing: Arc::clone(&self.waiting),
-            },
-            patience,
-        ));
+        let (host, id, room, member) = (host.clone(), id.clone(), room.clone(), member.to_owned());
+        alarms.arm(
+            key,
+            Alarm::new(tokio::time::Instant::now() + patience, async move {
+                wake_if_behind(&host, &id, &room, &member, &seat).await;
+            }),
+        );
     }
 
-    /// The waits already being timed. A panic in another task must not strand
-    /// every seat after it.
-    fn timed(&self) -> MutexGuard<'_, BTreeSet<Waiting>> {
+    pub fn clear(&self) {
+        self.timed().clear();
+    }
+    fn timed(&self) -> MutexGuard<'_, Alarms<Waiting>> {
         self.waiting.lock().unwrap_or_else(|held| held.into_inner())
     }
-}
-
-/// One wait, as the task that times it holds it: which room, which seat, and
-/// the table to take itself out of when it is done.
-struct Wait {
-    host: HostHandle,
-    room: (SessionId, Room),
-    seat: (SessionId, String),
-    timing: Timing,
-}
-
-/// The timer itself: it sleeps out the patience and wakes the seat if it is
-/// still behind. What it re-reads is the live pair of journals, so a seat that
-/// read the room meanwhile is left alone — and either way the wait is over, so
-/// the next post left unread arms a new one.
-async fn wait(waiting: Wait, patience: Duration) {
-    tokio::time::sleep(patience).await;
-    let (id, room) = &waiting.room;
-    let (seat, member) = &waiting.seat;
-    wake_if_behind(&waiting.host, id, room, member, seat).await;
-    waiting
-        .timing
-        .lock()
-        .unwrap_or_else(|held| held.into_inner())
-        .remove(&(seat.clone(), room.title.clone()));
 }
 
 /// A seat behind its room, woken for it. Nothing is said of what it missed —
@@ -141,7 +106,7 @@ async fn wake_if_behind(
     let Some(state) = room::read(host, id).await else {
         return;
     };
-    if Unread::of(&state, member).is_empty() {
+    if room::closed_of(&state) || Unread::of(&state, member).is_empty() {
         return;
     }
     post::nudge(host, seat, &room.title, post::unread(&room.title)).await;

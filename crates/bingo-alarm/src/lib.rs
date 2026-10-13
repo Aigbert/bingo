@@ -1,6 +1,6 @@
 //! Keyed, owned timers. Owners derive deliveries from their own records.
-use std::{collections::BTreeMap, future::Future, pin::Pin, time::Duration};
 use bingo_sdk::CancellationToken;
+use std::{collections::BTreeMap, future::Future, pin::Pin, time::Duration};
 use tokio::{task::JoinHandle, time::Instant};
 
 /// A deadline and the work it releases, kept together during reconciliation.
@@ -11,7 +11,10 @@ pub struct Alarm {
 
 impl Alarm {
     pub fn new(at: Instant, deliver: impl Future<Output = ()> + Send + 'static) -> Self {
-        Self { at, deliver: Box::pin(deliver) }
+        Self {
+            at,
+            deliver: Box::pin(deliver),
+        }
     }
 }
 
@@ -34,7 +37,11 @@ pub struct Alarms<K: Ord + Clone> {
     tasks: BTreeMap<K, Task>,
 }
 impl<K: Ord + Clone> Default for Alarms<K> {
-    fn default() -> Self { Self { tasks: BTreeMap::new() } }
+    fn default() -> Self {
+        Self {
+            tasks: BTreeMap::new(),
+        }
+    }
 }
 impl<K: Ord + Clone> Alarms<K> {
     pub fn arm(&mut self, key: K, alarm: Alarm) {
@@ -45,18 +52,26 @@ impl<K: Ord + Clone> Alarms<K> {
             tokio::select! {
                 biased;
                 () = stopped.cancelled() => {},
-                () = async { tokio::time::sleep_until(alarm.at).await; alarm.deliver.await; } => {},
+                () = async { if alarm.at > Instant::now() { tokio::time::sleep_until(alarm.at).await; } alarm.deliver.await; } => {},
             }
         });
         self.tasks.insert(key, Task { cancel, running });
     }
 
-    pub fn cancel(&mut self, key: &K) { self.tasks.remove(key); }
-    pub fn contains(&self, key: &K) -> bool { self.tasks.contains_key(key) }
-    pub fn pending(&self, key: &K) -> bool {
-        self.tasks.get(key).is_some_and(|task| !task.running.is_finished())
+    pub fn cancel(&mut self, key: &K) {
+        self.tasks.remove(key);
     }
-    pub fn clear(&mut self) { self.tasks.clear(); }
+    pub fn contains(&self, key: &K) -> bool {
+        self.tasks.contains_key(key)
+    }
+    pub fn pending(&self, key: &K) -> bool {
+        self.tasks
+            .get(key)
+            .is_some_and(|task| !task.running.is_finished())
+    }
+    pub fn clear(&mut self) {
+        self.tasks.clear();
+    }
     pub fn retain(&mut self, mut keep: impl FnMut(&K) -> bool) {
         self.tasks.retain(|key, _| keep(key));
     }
@@ -65,7 +80,9 @@ impl<K: Ord + Clone> Alarms<K> {
         let wanted: BTreeMap<K, Alarm> = wanted.into_iter().collect();
         self.retain(|key| wanted.contains_key(key));
         for (key, alarm) in wanted {
-            if !self.contains(&key) { self.arm(key, alarm); }
+            if !self.contains(&key) {
+                self.arm(key, alarm);
+            }
         }
     }
 }
@@ -73,6 +90,10 @@ impl<K: Ord + Clone> Alarms<K> {
 /// Convert a journal timestamp once; paused Tokio clocks remain deterministic.
 pub fn deadline(at: jiff::Timestamp, now: jiff::Timestamp) -> Instant {
     let delay = at.duration_since(now);
-    let delay = if delay.is_negative() { Duration::ZERO } else { delay.unsigned_abs() };
+    let delay = if delay.is_negative() {
+        Duration::ZERO
+    } else {
+        delay.unsigned_abs()
+    };
     Instant::now() + delay
 }

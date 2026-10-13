@@ -9,7 +9,15 @@ fn names_keep_their_spelling_and_share_one_rule() {
         assert_eq!(left.to_string(), a);
         assert_eq!(left == Name::parse(b).unwrap(), equal);
     }
-    for invalid in ["Parent", "PARENT", "parent", "#room", "", "a/b", "two words"] {
+    for invalid in [
+        "Parent",
+        "PARENT",
+        "parent",
+        "#room",
+        "",
+        "a/b",
+        "two words",
+    ] {
         assert!(Name::parse(invalid).is_err(), "{invalid}");
     }
     assert_eq!(Name::parse(" Scout ").unwrap().to_string(), "Scout");

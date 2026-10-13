@@ -1,7 +1,9 @@
 //! Room I/O; records and folds live in bingo-collab.
-use bingo_sdk::{HostHandle, KernelError, OpenOptions, SessionFilter, SessionId, SessionSelector, SessionState};
 use crate::identity;
 pub use bingo_collab::room::*;
+use bingo_sdk::{
+    HostHandle, KernelError, OpenOptions, SessionFilter, SessionId, SessionSelector, SessionState,
+};
 
 /// The rooms hanging under one session, as the host lists its children.
 /// Everything that asks "which rooms are here" — the listing, the reading at
@@ -46,13 +48,13 @@ pub async fn read(host: &HostHandle, session: &SessionId) -> Option<SessionState
 
 #[cfg(test)]
 mod tests {
-use crate::ear::{Ears, Seat};
-use bingo_sdk::View;
-use jiff::Timestamp;
-use serde_json::{Value, json};
     use super::*;
     use crate::ear::Ear;
+    use crate::ear::{Ears, Seat};
     use crate::tests::{room_summary, summary};
+    use bingo_sdk::View;
+    use jiff::Timestamp;
+    use serde_json::{Value, json};
     use std::time::Duration;
 
     #[test]

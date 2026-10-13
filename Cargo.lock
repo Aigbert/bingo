@@ -285,6 +285,7 @@ name = "bingo-agents"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-alarm",
  "bingo-collab",
  "bingo-sdk",
  "bingo-services",
@@ -743,6 +744,7 @@ name = "bingo-rooms"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-alarm",
  "bingo-collab",
  "bingo-sdk",
  "bingo-services",
@@ -761,6 +763,7 @@ name = "bingo-schedule"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-alarm",
  "bingo-claim",
  "bingo-sdk",
  "bingo-shelf",

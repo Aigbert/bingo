@@ -12,6 +12,7 @@ description = "Rooms plugin for bingo: a room is a session nobody answers, and a
 workspace = true
 
 [dependencies]
+bingo-alarm.workspace = true
 bingo-collab.workspace = true
 bingo-services.workspace = true
 bingo-sdk.workspace = true

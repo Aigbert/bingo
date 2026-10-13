@@ -1,7 +1,7 @@
 //! Reading room debts through the shared fold.
+use crate::room;
 pub use bingo_collab::mentions::*;
 use bingo_sdk::{HostHandle, SessionId};
-use crate::room;
 
 /// nothing here: a debt is only ever what the journal says it is.
 pub async fn of_room(host: &HostHandle, room: &SessionId) -> Vec<Mention> {
@@ -14,10 +14,10 @@ pub async fn of_room(host: &HostHandle, room: &SessionId) -> Vec<Mention> {
 
 #[cfg(test)]
 mod tests {
-use bingo_sdk::{ItemId, ItemBody};
-use crate::name::PARENT;
-use jiff::Timestamp;
     use super::*;
+    use crate::name::PARENT;
+    use bingo_sdk::{ItemBody, ItemId};
+    use jiff::Timestamp;
 
     fn members() -> Vec<String> {
         ["reviewer", "scout"].map(str::to_string).to_vec()

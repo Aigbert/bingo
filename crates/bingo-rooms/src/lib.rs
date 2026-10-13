@@ -123,6 +123,7 @@ pub(crate) fn identity() -> ClientIdentity {
 #[derive(Debug, Default)]
 pub struct RoomsPlugin {
     writer: Arc<RoomWriter>,
+    hook: Arc<RoomsHook>,
 }
 
 #[async_trait]
@@ -135,9 +136,7 @@ impl Plugin for RoomsPlugin {
         registrar.add(Contribution::Command(
             Arc::new(RoomCommand) as Arc<dyn Command>
         ));
-        registrar.add(Contribution::Hook(
-            Arc::new(RoomsHook::default()) as Arc<dyn Hook>
-        ));
+        registrar.add(Contribution::Hook(self.hook.clone() as Arc<dyn Hook>));
         registrar.add(Contribution::Tool(Arc::new(OpenRoomTool) as Arc<dyn Tool>));
         registrar.add(Contribution::Tool(Arc::new(SeatTool) as Arc<dyn Tool>));
         registrar.add(Contribution::Tool(Arc::new(UnseatTool) as Arc<dyn Tool>));
@@ -147,12 +146,24 @@ impl Plugin for RoomsPlugin {
             Arc::new(Reader) as Arc<dyn ContextContributor>
         ));
         let writer: Arc<dyn bingo_services::room_post::RoomPost> = self.writer.clone();
-        registrar.add(Contribution::service(&bingo_services::room_post::KEY, writer.clone(), Some(bingo_services::room_post::wire(writer))));
+        registrar.add(Contribution::service(
+            &bingo_services::room_post::KEY,
+            writer.clone(),
+            Some(bingo_services::room_post::wire(writer)),
+        ));
         registrar.add(guide::contribution(registrar));
         Ok(())
     }
     async fn start(&self, host: bingo_sdk::HostHandle) -> Result<(), PluginError> {
-        self.writer.start(host);
+        self.writer.start(host.clone());
+        self.hook
+            .start(&host)
+            .await
+            .map_err(|error| PluginError::Failed(error.message))
+    }
+
+    async fn stop(&self) -> Result<(), PluginError> {
+        self.hook.stop();
         Ok(())
     }
 }
@@ -179,7 +190,7 @@ mod plugin_tests {
                 "tool:CloseRoom",
                 "tool:Listen",
                 "context:rooms",
-        bingo_services::room_post::CAPABILITY,
+                bingo_services::room_post::CAPABILITY,
                 &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
             ]
         );
@@ -215,5 +226,52 @@ mod plugin_tests {
             }
             other => panic!("expected the page service, got {other:?}"),
         }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_second_plugin_rearms_persisted_debt_and_patience_once() {
+        let fleet = crate::tests::Fleet::default();
+        let root = fleet.root();
+        fleet.child(&root, "scout");
+        let first = RoomsPlugin::default();
+        first.start(fleet.handle()).await.unwrap();
+        let id = seat(
+            &fleet.handle(),
+            &root,
+            std::path::Path::new("/work"),
+            Opening::person("design", None),
+            &[Seat::named("scout")],
+        )
+        .await
+        .unwrap();
+        fleet.post(
+            &id,
+            "@scout inspect the build",
+            None,
+            jiff::Timestamp::now() - jiff::SignedDuration::from_secs(3600),
+        );
+        first.stop().await.unwrap();
+        drop(first);
+        let second = RoomsPlugin::default();
+        second.start(fleet.handle()).await.unwrap();
+        for _ in 0..16 {
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(
+            fleet.delivered().len(),
+            2,
+            "one debt chase and one patient-seat nudge"
+        );
+        tokio::time::advance(std::time::Duration::from_secs(3600)).await;
+        second.start(fleet.handle()).await.unwrap();
+        for _ in 0..16 {
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(
+            fleet.delivered().len(),
+            2,
+            "reconciliation does not duplicate overdue deliveries"
+        );
+        second.stop().await.unwrap();
     }
 }

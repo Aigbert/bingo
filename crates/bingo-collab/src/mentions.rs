@@ -201,4 +201,3 @@ pub fn of_state(state: &SessionState) -> Vec<Mention> {
         .collect();
     mentions(&posts, &room::members_of(state))
 }
-

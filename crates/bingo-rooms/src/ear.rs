@@ -3,12 +3,12 @@ pub use bingo_collab::ear::*;
 
 #[cfg(test)]
 mod tests {
-use std::time::Duration;
-use bingo_sdk::ErrorCode;
-use serde_json::{Value, json};
     use super::*;
     use crate::name::PARENT;
     use crate::room;
+    use bingo_sdk::ErrorCode;
+    use serde_json::{Value, json};
+    use std::time::Duration;
 
     fn seat(name: &str, seconds: u64) -> Seat {
         Seat {

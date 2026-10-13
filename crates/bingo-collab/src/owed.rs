@@ -2,7 +2,7 @@
 //! the room's parent carries while any debt stands. Both are drawn from the
 //! fold at the moment they are asked for, and nothing here is kept.
 
-use bingo_sdk::{View};
+use bingo_sdk::View;
 use jiff::Timestamp;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -102,4 +102,3 @@ pub fn age(at: Timestamp, now: Timestamp) -> String {
         _ => format!("{}h", seconds / 3600),
     }
 }
-

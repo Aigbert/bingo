@@ -1,7 +1,7 @@
 //! Cursor writes; readings are shared.
+use crate::PLUGIN;
 pub use bingo_collab::cursor::*;
 use bingo_sdk::{HostHandle, ItemId, KernelError, SessionId};
-use crate::PLUGIN;
 
 /// Move a seat's cursor to a post it has now read.
 pub async fn advance(
@@ -16,13 +16,13 @@ pub async fn advance(
 
 #[cfg(test)]
 mod tests {
-use bingo_sdk::SessionState;
-use crate::mentions::Post;
-use serde_json::{Value, json};
     use super::*;
+    use crate::mentions::Post;
     use crate::room;
     use crate::tests::{Fleet, posted_item, summary};
+    use bingo_sdk::SessionState;
     use jiff::Timestamp;
+    use serde_json::{Value, json};
 
     fn post(n: i64, author: &str) -> Post {
         Post {

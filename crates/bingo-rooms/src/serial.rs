@@ -22,12 +22,12 @@
 
 use bingo_sdk::{ContentPart, Item, ItemBody, ItemId, SessionState, ToolOutput};
 
-use bingo_collab::room as rooms;
+use crate::post::MessageArgs;
 #[cfg(test)]
 use bingo_collab::name as names;
-use bingo_collab::seen::{awaited, read, verdict, Verdict};
+use bingo_collab::room as rooms;
 use bingo_collab::seen::Post;
-use crate::post::MessageArgs;
+use bingo_collab::seen::{Verdict, awaited, read, verdict};
 
 /// The bounce a stale post gets, or nothing when it may land. Both journals
 /// are read once, by the caller, and folded here: the discipline is only ever
@@ -414,5 +414,4 @@ mod tests {
             "another room's bounce, a landed post, and the call being made"
         );
     }
-
 }

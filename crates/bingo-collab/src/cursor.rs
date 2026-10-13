@@ -103,7 +103,8 @@ impl Unread {
     }
 }
 
-
 /// The persisted cursor payload.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct Cursor { pub post: ItemId }
+pub struct Cursor {
+    pub post: ItemId,
+}

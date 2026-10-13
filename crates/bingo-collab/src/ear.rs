@@ -380,4 +380,3 @@ pub fn ears_of(state: &SessionState) -> Ears {
     }
     ears
 }
-

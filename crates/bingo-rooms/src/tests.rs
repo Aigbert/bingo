@@ -234,7 +234,7 @@ impl Fleet {
         state
     }
 
-    fn remember(&self, session: &SessionId, event: Event) {
+    pub(crate) fn remember(&self, session: &SessionId, event: Event) {
         let mut sessions = locked(&self.0.sessions);
         if let Some(live) = sessions.iter_mut().find(|l| &l.summary.id == session) {
             live.history.push(event);

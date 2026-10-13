@@ -1,8 +1,8 @@
 //! Publish the shared owed view.
+use crate::PLUGIN;
 pub use bingo_collab::owed::*;
 use bingo_sdk::{HostHandle, SessionId};
 use serde_json::Value;
-use crate::PLUGIN;
 
 /// Put it where a person looks: on the session the room hangs under, which is
 /// the whole of who its members are.
@@ -14,12 +14,12 @@ pub async fn publish(host: &HostHandle, parent: &SessionId, payload: Value) {
 
 #[cfg(test)]
 mod tests {
-use crate::mentions::Mention;
-use bingo_sdk::View;
-use jiff::Timestamp;
     use super::*;
+    use crate::mentions::Mention;
     use crate::mentions::Owed;
     use bingo_sdk::ItemId;
+    use bingo_sdk::View;
+    use jiff::Timestamp;
 
     fn at(second: i64) -> Timestamp {
         Timestamp::from_second(second).expect("a timestamp")

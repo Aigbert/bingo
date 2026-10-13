@@ -7,15 +7,13 @@
 //! is there, and `closed` that it has ended (ADR-0053 §1 and §4). Each is read
 //! back here and nowhere else, so no caller can hold a second idea of one.
 
-use bingo_sdk::{
-    Driver, SessionId, SessionState, SessionSummary, View,
-};
+use bingo_sdk::{Driver, SessionId, SessionState, SessionSummary, View};
 use jiff::Timestamp;
 use serde_json::{Value, json};
 
+pub use crate::cursor::{Cursor, of_state as cursor};
 use crate::ear::{self, Ears, Seat};
 pub use crate::ear::{Ear, Listener};
-pub use crate::cursor::{Cursor, of_state as cursor};
 pub const PLUGIN: &str = "bingo.rooms";
 
 /// The one kind this plugin publishes for a room as a whole. A payload is the
@@ -273,7 +271,6 @@ fn drawn(seats: &[Seat]) -> Value {
     };
     serde_json::to_value(view).unwrap_or_default()
 }
-
 
 /// The complete membership payload, including its surface view.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

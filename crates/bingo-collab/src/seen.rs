@@ -1,6 +1,6 @@
 //! The pure serial checkpoint ledgers.
-use bingo_sdk::{ContentPart, Item, ItemBody, ItemId, SessionState};
 use crate::name as names;
+use bingo_sdk::{ContentPart, Item, ItemBody, ItemId, SessionState};
 /// One post, as a room's journal has it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Post {
@@ -74,4 +74,3 @@ pub fn verdict(awaited: Vec<(usize, Post)>, seen: usize) -> Verdict {
             .collect(),
     }
 }
-

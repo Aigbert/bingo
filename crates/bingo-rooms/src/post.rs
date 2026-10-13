@@ -616,8 +616,24 @@ pub(crate) struct MessageArgs {
 }
 
 /// Land a post after the room's serial checkpoint accepted it.
-pub(crate) async fn write(host: &HostHandle, room: &SessionId, author: &str, text: String) -> Result<(), bingo_sdk::KernelError> {
-    host.deliver(room, bingo_sdk::IntentId::mint(), bingo_sdk::Input::text(text, bingo_sdk::Origin {
-        surface: "agent".into(), principal: Some(author.into()), conversation: None,
-    }), bingo_sdk::Delivery::Wake).await
+pub(crate) async fn write(
+    host: &HostHandle,
+    room: &SessionId,
+    author: &str,
+    text: String,
+) -> Result<(), bingo_sdk::KernelError> {
+    host.deliver(
+        room,
+        bingo_sdk::IntentId::mint(),
+        bingo_sdk::Input::text(
+            text,
+            bingo_sdk::Origin {
+                surface: "agent".into(),
+                principal: Some(author.into()),
+                conversation: None,
+            },
+        ),
+        bingo_sdk::Delivery::Wake,
+    )
+    .await
 }
