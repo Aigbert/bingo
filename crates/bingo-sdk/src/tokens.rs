@@ -136,3 +136,33 @@ mod pixel_contract {
         assert_eq!(super::parts(&[image]), 4_000_000u64.div_ceil(750));
     }
 }
+
+#[cfg(test)]
+mod extreme_pixels {
+    use super::*;
+    #[test]
+    fn aggregate_pixel_estimates_saturate() {
+        let image = ContentPart::Image(crate::Image {
+            width: Some(u32::MAX),
+            height: Some(u32::MAX),
+            ..crate::Image::from_bytes("image/png", b"x").unwrap()
+        });
+        let pictures = vec![image; 1000];
+        assert_eq!(parts(&pictures), u64::MAX);
+        let messages = [
+            Message::user(pictures),
+            Message::text(crate::Role::User, "more"),
+        ];
+        assert_eq!(
+            estimate(
+                &[SystemBlock {
+                    text: "system".into(),
+                    cache: false
+                }],
+                &messages,
+                &[]
+            ),
+            u64::MAX
+        );
+    }
+}

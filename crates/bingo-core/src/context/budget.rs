@@ -178,3 +178,11 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod extreme_pixels {
+    #[test]
+    fn anchoring_a_saturated_pixel_estimate_stays_saturated() {
+        assert_eq!(super::Anchor::from_count(1, 0).used(u64::MAX), u64::MAX);
+    }
+}
