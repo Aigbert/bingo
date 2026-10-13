@@ -7,3 +7,5 @@ mod meter;
 pub mod sandbox;
 pub mod strip;
 mod thread;
+mod plugin;
+pub use plugin::ModsPlugin;

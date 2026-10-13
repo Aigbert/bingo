@@ -628,6 +628,7 @@ name = "bingo-mods"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-core",
  "bingo-digest",
  "bingo-plugin-host",
  "bingo-sdk",
