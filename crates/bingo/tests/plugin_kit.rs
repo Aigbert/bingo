@@ -235,3 +235,43 @@ fn module_listing_names_the_runtime_and_its_disabled_reason() {
         "{row}"
     );
 }
+
+#[test]
+fn the_cli_composes_the_module_runtime_for_an_explicit_directory() {
+    let root = tempfile::tempdir().unwrap();
+    let plugin = root.path().join("hello");
+    std::fs::create_dir(&plugin).unwrap();
+    std::fs::write(
+        plugin.join("plugin.json"),
+        r#"{"name":"hello","version":"1","module":"main.ts"}"#,
+    )
+    .unwrap();
+    std::fs::write(plugin.join("main.ts"), "export function register(on) { on('tool.call', () => ({parts:[{kind:'text',text:'module result'}],isError:false})); }").unwrap();
+    let script = root.path().join("fake.json");
+    std::fs::write(&script, r#"{"responses":[{"steps":[{"toolCall":{"name":"Read","input":{"file_path":"missing.txt"}}}]},{"steps":[{"text":"offline"}]}]}"#).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+        .args([
+            "--print",
+            "--output-format",
+            "json",
+            "--provider",
+            "fake",
+            "--model",
+            "fake-1",
+            "--plugin-dir",
+        ])
+        .arg(&plugin)
+        .arg("hello")
+        .current_dir(root.path())
+        .envs(home::home_env(root.path()))
+        .env("BINGO_FAKE_SCRIPT", script)
+        .output()
+        .unwrap();
+    let output = success(&output);
+    let frames: Vec<bingo_sdk::Frame> = output
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("stdout is NDJSON frames"))
+        .collect();
+    assert!(frames.iter().any(|frame| matches!(&frame.event, bingo_sdk::Event::ItemCompleted {item}
+        if matches!(&item.body, bingo_sdk::ItemBody::ToolCall {output:Some(output), ..} if output.parts.iter().any(|part| part.as_text() == Some("module result"))))), "{output}");
+}

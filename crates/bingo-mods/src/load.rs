@@ -106,6 +106,18 @@ mod tests {
         );
         assert!(crate::strip::resolve(Path::new("nested/register.ts"), "../../escape.ts").is_err());
     }
+    #[test]
+    fn an_absolute_path_cannot_load_an_outside_file_on_any_platform() {
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        assert!(
+            Root::new(root.path(), 4096)
+                .unwrap()
+                .source(outside.path().to_str().unwrap())
+                .unwrap_err()
+                .contains("escapes")
+        );
+    }
     #[cfg(unix)]
     #[test]
     fn a_symlink_cannot_import_an_outside_file() {
