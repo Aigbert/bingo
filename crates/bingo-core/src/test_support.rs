@@ -545,6 +545,8 @@ impl Command for ScriptedCommand {
 }
 
 /// A host that serves nothing, so a command context has one to hold.
+/// Kept with the real actor harness: its permissive no-ops exercise kernel
+/// command paths, which M111 leaves outside the plugin TestHost migration.
 pub struct NoApi;
 
 #[async_trait]

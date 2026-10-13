@@ -14,6 +14,7 @@ use crate::session::Mailbox;
 
 /// A host that reaches the sessions it was told about, by mailbox, and
 /// nothing else.
+/// Kept instead of TestHost because it routes into real kernel mailboxes.
 #[derive(Default)]
 pub struct RoutingHost {
     targets: Mutex<HashMap<SessionId, Mailbox>>,
