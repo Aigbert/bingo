@@ -262,6 +262,40 @@ mod tests {
         Layer::new(source, map)
     }
 
+    #[test]
+    fn plugin_trust_comes_only_from_an_explicit_user_layer() {
+        let grant =
+            serde_json::json!({"pluginTrust": {"outside": {"tier": "full", "uses": ["process"]}}});
+        let rejected = merge(
+            &[
+                layer("user", grant.clone()),
+                layer("project", grant.clone()),
+                layer("cli", grant.clone()),
+            ],
+            &[],
+        )
+        .unwrap();
+        assert!(rejected.kernel.plugin_trust.is_empty());
+        assert_eq!(rejected.notices.len(), 3);
+        let accepted = merge(
+            &[
+                layer("settings.toml", grant).user(),
+                layer(
+                    "project",
+                    serde_json::json!({"pluginTrust": {"outside": {"tier": "tighten"}}}),
+                ),
+            ],
+            &[],
+        )
+        .unwrap();
+        assert_eq!(
+            accepted.kernel.plugin_trust["outside"].tier,
+            bingo_sdk::Tier::Full
+        );
+        assert_eq!(accepted.kernel.plugin_trust["outside"].uses, ["process"]);
+        assert_eq!(accepted.notices.len(), 1);
+    }
+
     fn permissions_claim() -> Claim {
         Claim {
             plugin: "bingo.permissions".into(),
