@@ -22,7 +22,7 @@ no new dependency.
    the one in `view.rs`. `Mode.modes[0]` is documented as the resting
    mode, which a surface may leave unsaid.
 3. **`ToolTraits.quiet`**, default `false`. A tool cannot be asked on
-   resume, so `turn.rs` stamps `ItemBody::ToolCall.quiet` (omitted when
+   resume, so `turn/stream.rs` stamps `ItemBody::ToolCall.quiet` (omitted when
    false) from `traits(&input)` when it opens the item. A fixture pins
    both shapes (after M113). The four task tools are quiet when `in` is
    null.
@@ -71,15 +71,17 @@ no new dependency.
 ## Files
 
 - `crates/bingo-sdk/src/{slot.rs,lib.rs,tool.rs,event.rs}`,
-  `crates/bingo-sdk/fixtures/slots/` (new)
-- `crates/bingo-core/src/{turn.rs,commands/status.rs}`,
+  `crates/bingo-sdk/fixtures/slots/` (new), `tests/record.rs`,
+  `fixtures/record/` (quiet-call compatibility), wire schema snapshots
+- `crates/bingo-core/src/{turn.rs,turn/stream.rs,accumulator.rs,commands/status.rs}`,
+  `session/inputs.rs` (external calls also stamp quiet), turn contract tests,
   `crates/bingo-surface-print/src/stream_json.rs`
 - `crates/bingo-tasks/src/{journal,lib,create,update,get,list}.rs`
 - `crates/bingo-tool-bash/src/{jobs,lib}.rs`, `crates/bingo-schedule/src/wake.rs`,
   `crates/bingo-permissions/src/lib.rs`
 - `crates/bingo-surface-tui/src/{status,activity,rail,panel,transcript,blocks,input,run,ui}.rs`;
   `{tasks,shells,wake,permission}.rs` deleted; `screens/{tasks,shells}.rs`,
-  `test_support.rs`, `test_lanes.rs`
+  `lib.rs`, `test_support.rs`, `test_lanes.rs`, slot rendering tests
 - `docs/design/tui.md`, `docs/adr/{0013,0019,0070}-*.md`
 
 ## Exit criteria
@@ -116,5 +118,9 @@ no new dependency.
 - `placed` runs every frame: it parses only payloads with `slots`.
 - An ended job's row says the display's fold ("Started in the background
   as …"), not "Ran in the background". Say it in the commit body.
-- Re-verify at start: the consumer lines named here, M113's `ItemBody`
-  fixtures, M112's transcript fold, and `ActionItem` in `view.rs`.
+- Re-verified at `50a885ed`: consumers and `ActionItem` still match; M112
+  folds through `Transcript`, M113 pins records in sdk `tests/record.rs`.
+  Call creation lives in the accumulator, publication in `turn/stream.rs`,
+  and external calls in `session/inputs.rs`. No Decision changes.
+- Mechanical constructors and wire fixtures outside Files gain the default
+  quiet field as protocol step 6 permits; list exact paths when changed.
