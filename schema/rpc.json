@@ -733,6 +733,7 @@
             "SERVER_ERROR",
             "TURN_LOST",
             "TURN_BUDGET_EXHAUSTED",
+            "UNSUPPORTED",
             "INTERNAL"
           ]
         },
@@ -887,6 +888,37 @@
             "usage",
             "context"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "turn": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TurnId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "plugin": {
+              "type": "string"
+            },
+            "usage": {
+              "$ref": "#/$defs/Usage"
+            },
+            "type": {
+              "type": "string",
+              "const": "usageCharged"
+            }
+          },
+          "required": [
+            "type",
+            "plugin",
+            "usage"
+          ],
+          "description": "Additive model spend, independent of context measurement and rounds."
         },
         {
           "type": "object",
