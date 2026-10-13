@@ -115,6 +115,14 @@ fn every_event_variant_has_a_golden_fixture() {
         let path = entry.unwrap().path();
         let wire = std::fs::read_to_string(&path).unwrap();
         let value: Event = serde_json::from_str(&wire).unwrap();
+        if std::env::var_os("BINGO_UPDATE_SCHEMA").is_some() {
+            std::fs::write(
+                &path,
+                format!("{}\n", serde_json::to_string(&value).unwrap()),
+            )
+            .unwrap();
+            continue;
+        }
         let (name, pinned) = fixture_name(&value);
         assert_eq!(path.file_stem().unwrap().to_str().unwrap(), name);
         assert_eq!(wire, pinned);

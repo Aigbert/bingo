@@ -7,6 +7,7 @@
 use std::path::Path;
 
 use async_trait::async_trait;
+use bingo_collab::lifecycle::Lifecycle;
 use bingo_sdk::{
     Attachment, ErrorCode, Event, HostHandle, IntentId, IntentOutcome, InterruptScope, KernelError,
     SessionId, Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, TurnStatus,
@@ -22,11 +23,11 @@ use crate::{names, watch};
 pub const STOP_AGENT: &str = "StopAgent";
 
 const DESCRIPTION: &str = "\
-Stop a sub-agent you started: the turn it is running ends where it stands, \
+Stop a working or asking sub-agent you started: its active turn ends where it stands, \
 every call in flight dropped, and the agent stays — idle, with its memory, \
 so a message opens its next turn. The call returns once the turn has \
 ended and says how. An agent that is already idle is refused: there is \
-nothing to stop. An agent beside you is not yours to stop. To remove an \
+nothing to stop. Asking between turns is refused: answer or cancel that prompt. An agent beside you is not yours to stop. To remove an \
 agent altogether, `DismissAgent`.";
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -56,7 +57,20 @@ pub async fn stop(
     let child = names::mine(host, caller, name).await?;
     let name = names::name_of(&child).to_string();
     let mut attachment = watch::follow(host, &child.id).await?;
-    if !attachment.snapshot.busy() {
+    if Lifecycle::of_state(&attachment.snapshot) == Some(Lifecycle::Asking)
+        && !attachment.snapshot.busy()
+    {
+        return Err(KernelError::new(
+            ErrorCode::NotReady,
+            format!(
+                "{name} is asking between turns: answer or cancel its prompt before stopping it."
+            ),
+        ));
+    }
+    if !matches!(
+        Lifecycle::of_state(&attachment.snapshot),
+        Some(Lifecycle::Working | Lifecycle::Asking)
+    ) {
         return Err(KernelError::new(
             ErrorCode::NotReady,
             format!("{name} is idle: no turn is running to stop. A message opens its next turn."),
@@ -192,6 +206,23 @@ mod tests {
             .call(json!({ "agent": agent }), &tool_context(caller, host))
             .await
             .expect("a stop this crate can serve")
+    }
+
+    #[tokio::test]
+    async fn asking_between_turns_is_refused_in_words() {
+        let fleet = Fleet::default();
+        let root = fleet.root();
+        let child = fleet.child(&root, "reviewer");
+        fleet.set_asking(&child);
+        let out = called(&fleet, &root, "reviewer").await;
+        assert!(out.is_error);
+        assert!(
+            out.parts[0]
+                .as_text()
+                .unwrap()
+                .contains("asking between turns")
+        );
+        assert!(fleet.interrupted().is_empty());
     }
 
     #[tokio::test]

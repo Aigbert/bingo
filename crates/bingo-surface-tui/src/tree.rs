@@ -16,6 +16,7 @@
 
 use std::collections::BTreeMap;
 
+use bingo_collab::lifecycle::Lifecycle;
 use bingo_sdk::{
     Driver, Interaction, ItemBody, ItemId, SessionId, SessionState, SessionSummary, TreeState,
 };
@@ -26,48 +27,6 @@ use crate::theme;
 /// state is the whole of the row, so nothing about it is stored twice.
 pub type Agents<'a> = BTreeMap<ItemId, &'a SessionState>;
 
-/// What a session is doing, as a person reads it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Status {
-    Running,
-    /// Idle, having finished at least one turn.
-    Done,
-    /// Idle, and it has not run yet.
-    Idle,
-    /// Not open in this process: in the store, and reopened by choosing it.
-    Stored,
-}
-
-impl Status {
-    /// What the session is doing, or nothing at all: a `Log` session has no
-    /// model behind it, so there is no work to report (ADR-0011 §1). One
-    /// whose stream closed is in the store and nowhere else, whatever it was
-    /// doing when its last process ended.
-    pub fn of(state: &SessionState) -> Option<Self> {
-        if state.summary.driver == Driver::Log {
-            return None;
-        }
-        if state.closed {
-            Some(Status::Stored)
-        } else if state.busy() {
-            Some(Status::Running)
-        } else if state.last_turn.is_some() {
-            Some(Status::Done)
-        } else {
-            Some(Status::Idle)
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Status::Running => "running",
-            Status::Done => "done",
-            Status::Idle => "idle",
-            Status::Stored => "stored",
-        }
-    }
-}
-
 /// One row of the switcher, derived from a session in the tree or from what
 /// the store answered with.
 #[derive(Debug)]
@@ -75,7 +34,7 @@ pub struct Row<'a> {
     pub session: &'a SessionId,
     pub name: String,
     /// Absent for a session nothing answers.
-    pub status: Option<Status>,
+    pub status: Option<Lifecycle>,
     pub attention: bool,
 }
 
@@ -200,7 +159,7 @@ impl Tree {
             .map(|state| Row {
                 session: &state.summary.id,
                 name: name(state),
-                status: Status::of(state),
+                status: Lifecycle::of_state(state),
                 attention: asking(state),
             })
             .collect()
@@ -239,7 +198,7 @@ pub fn count(tree: &Tree, wants: Wants, scope: Scope<'_>) -> Option<usize> {
         .filter(|row| within.contains(&row.session))
         .filter(|row| match wants {
             Wants::Attention => row.attention,
-            Wants::Running => row.status == Some(Status::Running),
+            Wants::Running => row.status == Some(Lifecycle::Working),
         })
         .count();
     (n > 0).then_some(n)
@@ -311,7 +270,7 @@ fn stored_row(summary: &SessionSummary) -> Row<'_> {
     Row {
         session: &summary.id,
         name: name_of(summary),
-        status: (summary.driver != Driver::Log).then_some(Status::Stored),
+        status: (summary.driver != Driver::Log).then_some(Lifecycle::Stored),
         attention: false,
     }
 }
@@ -340,7 +299,7 @@ pub fn directory(cwd: &str) -> String {
 /// A session with a question open wants a person now. One that finished while
 /// you were looking elsewhere is unread, which is not the same thing —
 /// `SessionState::attention` counts both, and the window title wants that
-/// wider sense, while a row that says `Needs you` means this one.
+/// wider sense, while an asking row means this one.
 pub fn asking(state: &SessionState) -> bool {
     !state.interactions.is_empty()
 }
@@ -349,17 +308,34 @@ pub fn asking(state: &SessionState) -> bool {
 /// has spent doing it. Nothing for a session nothing answers — a room is not
 /// at work, so it reports no work.
 pub fn activity(state: &SessionState) -> Option<String> {
-    if asking(state) {
-        return Some("Needs you".to_string());
+    let lifecycle = Lifecycle::of_state(state)?;
+    let cost = if lifecycle == Lifecycle::Working
+        || (lifecycle == Lifecycle::Idle && state.last_status().is_some())
+    {
+        let mut cost = spent(state);
+        if state.last_status().is_some() && lifecycle == Lifecycle::Idle {
+            cost.push_str(&format!(" · {}s", seconds(state)));
+        }
+        cost
+    } else {
+        String::new()
+    };
+    Some(describe(state, &cost))
+}
+
+/// A never-run child's brief belongs beside its lifecycle word.
+pub fn describe(state: &SessionState, spent: &str) -> String {
+    let Some(lifecycle) = Lifecycle::of_state(state) else {
+        return String::new();
+    };
+    let mut words = crate::lifecycle::said(lifecycle, state.last_status(), spent);
+    if lifecycle == Lifecycle::Idle
+        && state.last_status().is_none()
+        && let Some(brief) = brief(state)
+    {
+        words.push_str(&format!(" · {brief}"));
     }
-    let spent = spent(state);
-    match Status::of(state)? {
-        Status::Running => Some(format!("Running{} {spent}", theme::ellipsis())),
-        Status::Done => Some(format!("Done ({spent} · {}s)", seconds(state))),
-        Status::Idle => Some(format!("Starting{}", theme::ellipsis())),
-        // Not at work: nothing runs it.
-        Status::Stored => None,
-    }
+    words
 }
 
 /// The first thing a session was asked, as a row says it: the opening line of
@@ -429,14 +405,18 @@ fn thousands(n: u64) -> String {
 
 /// A session's bullet takes the colour a tool row in the same state takes, and
 /// one that wants a person takes bingo's own colour wherever it is drawn.
-pub fn bullet_style(status: Option<Status>, attention: bool) -> ratatui::style::Style {
+pub fn bullet_style(
+    status: Option<Lifecycle>,
+    attention: bool,
+    last: Option<&bingo_sdk::TurnStatus>,
+) -> ratatui::style::Style {
     if attention {
         return theme::presence();
     }
     match status {
-        Some(Status::Running) => theme::presence(),
-        Some(Status::Done) => theme::good(),
-        Some(Status::Idle) | Some(Status::Stored) | None => theme::dim(),
+        Some(Lifecycle::Working | Lifecycle::Asking) => theme::presence(),
+        Some(Lifecycle::Idle) if last.is_some() => theme::good(),
+        Some(Lifecycle::Idle | Lifecycle::Stored | Lifecycle::Unseated) | None => theme::dim(),
     }
 }
 
@@ -460,7 +440,7 @@ mod tests {
         tree.fold.apply(&child_frame(2, started("trn_9")));
         let rows = tree.rows();
         assert_eq!(rows[1].name, "reviewer");
-        assert_eq!(rows[1].status, Some(Status::Running));
+        assert_eq!(rows[1].status, Some(Lifecycle::Working));
         assert_eq!(rows[0].name, "project", "the root is named by its cwd");
     }
 
@@ -536,7 +516,7 @@ mod tests {
         assert_eq!(tree.spawned_by(&spawned), Some(&child_id()));
         assert_eq!(
             agents.get(&spawned).and_then(|child| activity(child)),
-            Some("Starting…".to_string())
+            Some("idle".to_string())
         );
 
         tree.show(&child_id());
@@ -559,7 +539,7 @@ mod tests {
         let room = tree.rows().pop().expect("the room's row");
         assert_eq!(room.name, "#design");
         assert_eq!(room.status, None);
-        assert!(Status::of(tree.sessions().last().expect("the room")).is_none());
+        assert!(Lifecycle::of_state(tree.sessions().last().expect("the room")).is_none());
     }
 
     #[test]
@@ -594,7 +574,7 @@ mod tests {
         let running = tree.fold.sessions().nth(1).expect("the child");
         assert_eq!(
             activity(running).as_deref(),
-            Some("Running… 3 tools · 1.2k tokens")
+            Some("working · 3 tools · 1.2k tokens")
         );
 
         tree.fold.apply(&child_frame(
@@ -604,12 +584,12 @@ mod tests {
         let done = tree.fold.sessions().nth(1).expect("the child");
         assert_eq!(
             activity(done).as_deref(),
-            Some("Done (3 tools · 1.2k tokens · 0s)")
+            Some("idle · completed · 3 tools · 1.2k tokens · 0s")
         );
 
         tree.fold.apply(&child_frame(7, opened(child_permission())));
         let asking = tree.fold.sessions().nth(1).expect("the child");
-        assert_eq!(activity(asking).as_deref(), Some("Needs you"));
+        assert_eq!(activity(asking).as_deref(), Some("asking"));
     }
 
     /// What a row says of a session that has not run yet: the thing it was
@@ -645,7 +625,7 @@ mod tests {
             tree.fold.apply(&frame);
         }
         tree.fold.apply(&log_frame(9, log_announced("#design")));
-        let named: Vec<(String, Option<Status>)> = tree
+        let named: Vec<(String, Option<Lifecycle>)> = tree
             .rows()
             .into_iter()
             .map(|row| (row.name, row.status))
@@ -653,9 +633,9 @@ mod tests {
         assert_eq!(
             named,
             vec![
-                ("project".to_string(), Some(Status::Idle)),
+                ("project".to_string(), Some(Lifecycle::Idle)),
                 ("#design".to_string(), None),
-                ("reviewer".to_string(), Some(Status::Running)),
+                ("reviewer".to_string(), Some(Lifecycle::Working)),
             ]
         );
     }
@@ -727,7 +707,7 @@ mod tests {
             rows.iter().map(|row| row.name.clone()).collect::<Vec<_>>(),
             ["project", "reviewer", "archivist", "scout"]
         );
-        assert_eq!(rows[2].status, Some(Status::Stored));
+        assert_eq!(rows[2].status, Some(Lifecycle::Stored));
         assert_eq!(rows[3].session, &SessionId::from_raw("ses_9"));
         assert!(
             !rows[2].attention,
@@ -745,7 +725,7 @@ mod tests {
         let stored = vec![child_summary("reviewer"), summary()];
         let rows = roster(&tree, &stored);
         assert_eq!(rows.len(), 2, "the root and the child, once each");
-        assert_eq!(rows[1].status, Some(Status::Running));
+        assert_eq!(rows[1].status, Some(Lifecycle::Working));
     }
 
     /// A child whose stream closed is a stored session until its stream says
@@ -767,11 +747,14 @@ mod tests {
                 reason: bingo_sdk::CloseReason::Shutdown,
             },
         ));
-        assert_eq!(tree.rows()[1].status, Some(Status::Stored));
-        assert_eq!(activity(tree.state(&child_id()).unwrap()), None);
+        assert_eq!(tree.rows()[1].status, Some(Lifecycle::Stored));
+        assert_eq!(
+            activity(tree.state(&child_id()).unwrap()).as_deref(),
+            Some("stored")
+        );
         tree.fold.apply(&child_frame(4, announced("reviewer")));
         let child = tree.state(&child_id()).expect("still in the tree");
-        assert_eq!(Status::of(child), Some(Status::Idle));
+        assert_eq!(Lifecycle::of_state(child), Some(Lifecycle::Idle));
         assert_eq!(
             child.transcript.items().len(),
             1,
@@ -843,12 +826,15 @@ mod tests {
             },
         ];
         let rows = roster(&tree, &stored);
-        assert_eq!(rows[1].status, Some(Status::Stored));
+        assert_eq!(rows[1].status, Some(Lifecycle::Stored));
         assert_eq!(
             rows[2].status, None,
             "a room answers nothing whether it is here or not, so the list \
              puts it where every other room goes"
         );
-        assert_eq!(bullet_style(Some(Status::Stored), false), theme::dim());
+        assert_eq!(
+            bullet_style(Some(Lifecycle::Stored), false, None),
+            theme::dim()
+        );
     }
 }

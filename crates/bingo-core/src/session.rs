@@ -294,6 +294,7 @@ impl Actor {
     fn stamped(&self, summary: SessionSummary) -> SessionSummary {
         SessionSummary {
             busy: self.running.is_some(),
+            asking: !self.pending.is_empty(),
             ..summary
         }
     }

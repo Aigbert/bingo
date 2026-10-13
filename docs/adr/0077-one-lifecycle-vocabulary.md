@@ -1,6 +1,6 @@
 # ADR-0077 — One lifecycle vocabulary for an agent
 
-Status: proposed · 2026-10-13 · Plan: M135 · Amends: ADR-0027, ADR-0029, ADR-0060
+Status: accepted · 2026-10-14 · Plan: M135 · Amends: ADR-0027, ADR-0029, ADR-0060
 
 ## Context
 

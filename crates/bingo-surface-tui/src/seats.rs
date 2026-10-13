@@ -1,5 +1,6 @@
 //! The room columns a session carries in the switcher.
-use crate::tree::{self, Status, Tree};
+use crate::tree::{self, Tree};
+use bingo_collab::lifecycle::Lifecycle;
 use bingo_collab::name::same;
 pub use bingo_collab::room::{HOLDER, Hearing as Ear, Owes, members_of as members};
 use bingo_collab::room::{hearing as ear, unread_count as unread};
@@ -61,7 +62,8 @@ pub fn counts(tree: &Tree, room: &SessionState) -> Counts {
 /// The sessions of the tree that answer nobody: a room is a `Log` session, and
 /// that is the same fact the list groups its two runs by.
 fn rooms(tree: &Tree) -> impl Iterator<Item = &SessionState> {
-    tree.sessions().filter(|state| Status::of(state).is_none())
+    tree.sessions()
+        .filter(|state| Lifecycle::of_state(state).is_none())
 }
 
 /// The oldest answer this seat still owes. The debts are published oldest

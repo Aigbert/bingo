@@ -162,13 +162,13 @@ fn posted_to_a_room() -> Item {
 /// `ListAgents`: a node per agent, badged with what it is doing.
 fn listed_the_agents() -> Item {
     let roster = View::Tree {
-        nodes: vec![leaf("helper", Some("busy")), leaf("scout", Some("idle"))],
+        nodes: vec![leaf("helper", Some("working")), leaf("scout", Some("idle"))],
     };
     completed(
         "itm_3",
         "ListAgents",
         json!({}),
-        answered_with("helper  ses_2  busy", roster),
+        answered_with("helper  ses_2  working", roster),
     )
 }
 
@@ -192,7 +192,7 @@ fn what_the_message_tools_answer() {
         wide.contains("read  at each seat's next turn; an @ wakes now"),
         "{wide}"
     );
-    assert!(wide.contains("├─ helper [ busy ]"), "{wide}");
+    assert!(wide.contains("├─ helper [ working ]"), "{wide}");
     both("message_tools", &tree, &mut ui, now);
 }
 
@@ -295,7 +295,7 @@ fn the_roster() {
     assert!(wide.contains("Agents"), "{wide}");
     assert!(wide.contains("Rooms"), "{wide}");
     assert!(
-        wide.contains("~ reviewer  running · in #design · 3 unread · live"),
+        wide.contains("~ reviewer  working · in #design · 3 unread · live"),
         "a live seat wears the sigil and says so: {wide}"
     );
     assert!(

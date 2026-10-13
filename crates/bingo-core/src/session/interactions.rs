@@ -59,6 +59,7 @@ impl Actor {
         );
         self.publish(Event::InteractionOpened { interaction }, None)
             .await?;
+        self.publish_summary(self.state.summary.clone()).await?;
         Ok(())
     }
 
@@ -121,6 +122,7 @@ impl Actor {
         )
         .await?;
         self.applied(intent, Value::Null).await?;
+        self.publish_summary(self.state.summary.clone()).await?;
         Ok(())
     }
 
@@ -156,6 +158,7 @@ impl Actor {
         pending: Vec<(InteractionId, Pending)>,
         reason: CancelReason,
     ) -> Result<(), KernelError> {
+        let changed = !pending.is_empty();
         for (id, pending) in pending {
             let _ = pending.reply.send(Err(KernelError::new(
                 ErrorCode::InteractionClosed,
@@ -163,6 +166,9 @@ impl Actor {
             )));
             self.publish(Event::InteractionCancelled { id, reason }, None)
                 .await?;
+        }
+        if changed {
+            self.publish_summary(self.state.summary.clone()).await?;
         }
         Ok(())
     }

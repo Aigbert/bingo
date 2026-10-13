@@ -99,3 +99,5 @@ digests, per-room notification config beyond the seat's own number.
 §3 derives owned patience alarms from the shared room records and cursors
 at startup. One alarm per seat and room checks that the seat is still behind
 before waking it. Delivery voice remains the separate M123 decision.
+
+*2026-10-14 · M135: [ADR-0077](0077-one-lifecycle-vocabulary.md). ADR-0077 unifies agent lifecycle words; the ear (`live`, `listening`) remains its independent fact.*

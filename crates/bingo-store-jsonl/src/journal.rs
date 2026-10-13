@@ -340,9 +340,16 @@ mod tests {
         )
         .expect("append");
         let written = std::fs::read_to_string(layout::journal(&dir)).expect("read back");
+        if std::env::var_os("BINGO_UPDATE_SCHEMA").is_some() {
+            std::fs::write(
+                concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/clean-v3.jsonl"),
+                &written,
+            )
+            .expect("update fixture");
+        }
         assert_eq!(
             written,
-            fixture("clean.jsonl").replacen("\"version\":1", "\"version\":3", 1),
+            fixture("clean-v3.jsonl"),
             "the format is a contract"
         );
     }

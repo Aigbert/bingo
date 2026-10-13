@@ -274,6 +274,7 @@ pub(crate) mod tests {
             updated_at: stamp(),
             usage: Usage::default(),
             busy: false,
+            asking: false,
             // A session as the kernel leaves one: counted, and nothing said yet.
             messages: Some(0),
         }

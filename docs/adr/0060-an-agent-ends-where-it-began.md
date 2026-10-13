@@ -23,3 +23,5 @@ The kernel already has every verb: `interrupt` on an attachment, `HostApi::delet
 ## Supersedes
 
 — (amends ADR-0010 §6 with its missing half; ADR-0010 is annotated).
+
+*2026-10-14 · M135: [ADR-0077](0077-one-lifecycle-vocabulary.md). ADR-0077 decides the formerly deferred state words: StopAgent ends active working/asking turns; DismissAgent refuses both. Asking between turns is refused in words, as M135 records.*

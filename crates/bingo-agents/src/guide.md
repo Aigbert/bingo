@@ -15,7 +15,7 @@ level) and `tools` staff it, and two words decide what becomes of its answer.
   at once and the agent's reply arrives later as a message from that name.
   Carry on with whatever does not depend on it, or end your turn: the reply
   wakes you and there is nothing to poll. Until it comes the agent is still
-  running — say so if asked, and never guess at what it will say.
+  working — say so if asked, and never guess at what it will say.
 - **`background: false`** — the call waits and returns the agent's final text.
   For when you cannot go on without it. A turn that failed or was cut short
   comes back as an error, not as an answer.
@@ -67,9 +67,12 @@ the draft is still in your own bounced call, so repeating it costs nothing.
 
 `ListAgents` names who you can write to: the ones you started, and — under
 `Beside you` — the ones the same agent started alongside you. Each row is an
-`agent`, a `session`, a `state` (`busy` or `idle`), the `model` it runs on,
+`agent`, a `session`, a `state` (`working`, `asking`, or `idle`), the `model` it runs on,
 the `messages` it has said and the `tokens` it has spent; `-` is a fact the
-session has not got yet.
+session has not got yet. `asking` means a prompt waits for the person;
+a message can wait behind it. The shared vocabulary also includes `stored`
+(in the TUI) and `not seated` (an empty `/team` role). Listings call stored
+agents `idle`, since a message reopens them.
 
 `ListModels` lists the providers this build has, whether each is signed in,
 and the models it serves with their context window, output cap and whether
@@ -87,14 +90,15 @@ so set your own level before the work you want it for.
 An agent ends where it began: by whoever started it. An agent beside you is
 not yours to end.
 
-- `StopAgent` ends the turn an agent of yours is running, every call in
+- `StopAgent` ends the active turn of a `working` or `asking` agent of yours, every call in
   flight dropped where it stands, and returns once the turn has ended,
   saying how. The agent stays, idle and with its memory; a message opens
   its next turn. One that is already idle is refused: there is nothing to
-  stop. A spawn that was waiting on it hears the cut turn as it would one a
+  stop. An agent `asking` between turns is refused: the person must answer
+  or cancel its prompt. A spawn that was waiting on it hears the cut turn as it would one a
   person cut with `esc`.
 - `DismissAgent` deletes an idle agent of yours — its session, journal and
-  all — and frees the name. One still working is refused: stop it first, or
+  all — and frees the name. One `working` or `asking` is refused: stop it first, or
   wait. A room that seated it keeps the name on its roster and skips it; a
   role `.bingo/team.json` declares is seated afresh, empty, at the next
   open. It is the one tool here that destroys anything, and the gate asks

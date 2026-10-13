@@ -305,6 +305,31 @@ impl Fleet {
         id
     }
 
+    pub(crate) fn set_asking(&self, session: &SessionId) {
+        let mut sessions = self.sessions();
+        let live = sessions
+            .iter_mut()
+            .find(|live| &live.summary.id == session)
+            .unwrap();
+        live.summary.asking = true;
+        live.history.push(Event::InteractionOpened {
+            interaction: bingo_sdk::Interaction {
+                id: InteractionId::from_raw("ask_1"),
+                session: session.clone(),
+                turn: None,
+                item: None,
+                opened_at: ts(),
+                guard_until: None,
+                expires_at: None,
+                kind: InteractionKind::Confirm {
+                    title: "Continue?".into(),
+                    detail: String::new(),
+                },
+                answers: vec![AnswerSpec::Confirm, AnswerSpec::Cancel],
+            },
+        });
+    }
+
     fn snapshot(&self, live: &Live) -> SessionState {
         let mut state = SessionState::new(live.summary.clone());
         for (n, event) in live.history.iter().enumerate() {
@@ -630,6 +655,7 @@ pub(crate) fn summary(id: &str, title: Option<&str>, parent: Option<SessionId>) 
         updated_at: ts(),
         usage: Usage::default(),
         busy: false,
+        asking: false,
         messages: None,
     }
 }

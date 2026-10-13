@@ -1560,7 +1560,7 @@ mod tests {
         let (mut ui, now) = scene();
         let screen = render_tree(&tree, &mut ui, now);
         assert!(screen.contains("⏺ reviewer(review the diff)"), "{screen}");
-        assert!(screen.contains("⎿  Running…"), "{screen}");
+        assert!(screen.contains("⎿  working"), "{screen}");
         insta::assert_snapshot!(screen);
     }
 

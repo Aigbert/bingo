@@ -55,3 +55,5 @@ them idle; the briefing lives with the role; work arrives as messages.
   state is written anywhere.
 - The foreground spawn, the background-with-watcher spawn and their tests
   are byte-identical to today; `standby` is a third arm, not a rewrite.
+
+*2026-10-14 · M135: [ADR-0077](0077-one-lifecycle-vocabulary.md). A standby member reads `idle` with its brief beside it; all lifecycle words now come from ADR-0077.*
