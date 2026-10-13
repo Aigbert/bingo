@@ -15,7 +15,8 @@ setting, a flag, the wire or a card.
    `tier = "library"`, on `bingo-sdk`, `bingo-auth-oauth` and what the
    moved files already use. Move `adapter.rs`, `conversation.rs`,
    `error.rs`, `limits.rs`, `question.rs` and `secret.rs` with their
-   tests, and `fixtures.rs` behind a `testing` feature. The `pub use`
+   tests, and `fixtures.rs` behind a `testing` feature. Keep the fixed-list
+   secret queries in the surface until brick 4 removes that dependency. The `pub use`
    lines in `bingo-channels` keep their names and point at the library,
    so no caller changes yet. The channels test count holds (paste).
 2. **The platform contract, tests first.** `trait Platform` in the
@@ -73,10 +74,11 @@ setting, a flag, the wire or a card.
 ## Files
 
 - `crates/bingo-channel-{adapter,feishu}/**` (new), `Cargo.toml`,
-  `scripts/budget.toml`
+  `scripts/budget.toml`, `Cargo.lock`
 - `crates/bingo-channels/{Cargo.toml,src/**}`
-- `crates/bingo/src/{main,channels}.rs`, `crates/bingo/tests/channels.rs`
-- `crates/bingo-gateway/{Cargo.toml,src/doctor.rs}`
+- `crates/bingo/{Cargo.toml,src/{main,channels}.rs}`
+- `crates/bingo/tests/{channels.rs,cli/gateway.rs}`
+- `crates/bingo-gateway/{Cargo.toml,src/{doctor,lib}.rs}`
 - `scripts/feishu-smoke.md`, `docs/adr/0016-*.md`
 
 ## Exit criteria
@@ -104,6 +106,14 @@ setting, a flag, the wire or a card.
 - The channels' claim (M109).
 
 ## Risks
+
+- Re-verified at `eddd0ebc`: M109 claim and M112 transcript folds remain;
+  M129 gateway dispatch still constructs `Patient` in `src/lib.rs`, so
+  that path and both composition manifests are included. Gateway CLI
+  loopback cases also need the switch. `Cargo.lock` records the two members.
+  Schema claims remain descriptive, with no runtime schema validator.
+  The shared channel-directory constant moves to the library with a
+  re-export from `lock`; no claim behavior changes.
 
 - Snapshots move with the files. Run with `INSTA_UPDATE=no`, so a
   moved one is never rewritten silently.
