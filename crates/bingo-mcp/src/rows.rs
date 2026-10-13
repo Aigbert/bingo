@@ -1,7 +1,7 @@
 //! The live MCP configuration behind the shared service contract.
 use crate::manager::Manager;
 use async_trait::async_trait;
-use bingo_services::mcp::{self, Servers};
+use bingo_services::mcp::Servers;
 use serde_json::{Map, Value};
 use std::sync::Arc;
 
@@ -23,6 +23,7 @@ impl Servers for Rows {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bingo_services::mcp;
     use serde_json::{Value, json};
     const METHOD: &str = "servers";
     fn wire(manager: Arc<Manager>) -> Arc<dyn bingo_sdk::WireService> {
