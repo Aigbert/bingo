@@ -201,3 +201,40 @@ async fn checkpoint_writes_cannot_regress_to_an_older_sequence() {
         Seq(7)
     );
 }
+
+#[tokio::test]
+async fn a_version_one_checkpoint_is_replayed_after_the_bump() {
+    let (_root, store) = root_with();
+    let state = journal_with_cut(&store).await;
+    store.checkpoint(&session(), &Checkpoint::new(state)).await.unwrap();
+    let dir = layout::session_dir(store.root(), &session());
+    let path = dir.join("checkpoint.json");
+    let mut saved: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    saved["version"] = 1.into();
+    std::fs::write(path, serde_json::to_vec(&saved).unwrap()).unwrap();
+    assert!(store.resume(&session()).await.unwrap().state.is_none());
+    assert!(store.resume(&session()).await.unwrap().state.is_some());
+}
+
+#[tokio::test]
+async fn checkpoint_pictures_are_references_and_missing_blobs_are_notes() {
+    let (_root, store) = root_with();
+    let mut state = journal_with_cut(&store).await;
+    let line = include_str!("../../fixtures/picture-v1.jsonl").lines().nth(1).unwrap();
+    let mut picture: bingo_sdk::Frame = serde_json::from_str(line).unwrap();
+    picture.seq = Seq(7);
+    picture.session = session();
+    store.append(&session(), &picture).await.unwrap();
+    state.apply(&picture);
+    store.checkpoint(&session(), &Checkpoint::new(state.clone())).await.unwrap();
+    let dir = layout::session_dir(store.root(), &session());
+    let saved = std::fs::read_to_string(dir.join("checkpoint.json")).unwrap();
+    assert!(saved.contains("\"blob\""));
+    assert!(!saved.contains("\"data\""));
+    assert_eq!(store.resume(&session()).await.unwrap().state, Some(state));
+    std::fs::remove_dir_all(dir.join("blobs")).unwrap();
+    let resumed = store.resume(&session()).await.unwrap().state.unwrap();
+    let item = resumed.transcript.get(&ItemId::from_raw("i")).unwrap();
+    assert!(matches!(&item.body, ItemBody::User { parts, .. }
+        if parts == &[bingo_sdk::ContentPart::text("[picture missing: image/png 0.0 KB]")]));
+}
