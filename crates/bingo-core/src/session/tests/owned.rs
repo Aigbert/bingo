@@ -36,11 +36,10 @@ async fn stopped_turn(cfg: TurnConfig, hung: Arc<Hung>, text: &str) {
     let (mut state, mut events) = mailbox.attach().await.unwrap();
     mailbox.submit(IntentId::mint(), input(text));
     bounded(hung.entered.notified()).await;
+    let interrupted_at = tokio::time::Instant::now();
     mailbox.interrupt(IntentId::mint(), InterruptScope::Head);
-    // The round trip proves the actor has processed the interrupt before time advances.
-    bounded(mailbox.summary()).await.unwrap();
-    tokio::time::advance(GRACE + Duration::from_millis(1)).await;
     let frames = bounded(frames_until(&mut events, &mut state, turn_completed)).await;
+    assert!(tokio::time::Instant::now() - interrupted_at <= GRACE);
     for frame in frames {
         if let Event::ItemStarted { item } = frame.event {
             assert_eq!(
