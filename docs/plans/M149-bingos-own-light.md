@@ -57,7 +57,7 @@ variant (`f90cc226`); keep the generic worked row with its caret.
 - `crates/bingo/tests/pty/**` only for removed-glyph needles;
   `scripts/tui-smoke.sh` changes the ASCII answer needle to `| Hello in ascii.`.
 - `docs/design/tui.md`, `tui-identity-2026-10.md`; terminal capture evidence
-  in `docs/design/m149-tmux-captures.txt`.
+  in `docs/design/m149-tmux-captures.txt` (commit `9f319d19`, removed after merge).
 - M137's host/runtime, plugin-rpc, manifests and schemas are excluded.
 
 ## Exit criteria
@@ -92,7 +92,7 @@ variant (`f90cc226`); keep the generic worked row with its caret.
   tests. It passed alone; the complete suite is rerun with one test thread.
 - The streaming estimate is for motion only, not billed token accounting.
 - Wordmark frame snapshots retain trailing cells to pin animation width.
-- Captures are in [m149-tmux-captures.txt](../design/m149-tmux-captures.txt).
+- Captures were committed in `9f319d19` (`docs/design/m149-tmux-captures.txt`) and removed after merge.
   No live/credential tests, sdk/wire/schema changes or new dependencies.
 
 ## Verified (2026-10-14)
