@@ -4,10 +4,10 @@
 
 use std::fmt;
 
+pub use crate::lines::{CodecError, Lines, lines};
 use serde::de::{self, Unexpected};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
-pub use crate::lines::{CodecError, Lines, lines};
 
 /// The only version this surface speaks.
 const VERSION: &str = "2.0";
@@ -156,7 +156,6 @@ pub enum Message {
     Response(Response),
     Notification(Notification),
 }
-
 
 impl Message {
     pub fn line(&self) -> Result<String, serde_json::Error> {
