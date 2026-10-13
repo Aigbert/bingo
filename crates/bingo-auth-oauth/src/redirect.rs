@@ -181,13 +181,24 @@ mod tests {
         assert_ne!(again.port(), named, "the port is held by the first bind");
         drop(first);
         drop(again);
-        let free = bind().await.expect("a port");
-        let port = free.port();
-        drop(free);
-        assert_eq!(
-            bind_named(Some(port)).await.expect("the named port").port(),
-            port
+        assert!(
+            a_freed_port_is_taken_again().await,
+            "a named port that was free was never taken"
         );
+    }
+
+    /// Another process may claim an ephemeral port between its release and
+    /// the named bind, so one of a few freed ports must be honoured.
+    async fn a_freed_port_is_taken_again() -> bool {
+        for _ in 0..5 {
+            let free = bind().await.expect("a port");
+            let port = free.port();
+            drop(free);
+            if bind_named(Some(port)).await.expect("a port").port() == port {
+                return true;
+            }
+        }
+        false
     }
 
     #[tokio::test]
