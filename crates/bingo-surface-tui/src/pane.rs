@@ -212,8 +212,8 @@ fn controls(view: &View, out: &mut Vec<Control>) {
                 out.push(Control::Button(button.hotkey, action.clone()));
             }
         }
-        View::Input { input } => out.push(Control::Input(input.clone())),
-        View::Select { select } => out.push(Control::Select(select.clone())),
+        View::Input { input } => out.push(Control::Input(input.as_ref().clone())),
+        View::Select { select } => out.push(Control::Select(select.as_ref().clone())),
         _ => {}
     }
 }
@@ -502,14 +502,16 @@ mod tests {
                         hotkey: Some('i'),
                         on_press: Some(action("press")),
                         ..Default::default()
-                    },
+                    }
+                    .into(),
                 },
                 View::Input {
                     input: InputProps {
                         value: Some("A".into()),
                         on_input: Some(action("input")),
                         ..Default::default()
-                    },
+                    }
+                    .into(),
                 },
             ])
             .into();

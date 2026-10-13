@@ -70,7 +70,7 @@ pub(crate) type Keys = Pin<Box<dyn Stream<Item = Term> + Send>>;
 
 /// The results of the host calls the loop spawns.
 enum Reply {
-    Rendered(crate::pulled::Key, bingo_sdk::View),
+    Rendered(crate::pulled::Key, Box<bingo_sdk::View>),
     Attached(Box<Attachment>),
     /// A child's mailbox, so a line typed in its view reaches it. The
     /// attachment's own stream is dropped: the tree's carries the child.
@@ -468,7 +468,7 @@ impl Run {
                         .render(&key.session, key.request.clone())
                         .await
                         .unwrap_or_else(|_| key.request.engine());
-                    Ok(Reply::Rendered(key, view))
+                    Ok(Reply::Rendered(key, Box::new(view)))
                 });
             }
         }
@@ -935,7 +935,7 @@ impl Run {
 
     fn reply(&mut self, reply: Reply, events: &mut Option<FrameStream>) {
         match reply {
-            Reply::Rendered(key, view) => self.ui.pulled.answer(key, view),
+            Reply::Rendered(key, view) => self.ui.pulled.answer(key, *view),
             Reply::Attached(attachment) => self.attach(*attachment, events),
             Reply::Handle(session, handle) => {
                 self.session.handles.insert(session, handle);

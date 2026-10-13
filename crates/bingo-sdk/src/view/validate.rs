@@ -15,7 +15,7 @@ fn check(view: &View, answer: Option<(Component, &str)>) -> Result<(), String> {
     }
     for (path, node) in nodes {
         if let View::Engine { component, .. } = node
-            && !answer.is_some_and(|(asked, _)| asked == *component)
+            && answer.is_none_or(|(asked, _)| asked != *component)
         {
             return Err(format!(
                 "{path}: Engine is only valid for the requested component"

@@ -133,7 +133,7 @@ fn column(
     let total: usize = children.iter().map(|child| grow(child)).sum();
     if total > 0 {
         for (lines, child) in drawn.iter_mut().zip(children) {
-            let extra = spare * grow(child) / total;
+            let extra = (spare * grow(child)).checked_div(total).unwrap_or_default();
             if extra > 0 {
                 let mut child = (*child).clone();
                 if let View::Box { layout, .. } = &mut child {
@@ -192,7 +192,7 @@ fn row(
     let total: usize = children.iter().map(|child| grow(child)).sum();
     if total > 0 {
         for (size, child) in widths.iter_mut().zip(children) {
-            *size += spare * grow(child) / total;
+            *size += (spare * grow(child)).checked_div(total).unwrap_or_default();
         }
     }
     let used = widths.iter().sum::<usize>().saturating_add(gaps);

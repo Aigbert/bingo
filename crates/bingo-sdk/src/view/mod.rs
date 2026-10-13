@@ -78,7 +78,7 @@ pub enum View {
     Box {
         children: Vec<View>,
         #[serde(flatten)]
-        layout: BoxStyle,
+        layout: Box<BoxStyle>,
     },
     Panel {
         title: String,
@@ -92,17 +92,17 @@ pub enum View {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         children: Vec<TextChild>,
         #[serde(flatten)]
-        button: ButtonProps,
+        button: Box<ButtonProps>,
     },
     #[serde(rename = "Input")]
     Input {
         #[serde(flatten)]
-        input: InputProps,
+        input: Box<InputProps>,
     },
     #[serde(rename = "Select")]
     Select {
         #[serde(flatten)]
-        select: SelectProps,
+        select: Box<SelectProps>,
     },
     #[serde(rename = "Link")]
     Link {

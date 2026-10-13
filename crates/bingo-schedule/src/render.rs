@@ -181,7 +181,7 @@ mod tests {
         else {
             panic!("the notice is text: {shown:?}");
         };
-        let text = bingo_sdk::view::text_children(&spans);
+        let text = bingo_sdk::view::text_children(spans);
         assert!(text.contains("broken.json"), "{text}");
         assert!(text.contains("1 file(s) could not be read"), "{text}");
     }

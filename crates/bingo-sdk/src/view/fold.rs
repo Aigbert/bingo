@@ -4,7 +4,7 @@ impl View {
     pub fn column(children: Vec<View>) -> Self {
         Self::Box {
             children,
-            layout: BoxStyle::default(),
+            layout: Box::default(),
         }
     }
     pub fn columns(children: Vec<View>) -> Self {
@@ -21,7 +21,8 @@ impl View {
                     flex_grow: Some(1),
                     width: Some(width as u16),
                     ..Default::default()
-                },
+                }
+                .into(),
             })
             .collect();
         Self::Box {
@@ -31,7 +32,8 @@ impl View {
                 flex_wrap: Some(Wrap::Wrap),
                 gap: Some(COLUMN_GAP as u16),
                 ..Default::default()
-            },
+            }
+            .into(),
         }
     }
 
