@@ -14,20 +14,22 @@ there is only one fold to agree.
 1. **The contract, failing.** In `bingo-sdk`, a `transcript` module with
    the type's public surface stubbed (`Transcript::new`, `apply(&Event)
    -> Applied`, `items() -> &[Arc<Item>]`, `get(&ItemId)`, `generation()`,
-   `cut() -> Option<&Cut>`) and the property test:
+   `model_items() -> impl Iterator<Item = &Item>`) and the property test:
    - generate frame sequences over item start/update/complete,
      `TurnRetrying`, `Rewound`, `Compacted` (with known and unknown
      boundaries), using ids from a small pool so updates hit;
    - assert: incremental fold == fold from scratch; the item order and
      content equal what today's `SessionState::apply` produces (a
      reference implementation kept in the test, copied from today's
-     code before it is removed); no dropped id survives.
+     code before it is removed); no dropped id survives; the model order
+     equals the frame-based `ContextView::items` oracle.
    Add `proptest` to `bingo-sdk`'s dev-dependencies (already a
    workspace dependency; no new crate in the tree).
 2. **`Transcript`.** `Vec<Arc<Item>>` plus `HashMap<ItemId, usize>`;
-   removal rebuilds the index (removal is rare: retry, rewind). The
-   compaction cut is recorded, not applied. `Serialize` writes the item
-   list as today's `items` field; `Deserialize` rebuilds the index.
+   removal rebuilds the index (removal is rare: retry, rewind). Model ids
+   have their own order and membership index; apply each compaction once
+   to that order. Serialize the existing client fields; deserialize rebuilds
+   client indexes (model replay comes from events, not a client snapshot).
 3. **`SessionState` embeds it.** Replace `items: Vec<Item>` and
    `history_generation` with `transcript: Transcript`, flattened so the
    serialised form is unchanged (fixture: today's `SessionState` JSON
@@ -35,10 +37,11 @@ there is only one fold to agree.
    `state.items` moves to `state.transcript.items()`; rewind's
    `dropped(&self.state.items, ..)` takes the transcript.
 4. **The model view.** `ContextView::model_view(&Transcript) ->
-   Vec<Message>` applies the cut via today's `splice_compaction` logic
-   (moved, not copied), skips `Item::external()` tool calls, and folds.
-   `ContextView::items(frames)` and `fold(frames)` become test helpers
-   (`#[cfg(test)]`) that build a `Transcript` first.
+   Vec<Message>` renders the model order and skips external tool calls.
+   Move the production splice into the sdk; retain today's frame-based
+   `ContextView::items` and its splice under `cfg(test)` as independent
+   oracles. Add the named two-compaction regression. Existing slice-based
+   hook/contributor/compactor APIs receive model items on demand.
 5. **The turn folds through it.** `TurnRun.history: Vec<Frame>` becomes
    `TurnRun.transcript: Transcript` (a clone is a vector of `Arc`s).
    The turn's `self.items`, `upsert`, its compaction splice and the
@@ -56,9 +59,11 @@ there is only one fold to agree.
 
 ## Files
 
-- `crates/bingo-sdk/src/{transcript.rs,state.rs,lib.rs}`, `Cargo.toml`
+- `crates/bingo-sdk/src/{transcript.rs,transcript/*.rs,state.rs,lib.rs}`
+- `crates/bingo-sdk/Cargo.toml`, workspace `Cargo.toml` and `Cargo.lock`
 - `crates/bingo-core/src/{context.rs,turn.rs,turn/*.rs,rewind.rs}`
-- `crates/bingo-core/src/session.rs`, `session/{running.rs,spawn.rs}`
+- `crates/bingo-core/src/session.rs`, `session/{running.rs,spawn.rs,title.rs}`
+- `crates/bingo-core/src/turn/tests.rs`, `turn/tests/*.rs`
 - every reader of `SessionState::items` (`rg -n '\.items\b' crates` —
   surfaces read it: TUI, print, channels, rpc, demo-ui)
 - `docs/adr/0064-*.md`, `docs/adr/0002-event-stream.md`
@@ -69,7 +74,7 @@ there is only one fold to agree.
 - [ ] `rg -n 'ContextView::items|history: actor.journal' crates` finds
       only test code.
 - [ ] `rg -n 'fn upsert|fn splice_compaction' crates` finds one
-      definition of each rule, in `bingo-sdk`.
+      production definition of each rule, in `bingo-sdk`; test oracles excepted.
 - [ ] `SessionState` JSON is byte-equal to before for the RPC fixtures.
 - [ ] The M108 retry and resume tests pass unchanged.
 - [ ] All gates, `scripts/tui-smoke.sh` included (surfaces changed).
@@ -105,13 +110,14 @@ there is only one fold to agree.
   `[s2, b, s1]`. Omitting the first cut leaves the same client items
   and latest cut but changes the required model result to `[s2, b, s1]`:
   the proposed stored facts do not distinguish these histories.
-- Options requiring a decision: (A) let `Transcript` retain cumulative
-  model visibility and ordering metadata, folded alongside client items,
-  instead of only the latest cut (recommended; item bodies can stay shared);
-  (B) retain ordered cuts and enough event ordering to replay their effects
-  (must address growth and request cost); (C) explicitly change model
-  semantics to latest-cut-only (would allow the demonstrated resurrection).
-  Do not implement any option or accept ADR-0064 until this is resolved.
+- **Resolved (2026-10-13):** the user selected A: own the model order beside
+  the client list over shared items. ADR-0064 was amended in `e28969f3`.
+  The frame-based model fold stays a test oracle through this milestone.
+- Re-verified against `72036be6`: slice-based plugin contracts still take
+  `&[Item]`; adapt at call sites without changing those public contracts.
+  Reader scope includes paging mutations, title lookup, plugin queries,
+  integration tests, and surface test fixtures. No new external crate;
+  `proptest` is an existing workspace dev dependency.
 
 ## Verified (2026-10-13 — blocked, not complete)
 
