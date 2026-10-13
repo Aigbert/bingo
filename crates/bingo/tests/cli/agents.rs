@@ -298,7 +298,9 @@ fn journal_text(dir: &std::path::Path) -> String {
         let path = entry.path();
         if path.is_dir() {
             text.push_str(&journal_text(&path));
-        } else if let Ok(contents) = std::fs::read_to_string(&path) {
+        } else if path.file_name().is_some_and(|name| name == "journal.jsonl")
+            && let Ok(contents) = std::fs::read_to_string(&path)
+        {
             text.push_str(&contents);
         }
     }
