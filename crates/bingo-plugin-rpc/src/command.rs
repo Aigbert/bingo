@@ -17,14 +17,21 @@ pub struct PluginCommand {
     plugin: String,
     spec: CommandSpec,
     connection: Arc<Connection>,
+    timeout: std::time::Duration,
 }
 
 impl PluginCommand {
-    pub fn new(plugin: &str, spec: CommandSpec, connection: Arc<Connection>) -> Self {
+    pub fn new(
+        plugin: &str,
+        spec: CommandSpec,
+        connection: Arc<Connection>,
+        timeout: std::time::Duration,
+    ) -> Self {
         Self {
             plugin: plugin.to_string(),
             spec,
             connection,
+            timeout,
         }
     }
 
@@ -47,11 +54,13 @@ impl Command for PluginCommand {
             session: cx.session.clone(),
         };
         let value = serde_json::to_value(params).map_err(|e| self.failed(e))?;
-        let answer = self
-            .connection
-            .request(name::COMMAND_RUN, value)
-            .await
-            .map_err(|error| self.failed(error.message))?;
+        let answer = tokio::time::timeout(
+            self.timeout,
+            self.connection.request(name::COMMAND_RUN, value),
+        )
+        .await
+        .map_err(|_| self.failed(crate::deadline::expired(name::COMMAND_RUN, self.timeout)))?
+        .map_err(|error| self.failed(error.message))?;
         let result: CommandRunResult =
             serde_json::from_value(answer).map_err(|e| self.failed(e))?;
         Ok(result.outcome)

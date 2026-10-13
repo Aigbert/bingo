@@ -49,6 +49,21 @@ pub const SERVICE: Duration = Duration::from_secs(30);
 /// quiet without closing its pipe cannot hold a turn open.
 pub const PROVIDER_IDLE: Duration = Duration::from_secs(120);
 
+/// A tool may build or crawl, so allow ten minutes by default. A plugin that
+/// needs longer names callTimeout in its manifest; a wedged process still ends.
+pub const TOOL_CALL: Duration = Duration::from_secs(600);
+
+/// Commands may run the same long work as tools. Bound the whole request so
+/// an unattended command cannot hold the session's input queue forever.
+pub const COMMAND_RUN: Duration = Duration::from_secs(600);
+
+pub fn expired(verb: &str, limit: Duration) -> String {
+    format!(
+        "{verb} timed out after {}s (configure callTimeout in plugin.json)",
+        limit.as_secs()
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -60,6 +75,8 @@ mod tests {
         assert!(HOOK < HANDSHAKE);
         assert!(HANDSHAKE < SERVICE);
         assert!(SERVICE < COMPACT);
+        assert!(SERVICE < COMMAND_RUN);
+        assert!(PROVIDER_IDLE < TOOL_CALL);
         assert!(
             COMPACT < PROVIDER_IDLE,
             "a whole compaction is bounded more tightly than one silence"

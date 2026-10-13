@@ -33,6 +33,7 @@ pub struct PluginTool {
     spec: ToolSpec,
     connection: Arc<Connection>,
     notices: Arc<Notices>,
+    timeout: std::time::Duration,
 }
 
 impl PluginTool {
@@ -41,12 +42,14 @@ impl PluginTool {
         spec: ToolSpec,
         connection: Arc<Connection>,
         notices: Arc<Notices>,
+        timeout: std::time::Duration,
     ) -> Self {
         Self {
             plugin: plugin.to_string(),
             spec,
             connection,
             notices,
+            timeout,
         }
     }
 
@@ -82,9 +85,14 @@ impl PluginTool {
         };
         let answered = self.connection.request(name::TOOL_CALL, value);
         tokio::pin!(answered);
+        let deadline = tokio::time::sleep(self.timeout);
+        tokio::pin!(deadline);
         loop {
             tokio::select! {
                 biased;
+                () = &mut deadline => return Err(RpcError::new(
+                    INTERNAL_ERROR, crate::deadline::expired(name::TOOL_CALL, self.timeout),
+                )),
                 Some(line) = tail.recv() => cx.progress(line),
                 reply = &mut answered => {
                     abandons.settled();
