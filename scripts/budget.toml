@@ -103,6 +103,8 @@
 # M133 (ADR-0075): schema-ts adds one member; existing tempfile moves
 # from dev to normal for disposable author-kit homes (+2, no new resolution).
 # M137 (ADR-0078): plugin-host adds one shared library member.
-max_dependencies = 356
+# M137 (ADR-0078): bingo-mods (+1), QuickJS engine/bindings (+3),
+# oxc compiler and shared compiler/runtime support (+50); budget.sh measures 410.
+max_dependencies = 410
 max_core_check_seconds = 20
 max_target_gb = 5

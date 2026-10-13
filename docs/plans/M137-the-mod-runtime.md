@@ -222,3 +222,49 @@ test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 ```
+
+`cargo test -p bingo-mods` (compiler contracts before implementation):
+```text
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test typescript_and_jsx_compile_without_a_runtime_import ... FAILED
+test imports_stay_inside_the_module_root_or_bingo ... FAILED
+test strings_and_comments_do_not_count_as_dynamic_imports ... FAILED
+called `Result::unwrap()` on an `Err` value: StripError("view.tsx:1: module compiler unavailable")
+called `Result::unwrap()` on an `Err` value: StripError("register.ts:1: module compiler unavailable")
+called `Result::unwrap()` on an `Err` value: StripError("register.ts:1: module compiler unavailable")
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+`cargo test -p bingo-mods --test strip`:
+```text
+test strings_and_comments_do_not_count_as_dynamic_imports ... ok
+test typescript_and_jsx_compile_without_a_runtime_import ... ok
+test imports_stay_inside_the_module_root_or_bingo ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+`scripts/budget.sh` (first engine measurement):
+```text
+dependencies (unique, normal): 410 (max  409)
+FAIL: too many dependencies
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 1 GB (soft max  5)
+test binaries: 8
+budget FAILED
+```
+
+`scripts/budget.sh` (measured cap):
+```text
+dependencies (unique, normal): 410 (max  410)
+warm cargo check -p bingo-core: 1s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 1 GB (soft max  5)
+test binaries: 8
+budget ok
+```
+
+`cargo deny check`:
+```text
+advisories ok, bans ok, licenses ok, sources ok
+```

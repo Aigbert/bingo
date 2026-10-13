@@ -12,6 +12,30 @@ description = "Sandboxed in-process module plugins"
 workspace = true
 
 [dependencies]
+rquickjs.workspace = true
+oxc_allocator.workspace = true
+oxc_ast.workspace = true
+oxc_parser.workspace = true
+oxc_semantic.workspace = true
+oxc_span.workspace = true
+oxc_transformer.workspace = true
+oxc_codegen.workspace = true
+bingo-sdk.workspace = true
+bingo-plugin-host.workspace = true
+bingo-digest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+tokio.workspace = true
+futures.workspace = true
+async-trait.workspace = true
+url.workspace = true
+getrandom.workspace = true
+
 thiserror.workspace = true
 
 [dev-dependencies]
+bingo-sdk = { workspace = true, features = ["testing"] }
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+
