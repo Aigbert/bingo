@@ -51,15 +51,16 @@ there is only one fold to agree.
    `actor.state.transcript.clone()`; `actor.journal` is no longer read
    by the turn.
 6. **Measure.** A bench-style test (not a timing assertion): build a
-   10 000-item session, assert that starting a turn clones no `Frame`
-   (count via a test hook) and touches no item body (`Arc::strong_count`
-   rises, contents unchanged).
+   10 000-item session. Exercise the same snapshot constructor as spawn:
+   it accepts no frames or journal; assert `Arc::ptr_eq` and increased
+   strong counts, so no item body is copied. No wall-clock assertion.
 7. ADR-0064 §1–4 accepted (the tree sections stay proposed until M120);
    dated note on ADR-0002 §3.
 
 ## Files
 
 - `crates/bingo-sdk/src/{transcript.rs,transcript/*.rs,state.rs,lib.rs}`
+- `crates/bingo-sdk/src/host.rs` (the removed model-fold API doc reference)
 - `crates/bingo-sdk/Cargo.toml`, workspace `Cargo.toml` and `Cargo.lock`
 - `crates/bingo-core/src/{context.rs,turn.rs,turn/*.rs,rewind.rs}`
 - `crates/bingo-core/src/session.rs`, `session/{running.rs,spawn.rs,title.rs}`
