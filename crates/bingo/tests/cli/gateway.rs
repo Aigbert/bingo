@@ -348,7 +348,19 @@ fn stopping_gives_back_the_schedule_runner_claim_and_the_pidfile() {
         .expect("the permanent schedule lease remains");
     file.try_lock()
         .expect("shutdown released the schedule lease");
-    assert!(channel_claims.iter().all(|path| !path.exists()));
+    for path in channel_claims {
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            bingo_channels::lock::MARKER.as_bytes()
+        );
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)
+            .expect("the permanent channel claim remains");
+        file.try_lock()
+            .expect("shutdown released the channel claim");
+    }
     assert!(!gateway.pidfile().exists());
 }
 
