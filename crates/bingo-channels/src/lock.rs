@@ -1,7 +1,7 @@
 //! One process owns one app (ADR-0016 §5).
 //!
-//! Feishu's long connection is cluster-mode — a random client gets each event
-//! — and Telegram's polling evicts whoever polled last. A second bingo on the
+//! A platform may distribute arrivals among listeners or evict the earlier
+//! listener when another starts. A second bingo on the
 //! same credential is therefore not a conflict anybody sees: it is half the
 //! messages going somewhere else, silently. So the claim is taken before the
 //! adapter starts, and a claim that cannot be taken is a refusal with the
@@ -90,8 +90,8 @@ mod tests {
     #[test]
     fn the_second_claim_on_one_credential_is_refused_loudly() {
         let home = tempfile::tempdir().expect("a temporary directory");
-        let first = Claim::take(home.path(), "feishu", "cli_a1").expect("the first claim");
-        let second = Claim::take(home.path(), "feishu", "cli_a1");
+        let first = Claim::take(home.path(), "sample", "cli_a1").expect("the first claim");
+        let second = Claim::take(home.path(), "sample", "cli_a1");
         let Err(ChannelError::Refused(message)) = second else {
             panic!("expected a refusal, got {second:?}");
         };
@@ -108,9 +108,9 @@ mod tests {
             let home = tempfile::tempdir().unwrap();
             let dir = home.path().join(DIRECTORY);
             std::fs::create_dir_all(&dir).unwrap();
-            let path = dir.join("feishu-cli_a1.lock");
+            let path = dir.join("sample-cli_a1.lock");
             std::fs::write(&path, bytes).unwrap();
-            let error = Claim::take(home.path(), "feishu", "cli_a1").unwrap_err();
+            let error = Claim::take(home.path(), "sample", "cli_a1").unwrap_err();
             let text = error.to_string();
             assert!(text.contains("legacy"), "{text}");
             assert!(text.contains("stop every bingo"), "{text}");
@@ -122,8 +122,8 @@ mod tests {
     #[test]
     fn a_different_credential_is_a_different_claim() {
         let home = tempfile::tempdir().expect("a temporary directory");
-        let _a = Claim::take(home.path(), "feishu", "cli_a1").expect("a");
-        let _b = Claim::take(home.path(), "feishu", "cli_b2").expect("b");
+        let _a = Claim::take(home.path(), "sample", "cli_a1").expect("a");
+        let _b = Claim::take(home.path(), "sample", "cli_b2").expect("b");
         let _c = Claim::take(home.path(), "loopback", "cli_a1").expect("c");
     }
 
@@ -131,11 +131,11 @@ mod tests {
     fn a_claim_is_given_back_when_it_is_dropped() {
         let home = tempfile::tempdir().expect("a temporary directory");
         let path = {
-            let claim = Claim::take(home.path(), "feishu", "cli_a1").expect("a claim");
+            let claim = Claim::take(home.path(), "sample", "cli_a1").expect("a claim");
             claim.path().to_path_buf()
         };
         assert!(path.exists(), "release keeps the permanent claim inode");
-        Claim::take(home.path(), "feishu", "cli_a1").expect("the next process may have it");
+        Claim::take(home.path(), "sample", "cli_a1").expect("the next process may have it");
     }
 
     #[test]

@@ -16,9 +16,9 @@ use serde_json::{Value, json};
 
 use super::content::{self, Resource};
 use super::posted::Handle;
-use crate::adapter::Incoming;
-use crate::conversation::Conversation;
-use crate::question::Question;
+use bingo_channel_adapter::adapter::Incoming;
+use bingo_channel_adapter::conversation::Conversation;
+use bingo_channel_adapter::question::Question;
 use bingo_sdk::InteractionId;
 
 const MESSAGE: &str = "im.message.receive_v1";

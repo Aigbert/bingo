@@ -39,15 +39,15 @@ use async_trait::async_trait;
 use bingo_sdk::{CancellationToken, SessionState};
 use serde_json::{Value, json};
 
-use crate::adapter::{
+use api::{Api, ApiError};
+use bingo_channel_adapter::adapter::{
     Acknowledge, Buttons, ChannelAdapter, ChannelCommand, Edit, Files, Inbox, Mark, Mode, Outcome,
     Outgoing, Threads,
 };
-use crate::conversation::{Conversation, Posted};
-use crate::error::ChannelError;
-use crate::limits::{Dialect, Encoding, Limits};
-use crate::question::Question;
-use api::{Api, ApiError};
+use bingo_channel_adapter::conversation::{Conversation, Posted};
+use bingo_channel_adapter::error::ChannelError;
+use bingo_channel_adapter::limits::{Dialect, Encoding, Limits};
+use bingo_channel_adapter::question::Question;
 use posted::Handle;
 use send::Queue;
 use upload::{Endpoint, Route};
@@ -489,7 +489,7 @@ impl ChannelAdapter for Feishu {
 
     /// None: a card that is visibly writing itself is the affordance, and
     /// Feishu has no typing indicator for a bot anyway.
-    fn typing(&self) -> Option<&dyn crate::adapter::Typing> {
+    fn typing(&self) -> Option<&dyn bingo_channel_adapter::adapter::Typing> {
         None
     }
 

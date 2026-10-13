@@ -329,21 +329,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "bingo-channels"
+name = "bingo-channel-feishu"
 version = "0.6.6"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
- "bingo-auth-oauth",
  "bingo-channel-adapter",
- "bingo-claim",
  "bingo-pictures",
  "bingo-sdk",
  "futures",
  "insta",
- "jiff",
  "reqwest",
- "schemars 1.2.2",
  "serde",
  "serde_json",
  "tempfile",
@@ -352,6 +348,24 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "wiremock",
+]
+
+[[package]]
+name = "bingo-channels"
+version = "0.6.6"
+dependencies = [
+ "async-trait",
+ "bingo-channel-adapter",
+ "bingo-claim",
+ "bingo-sdk",
+ "futures",
+ "jiff",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

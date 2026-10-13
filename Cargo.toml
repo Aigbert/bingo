@@ -11,6 +11,7 @@ repository = "https://github.com/yexrob/bingo"
 publish = false
 
 [workspace.dependencies]
+bingo-channel-feishu = { path = "crates/bingo-channel-feishu" }
 bingo-channel-adapter = { path = "crates/bingo-channel-adapter" }
 bingo-shelf = { path = "crates/bingo-shelf" }
 bingo-claim = { path = "crates/bingo-claim" }

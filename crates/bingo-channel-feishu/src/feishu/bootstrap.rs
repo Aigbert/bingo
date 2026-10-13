@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 
-use crate::error::ChannelError;
+use bingo_channel_adapter::error::ChannelError;
 
 /// Where the endpoint is asked for. The path is not under `/open-apis`.
 pub const ENDPOINT: &str = "/callback/ws/endpoint";

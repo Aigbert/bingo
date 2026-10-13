@@ -14,7 +14,6 @@
 //! - [`directory`] — which chat a session sits in, for whoever asks later.
 //! - [`tool`] — `SendFile`, the one way a file goes out (ADR-0051 §3).
 //! - [`loopback`] — the adapter that is the contract fixture.
-//! - [`feishu`] — the first real platform, wire bricks and all.
 //!
 //! Nothing here reaches the sdk: a channel is a client of the one event
 //! stream like every other surface, folding frames with `SessionState::apply`
@@ -26,7 +25,6 @@ pub use bingo_channel_adapter::conversation;
 pub mod deliver;
 pub mod directory;
 pub use bingo_channel_adapter::error;
-pub mod feishu;
 pub mod gate;
 pub mod guide;
 pub mod host;
@@ -58,7 +56,6 @@ pub use conversation::{Conversation, Posted};
 pub use deliver::{Deliverer, Op};
 pub use directory::{Directory, Seat};
 pub use error::ChannelError;
-pub use feishu::Feishu;
 pub use gate::Gate;
 pub use host::ChannelsSurface;
 pub use limits::{Dialect, Encoding, Limits};

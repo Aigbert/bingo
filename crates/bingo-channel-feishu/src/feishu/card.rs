@@ -13,9 +13,9 @@
 use serde_json::{Value, json};
 
 use super::event::button_value;
-use crate::conversation::Conversation;
-use crate::limits::Limits;
-use crate::question::Question;
+use bingo_channel_adapter::conversation::Conversation;
+use bingo_channel_adapter::limits::Limits;
+use bingo_channel_adapter::question::Question;
 
 /// The element a streamed answer is written into. Fixed, so an update never
 /// has to look one up.
@@ -103,8 +103,8 @@ fn markdown(content: &str) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::limits::{Dialect, Encoding};
-    use crate::question::Choice;
+    use bingo_channel_adapter::limits::{Dialect, Encoding};
+    use bingo_channel_adapter::question::Choice;
     use bingo_sdk::{Answer, InteractionId};
 
     fn limits() -> Limits {

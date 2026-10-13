@@ -2,7 +2,7 @@
 
 The one thing the test suite cannot do: talk to Feishu. Everything else about
 the channel surface is proven offline against the loopback adapter and byte
-fixtures (`cargo test -p bingo-channels`, `cargo test -p bingo --test channels`);
+fixtures (`cargo test -p bingo-channel-feishu`, `cargo test -p bingo --test channels`);
 this is the half-hour that decides whether the wire notes in ADR-0016 §6 are
 still true.
 

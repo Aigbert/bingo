@@ -5,9 +5,9 @@ use wiremock::matchers::{body_json, method, path, query_param};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
 use super::*;
-use crate::adapter::{ChannelAdapter, ChannelCommand};
-use crate::conversation::Conversation;
-use crate::question::Choice;
+use bingo_channel_adapter::adapter::{ChannelAdapter, ChannelCommand};
+use bingo_channel_adapter::conversation::Conversation;
+use bingo_channel_adapter::question::Choice;
 use bingo_sdk::{Answer, InteractionId};
 
 async fn ok(server: &MockServer, verb: &str, at: &str, data: serde_json::Value) {
