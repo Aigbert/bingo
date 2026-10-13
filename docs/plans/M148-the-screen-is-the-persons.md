@@ -98,61 +98,27 @@ become data. No new dependency.
   is approved; list every such test here. No other outside-scope change is
   authorized. Currently identified: context
   `session_start_invalidates_both_keys_without_opening_the_session`.
-- **Stopped during brick 1 (2026-10-14), protocol step 6 and the user's
-  scope restriction.** The re-verification omitted `bingo-surface-tui/src/blocks.rs`:
-  `Blocks::live`, the `sync(..., live)` argument and `segments()` implement
-  the under-the-running-rows lane that brick 3 explicitly removes. Passing
-  an empty vector forever would retain the obsolete lane, contrary to the plan.
-  Recommended: approve this file for removing that field, argument and segment,
-  plus mechanical `sync` caller edits in `src/motion.rs`, `src/transcript.rs`
-  and `src/transcript/pictured.rs` (tests; unchanged assertions). `view.rs`
-  and the callers inside `blocks.rs` complete the call-site list.
-  Alternative: explicitly revise brick 3 to retain the empty lane API.
-  None of these outside-scope files was changed. The ten new contract tests
-  compile and fail for the expected missing behavior; implementation has not begun.
+- Approved TUI removal files (relative to `src/`): `blocks.rs`, `focus.rs`, `frame.rs`, `input.rs`, `keys.rs`, `layout.rs`, `layout/tests.rs`, `lib.rs`, `motion.rs`, `panel.rs`, `pointer.rs`, `rail.rs`, `screens.rs`, `screens/teams.rs`, `screens/windows.rs`, `select.rs`, `test_lanes.rs`, `theme.rs`, `transcript.rs`, `transcript/pictured.rs`, `ui.rs`, `ui/controls.rs`, `view.rs`, `views/mod.rs`, `window.rs`.
+- Deleted snapshots: `panel_end`, `panel_middle`, `custom_panel_{80x24,120x40}`, `panel_sheet_{80x24,120x40}`, `owed_{80x24,120x40}`, `ctrl_p_shows_what_the_plugins_wrote_into_the_session`, `the_rail_holds_the_pinned_board_and_the_live_progress_card`, `without_a_rail_the_same_cards_draw_under_the_running_rows`: removed sheet/rail/lane only.
+- **Stopped (2026-10-14):** `bingo-rooms/src/room.rs:219`, outside Files,
+  `the_payload_carries_the_names_the_listeners_and_the_tree_it_draws_as`
+  fails on added `slots: []`. Proposed fix: add this file to scope and add
+  `"slots": []` to its two complete-payload expectations; keep all other
+  assertions. This is not a Null-absence change. The file is untouched.
+- Pending: eight TUI failures (band instrumentation and removal-affected
+  snapshots/token-site lists), remaining gates, row-action drive, docs and smoke.
 
 ## Re-verified (2026-10-14, `23810b23`)
 
-- Branch `m148-the-screen-is-the-persons`; clean tree at the supplied base.
-  M108–M136 and M147 are the supplied landed set; M137 files are untouched.
-- M124/M125 geometry is in `frame.rs` and `layout.rs`; `view::compose`
-  renders rail cards and the inline fallback. `Ui::pinned`, `Focus::Card`,
-  `Open::Panel`, key/pointer dispatch and layout targets are removal callers.
-- `slot::with` adds `slots` to a View object without losing its other fields;
-  `Slot::Row` holds a body and actions, but requires an existing `ItemId`.
-  `/board` currently returns `Applied` and journals only an extension.
-  Use `CommandOutcome::Record` for a board notice anchor and a demo-ui
-  event observer to place the row on its recorded id; no new kernel door.
-- The shared owed/member writers are in `bingo-collab`, not `roster.rs`.
-  TUI `seats.rs` uses the collab readers. Schedule `wake::payload` currently
-  places a `Status` countdown; M148 intentionally changes it to empty slots.
-- The extension-reader search found the context assertion above. Other
-  inspected readers use optional lookup/deserialization: tasks, demo-ui,
-  collab room/ear/cursor/readers, context memory rows and agents report-back.
-- `scripts/tui-smoke.sh` currently uses fixed tmux socket `bingo` and kills
-  that server in cleanup. Before running it, use a unique owned socket;
-  migrate the progress and pinned-board steps to Activity and `/board`.
+- Original tree clean; branch `m148-the-screen-is-the-persons`. M137 untouched.
+- Geometry: `frame`/`layout`; data writers: collab `room`/`owed`. Wake moves
+  from Status to empty slots. The board uses Record plus an event observer.
+- Extension readers inspected: tasks, demo-ui, collab room/ear/cursor/readers,
+  context baseline/memory, agents report-back. Only the approved baseline
+  assertion requires present-as-null to absent so far.
+- Smoke must use a unique owned tmux socket, replacing its fixed `bingo` socket.
 
 ## Verified (2026-10-14)
-
-The initial re-verification stopped before code; the user approved the
-Null-absence assertion updates on 2026-10-14. Implementation resumed from
-`dd226ee6`. Gate evidence follows as checks run.
-
-```text
-$ git branch --show-current
-m148-the-screen-is-the-persons
-$ git rev-parse --short HEAD
-23810b23
-$ git status --porcelain=v1
-(no output before the plan edit)
-```
-
-Brick 1: an initial test-fixture compile failed with `E0308` (`round: None`,
-expected `u32`) and `E0560` (`ended_at`; the field is `completed_at`). The
-fixture was corrected before the red run below; these were not behavioral failures.
-Screen operands are omitted below; the equality failures show the legacy cards
-still drawing. The journal fixture was generated with `BINGO_UPDATE_SCHEMA=1`.
 
 ```text
 $ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-surface-tui -p bingo-collab -p bingo-demo-ui -p bingo-schedule m148 --locked --no-fail-fast
@@ -212,6 +178,59 @@ $ git diff --check
 (exit 0; no output)
 ```
 
-Stopped before implementation: workspace check, clippy, workspace tests,
-discipline, budget, deny, MSVC and PTY gates were not run. No live or credential
-tests ran; no tmux server was touched. All completion criteria remain unticked.
+```text
+$ cargo test -p bingo-sdk m148 --locked
+test state::tests::m148_null_extension_journal_removes_only_its_kind ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 135 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+$ cargo test -p bingo-context session_start_invalidates_both_keys_without_opening_the_session --locked
+test baseline::lifecycle::session_start_invalidates_both_keys_without_opening_the_session ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 98 filtered out; finished in 0.09s
+
+$ cargo test -p bingo-surface-tui --lib --locked
+test motion::esc_runs_a_sheet_back_down_the_way_it_came ... FAILED
+test motion::a_card_reveals_top_down_and_a_sheet_slides_up ... FAILED
+test layout::tests::layout_renders_each_band_once_and_reuses_unchanged_blocks ... FAILED
+test screens::teams::the_roster ... FAILED
+test screens::teams::the_roster_with_the_cursor_on_a_room ... FAILED
+test screens::the_help_sheet ... FAILED
+test theme::tests::every_token_is_spent_where_the_design_says ... FAILED
+test view::tests::help_panel ... FAILED
+snapshot assertion for 'sheet_close' failed in line 616
+snapshot assertion for 'sheet_slide' failed in line 599
+assertion `left == right` failed
+  left: [1, 1, 1, 0, 1]
+ right: [1, 1, 1, 1, 1]
+snapshot assertion for 'roster_80x24' failed in line 53
+snapshot assertion for 'roster_in_the_rooms' failed in line 325
+snapshot assertion for 'help_80x30' failed in line 607
+assertion `left == right` failed: where `text` is spent
+snapshot assertion for 'help_panel' failed in line 1119
+test result: FAILED. 1091 passed; 8 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.51s
+
+$ cargo test -p bingo-demo-ui -p bingo-collab -p bingo-rooms -p bingo-schedule --locked --no-fail-fast
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test room::tests::the_payload_carries_the_names_the_listeners_and_the_tree_it_draws_as ... FAILED
+assertion `left == right` failed: a roster of bare names says nothing about ears
+  left: Object {"kind": String("tree"), "nodes": Array [Object {"label": String("scout"), "tone": String("neutral")}], "members": Array [String("scout")], "slots": Array []}
+ right: Object {"members": Array [String("scout")], "kind": String("tree"), "nodes": Array [Object {"label": String("scout"), "tone": String("neutral")}]}
+test result: FAILED. 229 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 116 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+error: 1 target failed:
+    `-p bingo-rooms --lib`
+
+$ cargo fmt --all -- --check
+(exit 0; no output)
+```
