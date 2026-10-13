@@ -97,3 +97,8 @@ both schemas before the freeze starts at its first release (ADR-0075).
 Unknown legacy fields deserialize without effect. A legacy `true` emits
 one Info notice at plugin load naming the plugin: an endpoint holding
 its own conversation is an agent. Fixtures pin absent and legacy true.*
+
+*2026-10-13, §1 clarification by the person's delegate: `AgentTurn` also
+carries `tools: Vec<ToolSpec>`, the turn's already resolved offer. ADR-0036
+§1 requires the unchanged bridge to offer exactly those tools; this adds
+no history, host reader or second selection.*

@@ -119,18 +119,10 @@ Audit §6.
   one Info notice at load naming the plugin and explaining that an endpoint
   holding its own conversation is an agent. Fixture tests pin absent/true.
 
-- **STOP (2026-10-13, protocol step 6): bridge offer missing from seam.**
-  ADR-0076 §1's `AgentTurn { session, cwd, input, model, reasoning, judge }`
-  lacks the exact session tool offer that unchanged ADR-0036 §1 requires.
-  `provider.rs::Asking::ready` passes `ModelRequest.tools` to `Link::observe`
-  and `Shared::observe`; `Shared::offer` then uses it, not the global catalogue.
-  `turn/late.rs::ToolSet::gather` owns filtering, sources and deduplication;
-  rereading the catalogue changes the offer, and repeating selection duplicates
-  authority. HostApi has no reader for the running turn's resolved offer.
-  Recommended: add `tools: Vec<ToolSpec>` to `AgentTurn`, from the resolved
-  turn set, passed to the unchanged bridge. It carries no conversation history.
-  Alternative: a session-scoped host reader adds a new sdk door and changes
-  the bridge. Await a decision on ADR-0076 §1 before brick 1.
+- **Decision (person's delegate, 2026-10-13):** `AgentTurn` also carries
+  `tools: Vec<ToolSpec>`, from `ToolSet::gather`'s resolved offer. ACP passes
+  it to the unchanged bridge, with no host reader or second selection.
+  A test pins that the bridge offers exactly that resolved set.
 
 ## Re-verified (2026-10-13, e9e45bb9)
 
@@ -145,6 +137,4 @@ Audit §6.
 
 ## Verification evidence
 
-The protocol freeze stop was resolved by the person's delegate on 2026-10-13.
-Stopped before brick 1: no code/schema/TUI/fixture changes or gates; `git diff --check` passed.
-All exit criteria remain unticked; ADR-0076 remains proposed.
+Both initial Decision stops were resolved by the person's delegate on 2026-10-13.
