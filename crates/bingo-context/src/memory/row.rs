@@ -231,7 +231,15 @@ mod tests {
             serde_json::from_value(writes[0].2["slots"].clone()).unwrap();
         assert_eq!(
             slots,
-            [row(&item, "Recall from memory", "the-build".into())]
+            [bingo_sdk::slot::Slot::Row {
+                item,
+                mark: None,
+                title: Some("Recall from memory".into()),
+                badge: Some("the-build".into()),
+                caption: None,
+                body: None,
+                actions: vec![],
+            }]
         );
     }
 

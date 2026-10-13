@@ -153,6 +153,17 @@ mod tests {
         assert_eq!(rows[0], rows[1]);
         let slots: Vec<bingo_sdk::slot::Slot> =
             serde_json::from_value(rows[0]["slots"].clone()).unwrap();
-        assert_eq!(slots, [row(&tool_cx.item, "guide", "the wire")]);
+        assert_eq!(
+            slots,
+            [bingo_sdk::slot::Slot::Row {
+                item: tool_cx.item,
+                mark: Some('❖'),
+                title: Some("Skill".into()),
+                badge: Some("guide".into()),
+                caption: Some("the wire".into()),
+                body: None,
+                actions: vec![],
+            }]
+        );
     }
 }

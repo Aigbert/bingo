@@ -104,8 +104,10 @@ mod tests {
 
     async fn call(tree: &Tree, input: Value) -> ToolOutput {
         let library = Arc::new(Library::new(bingo_sdk::Env::rooted(tree.root())));
+        let mut cx = tool_context(&tree.cwd());
+        cx.host = bingo_sdk::testing::TestHost::default().handle();
         SkillTool::new(library)
-            .call(input, &tool_context(&tree.cwd()))
+            .call(input, &cx)
             .await
             .expect("a named skill is not a failure")
     }

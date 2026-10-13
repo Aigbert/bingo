@@ -185,8 +185,24 @@ mod tests {
         );
         assert_eq!(promotions.open(), ["call_1"]);
         let rows = promotions.rows(&bingo_sdk::SessionId::from_raw("ses_1"));
-        assert!(
-            matches!(&rows[0], bingo_sdk::slot::Slot::Row { item, actions, .. } if item.as_str() == "call_1" && actions[0].key == Some('b') && actions[0].action.name == ACTION && actions[0].action.args == "call_1")
+        assert_eq!(
+            rows,
+            [bingo_sdk::slot::Slot::Row {
+                item: bingo_sdk::ItemId::from_raw("call_1"),
+                mark: None,
+                title: None,
+                badge: None,
+                caption: None,
+                body: None,
+                actions: vec![bingo_sdk::ActionItem {
+                    label: "background".into(),
+                    action: bingo_sdk::Action {
+                        name: "bash.promote".into(),
+                        args: serde_json::json!("call_1"),
+                    },
+                    key: Some('b'),
+                }],
+            }]
         );
         assert!(
             promotions
