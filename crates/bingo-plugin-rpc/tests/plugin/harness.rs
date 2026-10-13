@@ -135,9 +135,23 @@ pub async fn started_with_timeout(plugins: &[(&str, &[&str])], seconds: Option<u
     }
 }
 
-/// Model the kernel's default registration policy without another dev dependency.
+/// Model user trust for the fixtures' declared model and service calls.
 pub async fn register(manager: &Manager) {
-    for proposal in manager.registrations(&BTreeMap::new()).await {
+    let trust = manager
+        .plugins()
+        .await
+        .into_iter()
+        .map(|status| {
+            (
+                status.id,
+                bingo_sdk::PluginTrust {
+                    tier: bingo_sdk::Tier::Rewrite,
+                    uses: vec!["model".into(), "kv".into()],
+                },
+            )
+        })
+        .collect();
+    for proposal in manager.registrations(&trust).await {
         manager
             .registered(&proposal.name, Ok(proposal.execution.grant))
             .await;

@@ -241,7 +241,7 @@ fn side_home(mode: &str) -> tempfile::TempDir {
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(root.join("main.py"), SIDE_PLUGIN).unwrap();
     std::fs::write(root.join("plugin.json"), serde_json::json!({
-        "name":"side", "version":"1", "entry":{"command":"python3","args":["${PLUGIN_ROOT}/main.py",mode]}
+        "name":"side", "version":"1", "uses":["session"], "entry":{"command":"python3","args":["${PLUGIN_ROOT}/main.py",mode]}
     }).to_string()).unwrap();
     std::fs::write(
         home.path().join(".bingo/settings.json"),

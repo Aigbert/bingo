@@ -6,13 +6,13 @@ use std::collections::BTreeSet;
 pub const UNSAFE: &[&str] = &["process", "http", "env", "model"];
 
 pub fn grant(
-    _runtime: PluginRuntime,
+    runtime: PluginRuntime,
     origin: Origin,
     trust: Option<&PluginTrust>,
     uses: &[String],
 ) -> Grant {
     let tier = trust.map_or(
-        if origin == Origin::Project {
+        if runtime == PluginRuntime::Process || origin == Origin::Project {
             Tier::Tighten
         } else {
             Tier::Rewrite

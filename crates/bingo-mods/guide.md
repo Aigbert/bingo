@@ -31,7 +31,8 @@ chain and signals cancellation to the module thread.
 
 User and explicit-directory modules receive rewrite authority and declared
 `uses`; project modules receive tighten authority and safe nouns. Only user
-`pluginTrust` can grant more. Registration can reduce authority or deny a
+`pluginTrust` can grant more. Process plugins retain their `tighten` default
+for every directory; declared safe nouns need no tier lift. Registration can reduce authority or deny a
 plugin with `{reason: "..."}`. Calls consult the granted catalogue; declaring
 a noun does not bypass an unsafe method's authority check.
 
