@@ -22,6 +22,7 @@ pub(crate) struct Manager {
     limits: Limits,
     modules: RwLock<Vec<Arc<Module>>>,
     host: OnceLock<HostHandle>,
+    dollar: OnceLock<Arc<crate::dollar::Runtime>>,
     this: OnceLock<Weak<Manager>>,
     watches: Mutex<BTreeMap<PathBuf, reload::Watch>>,
     reloading: tokio::sync::Mutex<()>,
@@ -46,6 +47,7 @@ impl Manager {
             limits,
             modules: RwLock::new(Vec::new()),
             host: OnceLock::new(),
+            dollar: OnceLock::new(),
             this: OnceLock::new(),
             watches: Mutex::new(BTreeMap::new()),
             reloading: tokio::sync::Mutex::new(()),
@@ -55,7 +57,13 @@ impl Manager {
             tasks: Mutex::new(Vec::new()),
         }
     }
-    pub async fn start(self: &Arc<Self>, cwd: &Path, host: HostHandle) {
+    pub async fn start(
+        self: &Arc<Self>,
+        cwd: &Path,
+        host: HostHandle,
+        dollar: Arc<crate::dollar::Runtime>,
+    ) {
+        let _ = self.dollar.set(dollar);
         let _ = self.host.set(host.clone());
         let _ = self.this.set(Arc::downgrade(self));
         self.tasks
@@ -109,6 +117,9 @@ impl Manager {
         }
         for module in self.modules() {
             module.close().await;
+        }
+        if let Some(dollar) = self.dollar.get() {
+            dollar.stop().await;
         }
     }
 }

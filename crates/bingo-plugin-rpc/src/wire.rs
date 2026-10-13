@@ -60,6 +60,11 @@ pub fn capabilities() -> BTreeSet<Cap> {
         .filter(|method| *method != name::INITIALIZE)
         .map(str::to_owned)
         .chain(
+            crate::schema::kernel_methods()
+                .into_iter()
+                .map(|(name, _)| name),
+        )
+        .chain(
             bingo_sdk::catalogue::ALL
                 .iter()
                 .filter(|entry| entry.kind == bingo_sdk::catalogue::Kind::Observation)

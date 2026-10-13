@@ -79,117 +79,210 @@ export type View = ({ "kind": "text"; "text": string; [key: string]: unknown; } 
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export const dollarRoutes = {
   "session.messages": {
-    "face": "bingo.plugin.session"
+    "face": "bingo.plugin.session",
+    "site": [
+      "session"
+    ]
   },
   "session.cwd": {
-    "face": "bingo.plugin.session"
+    "face": "bingo.plugin.session",
+    "site": [
+      "session"
+    ]
   },
   "session.root": {
-    "face": "bingo.plugin.session"
+    "face": "bingo.plugin.session",
+    "site": [
+      "session"
+    ]
   },
   "session.model": {
-    "face": "bingo.plugin.session"
+    "face": "bingo.plugin.session",
+    "site": [
+      "session"
+    ]
   },
   "session.turns": {
-    "face": "bingo.plugin.session"
+    "face": "bingo.plugin.session",
+    "site": [
+      "session"
+    ]
   },
   "session.id": {
-    "face": "bingo.plugin.session"
+    "face": "bingo.plugin.session",
+    "site": [
+      "session"
+    ]
   },
   "session.surfaces": {
-    "face": "bingo.plugin.session"
+    "face": "bingo.plugin.session",
+    "site": [
+      "session"
+    ]
   },
   "session.usage": {
-    "face": "bingo.plugin.session"
+    "face": "bingo.plugin.session",
+    "site": [
+      "session"
+    ]
   },
   "session.version": {
-    "face": "bingo.plugin.session"
+    "face": "bingo.plugin.session",
+    "site": []
   },
   "session.compact": {
-    "kernel": "session.compact"
+    "kernel": "session.compact",
+    "site": [
+      "session"
+    ]
   },
   "session.send": {
-    "kernel": "session.send"
+    "kernel": "session.send",
+    "site": []
   },
   "session.append": {
-    "kernel": "session.append"
+    "kernel": "session.append",
+    "site": [
+      "session"
+    ]
   },
   "session.authorize": {
-    "face": "bingo.plugin.session"
+    "face": "bingo.plugin.session",
+    "site": [
+      "session"
+    ]
   },
   "turn.abort": {
-    "face": "bingo.plugin.turn"
+    "face": "bingo.plugin.turn",
+    "site": [
+      "session"
+    ]
   },
   "prompt.submit": {
-    "kernel": "prompt.submit"
+    "kernel": "prompt.submit",
+    "site": [
+      "session"
+    ]
   },
   "prompt.read": {
-    "face": "bingo.plugin.prompt"
+    "face": "bingo.plugin.prompt",
+    "site": [
+      "session"
+    ]
   },
   "tool.list": {
-    "face": "bingo.plugin.tool"
+    "face": "bingo.plugin.tool",
+    "site": []
   },
   "tool.call": {
-    "kernel": "tool.call"
+    "kernel": "tool.call",
+    "site": [
+      "session"
+    ]
   },
   "tool.register": {
-    "face": "bingo.plugin.tool"
+    "face": "bingo.plugin.tool",
+    "site": [
+      "session"
+    ]
   },
   "command.list": {
-    "face": "bingo.plugin.command"
+    "face": "bingo.plugin.command",
+    "site": []
   },
   "command.run": {
-    "kernel": "command.run"
+    "kernel": "command.run",
+    "site": [
+      "session"
+    ]
   },
   "command.register": {
-    "face": "bingo.plugin.command"
+    "face": "bingo.plugin.command",
+    "site": [
+      "session"
+    ]
   },
   "config.list": {
-    "face": "bingo.plugin.config"
+    "face": "bingo.plugin.config",
+    "site": [
+      "session"
+    ]
   },
   "config.read": {
-    "face": "bingo.plugin.config"
+    "face": "bingo.plugin.config",
+    "site": [
+      "session"
+    ]
   },
   "config.set": {
-    "kernel": "config.set"
+    "kernel": "config.set",
+    "site": [
+      "session"
+    ]
   },
   "model.complete": {
-    "kernel": "model.complete"
+    "kernel": "model.complete",
+    "site": [
+      "session",
+      "turn"
+    ]
   },
   "model.classify": {
-    "face": "bingo.plugin.model"
+    "face": "bingo.plugin.model",
+    "site": [
+      "session",
+      "turn"
+    ]
   },
   "model.fork": {
-    "face": "bingo.plugin.model"
+    "face": "bingo.plugin.model",
+    "site": [
+      "session",
+      "turn"
+    ]
   },
   "state.get": {
-    "face": "bingo.plugin.state"
+    "face": "bingo.plugin.state",
+    "site": []
   },
   "state.set": {
-    "face": "bingo.plugin.state"
+    "face": "bingo.plugin.state",
+    "site": []
   },
   "store.get": {
-    "face": "bingo.plugin.store"
+    "face": "bingo.plugin.store",
+    "site": []
   },
   "store.set": {
-    "face": "bingo.plugin.store"
+    "face": "bingo.plugin.store",
+    "site": []
   },
   "store.delete": {
-    "face": "bingo.plugin.store"
+    "face": "bingo.plugin.store",
+    "site": []
   },
   "store.keys": {
-    "face": "bingo.plugin.store"
+    "face": "bingo.plugin.store",
+    "site": []
   },
   "clock.now": {
-    "face": "bingo.plugin.clock"
+    "face": "bingo.plugin.clock",
+    "site": []
   },
   "clock.sleep": {
-    "face": "bingo.plugin.clock"
+    "face": "bingo.plugin.clock",
+    "site": []
   },
   "clock.after": {
-    "face": "bingo.plugin.clock"
+    "face": "bingo.plugin.clock",
+    "site": [
+      "session"
+    ]
   },
   "clock.every": {
-    "face": "bingo.plugin.clock"
+    "face": "bingo.plugin.clock",
+    "site": [
+      "session"
+    ]
   }
 } as const;

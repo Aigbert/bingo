@@ -229,3 +229,55 @@ async fn a_timed_out_inner_hook_gets_a_fresh_catch_budget() {
     );
     host.shutdown().await;
 }
+
+mod support;
+
+#[tokio::test]
+async fn dollar_reads_the_session_fold_and_freezes_its_plugin_identity() {
+    let fixture = support::Fixture::new(
+        r#"
+      export function register(on) {
+        on('fixture.echo', async ($, e) => {
+          let frozen = false;
+          try { $.plugin.name = 'foreign'; } catch { frozen = true; }
+          return { id:await $.session.id({session:e.session}),
+            cwd:await $.session.cwd({session:e.session}),
+            config:await $.config.list({session:e.session}), plugin:$.plugin, frozen };
+        });
+      }
+    "#,
+        &["session", "config"],
+        json!({}),
+    )
+    .await;
+    let answer = fixture
+        .call(
+            "fixture",
+            "echo",
+            json!({"session":fixture.attachment.session}),
+        )
+        .await;
+    assert_eq!(answer["id"], json!(fixture.attachment.session));
+    assert_eq!(answer["cwd"], json!(fixture.home.path()));
+    let current = fixture
+        .host
+        .open(
+            bingo_sdk::SessionSelector::ById {
+                id: fixture.attachment.session.clone(),
+            },
+            bingo_sdk::ClientIdentity {
+                name: "check".into(),
+                surface: "test".into(),
+            },
+            bingo_sdk::OpenOptions::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(answer["config"], json!(current.snapshot.config));
+    assert_eq!(
+        answer["plugin"],
+        json!({"name":"fixture","root":fixture.root})
+    );
+    assert_eq!(answer["frozen"], true);
+    fixture.host.shutdown().await;
+}

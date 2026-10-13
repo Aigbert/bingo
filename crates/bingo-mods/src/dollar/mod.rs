@@ -1,6 +1,9 @@
 //! The host nouns, defined once for both transports.
+mod client;
 mod params;
 pub mod read;
+mod runtime;
 pub mod table;
 #[cfg(test)]
 mod tests;
+pub use runtime::Runtime;

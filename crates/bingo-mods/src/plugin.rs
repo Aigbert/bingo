@@ -71,16 +71,18 @@ impl Plugin for ModsPlugin {
         Ok(())
     }
     async fn start(&self, host: HostHandle) -> Result<(), PluginError> {
-        bingo_plugin_host::ops::install(&host)
-            .map_err(|error| PluginError::Failed(error.message))?;
         let cwd = self
             .project
             .clone()
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|error| PluginError::Failed(error.to_string()))?;
+        let dollar = crate::dollar::Runtime::install(&host, cwd.clone())
+            .map_err(|error| PluginError::Failed(error.message))?;
+        bingo_plugin_host::ops::install(&host)
+            .map_err(|error| PluginError::Failed(error.message))?;
         if let Some(manager) = self.manager.get() {
-            manager.start(&cwd, host).await;
+            manager.start(&cwd, host, dollar).await;
         }
         Ok(())
     }

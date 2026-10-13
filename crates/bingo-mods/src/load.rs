@@ -23,6 +23,13 @@ impl Root {
     }
 
     pub fn source(&self, name: &str) -> Result<String, String> {
+        if name == "__bingo_dollar_types__" {
+            return crate::strip::strip(
+                Path::new("dollar-types.ts"),
+                include_str!("../../../sdk/typescript/src/dollar-types.ts"),
+            )
+            .map_err(|why| why.to_string());
+        }
         if name == "bingo" {
             let hooks = crate::strip::strip(
                 Path::new("on.ts"),
@@ -70,6 +77,9 @@ impl Resolver for Root {
         name: &str,
         _: Option<ImportAttributes<'js>>,
     ) -> rquickjs::Result<String> {
+        if base == "bingo" && name == "./dollar-types.ts" {
+            return Ok("__bingo_dollar_types__".into());
+        }
         let path = crate::strip::resolve(Path::new(base), name)
             .map_err(|why| rquickjs::Exception::throw_type(ctx, &why))?;
         let name = path.to_string_lossy().replace('\\', "/");

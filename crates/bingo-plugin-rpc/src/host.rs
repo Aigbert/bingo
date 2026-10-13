@@ -84,11 +84,32 @@ impl Server {
             .map_err(failed)?;
         self.permits(method)?;
         if method == name::SERVICE_CALL {
-            return self.service.call(params).await;
+            return bingo_plugin_host::ops::scope(
+                &self.host,
+                &self.plugin,
+                &self.state,
+                self.service.call(params),
+            )
+            .await;
         }
-        bingo_plugin_host::ops::admit(&self.host, &self.plugin, method, &params)
+        let (noun, _) = bingo_plugin_host::ops::admit(&self.host, &self.plugin, method, &params)
             .await
             .map_err(failed)?;
+        if self
+            .host
+            .service_wire(&format!("bingo.plugin.{noun}"))
+            .is_some()
+        {
+            return bingo_plugin_host::ops::call(
+                &self.host,
+                &self.plugin,
+                &self.state,
+                method,
+                params,
+            )
+            .await
+            .map_err(failed);
+        }
         bingo_plugin_host::host::Operations {
             plugin: &self.plugin,
             host: &self.host,

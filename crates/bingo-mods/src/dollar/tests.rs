@@ -54,7 +54,20 @@ fn schema_and_types_are_generated_from_the_same_rows() {
         .as_object()
         .unwrap()
         .iter()
-        .map(|(name, method)| (name.clone(), method["door"].clone()))
+        .map(|(name, method)| {
+            let mut route = method["door"].clone();
+            let input = method["input"]["$ref"]
+                .as_str()
+                .and_then(|reference| schema.pointer(&reference[1..]))
+                .unwrap_or(&method["input"]);
+            route["site"] = serde_json::json!(
+                ["session", "turn"]
+                    .into_iter()
+                    .filter(|field| input["properties"].get(*field).is_some())
+                    .collect::<Vec<_>>()
+            );
+            (name.clone(), route)
+        })
         .collect();
     rendered.push_str(&format!(
         "export const dollarRoutes = {} as const;\n",

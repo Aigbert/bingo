@@ -2,6 +2,7 @@ import { stdout } from 'node:process';
 import { Hooks } from './cross.ts';
 import type { Register, Entry } from './on.ts';
 import { dollar } from './dollar.ts';
+import { dollarRoutes } from './dollar-types.ts';
 import { Peer, stdio } from './rpc.ts';
 import type { InitializeParams, InitializeResult, ToolSpec } from './wire.ts';
 
@@ -15,6 +16,7 @@ export function runtime(peer: Peer, register: Register) {
   const hooks = new Hooks();
   let negotiated = new Set<string>();
   let pluginName = "";
+  let identity = Object.freeze({ name: "", root: "" });
   const rpc = {
     request: <T>(method: string, params: unknown): Promise<T> => {
       if (!negotiated.has(method)) return Promise.reject(new Error(`capability unavailable: ${method}`));
@@ -33,7 +35,7 @@ export function runtime(peer: Peer, register: Register) {
         const hook = hooks.entries.indexOf(entry);
         const context = { parent: request.chain, hook, callers: [...callers, { plugin: pluginName, hook }] };
         return dollar({ ...rpc, request: <T>(method: string, params: unknown) =>
-          peer.withContext(context, () => rpc.request<T>(method, params)) }, request.site);
+          peer.withContext(context, () => rpc.request<T>(method, params)) }, request.site, identity);
       },
     };
   };
@@ -44,11 +46,13 @@ export function runtime(peer: Peer, register: Register) {
   peer.handlers.set('initialize', async (params: InitializeParams): Promise<InitializeResult> => {
     if (params.protocol !== 2) throw new Error(`plugin protocol 2 required; host speaks ${params.protocol}`);
     pluginName = params.pluginName;
+    identity = Object.freeze({ name: params.pluginName, root: params.pluginRoot });
     await register(hooks.on, params.config);
     const observed = hooks.names(params.capabilities.filter(name => name.startsWith('observe/')).map(name => name.slice(8)));
     const hooked = hooks.names(points(params.capabilities));
     const catalogue = params.capabilities.includes('intercept/*');
-    const capabilities = ['intercept/*', 'intercept/*/after', 'host/place', 'host/extend', 'host/deliver', 'host/state/get',
+    const capabilities = [
+      ...Object.entries(dollarRoutes).filter(([, route]) => 'kernel' in route).map(([name]) => `host/${name.replace('.', '/')}`),'intercept/*', 'intercept/*/after', 'host/place', 'host/extend', 'host/deliver', 'host/state/get',
       'host/state/set', 'host/model/complete', 'service/call', 'tools/changed', 'intercept/cancel', 'hook/observe',
       ...observed.map(name => `observe/${name}`),
       ...hooked.flatMap(name => [`intercept/${name}`, `intercept/${name}/after`])]

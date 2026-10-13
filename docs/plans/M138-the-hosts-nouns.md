@@ -30,7 +30,7 @@ it: natives in process, and M133's `dollar.ts` under node.
 - `crates/bingo-mods/src/dollar/*.rs` (new), `src/{lib,link,chain,engine,thread,module,manager,plugin,load,config}.rs`, `src/{thread.js,manager/reload.rs}`, `tests/{contracts,plugin}.rs`, `tests/mods/nouns/*` (new), `guide.md`, `Cargo.toml`
 - `crates/bingo-sdk/src/{catalogue.rs,catalogue/payload.rs}`; `crates/bingo-core/src/{host.rs,config.rs,commands/model.rs,commands/think.rs,host/completion.rs,host/tests/complete.rs,host/tests/catalogue.rs}`
 - `crates/bingo-plugin-host/src/{state,ops,host,invocation,lib}.rs`
-- `crates/bingo-plugin-rpc/src/{host,service,bridge,schema,wire_ts,context,connection,intercept,lib}.rs`
+- `crates/bingo-plugin-rpc/src/{host,service,bridge,schema,wire,wire_ts,context,connection,intercept,lib}.rs`
 - `schema/{dollar,plugin,events}.json`, `sdk/typescript/src/{cross,rpc,dollar,dollar-types,plugin,wire,events}.ts`, SDK noun tests
 - `crates/bingo/tests/{plugin_kit.rs,support/reentry.rs}`, noun fixture modules and mechanical schema/fixture consumers
 - Existing workspace dependencies only: `jiff` for the specified timestamp, and `bingo-schema-ts` as a dev dependency for the generated dollar types; measure with `scripts/budget.sh`.
@@ -121,4 +121,9 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 498 filtered out
 cargo test -p bingo-core --lib --locked a_denied_setting_changes_neither_the_session_nor_the_file
 direct reconfigure bypassed config.set
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 498 filtered out; finished in 0.05s
+cargo test -p bingo-mods --lib --locked dollar::read
+unknown folded read: session.id
+cargo test -p bingo-mods --locked
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
 ```

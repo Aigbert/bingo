@@ -23,6 +23,28 @@ static UNNAMED: &[Ref] = &[
     schema_of::<crate::wire::ServiceMethod>,
 ];
 
+fn dollar() -> &'static Value {
+    static DOLLAR: std::sync::LazyLock<Value> = std::sync::LazyLock::new(|| {
+        serde_json::from_str(include_str!("../../../schema/dollar.json")).unwrap_or(Value::Null)
+    });
+    &DOLLAR
+}
+pub(crate) fn kernel_methods() -> Map<String, Value> {
+    dollar()["methods"]
+        .as_object()
+        .into_iter()
+        .flat_map(|methods| methods.iter())
+        .filter_map(|(name, row)| {
+            row["door"].get("kernel").map(|_| {
+                (
+                    format!("host/{}", name.replace('.', "/")),
+                    json!({"params":row["input"], "result":row["result"]}),
+                )
+            })
+        })
+        .collect()
+}
+
 pub fn document() -> Value {
     let mut generator = generator();
     let methods = method_table(&mut generator);
@@ -31,12 +53,16 @@ pub fn document() -> Value {
     for name in UNNAMED {
         name(&mut generator);
     }
+    let mut definitions = dollar()["$defs"].as_object().cloned().unwrap_or_default();
+    definitions.remove("DollarInputs");
+    definitions.remove("DollarResults");
+    definitions.extend(generator.take_definitions(true));
     json!({
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "bingo plugin",
         "protocol": PROTOCOL,
         "capabilities": crate::wire::capabilities(),
-        "$defs": sorted(generator.take_definitions(true)),
+        "$defs": sorted(definitions),
         "requestContext": { "field": "_bingo", "schema": { "$ref": "#/$defs/HostCallContext" } },
         "manifest": { "$ref": "#/$defs/Manifest" },
         "methods": methods,
@@ -54,7 +80,9 @@ fn generator() -> SchemaGenerator {
 }
 
 fn method_table(generator: &mut SchemaGenerator) -> Map<String, Value> {
-    table(generator, METHODS)
+    let mut methods = kernel_methods();
+    methods.extend(table(generator, METHODS));
+    methods
 }
 
 /// One name → `{params, result}` per entry: the wire's methods and the host
@@ -255,7 +283,9 @@ mod tests {
         let file = std::fs::read_to_string(committed()).unwrap_or_default();
         let document: Value = serde_json::from_str(&file).expect("the committed schema is json");
         let mut spoken: Vec<String> = METHODS.iter().map(|method| method.0.to_owned()).collect();
+        spoken.extend(kernel_methods().into_iter().map(|(name, _)| name));
         spoken.sort();
+        spoken.dedup();
         let mut named = keys(&document["methods"]);
         named.sort();
         assert_eq!(named, spoken);
