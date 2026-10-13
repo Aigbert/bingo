@@ -25,8 +25,8 @@ no sdk change.
      `presence`, `good`, `bad` and `mode` (theme's own readable test,
      extended).
    - child row: `◆ reviewer(review the manifest)`, sigil and name in the
-     hue, the sigil pulsing while live, `⎿  Running… 3 tools · ↓ 1.2k`
-     unchanged in words (M135's vocabulary).
+     hue, the sigil pulsing while live, `⎿  working · 3 tools · ↓ 1.2k`
+     in M135's vocabulary; `asking` and `idle · completed` keep their words.
    - the list (`ctrl+g`): the dot column is the sigil; `~` still marks a
      live ear; a room keeps `#`.
    - crew strip: the status line's middle with two agents running reads
@@ -44,7 +44,7 @@ no sdk change.
    `roster.rs` `dot`, `transcript/said.rs` `post`): the face where the
    bullet or the dot was; state keeps its words and its pulse.
 5. **The crew strip** (`status.rs` middle): agents under the viewed
-   session that are alive by M135's vocabulary, in tree order, then
+   session whose lifecycle is `Working` or `Asking`, in tree order, then
    `+N` for what the width cuts; `owes` read from the `owed` data
    M148 kept (by name, through M123's readers); a click opens `ctrl+g`.
 6. **Mentions in prose** (`markdown.rs` inline pass, the room view):
@@ -61,6 +61,11 @@ no sdk change.
 - `crates/bingo-surface-tui/src/{face,theme,transcript,tree,roster,
   status,markdown}.rs`, `transcript/said.rs`, the room view, `fixtures/
   faces.json`
+- TUI wiring: `src/{lib,blocks,seats,pointer,layout,view}.rs`,
+  `src/layout/deadline.rs`, new `src/crew.rs`,
+  `src/markdown/mentions.rs`, and TUI test modules/fixtures as needed.
+  The room view is `transcript/said.rs`; cache revisions must include its
+  render inputs and the known names used by prose.
 - `crates/bingo-surface-tui/src/**/snapshots` (teams, roster, room,
   child-row families)
 - `scripts/tui-smoke.sh` (`❯ ⏺ ask me` becomes the session's sigil)
@@ -75,7 +80,7 @@ no sdk change.
       and a room (fake provider): child rows, the strip while both run
       and after one ends, a needs-you pulse, `ctrl+g`, the room view with
       grouped posts and a mention; dark, light, `NO_COLOR`,
-      `BINGO_ASCII=1`; captures pasted.
+      `BINGO_ASCII=1`; concise capture assertions recorded, no capture files.
 - [ ] Changed snapshots listed by family; no row moved.
 - [ ] `scripts/tui-smoke.sh` passes.
 - [ ] All gates of the upgrade protocol, plus the Windows cross-check
@@ -95,5 +100,18 @@ no sdk change.
 - The strip competes with notices and placed statuses for one slot.
   Order: a notice, then a placed `Status`, then the strip; each test
   pins one handover.
-- Re-verify at start: M135's lifecycle words and where the tree fold
-  answers "alive"; M148's `owed` data shape; M149's caret and palette.
+- Re-verified at `9150697a` (2026-10-14), after M108–M136 and M147–M149.
+  ADR-0034, ADR-0070/0071, ADR-0077 and ADR-0081 §§1–6 still hold.
+  `Lifecycle::of_state` owns the words; `Tree::sessions` is root then id
+  order, and `Scope::Under` walks descendants. `seats::seat` reads debts
+  through `bingo_collab::room::debts` on the room's parent; `members` reads
+  the room itself. Both payloads retain data with empty slots.
+- There is no separate room-view module. `Place::previous` supplies chat
+  grouping; `Rows` supplies folded context, and `blocks::Revision` must
+  invalidate when that context changes. The status click belongs in pointer
+  handling against the layout's status region; no mirror session state.
+- C1's proposed dark pink is only 35.53° from `bad` in RGB hue; adjust
+  crew colours minimally to satisfy 36° and 4.5:1 on their own palette's
+  ground and raised tint. Existing state accents stay unchanged.
+- No new dependency or wire/schema change is planned. M137's plugin-host,
+  plugin-rpc, plugin manifests and schemas are outside this work.
