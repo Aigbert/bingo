@@ -389,11 +389,12 @@ pub fn tool(
         ItemBody::ToolCall {
             call_id: "call_1".into(),
             name: name.into(),
+            quiet: ["TaskCreate", "TaskUpdate", "TaskGet", "TaskList"].contains(&name)
+                && input.get("in").is_none_or(Value::is_null),
             input,
             output,
             progress: None,
             duration_ms: Some(12),
-            quiet: false,
         },
     )
 }
@@ -660,6 +661,11 @@ pub fn resolved() -> Event {
 
 /// A plugin publishing the whole of one kind of its state (ADR-0011 §2).
 pub fn extended(plugin: &str, kind: &str, payload: Value) -> Event {
+    let payload = if plugin == "bingo.tasks" && kind == "tasks" && payload.is_array() {
+        crate::test_lanes::task_payload(payload)
+    } else {
+        payload
+    };
     Event::Extension {
         plugin: plugin.into(),
         kind: kind.into(),
@@ -669,6 +675,25 @@ pub fn extended(plugin: &str, kind: &str, payload: Value) -> Event {
 
 /// The kernel's projection of one plugin's per-session setting (ADR-0009 §5).
 pub fn plugin_view(plugin: &str, value: Value) -> Event {
+    let value = if plugin == "bingo.permissions" {
+        let current = value["mode"].as_str().unwrap_or("default").to_string();
+        let modes = value["modes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|mode| bingo_sdk::ActionItem {
+                label: mode.as_str().unwrap().into(),
+                key: None,
+                action: bingo_sdk::Action {
+                    name: "permission".into(),
+                    args: mode.clone(),
+                },
+            })
+            .collect();
+        bingo_sdk::slot::with(value, [bingo_sdk::slot::Slot::Mode { current, modes }])
+    } else {
+        value
+    };
     Event::ConfigChanged {
         config: bingo_sdk::ConfigView {
             plugins: std::collections::BTreeMap::from([(plugin.to_string(), value)]),
@@ -683,7 +708,14 @@ pub fn pending_wake(at: &str) -> Event {
     Event::Extension {
         plugin: "bingo.schedule".into(),
         kind: "wake".into(),
-        payload: json!({ "at": at, "note": "look at the build again" }),
+        payload: bingo_sdk::slot::with(
+            json!({ "at": at, "note": "look at the build again" }),
+            [bingo_sdk::slot::Slot::Status {
+                text: "wake".into(),
+                tone: bingo_sdk::Tone::Neutral,
+                until: Some(at.parse().unwrap()),
+            }],
+        ),
     }
 }
 

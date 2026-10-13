@@ -1,6 +1,5 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 52
 expression: "draw_tree(80, 24, tree, ui, now)"
 ---
 "│ ✻ Welcome to bingo!                                                          │"
@@ -12,7 +11,7 @@ expression: "draw_tree(80, 24, tree, ui, now)"
 "> run the tests in the background                                               "
 "                                                                                "
 "⏺ Bash(cargo test --workspace)                                                  "
-"  ⎿  Ran in the background                                                      "
+"  ⎿  Started in the background as job_ab12cd34                                  "
 "                                                                                "
 "⏺ Started.                                                                      "
 "                                                                                "

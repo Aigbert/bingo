@@ -19,7 +19,7 @@ use crate::fold::{self, Fold, Folds};
 use crate::graphics::{Decoded, Linked, Picture};
 use crate::skill::{self, Run};
 use crate::tree::{self, Agents};
-use crate::{acp, markdown, memory, paths, shells, tasks, theme, thoughts, worked, wrap};
+use crate::{acp, markdown, memory, paths, theme, thoughts, worked, wrap};
 
 /// What was said into a session: a person's line, a subsystem's notice, a
 /// room's conversation.
@@ -101,10 +101,8 @@ pub struct Rows<'a> {
     /// in (M51). A row asks and draws what is there; it never goes looking,
     /// which is the run's job between frames.
     pub linked: &'a Linked,
-    /// The shells the session still has running in the background (M75),
-    /// read from the set the shell's plugin signals: what the row under a
-    /// backgrounded call says is true of now, not of when the call closed.
-    pub shells: Vec<String>,
+    /// Plugin placements read from this frame's folded session.
+    pub slots: Vec<bingo_sdk::slot::Placed>,
     /// Where the session's memories are (M84), read from what the memory
     /// plugin publishes: a call on one of them is drawn as remembering.
     pub memory: memory::Directories,
@@ -151,7 +149,7 @@ impl<'a> Rows<'a> {
             now,
             pictures,
             linked,
-            shells: shells::running(state),
+            slots: bingo_sdk::slot::placed(state),
             memory: memory::of(state),
             title: state.summary.title.as_deref(),
             driver: state.summary.driver,
@@ -159,6 +157,18 @@ impl<'a> Rows<'a> {
             measure: None,
             opening: None,
         }
+    }
+
+    pub fn placed_on(
+        &self,
+        item: &bingo_sdk::ItemId,
+    ) -> impl DoubleEndedIterator<Item = &bingo_sdk::slot::Slot> {
+        self.slots
+            .iter()
+            .filter_map(move |placed| match &placed.slot {
+                bingo_sdk::slot::Slot::Row { item: id, .. } if id == item => Some(&placed.slot),
+                _ => None,
+            })
     }
 
     /// What the welcome box has to add: the release this build could become.
@@ -352,6 +362,21 @@ fn item_lines(
     cue: Cue,
     fold: Fold,
 ) -> Block {
+    let block = default_item_lines(item, place, agents, rows, cue, fold);
+    match rows.placed_on(&item.id).next_back() {
+        Some(slot) => placed_row(item, slot, rows, block),
+        None => block,
+    }
+}
+
+fn default_item_lines(
+    item: &Item,
+    place: &Place<'_>,
+    agents: &Agents<'_>,
+    rows: &Rows<'_>,
+    cue: Cue,
+    fold: Fold,
+) -> Block {
     match &item.body {
         ItemBody::Unknown { .. } => Block::default(),
         ItemBody::User { parts, origin } => said::lines(item, parts, origin, fold, rows).into(),
@@ -400,6 +425,81 @@ fn item_lines(
     }
 }
 
+/// Apply only the fields a producer replaces; absent fields keep the item's drawing.
+fn placed_row(
+    item: &Item,
+    slot: &bingo_sdk::slot::Slot,
+    rows: &Rows<'_>,
+    mut block: Block,
+) -> Block {
+    let bingo_sdk::slot::Slot::Row {
+        mark,
+        title,
+        badge,
+        body,
+        actions,
+        ..
+    } = slot
+    else {
+        return block;
+    };
+    let quiet = matches!(&item.body, ItemBody::ToolCall { quiet: true, output, .. }
+        if !item.status.failed(output.as_ref()));
+    if let Some(body) = body {
+        block.lines.truncate(usize::from(!quiet));
+        block.pictures.clear();
+        block.wanted.clear();
+        block.lines.extend(placed_body(body, rows));
+    }
+    if !quiet {
+        if let Some(title) = title {
+            let heading = speaks(
+                theme::text(),
+                vec![Line::from(Span::styled(title.clone(), theme::bold()))],
+                rows,
+            );
+            block.lines.splice(..block.lines.len().min(1), heading);
+        }
+        if let Some(heading) = block.lines.first_mut() {
+            placed_heading(heading, *mark, badge.as_deref());
+        }
+    }
+    if !actions.is_empty() {
+        block.lines.extend(placed_body(
+            &bingo_sdk::View::Actions {
+                items: actions.clone(),
+            },
+            rows,
+        ));
+    }
+    block
+}
+
+fn placed_heading(heading: &mut Line<'static>, mark: Option<char>, badge: Option<&str>) {
+    use unicode_width::UnicodeWidthChar;
+    if let Some(mark) = mark.filter(|mark| mark.width() == Some(1))
+        && let Some(bullet) = heading.spans.first_mut()
+    {
+        bullet.content = format!("{mark} ").into();
+    }
+    if let Some(badge) = badge {
+        heading
+            .spans
+            .push(Span::styled(format!(" {badge}"), theme::dim()));
+    }
+}
+
+fn placed_body(view: &bingo_sdk::View, rows: &Rows<'_>) -> Vec<Line<'static>> {
+    returns(
+        crate::views::marked(
+            view,
+            rows.result_width(),
+            &crate::views::Marks::at(rows.now),
+        ),
+        rows,
+    )
+}
+
 /// The seam a compaction left, across the width of the transcript.
 fn compacted(before: u64, after: u64, rows: &Rows<'_>) -> Vec<Line<'static>> {
     vec![rule(
@@ -427,19 +527,33 @@ fn called(
     rows: &Rows<'_>,
     cue: Cue,
 ) -> Vec<Line<'static>> {
-    if tasks::quiet(item) {
-        return Vec::new();
-    }
     let ItemBody::ToolCall {
         name,
         input,
         output,
         progress,
+        quiet,
         ..
     } = &item.body
     else {
         return Vec::new();
     };
+    if *quiet && !item.status.failed(output.as_ref()) {
+        return output
+            .as_ref()
+            .and_then(|output| output.display.as_ref())
+            .map(|view| {
+                returns(
+                    crate::views::marked(
+                        view,
+                        rows.result_width(),
+                        &crate::views::Marks::at(rows.now),
+                    ),
+                    rows,
+                )
+            })
+            .unwrap_or_default();
+    }
     let (name, about) = memory::call(name, input, rows.cwd, &rows.memory)
         .unwrap_or_else(|| (name.as_str(), summarize(input)));
     match agents.get(&item.id) {
@@ -765,12 +879,7 @@ fn result(call: &Call<'_>, rows: &Rows<'_>) -> Vec<Line<'static>> {
     let Some(output) = call.output else {
         return Vec::new();
     };
-    // A call that went to the background is answered by where its shell is
-    // now, not by what the answer said then (M75).
-    let body = match shells::started(output) {
-        Some(id) => kept(vec![shells::row(id, &rows.shells)], call.fold, 1, None),
-        None => folded(output, call.fold, rows.result_width()),
-    };
+    let body = folded(output, call.fold, rows.result_width());
     returns(body, rows)
 }
 

@@ -406,7 +406,7 @@ impl Run {
                 .session
                 .tree
                 .sessions()
-                .any(|s| crate::wake::counting(s, screen))
+                .any(|s| bingo_sdk::slot::placed(s).iter().any(|placed| matches!(placed.slot, bingo_sdk::slot::Slot::Status { until: Some(at), .. } if at > screen.wall)))
     }
 
     /// The way out. Whatever arrived in the last tick is drawn first, so the

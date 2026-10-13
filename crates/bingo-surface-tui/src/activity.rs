@@ -1,7 +1,7 @@
 //! The activity band: the rows between the transcript and the input box
 //! (design §3), which are what is going on rather than what was said — the
 //! verb row while a turn runs, what the session is waiting on between turns
-//! (M82), the task list under it or in its place ([`crate::tasks`], M74),
+//! (M82), the task list under it or in its place (plugin activity slots, M74),
 //! and whatever the person has queued behind it. What the last turn cost is
 //! not here: it closes the transcript ([`crate::transcript::closing`]).
 //!
@@ -16,7 +16,7 @@ use ratatui::text::{Line, Span};
 use crate::clock::{self, Now};
 use crate::tree::{self, Scope, Tree, Wants};
 use crate::ui::Ui;
-use crate::{foot, tasks, theme, transcript};
+use crate::{foot, theme, transcript, views};
 
 /// How long a turn must have run before it is worth a row of its own (§6).
 const ACTIVITY_AFTER: std::time::Duration = std::time::Duration::from_millis(300);
@@ -50,8 +50,8 @@ const VERBS: [&str; 8] = [
 /// whatever the person has queued behind it.
 pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'static>> {
     let state = tree.viewed();
-    let tasks = tasks::of(state);
-    let mut out = band(tree, ui, &tasks, width, now);
+    let slots = bingo_sdk::slot::placed(state);
+    let mut out = band(tree, ui, &slots, width, now);
     out.extend(queued(state));
     // A blank row between the transcript and these, as between any two blocks
     // (§3): they are not the tail of what was said, they are what is going on.
@@ -86,24 +86,105 @@ fn footed(mut out: Vec<Line<'static>>, ui: &Ui, width: usize, now: Now) -> Vec<L
 ///
 /// The turn's row comes first, the wait after it (M82) — the wake that ends
 /// a wait opens a turn, and that turn is what the row is then for.
-fn band(tree: &Tree, ui: &Ui, tasks: &[tasks::Task], width: usize, now: Now) -> Vec<Line<'static>> {
-    let listed = !ui.tasks_hidden && !tasks.is_empty();
-    let row = working(tree.viewed(), ui, tasks, now).or_else(|| waiting(tree, now));
-    match row {
-        Some(row) => {
-            let mut out = vec![row];
-            if listed {
-                out.extend(tasks::hung(tasks::rows(tasks, width)));
+fn band(
+    tree: &Tree,
+    ui: &Ui,
+    slots: &[bingo_sdk::slot::Placed],
+    width: usize,
+    now: Now,
+) -> Vec<Line<'static>> {
+    let verb = slots.iter().find_map(|placed| match &placed.slot {
+        bingo_sdk::slot::Slot::Activity { verb, .. } => verb.as_deref(),
+        _ => None,
+    });
+    let row = working(tree.viewed(), ui, verb, now).or_else(|| waiting(tree, now));
+    let running = row.is_some();
+    let mut out: Vec<_> = row.into_iter().collect();
+    if !ui.activity_hidden {
+        for placed in slots {
+            if let bingo_sdk::slot::Slot::Activity { view, .. } = &placed.slot {
+                let view = match (running, view) {
+                    (true, bingo_sdk::View::Panel { child, .. }) => child,
+                    _ => view,
+                };
+                let lines = activity_view(view, width, now);
+                out.extend(if running {
+                    hung(lines)
+                } else {
+                    standing(lines)
+                });
             }
+        }
+    }
+    out
+}
+
+fn activity_view(view: &bingo_sdk::View, width: usize, now: Now) -> Vec<Line<'static>> {
+    use bingo_sdk::View;
+    match view {
+        View::Panel { title, child } => {
+            let mut out = vec![Line::from(Span::styled(title.clone(), theme::dim()))];
+            out.extend(activity_view(child, width, now));
             out
         }
-        None if listed => {
-            let mut out = vec![tasks::summary(tasks)];
-            out.extend(tasks::rows(tasks, width));
-            tasks::standing(out)
-        }
-        None => Vec::new(),
+        View::Stack { children } => children
+            .iter()
+            .flat_map(|v| activity_view(v, width, now))
+            .collect(),
+        View::Tree { nodes } if nodes.iter().all(|n| n.children.is_empty()) => nodes
+            .iter()
+            .map(|node| activity_node(node, width))
+            .collect(),
+        View::Text { text } => vec![Line::from(Span::styled(text.clone(), theme::dim()))],
+        _ => views::marked(view, width, &views::Marks::at(now)),
     }
+}
+
+fn activity_node(node: &bingo_sdk::TreeNode, width: usize) -> Line<'static> {
+    use bingo_sdk::Tone;
+    use unicode_width::UnicodeWidthStr;
+    let (index, mark, words) = match node.tone {
+        Tone::Neutral => (0, theme::text(), theme::text()),
+        Tone::Attention => (1, theme::presence(), theme::text().patch(theme::bold())),
+        Tone::Good => (2, theme::good(), theme::dim().patch(theme::struck())),
+        Tone::Bad => (0, theme::bad(), theme::bad()),
+    };
+    let glyph = theme::tasks()[index];
+    let mut spans = vec![
+        Span::styled(format!("{glyph} "), mark),
+        Span::styled(
+            views::clip(&node.label, width.saturating_sub(glyph.width() + 1)),
+            words,
+        ),
+    ];
+    if let Some(badge) = &node.badge {
+        spans.push(Span::styled(format!(" — {badge}"), theme::dim()));
+    }
+    Line::from(spans)
+}
+
+fn hung(rows: Vec<Line<'static>>) -> Vec<Line<'static>> {
+    let connector = format!("  {}  ", theme::connector());
+    let indent = " ".repeat(connector.chars().count());
+    rows.into_iter()
+        .enumerate()
+        .map(|(at, row)| {
+            let mut spans = vec![Span::styled(
+                if at == 0 {
+                    connector.clone()
+                } else {
+                    indent.clone()
+                },
+                theme::dim(),
+            )];
+            spans.extend(row.spans);
+            Line::from(spans)
+        })
+        .collect()
+}
+
+fn standing(rows: Vec<Line<'static>>) -> Vec<Line<'static>> {
+    rows.into_iter().map(|row| views::indent(row, 2)).collect()
 }
 
 /// The lines the person is holding behind the turn, dim, each under its `>`.
@@ -157,7 +238,7 @@ fn pending(origin: &Origin) -> bool {
 fn working(
     state: &SessionState,
     ui: &Ui,
-    tasks: &[tasks::Task],
+    placed_verb: Option<&str>,
     now: Now,
 ) -> Option<Line<'static>> {
     let turn = state.turn.as_ref()?;
@@ -171,7 +252,7 @@ fn working(
     let (verb, hint) = match stopping {
         true => (STOPPING, ""),
         false => (
-            tasks::doing(tasks).unwrap_or_else(|| verb(&turn.id)),
+            placed_verb.unwrap_or_else(|| verb(&turn.id)),
             "esc to interrupt · ",
         ),
     };

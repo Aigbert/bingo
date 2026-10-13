@@ -25,7 +25,7 @@ use crate::rewind::{self, Rewind};
 use crate::search::Search;
 use crate::tree::Tree;
 use crate::ui::{Menu, Open, Pending, Ui};
-use crate::{panel, permission, views};
+use crate::{panel, views};
 
 mod switcher;
 
@@ -691,7 +691,7 @@ fn control(ui: &mut Ui, key: KeyEvent) -> Vec<Effect> {
         KeyCode::Char('v') => return vec![Effect::PasteImage],
         // Claude Code's own key for its own list (M74): the rows go off the
         // band and come back, and nothing opens.
-        KeyCode::Char('t') => ui.tasks_hidden = !ui.tasks_hidden,
+        KeyCode::Char('t') => ui.activity_hidden = !ui.activity_hidden,
         _ => {}
     }
     Vec::new()
@@ -750,14 +750,22 @@ fn plain(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
 /// would: the kernel decides, and the badge moves when the config frame lands.
 /// Nothing is assumed here, so a refused command leaves the screen truthful.
 fn cycle_mode(ui: &mut Ui, state: &SessionState, now: Now) -> Vec<Effect> {
-    let Some(next) = permission::next(state) else {
+    let next = bingo_sdk::slot::placed(state)
+        .into_iter()
+        .find_map(|placed| {
+            let bingo_sdk::slot::Slot::Mode { current, modes } = placed.slot else {
+                return None;
+            };
+            let at = modes.iter().position(|item| item.label == current)?;
+            modes
+                .get((at + 1) % modes.len())
+                .map(|item| item.action.clone())
+        });
+    let Some(action) = next else {
         ui.notify(Level::Warn, UNKNOWN_MODE, now.instant);
         return Vec::new();
     };
-    vec![Effect::Submit(Input::text(
-        format!("/permission {next}"),
-        Origin::surface(SURFACE_ID),
-    ))]
+    vec![Effect::Submit(Input::Action { action })]
 }
 
 /// Enter sends, unless the line ends in a backslash — the newline chord for
@@ -1231,10 +1239,12 @@ mod tests {
                     shift(KeyCode::BackTab),
                     now
                 ),
-                vec![Effect::Submit(Input::text(
-                    format!("/permission {next}"),
-                    Origin::surface("tui")
-                ))],
+                vec![Effect::Submit(Input::Action {
+                    action: bingo_sdk::Action {
+                        name: "permission".into(),
+                        args: next.into()
+                    }
+                })],
                 "{mode}"
             );
             assert!(ui.notices.is_empty(), "{mode}");
@@ -3405,12 +3415,12 @@ mod tests {
     #[test]
     fn ctrl_t_hides_the_task_list_and_again_shows_it() {
         let (mut ui, now) = scene();
-        assert!(!ui.tasks_hidden);
+        assert!(!ui.activity_hidden);
         assert!(press(&mut ui, &state(), ctrl('t'), now).is_empty());
-        assert!(ui.tasks_hidden);
+        assert!(ui.activity_hidden);
         assert!(!ui.layer.showing(), "nothing opens");
         press(&mut ui, &state(), ctrl('t'), now);
-        assert!(!ui.tasks_hidden, "the same chord brings it back");
+        assert!(!ui.activity_hidden, "the same chord brings it back");
     }
 
     #[test]

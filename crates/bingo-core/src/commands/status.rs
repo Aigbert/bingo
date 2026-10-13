@@ -39,7 +39,7 @@ fn rows(state: &SessionState) -> Vec<(String, String)> {
             "model".into(),
             s.model.clone().unwrap_or_else(|| "?".into()),
         ),
-        ("mode".into(), mode(&state.config)),
+        ("mode".into(), mode(state)),
         ("context".into(), context(state.context)),
         (
             "tokens".into(),
@@ -55,14 +55,14 @@ fn rows(state: &SessionState) -> Vec<(String, String)> {
     rows
 }
 
-fn mode(config: &ConfigView) -> String {
-    config
-        .plugins
-        .get("bingo.permissions")
-        .and_then(|policy| policy.get("mode"))
-        .and_then(|mode| mode.as_str())
-        .unwrap_or("default")
-        .to_string()
+fn mode(state: &SessionState) -> String {
+    bingo_sdk::slot::placed(state)
+        .into_iter()
+        .find_map(|placed| match placed.slot {
+            bingo_sdk::slot::Slot::Mode { current, .. } => Some(current),
+            _ => None,
+        })
+        .unwrap_or_else(|| "default".into())
 }
 
 fn context(context: Option<ContextUsage>) -> String {
@@ -84,13 +84,19 @@ mod tests {
 
     #[test]
     fn the_mode_is_the_policy_s_or_default() {
-        let mut config = ConfigView::default();
-        assert_eq!(mode(&config), "default");
-        config.plugins.insert(
+        let mut state = SessionState::new(crate::test_support::summary("ses_mode"));
+        assert_eq!(mode(&state), "default");
+        state.config.plugins.insert(
             "bingo.permissions".into(),
-            serde_json::json!({"mode": "acceptEdits"}),
+            bingo_sdk::slot::with(
+                serde_json::json!({}),
+                [bingo_sdk::slot::Slot::Mode {
+                    current: "acceptEdits".into(),
+                    modes: vec![],
+                }],
+            ),
         );
-        assert_eq!(mode(&config), "acceptEdits");
+        assert_eq!(mode(&state), "acceptEdits");
     }
 
     #[test]

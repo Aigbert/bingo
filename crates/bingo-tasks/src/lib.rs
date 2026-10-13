@@ -146,6 +146,21 @@ mod plugin_tests {
     use bingo_sdk::Env;
 
     #[test]
+    fn all_four_tools_are_quiet_only_on_the_local_board() {
+        let tools: Vec<Box<dyn bingo_sdk::Tool>> = vec![
+            Box::new(create::TaskCreateTool),
+            Box::new(update::TaskUpdateTool),
+            Box::new(get::TaskGetTool),
+            Box::new(list::TaskListTool),
+        ];
+        for tool in tools {
+            assert!(tool.traits(&serde_json::json!({})).quiet);
+            assert!(tool.traits(&serde_json::json!({"in": null})).quiet);
+            assert!(!tool.traits(&serde_json::json!({"in": "#design"})).quiet);
+        }
+    }
+
+    #[test]
     fn the_manifest_says_what_it_provides_and_claims_no_settings() {
         assert_eq!(MANIFEST.id, "bingo.tasks");
         assert_eq!(

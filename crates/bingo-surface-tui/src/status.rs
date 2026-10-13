@@ -14,7 +14,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::clock::{self, Now};
 use crate::tree::{self, Scope, Tree, Wants};
 use crate::ui::Ui;
-use crate::{keys, permission, shells, theme, wake};
+use crate::{keys, theme};
 
 /// Cells between two slots.
 const GAP: usize = 2;
@@ -36,17 +36,24 @@ pub fn line(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Line<'static> {
     )
 }
 
-/// The permission mode, as the policy published it. `default` is what a
-/// session already is, so it says nothing at all.
+/// A mode may leave its first, resting choice unsaid.
 fn left(state: &SessionState) -> Vec<Span<'static>> {
-    let mode = permission::mode(state).filter(|mode| *mode != "default");
-    mode.map(|mode| {
-        vec![
-            Span::styled(format!("{} {mode}", theme::glyphs().mode), theme::mode()),
-            Span::styled(" (shift+tab to cycle)", theme::dim()),
-        ]
-    })
-    .unwrap_or_default()
+    bingo_sdk::slot::placed(state)
+        .into_iter()
+        .filter_map(|placed| {
+            let bingo_sdk::slot::Slot::Mode { current, modes } = placed.slot else {
+                return None;
+            };
+            if modes.first().is_some_and(|mode| mode.label == current) {
+                return None;
+            }
+            Some(vec![
+                Span::styled(format!("{} {current}", theme::glyphs().mode), theme::mode()),
+                Span::styled(" (shift+tab to cycle)", theme::dim()),
+            ])
+        })
+        .flatten()
+        .collect()
 }
 
 /// Only what is true now, in the order the eye should take it.
@@ -66,8 +73,7 @@ fn middle(tree: &Tree, ui: &Ui, now: Now) -> Vec<Span<'static>> {
     if let Some(running) = tree::count(tree, Wants::Running, Scope::Others) {
         parts.push(Span::styled(format!("{running} running"), theme::dim()));
     }
-    parts.extend(shells::counted(tree.viewed()));
-    parts.extend(waking(tree.viewed(), now));
+    parts.extend(placed_status(tree.viewed(), now));
     parts.extend(notice(ui, now));
     if parts.is_empty() && ui.composer.is_empty() {
         parts.push(Span::styled(HINT, theme::dim()));
@@ -75,23 +81,31 @@ fn middle(tree: &Tree, ui: &Ui, now: Now) -> Vec<Span<'static>> {
     join(parts)
 }
 
-/// The wake the model set on this session, counted down against the frame's
-/// own clock (ADR-0019 §8). It is the one thing on this line the *model* set
-/// in motion, and a person who does not want it types `/wake off`; a moment
-/// already past is a wake on its way in, and says nothing rather than a
-/// negative.
-fn waking(state: &SessionState, now: Now) -> Vec<Span<'static>> {
-    let Some(at) = wake::at(state) else {
-        return Vec::new();
-    };
-    let ahead = at.duration_since(now.wall);
-    if !ahead.is_positive() {
-        return Vec::new();
-    }
-    vec![Span::styled(
-        format!("wake in {}", clock::span(ahead.unsigned_abs())),
-        theme::dim(),
-    )]
+/// Timed status entries use the frame clock and disappear when their time is past.
+fn placed_status(state: &SessionState, now: Now) -> Vec<Span<'static>> {
+    bingo_sdk::slot::placed(state)
+        .into_iter()
+        .filter_map(|placed| {
+            let bingo_sdk::slot::Slot::Status { text, tone, until } = placed.slot else {
+                return None;
+            };
+            let text = match until {
+                Some(at) if at > now.wall => format!(
+                    "{text} in {}",
+                    clock::span(at.duration_since(now.wall).unsigned_abs())
+                ),
+                Some(_) => return None,
+                None => text,
+            };
+            let style = match tone {
+                bingo_sdk::Tone::Neutral => theme::dim(),
+                bingo_sdk::Tone::Good => theme::good(),
+                bingo_sdk::Tone::Bad => theme::bad(),
+                bingo_sdk::Tone::Attention => theme::attention(now),
+            };
+            Some(Span::styled(text, style))
+        })
+        .collect()
 }
 
 /// What the next request carries against the model's window — `41k/200k`,
@@ -403,7 +417,14 @@ mod tests {
             !past.contains("wake"),
             "a wake on its way in says nothing: {past}"
         );
-        let none = at(&solo(&state()), &ui, 80, now);
+        let removed = folded(vec![
+            frame(
+                1,
+                pending_wake(&(now.wall + jiff::SignedDuration::from_secs(40)).to_string()),
+            ),
+            frame(2, wake_taken_back()),
+        ]);
+        let none = at(&solo(&removed), &ui, 80, now);
         assert!(!none.contains("wake"), "{none}");
     }
 

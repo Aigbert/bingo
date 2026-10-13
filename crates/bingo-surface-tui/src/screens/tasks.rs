@@ -164,9 +164,9 @@ fn tasks_cut_to_five() {
 /// `ctrl+t` takes the rows and the summary off the band; the verb row keeps
 /// the task being done, because that is what the turn is doing.
 #[test]
-fn tasks_hidden() {
+fn activity_hidden() {
     let (mut ui, now) = mid_turn();
-    ui.tasks_hidden = true;
+    ui.activity_hidden = true;
     let state = at_work(three());
     let screen = draw_tree(80, 24, &solo(&state), &ui, now);
     assert!(screen.contains("✻ Shipping it…"), "{screen}");
