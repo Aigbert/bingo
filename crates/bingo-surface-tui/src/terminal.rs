@@ -26,12 +26,9 @@ use crossterm::terminal::{
 use ratatui::backend::CrosstermBackend;
 use ratatui::{Terminal, TerminalOptions, Viewport};
 
-use crate::clock::Now;
 use crate::graphics::Transport;
 use crate::graphics::tmux;
-use crate::tree::Tree;
-use crate::ui::Ui;
-use crate::view;
+use crate::layout::{self, Layout};
 
 /// Push the window title onto the terminal's stack, and pop it back at exit,
 /// so the shell's own title survives the session.
@@ -59,7 +56,7 @@ static HOOK: Once = Once::new();
 
 /// What the loop needs from a screen, so a test can be the screen.
 pub(crate) trait Screen: Send {
-    fn draw(&mut self, tree: &Tree, ui: &Ui, now: Now) -> io::Result<()>;
+    fn draw(&mut self, layout: &Layout) -> io::Result<()>;
 
     /// Out-of-band bytes: they paint no cell, so they go between frames.
     fn title(&mut self, text: &str) -> io::Result<()>;
@@ -145,16 +142,15 @@ impl Tui {
 }
 
 impl Screen for Tui {
-    fn draw(&mut self, tree: &Tree, ui: &Ui, now: Now) -> io::Result<()> {
+    fn draw(&mut self, layout: &Layout) -> io::Result<()> {
         if !self.synchronized {
-            self.terminal
-                .draw(|frame| view::draw(tree, ui, frame, now))?;
+            self.terminal.draw(|frame| layout::paint(layout, frame))?;
             return Ok(());
         }
         // The closing half is written whatever the frame did: a terminal left
         // holding an update that never ends shows nothing at all.
         out_of_band(BEGIN_FRAME)?;
-        let drawn = self.terminal.draw(|frame| view::draw(tree, ui, frame, now));
+        let drawn = self.terminal.draw(|frame| layout::paint(layout, frame));
         let ended = out_of_band(END_FRAME);
         drawn?;
         ended

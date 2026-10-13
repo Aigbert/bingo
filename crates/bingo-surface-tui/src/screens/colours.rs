@@ -6,9 +6,9 @@ use super::*;
 
 #[test]
 fn an_answer_row_is_white_after_its_bullet() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let tree = solo(&folded(answered()));
-    let painted = painted(80, 24, &tree, &ui, now);
+    let painted = painted(80, 24, &tree, &mut ui, now);
     assert_row_styled(
         &painted,
         "All 33 pass.",
@@ -23,8 +23,8 @@ fn an_answer_row_is_white_after_its_bullet() {
 /// two bullets in `presence` in the same frame, breathing side by side.
 #[test]
 fn every_row_of_a_batch_wears_the_live_mark_at_once() {
-    let (ui, now) = mid_turn();
-    let painted = painted(80, 24, &solo(&folded(running_together())), &ui, now);
+    let (mut ui, now) = mid_turn();
+    let painted = painted(80, 24, &solo(&folded(running_together())), &mut ui, now);
     for command in ["cargo fmt --all -- --check", "cargo test --workspace"] {
         assert_row_styled(
             &painted,
@@ -51,8 +51,8 @@ fn a_tool_rows_bullet_is_the_only_cell_a_colour_is_spent_on() {
             ItemStatus::Completed,
         ),
     )]);
-    let (ui, now) = scene();
-    let painted = painted(80, 24, &solo(&state), &ui, now);
+    let (mut ui, now) = scene();
+    let painted = painted(80, 24, &solo(&state), &mut ui, now);
     assert_eq!(painted.coloured("Read(src/lib.rs)"), vec!["⏺".to_string()]);
     assert!(
         painted.coloured("Read 3 lines").is_empty(),
@@ -84,7 +84,7 @@ fn a_skill_rows_mark_wears_the_state_and_spends_the_only_colour() {
     ui.catalogs.commands = skills::skills_in_the_catalogue();
     for state in [called, typed] {
         let state = with_skill_row(state, "itm_1", "guide", "the wire format");
-        let painted = painted(80, 24, &solo(&state), &ui, now);
+        let painted = painted(80, 24, &solo(&state), &mut ui, now);
         assert_row_styled(
             &painted,
             "Skill(guide)",
@@ -100,8 +100,8 @@ fn a_skill_rows_mark_wears_the_state_and_spends_the_only_colour() {
 
 #[test]
 fn a_card_spends_its_colour_on_the_row_the_keyboard_is_on() {
-    let (tree, ui, now) = asked(permission(Some("Edit(src/)"), None));
-    let painted = painted(80, 24, &tree, &ui, now);
+    let (tree, mut ui, now) = asked(permission(Some("Edit(src/)"), None));
+    let painted = painted(80, 24, &tree, &mut ui, now);
     // The cursor, and the card's own border on either side of the row (§4:
     // a card has the only bright border on the screen).
     assert_eq!(
@@ -131,9 +131,9 @@ fn a_card_spends_its_colour_on_the_row_the_keyboard_is_on() {
 /// keeps the band a person's words are on.
 #[test]
 fn a_notice_is_marked_and_everybody_else_keeps_the_bar() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     crate::theme::with(truecolor(), || {
-        let painted = painted(120, 40, &solo(&folded(reported())), &ui, now);
+        let painted = painted(120, 40, &solo(&folded(reported())), &mut ui, now);
         assert_row_styled(
             &painted,
             "Background job",
@@ -161,10 +161,10 @@ fn a_notice_is_marked_and_everybody_else_keeps_the_bar() {
 /// the eight cannot: what you said is a band, not a sentence.
 #[test]
 fn your_own_line_sits_on_a_bar_the_width_of_the_transcript() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let tree = solo(&folded(answered()));
     crate::theme::with(truecolor(), || {
-        let row = painted(80, 24, &tree, &ui, now).row("run the tests");
+        let row = painted(80, 24, &tree, &mut ui, now).row("run the tests");
         let width: usize = row.iter().map(|(text, _)| text.width()).sum();
         assert_eq!(width, 80, "the bar runs to the edge: {row:#?}");
         let ground = crate::theme::as_drawn(crate::theme::raised()).bg;
@@ -178,8 +178,8 @@ fn your_own_line_sits_on_a_bar_the_width_of_the_transcript() {
 #[test]
 fn the_status_line_spends_no_colour_but_the_mode() {
     let state = with_permission_mode("acceptEdits");
-    let (ui, now) = scene();
-    let painted = painted(80, 24, &solo(&state), &ui, now);
+    let (mut ui, now) = scene();
+    let painted = painted(80, 24, &solo(&state), &mut ui, now);
     assert_eq!(
         painted.coloured("? for shortcuts"),
         vec!["⏵⏵ acceptEdits".to_string()],
@@ -191,8 +191,8 @@ fn the_status_line_spends_no_colour_but_the_mode() {
 /// failing line came to is the one cell of the block a colour is spent on.
 #[test]
 fn the_line_is_the_persons_own_and_only_a_bad_exit_is_coloured() {
-    let (ui, now) = scene();
-    let drawn = painted(80, 24, &solo(&super::ran::session()), &ui, now);
+    let (mut ui, now) = scene();
+    let drawn = painted(80, 24, &solo(&super::ran::session()), &mut ui, now);
     assert_row_styled(
         &drawn,
         "git status --short",
@@ -212,10 +212,10 @@ fn the_line_is_the_persons_own_and_only_a_bad_exit_is_coloured() {
 /// the same raised ground the `>` row does (§4).
 #[test]
 fn a_shell_line_sits_on_the_bar_your_own_words_sit_on() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let tree = solo(&super::ran::session());
     crate::theme::with(truecolor(), || {
-        let row = painted(80, 24, &tree, &ui, now).row("git status --short");
+        let row = painted(80, 24, &tree, &mut ui, now).row("git status --short");
         let width: usize = row.iter().map(|(text, _)| text.width()).sum();
         assert_eq!(width, 80, "the bar runs to the edge: {row:#?}");
         let ground = crate::theme::as_drawn(crate::theme::raised()).bg;
@@ -239,7 +239,7 @@ fn a_shell_line_sits_on_the_bar_your_own_words_sit_on() {
 /// and this is one of them.
 #[test]
 fn a_terminal_that_turns_light_under_a_drawn_screen_is_followed() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let tree = solo(&folded(answered()));
     crate::theme::with(truecolor(), || {
         let band = |painted: &crate::painted::Painted| {
@@ -249,7 +249,7 @@ fn a_terminal_that_turns_light_under_a_drawn_screen_is_followed() {
                 .filter_map(|(_, style)| style.bg)
                 .collect::<Vec<_>>()
         };
-        let before = band(&painted(80, 24, &tree, &ui, now));
+        let before = band(&painted(80, 24, &tree, &mut ui, now));
         assert!(
             before.contains(&crate::theme::DARK.raised),
             "the line is banded in the dark palette's tint: {before:?}"
@@ -258,7 +258,7 @@ fn a_terminal_that_turns_light_under_a_drawn_screen_is_followed() {
             crate::theme::swap(true),
             "and then the terminal says its ground has turned"
         );
-        let after = band(&painted(80, 24, &tree, &ui, now));
+        let after = band(&painted(80, 24, &tree, &mut ui, now));
         assert!(
             after.contains(&crate::theme::LIGHT.raised),
             "the next frame wears the light one: {after:?}"
@@ -277,32 +277,32 @@ fn a_terminal_that_turns_light_under_a_drawn_screen_is_followed() {
 /// nothing redrawn.
 #[test]
 fn no_screen_paints_prose_in_a_colour_of_its_own() {
-    let (idle, now) = scene();
-    let (busy, live) = mid_turn();
-    let (card, asking, asked_now) = asked(permission(Some("Edit(src/)"), Some(long_diff())));
+    let (mut idle, now) = scene();
+    let (mut busy, live) = mid_turn();
+    let (card, mut asking, asked_now) = asked(permission(Some("Edit(src/)"), Some(long_diff())));
     for look in [truecolor(), daylight()] {
         crate::theme::with(look, || {
             let allowed = crate::theme::spendable();
             let scenes: Vec<(&str, crate::painted::Painted)> = vec![
                 (
                     "an answered question",
-                    painted(80, 24, &solo(&folded(answered())), &idle, now),
+                    painted(80, 24, &solo(&folded(answered())), &mut idle, now),
                 ),
                 (
                     "a turn at work",
-                    painted(80, 24, &solo(&folded(running_together())), &busy, live),
+                    painted(80, 24, &solo(&folded(running_together())), &mut busy, live),
                 ),
                 (
                     "a card over a diff",
-                    painted(80, 24, &card, &asking, asked_now),
+                    painted(80, 24, &card, &mut asking, asked_now),
                 ),
                 (
                     "a shell line the person ran",
-                    painted(80, 24, &solo(&super::ran::session()), &idle, now),
+                    painted(80, 24, &solo(&super::ran::session()), &mut idle, now),
                 ),
                 (
                     "what a channel reported",
-                    painted(120, 40, &solo(&folded(reported())), &idle, now),
+                    painted(120, 40, &solo(&folded(reported())), &mut idle, now),
                 ),
             ];
             for (name, painted) in scenes {
@@ -330,10 +330,10 @@ fn the_foot_row_is_a_bar_with_the_count_in_text_and_the_hint_in_dim() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
         let tree = solo(&state);
-        painted(80, 24, &tree, &ui, now);
+        painted(80, 24, &tree, &mut ui, now);
         crate::input::on_key(&mut ui, &tree, key(KeyCode::PageUp), now);
         let settled = later(now, 100);
-        let painted = painted(80, 24, &tree, &ui, settled);
+        let painted = painted(80, 24, &tree, &mut ui, settled);
         let below = crate::foot::below(&ui, settled).expect("held");
         let count = format!(" ↓ {below} lines below");
         let hint = " · end or click to follow ";

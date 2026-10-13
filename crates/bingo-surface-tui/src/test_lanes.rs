@@ -185,7 +185,7 @@ fn a_stranger_places_every_slot_without_a_surface_registration() {
         ),
         frame(2, signalled("stranger", "placed", payload)),
     ]);
-    let screen = draw_sized(120, 40, &state, &ui, now);
+    let screen = draw_sized(120, 40, &state, &mut ui, now);
     for text in [
         "stranger status",
         "stranger activity",
@@ -369,7 +369,7 @@ fn an_unrelated_placement_does_not_move_a_pinned_panel() {
 fn quiet_is_a_record_flag_and_still_shows_displays_and_failures() {
     use crate::test_support::*;
     use bingo_sdk::{ItemBody, ItemStatus, ToolOutput};
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let mut item = tool(
         "itm_quiet",
         "Unfamiliar",
@@ -386,11 +386,11 @@ fn quiet_is_a_record_flag_and_still_shows_displays_and_failures() {
     };
     *quiet = true;
     let state = folded(vec![frame(1, Event::ItemCompleted { item: item.clone() })]);
-    let screen = render(&state, &ui, now);
+    let screen = render(&state, &mut ui, now);
     assert!(screen.contains("placed result") && !screen.contains("Unfamiliar"));
     item.status = ItemStatus::Failed;
     let state = folded(vec![frame(1, Event::ItemCompleted { item })]);
-    assert!(render(&state, &ui, now).contains("Unfamiliar"));
+    assert!(render(&state, &mut ui, now).contains("Unfamiliar"));
 }
 
 #[test]
@@ -400,7 +400,7 @@ fn a_row_with_no_body_keeps_the_item_and_a_wide_mark_keeps_the_bullet() {
         ItemId, ItemStatus,
         slot::{self, Slot},
     };
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let state = folded(vec![
         frame(
             1,
@@ -428,7 +428,7 @@ fn a_row_with_no_body_keeps_the_item_and_a_wide_mark_keeps_the_bullet() {
             ),
         ),
     ]);
-    let screen = render(&state, &ui, now);
+    let screen = render(&state, &mut ui, now);
     assert!(
         screen.contains("⏺ original words") && screen.contains("badge"),
         "{screen}"

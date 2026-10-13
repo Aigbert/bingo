@@ -53,6 +53,14 @@ impl Scroll {
         }
     }
 
+    pub fn next_change(&self, now: crate::clock::Now) -> Option<Instant> {
+        let Self::Held { since, from, to } = self else {
+            return None;
+        };
+        (from != to && self.moving(now.instant))
+            .then(|| (now.instant + crate::clock::FRAME).min(*since + EASE))
+    }
+
     /// Move `lines` towards the top of the transcript, or towards its foot
     /// when negative. Reaching the foot is following it again.
     ///

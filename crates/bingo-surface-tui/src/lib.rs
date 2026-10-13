@@ -15,8 +15,8 @@
 //! - [`input::on_key`] and [`pointer::on_mouse`] are pure: they mutate
 //!   [`ui::Ui`] and return [`effect::Effect`]s, so every binding is a test
 //!   with no runtime in it.
-//! - [`frame::regions`] cuts the screen into its regions and [`view::draw`]
-//!   fills them; the transcript is what is left once the input box and the
+//! - [`layout::layout`] cuts regions and composes their cells and targets;
+//!   [`layout::paint`] copies them to the terminal; the transcript is what is left once the input box and the
 //!   status line have taken theirs, so nothing below the transcript moves.
 //! - [`tree::Tree`] holds one reducer state per session the attachment
 //!   carries — the root and its sub-sessions (ADR-0010 §3) — and which of
@@ -76,6 +76,7 @@ mod keys;
 /// An answer that came back after the probe that asked for it gave up (M60).
 mod late;
 mod layers;
+mod layout;
 mod markdown;
 mod matching;
 mod mentions;

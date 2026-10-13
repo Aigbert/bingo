@@ -4,10 +4,10 @@
 //! is given what is left, so a dialog opening or a notice arriving never
 //! shifts a row a person was reading.
 //!
-//! `draw` is pure of everything but the frame it paints.
+//! `compose` fills an owned layout without borrowing a terminal frame.
 
+use crate::layout::Layout;
 use bingo_sdk::{Driver, SessionState, SessionSummary};
-use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Padding, Paragraph};
@@ -32,11 +32,16 @@ const MENU_ROWS: usize = 8;
 /// One render path for the whole tree: it paints the session in view and
 /// derives everything about the others — the counts on the status line, the
 /// `↳` rows, the switcher — from their states.
-pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Frame, now: Now) {
+pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let area = frame.area();
+    let state = tree.viewed();
+    let draft = ui.composer.layout(inner_width(state, area.width as usize));
+    let strip = strip(state, ui, &frame.measurements, area.width);
+    let activity = activity::lines(tree, ui, area.width as usize, now);
     let cards = rail::cards(tree.viewed(), tree.view(), &ui.pinned);
-    let regions = frame::regions(area, demand(tree, ui, area.width, now, !cards.is_empty()));
-    ui.painted.borrow_mut().begin(regions);
+    frame.next_frame = rail::next_change(&cards, now);
+    let regions = frame::regions(area, demand(&draft, &strip, &activity, !cards.is_empty()));
+    frame.regions = regions;
     let drawn = rail::render(
         &cards,
         rail::width(regions.rail, regions.transcript),
@@ -50,68 +55,54 @@ pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Frame, now: Now) {
         None => rail::inline(&drawn),
     };
     render_transcript(tree, ui, frame, regions.transcript, now, live);
-    render_rail(ui, frame, regions.rail, &drawn);
-    render_activity(tree, ui, frame, regions.activity, now);
-    render_strip(
-        ui,
-        frame,
-        regions.strip,
-        strip(tree.viewed(), ui, area.width),
-    );
-    render_composer(tree.viewed(), ui, frame, regions.composer, now);
+    render_rail(frame, regions.rail, &drawn);
+    render_activity(ui, frame, regions.activity, activity);
+    render_strip(frame, regions.strip, strip);
+    render_composer(tree.viewed(), ui, frame, regions.composer, now, draft);
     render_status(tree, ui, frame, regions.status, now);
     layers(tree, ui, frame, regions, now);
 }
 
 /// What the frame must make room for before the transcript is given the rest.
-fn demand(tree: &Tree, ui: &Ui, width: u16, now: Now, rail: bool) -> Demand {
-    let state = tree.viewed();
+fn demand(
+    draft: &prompt::Layout,
+    strip: &graphics::Band,
+    activity: &[Line<'_>],
+    rail: bool,
+) -> Demand {
     Demand {
-        composer: u16::try_from(composer_rows(state, ui, width as usize)).unwrap_or(u16::MAX),
-        strip: strip(state, ui, width).height(),
-        // Never fewer than two: the band holds its air and its verb row even
-        // while idle, so a turn starting or ending moves nothing — the
-        // bottom-anchored transcript used to bounce by two rows at each end
-        // of every stream, which read as flicker (§6: nothing still moves).
-        activity: u16::try_from(activity::lines(tree, ui, usize::from(width), now).len())
-            .unwrap_or(u16::MAX)
-            .max(2),
+        composer: u16::try_from(draft.lines.len().clamp(1, COMPOSER_ROWS)).unwrap_or(u16::MAX),
+        strip: strip.height(),
+        activity: u16::try_from(activity.len()).unwrap_or(u16::MAX).max(2),
         rail,
     }
 }
 
 /// The rail: the cards on their raised tint, from the top row down. Where
-/// each landed is left in [`crate::ui::Painted`] for a click to read.
-fn render_rail(ui: &Ui, frame: &mut Frame, area: Option<Rect>, drawn: &[rail::Drawn]) {
+/// each landed is left in [`crate::layout::Layout`] for a click to read.
+fn render_rail(frame: &mut Layout, area: Option<Rect>, drawn: &[rail::Drawn]) {
     let Some(area) = area.filter(|area| area.height > 0) else {
-        ui.painted.borrow_mut().rail.clear();
+        frame.rail.clear();
         return;
     };
     let (lines, where_) = rail::painted(drawn, area.width as usize);
-    ui.painted.borrow_mut().rail = where_;
+    frame.rail = where_;
     frame.render_widget(Paragraph::new(lines), area);
 }
 
-/// The rows the draft needs, at most [`COMPOSER_ROWS`].
-fn composer_rows(state: &SessionState, ui: &Ui, width: usize) -> usize {
-    ui.composer
-        .layout(inner_width(state, width))
-        .lines
-        .len()
-        .clamp(1, COMPOSER_ROWS)
-}
-
-/// The thumbnails of the pictures the draft is carrying, for a box this wide
-/// (design §4, M48). Asked for twice a frame — once to make room for it and
-/// once to draw it — which costs one walk of the line, the pixels being the
-/// memo's ([`crate::graphics::Decoded`]).
-fn strip(state: &SessionState, ui: &Ui, width: u16) -> graphics::Band {
+/// The draft's thumbnails, measured and rendered once for this frame.
+fn strip(
+    state: &SessionState,
+    ui: &Ui,
+    measured: &graphics::Decoded,
+    width: u16,
+) -> graphics::Band {
     strip::rows(
         &ui.pictures,
         ui.composer.text(),
         &ui.linked,
         graphics::chosen(),
-        &ui.decoded,
+        measured,
         u16::try_from(inner_width(state, usize::from(width))).unwrap_or(u16::MAX),
     )
 }
@@ -127,7 +118,7 @@ fn inner_width(state: &SessionState, width: usize) -> usize {
 /// The one line of furniture: the status line, or what has taken its row — a
 /// search's query. Both are one row, so what a person opens never moves
 /// anything above it (§3).
-fn render_status(tree: &Tree, ui: &Ui, frame: &mut Frame, area: Rect, now: Now) {
+fn render_status(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
     if area.height == 0 {
         return;
     }
@@ -142,22 +133,30 @@ fn render_status(tree: &Tree, ui: &Ui, frame: &mut Frame, area: Rect, now: Now) 
 /// The activity row and whatever is queued behind it. It takes the tree
 /// rather than the session on screen: between turns the row says what the
 /// sessions *around* this one are still doing (M82).
-fn render_activity(tree: &Tree, ui: &Ui, frame: &mut Frame, area: Rect, now: Now) {
+fn render_activity(ui: &Ui, frame: &mut Layout, area: Rect, mut lines: Vec<Line<'static>>) {
     if area.height == 0 {
         return;
     }
-    frame.render_widget(
-        Paragraph::new(activity::lines(tree, ui, usize::from(area.width), now)),
-        area,
-    );
-    ui.painted.borrow_mut().foot = foot::placed(ui, area, now);
+    let below = (!ui.scroll.following()).then(|| {
+        frame
+            .height
+            .saturating_sub(frame.top + usize::from(frame.regions.transcript.height))
+    });
+    if let Some(pill) = below.and_then(|below| foot::pill(below, area.width as usize)) {
+        frame.foot = Some(Rect::new(area.x + pill.x, area.y, pill.width, 1));
+        match lines.first_mut() {
+            Some(air) => *air = pill.line,
+            None => lines.push(pill.line),
+        }
+    }
+    frame.render_widget(Paragraph::new(lines), area);
 }
 
 /// What floats over the frame, in the order it is stacked: the dropdown and a
 /// command's block ride just above the input box; a card or a sheet dims the
 /// world and takes the screen. Every one of them is a layer, not a row — the
 /// input box never moves to make room.
-fn layers(tree: &Tree, ui: &Ui, frame: &mut Frame, regions: Regions, now: Now) {
+fn layers(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
     let width = regions.transcript.width as usize;
     let above = regions.above();
     over(
@@ -177,10 +176,6 @@ fn layers(tree: &Tree, ui: &Ui, frame: &mut Frame, regions: Regions, now: Now) {
         ]
         .concat(),
     );
-    let mut painted = ui.painted.borrow_mut();
-    painted.card = None;
-    painted.list = None;
-    drop(painted);
     match ui.layer.drawn(now) {
         Some(reveal) => layer(tree, ui, frame, above, reveal, width, now),
         None => card(tree, ui, frame, regions, now),
@@ -192,7 +187,7 @@ fn layers(tree: &Tree, ui: &Ui, frame: &mut Frame, regions: Regions, now: Now) {
 fn layer(
     tree: &Tree,
     ui: &Ui,
-    frame: &mut Frame,
+    frame: &mut Layout,
     above: Rect,
     reveal: layers::Reveal,
     width: usize,
@@ -205,7 +200,8 @@ fn layer(
         Open::Nothing => {}
         // A dropdown above the input box, like the `/` menu: nothing dims.
         Open::Switcher(switcher) => {
-            over(frame, above, switcher_lines(tree, ui, switcher, now, above))
+            let lines = switcher_lines(tree, ui, switcher, now, above, frame);
+            over(frame, above, lines)
         }
         Open::Help => sheet(frame, above, help(ui, width), reveal),
         Open::Panel => sheet(
@@ -238,7 +234,7 @@ fn layer(
 /// into it.
 fn paged(
     tree: &Tree,
-    frame: &mut Frame,
+    frame: &mut Layout,
     above: Rect,
     open: &crate::pager::Pager,
     reveal: layers::Reveal,
@@ -265,7 +261,7 @@ fn paged(
 /// The hits of the pager's own query, once the sheet has finished arriving:
 /// one still sliding up would carry the marks to the wrong rows.
 fn marked(
-    frame: &mut Frame,
+    frame: &mut Layout,
     above: Rect,
     open: &crate::pager::Pager,
     window: pager::Window,
@@ -284,7 +280,7 @@ fn marked(
 }
 
 /// A sheet over a dimmed frame.
-fn sheet(frame: &mut Frame, above: Rect, lines: Vec<Line<'static>>, reveal: layers::Reveal) {
+fn sheet(frame: &mut Layout, above: Rect, lines: Vec<Line<'static>>, reveal: layers::Reveal) {
     layers::dim(frame);
     layers::sheet(frame, above, lines, reveal);
 }
@@ -293,7 +289,7 @@ fn sheet(frame: &mut Frame, above: Rect, lines: Vec<Line<'static>>, reveal: laye
 /// or the form's band ([`dialog::shape`]). Its arrival is measured from when
 /// the kernel opened it, so a card that was already up when this client
 /// attached is simply there.
-fn card(tree: &Tree, ui: &Ui, frame: &mut Frame, regions: Regions, now: Now) {
+fn card(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
     let Some((owner, interaction)) = tree.open_interaction() else {
         return;
     };
@@ -328,10 +324,10 @@ fn card(tree: &Tree, ui: &Ui, frame: &mut Frame, regions: Regions, now: Now) {
     // Only a row of the transcript on screen can anchor it: a child's item
     // ids are its own, and would name the wrong row here.
     let anchor = (!asked_elsewhere)
-        .then(|| asking_row(ui, interaction))
+        .then(|| asking_row(frame, interaction))
         .flatten();
     let at = layers::under(above, anchor, shape.height(lines.len(), above));
-    ui.painted.borrow_mut().card = Some(Card {
+    frame.card = Some(Card {
         area: at,
         options: rows.iter().map(|(_, option)| *option).collect(),
     });
@@ -401,15 +397,14 @@ fn guarded(interaction: &bingo_sdk::Interaction, now: Now) -> bool {
 }
 
 /// Where the row that asked ends, in screen rows, when it is on the screen.
-fn asking_row(ui: &Ui, interaction: &bingo_sdk::Interaction) -> Option<u16> {
-    let painted = ui.painted.borrow();
-    let line = painted.blocks.span(interaction.item.as_ref()?)?.1;
-    Some(painted.regions.transcript.y + painted.row_of(line)?)
+fn asking_row(frame: &Layout, interaction: &bingo_sdk::Interaction) -> Option<u16> {
+    let line = frame.blocks.span(interaction.item.as_ref()?)?.1;
+    Some(frame.regions.transcript.y + frame.row_of(line)?)
 }
 
 /// How far into its arrival a card the kernel opened is. A still surface has
 /// it whole from the first frame.
-fn opening(interaction: &bingo_sdk::Interaction, now: Now) -> layers::Reveal {
+pub(crate) fn opening(interaction: &bingo_sdk::Interaction, now: Now) -> layers::Reveal {
     if !now.motion {
         return layers::Reveal::whole(layers::CARD_FRAMES);
     }
@@ -420,7 +415,7 @@ fn opening(interaction: &bingo_sdk::Interaction, now: Now) -> layers::Reveal {
 
 /// Rows that ride just above the input box, trimmed from the top when the
 /// region cannot hold them all.
-fn over(frame: &mut Frame, region: Rect, lines: Vec<Line<'static>>) {
+fn over(frame: &mut Layout, region: Rect, lines: Vec<Line<'static>>) {
     if lines.is_empty() {
         return;
     }
@@ -441,11 +436,11 @@ fn over(frame: &mut Frame, region: Rect, lines: Vec<Line<'static>>) {
 }
 
 /// The tail of the transcript, or the window the scroll keys parked on. What
-/// it drew is left in [`crate::ui::Painted`] for the next key to read.
+/// it drew is left in [`crate::layout::Layout`] for the next key to read.
 fn render_transcript(
     tree: &Tree,
     ui: &Ui,
-    frame: &mut Frame,
+    frame: &mut Layout,
     area: Rect,
     now: Now,
     live: Vec<Line<'static>>,
@@ -454,9 +449,8 @@ fn render_transcript(
         return;
     }
     let rows = area.height as usize;
-    let mut painted = ui.painted.borrow_mut();
     let state = tree.viewed();
-    painted.height = painted.blocks.sync(
+    frame.height = frame.blocks.sync(
         state,
         &tree.agents(),
         &transcript::Rows::of(
@@ -464,7 +458,7 @@ fn render_transcript(
             area.width as usize,
             &ui.folds,
             &ui.catalogs.commands,
-            &ui.decoded,
+            &frame.measurements,
             &ui.linked,
             now,
         )
@@ -473,22 +467,22 @@ fn render_transcript(
         .measuring(ui.measure),
         live,
     );
-    painted.top = ui.scroll.top(painted.height, rows, now.instant);
-    let mut shown = painted.blocks.window(painted.top, rows);
+    frame.top = ui.scroll.top(frame.height, rows, now.instant);
+    let mut shown = frame.blocks.window(frame.top, rows);
     // A short transcript hangs from the composer, not from the top of the screen.
-    let padding = painted.padding();
+    let padding = frame.padding();
     shown.splice(..0, std::iter::repeat_n(Line::default(), padding));
     // Where the pictures among those lines landed, for a click on one (M56).
-    painted.cells = graphics::placed::cells(&shown, area);
+    frame.cells = graphics::placed::cells(&shown, area);
     frame.render_widget(Paragraph::new(shown), area);
     // A mark is measured from the row line `top` was drawn at, which is where
     // the lines start rather than where the region does.
     let lined = lined(area, padding);
     if let Some(search) = ui.search.as_ref() {
-        search::mark(frame, lined, painted.top, search);
+        search::mark(&mut frame.canvas, lined, frame.top, search);
     }
     if let Some(run) = ui.select.run.as_ref() {
-        select::mark(frame, lined, painted.top, run);
+        select::mark(&mut frame.canvas, lined, frame.top, run);
     }
     if ui.crossfading(now) {
         layers::hush(frame, area);
@@ -534,6 +528,7 @@ fn switcher_lines(
     switcher: &Switcher,
     now: Now,
     above: Rect,
+    frame: &mut Layout,
 ) -> Vec<Line<'static>> {
     let rows = tree::roster(tree, &switcher.stored);
     let drawn = roster::lines(
@@ -547,7 +542,7 @@ fn switcher_lines(
         now,
     );
     let height = u16::try_from(drawn.lines.len()).unwrap_or(u16::MAX);
-    ui.painted.borrow_mut().list = Some(Listed {
+    frame.list = Some(Listed {
         area: Rect {
             y: above.bottom().saturating_sub(height),
             height,
@@ -616,7 +611,14 @@ fn picker_row(session: &SessionSummary, now: Now) -> String {
 
 /// The prompt box: the caret lives here and nowhere else. Its border is the
 /// one box the frame draws itself; what is inside it is [`crate::composer`]'s.
-fn render_composer(state: &SessionState, ui: &Ui, frame: &mut Frame, area: Rect, now: Now) {
+fn render_composer(
+    state: &SessionState,
+    ui: &Ui,
+    frame: &mut Layout,
+    area: Rect,
+    now: Now,
+    draft: prompt::Layout,
+) {
     if area.height == 0 {
         return;
     }
@@ -629,7 +631,7 @@ fn render_composer(state: &SessionState, ui: &Ui, frame: &mut Frame, area: Rect,
     if let Some(come) = ui.sending(now) {
         ignite(frame, area, come);
     }
-    render_draft(state, ui, frame, inner, area.width);
+    render_draft(state, ui, frame, inner, draft);
 }
 
 /// The one light the box runs along its own border when a line is sent: the
@@ -637,7 +639,7 @@ fn render_composer(state: &SessionState, ui: &Ui, frame: &mut Frame, area: Rect,
 /// answer at all. It rides over the border the box has already drawn, so what
 /// the border says — dim while nothing is happening, breathing while the
 /// model works — is what it comes back to (§6).
-fn ignite(frame: &mut Frame, area: Rect, come: f32) {
+fn ignite(frame: &mut Layout, area: Rect, come: f32) {
     let width = usize::from(area.width);
     let buffer = frame.buffer_mut();
     for (x, y) in outline(area) {
@@ -665,10 +667,10 @@ fn outline(area: Rect) -> impl Iterator<Item = (u16, u16)> {
 /// the words it belongs to. A frame that cut no rows for it — the screen was
 /// too short — draws none of it: what is being typed matters more than what
 /// was pasted beside it.
-fn render_strip(ui: &Ui, frame: &mut Frame, area: Rect, strip: graphics::Band) {
+fn render_strip(frame: &mut Layout, area: Rect, strip: graphics::Band) {
     let rows = strip.height();
     if rows == 0 || area.height < rows {
-        ui.painted.borrow_mut().strip.clear();
+        frame.strip.clear();
         return;
     }
     let indent = 2;
@@ -677,19 +679,23 @@ fn render_strip(ui: &Ui, frame: &mut Frame, area: Rect, strip: graphics::Band) {
         width: area.width.saturating_sub(indent),
         ..area
     };
-    let mut painted = ui.painted.borrow_mut();
-    painted
+    frame
         .cells
         .extend(graphics::placed::cells(&strip.lines, band));
-    painted.strip = strip.pictures;
+    frame.strip = strip.pictures;
     frame.render_widget(Paragraph::new(strip.lines), band);
 }
 
 /// The draft itself and the caret in it. `width` is the box's, borders and
 /// all, which is what says how wide a row of text may be.
-fn render_draft(state: &SessionState, ui: &Ui, frame: &mut Frame, area: Rect, width: u16) {
+fn render_draft(
+    state: &SessionState,
+    ui: &Ui,
+    frame: &mut Layout,
+    area: Rect,
+    layout: prompt::Layout,
+) {
     let prompt = prompt::prompt(state);
-    let layout = ui.composer.layout(inner_width(state, usize::from(width)));
     // Scroll only as far as the caret needs: it must stay in the box.
     let start = layout.cursor.0.saturating_sub(COMPOSER_ROWS - 1);
     let placeholder = placeholder(state);
@@ -825,8 +831,8 @@ mod tests {
                 ),
             ),
         ]);
-        let (ui, now) = scene();
-        insta::assert_snapshot!(render(&state, &ui, now));
+        let (mut ui, now) = scene();
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -850,8 +856,8 @@ mod tests {
                 },
             ),
         ]);
-        let (ui, now) = mid_turn();
-        insta::assert_snapshot!(render(&state, &ui, now));
+        let (mut ui, now) = mid_turn();
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -865,8 +871,8 @@ mod tests {
                 },
             ),
         ]);
-        let (ui, now) = mid_turn();
-        insta::assert_snapshot!(render(&state, &ui, now));
+        let (mut ui, now) = mid_turn();
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -888,8 +894,8 @@ mod tests {
                 ItemStatus::Completed,
             ),
         )]);
-        let (ui, now) = scene();
-        insta::assert_snapshot!(render(&state, &ui, now));
+        let (mut ui, now) = scene();
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -918,8 +924,8 @@ mod tests {
                 ),
             ),
         ]);
-        let (ui, now) = scene();
-        insta::assert_snapshot!(render(&state, &ui, now));
+        let (mut ui, now) = scene();
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -934,8 +940,8 @@ mod tests {
                 ItemStatus::Completed,
             ),
         )]);
-        let (ui, now) = scene();
-        insta::assert_snapshot!(render(&state, &ui, now));
+        let (mut ui, now) = scene();
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -946,7 +952,7 @@ mod tests {
         )]);
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -958,7 +964,7 @@ mod tests {
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
         crate::input::on_key(&mut ui, &solo(&state), ctrl('e'), now);
-        insta::assert_snapshot!(draw_sized(80, 34, &state, &ui, now));
+        insta::assert_snapshot!(draw_sized(80, 34, &state, &mut ui, now));
     }
 
     #[test]
@@ -977,7 +983,7 @@ mod tests {
         ui.dialog.focus_on(state.interactions.first());
         crate::input::on_key(&mut ui, &solo(&state), typed('n'), now);
         write(&mut ui, &state, "use cargo clean", now);
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -987,11 +993,11 @@ mod tests {
         ui.dialog.focus_on(asked.interactions.first());
         // Frame 0 is the screen before the kernel opened it; then one frame
         // every 33 ms until the card is whole.
-        let mut screens = vec![render(&state(), &ui, now)];
-        screens.extend((0..3).map(|f| render(&asked, &ui, later(now, f * 33))));
+        let mut screens = vec![render(&state(), &mut ui, now)];
+        screens.extend((0..3).map(|f| render(&asked, &mut ui, later(now, f * 33))));
         assert_eq!(
             screens[3],
-            render(&asked, &ui, later(now, 500)),
+            render(&asked, &mut ui, later(now, 500)),
             "by the third frame it has arrived"
         );
         insta::assert_snapshot!(screens.join("\n"));
@@ -1031,7 +1037,7 @@ mod tests {
         state.apply(&frame(12, opened(permission(Some("Edit(src/)"), None))));
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
-        let screen = render(&state, &ui, now);
+        let screen = render(&state, &mut ui, now);
         let rows: Vec<&str> = screen.lines().collect();
         let asked = rows
             .iter()
@@ -1057,7 +1063,7 @@ mod tests {
         ]);
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
-        let screen = drawn(80, 24, &solo(&state), &ui, now);
+        let screen = drawn(80, 24, &solo(&state), &mut ui, now);
         let card: Vec<usize> = screen
             .buffer()
             .content()
@@ -1087,7 +1093,7 @@ mod tests {
         let state = folded(vec![frame(1, opened(question(false, false)))]);
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -1096,7 +1102,7 @@ mod tests {
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
         crate::input::on_key(&mut ui, &solo(&state), typed(' '), now);
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -1104,7 +1110,7 @@ mod tests {
         let state = folded(vec![frame(1, opened(confirm()))]);
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -1117,7 +1123,7 @@ mod tests {
         )]);
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -1131,7 +1137,7 @@ mod tests {
         )]);
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -1141,7 +1147,7 @@ mod tests {
         ui.dialog.focus_on(state.interactions.first());
         crate::input::on_key(&mut ui, &solo(&state), typed('1'), now);
         write(&mut ui, &state, "sk-pasted-elsewhere", now);
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -1149,7 +1155,7 @@ mod tests {
         let state = state();
         let (mut ui, now) = scene();
         shown(&mut ui, Open::Help, now);
-        insta::assert_snapshot!(draw_sized(100, 28, &state, &ui, now));
+        insta::assert_snapshot!(draw_sized(100, 28, &state, &mut ui, now));
     }
 
     #[test]
@@ -1167,7 +1173,7 @@ mod tests {
             family: "kernel".into(),
         }];
         write(&mut ui, &state, "/", now);
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     /// ADR-0008 §6a: the word after a verb is drawn like every other value,
@@ -1196,7 +1202,7 @@ mod tests {
                 .to_vec(),
         )]);
         write(&mut ui, &state, "/plugins disable ", now);
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -1204,7 +1210,7 @@ mod tests {
         let state = state();
         let (mut ui, now) = scene();
         crate::input::on_key(&mut ui, &solo(&state), ctrl('c'), now);
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -1236,8 +1242,8 @@ mod tests {
                 },
             ),
         ]);
-        let (ui, now) = mid_turn();
-        insta::assert_snapshot!(render(&state, &ui, now));
+        let (mut ui, now) = mid_turn();
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     /// A queue as the kernel published it, each entry labelled by the surface
@@ -1267,10 +1273,10 @@ mod tests {
     /// preview)`. The turn has only just started, so nothing but the queue asks
     /// for a row: what the band holds is what the queue put there.
     fn band(entries: &[(&str, &str, bool)]) -> String {
-        let (ui, now) = scene();
+        let (mut ui, now) = scene();
         render(
             &folded(vec![frame(1, started("trn_1")), queue_frame(2, entries)]),
-            &ui,
+            &mut ui,
             now,
         )
     }
@@ -1320,7 +1326,7 @@ mod tests {
         assert!(waits.contains("> and then the docs (waits)"), "{waits}");
 
         assert!(waits.contains(keys::BUSY_PLACEHOLDER), "{waits}");
-        let idle = render(&state(), &scene().0, scene().1);
+        let idle = render(&state(), &mut scene().0, scene().1);
         assert!(idle.contains(keys::PLACEHOLDER), "{idle}");
         assert!(!idle.contains(keys::BUSY_PLACEHOLDER), "{idle}");
     }
@@ -1377,8 +1383,8 @@ mod tests {
                 ),
             ),
         ]);
-        let (ui, now) = scene();
-        insta::assert_snapshot!(render(&state, &ui, now));
+        let (mut ui, now) = scene();
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     fn with_context(used: u64) -> bingo_sdk::SessionState {
@@ -1398,23 +1404,23 @@ mod tests {
 
     #[test]
     fn the_context_notice_sits_on_the_status_line_when_it_is_true() {
-        let (ui, now) = scene();
-        insta::assert_snapshot!(render(&with_context(170_000), &ui, now));
+        let (mut ui, now) = scene();
+        insta::assert_snapshot!(render(&with_context(170_000), &mut ui, now));
     }
 
     #[test]
     fn the_status_line_names_the_mode_the_policy_published() {
-        let (ui, now) = scene();
-        insta::assert_snapshot!(render(&with_permission_mode("acceptEdits"), &ui, now));
+        let (mut ui, now) = scene();
+        insta::assert_snapshot!(render(&with_permission_mode("acceptEdits"), &mut ui, now));
     }
 
     #[test]
     fn a_config_without_a_mode_leaves_the_status_line_as_it_was() {
         let published = folded(vec![frame(1, plugin_view("hooks", json!({"events": 3})))]);
-        let (ui, now) = scene();
+        let (mut ui, now) = scene();
         assert_eq!(
-            render(&published, &ui, now),
-            render(&state(), &ui, now),
+            render(&published, &mut ui, now),
+            render(&state(), &mut ui, now),
             "no badge until a policy publishes one"
         );
     }
@@ -1424,7 +1430,7 @@ mod tests {
         let state = state();
         let (mut ui, now) = scene();
         ui.notify(Level::Error, "unknown command: /x", now.instant);
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -1441,7 +1447,7 @@ mod tests {
                 ],
             ],
         });
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     /// A row says what a session is — its first ask, how much was said, how
@@ -1482,7 +1488,7 @@ mod tests {
             }),
             now,
         );
-        insta::assert_snapshot!(render(&state, &ui, now));
+        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     /// A name as long as the mint allows is twice as wide as it is long when
@@ -1512,7 +1518,7 @@ mod tests {
             }),
             now,
         );
-        let screen = render(&state, &ui, now);
+        let screen = render(&state, &mut ui, now);
         let rows: Vec<&str> = screen.lines().collect();
         assert!(rows[1].contains("❯ 1. 解解解"), "{screen}");
         assert!(
@@ -1551,8 +1557,8 @@ mod tests {
     #[test]
     fn a_tool_call_that_spawned_an_agent_says_what_it_is_doing() {
         let tree = spawned(vec![child_frame(2, started("trn_9"))]);
-        let (ui, now) = scene();
-        let screen = render_tree(&tree, &ui, now);
+        let (mut ui, now) = scene();
+        let screen = render_tree(&tree, &mut ui, now);
         assert!(screen.contains("⏺ reviewer(review the diff)"), "{screen}");
         assert!(screen.contains("⎿  Running…"), "{screen}");
         insta::assert_snapshot!(screen);
@@ -1564,7 +1570,7 @@ mod tests {
         let (mut ui, now) = settled();
         ui.dialog
             .focus_on(tree.open_interaction().map(|(_, open)| open));
-        let screen = render_tree(&tree, &ui, now);
+        let screen = render_tree(&tree, &mut ui, now);
         assert!(screen.contains("1 needs you (ctrl+g)"), "{screen}");
         insta::assert_snapshot!(screen);
     }
@@ -1587,8 +1593,8 @@ mod tests {
             ),
         ]);
         tree.show(&child_id());
-        let (ui, now) = mid_turn();
-        let screen = render_tree(&tree, &ui, now);
+        let (mut ui, now) = mid_turn();
+        let screen = render_tree(&tree, &mut ui, now);
         assert!(screen.contains("in reviewer · fake/fake-1"), "{screen}");
         assert!(screen.contains("Two nits"), "{screen}");
         insta::assert_snapshot!(screen);
@@ -1611,7 +1617,7 @@ mod tests {
             }),
             now,
         );
-        insta::assert_snapshot!(render_tree(&tree, &ui, now));
+        insta::assert_snapshot!(render_tree(&tree, &mut ui, now));
     }
 
     /// M31: the two states of one row. A session the store knows and this
@@ -1632,13 +1638,13 @@ mod tests {
             now,
         );
         let mut tree = spawned(vec![child_frame(2, started("trn_9"))]);
-        let asleep = render_tree(&tree, &ui, now);
+        let asleep = render_tree(&tree, &mut ui, now);
         assert!(asleep.contains("⏺ scout"), "{asleep}");
         assert!(asleep.contains("stored"), "{asleep}");
         insta::assert_snapshot!("switcher_row_stored", asleep);
 
         tree.fold.apply(&woken(1, scout));
-        let awake = render_tree(&tree, &ui, now);
+        let awake = render_tree(&tree, &mut ui, now);
         assert!(!awake.contains("stored"), "{awake}");
         assert!(awake.contains("⏺ scout"), "{awake}");
         insta::assert_snapshot!("switcher_row_live", awake);
@@ -1651,9 +1657,9 @@ mod tests {
     fn the_list_covers_the_transcript_and_moves_nothing_under_it() {
         let tree = spawned(vec![child_frame(2, started("trn_9"))]);
         let (mut ui, now) = scene();
-        let before = render_tree(&tree, &ui, now);
+        let before = render_tree(&tree, &mut ui, now);
         shown(&mut ui, Open::Switcher(Switcher::default()), now);
-        let with_list = render_tree(&tree, &ui, now);
+        let with_list = render_tree(&tree, &mut ui, now);
 
         let rows = |screen: &str| screen.lines().map(str::to_string).collect::<Vec<_>>();
         let (was, is) = (rows(&before), rows(&with_list));
@@ -1704,8 +1710,8 @@ mod tests {
                 },
             ),
         ]);
-        let (ui, now) = scene();
-        let screen = render_tree(&tree, &ui, now);
+        let (mut ui, now) = scene();
+        let screen = render_tree(&tree, &mut ui, now);
         assert!(screen.contains("⏺ reviewer: the plan"), "{screen}");
         assert!(
             screen.contains("  none of M9's exit criteria name one"),
@@ -1728,8 +1734,8 @@ mod tests {
 
     #[test]
     fn the_composer_of_a_room_offers_to_post_to_it() {
-        let (ui, now) = scene();
-        let screen = render_tree(&room(vec![]), &ui, now);
+        let (mut ui, now) = scene();
+        let screen = render_tree(&room(vec![]), &mut ui, now);
         assert!(screen.contains("#design > post to the room"), "{screen}");
         insta::assert_snapshot!(screen);
     }
@@ -1750,7 +1756,7 @@ mod tests {
             }),
             now,
         );
-        let screen = render_tree(&tree, &ui, now);
+        let screen = render_tree(&tree, &mut ui, now);
         assert!(screen.contains("Agents"), "{screen}");
         assert!(screen.contains("Rooms"), "{screen}");
         assert!(screen.contains("#design"), "{screen}");
@@ -1800,7 +1806,7 @@ mod tests {
         ]);
         let (mut ui, now) = scene();
         shown(&mut ui, Open::Panel, now);
-        let screen = render_tree(&tree, &ui, now);
+        let screen = render_tree(&tree, &mut ui, now);
         assert!(screen.contains("bingo.rooms · members"), "{screen}");
         assert!(!screen.contains("bingo.tasks"), "{screen}");
         insta::assert_snapshot!(screen);
@@ -1811,11 +1817,11 @@ mod tests {
         let mut tree = room(vec![log_frame(2, members())]);
         let (mut ui, now) = scene();
         shown(&mut ui, Open::Panel, now);
-        assert!(render_tree(&tree, &ui, now).contains("scout"));
+        assert!(render_tree(&tree, &mut ui, now).contains("scout"));
 
         let root = tree.root_id().clone();
         tree.show(&root);
-        let screen = render_tree(&tree, &ui, now);
+        let screen = render_tree(&tree, &mut ui, now);
         assert!(screen.contains(crate::panel::NOTHING), "{screen}");
         assert!(!screen.contains("scout"), "{screen}");
     }
@@ -1825,8 +1831,8 @@ mod tests {
     #[test]
     fn a_room_s_board_is_drawn_in_the_room_s_view_and_not_in_its_parent_s() {
         let mut tree = room(vec![log_frame(2, tasks())]);
-        let (ui, now) = scene();
-        let board = render_tree(&tree, &ui, now);
+        let (mut ui, now) = scene();
+        let board = render_tree(&tree, &mut ui, now);
         assert!(
             board.contains("2 tasks (0 done, 1 in progress, 1 open)"),
             "{board}"
@@ -1835,7 +1841,7 @@ mod tests {
 
         let root = tree.root_id().clone();
         tree.show(&root);
-        assert!(!render_tree(&tree, &ui, now).contains("ship it"));
+        assert!(!render_tree(&tree, &mut ui, now).contains("ship it"));
     }
 
     // ---- the three lanes (ADR-0013) -------------------------------------
@@ -1850,8 +1856,8 @@ mod tests {
 
     #[test]
     fn the_rail_holds_the_pinned_board_and_the_live_progress_card() {
-        let (ui, now) = watching();
-        let screen = draw_sized(120, 40, &boarded(), &ui, now);
+        let (mut ui, now) = watching();
+        let screen = draw_sized(120, 40, &boarded(), &mut ui, now);
         assert!(screen.contains("❯ Board"), "{screen}");
         assert!(screen.contains("[ 1 Tick ]"), "{screen}");
         assert!(screen.contains("████████░░ 80 %"), "{screen}");
@@ -1860,15 +1866,15 @@ mod tests {
 
     #[test]
     fn a_rail_is_not_drawn_for_a_session_no_plugin_has_written_to() {
-        let (ui, now) = scene();
-        draw_sized(120, 40, &state(), &ui, now);
-        let quiet = ui.painted.borrow().regions;
+        let (mut ui, now) = scene();
+        draw_sized(120, 40, &state(), &mut ui, now);
+        let quiet = ui.shown.regions;
         assert!(quiet.rail.is_none(), "an empty rail is not drawn");
         assert_eq!(quiet.transcript.width, 120, "the transcript keeps it all");
 
-        let (ui, now) = watching();
-        draw_sized(120, 40, &boarded(), &ui, now);
-        let busy = ui.painted.borrow().regions;
+        let (mut ui, now) = watching();
+        draw_sized(120, 40, &boarded(), &mut ui, now);
+        let busy = ui.shown.regions;
         assert!(busy.rail.is_some(), "a card asks for the column");
         assert_eq!(busy.transcript.width, 120 - crate::frame::RAIL_WIDTH);
     }
@@ -1877,8 +1883,8 @@ mod tests {
     /// a signal is never lost to a narrow terminal (design §3).
     #[test]
     fn without_a_rail_the_same_cards_draw_under_the_running_rows() {
-        let (ui, now) = watching();
-        let screen = render(&boarded(), &ui, now);
+        let (mut ui, now) = watching();
+        let screen = render(&boarded(), &mut ui, now);
         assert!(screen.contains("████████░░ 80 %"), "{screen}");
         assert!(screen.contains("❯ Board"), "{screen}");
         insta::assert_snapshot!(screen);
@@ -1909,8 +1915,8 @@ mod tests {
                 ItemStatus::Completed,
             ),
         )]);
-        let (ui, now) = scene();
-        let screen = render(&state, &ui, now);
+        let (mut ui, now) = scene();
+        let screen = render(&state, &mut ui, now);
         assert!(screen.contains("⎿  id  task"), "{screen}");
         assert!(!screen.contains("2 open"), "the model's text is not drawn");
         insta::assert_snapshot!(screen);
@@ -1925,7 +1931,7 @@ mod tests {
         let (mut ui, now) = scene();
         shown(&mut ui, Open::Help, now);
         ui.dialog.focus_on(state.interactions.first());
-        let screen = draw_sized(60, 12, &state, &ui, now);
+        let screen = draw_sized(60, 12, &state, &mut ui, now);
         let rows: Vec<&str> = screen.lines().collect();
         assert!(rows[rows.len() - 4].contains('\u{256d}'), "{screen}");
         assert!(rows[rows.len() - 3].contains("│ > "), "{screen}");
@@ -1936,14 +1942,14 @@ mod tests {
     #[test]
     fn a_full_draw_of_a_long_transcript_reuses_the_cached_blocks() {
         let state = long_transcript(5_000);
-        let (ui, now) = scene();
-        let first = draw_sized(120, 40, &state, &ui, now);
-        assert_eq!(ui.painted.borrow().blocks.renders(), 5_000);
+        let (mut ui, now) = scene();
+        let first = draw_sized(120, 40, &state, &mut ui, now);
+        assert_eq!(ui.shown.blocks.renders(), 5_000);
         for _ in 0..20 {
-            assert_eq!(draw_sized(120, 40, &state, &ui, now), first);
+            assert_eq!(draw_sized(120, 40, &state, &mut ui, now), first);
         }
         assert_eq!(
-            ui.painted.borrow().blocks.renders(),
+            ui.shown.blocks.renders(),
             5_000,
             "warm draws reuse every finished block"
         );
@@ -1951,9 +1957,9 @@ mod tests {
 
     #[test]
     fn a_terminal_too_small_for_anything_still_draws() {
-        let (ui, now) = scene();
+        let (mut ui, now) = scene();
         for (width, height) in [(1u16, 1u16), (4, 2), (10, 3), (20, 5)] {
-            draw_sized(width, height, &state(), &ui, now);
+            draw_sized(width, height, &state(), &mut ui, now);
         }
     }
 
@@ -1961,7 +1967,7 @@ mod tests {
     fn ctrl_f_searches_the_transcript_and_esc_gives_the_status_line_back() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         let press = |ui: &mut Ui, key| {
             crate::input::on_key(ui, &solo(&state), key, now);
         };
@@ -1969,7 +1975,7 @@ mod tests {
         for c in "line 4".chars() {
             press(&mut ui, typed(c));
         }
-        let typing = render(&state, &ui, now);
+        let typing = render(&state, &mut ui, now);
         assert!(typing.contains("/line 4▌"), "{typing}");
 
         press(&mut ui, key(crossterm::event::KeyCode::Enter));
@@ -1978,18 +1984,18 @@ mod tests {
             instant: now.instant + crate::scroll::EASE,
             ..now
         };
-        let found = render(&state, &ui, there);
+        let found = render(&state, &mut ui, there);
         assert!(found.contains("1/11 · n/N · esc"), "{found}");
         assert!(found.contains("line 4"), "it scrolled to the hit: {found}");
         insta::assert_snapshot!(found);
 
         press(&mut ui, typed('n'));
-        let stepped = render(&state, &ui, there);
+        let stepped = render(&state, &mut ui, there);
         assert!(stepped.contains("2/11"), "{stepped}");
 
         press(&mut ui, key(crossterm::event::KeyCode::Esc));
         assert!(
-            render(&state, &ui, there).contains("? for shortcuts"),
+            render(&state, &mut ui, there).contains("? for shortcuts"),
             "esc gives the status line back"
         );
     }
@@ -1998,7 +2004,7 @@ mod tests {
     fn a_hit_on_the_screen_is_marked_where_it_sits() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
+        render(&state, &mut ui, now);
         crate::input::on_key(&mut ui, &solo(&state), ctrl('f'), now);
         for c in "line 59".chars() {
             crate::input::on_key(&mut ui, &solo(&state), typed(c), now);
@@ -2013,7 +2019,7 @@ mod tests {
             80,
             24,
             &solo(&state),
-            &ui,
+            &mut ui,
             Now {
                 instant: now.instant + crate::scroll::EASE,
                 ..now
@@ -2048,14 +2054,14 @@ mod tests {
         let state = folded(vec![item_frame(1, user("itm_1", "run the tests"))]);
         let tree = solo(&state);
         let (mut ui, now) = scene();
-        let row = row_carrying(&render(&state, &ui, now), "run the tests");
+        let row = row_carrying(&render(&state, &mut ui, now), "run the tests");
         crate::input::on_key(&mut ui, &tree, ctrl('f'), now);
         for c in "tests".chars() {
             crate::input::on_key(&mut ui, &tree, typed(c), now);
         }
         crate::input::on_key(&mut ui, &tree, key(crossterm::event::KeyCode::Enter), now);
         assert_eq!(
-            hit_cells(&drawn(80, 24, &tree, &ui, now)),
+            hit_cells(&drawn(80, 24, &tree, &mut ui, now)),
             (10..15).map(|x| (x, row)).collect::<Vec<_>>(),
             "the five cells of `tests` on the row it is drawn on"
         );
@@ -2096,12 +2102,15 @@ mod tests {
     ) -> (u16, Vec<(u16, String)>) {
         let tree = solo(state);
         let (mut ui, now) = scene();
-        let row = row_carrying(&render(state, &ui, now), needle);
+        let row = row_carrying(&render(state, &mut ui, now), needle);
         crate::pointer::on_mouse(&mut ui, &tree, click(from, row), now);
         crate::pointer::on_mouse(&mut ui, &tree, dragged(to, row), now);
-        let marked = drawn(80, 24, &tree, &ui, now);
+        let marked = drawn(80, 24, &tree, &mut ui, now);
         ui.select.clear();
-        (row, marked_cells(&drawn(80, 24, &tree, &ui, now), &marked))
+        (
+            row,
+            marked_cells(&drawn(80, 24, &tree, &mut ui, now), &marked),
+        )
     }
 
     /// A transcript shorter than its region hangs from the composer, so the
@@ -2140,7 +2149,7 @@ mod tests {
                 .collect(),
         );
         let (mut ui, now) = scene();
-        let bottom = render(&state, &ui, now);
+        let bottom = render(&state, &mut ui, now);
         crate::input::on_key(
             &mut ui,
             &solo(&state),
@@ -2152,7 +2161,7 @@ mod tests {
             instant: now.instant + crate::scroll::EASE,
             ..now
         };
-        let scrolled = render(&state, &ui, settled);
+        let scrolled = render(&state, &mut ui, settled);
         assert_ne!(bottom, scrolled, "page up must move the window");
         insta::assert_snapshot!(scrolled);
     }
@@ -2164,8 +2173,8 @@ mod tests {
     fn the_foot_row_costs_the_transcript_nothing() {
         let state = long_transcript(60);
         let (mut ui, now) = scene();
-        render(&state, &ui, now);
-        let following = ui.painted.borrow().regions;
+        render(&state, &mut ui, now);
+        let following = ui.shown.regions;
         crate::input::on_key(
             &mut ui,
             &solo(&state),
@@ -2173,9 +2182,9 @@ mod tests {
             now,
         );
         let settled = later(now, 100);
-        let screen = render(&state, &ui, settled);
+        let screen = render(&state, &mut ui, settled);
         assert!(screen.contains("lines below"), "{screen}");
-        assert_eq!(ui.painted.borrow().regions, following);
+        assert_eq!(ui.shown.regions, following);
     }
 
     /// `ctrl+o` only opens further: the fold lifts, then the whole of it takes
@@ -2201,15 +2210,15 @@ mod tests {
             ),
         )]);
         let (mut ui, now) = scene();
-        assert!(render(&state, &ui, now).contains("+4 lines (ctrl+o to expand)"));
+        assert!(render(&state, &mut ui, now).contains("+4 lines (ctrl+o to expand)"));
         let tree = solo(&state);
         crate::input::on_key(&mut ui, &tree, ctrl('o'), now);
-        let opened = render(&state, &ui, now);
+        let opened = render(&state, &mut ui, now);
         assert!(opened.contains("line 9"), "{opened}");
         assert!(!opened.contains("+4 lines"), "{opened}");
 
         crate::input::on_key(&mut ui, &tree, ctrl('o'), now);
-        let paged = render(&state, &ui, later(now, 200));
+        let paged = render(&state, &mut ui, later(now, 200));
         assert!(
             paged.contains("Read(src/lib.rs)"),
             "the sheet says what it is: {paged}"
@@ -2218,7 +2227,7 @@ mod tests {
 
         crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
         assert!(
-            render(&state, &ui, later(now, 200)).contains("+4 lines (ctrl+o to expand)"),
+            render(&state, &mut ui, later(now, 200)).contains("+4 lines (ctrl+o to expand)"),
             "leaving the sheet folds the result it came from"
         );
     }
@@ -2244,17 +2253,17 @@ mod tests {
         )]);
         let (mut ui, now) = scene();
         let tree = solo(&state);
-        let before = render(&state, &ui, now);
+        let before = render(&state, &mut ui, now);
 
         // A click focuses the block; `⏎` opens it whole.
         crate::input::on_key(&mut ui, &tree, ctrl('o'), now);
         crate::input::on_key(&mut ui, &tree, ctrl('o'), now);
         let settled = later(now, 200);
-        let top = render(&state, &ui, settled);
+        let top = render(&state, &mut ui, settled);
         assert!(top.contains("line 1"), "{top}");
 
         crate::input::on_key(&mut ui, &tree, typed('G'), now);
-        let bottom = render(&state, &ui, settled);
+        let bottom = render(&state, &mut ui, settled);
         assert!(bottom.contains("line 40"), "{bottom}");
         assert_ne!(top, bottom, "G takes the end of it");
 
@@ -2262,17 +2271,17 @@ mod tests {
         for c in "line 7".chars() {
             crate::input::on_key(&mut ui, &tree, typed(c), now);
         }
-        let typing = render(&state, &ui, settled);
+        let typing = render(&state, &mut ui, settled);
         assert!(typing.contains("/line 7"), "{typing}");
         crate::input::on_key(&mut ui, &tree, key(KeyCode::Enter), now);
-        let found = render(&state, &ui, settled);
+        let found = render(&state, &mut ui, settled);
         assert!(found.contains("1/1 · n/N · esc"), "{found}");
         assert!(found.contains("line 7"), "{found}");
 
         crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
         crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
         assert_eq!(
-            render(&state, &ui, later(now, 400)),
+            render(&state, &mut ui, later(now, 400)),
             before,
             "the frame beneath is what it was"
         );
@@ -2316,10 +2325,10 @@ mod tests {
     fn a_carried_picture_puts_a_strip_on_the_box() {
         let state = state();
         let (mut ui, now) = scene();
-        let plain = render(&state, &ui, now);
+        let plain = render(&state, &mut ui, now);
         crate::graphics::with(crate::graphics::drawing(), || {
             carrying(&mut ui, 1);
-            let screen = render(&state, &ui, now);
+            let screen = render(&state, &mut ui, now);
             assert_eq!(box_rows(&screen).len(), box_rows(&plain).len(), "{screen}");
             assert_eq!(
                 placeholder_rows(&screen),
@@ -2356,11 +2365,11 @@ mod tests {
         let state = state();
         let (mut ui, now) = scene();
         crate::graphics::with(crate::graphics::drawing(), || {
-            let plain = render(&state, &ui, now);
+            let plain = render(&state, &mut ui, now);
             carrying(&mut ui, 1);
-            assert_eq!(placeholder_rows(&render(&state, &ui, now)), 3);
+            assert_eq!(placeholder_rows(&render(&state, &mut ui, now)), 3);
             ui.composer.clear();
-            let after = render(&state, &ui, now);
+            let after = render(&state, &mut ui, now);
             assert_eq!(placeholder_rows(&after), 0, "{after}");
             assert_eq!(after, plain, "and the box is what it was");
         });
@@ -2373,13 +2382,9 @@ mod tests {
         let (mut ui, now) = scene();
         crate::graphics::with(crate::graphics::drawing(), || {
             carrying(&mut ui, 5);
-            let screen = render(&state, &ui, now);
+            let screen = render(&state, &mut ui, now);
             assert!(screen.contains("+1"), "{screen}");
-            assert_eq!(
-                ui.painted.borrow().strip.len(),
-                graphics::band::SHOWN,
-                "{screen}"
-            );
+            assert_eq!(ui.shown.strip.len(), graphics::band::SHOWN, "{screen}");
         });
     }
 
@@ -2390,10 +2395,10 @@ mod tests {
         let state = state();
         let (mut ui, now) = scene();
         carrying(&mut ui, 2);
-        let screen = render(&state, &ui, now);
+        let screen = render(&state, &mut ui, now);
         assert_eq!(placeholder_rows(&screen), 0, "{screen}");
         assert!(screen.contains("[image 1]"), "{screen}");
-        assert!(ui.painted.borrow().strip.is_empty());
+        assert!(ui.shown.strip.is_empty());
     }
 
     /// A room is posted into rather than asked, and its prompt keeps the
@@ -2404,7 +2409,7 @@ mod tests {
         let (mut ui, now) = scene();
         crate::graphics::with(crate::graphics::drawing(), || {
             carrying(&mut ui, 1);
-            let screen = render_tree(&tree, &ui, now);
+            let screen = render_tree(&tree, &mut ui, now);
             let rows = box_rows(&screen);
             let prompt = rows
                 .iter()
@@ -2443,11 +2448,11 @@ mod tests {
         )]);
         let tree = solo(&state);
         let (mut ui, now) = scene();
-        let filled = widest_prose(&drawn(200, 40, &tree, &ui, now));
+        let filled = widest_prose(&drawn(200, 40, &tree, &mut ui, now));
         assert!(filled > 150, "prose fills the terminal: {filled} cells");
         assert!(filled <= 200, "and never overruns it: {filled} cells");
         ui.measure = Some(100);
-        let capped = widest_prose(&drawn(200, 40, &tree, &ui, now));
+        let capped = widest_prose(&drawn(200, 40, &tree, &mut ui, now));
         assert!(capped <= 100, "a person who set one has it: {capped} cells");
         assert!(capped > 80, "and it is the measure, not a guess: {capped}");
     }
@@ -2460,7 +2465,7 @@ mod tests {
         let (mut ui, now) = scene();
         crate::graphics::with(crate::graphics::drawing(), || {
             carrying(&mut ui, 1);
-            let screen = draw_sized(80, 5, &state, &ui, now);
+            let screen = draw_sized(80, 5, &state, &mut ui, now);
             assert_eq!(placeholder_rows(&screen), 0, "{screen}");
             assert!(screen.contains("[image 1]"), "{screen}");
         });

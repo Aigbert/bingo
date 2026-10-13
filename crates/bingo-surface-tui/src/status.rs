@@ -28,6 +28,7 @@ pub const HINT: &str = keys::FOOTER_HINT;
 
 /// The status line at this width.
 pub fn line(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Line<'static> {
+    crate::layout::count::band(4);
     place(
         left(tree.viewed()),
         middle(tree, ui, now),
@@ -79,6 +80,39 @@ fn middle(tree: &Tree, ui: &Ui, now: Now) -> Vec<Span<'static>> {
         parts.push(Span::styled(HINT, theme::dim()));
     }
     join(parts)
+}
+
+pub fn next_change(tree: &Tree, now: Now) -> Option<std::time::Instant> {
+    let slots = bingo_sdk::slot::placed(tree.viewed());
+    let attention = crate::tree::count(tree, crate::tree::Wants::Attention, crate::tree::Scope::Others).is_some()
+        || slots.iter().any(|placed| matches!(&placed.slot, bingo_sdk::slot::Slot::Status { tone: bingo_sdk::Tone::Attention, until, .. } if until.is_none_or(|at| at > now.wall)));
+    let pulse = (now.motion && attention).then(|| clock::next_tick(now, theme::PULSE));
+    slots
+        .iter()
+        .filter_map(|placed| {
+            let bingo_sdk::slot::Slot::Status {
+                until: Some(at), ..
+            } = &placed.slot
+            else {
+                return None;
+            };
+            if *at <= now.wall {
+                return None;
+            }
+            let left = at.duration_since(now.wall).unsigned_abs();
+            let seconds = left.as_secs();
+            let unit = match seconds {
+                0..60 => 1,
+                60..3600 => 60,
+                3600..86400 => 3600,
+                _ => 86400,
+            };
+            let boundary = std::time::Duration::from_secs(seconds / unit * unit);
+            let delay = (left - boundary + std::time::Duration::from_nanos(1)).min(left);
+            Some(now.instant + delay)
+        })
+        .chain(pulse)
+        .min()
 }
 
 /// Timed status entries use the frame clock and disappear when their time is past.
@@ -471,7 +505,7 @@ mod tests {
     /// the numbers the kernel now sends, on the screen a person reads.
     #[test]
     fn a_context_the_agent_holds_reads_as_its_own_count_and_its_own_cut() {
-        let (ui, now) = scene();
+        let (mut ui, now) = scene();
         let state = folded(vec![
             frame(
                 1,
@@ -502,7 +536,7 @@ mod tests {
                 },
             ),
         ]);
-        let screen = render(&state, &ui, now);
+        let screen = render(&state, &mut ui, now);
         assert!(screen.contains("400k/1000k"), "{screen}");
         assert!(
             !screen.contains("/compact"),

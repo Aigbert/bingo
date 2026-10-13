@@ -50,7 +50,7 @@ mod thinking;
 mod windows;
 
 /// One scene, at the two sizes every layout rule is written for.
-fn both(name: &str, tree: &Tree, ui: &Ui, now: Now) {
+fn both(name: &str, tree: &Tree, ui: &mut Ui, now: Now) {
     insta::assert_snapshot!(format!("{name}_80x24"), draw_tree(80, 24, tree, ui, now));
     insta::assert_snapshot!(format!("{name}_120x40"), draw_tree(120, 40, tree, ui, now));
 }
@@ -58,7 +58,7 @@ fn both(name: &str, tree: &Tree, ui: &Ui, now: Now) {
 /// One scene in the look a terminal that can draw nothing but ASCII gets
 /// (§7). Written here rather than at each call site so every screen of that
 /// look is named alike, whichever module drew it.
-fn without_glyphs(name: &str, tree: &Tree, ui: &Ui, now: Now) {
+fn without_glyphs(name: &str, tree: &Tree, ui: &mut Ui, now: Now) {
     insta::assert_snapshot!(
         name.to_string(),
         in_look(ascii(), || draw_tree(80, 24, tree, ui, now))
@@ -94,8 +94,8 @@ fn asked(interaction: bingo_sdk::Interaction) -> (Tree, Ui, Now) {
 
 #[test]
 fn idle() {
-    let (ui, now) = scene();
-    both("idle", &solo(&folded(answered())), &ui, now);
+    let (mut ui, now) = scene();
+    both("idle", &solo(&folded(answered())), &mut ui, now);
 }
 
 /// A tool call handed into a turn from outside the model (ADR-0036 §2) lands
@@ -139,14 +139,14 @@ fn a_call_that_lands_while_the_assistant_is_still_writing() {
             ),
         ),
     ]);
-    let (ui, now) = mid_turn();
-    both("bridged_call_while_streaming", &solo(&state), &ui, now);
+    let (mut ui, now) = mid_turn();
+    both("bridged_call_while_streaming", &solo(&state), &mut ui, now);
 }
 
 #[test]
 fn welcome_on_a_fresh_session() {
-    let (ui, now) = scene();
-    both("welcome", &solo(&state()), &ui, now);
+    let (mut ui, now) = scene();
+    both("welcome", &solo(&state()), &mut ui, now);
 }
 
 /// The same box with a newer release out (M63): one more row under the help
@@ -155,7 +155,7 @@ fn welcome_on_a_fresh_session() {
 fn welcome_with_a_newer_release_out() {
     let (mut ui, now) = scene();
     ui.update = Some("0.5.0".to_string());
-    both("welcome_update", &solo(&state()), &ui, now);
+    both("welcome_update", &solo(&state()), &mut ui, now);
 }
 
 #[test]
@@ -181,8 +181,8 @@ fn streaming() {
             },
         ),
     ]);
-    let (ui, now) = mid_turn();
-    both("streaming", &solo(&state), &ui, now);
+    let (mut ui, now) = mid_turn();
+    both("streaming", &solo(&state), &mut ui, now);
 }
 
 /// The same running command, one `esc` later. The row is the only thing that
@@ -204,7 +204,7 @@ fn stopping() {
     ]);
     let (mut ui, now) = mid_turn();
     ui.stop_asked = Some(TurnId::from_raw("trn_1"));
-    both("stopping", &solo(&state), &ui, now);
+    both("stopping", &solo(&state), &mut ui, now);
 }
 
 #[test]
@@ -220,8 +220,8 @@ fn tool_running() {
             ),
         ),
     ]);
-    let (ui, now) = mid_turn();
-    both("tool_running", &solo(&state), &ui, now);
+    let (mut ui, now) = mid_turn();
+    both("tool_running", &solo(&state), &mut ui, now);
 }
 
 /// Two commands the model asked for in one step. The executor runs a batch of
@@ -238,11 +238,11 @@ fn running_together() -> Vec<bingo_sdk::Frame> {
 
 #[test]
 fn two_tools_running_at_once() {
-    let (ui, now) = mid_turn();
+    let (mut ui, now) = mid_turn();
     both(
         "tools_running_together",
         &solo(&folded(running_together())),
-        &ui,
+        &mut ui,
         now,
     );
 }
@@ -278,8 +278,8 @@ fn tool_done_with_output() {
             }),
         ),
     ]);
-    let (ui, now) = scene();
-    both("tool_done", &solo(&state), &ui, now);
+    let (mut ui, now) = scene();
+    both("tool_done", &solo(&state), &mut ui, now);
 }
 
 fn item_of(body: ItemBody) -> bingo_sdk::Item {
@@ -298,21 +298,21 @@ fn a_diff_result_sits_on_its_tints() {
             ItemStatus::Completed,
         ),
     )]);
-    let (ui, now) = scene();
-    both("diff_result", &solo(&state), &ui, now);
+    let (mut ui, now) = scene();
+    both("diff_result", &solo(&state), &mut ui, now);
 }
 
 #[test]
 fn permission_collapsed() {
-    let (tree, ui, now) = asked(permission(Some("Edit(src/)"), Some(long_diff())));
-    both("permission_collapsed", &tree, &ui, now);
+    let (tree, mut ui, now) = asked(permission(Some("Edit(src/)"), Some(long_diff())));
+    both("permission_collapsed", &tree, &mut ui, now);
 }
 
 #[test]
 fn permission_expanded() {
     let (tree, mut ui, now) = asked(permission(Some("Edit(src/)"), Some(long_diff())));
     crate::input::on_key(&mut ui, &tree, ctrl('e'), now);
-    both("permission_expanded", &tree, &ui, now);
+    both("permission_expanded", &tree, &mut ui, now);
 }
 
 #[test]
@@ -331,7 +331,7 @@ fn permission_with_the_feedback_row_open() {
     let (tree, mut ui, now) = asked(asking);
     crate::input::on_key(&mut ui, &tree, typed('n'), now);
     write(&mut ui, tree.root(), "use cargo clean", now);
-    both("permission_feedback", &tree, &ui, now);
+    both("permission_feedback", &tree, &mut ui, now);
 }
 
 /// A path far longer than the row it has to fit in.
@@ -343,31 +343,31 @@ fn a_long_path_fits_one_row() {
         *tool = "Write".into();
         *summary = format!("Write {deep}");
     }
-    let (tree, ui, now) = asked(asking);
-    both("long_path", &tree, &ui, now);
+    let (tree, mut ui, now) = asked(asking);
+    both("long_path", &tree, &mut ui, now);
 }
 
 #[test]
 fn confirm() {
-    let (tree, ui, now) = asked(crate::test_support::confirm());
-    both("confirm", &tree, &ui, now);
+    let (tree, mut ui, now) = asked(crate::test_support::confirm());
+    both("confirm", &tree, &mut ui, now);
 }
 
 #[test]
 fn login_browser() {
-    let (tree, ui, now) = asked(login(LoginFlow::Browser {
+    let (tree, mut ui, now) = asked(login(LoginFlow::Browser {
         url: "https://auth.openai.com/oauth/authorize?client_id=app_x&state=s1".into(),
     }));
-    both("login_browser", &tree, &ui, now);
+    both("login_browser", &tree, &mut ui, now);
 }
 
 #[test]
 fn login_device() {
-    let (tree, ui, now) = asked(login(LoginFlow::Device {
+    let (tree, mut ui, now) = asked(login(LoginFlow::Device {
         url: "https://auth.openai.com/codex/device".into(),
         code: "ABCD-EFGH".into(),
     }));
-    both("login_device", &tree, &ui, now);
+    both("login_device", &tree, &mut ui, now);
 }
 
 #[test]
@@ -375,7 +375,7 @@ fn login_paste() {
     let (tree, mut ui, now) = asked(login(LoginFlow::Paste));
     crate::input::on_key(&mut ui, &tree, typed('1'), now);
     write(&mut ui, tree.root(), "sk-pasted-elsewhere", now);
-    both("login_paste", &tree, &ui, now);
+    both("login_paste", &tree, &mut ui, now);
 }
 
 #[test]
@@ -405,8 +405,8 @@ fn an_error_turn() {
             ),
         ),
     ]);
-    let (ui, now) = scene();
-    both("error_turn", &solo(&state), &ui, now);
+    let (mut ui, now) = scene();
+    both("error_turn", &solo(&state), &mut ui, now);
 }
 
 #[test]
@@ -433,8 +433,8 @@ fn an_interrupted_turn() {
             ),
         ),
     ]);
-    let (ui, now) = scene();
-    both("interrupted", &solo(&state), &ui, now);
+    let (mut ui, now) = scene();
+    both("interrupted", &solo(&state), &mut ui, now);
 }
 
 /// What a background job says when it ends, first line first.
@@ -468,15 +468,15 @@ fn reported() -> Vec<bingo_sdk::Frame> {
 /// words get those, and so does a correspondent the closed set does not name.
 #[test]
 fn quiet_notices() {
-    let (ui, now) = scene();
-    both("quiet_notices", &solo(&folded(reported())), &ui, now);
+    let (mut ui, now) = scene();
+    both("quiet_notices", &solo(&folded(reported())), &mut ui, now);
 }
 
 #[test]
 fn a_child_row_while_it_runs() {
     let tree = spawned_tree(busy_child("reviewer"));
-    let (ui, now) = scene();
-    both("child_running", &tree, &ui, now);
+    let (mut ui, now) = scene();
+    both("child_running", &tree, &mut ui, now);
 }
 
 #[test]
@@ -484,8 +484,8 @@ fn a_child_row_when_it_is_done() {
     let mut frames = busy_child("reviewer");
     frames.push(child_frame(6, completed("trn_9", TurnStatus::Completed)));
     let tree = spawned_tree(frames);
-    let (ui, now) = scene();
-    both("child_done", &tree, &ui, now);
+    let (mut ui, now) = scene();
+    both("child_done", &tree, &mut ui, now);
 }
 
 #[test]
@@ -496,7 +496,7 @@ fn a_child_row_that_wants_a_person() {
     let (mut ui, now) = settled();
     ui.dialog
         .focus_on(tree.open_interaction().map(|(_, open)| open));
-    both("child_needs_you", &tree, &ui, now);
+    both("child_needs_you", &tree, &mut ui, now);
 }
 
 #[test]
@@ -516,8 +516,8 @@ fn a_child_transcript() {
     ));
     let mut tree = spawned_tree(frames);
     tree.show(&child_id());
-    let (ui, now) = mid_turn();
-    both("child_transcript", &tree, &ui, now);
+    let (mut ui, now) = mid_turn();
+    both("child_transcript", &tree, &mut ui, now);
 }
 
 /// The cursor on a row of the list, by its number.
@@ -539,7 +539,7 @@ fn the_switcher_dropdown() {
         }),
         now,
     );
-    both("switcher", &tree, &ui, now);
+    both("switcher", &tree, &mut ui, now);
 }
 
 /// M55, re-cut by M58: the list is typed into and what is typed is in the
@@ -560,7 +560,7 @@ fn the_switcher_dropdown_narrowed_by_a_query() {
         now,
     );
     ui.composer.set("rev");
-    both("switcher_query", &tree, &ui, now);
+    both("switcher_query", &tree, &mut ui, now);
 }
 
 /// What was spawned in an earlier process is in the store and not here
@@ -578,7 +578,7 @@ fn the_switcher_lists_what_is_only_in_the_store() {
         }),
         now,
     );
-    both("switcher_stored", &tree, &ui, now);
+    both("switcher_stored", &tree, &mut ui, now);
 }
 
 #[test]
@@ -596,7 +596,7 @@ fn the_command_dropdown() {
         family: "kernel".into(),
     }];
     write(&mut ui, &state, "/", now);
-    both("dropdown", &solo(&state), &ui, now);
+    both("dropdown", &solo(&state), &mut ui, now);
 }
 
 #[test]
@@ -614,7 +614,7 @@ fn the_panel_sheet() {
     ]);
     let (mut ui, now) = scene();
     shown(&mut ui, Open::Panel, now);
-    both("panel_sheet", &tree, &ui, now);
+    both("panel_sheet", &tree, &mut ui, now);
 }
 
 /// Two words this surface has not learned (ADR-0038): one a plugin wrote as
@@ -652,7 +652,7 @@ fn the_panel_sheet_reads_a_word_it_has_not_learned() {
     ]);
     let (mut ui, now) = scene();
     shown(&mut ui, Open::Panel, now);
-    both("custom_panel", &solo(&state), &ui, now);
+    both("custom_panel", &solo(&state), &mut ui, now);
 }
 
 #[test]
@@ -660,8 +660,8 @@ fn the_help_sheet() {
     let state = folded(answered());
     let (mut ui, now) = scene();
     shown(&mut ui, Open::Help, now);
-    insta::assert_snapshot!("help_80x30", draw_sized(80, 30, &state, &ui, now));
-    insta::assert_snapshot!("help_100x30", draw_sized(100, 30, &state, &ui, now));
+    insta::assert_snapshot!("help_80x30", draw_sized(80, 30, &state, &mut ui, now));
+    insta::assert_snapshot!("help_100x30", draw_sized(100, 30, &state, &mut ui, now));
 }
 
 #[test]
@@ -683,7 +683,7 @@ fn a_notice_and_a_context_warning() {
     ]);
     let (mut ui, now) = scene();
     ui.notify(Level::Error, "unknown command: /x", now.instant);
-    both("notice", &solo(&state), &ui, now);
+    both("notice", &solo(&state), &mut ui, now);
 }
 
 #[test]
@@ -700,26 +700,26 @@ fn a_view_a_command_answered() {
             ],
         ],
     });
-    both("view_table", &solo(&state), &ui, now);
+    both("view_table", &solo(&state), &mut ui, now);
 }
 
 // ---- the looks a person can ask for -------------------------------------
 
 #[test]
 fn without_colour() {
-    let (ui, now) = settled();
+    let (mut ui, now) = settled();
     let tree = solo(&folded(answered()));
     insta::assert_snapshot!(
         "no_colour_idle",
-        in_look(no_colour(), || draw_tree(80, 24, &tree, &ui, now))
+        in_look(no_colour(), || draw_tree(80, 24, &tree, &mut ui, now))
     );
-    let (card, ui, now) = asked(permission(Some("Edit(src/)"), Some(long_diff())));
+    let (card, mut ui, now) = asked(permission(Some("Edit(src/)"), Some(long_diff())));
     insta::assert_snapshot!(
         "no_colour_permission",
-        in_look(no_colour(), || draw_tree(80, 24, &card, &ui, now))
+        in_look(no_colour(), || draw_tree(80, 24, &card, &mut ui, now))
     );
     crate::theme::with(no_colour(), || {
-        let painted = painted(80, 24, &card, &ui, now);
+        let painted = painted(80, 24, &card, &mut ui, now);
         for row in ["Do you want to", "1. Yes", "+line 1", "Edit"] {
             assert!(
                 painted.coloured(row).is_empty(),
@@ -733,19 +733,19 @@ fn without_colour() {
 /// token is the other end of its own hue (design §4).
 #[test]
 fn in_daylight() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     let tree = solo(&folded(answered()));
     insta::assert_snapshot!(
         "light_idle",
-        in_look(daylight(), || draw_tree(80, 24, &tree, &ui, now))
+        in_look(daylight(), || draw_tree(80, 24, &tree, &mut ui, now))
     );
     assert_eq!(
-        in_look(daylight(), || draw_tree(80, 24, &tree, &ui, now)),
-        in_look(truecolor(), || draw_tree(80, 24, &tree, &ui, now)),
+        in_look(daylight(), || draw_tree(80, 24, &tree, &mut ui, now)),
+        in_look(truecolor(), || draw_tree(80, 24, &tree, &mut ui, now)),
         "a palette changes what a cell is worth, never which cell it is"
     );
     crate::theme::with(daylight(), || {
-        let painted = painted(80, 24, &tree, &ui, now);
+        let painted = painted(80, 24, &tree, &mut ui, now);
         let ground = crate::theme::as_drawn(crate::theme::raised()).bg;
         assert!(
             painted
@@ -759,10 +759,10 @@ fn in_daylight() {
 
 #[test]
 fn without_the_glyphs() {
-    let (ui, now) = scene();
-    without_glyphs("ascii_idle", &solo(&folded(answered())), &ui, now);
-    let (card, ui, now) = asked(permission(Some("Edit(src/)"), Some(long_diff())));
-    without_glyphs("ascii_permission", &card, &ui, now);
+    let (mut ui, now) = scene();
+    without_glyphs("ascii_idle", &solo(&folded(answered())), &mut ui, now);
+    let (card, mut ui, now) = asked(permission(Some("Edit(src/)"), Some(long_diff())));
+    without_glyphs("ascii_permission", &card, &mut ui, now);
 }
 
 // ---- M11e: the content kinds of §5 --------------------------------------
@@ -786,8 +786,8 @@ fn a_markdown_table_is_ruled() {
             ),
         ),
     ]);
-    let (ui, now) = scene();
-    both("markdown_table", &solo(&state), &ui, now);
+    let (mut ui, now) = scene();
+    both("markdown_table", &solo(&state), &mut ui, now);
 }
 
 const RUST: &str = "// the frame, once\npub fn draw(now: Now) -> bool {\n    let ready = true;\n    ready && now.motion\n}\n";
@@ -807,8 +807,8 @@ fn a_highlighted_code_block() {
             ),
         ),
     ]);
-    let (ui, now) = scene();
-    both("code_block", &solo(&state), &ui, now);
+    let (mut ui, now) = scene();
+    both("code_block", &solo(&state), &mut ui, now);
 }
 
 /// `esc esc`: the turns of this transcript, newest first, above the input box
@@ -837,7 +837,7 @@ fn the_rewind_picker() {
         Open::Rewind(crate::rewind::Rewind { selected: 1 }),
         now,
     );
-    both("rewind_picker", &solo(&state), &ui, now);
+    both("rewind_picker", &solo(&state), &mut ui, now);
 }
 
 /// `@` in the composer: the paths under the session's own directory, on the
@@ -856,7 +856,7 @@ fn the_at_completion_dropdown() {
     state.summary.cwd = dir.path().to_string_lossy().into_owned();
     let (mut ui, now) = scene();
     write(&mut ui, &state, "read @src/", now);
-    both("at_dropdown", &solo(&state), &ui, now);
+    both("at_dropdown", &solo(&state), &mut ui, now);
 }
 
 /// The same `@`, where the session has agents under it: the names it can reach
@@ -879,12 +879,12 @@ fn the_at_completion_dropdown_with_agents_to_reach() {
     for c in "@re".chars() {
         crate::input::on_key(&mut ui, &tree, typed(c), now);
     }
-    let screen = draw_tree(80, 24, &tree, &ui, now);
+    let screen = draw_tree(80, 24, &tree, &mut ui, now);
     assert!(screen.contains("Agents"), "{screen}");
     assert!(screen.contains("@reviewer"), "{screen}");
     assert!(screen.contains("Files"), "{screen}");
     assert!(screen.contains("@src/reader.rs"), "{screen}");
-    both("at_dropdown_agents", &tree, &ui, now);
+    both("at_dropdown_agents", &tree, &mut ui, now);
 }
 
 /// A long result, open whole: what `⏎` on a focused block and the second
@@ -917,21 +917,21 @@ fn the_pager_sheet() {
         ))),
         now,
     );
-    both("pager_sheet", &solo(&state), &ui, now);
+    both("pager_sheet", &solo(&state), &mut ui, now);
 }
 
 /// The card of §4 with a replacement under its title: the colour comes from
 /// the column, the weight from the words that actually moved.
 #[test]
 fn a_permission_card_previews_a_word_level_diff() {
-    let (tree, ui, now) = asked(permission(
+    let (tree, mut ui, now) = asked(permission(
         Some("Edit(src/)"),
         Some(Preview::Diff {
             unified: "--- a/src/view.rs\n+++ b/src/view.rs\n@@ -12,3 +12,3 @@\n fn border(busy: bool) -> Style {\n-    match busy { true => dim() }\n+    match busy { true => breathing() }\n }\n".into(),
         }),
     ));
-    both("permission_word_diff", &tree, &ui, now);
-    let painted = painted(80, 24, &tree, &ui, now);
+    both("permission_word_diff", &tree, &mut ui, now);
+    let painted = painted(80, 24, &tree, &mut ui, now);
     let emphasised: Vec<String> = painted
         .row("+    match busy")
         .into_iter()

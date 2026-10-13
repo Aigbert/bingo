@@ -12,13 +12,10 @@
 //! What it counts is the lines under the frame's last row: the one fact the
 //! scroll already has, read at draw time, never a counter of its own.
 
-use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
-use crate::clock::Now;
 use crate::theme;
-use crate::ui::Ui;
 
 /// The hint after the count: the key and the click that follow the foot.
 const HINT: &str = "end or click to follow";
@@ -28,17 +25,6 @@ pub struct Pill {
     pub line: Line<'static>,
     pub x: u16,
     pub width: u16,
-}
-
-/// The lines under the frame's last row while the transcript is held, and
-/// nothing while it follows the tail.
-pub fn below(ui: &Ui, now: Now) -> Option<usize> {
-    if ui.scroll.following() {
-        return None;
-    }
-    let (total, rows) = ui.transcript();
-    let top = ui.scroll.top(total, rows, now.instant);
-    Some(total.saturating_sub(top + rows))
 }
 
 /// The pill for a band `width` wide, centred on its bar: the count in text
@@ -65,21 +51,6 @@ pub fn pill(below: usize, width: usize) -> Option<Pill> {
     })
 }
 
-/// Where this frame drew the pill, when it drew one: what a click is
-/// answered against.
-pub fn placed(ui: &Ui, area: Rect, now: Now) -> Option<Rect> {
-    if area.height == 0 {
-        return None;
-    }
-    let pill = pill(below(ui, now)?, usize::from(area.width))?;
-    Some(Rect {
-        x: area.x.saturating_add(pill.x),
-        y: area.y,
-        width: pill.width,
-        height: 1,
-    })
-}
-
 /// The words, as much of them as `width` holds with a cell of air each side:
 /// the count and the hint, the count alone, the arrow alone — and nothing on
 /// a row too narrow for even that. No count when there is nothing below: a
@@ -98,6 +69,15 @@ pub fn label(below: usize, width: usize) -> Option<(String, Option<&'static str>
         return Some((lead, None));
     }
     fits("↓").then(|| ("↓".to_string(), None))
+}
+
+#[cfg(test)]
+pub fn below(ui: &crate::ui::Ui, now: crate::clock::Now) -> Option<usize> {
+    if ui.scroll.following() {
+        return None;
+    }
+    let (total, rows) = ui.transcript();
+    Some(total.saturating_sub(ui.scroll.top(total, rows, now.instant) + rows))
 }
 
 #[cfg(test)]

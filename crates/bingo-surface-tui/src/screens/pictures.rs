@@ -53,27 +53,27 @@ fn handed_over(count: u32) -> bingo_sdk::Item {
 /// One picture: three rows of band above the line, in the line's own column.
 #[test]
 fn one_picture_sent() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     crate::graphics::with(crate::graphics::drawing(), || {
-        both("sent_one_picture", &solo(&sent(1)), &ui, now);
+        both("sent_one_picture", &solo(&sent(1)), &mut ui, now);
     });
 }
 
 /// Three of them, side by side with a column between — a row, not a wall.
 #[test]
 fn three_pictures_sent() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     crate::graphics::with(crate::graphics::drawing(), || {
-        both("sent_three_pictures", &solo(&sent(3)), &ui, now);
+        both("sent_three_pictures", &solo(&sent(3)), &mut ui, now);
     });
 }
 
 /// Six: four are shown and the rest are counted, as the composer counted them.
 #[test]
 fn six_pictures_sent() {
-    let (ui, now) = scene();
+    let (mut ui, now) = scene();
     crate::graphics::with(crate::graphics::drawing(), || {
-        both("sent_six_pictures", &solo(&sent(6)), &ui, now);
+        both("sent_six_pictures", &solo(&sent(6)), &mut ui, now);
     });
 }
 
@@ -82,6 +82,6 @@ fn six_pictures_sent() {
 /// (M45). This is the `--print` shape and a chat channel's.
 #[test]
 fn pictures_on_a_terminal_that_draws_none() {
-    let (ui, now) = scene();
-    both("sent_pictures_undrawn", &solo(&sent(3)), &ui, now);
+    let (mut ui, now) = scene();
+    both("sent_pictures_undrawn", &solo(&sent(3)), &mut ui, now);
 }

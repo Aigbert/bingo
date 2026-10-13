@@ -108,7 +108,7 @@ enum State {
 ///
 /// The cells are inside rather than around it because this is a memo: a draw
 /// holds it by shared reference, the way the frame holds everything else it
-/// derives ([`crate::ui::Painted`]).
+/// derives ([`crate::layout::Layout`]).
 #[derive(Debug, Default)]
 pub struct Decoded {
     /// How many pixels each picture is, by its number, oldest first. `None`

@@ -13,8 +13,8 @@ use super::*;
 /// them at 80, so what gives way on a short screen is never an answer (§2).
 #[test]
 fn form_asked() {
-    let (tree, ui, now) = asked(crate::test_support::form());
-    both("form_asked", &tree, &ui, now);
+    let (tree, mut ui, now) = asked(crate::test_support::form());
+    both("form_asked", &tree, &mut ui, now);
 }
 
 /// Two settled and the third on screen: a tab that has been answered wears
@@ -25,7 +25,7 @@ fn form_part_answered() {
     for key in [key(KeyCode::Enter), key(KeyCode::Enter), typed(' ')] {
         crate::input::on_key(&mut ui, &tree, key, now);
     }
-    both("form_part_answered", &tree, &ui, now);
+    both("form_part_answered", &tree, &mut ui, now);
 }
 
 /// The same card where nothing but the characters of §7 may be drawn. The tab
@@ -33,8 +33,8 @@ fn form_part_answered() {
 /// help sheet's `↑↓` already are, so they stand in either look.
 #[test]
 fn form_in_ascii() {
-    let (tree, ui, now) = asked(crate::test_support::form());
-    without_glyphs("form_in_ascii", &tree, &ui, now);
+    let (tree, mut ui, now) = asked(crate::test_support::form());
+    without_glyphs("form_in_ascii", &tree, &mut ui, now);
 }
 
 /// The tab that sends, reached with a question still open (M57): it says how
@@ -46,7 +46,7 @@ fn form_submit_with_one_left() {
     for key in [key(KeyCode::Enter), key(KeyCode::Enter), key(KeyCode::Tab)] {
         crate::input::on_key(&mut ui, &tree, key, now);
     }
-    both("form_submit_with_one_left", &tree, &ui, now);
+    both("form_submit_with_one_left", &tree, &mut ui, now);
 }
 
 /// The layout question of M57's capture: three options, compact because the
@@ -56,8 +56,8 @@ fn form_submit_with_one_left() {
 /// the card's own edge.
 #[test]
 fn form_layout() {
-    let (tree, ui, now) = asked(layout());
-    both("form_layout", &tree, &ui, now);
+    let (tree, mut ui, now) = asked(layout());
+    both("form_layout", &tree, &mut ui, now);
 }
 
 /// That question, built off the fixture every other form screen uses so there
@@ -113,7 +113,7 @@ fn form_set_ticked_and_typed_on() {
     for key in walk.into_iter().chain(words) {
         crate::input::on_key(&mut ui, &tree, key, now);
     }
-    both("form_set_ticked_and_typed_on", &tree, &ui, now);
+    both("form_set_ticked_and_typed_on", &tree, &mut ui, now);
 }
 
 /// §3's "nothing jumps" is the card's too (M59): the band holds one height for
@@ -129,7 +129,7 @@ fn the_band_holds_still_as_the_tabs_are_walked() {
         if tab > 0 {
             crate::input::on_key(&mut ui, &tree, key(KeyCode::Right), now);
         }
-        walked.push(landmarks(&draw_tree(80, 24, &tree, &ui, now), 80));
+        walked.push(landmarks(&draw_tree(80, 24, &tree, &mut ui, now), 80));
     }
     assert_eq!(walked[0], walked[1], "{walked:#?}");
     assert_eq!(walked[1], walked[2], "{walked:#?}");

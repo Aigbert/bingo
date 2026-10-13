@@ -59,6 +59,22 @@ impl Marks {
     }
 }
 
+/// Views rendered with a live clock report their next visible step.
+pub fn next_change(view: &View, now: Now) -> Option<std::time::Instant> {
+    if !now.motion {
+        return None;
+    }
+    match view {
+        View::Progress { total, .. } if total.unwrap_or(0) == 0 => Some(progress::next_change(now)),
+        View::Stack { children } | View::Columns { children } => children
+            .iter()
+            .filter_map(|child| next_change(child, now))
+            .min(),
+        View::Panel { child, .. } => next_change(child, now),
+        _ => None,
+    }
+}
+
 /// A view as styled lines at rest: a record — a finished output, a sheet of
 /// one — knows no frame and moves in none.
 pub fn render(view: &View, width: usize) -> Vec<Line<'static>> {

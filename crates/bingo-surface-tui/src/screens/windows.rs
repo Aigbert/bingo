@@ -10,7 +10,7 @@ use crate::rewind::Rewind;
 use crate::ui::Picker;
 
 /// One picker at 80×24, the size every card must be readable at (§7).
-fn shot(name: &str, tree: &Tree, ui: &Ui, now: Now) -> String {
+fn shot(name: &str, tree: &Tree, ui: &mut Ui, now: Now) -> String {
     let screen = draw_tree(80, 24, tree, ui, now);
     insta::assert_snapshot!(name, screen.clone());
     screen
@@ -55,8 +55,8 @@ fn crowded_switcher(at: usize) -> (Tree, Ui, Now) {
 
 #[test]
 fn the_switcher_scrolls_under_the_row_the_keyboard_is_on() {
-    let (tree, ui, now) = crowded_switcher(21);
-    let screen = shot("switcher_end", &tree, &ui, now);
+    let (tree, mut ui, now) = crowded_switcher(21);
+    let screen = shot("switcher_end", &tree, &mut ui, now);
     assert!(marked(&screen).contains("scout 39"), "{screen}");
     assert_eq!(
         cuts(&screen),
@@ -64,8 +64,8 @@ fn the_switcher_scrolls_under_the_row_the_keyboard_is_on() {
         "the list goes on above it and nowhere else"
     );
 
-    let (tree, ui, now) = crowded_switcher(11);
-    let screen = shot("switcher_middle", &tree, &ui, now);
+    let (tree, mut ui, now) = crowded_switcher(11);
+    let screen = shot("switcher_middle", &tree, &mut ui, now);
     assert!(marked(&screen).contains("scout 29"), "{screen}");
     assert_eq!(cuts(&screen), 2, "and here it goes on at both ends");
 }
@@ -94,13 +94,13 @@ fn crowded_menu(from_the_end: usize) -> (bingo_sdk::SessionState, Ui, Now) {
 
 #[test]
 fn the_command_dropdown_scrolls_under_the_row_the_keyboard_is_on() {
-    let (state, ui, now) = crowded_menu(0);
-    let screen = shot("dropdown_end", &solo(&state), &ui, now);
+    let (state, mut ui, now) = crowded_menu(0);
+    let screen = shot("dropdown_end", &solo(&state), &mut ui, now);
     assert!(marked(&screen).contains("/plugin-12"), "{screen}");
     assert_eq!(cuts(&screen), 1);
 
-    let (state, ui, now) = crowded_menu(6);
-    let screen = shot("dropdown_middle", &solo(&state), &ui, now);
+    let (state, mut ui, now) = crowded_menu(6);
+    let screen = shot("dropdown_middle", &solo(&state), &mut ui, now);
     assert!(marked(&screen).contains("/plugin-06"), "{screen}");
     assert_eq!(cuts(&screen), 2);
 }
@@ -117,13 +117,13 @@ fn crowded_picker(selected: usize) -> (bingo_sdk::SessionState, Ui, Now) {
 
 #[test]
 fn the_resume_picker_scrolls_under_the_row_the_keyboard_is_on() {
-    let (state, ui, now) = crowded_picker(23);
-    let screen = shot("resume_end", &solo(&state), &ui, now);
+    let (state, mut ui, now) = crowded_picker(23);
+    let screen = shot("resume_end", &solo(&state), &mut ui, now);
     assert!(marked(&screen).contains("session 33"), "{screen}");
     assert_eq!(cuts(&screen), 1);
 
-    let (state, ui, now) = crowded_picker(12);
-    let screen = shot("resume_middle", &solo(&state), &ui, now);
+    let (state, mut ui, now) = crowded_picker(12);
+    let screen = shot("resume_middle", &solo(&state), &mut ui, now);
     assert!(marked(&screen).contains("session 22"), "{screen}");
     assert_eq!(cuts(&screen), 2);
 }
@@ -146,14 +146,14 @@ fn crowded_rewind(selected: usize) -> (bingo_sdk::SessionState, Ui, Now) {
 
 #[test]
 fn the_rewind_card_scrolls_under_the_row_the_keyboard_is_on() {
-    let (state, ui, now) = crowded_rewind(13);
-    let screen = shot("rewind_end", &solo(&state), &ui, now);
+    let (state, mut ui, now) = crowded_rewind(13);
+    let screen = shot("rewind_end", &solo(&state), &mut ui, now);
     assert!(marked(&screen).contains("turn 01"), "{screen}");
     assert_eq!(cuts(&screen), 1);
     assert!(screen.contains("Rewind to"), "the title stays: {screen}");
 
-    let (state, ui, now) = crowded_rewind(6);
-    let screen = shot("rewind_middle", &solo(&state), &ui, now);
+    let (state, mut ui, now) = crowded_rewind(6);
+    let screen = shot("rewind_middle", &solo(&state), &mut ui, now);
     assert!(marked(&screen).contains("turn 08"), "{screen}");
     assert_eq!(cuts(&screen), 2);
 }
@@ -231,8 +231,8 @@ fn crowded_form(options: usize, focus: usize) -> (Tree, Ui, Now) {
 /// (M57) — and every answer, the one under the cursor included, stays.
 #[test]
 fn a_form_keeps_its_tabs_and_the_answer_the_cursor_is_on() {
-    let (tree, ui, now) = crowded_form(12, 11);
-    let screen = shot("form_end", &tree, &ui, now);
+    let (tree, mut ui, now) = crowded_form(12, 11);
+    let screen = shot("form_end", &tree, &mut ui, now);
     assert!(marked(&screen).contains("option 12"), "{screen}");
     assert_eq!(cuts(&screen), 0, "nothing had to be cut: {screen}");
     assert!(
@@ -251,8 +251,8 @@ fn a_form_keeps_its_tabs_and_the_answer_the_cursor_is_on() {
 /// the answers keep their window around the cursor and say where they cut it.
 #[test]
 fn a_form_with_more_answers_than_room_windows_them_around_the_cursor() {
-    let (tree, ui, now) = crowded_form(24, 23);
-    let screen = shot("form_crowded", &tree, &ui, now);
+    let (tree, mut ui, now) = crowded_form(24, 23);
+    let screen = shot("form_crowded", &tree, &mut ui, now);
     assert!(marked(&screen).contains("option 24"), "{screen}");
     assert_eq!(cuts(&screen), 1);
     assert!(screen.contains("Auth method"), "the tabs stay: {screen}");
@@ -262,14 +262,14 @@ fn a_form_with_more_answers_than_room_windows_them_around_the_cursor() {
 /// room: the preview above them still gives way first (§10, 2026-08-31).
 #[test]
 fn a_card_walks_its_answers_without_losing_the_one_it_is_on() {
-    let (tree, ui, now) = crowded_question(0);
-    let screen = shot("question_head", &tree, &ui, now);
+    let (tree, mut ui, now) = crowded_question(0);
+    let screen = shot("question_head", &tree, &mut ui, now);
     assert!(marked(&screen).contains("option 01"), "{screen}");
     assert_eq!(cuts(&screen), 1);
     assert!(screen.contains("Auth"), "the title stays: {screen}");
 
-    let (tree, ui, now) = crowded_question(11);
-    let screen = shot("question_end", &tree, &ui, now);
+    let (tree, mut ui, now) = crowded_question(11);
+    let screen = shot("question_end", &tree, &mut ui, now);
     assert!(marked(&screen).contains("option 12"), "{screen}");
     assert_eq!(cuts(&screen), 1);
 }
@@ -278,13 +278,13 @@ fn a_card_walks_its_answers_without_losing_the_one_it_is_on() {
 /// it — so the sheet starts at the one it is on rather than around it.
 #[test]
 fn the_panel_sheet_starts_at_the_row_the_keyboard_is_on() {
-    let (state, ui, now) = crowded_panel(3);
-    let screen = shot("panel_end", &solo(&state), &ui, now);
+    let (state, mut ui, now) = crowded_panel(3);
+    let screen = shot("panel_end", &solo(&state), &mut ui, now);
     assert!(marked(&screen).contains("bingo.plugin-4"), "{screen}");
     assert_eq!(cuts(&screen), 1);
 
-    let (state, ui, now) = crowded_panel(1);
-    let screen = shot("panel_middle", &solo(&state), &ui, now);
+    let (state, mut ui, now) = crowded_panel(1);
+    let screen = shot("panel_middle", &solo(&state), &mut ui, now);
     assert!(marked(&screen).contains("bingo.plugin-2"), "{screen}");
     assert_eq!(cuts(&screen), 2);
 }

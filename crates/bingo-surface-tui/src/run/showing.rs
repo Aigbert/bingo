@@ -75,7 +75,7 @@ pub(super) fn hand(run: &mut Run, screen: &mut dyn Screen) -> Result<(), KernelE
     let Graphics::Kitty { cell, transport } = crate::graphics::chosen() else {
         return Ok(());
     };
-    let placed = run.ui.painted.borrow().placed();
+    let placed = run.ui.shown.placed();
     let state = run.session.tree.viewed();
     let bytes = placing(&run.ui, state, cell, &mut run.stored, &placed, transport);
     if bytes.is_empty() {
@@ -113,7 +113,7 @@ pub(super) fn read_linked(run: &mut Run) {
         return;
     }
     // The draft's own pictures are files too (ADR-0052), read the same way.
-    let mut wanted = run.ui.painted.borrow().blocks.wanted();
+    let mut wanted = run.ui.shown.blocks.wanted();
     wanted.extend(run.ui.pictures.wanted(run.ui.composer.text()));
     let cwd = std::path::PathBuf::from(&run.session.tree.viewed().summary.cwd);
     let reads = run.ui.linked.take_all(wanted, &cwd, crate::paths::home());

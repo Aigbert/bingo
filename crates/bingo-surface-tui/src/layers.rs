@@ -12,7 +12,7 @@
 
 use std::time::{Duration, Instant};
 
-use ratatui::Frame;
+use crate::layout::Canvas;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
@@ -93,7 +93,7 @@ impl Reveal {
 /// Everything on the screen goes dim. What is behind a layer is behind it
 /// (§3): a style pass over what is already painted, so no view has to know
 /// whether something is open above it.
-pub fn dim(frame: &mut Frame) {
+pub fn dim(frame: &mut Canvas) {
     hush(frame, frame.area());
 }
 
@@ -104,7 +104,7 @@ pub fn dim(frame: &mut Frame) {
 /// the terminal draws the picture by ([`crate::graphics::kitty`]), so dimming
 /// one is not a dimmer picture but no picture — and its return two frames
 /// later is a flicker. A photograph does not recede; the words around it do.
-pub fn hush(frame: &mut Frame, area: Rect) {
+pub fn hush(frame: &mut Canvas, area: Rect) {
     let buffer = frame.buffer_mut();
     for y in area.top()..area.bottom() {
         for x in area.left()..area.right() {
@@ -167,7 +167,7 @@ impl Shape {
 /// wants a person shares (§6): a card is on the screen exactly while it is
 /// unanswered, so it is asking for the whole of its life and stops by going.
 pub fn card(
-    frame: &mut Frame,
+    frame: &mut Canvas,
     at: Rect,
     shape: Shape,
     lines: Vec<Line<'static>>,
@@ -198,7 +198,7 @@ pub fn card(
 
 /// The box's own edge. While it is still coming down it has no foot: the
 /// bottom border belongs to the last frame, not to every one of them.
-fn bordered(frame: &mut Frame, area: Rect, whole: bool, now: crate::clock::Now) {
+fn bordered(frame: &mut Canvas, area: Rect, whole: bool, now: crate::clock::Now) {
     let sides = match whole {
         true => Borders::ALL,
         false => Borders::TOP | Borders::LEFT | Borders::RIGHT,
@@ -215,7 +215,7 @@ fn bordered(frame: &mut Frame, area: Rect, whole: bool, now: crate::clock::Now) 
 /// The band's own edge: one dim rule the width of the region, where the box's
 /// top border was. The rule that closes the band is a line of the card, so
 /// what hangs under it — the way out and the keys — hangs outside it.
-fn ruled(frame: &mut Frame, area: Rect) {
+fn ruled(frame: &mut Canvas, area: Rect) {
     frame.render_widget(
         Paragraph::new(rule(usize::from(area.width))),
         Rect { height: 1, ..area },
@@ -230,7 +230,7 @@ pub fn rule(width: usize) -> Line<'static> {
 
 /// The card's own rows, in the room the shape leaves them.
 fn body(
-    frame: &mut Frame,
+    frame: &mut Canvas,
     at: Rect,
     shape: Shape,
     lines: Vec<Line<'static>>,
@@ -283,7 +283,7 @@ fn fitted(lines: Vec<Line<'static>>, rows: usize) -> Vec<Line<'static>> {
 }
 
 /// A sheet fills `at` from its foot upwards: it comes out of the composer.
-pub fn sheet(frame: &mut Frame, at: Rect, lines: Vec<Line<'static>>, reveal: Reveal) {
+pub fn sheet(frame: &mut Canvas, at: Rect, lines: Vec<Line<'static>>, reveal: Reveal) {
     let shown = reveal.rows(at.height);
     if shown == 0 {
         return;
@@ -334,7 +334,11 @@ mod tests {
                 let words = ratatui::text::Line::from("hi");
                 frame.render_widget(Paragraph::new(vec![line, words]), frame.area());
                 let before = frame.buffer_mut()[(0, 0)].style();
-                hush(frame, frame.area());
+                let mut canvas = Canvas::new(frame.area());
+                canvas.buffer.clone_from(frame.buffer_mut());
+                let area = canvas.area();
+                hush(&mut canvas, area);
+                frame.buffer_mut().clone_from(&canvas.buffer);
                 assert_eq!(
                     frame.buffer_mut()[(0, 0)].style(),
                     before,

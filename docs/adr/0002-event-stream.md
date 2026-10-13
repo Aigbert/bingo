@@ -22,6 +22,14 @@ The old bingo carried four event enums for one stream (`StreamEvent → EngineEv
 8. **Plugin-owned resources** (roster, rooms, tasks) travel as `Event::Extension { plugin, kind, payload }`; the kernel does not enumerate them.
    *(Amended 2026-09-08, M84: the fold keeps the turn that last ended whole — `SessionState.last_turn` is a `LastTurn { id, status, started_at, ended_at, usage }` folded from the live turn it closes and the frame that closed it, where it was the status alone — so a surface can say `Worked for 15m 11s · done 13:48` without keeping a clock of its own. Nothing new is on the wire: the clocks are two frames' `ts`, the usage is `TurnCompleted`'s.)*
 
+## Surface layout note — 2026-10-13 (M124)
+
+The TUI's last `Layout` is a memo of the screen, including rendered blocks,
+visible cells, geometry, input targets and the next motion deadline. It is
+consumed by the next layout pass and published only after painting, never
+another representation of session state. Every surface still reads the one
+reducer and event stream described above.
+
 ## Consequences
 
 - Any client's view equals `apply(snapshot, frames since snapshot.seq)`; a GUI store is the generated twin of the same reducer, pinned by shared fixtures.

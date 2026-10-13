@@ -5,7 +5,6 @@
 //!
 //! Every time-dependent decision takes `now`, so a test never sleeps.
 
-use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
 use std::collections::BTreeSet;
@@ -14,17 +13,16 @@ use bingo_sdk::{
     Action, CommandSpec, Level, Seq, SessionId, SessionState, SessionSummary, TurnId, View,
 };
 
-use crate::blocks::Blocks;
 use crate::clock::{Anim, FRAME, Now};
 use crate::commands::{self, Suggestion};
 use crate::complete;
 use crate::composer::Composer;
 use crate::dialog::Dialog;
 use crate::fold::Folds;
-use crate::frame::Regions;
-use crate::graphics::{Decoded, Linked, Placed};
+use crate::graphics::{Decoded, Linked};
 use crate::history::PromptHistory;
 use crate::layers::{self, Reveal};
+use crate::layout::Layout;
 use crate::pager::Pager;
 use crate::pictures::Held;
 use crate::rail::{CardId, Pin};
@@ -80,6 +78,21 @@ impl Notice {
         }
     }
 
+    pub fn next_change(&self, now: Now) -> Option<Instant> {
+        let shown = self.shown?;
+        let expiry = shown + self.life();
+        let changes = [
+            shown + NOTICE_FADE,
+            shown + NOTICE_FADE + NOTICE + Duration::from_nanos(1),
+            expiry,
+        ];
+        if now.motion {
+            changes.into_iter().find(|at| *at > now.instant)
+        } else {
+            (expiry > now.instant).then_some(expiry)
+        }
+    }
+
     /// Whether it has said its piece and left.
     fn gone(&self, now: Instant) -> bool {
         self.shown
@@ -104,93 +117,6 @@ pub struct Menu {
 pub struct Picker {
     pub sessions: Vec<SessionSummary>,
     pub selected: usize,
-}
-
-/// What the last frame put on the screen: the blocks it rendered, where it
-/// cut the regions, how tall the transcript came out and which of its lines
-/// was at the top. A key or a click is answered against this — nothing else
-/// knows how many lines there are to scroll through.
-///
-/// It is a memo of the draw, not state of its own: every field is what the
-/// reducer and the terminal's size already imply, which is why drawing may
-/// fill it from behind a shared borrow.
-#[derive(Debug, Default)]
-pub struct Painted {
-    pub blocks: Blocks,
-    pub regions: Regions,
-    /// The transcript's height in wrapped lines.
-    pub height: usize,
-    /// The first transcript line the frame showed.
-    pub top: usize,
-    /// The card on the screen, when one is open.
-    pub card: Option<Card>,
-    /// The list of sessions on the screen, when it is open.
-    pub list: Option<Listed>,
-    /// Where each rail card landed, in the rail's own rows: what a click on
-    /// the rail is answered against.
-    pub rail: Vec<(CardId, std::ops::Range<usize>)>,
-    /// The thumbnails the composer's strip drew, in the line's own order.
-    pub strip: Vec<crate::graphics::Picture>,
-    /// Where this frame drew each picture's cells, in the terminal's own rows
-    /// and columns: what a click on a picture is answered against. It is read
-    /// back out of the lines that were drawn
-    /// ([`crate::graphics::placed::cells`]), so it can never say a picture is
-    /// somewhere the screen does not (M56).
-    pub cells: Vec<Placed>,
-    /// Where this frame drew the way back to the foot ([`crate::foot`]), when
-    /// the transcript was held: what a click there is answered against.
-    pub foot: Option<ratatui::layout::Rect>,
-}
-
-impl Painted {
-    /// A frame is beginning: the regions it cut, and none of the cells the last
-    /// one drew — every region fills its own in as it draws.
-    pub fn begin(&mut self, regions: Regions) {
-        self.regions = regions;
-        self.cells.clear();
-        self.foot = None;
-    }
-
-    /// The picture a pointer is on, when it is on one. The cells under it say
-    /// which picture they are cells of, and this frame's own list says which
-    /// picture that is — so a click can only ever open a picture the screen is
-    /// showing (M56).
-    pub fn picture_at(&self, at: ratatui::layout::Position) -> Option<crate::graphics::Picture> {
-        let id = self.cells.iter().find(|one| one.area.contains(at))?.id;
-        self.placed().into_iter().find(|picture| picture.id() == id)
-    }
-
-    /// Every picture this frame put cells on the screen for, oldest first: the
-    /// transcript's, then the composer's own. The strip comes last because
-    /// what falls off the terminal's cap is the oldest, and the picture a
-    /// person is about to send is the newest thing on the screen.
-    pub fn placed(&self) -> Vec<crate::graphics::Picture> {
-        let mut placed = self.blocks.pictures();
-        placed.extend(self.strip.iter().cloned());
-        placed
-    }
-
-    /// The blank rows a short transcript leaves above itself: it hangs from
-    /// the composer, not from the top of the screen, so those rows are nobody's
-    /// lines.
-    pub fn padding(&self) -> usize {
-        let rows = usize::from(self.regions.transcript.height);
-        rows - self.height.min(rows)
-    }
-
-    /// The transcript line drawn at a row of the transcript region, when that
-    /// row carries one. The one mapping from the screen back into the
-    /// transcript: a click, a drag and a mark are all answered by it.
-    pub fn line_at(&self, row: usize) -> Option<usize> {
-        Some(self.top + row.checked_sub(self.padding())?)
-    }
-
-    /// The row of the transcript region a line was drawn at, when it is on the
-    /// screen — [`Painted::line_at`] the other way round.
-    pub fn row_of(&self, line: usize) -> Option<u16> {
-        let row = u16::try_from(line.checked_sub(self.top)? + self.padding()).ok()?;
-        (row < self.regions.transcript.height).then_some(row)
-    }
 }
 
 /// The list of sessions as it was drawn: where its rows are, and which row of
@@ -364,6 +290,14 @@ impl Layer {
         (self.open != Open::Nothing && !reveal.gone()).then_some(reveal)
     }
 
+    pub fn next_change(&self, now: Now) -> Option<Instant> {
+        if self.open == Open::Nothing || !self.reveal(now).moving() {
+            return None;
+        }
+        let elapsed = now.since(self.since).as_nanos() / FRAME.as_nanos();
+        Some(self.since + FRAME * u32::try_from(elapsed + 1).unwrap_or(u32::MAX))
+    }
+
     /// Open this one, from the first frame.
     pub fn show(&mut self, open: Open, now: Instant) {
         self.open = open;
@@ -467,9 +401,9 @@ pub struct Ui {
     /// that a person pressed the key.
     pub sent: Option<Instant>,
     /// The frame as the last draw left it.
-    pub painted: RefCell<Painted>,
+    pub shown: Layout,
     /// The pictures the transcript has turned into pixels. A memo of work
-    /// already done, like [`Painted`], and holding no more of them than the
+    /// already done, like [`Layout`], and holding no more of them than the
     /// terminal itself is asked to hold.
     pub decoded: Decoded,
     /// The pictures this session's own words named, read in once each (M51).
@@ -490,7 +424,7 @@ pub struct Ui {
     /// like one.
     pub intro: Option<crate::opening::Playing>,
     /// The paths the `@` dropdown ranks, walked when the first one asks.
-    files: RefCell<Files>,
+    files: Files,
 }
 
 /// One reading of a directory, kept until the session's own directory changes.
@@ -528,13 +462,13 @@ impl Ui {
             focused: true,
             switched: None,
             sent: None,
-            painted: RefCell::default(),
+            shown: Layout::default(),
             decoded: Decoded::default(),
             linked: Linked::default(),
             update: None,
             measure: None,
             intro: None,
-            files: RefCell::default(),
+            files: Files::default(),
         }
     }
 
@@ -625,9 +559,32 @@ impl Ui {
         now.motion && self.switched.is_some_and(|at| now.since(at) < SWITCH)
     }
 
-    /// Whether the next frame would draw a layer differently.
-    pub fn layer_moving(&self, now: Now) -> bool {
-        self.layer.open != Open::Nothing && self.layer.reveal(now).moving()
+    pub fn next_change(&self, now: Now) -> Option<Instant> {
+        let exit = self
+            .armed
+            .map(|at| at + EXIT_WINDOW)
+            .filter(|at| *at > now.instant);
+        let send = self
+            .sent
+            .filter(|_| self.sending(now).is_some())
+            .map(|at| (now.instant + FRAME).min(at + IGNITION));
+        let crossfade = self
+            .switched
+            .filter(|_| self.crossfading(now))
+            .map(|at| at + SWITCH);
+        let drag = self
+            .select
+            .dragging
+            .map(|held| held.stepped + select::EDGE_PACE);
+        let intro = self
+            .intro
+            .as_ref()
+            .filter(|intro| !intro.over(now))
+            .map(|_| now.instant + FRAME);
+        [exit, send, crossfade, drag, intro]
+            .into_iter()
+            .flatten()
+            .min()
     }
 
     /// Every command the dropdown may offer: the surface's own and the
@@ -656,9 +613,16 @@ impl Ui {
         }
     }
 
-    /// The `@` rows. The walk is a memo of the directory, taken when the first
-    /// mention asks for it and thrown away when the session's own directory
-    /// changes — nothing here is a second copy of what is on disk.
+    /// Read directory names before entering the pure layout pass or answering a key.
+    pub fn prepare(&mut self, cwd: &str) {
+        if complete::mention(self.composer.text()).is_some() && self.files.cwd != cwd {
+            self.files = Files {
+                cwd: cwd.to_string(),
+                paths: complete::walk(std::path::Path::new(cwd)),
+            };
+        }
+    }
+
     fn mentioned(
         &self,
         cwd: &str,
@@ -666,14 +630,12 @@ impl Ui {
         line: &str,
         mentions: &[String],
     ) -> Vec<Suggestion> {
-        let mut files = self.files.borrow_mut();
-        if files.cwd != cwd {
-            *files = Files {
-                cwd: cwd.to_string(),
-                paths: complete::walk(std::path::Path::new(cwd)),
-            };
-        }
-        complete::offered(line, partial, mentions, &files.paths)
+        let paths = if self.files.cwd == cwd {
+            self.files.paths.as_slice()
+        } else {
+            &[]
+        };
+        complete::offered(line, partial, mentions, paths)
     }
 
     pub fn selected_suggestion(&self, cwd: &str, mentions: &[String]) -> Option<Suggestion> {
@@ -704,14 +666,14 @@ impl Ui {
     /// How tall the transcript came out last frame and how many rows it had
     /// to show it in — what a scroll is measured against.
     pub fn transcript(&self) -> (usize, usize) {
-        let painted = self.painted.borrow();
+        let painted = &self.shown;
         (painted.height, painted.regions.transcript.height as usize)
     }
 
     /// The whole transcript as the last frame rendered it, one string a line:
     /// what a search looks through.
     pub fn transcript_text(&self) -> Vec<String> {
-        let painted = self.painted.borrow();
+        let painted = &self.shown;
         painted
             .blocks
             .window(0, painted.height)

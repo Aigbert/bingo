@@ -34,6 +34,10 @@ pub fn walk(now: Now) -> f32 {
     }
 }
 
+pub fn next_change(now: Now) -> std::time::Instant {
+    clock::next_tick(now, WALK / TRACK as u32)
+}
+
 pub fn lines(
     value: u64,
     total: Option<u64>,

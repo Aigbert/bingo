@@ -7,7 +7,7 @@
 //! from what is on the screen.
 //!
 //! Pure over the lines and the rectangle they were drawn in. It is what a
-//! click on a picture is answered against ([`crate::ui::Painted::picture_at`]).
+//! click on a picture is answered against ([`crate::layout::Layout::picture_at`]).
 
 use ratatui::layout::Rect;
 use ratatui::text::Line;
