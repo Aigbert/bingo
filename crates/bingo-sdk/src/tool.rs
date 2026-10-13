@@ -26,6 +26,8 @@ use crate::model::ToolSpec;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolTraits {
+    /// Draw no call row unless it failed; a returned display still draws.
+    pub quiet: bool,
     pub concurrency_safe: bool,
     pub read_only: bool,
     pub destructive: bool,
@@ -40,6 +42,7 @@ pub struct ToolTraits {
 impl Default for ToolTraits {
     fn default() -> Self {
         Self {
+            quiet: false,
             concurrency_safe: false,
             read_only: false,
             destructive: false,

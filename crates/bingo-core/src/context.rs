@@ -428,6 +428,7 @@ mod tests {
                 output: output.map(ToolOutput::text),
                 progress: None,
                 duration_ms: None,
+                quiet: false,
             },
         )
     }

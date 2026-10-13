@@ -295,6 +295,7 @@ mod tests {
             output: Some(output),
             progress: None,
             duration_ms: None,
+            quiet: false,
         })
     }
 

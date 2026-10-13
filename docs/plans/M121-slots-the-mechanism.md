@@ -122,5 +122,10 @@ no new dependency.
   folds through `Transcript`, M113 pins records in sdk `tests/record.rs`.
   Call creation lives in the accumulator, publication in `turn/stream.rs`,
   and external calls in `session/inputs.rs`. No Decision changes.
-- Mechanical constructors and wire fixtures outside Files gain the default
-  quiet field as protocol step 6 permits; list exact paths when changed.
+- Mechanical quiet constructors/fixtures (step 6): `bingo-agents/src/{serial,tests}.rs`,
+  `bingo-context/src/fixtures.rs`, `bingo-core/src/{context,host/catalog}.rs`,
+  `bingo-sdk/src/state.rs`, `bingo-store-jsonl/src/summary.rs`,
+  `bingo-surface-print/src/lib.rs`, TUI `graphics/picture.rs` and
+  `transcript/pictured.rs`. All paths are under `crates/`.
+- Producer fixtures: `bingo-tasks/fixtures/pre-m121.json`; bash job test
+  constructors in `src/{kill,read,notify}.rs` mechanically gain an item id.

@@ -393,6 +393,7 @@ pub fn tool(
             output,
             progress: None,
             duration_ms: Some(12),
+            quiet: false,
         },
     )
 }
@@ -408,6 +409,7 @@ pub fn running_tool(id: &str, name: &str, progress: &str) -> Item {
             output: None,
             progress: Some(progress.into()),
             duration_ms: None,
+            quiet: false,
         },
     )
 }
@@ -425,6 +427,7 @@ pub fn running_command(id: &str, command: &str) -> Item {
             output: None,
             progress: None,
             duration_ms: None,
+            quiet: false,
         },
     )
 }
