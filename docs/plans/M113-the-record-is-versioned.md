@@ -103,3 +103,33 @@ Byte preservation requires retaining raw JSON alongside the attempt to
 read a known shape: enable the existing `serde_json` dependency's
 `raw_value` feature (no new crate). An opaque wrapper's field is private;
 only deserialisation creates it. No duplicated live enum is needed.
+
+
+## Protocol stop (2026-10-13, test helper scope)
+
+The development workspace check needs `ItemBody::Unknown` in the exhaustive
+label match at `crates/bingo-core/src/test_support.rs:273`. This file is
+outside Files and overlaps M111's test-support work. Protocol step 6
+requires a stop before fixing it. Options: authorize this one match arm
+and add the file to Files, or wait for an agreed M111 helper update. Neither
+was applied. The SDK implementation is committed; version lines, reducer
+coverage, schema updates and remaining verification are still outstanding.
+ADR-0065 stays proposed and every exit criterion remains unticked.
+
+Evidence collected so far (trimmed; these are not all milestone gates):
+
+```text
+$ cargo test -p bingo-sdk --test record --locked  # fixture temporarily removed
+error: couldn't read `.../fixtures/record/event/notice.json`: No such file or directory
+$ cargo test -p bingo-store-jsonl journal::compatibility --locked -- --nocapture # before implementation
+historical_shapes_stay_known ... ok
+an_unknown_event_journal_replays ... FAILED  # Storage, line 3: unknown variant `futureEvent`
+an_unknown_item_journal_replays ... FAILED   # Storage, line 3: unknown variant `futureItem`
+$ cargo test -p bingo-sdk --test record --test unknown_record --locked # after implementation
+record: test result: ok. 2 passed; 0 failed
+unknown_record: test result: ok. 2 passed; 0 failed
+$ cargo check --workspace --all-targets --locked
+error[E0004]: non-exhaustive patterns: `&bingo_sdk::ItemBody::Unknown { .. }` not covered
+  --> crates/bingo-core/src/test_support.rs:273:22
+error: could not compile `bingo-core` (lib test) due to 1 previous error
+```
