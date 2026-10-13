@@ -238,6 +238,7 @@ fn tool_context(cancel: CancellationToken) -> ToolContext {
 
 fn command_context() -> CommandContext {
     CommandContext {
+        cancel: bingo_sdk::CancellationToken::new(),
         session: SessionId::from_raw("ses_test"),
         cwd: PathBuf::from("/work"),
         host: UnusedHost.scripted().handle(),

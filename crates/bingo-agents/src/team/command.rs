@@ -85,6 +85,7 @@ mod tests {
 
     async fn run(cwd: &std::path::Path, fleet: &Fleet, session: &bingo_sdk::SessionId) -> View {
         let cx = CommandContext {
+            cancel: bingo_sdk::CancellationToken::new(),
             cwd: cwd.to_path_buf(),
             ..command_context(session, fleet)
         };

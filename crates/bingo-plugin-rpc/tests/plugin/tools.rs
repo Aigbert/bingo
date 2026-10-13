@@ -33,6 +33,7 @@ async fn a_plugin_s_commands_keep_the_name_the_plugin_gave_them() {
     assert_eq!(commands.len(), 1);
     assert_eq!(commands[0].spec().name, "stub");
     let cx = CommandContext {
+        cancel: bingo_sdk::CancellationToken::new(),
         session: SessionId::from_raw("ses_test"),
         cwd: project.path().to_path_buf(),
         host: bingo_sdk::testing::NoHost::handle(),
