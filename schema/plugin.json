@@ -793,7 +793,8 @@
           "default": []
         },
         "hint": {
-          "type": "string"
+          "type": "string",
+          "description": "A one-line description for the command menu; argument syntax belongs in `args`."
         },
         "args": {
           "$ref": "#/$defs/ArgSpec"
