@@ -1,0 +1,76 @@
+# ADR-0065 — The record is not the live type
+
+Status: proposed · 2026-10-13 · Plan: M113 · Amends: ADR-0005 §2–3
+
+## Context
+
+ADR-0005 §2 promised that a format change is a new `version` and a
+migrator. The header has said `version: 1` since the first journal
+(`bingo-store-jsonl/src/journal.rs`, `VERSION`), while the type it
+serialises has changed shape under it: `379bd04c` (2026-08-29) and
+`4afd43d3` (2026-08-30) removed or renamed variants, and `6471cde6`
+(2026-09-04) restructured `Question`. The journal line is simply
+whatever `serde` makes of today's `Event`, so every such change is a
+format change nobody wrote down. A journal holding one of the old shapes
+fails `replay` with `STORAGE` on that line (§3: "an unreadable line
+anywhere else is a STORAGE error"), and the whole session is lost to
+resume over one frame. The reverse holds too: a binary that adds a
+variant writes lines every older binary refuses.
+
+The fixture `bingo-core/fixtures/frames-v1.jsonl` covers part of the
+vocabulary; nothing makes a change to `Event` or `ItemBody` fail a test
+when it changes how an existing record reads.
+
+## Decision
+
+1. **The envelope is the record; the event is a payload.** A journal line
+   is a `Frame` envelope (`seq`, `ts`, `session`, `cause`) around an
+   `event`. A line that is not JSON, or whose envelope does not parse, is
+   corruption, exactly as §3 says (a torn last line is still dropped).
+   A line whose envelope parses and whose `event` does not is **kept**,
+   as `Event::Unknown { raw }`: the JSON verbatim.
+2. **The same one level down.** An item whose `body` does not parse is
+   kept as `ItemBody::Unknown { raw }`, with its id, turn and status.
+3. **Unknown is carried, never interpreted.** Reducers ignore an unknown
+   event; the transcript keeps an unknown item in place and the model
+   view skips it. Serialising an unknown writes `raw` back byte for
+   byte, so replay to a client and a re-read journal are unchanged. No
+   producer may construct one; only deserialisation does.
+4. **Golden fixtures are the contract.** Every `Event` variant and every
+   `ItemBody` variant has a fixture line under
+   `bingo-sdk/fixtures/record/`. A test reads each into its known variant
+   (never `Unknown`) and writes it back equal; an exhaustive `match`
+   helper with no wildcard arm makes a new variant without a fixture a
+   compile error in that test.
+5. **What bumps the version.** Adding a variant or an optional field is
+   not breaking: older readers keep it as unknown. Renaming, removing or
+   restructuring is breaking, and is detected by a fixture that no
+   longer reads; it requires `VERSION + 1` and a step
+   `fn(serde_json::Value) -> serde_json::Value` from the old shape to the
+   new, applied to raw lines before they are deserialised. Steps chain.
+6. **A journal is never rewritten; a version line is appended.** When a
+   binary appends to a journal whose last version is older than its own,
+   it first appends a version line (the header's shape, without
+   `session`); lines after it are read at that version. A reader meeting
+   a version newer than its own refuses with `STORAGE` naming both, as
+   today. The reader for version lines ships with this ADR, before any
+   writer needs one.
+7. **No migrator for the past.** The shapes removed before this ADR read
+   as `Unknown`; their sessions open, without those records.
+
+## Consequences
+
+- A session written before 2026-09-04 resumes instead of failing; the
+  frames whose shape left the vocabulary are visible as unknown to a
+  client that asks, and to nobody else.
+- An unknown event takes a `seq` like any other, so `seq` stays gapless
+  for durable frames (ADR-0002 §2).
+- Every `Event` or `ItemBody` change now touches a fixture; a breaking
+  change also touches the migration chain. That cost is the point.
+- `Event` gains a variant clients must tolerate. The RPC schema
+  (ADR-0007) documents it as opaque; a client that matches the event
+  type exhaustively gains one arm that ignores it.
+- ADR-0067 is the first breaking change (pictures become references) and
+  the first version line.
+
+Refs: ADR-0002, ADR-0005, ADR-0007, ADR-0067; Plan: M113; audit-2026-10 §1
