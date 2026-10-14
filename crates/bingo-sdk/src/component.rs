@@ -36,7 +36,7 @@ components! {
     Browse(Box<BrowseProps>),
     Plugins(PluginsProps),
     Palette(Box<PaletteProps>),
-    Sessions(Box<SessionsProps>), Status(StatusProps),
+    Sessions(Box<SessionsProps>), Status(Box<StatusProps>),
     Question(QuestionProps), UserMessage(UserMessageProps),
     AssistantMessage(AssistantMessageProps), ToolUse(ToolUseProps),
     ToolResult(ToolResultProps), ToolGroup(ToolGroupProps),

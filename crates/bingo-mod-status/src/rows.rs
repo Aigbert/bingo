@@ -187,7 +187,15 @@ fn plugin_row(plugins: &[CatalogEntry]) -> Row {
             Ok(PluginState::Off { .. }) => off += 1,
             Ok(PluginState::Failed { .. }) => failed.push(name),
             Ok(PluginState::Waiting { .. }) => waiting.push(name),
-            Ok(PluginState::Registering | PluginState::Pending { .. }) => pending.push(name),
+            Ok(PluginState::Registering) => pending.push(name),
+            Ok(PluginState::Pending { now, .. }) => {
+                if now {
+                    on += 1;
+                } else {
+                    off += 1;
+                }
+                pending.push(name);
+            }
             Err(_) => unknown.push(name),
         }
     }

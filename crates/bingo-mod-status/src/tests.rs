@@ -32,6 +32,22 @@ fn rows_match_the_prototype_scenarios() {
             rows::Tone::Warn,
         ),
         (PluginState::Registering, "pending", rows::Tone::Warn),
+        (
+            PluginState::Pending {
+                now: true,
+                at: plugin::NextStart::AfterTurn,
+            },
+            "1 on",
+            rows::Tone::Ok,
+        ),
+        (
+            PluginState::Pending {
+                now: false,
+                at: plugin::NextStart::NextStart,
+            },
+            "1 off",
+            rows::Tone::Ok,
+        ),
     ] {
         let plugins = vec![CatalogEntry {
             id: "fixture".into(),
