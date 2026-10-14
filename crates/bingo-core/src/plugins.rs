@@ -161,8 +161,8 @@ pub(crate) async fn switch_in(
             "plugin switch must be a boolean",
         )
     })?;
+    let (merged, source) = effective_wish(host, name, &value).map_err(failed)?;
     settings::remember(&path, &[(KEY, value)]).map_err(failed)?;
-    let (merged, source) = effective_wish(host, name).map_err(failed)?;
     let effective = merged.enabled_plugins.get(name).copied().unwrap_or(true);
     *host
         .registry()
@@ -182,6 +182,7 @@ pub(crate) async fn switch_in(
 fn effective_wish(
     host: &crate::host::Host,
     name: &str,
+    proposed: &Value,
 ) -> Result<(settings::KernelSettings, String), SettingsError> {
     let path = settings::user_path(host.env());
     let mut layers = vec![settings::Layer::new(
@@ -189,6 +190,7 @@ fn effective_wish(
         path.display().to_string(),
         settings::read_document(&path)?,
     )];
+    layers[0].value.insert(KEY.into(), proposed.clone());
     for layer in host
         .settings_layers()
         .iter()
@@ -197,7 +199,9 @@ fn effective_wish(
         let mut layer = layer.clone();
         let path = Path::new(&layer.source);
         if path.is_file() {
-            layer.value = settings::read_document(path)?;
+            layer.value = settings::read_layer(settings::LayerOrigin::Explicit, path)?
+                .map(|fresh| fresh.value)
+                .unwrap_or_default();
         }
         layers.push(layer);
     }

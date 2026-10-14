@@ -698,3 +698,61 @@ async fn project_switch_override_keeps_the_effective_wish_and_names_its_file() {
         host.shutdown().await;
     }
 }
+
+#[tokio::test]
+async fn commented_layers_allow_switches_and_invalid_layers_leave_no_write() {
+    for (explicit, invalid) in [(false, false), (true, false), (false, true), (true, true)] {
+        let home = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let path = project.path().join(if explicit {
+            "settings.json"
+        } else {
+            ".bingo/settings.json"
+        });
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, "{ // project note\n \"enabledPlugins\": {} }").unwrap();
+        let env = env_in(home.path());
+        crate::plugins::switch(&env, "test.provider", true).unwrap();
+        let user = settings::user_path(&env);
+        let before = std::fs::read(&user).unwrap();
+        let mut config = HostConfig::new(env.clone());
+        config.layers =
+            settings::load(&env, project.path(), explicit.then_some(path.as_path())).unwrap();
+        let host = Host::build(vec![TestPlugin::boxed(&PROVIDER, vec![])], config)
+            .await
+            .unwrap();
+        if invalid {
+            std::fs::write(&path, "{broken").unwrap();
+        }
+        let result =
+            crate::plugins::switch_in(&host, &SessionId::mint(), "test.provider", false).await;
+        if invalid {
+            assert!(result.is_err());
+            assert_eq!(
+                std::fs::read(&user).unwrap(),
+                before,
+                "refusal changed user settings"
+            );
+            assert!(
+                !host
+                    .registry
+                    .switches
+                    .wishes
+                    .read()
+                    .unwrap()
+                    .contains("test.provider")
+            );
+        } else {
+            assert!(result.is_ok(), "commented settings refused");
+            assert!(
+                host.registry
+                    .switches
+                    .wishes
+                    .read()
+                    .unwrap()
+                    .contains("test.provider")
+            );
+        }
+        host.shutdown().await;
+    }
+}
