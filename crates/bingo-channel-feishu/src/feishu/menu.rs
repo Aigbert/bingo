@@ -66,8 +66,10 @@ impl Publisher {
         self.save(&owned)?;
         self.remove(api, entries, &mut owned, &mut remote).await?;
         for entry in entries.iter().take(100) {
-            self.upsert(api, entry, &mut owned, &mut remote, state)
-                .await?;
+            let result = self
+                .upsert(api, entry, &mut owned, &mut remote, state)
+                .await;
+            skip_refused(result, state, &entry.name)?;
         }
         Ok(())
     }
@@ -171,7 +173,31 @@ impl Publisher {
 }
 
 async fn list(api: &Api) -> Result<BTreeMap<String, Value>, ApiError> {
-    let answer = api.get(PATH).await?;
+    let mut remote = BTreeMap::new();
+    let mut path = format!("{PATH}?page_size=100");
+    let mut seen = BTreeSet::new();
+    loop {
+        let answer = api.get(&path).await?;
+        remote.extend(listed(&answer)?);
+        if answer["data"]["has_more"].as_bool() != Some(true) {
+            return Ok(remote);
+        }
+        let token = answer["data"]["page_token"]
+            .as_str()
+            .filter(|token| !token.is_empty())
+            .ok_or_else(|| {
+                ApiError::Transport("feishu listed no next command page token".into())
+            })?;
+        if !seen.insert(token.to_owned()) {
+            return Err(ApiError::Transport(
+                "feishu repeated a command page token".into(),
+            ));
+        }
+        path = format!("{PATH}?page_size=100&page_token={}", segment(token));
+    }
+}
+
+fn listed(answer: &Value) -> Result<BTreeMap<String, Value>, ApiError> {
     let items = answer["data"]["items"]
         .as_array()
         .ok_or_else(|| ApiError::Transport("feishu listed no command items".into()))?;
@@ -186,6 +212,24 @@ async fn list(api: &Api) -> Result<BTreeMap<String, Value>, ApiError> {
         })
         .collect()
 }
+fn skip_refused(
+    result: Result<(), ApiError>,
+    state: &mut State,
+    name: &str,
+) -> Result<(), ApiError> {
+    match result {
+        Err(error @ ApiError::Refused { .. }) if !missing_scope(&error) => {
+            warn(
+                state,
+                name,
+                &format!("the command menu skipped a refused entry: {error}"),
+            );
+            Ok(())
+        }
+        result => result,
+    }
+}
+
 fn description(entry: &MenuEntry) -> Value {
     json!({"default_value":entry.description,"i18n":{}})
 }

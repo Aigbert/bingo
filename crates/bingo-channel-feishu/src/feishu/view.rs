@@ -50,24 +50,31 @@ fn count(value: &Value) -> usize {
 }
 
 fn fallback(drawing: &Drawing) -> Value {
-    let mut body = drawing.clone();
-    body.footer.clear();
-    let mut text = body.fold();
+    let mut text = fold(&drawing.view, &drawing.request);
     let footer = markdown::element(&format!(
         "---\n{}",
         markdown::escape(&drawing.footer.chars().take(2048).collect::<String>())
     ));
     loop {
-        let card = envelope(vec![
-            markdown::element(&markdown::escape(&text)),
-            footer.clone(),
-        ]);
+        let card = envelope(vec![markdown::element(&text), footer.clone()]);
         if card.to_string().len() <= BYTES {
             return card;
         }
         let keep = text.chars().count() / 2;
         text = text.chars().take(keep).collect::<String>();
         text.push('…');
+    }
+}
+
+fn fold(view: &View, request: &bingo_sdk::render::RenderRequest) -> String {
+    match view {
+        View::Engine { component, props } => engine(*component, props, request),
+        View::Box { children, .. } => children
+            .iter()
+            .map(|child| fold(child, request))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => markdown::escape(&view.fold_markdown()),
     }
 }
 
@@ -101,8 +108,10 @@ impl Context<'_> {
                 }
                 None => markdown::element(&markdown::escape(alt)),
             }],
-            View::Engine { component, props } => vec![markdown::element(&markdown::escape(
-                &engine(*component, props, &self.drawing.request),
+            View::Engine { component, props } => vec![markdown::element(&engine(
+                *component,
+                props,
+                &self.drawing.request,
             ))],
             _ => vec![markdown::element(&markdown::view(view))],
         }

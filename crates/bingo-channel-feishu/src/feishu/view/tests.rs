@@ -76,7 +76,6 @@ fn hostile_text_cannot_make_markup_or_controls() {
         json!({"kind":"Text","children":[hostile],"color":"red' onclick='evil"}),
         json!({"kind":"Markdown","text":hostile}),
         json!({"kind":"custom","customKind":"future","data":{"action":"evil"},"fold":hostile}),
-        json!({"kind":"Engine","component":"AssistantMessage","props":{"text":hostile,"isFirstOfReply":true}}),
     ] {
         let card = render(view);
         let content = card["body"]["elements"][0]["content"].as_str().unwrap();
@@ -91,4 +90,37 @@ fn hostile_text_cannot_make_markup_or_controls() {
     let code = code["body"]["elements"][0]["content"].as_str().unwrap();
     assert!(code.starts_with("````\n"));
     assert!(!code.contains("<at"));
+}
+
+#[test]
+fn wrapped_engine_keeps_markdown_while_mod_text_is_escaped() {
+    let answer = "**bold** and - item";
+    let hostile = "<at id=all>**mod**</at> [x](javascript:evil)";
+    let mut children = vec![
+        json!({"kind":"Engine","component":"AssistantMessage","props":{"text":answer,"isFirstOfReply":true}}),
+        json!({"kind":"Button","children":["Press"],"onPress":{"name":"fixture:ui","args":{"handler":"minted"}}}),
+        json!({"kind":"Text","children":[hostile]}),
+    ];
+    let native = render(json!({"kind":"Box","children":children}));
+    assert_eq!(native["body"]["elements"][0]["content"], answer);
+    assert_eq!(native["body"]["elements"][1]["tag"], "button");
+    assert_eq!(
+        native["body"]["elements"][2]["content"],
+        markdown::escape(hostile)
+    );
+
+    for extra in [
+        vec![json!({"kind":"Text","children":["x"]}); ELEMENTS],
+        vec![json!({"kind":"Text","children":["x".repeat(BYTES * 2)]})],
+    ] {
+        children.truncate(3);
+        children.extend(extra);
+        let folded = render(json!({"kind":"Box","children":children}));
+        let content = folded["body"]["elements"][0]["content"].as_str().unwrap();
+        assert!(content.starts_with(answer));
+        assert!(content.contains(&markdown::escape(hostile)));
+        assert!(!content.contains("<at"));
+        assert_eq!(folded["body"]["elements"].as_array().unwrap().len(), 2);
+        assert!(folded.to_string().len() <= BYTES);
+    }
 }

@@ -3,13 +3,36 @@ use bingo_channel_adapter::drawing::Drawing;
 use bingo_sdk::{Action, SessionId, render::RenderRequest};
 use serde_json::Value;
 
+const REMEMBERED: usize = 64;
+
 impl Runner {
+    fn drawing(&self, id: &str) -> Option<&(Drawing, Posted)> {
+        self.drawn
+            .iter()
+            .find(|(drawing, _)| drawing.request.request_id == id)
+    }
+
+    fn remember(&mut self, drawing: Drawing, at: Posted) {
+        if let Some(previous) = self
+            .drawn
+            .iter_mut()
+            .find(|(previous, _)| previous.request.request_id == drawing.request.request_id)
+        {
+            *previous = (drawing, at);
+            return;
+        }
+        if self.drawn.len() >= REMEMBERED {
+            self.drawn.pop_front();
+        }
+        self.drawn.push_back((drawing, at));
+    }
+
     pub(super) async fn draw_site(
         &mut self,
         request: RenderRequest,
         fallback: Op,
     ) -> Result<(), ChannelError> {
-        if let Some((drawing, _)) = self.drawn.get(&request.request_id)
+        if let Some((drawing, _)) = self.drawing(&request.request_id)
             && drawing.request == request
         {
             return Ok(());
@@ -47,8 +70,7 @@ impl Runner {
                 if matches!(fallback, Op::Finalize { .. }) {
                     self.streaming = None;
                 }
-                self.drawn
-                    .insert(drawing.request.request_id.clone(), (drawing, at));
+                self.remember(drawing, at);
                 Ok(())
             }
             Err(error) => {
@@ -87,7 +109,7 @@ impl Runner {
             return;
         }
         for id in requests {
-            let Some((mut drawing, at)) = self.drawn.get(id).cloned() else {
+            let Some((mut drawing, at)) = self.drawing(id).cloned() else {
                 continue;
             };
             match self
@@ -103,7 +125,7 @@ impl Runner {
             }
             match self.post_drawing(&drawing, Some(&at)).await {
                 Ok(at) => {
-                    self.drawn.insert(id.clone(), (drawing, at));
+                    self.remember(drawing, at);
                 }
                 Err(error) => tracing::warn!(%error, "the chat could not replace a drawn site"),
             }
@@ -118,8 +140,7 @@ impl Runner {
         value: Option<Value>,
     ) {
         let allowed = self
-            .drawn
-            .get(id)
+            .drawing(id)
             .is_some_and(|(drawing, _)| drawing.session == session && drawing.permits(&action));
         if !allowed {
             if let Err(error) = self
@@ -200,7 +221,7 @@ mod tests {
         let (mut matched, host, adapter) = runner(true, true).await;
         answer(&mut matched).await;
         assert_eq!(renders(&host), 1);
-        let (drawing, at) = matched.drawn.values().next().unwrap().clone();
+        let (drawing, at) = matched.drawn.front().unwrap().clone();
         matched
             .draw_site(
                 drawing.request.clone(),
@@ -221,8 +242,64 @@ mod tests {
     async fn a_chat_without_edits_does_not_reask_delivered_sites() {
         let (mut runner, host, _) = runner(true, false).await;
         answer(&mut runner).await;
-        let id = runner.drawn.keys().next().unwrap().clone();
+        let id = runner.drawn.front().unwrap().0.request.request_id.clone();
         runner.redraw(&[id]).await;
         assert_eq!(renders(&host), 1);
+    }
+    #[tokio::test]
+    async fn oldest_drawing_is_evicted_and_its_controls_are_stale() {
+        let (mut runner, host, adapter) = runner(true, true).await;
+        answer(&mut runner).await;
+        let (mut first, at) = runner.drawn.front().unwrap().clone();
+        let action = Action {
+            name: "fixture:ui".into(),
+            args: json!({"handler":"minted"}),
+        };
+        first.view =
+            serde_json::from_value(json!({"kind":"Button","children":["Press"],"onPress":action}))
+                .unwrap();
+        runner.remember(first.clone(), at.clone());
+        assert!(
+            runner
+                .drawing(&first.request.request_id)
+                .unwrap()
+                .0
+                .permits(&action)
+        );
+        for i in 1..=REMEMBERED {
+            let mut request = first.request.clone();
+            request.request_id = format!("answer-{i}");
+            runner
+                .draw_site(
+                    request,
+                    Op::Card {
+                        text: "unused".into(),
+                    },
+                )
+                .await
+                .unwrap();
+            if i == REMEMBERED - 1 {
+                runner.remember(first.clone(), at.clone());
+                assert_eq!(
+                    runner.drawn.len(),
+                    REMEMBERED,
+                    "replacements keep their original age"
+                );
+            }
+        }
+        assert_eq!(runner.drawn.len(), REMEMBERED);
+        assert!(runner.drawing(&first.request.request_id).is_none());
+        assert!(runner.drawing("answer-1").is_some());
+        assert!(runner.drawing(&format!("answer-{REMEMBERED}")).is_some());
+        runner
+            .pressed(first.session, &first.request.request_id, action, None)
+            .await;
+        assert!(
+            matches!(adapter.records().last(), Some(Record::Send { text, .. })
+            if text == "This control belongs to an earlier drawing; try the current one.")
+        );
+        let before = renders(&host);
+        runner.redraw(&[first.request.request_id]).await;
+        assert_eq!(renders(&host), before);
     }
 }

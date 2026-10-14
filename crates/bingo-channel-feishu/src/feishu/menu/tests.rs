@@ -1,6 +1,6 @@
 use super::*;
 use crate::feishu::tests::{ok, signed_in};
-use wiremock::matchers::{body_json, header, method, path};
+use wiremock::matchers::{body_json, header, method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn entry(name: &str, description: &str) -> MenuEntry {
@@ -172,4 +172,181 @@ async fn an_owned_name_recreated_by_the_person_is_no_longer_owned() {
     publisher.publish(&api, &[]).await.unwrap();
     assert!(publisher.read().unwrap().is_empty());
     assert_eq!(server.received_requests().await.unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn a_refused_create_does_not_block_the_next_entry() {
+    let (server, api, _dir, publisher) = setup().await;
+    ok(&server, "GET", PATH, json!({"items":[]})).await;
+    for (name, response) in [
+        (
+            "plugin:Command",
+            json!({"code":40000001,"msg":"invalid command"}),
+        ),
+        ("valid", json!({"code":0,"data":{"command_id":"id-valid"}})),
+    ] {
+        Mock::given(method("POST"))
+            .and(path(PATH))
+            .and(body_json(
+                json!({"command":name,"description":{"default_value":"Command","i18n":{}}}),
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(response))
+            .expect(1)
+            .mount(&server)
+            .await;
+    }
+    publisher
+        .publish(
+            &api,
+            &[
+                entry("plugin:Command", "Command"),
+                entry("valid", "Command"),
+            ],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        publisher.read().unwrap(),
+        BTreeMap::from([("valid".into(), "id-valid".into())])
+    );
+    assert!(
+        publisher
+            .state
+            .lock()
+            .await
+            .warned
+            .contains("plugin:Command")
+    );
+}
+
+#[tokio::test]
+async fn ownership_pruning_waits_for_every_remote_page() {
+    let (server, api, _dir, publisher) = setup().await;
+    publisher
+        .save(&BTreeMap::from([("owned".into(), "id-owned".into())]))
+        .unwrap();
+    Mock::given(method("GET"))
+        .and(path(PATH))
+        .and(query_param("page_size", "100"))
+        .and(query_param_is_missing("page_token"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({"code":0,"data":{
+                "items":[{"command":"personal","command_id":"id-person"}],
+                "has_more":true,"page_token":"next+/=&page"
+            }})),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path(PATH))
+        .and(query_param("page_size", "100"))
+        .and(query_param("page_token", "next+/=&page"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({"code":0,"data":{
+                "items":[{"command":"owned","command_id":"id-owned"}],"has_more":false
+            }})),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("DELETE"))
+        .and(path(format!("{PATH}/id-owned")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"code":0,"data":{}})))
+        .expect(1)
+        .mount(&server)
+        .await;
+    publisher.publish(&api, &[]).await.unwrap();
+    assert!(publisher.read().unwrap().is_empty());
+    assert_eq!(server.received_requests().await.unwrap().len(), 4);
+}
+
+#[tokio::test]
+async fn a_refused_patch_does_not_block_the_next_entry() {
+    let (server, api, _dir, publisher) = setup().await;
+    publisher
+        .save(&BTreeMap::from([("owned".into(), "id-owned".into())]))
+        .unwrap();
+    ok(&server, "GET", PATH, json!({"items":[{"command":"owned","command_id":"id-owned","description":{"default_value":"before"}}]})).await;
+    Mock::given(method("PATCH"))
+        .and(path(format!("{PATH}/id-owned")))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"code":40000001,"msg":"invalid description"})),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path(PATH))
+        .and(body_json(
+            json!({"command":"valid","description":{"default_value":"Command","i18n":{}}}),
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"code":0,"data":{"command_id":"id-valid"}})),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    publisher
+        .publish(&api, &[entry("owned", "after"), entry("valid", "Command")])
+        .await
+        .unwrap();
+    assert_eq!(
+        publisher.read().unwrap(),
+        BTreeMap::from([
+            ("owned".into(), "id-owned".into()),
+            ("valid".into(), "id-valid".into())
+        ])
+    );
+}
+
+#[tokio::test]
+async fn transport_errors_and_missing_scopes_still_stop_mutations() {
+    for response in [
+        ResponseTemplate::new(200).set_body_json(json!({"code":99991672,"msg":"Missing scope"})),
+        ResponseTemplate::new(502).set_body_string("unavailable"),
+    ] {
+        let (server, api, _dir, publisher) = setup().await;
+        ok(&server, "GET", PATH, json!({"items":[]})).await;
+        Mock::given(method("POST"))
+            .and(path(PATH))
+            .respond_with(response)
+            .expect(1)
+            .mount(&server)
+            .await;
+        assert!(
+            publisher
+                .publish(
+                    &api,
+                    &[entry("first", "Command"), entry("second", "Command")]
+                )
+                .await
+                .is_err()
+        );
+        assert!(publisher.read().unwrap().is_empty());
+        assert!(publisher.state.lock().await.warned.is_empty());
+    }
+}
+
+#[tokio::test]
+async fn incomplete_pagination_never_prunes_ownership() {
+    for token in [Value::Null, json!("repeated")] {
+        let (server, api, _dir, publisher) = setup().await;
+        let owned = BTreeMap::from([("owned".into(), "id-owned".into())]);
+        publisher.save(&owned).unwrap();
+        Mock::given(method("GET"))
+            .and(path(PATH))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({"code":0,"data":{
+                    "items":[],"has_more":true,"page_token":token
+                }})),
+            )
+            .expect(if token.is_null() { 1 } else { 2 })
+            .mount(&server)
+            .await;
+        assert!(publisher.publish(&api, &[]).await.is_err());
+        assert_eq!(publisher.read().unwrap(), owned);
+    }
 }

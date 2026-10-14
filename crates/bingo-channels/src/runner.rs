@@ -5,7 +5,7 @@
 //! direction — a reply that answers an open question resolves it, and anything
 //! else is a prompt.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -61,7 +61,7 @@ pub struct Runner {
     /// this chat started is running (ADR-0051 §5).
     working: Option<(Posted, Mark)>,
     asked: BTreeMap<InteractionId, Asked>,
-    drawn: BTreeMap<String, (bingo_channel_adapter::drawing::Drawing, Posted)>,
+    drawn: VecDeque<(bingo_channel_adapter::drawing::Drawing, Posted)>,
     inbound: mpsc::Receiver<Incoming>,
 }
 
@@ -109,7 +109,7 @@ impl Runner {
             directory,
             working: None,
             asked: BTreeMap::new(),
-            drawn: BTreeMap::new(),
+            drawn: VecDeque::new(),
             key,
             inbound,
         })
