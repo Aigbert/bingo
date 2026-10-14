@@ -53,6 +53,7 @@ mod clock;
 mod commands;
 mod complete;
 mod composer;
+mod component;
 mod count;
 mod crew;
 mod dialog;
