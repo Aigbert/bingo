@@ -448,6 +448,8 @@ fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
         }
         if component == Component::Palette {
             crate::palette::open(&mut ui, bingo_sdk::component::PaletteOpen::Commands, now);
+        } else if component == Component::Plugins {
+            crate::plugins::open(&mut ui, bingo_sdk::component::PluginsOpen::Plugins, now);
         }
         if component == Component::Sessions {
             crate::sessions::open(&mut ui, now);
