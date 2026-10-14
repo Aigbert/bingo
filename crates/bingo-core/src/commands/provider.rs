@@ -35,10 +35,7 @@ impl Command for ProviderCommand {
                 let result = provider::set_provider(&host, name, url).await?;
                 outcome(&host, &result, "updated")
             }
-            ["remove", name] => {
-                provider::remove_provider(&host, name).await?;
-                format!("Removed provider {name}.")
-            }
+            ["remove", name] => provider::remove_provider(&host, name).await?,
             _ => return Err(KernelError::new(ErrorCode::InvalidInput, USAGE)),
         };
         Ok(CommandOutcome::Applied {

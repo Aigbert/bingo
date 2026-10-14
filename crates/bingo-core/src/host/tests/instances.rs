@@ -172,9 +172,14 @@ async fn adding_cannot_adopt_an_existing_credential() {
 struct FreshProviders;
 #[async_trait]
 impl ProviderSource for FreshProviders {
-    fn id(&self) -> &str { "fresh" }
+    fn id(&self) -> &str {
+        "fresh"
+    }
     async fn providers(&self) -> Vec<Arc<dyn Provider>> {
-        vec![Arc::new(Local { name: "remote".into(), url: "http://up".into() })]
+        vec![Arc::new(Local {
+            name: "remote".into(),
+            url: "http://up".into(),
+        })]
     }
 }
 
@@ -182,16 +187,26 @@ impl ProviderSource for FreshProviders {
 async fn a_source_that_rebuilds_arcs_can_publish_models_and_reach() {
     let dir = tempfile::tempdir().unwrap();
     let host = Host::build(
-        vec![TestPlugin::boxed(&PROVIDER, vec![Contribution::Providers(Arc::new(FreshProviders))])],
+        vec![TestPlugin::boxed(
+            &PROVIDER,
+            vec![Contribution::Providers(Arc::new(FreshProviders))],
+        )],
         HostConfig::new(Env::rooted(dir.path())),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     let mut events = host.gateway.subscribe();
     host.refresh_models().await;
     assert_eq!(provider::provider_reach(&host, "remote")["kind"], "ok");
     assert!(host.served.get("remote").is_some());
     let mut models_changed = false;
     while let Ok(event) = events.try_recv() {
-        models_changed |= matches!(event, GatewayEvent::CatalogChanged { kind: CatalogKind::Models });
+        models_changed |= matches!(
+            event,
+            GatewayEvent::CatalogChanged {
+                kind: CatalogKind::Models
+            }
+        );
     }
     assert!(models_changed);
 }

@@ -125,7 +125,10 @@ async fn current(host: &Host, endpoint: &Endpoint) -> bool {
             if let Some(current) = host.registry.provider_state.instances.current(provider) {
                 return current;
             }
-            host.providers().await.iter().any(|p| p.id() == provider.id())
+            host.providers()
+                .await
+                .iter()
+                .any(|p| p.id() == provider.id())
         }
         Endpoint::Agent(_) => true,
     }

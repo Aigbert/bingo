@@ -26,8 +26,19 @@ impl Instances {
     }
 
     pub fn current(&self, provider: &Arc<dyn Provider>) -> Option<bool> {
-        self.entries.lock().unwrap_or_else(|p| p.into_inner())
-            .get(provider.id()).map(|entry| entry.as_ref().is_some_and(|p| Arc::ptr_eq(p, provider)))
+        self.entries
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get(provider.id())
+            .map(|entry| entry.as_ref().is_some_and(|p| Arc::ptr_eq(p, provider)))
+    }
+
+    pub fn removed(&self, name: &str) -> bool {
+        self.entries
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get(name)
+            .is_some_and(Option::is_none)
     }
 
     pub fn replace(&self, name: &str, provider: Option<Arc<dyn Provider>>) {

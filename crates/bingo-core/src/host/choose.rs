@@ -29,9 +29,13 @@ impl Host {
     /// neither, the first that can actually answer.
     pub async fn provider(&self, id: Option<&str>) -> Result<Arc<dyn Provider>, KernelError> {
         let providers = self.providers().await;
-        let named = id
-            .map(str::to_string)
-            .or_else(|| self.settings.kernel.provider.clone());
+        let named = id.map(str::to_string).or_else(|| {
+            self.settings
+                .kernel
+                .provider
+                .clone()
+                .filter(|name| !self.registry.provider_state.instances.removed(name))
+        });
         match named {
             Some(wanted) => by_id(&providers, &wanted),
             None => default_provider(&providers),
@@ -79,10 +83,12 @@ impl Host {
         &self,
         spec: &SessionSpec,
     ) -> Result<ModelChoice, KernelError> {
-        let named = spec
+        let named = spec.provider.as_ref().or(self
+            .settings
+            .kernel
             .provider
             .as_ref()
-            .or(self.settings.kernel.provider.as_ref());
+            .filter(|name| !self.registry.provider_state.instances.removed(name)));
         let agent = self
             .registry
             .agents

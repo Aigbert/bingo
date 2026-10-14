@@ -40,7 +40,12 @@ pub fn add(path: &Path, key: &str, name: &str, spec: &InstanceSpec) -> Result<()
     save(path, &document)
 }
 
-pub fn change(path: &Path, key: &str, name: &str, url: Option<&str>) -> Result<(), KernelError> {
+pub fn change(
+    path: &Path,
+    key: &str,
+    name: &str,
+    url: Option<&str>,
+) -> Result<Vec<String>, KernelError> {
     let mut document = read(path)?;
     let entries = instances(&mut document, key)?;
     let entry = entries
@@ -54,7 +59,30 @@ pub fn change(path: &Path, key: &str, name: &str, url: Option<&str>) -> Result<(
     } else {
         entries.remove(name);
     }
-    save(path, &document)
+    let cleared = if url.is_none() {
+        clear_choices(&mut document, name)
+    } else {
+        Vec::new()
+    };
+    save(path, &document)?;
+    Ok(cleared)
+}
+
+fn clear_choices(document: &mut Map<String, Value>, name: &str) -> Vec<String> {
+    let mut cleared = Vec::new();
+    if document.get("provider").and_then(Value::as_str) == Some(name) {
+        document.remove("provider");
+        cleared.push("default provider".into());
+    }
+    if let Some(pins) = document.get_mut("pinned").and_then(Value::as_array_mut) {
+        let before = pins.len();
+        let prefix = format!("{name}/");
+        pins.retain(|pin| !pin.as_str().is_some_and(|p| p.starts_with(&prefix)));
+        if pins.len() != before {
+            cleared.push(format!("{} model pins", before - pins.len()));
+        }
+    }
+    cleared
 }
 
 fn instances<'a>(
@@ -88,6 +116,28 @@ fn invalid(message: &str) -> KernelError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn removal_clears_the_default_and_only_this_instances_pins() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        std::fs::write(
+            &path,
+            r#"# keep
+model = "m"
+provider = "work"
+pinned = ["work/m", "other/m", "worker/m"]
+[local.instances.work]
+baseUrl = "http://up"
+"#,
+        )
+        .unwrap();
+        change(&path, "local", "work", None).unwrap();
+        let doc = read(&path).unwrap();
+        assert!(doc.get("provider").is_none());
+        assert_eq!(doc["pinned"], json!(["other/m", "worker/m"]));
+        assert!(std::fs::read_to_string(path).unwrap().contains("# keep"));
+    }
+
     #[test]
     fn names_cannot_address_other_credential_namespaces() {
         for name in ["channels.telegram", "service:key", "é", "a/b", "a b", ""] {

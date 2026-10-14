@@ -87,7 +87,7 @@ pub(crate) async fn set_provider(
     Ok(refresh::one(host, provider).await)
 }
 
-pub(crate) async fn remove_provider(host: &Host, name: &str) -> Result<(), KernelError> {
+pub(crate) async fn remove_provider(host: &Host, name: &str) -> Result<String, KernelError> {
     let _edit = host.registry.provider_state.instances.edit.lock().await;
     let provider = instance_provider(host, name).await?;
     let shape = provider_shape(
@@ -97,7 +97,7 @@ pub(crate) async fn remove_provider(host: &Host, name: &str) -> Result<(), Kerne
             .ok_or_else(|| invalid("provider has no registered shape"))?,
     )?;
     // Persist first: a file that refuses a write must not silently change live choices.
-    instances::change(
+    let cleared = instances::change(
         &settings::user_path(host.env()),
         shape.settings_key(),
         name,
@@ -107,7 +107,14 @@ pub(crate) async fn remove_provider(host: &Host, name: &str) -> Result<(), Kerne
     let forgotten = provider.logout().await;
     forgotten
         .map_err(|_| invalid("instance removed, but its stored credential could not be removed"))?;
-    Ok(())
+    Ok(if cleared.is_empty() {
+        format!("Removed provider {name}.")
+    } else {
+        format!(
+            "Removed provider {name}; cleared {}.",
+            cleared.join(" and ")
+        )
+    })
 }
 
 async fn instance_provider(host: &Host, name: &str) -> Result<Arc<dyn Provider>, KernelError> {
