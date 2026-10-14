@@ -54,9 +54,10 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
         && let Ok(answer) = serde_json::from_value::<bingo_sdk::Answer>(result["answer"].clone())
         && open.answers.contains(&answer.spec())
     {
+        let interaction = open.id.clone();
         run.ui.dialog.answered = true;
         run.site_queue.retain(|(site, _)| site != &pending.focus);
-        run.answer(open.id.clone(), answer, bingo_sdk::Activation::Keyboard);
+        super::interactions::answer(run, interaction, answer, bingo_sdk::Activation::Keyboard);
         return;
     }
     if let Some((_, open)) = run.session.tree.open_interaction()

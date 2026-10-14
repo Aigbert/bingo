@@ -232,7 +232,7 @@ fn question_run() -> (Run, Arc<TestSession>, crate::clock::Now) {
     let session = Arc::new(TestSession::default());
     let now = still(scene().1);
     let mut run = tests::idle_in(state, session.clone(), now.instant);
-    run.refocus();
+    interactions::refocus(&mut run);
     (run, session, now)
 }
 fn pull_question(run: &mut Run, width: u16, now: crate::clock::Now) {
@@ -332,7 +332,7 @@ async fn aside_uses_surface_reception_instead_of_the_kernel_clock() {
         now.instant,
     );
     run.ui.last_typed = Some(now.wall);
-    run.refocus_at(now.wall);
+    interactions::refocus_at(&mut run, now.wall);
     assert!(
         run.ui.dialog.aside,
         "the fixture's remote opened_at is long before the local keystroke"

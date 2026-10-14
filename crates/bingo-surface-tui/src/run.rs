@@ -476,7 +476,7 @@ impl Run {
         if !self.fold(frame) {
             return Ok(());
         }
-        self.refocus();
+        interactions::refocus(self);
         match &frame.event {
             Event::InteractionOpened { .. } => {
                 screen.bell().map_err(stdio)?;
@@ -568,7 +568,7 @@ impl Run {
             });
         self.forget(&removed);
         self.forget(std::slice::from_ref(session));
-        self.refocus();
+        interactions::refocus(self);
     }
 
     fn forget(&mut self, removed: &[SessionId]) {
@@ -723,12 +723,12 @@ impl Run {
                 session,
                 interaction,
                 answer,
-            } => self.stop_interaction(session, interaction, answer),
+            } => interactions::stop_interaction(self, session, interaction, answer),
             Effect::Answer {
                 interaction,
                 answer,
                 activation,
-            } => self.answer(interaction, answer, activation),
+            } => interactions::answer(self, interaction, answer, activation),
             Effect::View(session) => self.show(session),
             Effect::Open(selector) => self.open(selector),
             Effect::ListSessions => opening::list_sessions(self),
@@ -781,7 +781,7 @@ impl Run {
         // of dim so the change of place is seen and not just noticed (§6).
         self.ui.switched = Some(Instant::now());
         self.ui.scroll = Default::default();
-        self.refocus();
+        interactions::refocus(self);
         if self.session.handles.contains_key(&session) {
             return;
         }
@@ -960,7 +960,7 @@ impl Run {
         self.ui.opening = false;
         self.ui.scroll = Default::default();
         self.ui.focus.close(Instant::now());
-        self.refocus();
+        interactions::refocus(self);
     }
 }
 
