@@ -183,7 +183,8 @@ fn setup() -> (SessionState, Ui, Now) {
                         key: None,
                     }],
                 }],
-            ),
+            )
+            .into(),
         );
     let (mut ui, now) = scene();
     ui.catalogs.commands=[("model",json!({"kind":"catalog","source":"models"})),("think",json!({"kind":"words","values":["off","low","high"]})),("rename",json!({"kind":"free","hint":"a name for this session"})),("permission",json!({"kind":"words","values":["default","acceptEdits","plan"]})),("resume",json!({"kind":"none"}))].into_iter().map(|(name,args)|serde_json::from_value(json!({"name":name,"hint":format!("choose {name}"),"args":args,"family":"session","keys":if name=="resume"{vec!["ctrl+r"]}else{vec![]}})).unwrap()).collect();
