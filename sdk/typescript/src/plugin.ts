@@ -4,7 +4,7 @@ import type { Register, Entry } from './on.ts';
 import { patternMatches, renderMatcher } from './on.ts';
 import { Callbacks } from './callbacks.ts';
 import { dollar } from './dollar.ts';
-import { Handlers } from './ui.ts';
+import { Handlers, resolveElements } from './ui.ts';
 import { dollarRoutes } from './dollar-types.ts';
 import { Peer, stdio } from './rpc.ts';
 import type { InitializeParams, InitializeResult, ToolSpec } from './wire.ts';
@@ -24,7 +24,7 @@ export function runtime(peer: Peer, register: Register) {
     const answer = await hook(api, input, next);
     const site = renderSites.get(api);
     return site && answer !== undefined ? handlers.mint(identity.name, site.request.site.session,
-      site.request.input.requestId, site.request.chain, answer, site.port) : answer;
+      site.request.input.requestId, site.request.chain, await resolveElements(answer), site.port) : answer;
   };
   let negotiated = new Set<string>();
   let pluginName = "";

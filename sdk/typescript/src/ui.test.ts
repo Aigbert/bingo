@@ -71,3 +71,27 @@ test('undefined status removes the same slot as null', async () => {
     ['status', null], ['worker', null],
   ]);
 });
+
+test('synchronous element references settle after the surface table operation', async () => {
+  const {ui, resolveElements} = await import('./ui.ts');
+  let answer: (reply: any) => void = () => {};
+  const rpc = {request: () => new Promise(resolve => {answer = resolve;})} as any;
+  const table = ui(rpc, {session:'s'} as any).resolve({surface:'terminal'});
+  const {Box, Text} = table;
+  assert.ok(Box, 'synchronous table destructuring must yield an element');
+  let settled = false;
+  const rendered = resolveElements({kind:Box,children:[{kind:Text,children:['hello']}]})
+    .then(value => {settled = true;return value;});
+  await Promise.resolve();
+  assert.equal(settled, false);
+  answer({result:[{kind:'Box',props:[]},{kind:'Text',props:[]}]});
+  assert.deepEqual(await rendered, {kind:'Box',children:[{kind:'Text',children:['hello']}]});
+  assert.deepEqual(await table, {Box:'Box',Text:'Text'});
+});
+
+test('denied resolution cannot publish an unresolved element', async () => {
+  const {ui, resolveElements} = await import('./ui.ts');
+  const rpc = {request: async () => {throw new Error('resolve denied');}} as any;
+  const {Box} = ui(rpc, {session:'s'} as any).resolve({surface:'terminal'});
+  await assert.rejects(resolveElements({kind:Box}), /resolve denied/);
+});

@@ -73,12 +73,43 @@ export function ui(rpc: Rpc, site: HookSite) {
     panes: () => call<Slot[]>('panes', {session:site.session}),
     invalidate: (requests: string | string[]) => rpc.request<null>('host/ui/invalidate',
       {session:site.session,requests:typeof requests === 'string' ? [requests] : requests}),
-    resolve: async (event: {surface:SurfaceName}) => {
-      const table = await call<{kind:string;props:string[]}[]>('resolve', {surface:event.surface});
-      return Object.fromEntries(table.map(element => [element.kind, element.kind])) as Record<string,string>;
-    },
+    resolve: (event: {surface:SurfaceName}) => elementReferences(
+      call<{kind:string;props:string[]}[]>('resolve', {surface:event.surface})
+        .then(table => Object.fromEntries(table.map(element => [element.kind, element.kind])))),
     log: (text: string) => call<null>('log', {text}),
     notice: (text: string, options: {level?:Level} = {}) => call<null>('notice', {text,...options}),
     ask: (kind: InteractionKind, answers: AnswerSpec[]) => call<Answer>('ask', {session:site.session,kind,answers}),
   };
+}
+
+// References cross the hook's synchronous expression; only resolved elements cross the wire.
+const elements = new WeakMap<object, Promise<string>>();
+type ElementReference = Readonly<object>;
+type ElementTable = Record<string, string | ElementReference> & PromiseLike<Record<string, string>>;
+function elementReferences(table: Promise<Record<string, string>>): ElementTable {
+  void table.catch(() => {});
+  const references = new Map<string, ElementReference>();
+  return new Proxy(Object.create(null), {get: (_, name) => {
+    if (name === 'then') return table.then.bind(table);
+    if (typeof name !== 'string') return undefined;
+    let reference = references.get(name);
+    if (!reference) {
+      reference = Object.freeze({});
+      const resolved = table.then(table => {
+        if (table[name] === undefined) throw new Error(`surface has no element ${name}`);
+        return table[name];
+      });
+      void resolved.catch(() => {});
+      elements.set(reference, resolved);
+      references.set(name, reference);
+    }
+    return reference;
+  }}) as ElementTable;
+}
+export async function resolveElements(value: any): Promise<any> {
+  if (!value || typeof value !== 'object') return value;
+  const element = elements.get(value);
+  if (element) return element;
+  if (Array.isArray(value)) return Promise.all(value.map(resolveElements));
+  return Object.fromEntries(await Promise.all(Object.entries(value).map(async ([key, child]) => [key, await resolveElements(child)])));
 }

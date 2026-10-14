@@ -47,7 +47,7 @@ export async function run(event, input, site, ask, cancelled, remaining) {
       ? await next(inputValue) : await invoke(api, inputValue, next);
     let result = answer === undefined && continuation ? await continuation : answer;
     if (event === 'ui.render' && result !== undefined) {
-      result = handlers.mint(location.plugin.name, location.session, inputValue.requestId, location.generation, result, port);
+      result = handlers.mint(location.plugin.name, location.session, inputValue.requestId, location.generation, await resolveElements(result), port);
     }
     return JSON.stringify({answered:result !== undefined, value:result ?? null});
   }

@@ -72,7 +72,7 @@ impl Root {
             )
             .map_err(|why| why.to_string())?;
             return Ok(format!(
-                "export const h = globalThis.h; export const Fragment = globalThis.Fragment;\nexport {{ Handlers }} from './ui.ts';\nexport {{ Callbacks }} from './callbacks.ts';\n{hooks}\n{dollar}\n{state}"
+                "export const h = globalThis.h; export const Fragment = globalThis.Fragment;\nexport {{ Handlers, resolveElements }} from './ui.ts';\nexport {{ Callbacks }} from './callbacks.ts';\n{hooks}\n{dollar}\n{state}"
             ));
         }
         let path = self.path(name)?;
