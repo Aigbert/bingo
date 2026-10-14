@@ -1,6 +1,6 @@
 # ADR-0088 — A plugin without tools switches now
 
-Status: proposed · 2026-10-14 · Plan: M172 · Amends: ADR-0057 §6
+Status: accepted · 2026-10-15 · Plan: M172 · Amends: ADR-0057 §6
 
 ## Context
 

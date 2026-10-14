@@ -21,7 +21,7 @@ and says why. The listing tells the wish from what runs.
    the registry for in-process and outside links; the command table
    records the owning plugin. Test that every registered link names a
    plugin in the listing.
-3. **The running set.** `Registry.running: RwLock<BTreeSet<String>>` of
+3. **The running set.** `Registry.switches.running: RwLock<BTreeSet<String>>` of
    plugins switched off now; dispatch skips their links and commands
    between turns (a turn keeps the chain it started with). Test: off
    mid-turn lands on the next turn.
@@ -42,13 +42,14 @@ and says why. The listing tells the wish from what runs.
 
 ## Exit criteria
 
-- [ ] Kind and derivation tables; link-owner test.
-- [ ] `TestBackend` with `bingo-mod-hello`: `/plugins disable hello` →
+- [x] Kind and derivation tables; link-owner test.
+- [x] `TestBackend` with `bingo-mod-hello`: `/plugins disable hello` →
       the `Toast` is the surface's own drawing in the next frame,
       `/hello` is gone, `ctrl+x` does nothing; enable brings all back.
-- [ ] A fixture plugin with a tool answers `off at next start (tools)`
+- [x] A fixture plugin with a tool answers `off at next start (tools)`
       and keeps its tool in the running session.
-- [ ] Gates as M167.
+- [x] Native gates as M167.
+- [ ] Windows checks for every touched crate: four C-toolchain deferrals below.
 
 ## Decisions
 
@@ -71,13 +72,20 @@ and says why. The listing tells the wish from what runs.
 - Module retirement keeps old generations alive while a captured chain or
   callback holds them, including their admitted grant scoped to each operation.
   Catalogue rereads would otherwise revoke a running turn at its next `$` call.
+  Box the scoped host operation: the composed three-mod smoke exposed stack
+  overflow when the new grant wrapper carried that large future inline.
   Enable waits for retirement before reusing resources.
   Dynamic `tool` authority is conservatively next-start even before registration;
   otherwise an unloaded module could add tools while being enabled.
 - The sole new dependency edge is TUI → core in dev-dependencies, to drive
   the real `/plugins` command in TestBackend coverage; no external dependency.
+- Group the native switch fields and the module off/retirement fields into
+  their own state records; use module-local lifecycle helpers. Discipline
+  exposed oversized registries and a fourth Manager impl file in the first cut.
 - Switching documentation belongs in the existing mods Page; add a second Page
-  if full, and correct the product guide's existing `/plugins` summary.
+  if full, and correct the product guide's existing `/plugins` summary. The
+  199-line mods guide links to a second registered Page, `mods-switches`;
+  the bundled map stays within its stricter 80-line body limit (ADR-0054).
 
 ## Non-goals
 
@@ -91,3 +99,44 @@ without a restart; per-session switches.
   drawn from it while off.
 - Racing a switch with a command already dispatched: the command runs
   to its end; the switch is read once per turn and once per command.
+
+## Verified — 2026-10-15
+
+Final gates ran sequentially; native commands exited 0. No live/credential tests.
+```text
+cargo fmt --all -- --check: no output
+cargo check --workspace --all-targets --locked: Finished dev profile
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev profile
+RUST_TEST_THREADS=4 cargo test --workspace --locked: 5578 passed; 0 failed; 5 ignored (166 summaries)
+bash scripts/check_discipline.sh: discipline ok (advisory warnings remain)
+bash scripts/budget.sh: 412/412 dependencies; warm core 0s; isolation 0; budget ok
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok
+bash scripts/tui-smoke.sh: tui-smoke ok (isolated socket and temporary HOME)
+cd sdk/typescript && npm test: tests 31; pass 31; fail 0
+```
+Generators, each with `BINGO_UPDATE_SCHEMA=1 cargo test --locked`:
+```text
+-p bingo-sdk: 189 passed; 0 failed
+-p bingo-plugin-rpc -p bingo-surface-rpc --lib: 150 passed; 0 failed
+-p bingo-mods --lib schema_and_types_are_generated_from_the_same_rows: 1 passed
+-p bingo-store-jsonl --lib journal: 35 passed; 0 failed
+```
+Regenerated schema/events.json, schema/plugin.json, schema/rpc.json and
+sdk/typescript/src/wire.ts through those generators; no handwritten wire edits.
+
+Ran `cargo check -p EACH --all-targets --target x86_64-pc-windows-msvc --locked`
+for all eight touched crates. Exit 0: bingo-{sdk,core,plugin-host,skills}.
+Exit 101: bingo, bingo-{mods,plugin-rpc,surface-tui}; aws-lc-sys lacks
+`stdlib.h`/`windows.h`. bingo/mods also fail in rquickjs-sys because host clang
+rejects MSVC `/std:c11` and `/experimental:c11atomics`. No Rust source diagnostic;
+the Windows criterion remains unticked pending these C prerequisites.
+
+Two intermittent failures passed alone: gateway's
+`doctor_never_removes_the_gateway_claim_file`, and CLI's
+`a_permission_no_rule_could_silence_offers_no_session_rung` (read a partial PTY
+prompt). Final full suite passed with four test threads to reduce contention.
+Verification also corrected the tool fixture, the bundled guide's line limit,
+and two TUI action fixtures needing a Tokio runtime for catalogue refreshes.
+The first smoke exposed a scoped-operation stack overflow; the new composed-mod
+black-box test reproduced it, passed after boxing, and the full smoke then passed.
+Budget warned at 9 GB of debug output; final worktree cleanup is `cargo clean`.
