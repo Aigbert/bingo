@@ -66,6 +66,22 @@ where
     .await
 }
 
+pub async fn call(
+    link: &(impl Interceptor + ?Sized),
+    cx: &HookContext,
+    input: ToolCall,
+    next: Next<'_, ToolCall, ToolOutput>,
+) -> Result<ToolOutput, KernelError> {
+    use catalogue::ToolCallResult;
+    let continuation = Next::at(next.tier(), move |call| {
+        async move { next.run(call).await.map(ToolCallResult::Output) }.boxed()
+    });
+    match tool(link, catalogue::TOOL_CALL, cx, input, continuation).await? {
+        ToolCallResult::Denied { deny } => Err(KernelError::new(ErrorCode::PermissionDenied, deny)),
+        ToolCallResult::Output(output) => Ok(output),
+    }
+}
+
 pub async fn step(
     link: &(impl Interceptor + ?Sized),
     cx: &HookContext,

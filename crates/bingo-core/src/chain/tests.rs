@@ -249,3 +249,55 @@ async fn draining_a_continuation_is_not_plugin_phase_time() {
     assert_eq!(result, ToolOutput::text("kernel"));
     assert!(report.take().is_empty());
 }
+
+#[tokio::test]
+async fn a_json_deny_only_answer_never_runs_the_tool() {
+    struct Deny;
+    #[async_trait]
+    impl Interceptor for Deny {
+        fn id(&self) -> &str {
+            "guard"
+        }
+        fn matcher(&self) -> LinkMatcher {
+            LinkMatcher::default()
+        }
+        async fn chain(
+            &self,
+            _: &catalogue::Entry,
+            _: &HookContext,
+            _: serde_json::Value,
+            _: Next<'_, serde_json::Value, serde_json::Value>,
+        ) -> Result<serde_json::Value, KernelError> {
+            Ok(serde_json::json!({"deny":"protected by guard"}))
+        }
+    }
+    for tier in [Tier::Tighten, Tier::Rewrite, Tier::Full] {
+        let count = AtomicUsize::new(0);
+        let kernel = Next::new(|_| {
+            Box::pin(async {
+                count.fetch_add(1, Ordering::SeqCst);
+                Ok(ToolOutput::text("must not run"))
+            })
+        });
+        let result = run::<tool::Call>(
+            &[Link {
+                external: Some("guard".into()),
+                interceptor: Arc::new(Deny),
+                tier,
+            }],
+            kernel,
+            &cx(),
+            call(),
+            Report::default(),
+        )
+        .await;
+        assert_eq!(
+            count.load(Ordering::SeqCst),
+            0,
+            "denial must stop the tool at {tier:?}"
+        );
+        let error = result.unwrap_err();
+        assert_eq!(error.code, ErrorCode::PermissionDenied);
+        assert_eq!(error.message, "protected by guard");
+    }
+}

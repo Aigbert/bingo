@@ -2158,34 +2158,53 @@
       },
       "result": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "ToolOutput",
-        "description": "What a tool returned: the parts the model sees, plus what a person sees\ninstead when the tool has something better than the text (ADR-0013 §2).",
-        "type": "object",
-        "properties": {
-          "parts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/$defs/ContentPart"
-            }
-          },
-          "isError": {
-            "type": "boolean"
-          },
-          "display": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/View"
-              },
-              {
-                "type": "null"
+        "title": "ToolCallResult",
+        "description": "A denial is an answer, never an invalid output that falls through to execution.",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "deny": {
+                "type": "string"
               }
+            },
+            "required": [
+              "deny"
             ]
+          },
+          {
+            "$ref": "#/$defs/ToolOutput"
           }
-        },
-        "required": [
-          "parts"
         ],
         "$defs": {
+          "ToolOutput": {
+            "description": "What a tool returned: the parts the model sees, plus what a person sees\ninstead when the tool has something better than the text (ADR-0013 §2).",
+            "type": "object",
+            "properties": {
+              "parts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ContentPart"
+                }
+              },
+              "isError": {
+                "type": "boolean"
+              },
+              "display": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/View"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "parts"
+            ]
+          },
           "ContentPart": {
             "oneOf": [
               {

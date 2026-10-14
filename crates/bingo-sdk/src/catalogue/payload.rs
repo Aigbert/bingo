@@ -5,6 +5,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+/// A denial is an answer, never an invalid output that falls through to execution.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum ToolCallResult {
+    Denied { deny: String },
+    Output(crate::ToolOutput),
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[schemars(rename = "ToolEvent")]
 pub struct ToolCall {

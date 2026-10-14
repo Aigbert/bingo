@@ -6,14 +6,16 @@ const edits = (file_path: string) => invoke('Edit',{file_path,old_string:'old',n
 
 test('environment edits are denied with the plugin name', async $ => {
   for (const path of ['.env','config/.env.local']) {
-    await mock.session({permissions:{allow:['Edit']},model:{responses:[edits(path),done]}});
+    await mock.session({permissions:{allow:['Write','Edit','Read']},model:{responses:[invoke('Write',{file_path:path,content:'old'}),edits(path),invoke('Read',{file_path:path}),done]}});
     await mock.session.submit('Check the environment guard');
     const snapshot = await mock.session.snapshot() as any;
-    const call = snapshot.items.find((item: any) => item.body.kind === 'toolCall');
+    const call = snapshot.items.find((item: any) => item.body.kind === 'toolCall' && item.body.name === 'Edit');
     const result = JSON.stringify(call.body.output);
     expect(call.status).toBe('failed');
     expect(result).toContain('protected');
     expect(result).toContain($.plugin.name);
+    const read = snapshot.items.find((item: any) => item.body.kind === 'toolCall' && item.body.name === 'Read');
+    expect(JSON.stringify(read.body.output)).toContain('old');
   }
 });
 
