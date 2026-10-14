@@ -99,13 +99,14 @@ then stop if dev lacks `merge: M141`, pending the person's merge instruction.
 - `crates/bingo-mods/Cargo.toml`: promote existing `bingo-schema-ts` to
   a normal library dependency for types on load; enable tokio test-util
   for the isolated test clock (no new external crate)
-- `crates/bingo/src/plugins/{mod,switch,validate,test}.rs`, `main.rs`;
+- `crates/bingo/src/plugins/{mod,switch,validate,test}.rs`, `test/`, `main.rs`;
   `{scenario,schema,expect}.rs` and `schema/plugin-scenario.json` deleted
 - `crates/bingo-surface-tui/src/lib.rs` (`pub fn drawn`)
 - `sdk/typescript/src/state.test.ts` (new)
 - `examples/plugins/ts-status/` (`hooks/register.test.ts` new, `scenarios/` deleted);
   `examples/plugins/{tool-call,band,pane}/` (one `*.test.ts` each)
-- `crates/bingo/tests/plugin_kit.rs`
+- `crates/bingo/tests/plugin_kit.rs`; `tests/fixtures/mods/counter/types/index.d.ts`
+  adds the state contract required for the existing counter to validate cleanly.
 ## Exit criteria
 - [ ] `cargo test -p bingo-mods validate::`: each rule's fixture yields
       its `expected.json`; the examples and `counter` yield none.

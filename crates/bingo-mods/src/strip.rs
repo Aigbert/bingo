@@ -14,6 +14,10 @@ use oxc_transformer::{JsxRuntime, TransformOptions, Transformer};
 pub struct StripError(pub String);
 
 pub fn strip(path: &Path, source: &str) -> Result<String, StripError> {
+    compile(path, source, false)
+}
+
+pub(crate) fn compile(path: &Path, source: &str, testing: bool) -> Result<String, StripError> {
     let allocator = Allocator::default();
     let source_type =
         SourceType::from_path(path).map_err(|why| at(path, source, 0, &why.to_string()))?;
@@ -47,7 +51,7 @@ pub fn strip(path: &Path, source: &str) -> Result<String, StripError> {
         ));
     }
     for node in semantics.semantic.nodes().iter() {
-        check(path, source, node.kind())?;
+        check(path, source, node.kind(), testing)?;
     }
     let mut options = TransformOptions::default();
     options.jsx.runtime = JsxRuntime::Classic;
@@ -69,7 +73,7 @@ pub fn strip(path: &Path, source: &str) -> Result<String, StripError> {
     Ok(Codegen::new().build(&program).code)
 }
 
-fn check(path: &Path, source: &str, kind: AstKind<'_>) -> Result<(), StripError> {
+fn check(path: &Path, source: &str, kind: AstKind<'_>, testing: bool) -> Result<(), StripError> {
     let denied = |why: &str| at(path, source, kind.span().start as usize, why);
     let specifier = match kind {
         AstKind::ImportDeclaration(import) => Some(import.source.value.as_str()),
@@ -82,6 +86,9 @@ fn check(path: &Path, source: &str, kind: AstKind<'_>) -> Result<(), StripError>
         _ => None,
     };
     if let Some(specifier) = specifier {
+        if testing && specifier == "bingo/testing" {
+            return Ok(());
+        }
         resolve(path, specifier).map_err(|why| denied(&why))?;
     }
     Ok(())

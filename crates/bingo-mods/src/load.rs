@@ -12,6 +12,7 @@ use rquickjs::{
 pub struct Root {
     root: PathBuf,
     max_bytes: u64,
+    testing: bool,
 }
 
 impl Root {
@@ -19,10 +20,20 @@ impl Root {
         Ok(Self {
             root: root.canonicalize()?,
             max_bytes,
+            testing: false,
         })
     }
 
+    pub(crate) fn for_testing(mut self) -> Self {
+        self.testing = true;
+        self
+    }
+
     pub fn source(&self, name: &str) -> Result<String, String> {
+        if name == "bingo/testing" && self.testing {
+            return crate::strip::strip(Path::new("testing.ts"), include_str!("../js/testing.ts"))
+                .map_err(|e| e.to_string());
+        }
         if name == "__bingo_ui__" {
             return crate::strip::strip(
                 Path::new("ui.ts"),
@@ -69,7 +80,7 @@ impl Root {
         if source.len() as u64 > self.max_bytes {
             return Err(format!("{name}:1: module exceeds the source limit"));
         }
-        crate::strip::strip(Path::new(name), &source).map_err(|why| why.to_string())
+        crate::strip::compile(Path::new(name), &source, self.testing).map_err(|why| why.to_string())
     }
 
     fn path(&self, name: &str) -> Result<PathBuf, String> {
@@ -101,6 +112,9 @@ impl Resolver for Root {
         }
         if base == "bingo" && name == "./dollar-types.ts" {
             return Ok("__bingo_dollar_types__".into());
+        }
+        if self.testing && name == "bingo/testing" {
+            return Ok(name.into());
         }
         let path = crate::strip::resolve(Path::new(base), name)
             .map_err(|why| rquickjs::Exception::throw_type(ctx, &why))?;

@@ -46,21 +46,77 @@ pub trait Driver: Send {
         params: serde_json::Value,
     ) -> Result<serde_json::Value, String>;
 }
-pub struct Runner;
+pub struct Runner {
+    engine: std::sync::Arc<crate::engine::Engine>,
+    file: String,
+}
+#[derive(Deserialize)]
+struct Case {
+    name: String,
+    at: String,
+}
 impl Runner {
     pub async fn load(
-        _: &std::path::Path,
-        _: &str,
-        _: crate::engine::Limits,
+        root: &std::path::Path,
+        file: &str,
+        limits: crate::engine::Limits,
     ) -> Result<Self, String> {
-        Err("test runtime is not installed".into())
+        Ok(Self {
+            engine: crate::engine::Engine::test(root, file, limits)
+                .await
+                .map_err(|e| e.to_string())?,
+            file: file.into(),
+        })
     }
     pub async fn run(
         &self,
-        _: &mut dyn Driver,
-        _: serde_json::Value,
+        driver: &mut dyn Driver,
+        mut site: serde_json::Value,
     ) -> Result<Vec<Report>, String> {
-        Ok(Vec::new())
+        site["testing"] = serde_json::json!("list");
+        let cases: Vec<Case> = serde_json::from_value(self.dispatch(driver, site.clone()).await?)
+            .map_err(|e| e.to_string())?;
+        let mut reports = Vec::new();
+        for (index, case) in cases.into_iter().enumerate() {
+            site["testing"] = serde_json::json!(index);
+            let outcome = match self.dispatch(driver, site.clone()).await {
+                Ok(value) => serde_json::from_value(value).map_err(|e| e.to_string())?,
+                Err(message) => Outcome::Fail {
+                    message,
+                    at: case.at,
+                },
+            };
+            reports.push(Report {
+                file: self.file.clone(),
+                test: case.name,
+                outcome,
+            });
+        }
+        Ok(reports)
     }
-    pub async fn close(&self) {}
+    async fn dispatch(
+        &self,
+        driver: &mut dyn Driver,
+        site: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let mut call = self
+            .engine
+            .call("test", serde_json::Value::Null, site)
+            .map_err(|e| e.to_string())?;
+        loop {
+            tokio::select! { biased;
+                Some(operation) = call.operations.recv() => {
+                    let result = driver.call(&operation.method, operation.params).await;
+                    let _ = operation.reply.send(result);
+                }
+                result = &mut call.result => return result.map_err(|e| e.to_string())?.map_err(|e| e.to_string()),
+            }
+        }
+    }
+    pub async fn close(&self) {
+        self.engine.close().await;
+    }
 }
+
+mod environment;
+pub use environment::{Environment, Paused};

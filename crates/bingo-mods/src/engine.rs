@@ -73,6 +73,10 @@ pub(crate) struct Request {
     pub meter: Arc<Meter>,
 }
 
+pub(crate) struct Entry {
+    pub path: String,
+    pub testing: bool,
+}
 pub struct Engine {
     requests: mpsc::UnboundedSender<Request>,
     stop: CancellationToken,
@@ -87,13 +91,41 @@ impl Engine {
         config: Value,
         limits: Limits,
     ) -> Result<Arc<Self>, Fault> {
+        Self::launch(
+            root,
+            Entry {
+                path: module.into(),
+                testing: false,
+            },
+            config,
+            limits,
+        )
+        .await
+    }
+    pub(crate) async fn test(root: &Path, file: &str, limits: Limits) -> Result<Arc<Self>, Fault> {
+        Self::launch(
+            root,
+            Entry {
+                path: file.into(),
+                testing: true,
+            },
+            serde_json::json!({}),
+            limits,
+        )
+        .await
+    }
+    async fn launch(
+        root: &Path,
+        module: Entry,
+        config: Value,
+        limits: Limits,
+    ) -> Result<Arc<Self>, Fault> {
         let root = root.to_path_buf();
         let (requests, receiver) = mpsc::unbounded_channel();
         let (ready, started) = oneshot::channel();
         let stop = CancellationToken::new();
         let shutdown = stop.clone();
         let worker_limits = limits.clone();
-        let module = module.to_string();
         let thread = std::thread::Builder::new()
             .name("bingo-mod".into())
             .spawn(move || {

@@ -8,6 +8,14 @@ export async function run(event, input, site, ask, cancelled, remaining) {
     return answer.value;
   };
   const location = JSON.parse(site);
+  if (location.testing !== undefined && testing) {
+    if (location.testing === 'list') return JSON.stringify(testing.list());
+    const api = new Proxy({}, {get: (_, noun) => {
+      const value = dollar({request},location,location.plugin,callbacks)[noun];
+      return noun === 'ui' ? {...value,mount:testing.mount} : value;
+    }});
+    return JSON.stringify(await testing.run(location.testing,api,request,location));
+  }
   if (location.callback !== undefined) {
     const port = {request:(method, params) => request(method, params, 4294967295)};
     const api = dollar(port, location, location.plugin, callbacks);

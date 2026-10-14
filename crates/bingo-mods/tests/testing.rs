@@ -29,3 +29,42 @@ async fn testing_module_runs_matchers_and_reports_each_outcome() {
     );
     assert_eq!(reports[2].outcome, Outcome::Skip);
 }
+
+#[tokio::test]
+async fn testing_is_unavailable_to_session_modules_and_hung_tests_are_named() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(
+        root.path().join("main.ts"),
+        "import { test } from 'bingo/testing'; export const register = on => {};",
+    )
+    .unwrap();
+    assert!(
+        bingo_mods::engine::Engine::start(root.path(), "main.ts", json!({}), Default::default())
+            .await
+            .is_err()
+    );
+    std::fs::write(
+        root.path().join("hung.test.ts"),
+        "import { test } from 'bingo/testing'; test('hung', () => { while(true) {} });",
+    )
+    .unwrap();
+    let limits = bingo_mods::engine::Limits {
+        hook_time: std::time::Duration::from_millis(50),
+        ..Default::default()
+    };
+    let runner = Runner::load(root.path(), "hung.test.ts", limits)
+        .await
+        .unwrap();
+    let reports = runner
+        .run(
+            &mut Offline,
+            json!({"session":"s","plugin":{"name":"fixture","root":root.path()}}),
+        )
+        .await
+        .unwrap();
+    runner.close().await;
+    assert_eq!(reports[0].test, "hung");
+    assert!(
+        matches!(&reports[0].outcome, Outcome::Fail { message, .. } if message.contains("timeout"))
+    );
+}

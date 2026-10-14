@@ -107,6 +107,29 @@ impl Manager {
         }
         self.watch();
     }
+    pub(crate) async fn testing_call(
+        &self,
+        name: &str,
+        method: &str,
+        params: Value,
+    ) -> Result<Value, String> {
+        let module = self
+            .modules()
+            .into_iter()
+            .find(|module| module.found.name == name)
+            .ok_or("module is not loaded")?;
+        if !module.admission.allowed() {
+            return Err("module is not admitted".into());
+        }
+        bingo_plugin_host::ops::call(
+            self.host.get().ok_or("host is not ready")?,
+            name,
+            &module.store,
+            method,
+            params,
+        )
+        .await
+    }
     pub(crate) fn env(&self) -> &Env {
         &self.env
     }

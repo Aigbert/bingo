@@ -11,12 +11,33 @@ use std::{
 
 #[derive(Clone, Default)]
 pub struct ModsPlugin {
+    testing: Option<Arc<crate::testing::Environment>>,
     directories: Vec<PathBuf>,
     settings: BTreeMap<String, Value>,
     project: Option<PathBuf>,
     manager: Arc<OnceLock<Arc<Manager>>>,
 }
 impl ModsPlugin {
+    pub fn with_testing(mut self, environment: Arc<crate::testing::Environment>) -> Self {
+        self.testing = Some(environment);
+        self
+    }
+    pub async fn testing_call(
+        &self,
+        name: &str,
+        method: &str,
+        params: Value,
+    ) -> Result<Value, String> {
+        if self.testing.is_none() {
+            return Err("testing is unavailable in a session".into());
+        }
+        self.manager
+            .get()
+            .ok_or("module runtime has not started")?
+            .testing_call(name, method, params)
+            .await
+    }
+
     pub async fn reload(&self, root: &std::path::Path) -> Result<(), KernelError> {
         let manager = self.manager.get().ok_or_else(|| {
             KernelError::new(ErrorCode::NotReady, "module runtime has not started")
@@ -93,8 +114,14 @@ impl Plugin for ModsPlugin {
             .manager
             .get()
             .ok_or_else(|| PluginError::Failed("module manager unavailable".into()))?;
-        let dollar = crate::dollar::Runtime::install_in(&host, cwd.clone(), manager.env(), floor)
-            .map_err(|error| PluginError::Failed(error.message))?;
+        let dollar = crate::dollar::Runtime::install_testing(
+            &host,
+            cwd.clone(),
+            manager.env(),
+            floor,
+            self.testing.clone(),
+        )
+        .map_err(|error| PluginError::Failed(error.message))?;
         bingo_plugin_host::ops::install(&host)
             .map_err(|error| PluginError::Failed(error.message))?;
         if let Some(manager) = self.manager.get() {
