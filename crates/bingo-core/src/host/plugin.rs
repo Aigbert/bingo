@@ -27,6 +27,10 @@ impl PluginHost {
 }
 #[async_trait]
 impl HostApi for PluginHost {
+    async fn approve(&self, request: Approval) -> Result<String, KernelError> {
+        self.inner().approve(request).await
+    }
+
     async fn render(
         &self,
         _session: &SessionId,

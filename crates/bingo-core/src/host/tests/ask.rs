@@ -455,3 +455,22 @@ async fn plugin_weak_handles_live_as_long_as_the_host_without_a_cycle() {
         "the adapter must not keep the host alive"
     );
 }
+
+#[tokio::test]
+async fn the_plugin_host_preserves_repository_approval_checks() {
+    let (host, plugin) = plugin_host().await;
+    let repository = tempfile::tempdir().unwrap();
+    let request = Approval {
+        root: repository.path().into(),
+        what: "acp.adapters:missing".into(),
+    };
+    let error = plugin.approve(request.clone()).await.unwrap_err();
+    assert_eq!(error.code, ErrorCode::PermissionDenied);
+    assert_eq!(error.message, "approval requires person input");
+    let error = bingo_sdk::render::under_input(true, plugin.approve(request))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::InvalidInput);
+    assert_eq!(error.message, "no repository entry with that name");
+    host.shutdown().await;
+}
