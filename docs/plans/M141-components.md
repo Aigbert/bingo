@@ -58,7 +58,7 @@ examples of those names do and draw in the TUI. After M138 and M140; see the re-
 - `crates/bingo-mods/src/` `$.ui.log`, the embedded helpers; `sdk/typescript/src/{state.ts (new),index.ts}`
 - `crates/bingo-surface-tui/src/{component.rs (new),views/mod.rs,transcript.rs,transcript/{said,output}.rs,
   activity.rs,worked.rs,status.rs,form.rs,dialog.rs,blocks.rs,pane.rs,pulled.rs,view.rs,run/pulling.rs,lib.rs}`
-- `crates/bingo-surface-rpc/src/schema.rs`; `schema/{rpc,events,plugin,plugin-2}.json`; generated TypeScript
+- `crates/bingo-{surface-rpc,plugin-rpc}/src/schema.rs`; `schema/{rpc,events,plugin,plugin-2}.json`; generated TypeScript
 - `sdk/typescript/src/{on.ts,plugin.ts}` (shared matcher metadata); `docs/adr/0075-plugin-protocol-2.md`
 - `examples/plugins/{tool-call,band,pane}/` (new)
 - `crates/bingo/tests/mods_components.rs` (new); `scripts/tui-smoke.sh`

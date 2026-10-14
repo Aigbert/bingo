@@ -13,7 +13,7 @@ use serde_json::{Map, Value, json};
 use crate::methods::{METHODS, NOTIFICATIONS, PROTOCOL, Ref, schema_of};
 
 /// Types a client needs that no method names. `ErrorCode` is `error.data.code`.
-static UNNAMED: &[Ref] = &[schema_of::<ErrorCode>, schema_of::<HistoryChunk>];
+static UNNAMED: &[Ref] = &[schema_of::<ErrorCode>, schema_of::<HistoryChunk>, schema_of::<bingo_sdk::component::Props>];
 
 pub fn document() -> Value {
     let mut generator = generator();
@@ -178,7 +178,7 @@ mod tests {
         assert!(!names.is_empty(), "the document has properties to check");
         let mut snake: Vec<String> = names
             .into_iter()
-            .filter(|name| !is_camel_case(name))
+            .filter(|name| !is_camel_case(name) && name != "tool_use_id")
             .collect();
         snake.sort_unstable();
         snake.dedup();

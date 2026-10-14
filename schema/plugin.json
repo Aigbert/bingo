@@ -77,6 +77,43 @@
     "tools/changed"
   ],
   "$defs": {
+    "AbovePromptProps": {
+      "type": "object",
+      "properties": {
+        "hasSurvey": {
+          "type": "boolean"
+        },
+        "isWorking": {
+          "type": "boolean"
+        },
+        "maxRows": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "bodyColumns": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "scroll": {
+          "$ref": "#/$defs/SiteScroll"
+        },
+        "view": {
+          "$ref": "#/$defs/SiteView"
+        }
+      },
+      "required": [
+        "hasSurvey",
+        "isWorking",
+        "maxRows",
+        "bodyColumns",
+        "scroll",
+        "view"
+      ]
+    },
     "Action": {
       "type": "object",
       "properties": {
@@ -711,6 +748,21 @@
         "answer"
       ],
       "description": "What the person answered, as the sdk writes it — including the cancel that\nis an answer."
+    },
+    "AssistantMessageProps": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "isFirstOfReply": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text",
+        "isFirstOfReply"
+      ]
     },
     "Authorize": {
       "type": "object",
@@ -1379,6 +1431,29 @@
           ],
           "description": "One completed item the kernel records in the transcript (a shell\nline's output, a login's receipt); the ack carries its id."
         }
+      ]
+    },
+    "CommandOutputProps": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "args": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "isErrored": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "command",
+        "args",
+        "text",
+        "isErrored"
       ]
     },
     "CommandRun": {
@@ -3653,6 +3728,23 @@
       ],
       "description": "A picture handed to the model, already the shape the journal keeps and a\nprovider's request encodes: one struct, so a surface that reads a picture\noff disk, a wire client that already holds the bytes, and a tool result\nthat returns one all produce the same thing."
     },
+    "InfoNoticeProps": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "command": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "text"
+      ]
+    },
     "InitializeParams": {
       "type": "object",
       "properties": {
@@ -5368,6 +5460,40 @@
       ],
       "description": "The actor's factual observation; only the RPC server can add a\nconnection-scoped availability token after pinning an immutable Item."
     },
+    "PaneProps": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "isFocused": {
+          "type": "boolean"
+        },
+        "bodyColumns": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "placement": {
+          "type": "string"
+        },
+        "scroll": {
+          "$ref": "#/$defs/SiteScroll"
+        },
+        "view": {
+          "$ref": "#/$defs/SiteView"
+        }
+      },
+      "required": [
+        "title",
+        "isFocused",
+        "bodyColumns",
+        "placement",
+        "scroll",
+        "view"
+      ]
+    },
     "ParentLink": {
       "type": "object",
       "properties": {
@@ -6150,6 +6276,25 @@
         "id"
       ]
     },
+    "PromptHintProps": {
+      "type": "object",
+      "properties": {
+        "isDraft": {
+          "type": "boolean"
+        },
+        "isWorking": {
+          "type": "boolean"
+        },
+        "hint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "isDraft",
+        "isWorking",
+        "hint"
+      ]
+    },
     "PromptView": {
       "type": "object",
       "properties": {
@@ -6168,6 +6313,250 @@
       },
       "required": [
         "queue"
+      ]
+    },
+    "Props": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Question"
+            },
+            "props": {
+              "$ref": "#/$defs/QuestionProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "UserMessage"
+            },
+            "props": {
+              "$ref": "#/$defs/UserMessageProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "AssistantMessage"
+            },
+            "props": {
+              "$ref": "#/$defs/AssistantMessageProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "ToolUse"
+            },
+            "props": {
+              "$ref": "#/$defs/ToolUseProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "ToolResult"
+            },
+            "props": {
+              "$ref": "#/$defs/ToolResultProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "ToolGroup"
+            },
+            "props": {
+              "$ref": "#/$defs/ToolGroupProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "ToolProgress"
+            },
+            "props": {
+              "$ref": "#/$defs/ToolProgressProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "CommandOutput"
+            },
+            "props": {
+              "$ref": "#/$defs/CommandOutputProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Spinner"
+            },
+            "props": {
+              "$ref": "#/$defs/SpinnerProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "TurnDuration"
+            },
+            "props": {
+              "$ref": "#/$defs/TurnDurationProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "InfoNotice"
+            },
+            "props": {
+              "$ref": "#/$defs/InfoNoticeProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "SessionMode"
+            },
+            "props": {
+              "$ref": "#/$defs/SessionModeProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "PromptHint"
+            },
+            "props": {
+              "$ref": "#/$defs/PromptHintProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "AbovePrompt"
+            },
+            "props": {
+              "$ref": "#/$defs/AbovePromptProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Pane"
+            },
+            "props": {
+              "$ref": "#/$defs/PaneProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        }
       ]
     },
     "ProviderCancelParams": {
@@ -6510,6 +6899,30 @@
       "required": [
         "id",
         "label"
+      ]
+    },
+    "QuestionProps": {
+      "type": "object",
+      "properties": {
+        "tool": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Question"
+          }
+        },
+        "metadataSource": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "tool",
+        "questions"
       ]
     },
     "QueueEntry": {
@@ -7178,6 +7591,20 @@
       "type": "string",
       "description": "One persisted context: one journal, one actor."
     },
+    "SessionModeProps": {
+      "type": "object",
+      "properties": {
+        "modes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "modes"
+      ]
+    },
     "SessionSummary": {
       "type": "object",
       "properties": {
@@ -7318,6 +7745,36 @@
           "$ref": "#/$defs/View"
         }
       ]
+    },
+    "SiteScroll": {
+      "type": "object",
+      "properties": {
+        "offset": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "bodyRows": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "offset",
+        "bodyRows"
+      ]
+    },
+    "SiteView": {
+      "type": "object",
+      "properties": {
+        "agentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
     },
     "Slot": {
       "oneOf": [
@@ -7563,6 +8020,31 @@
             "actions"
           ]
         }
+      ]
+    },
+    "SpinnerProps": {
+      "type": "object",
+      "properties": {
+        "word": {
+          "type": "string"
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "suffix": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "word",
+        "suffix",
+        "mode"
       ]
     },
     "StateGet": {
@@ -7890,6 +8372,28 @@
       ],
       "additionalProperties": true
     },
+    "ToolGroupProps": {
+      "type": "object",
+      "properties": {
+        "calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolUseProps"
+          }
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "isExpanded": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "calls",
+        "isActive",
+        "isExpanded"
+      ]
+    },
     "ToolOutput": {
       "type": "object",
       "properties": {
@@ -7934,6 +8438,46 @@
       ],
       "description": "Plugin → kernel, while a call runs: the whole of the live output line."
     },
+    "ToolProgressProps": {
+      "type": "object",
+      "properties": {
+        "tool_use_id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "hint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_use_id",
+        "kind",
+        "hint"
+      ]
+    },
+    "ToolResultProps": {
+      "type": "object",
+      "properties": {
+        "tool_use_id": {
+          "type": "string"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "output": true,
+        "isErrored": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "tool_use_id",
+        "tool",
+        "output",
+        "isErrored"
+      ]
+    },
     "ToolSpec": {
       "type": "object",
       "properties": {
@@ -7956,6 +8500,36 @@
         "inputSchema"
       ],
       "description": "A tool as the model sees it."
+    },
+    "ToolUseProps": {
+      "type": "object",
+      "properties": {
+        "tool_use_id": {
+          "type": "string"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "input": true,
+        "isRunning": {
+          "type": "boolean"
+        },
+        "isErrored": {
+          "type": "boolean"
+        },
+        "isInterrupted": {
+          "type": "boolean"
+        },
+        "output": true
+      },
+      "required": [
+        "tool_use_id",
+        "tool",
+        "input",
+        "isRunning",
+        "isErrored",
+        "isInterrupted"
+      ]
     },
     "ToolsChanged": {
       "type": "object",
@@ -8019,6 +8593,23 @@
         "outcome",
         "usage",
         "answer"
+      ]
+    },
+    "TurnDurationProps": {
+      "type": "object",
+      "properties": {
+        "word": {
+          "type": "string"
+        },
+        "durationMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "word",
+        "durationMs"
       ]
     },
     "TurnId": {
@@ -8175,6 +8766,25 @@
       },
       "required": [
         "session"
+      ]
+    },
+    "UserMessageProps": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/$defs/Origin"
+        },
+        "isExpanded": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text",
+        "origin",
+        "isExpanded"
       ]
     },
     "View": {
