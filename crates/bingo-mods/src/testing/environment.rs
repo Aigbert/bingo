@@ -13,10 +13,10 @@ impl Default for Environment {
     }
 }
 impl Environment {
-    pub fn now(&self) -> Result<String, String> {
+    pub fn now(&self) -> Result<i64, String> {
         let (base, start) = *self.clock.lock().unwrap_or_else(|e| e.into_inner());
         base.checked_add(tokio::time::Instant::now().duration_since(start))
-            .map(|time| time.to_string())
+            .map(|time| time.as_millisecond())
             .map_err(|e| e.to_string())
     }
     pub fn set(&self, time: &str) -> Result<(), String> {

@@ -115,7 +115,7 @@ rows! {
     "store", "set", Face, false, StateSet => StateValue;
     "store", "delete", Face, false, StateGet => bool;
     "store", "keys", Face, false, () => Vec<String>;
-    "clock", "now", Face, false, () => String;
+    "clock", "now", Face, false, () => i64;
     "clock", "sleep", Face, false, Millis => ();
     "clock", "after", Face, false, Timer => String;
     "clock", "every", Face, false, Timer => String;

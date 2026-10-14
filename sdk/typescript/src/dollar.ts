@@ -112,7 +112,7 @@ export type Dollar = Replace<HostNouns, {
   tool: Replace<HostNouns['tool'], {register(spec: ToolSpec, handler: Callback): Promise<string>}>;
   command: Replace<HostNouns['command'], {register(spec: CommandRegistration, handler?: Callback): Promise<string>}>;
   clock: {
-    now(): Promise<string>;
+    now(): Promise<number>;
     sleep(ms: number): Promise<null>;
     after(ms: number, handler: Callback): Promise<string>;
     every(ms: number, handler: Callback): Promise<string>;

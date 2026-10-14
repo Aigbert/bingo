@@ -4474,7 +4474,8 @@
           }
         },
         "clock.now": {
-          "type": "string"
+          "type": "integer",
+          "format": "int64"
         },
         "clock.sleep": {
           "type": "null"
@@ -5338,7 +5339,8 @@
         "type": "null"
       },
       "result": {
-        "type": "string"
+        "type": "integer",
+        "format": "int64"
       }
     },
     "clock.sleep": {

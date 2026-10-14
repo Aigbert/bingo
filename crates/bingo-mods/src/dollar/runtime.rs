@@ -164,7 +164,7 @@ impl Runtime {
             "store.keys" | "store.delete" => store(caller, method, params).await,
             "clock.now" => Ok(json!(match &self.testing {
                 Some(testing) => testing.now()?,
-                None => jiff::Timestamp::now().to_string(),
+                None => jiff::Timestamp::now().as_millisecond(),
             })),
             "clock.sleep" => {
                 tokio::time::sleep(std::time::Duration::from_millis(
