@@ -145,6 +145,62 @@ fn tool_call_agrees_under_quickjs_and_node() {
     assert_eq!(tool_evidence(false), tool_evidence(true));
 }
 
+#[test]
+fn composed_examples_finish_a_tool_round_on_the_default_stack() {
+    use serde_json::json;
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    std::fs::create_dir_all(root.join(".bingo")).unwrap();
+    std::fs::write(
+        root.join(".bingo/settings.json"),
+        r#"{"update":{"check":false}}"#,
+    )
+    .unwrap();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_bingo"));
+    for name in ["tool-call", "band", "pane"] {
+        let plugin = root.join(name);
+        copy_example(&workspace().join("examples/plugins").join(name), &plugin);
+        command.arg("--plugin-dir").arg(plugin);
+    }
+    let script = root.join("fake.json");
+    std::fs::write(
+        &script,
+        json!({"responses":[
+            {"steps":[{"toolCall":{"name":"Bash","input":{"command":"echo before"}}}]},
+            {"steps":[{"text":"Composed examples complete."}]}
+        ]})
+        .to_string(),
+    )
+    .unwrap();
+    let output = command
+        .args([
+            "--print",
+            "--output-format",
+            "json",
+            "--provider",
+            "fake",
+            "--model",
+            "fake-1",
+            "--dangerously-skip-permissions",
+            "Run the examples",
+        ])
+        .current_dir(root)
+        .envs(home::home_env(root))
+        .env_remove("RUST_MIN_STACK")
+        .env("BINGO_FAKE_SCRIPT", script)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    let _snapshot = fold_frames(&text);
+    assert!(text.contains("Composed examples complete."), "{text}");
+    assert!(text.contains("echo after"), "{text}");
+}
+
 fn tool_evidence(node: bool) -> Vec<serde_json::Value> {
     use serde_json::json;
     let temp = tempfile::tempdir().unwrap();
