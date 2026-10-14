@@ -587,7 +587,7 @@ fn sdk_helpers_run_without_a_mod_manifest() {
             .lines()
             .filter(|line| line.starts_with("PASS "))
             .count(),
-        3,
+        4,
         "{output}"
     );
     assert!(output.contains("SKIP src/on.test.ts"), "{output}");
