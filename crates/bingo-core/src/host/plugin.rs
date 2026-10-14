@@ -8,6 +8,37 @@ use std::{
     sync::{Arc, Weak},
 };
 
+/// Start the enabled plugins in load order; each receives a host handle.
+pub(super) async fn start(host: &super::Host) -> Result<(), super::HostError> {
+    for plugin in &host.plugins {
+        let manifest = plugin.manifest();
+        if !host.registry.enabled(manifest.id) {
+            continue;
+        }
+        if let Err(source) = plugin.start(host.plugin_host.clone()).await {
+            if host
+                .registry
+                .switches
+                .running
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .contains(manifest.id)
+            {
+                host.registry.unavailable(manifest.id, source.to_string());
+                if let Err(error) = plugin.stop().await {
+                    tracing::warn!(plugin = manifest.id, %error, "disabled plugin cleanup failed");
+                }
+                continue;
+            }
+            return Err(super::HostError::Start {
+                plugin: manifest.id.into(),
+                source,
+            });
+        }
+    }
+    Ok(())
+}
+
 thread_local! { static ANSWERING: Cell<bool> = const { Cell::new(false) }; }
 pub(crate) fn answering() -> bool {
     ANSWERING.get()

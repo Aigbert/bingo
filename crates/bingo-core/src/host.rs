@@ -184,7 +184,7 @@ impl Host {
                 pinned,
             }
         });
-        host.start_plugins().await?;
+        plugin::start(&host).await?;
         interception::register_pending(&host).await;
         refresh::in_background(&host);
         Ok(host)
@@ -200,37 +200,6 @@ impl Host {
     /// old the list is; `None` if it never has.
     pub(crate) fn served_at(&self, provider: &str) -> Option<Timestamp> {
         self.served.get(provider).map(|served| served.fetched)
-    }
-
-    /// Start the enabled plugins in load order; each receives a host handle.
-    async fn start_plugins(&self) -> Result<(), HostError> {
-        for plugin in &self.plugins {
-            let manifest = plugin.manifest();
-            if !self.registry.enabled(manifest.id) {
-                continue;
-            }
-            if let Err(source) = plugin.start(self.plugin_host.clone()).await {
-                if self
-                    .registry
-                    .switches
-                    .running
-                    .read()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .contains(manifest.id)
-                {
-                    self.registry.unavailable(manifest.id, source.to_string());
-                    if let Err(error) = plugin.stop().await {
-                        tracing::warn!(plugin = manifest.id, %error, "disabled plugin cleanup failed");
-                    }
-                    continue;
-                }
-                return Err(HostError::Start {
-                    plugin: manifest.id.into(),
-                    source,
-                });
-            }
-        }
-        Ok(())
     }
 
     /// What a session actor needs from the host: the command table and a
