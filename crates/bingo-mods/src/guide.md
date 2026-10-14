@@ -1,11 +1,8 @@
 # Mods
 
-A mod is a plugin whose `plugin.json` names a JavaScript or TypeScript `module`.
-Bingo runs it in its own sandboxed QuickJS runtime. Use one to change a dispatch,
-add a tool or command, or draw part of the interface. A skill is instructions
-loaded into the model's context (`guide-skills`); a shell hook runs a configured
-command at a hook site (`guide-hooks`); an MCP server supplies tools through MCP
-(`guide-mcp`). An external-process plugin runs its own executable and speaks the
+A mod's `plugin.json` names a JavaScript or TypeScript `module`, run in sandboxed
+QuickJS. It can change dispatch, add tools or commands, and draw the interface. A skill supplies instructions (`guide-skills`), a shell hook runs a configured
+command (`guide-hooks`), and an MCP server supplies tools (`guide-mcp`). An external-process plugin runs its own executable and speaks the
 plugin protocol; it is the other code-authoring path, described below.
 
 ## Files and loading
@@ -115,7 +112,10 @@ as `onPress` can update state. Keep writes out of the render hook itself.
 matching `{component:'Pane', requestId:'counter'}`. `$.ui.close(id)` removes it.
 `place`, `size`, `focus` and `closeOnEscape` say where it seats and how keys
 reach it. A pane opened while no person asked (from `session.start`, a timer)
-waits as `1 pane waiting` until clicked; open it from a command instead.
+waits as `1 pane waiting` unless the person previously opened it. Clicks and
+commands remember open; Escape, close controls and commands remember closed.
+Choices are keyed by plugin and pane id in the user's data, across projects and
+starts. Autonomous moves never change them; missing or corrupt memory means waiting.
 `$.ui.status('Ready', {key:'counter'})` places status; pass `null` to remove it.
 `$.ui.toast('Finished')` shows a temporary notification. `AbovePrompt` draws the
 band above the prompt without opening a pane.
@@ -167,11 +167,13 @@ For example, `[pluginTrust.counter]` with `tier = "rewrite"` and
 `process`, `http`, `env`, `model`, writes outside the mod's data directory and
 unsafe service methods require the corresponding authority.
 
-Only `--plugin-dir` mods are watched; a new or edited mod under the user or
-project directory loads at the next start. A file change marks the mod stale; reload
-waits for `turn.complete`, or happens before its own tool or command runs. The
-fresh runtime calls `register` and replays `session.start`; host state and panes
-stay. `PLUGIN_STALE`, `PLUGIN_RELOADED` and `PLUGIN_RELOAD` notices report it.
+User-directory and `--plugin-dir` mods are watched, including additions and removals.
+Changes load while idle, at `turn.complete`, or before a mod's tool or command runs.
+Project mods require `/plugins reload`, which rescans all three directories and
+answers with counts and added names, or `nothing changed`. Broken mods report
+errors without taking others down. Each replacement runs `register` and
+`session.start` again, retaining state, store and panes under the same trust checks.
+`PLUGIN_STALE`, `PLUGIN_RELOADED`, `PLUGIN_UNLOADED` and `PLUGIN_RELOAD` report changes.
 Load failures appear as `PLUGIN_UNREADABLE` notices and a disabled plugin reason
 in `/plugins`; malformed names have `PLUGIN_MISNAMED`. A hook that throws,
 exceeds its budget, returns an invalid shape or oversteps its tier is skipped

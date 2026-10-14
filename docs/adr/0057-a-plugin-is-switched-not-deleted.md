@@ -29,3 +29,11 @@ The kernel door this opens: an external process is a plugin the kernel has never
 Amended 2026-10-13 by ADR-0069 §3 (M119): the headless listing reports missing optional service uses without disabling the consumer. Settings/composition changes in ADR-0069 §5–6 remain M126 work.
 
 Amended 2026-10-14 by ADR-0069 §6 (M126): `enabledPlugins` is the plugin switch. The opt-in demo (`bingo.demo.ui`) is composed only on explicit true or `--demo-ui`; absent does not compose it. `demoUi` and `experience.enabled` remain readable for one release with startup notices naming `enabledPlugins`, then become unknown keys. No settings file is rewritten.
+
+Amended 2026-10-14 (M157): `/plugins reload` rescans user and project mods,
+adding, removing and replacing changed modules with the existing hot-reload
+lifecycle and a one-line summary. User mods are also watched; project mods
+require this explicit move. Admission and switches still apply on every load;
+state and store survive replacement. The SDK plugin-source reload method keeps
+the kernel independent of runtimes. Built-in switches still take effect at
+next start, and process-plugin reload behavior is unchanged.
