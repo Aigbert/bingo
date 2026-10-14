@@ -58,6 +58,23 @@ impl Registrations {
         entries.insert((caller.plugin.clone(), callback), named);
         Ok(())
     }
+    pub fn remove(&self, plugin: &str) {
+        self.0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .retain(|(owner, _), _| owner != plugin);
+    }
+    pub fn has_tools(&self, plugin: &str) -> bool {
+        self.0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .values()
+            .any(|entry| {
+                entry.plugin == plugin
+                    && matches!(entry.spec, Spec::Tool(_))
+                    && !entry.stopped.is_cancelled()
+            })
+    }
     pub fn tools(&self) -> Vec<Arc<dyn Tool>> {
         self.0
             .lock()

@@ -193,7 +193,7 @@ Start from the repository's `examples/plugins/` and read the adjacent tests:
 - `examples/plugins/wordcount` — the Python external-process example, with `plugin.json` and `main.py`.
 
 ## Repository approval
-
 `/plugins approve <name>` approves the current directory bytes and loads modules now; process plugins start next time. CI uses `bingo plugins approve <name>` during setup.
+For `/plugins enable|disable`, immediate switches and restart reasons, read `guide-mods-switches`.
 A changed directory waits again. A waiting project plugin leaves the user namesake running. Approval names the canonical checkout path and lives only in user settings; `pluginTrust` separately limits authority.
 Fingerprints cover paths and bytes, capped at 8 MiB or 2,000 entries. Escaping/looping symlinks and special files cannot be approved. Repository `pluginDirs` is ignored; personal settings and explicit `--plugin-dir` still work. Project shell hooks are outside this mechanism.

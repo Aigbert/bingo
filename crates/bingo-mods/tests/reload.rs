@@ -127,3 +127,79 @@ async fn a_mid_turn_edit_waits_for_turn_complete() {
     assert_eq!(result["saved"]["value"], "kept");
     fixture.host.shutdown().await;
 }
+
+#[tokio::test]
+async fn disabling_during_a_turn_preserves_its_links_through_completion() {
+    let source = SOURCE.replace("  on('tool.check'", "  on('turn.complete', async ($, e, next) => { await $.store.set('completed', true); return next(e); });\n  on('tool.check'");
+    let mut fixture = Fixture::agent(&source, &["store", "gate"], json!({})).await;
+    let gate = Arc::new(Gate {
+        entered: Default::default(),
+        release: Default::default(),
+    });
+    fixture.host.open_service("gate", gate.clone()).unwrap();
+    fixture
+        .attachment
+        .handle
+        .submit(IntentId::mint(), Input::text("go", Origin::surface("test")));
+    tokio::time::timeout(Duration::from_secs(15), gate.entered.notified())
+        .await
+        .unwrap();
+    let intent = IntentId::mint();
+    fixture.attachment.handle.submit(
+        intent.clone(),
+        Input::text("/plugins disable fixture", Origin::surface("test")),
+    );
+    tokio::time::timeout(Duration::from_secs(15), async {
+        while let Some(frame) = fixture.attachment.events.next().await {
+            if let Event::IntentAck {
+                intent: ack,
+                outcome,
+            } = frame.event
+                && ack == intent
+            {
+                assert!(
+                    matches!(outcome, IntentOutcome::Applied { .. }),
+                    "{outcome:?}"
+                );
+                return;
+            }
+        }
+        panic!("no switch acknowledgement");
+    })
+    .await
+    .unwrap();
+    let catalogue = fixture.host.catalog(CatalogKind::Plugins).await.unwrap();
+    assert_eq!(
+        catalogue
+            .entries
+            .iter()
+            .find(|row| row.id == "fixture")
+            .unwrap()
+            .meta["state"]["kind"],
+        "off"
+    );
+    gate.release.notify_one();
+    tokio::time::timeout(Duration::from_secs(15), async {
+        while let Some(frame) = fixture.attachment.events.next().await {
+            if let Event::TurnCompleted { status, .. } = frame.event {
+                assert_eq!(status, TurnStatus::Completed);
+                return;
+            }
+        }
+        panic!("no completed turn");
+    })
+    .await
+    .unwrap();
+    let store =
+        bingo_plugin_host::state::Store::new(&Env::rooted(fixture.home.path()).data_dir, "fixture");
+    assert_eq!(
+        store
+            .get("global".into(), "completed".into())
+            .await
+            .unwrap()
+            .unwrap()
+            .value,
+        json!(true)
+    );
+    fixture.host.shutdown().await;
+}

@@ -3,6 +3,17 @@ pub use bingo_sdk::{PluginGrant as Grant, PluginOrigin as Origin};
 use bingo_sdk::{PluginRuntime, PluginTrust, Tier};
 use std::collections::BTreeSet;
 
+tokio::task_local! { static GENERATION: (String, Grant); }
+
+/// An admitted generation keeps its authority for work already dispatched.
+pub async fn scope<T>(
+    plugin: &str,
+    grant: Grant,
+    future: impl std::future::Future<Output = T>,
+) -> T {
+    GENERATION.scope((plugin.into(), grant), future).await
+}
+
 pub const UNSAFE: &[&str] = &["process", "http", "env", "model"];
 
 pub fn grant(
@@ -56,6 +67,11 @@ pub fn admits(grant: &Grant, noun: &str, method: &str, unsafe_call: bool) -> Res
 
 /// Read the kernel-adjudicated grant; display hooks cannot replace this metadata.
 pub async fn granted(host: &bingo_sdk::HostHandle, plugin: &str) -> Result<Grant, String> {
+    if let Ok(Some(grant)) =
+        GENERATION.try_with(|(owner, grant)| (owner == plugin).then(|| grant.clone()))
+    {
+        return Ok(grant);
+    }
     let catalog = host
         .catalog(bingo_sdk::CatalogKind::Plugins)
         .await
@@ -378,5 +394,36 @@ mod world_tests {
         );
         audit.end(&session);
         assert_eq!(audit.call("record", input).await.unwrap(), true);
+    }
+}
+
+#[cfg(test)]
+mod generation_tests {
+    use super::*;
+    #[tokio::test]
+    async fn a_generation_grant_is_scoped_to_its_owner_and_call() {
+        let host = bingo_sdk::testing::NoHost::handle();
+        let grant = Grant {
+            tier: Tier::Tighten,
+            uses: ["store".into()].into(),
+        };
+        scope("one", grant.clone(), async {
+            assert_eq!(granted(&host, "one").await.unwrap(), grant);
+            assert!(granted(&host, "two").await.is_err());
+            assert!(
+                check(
+                    &host,
+                    "one",
+                    "http",
+                    "fetch",
+                    false,
+                    &serde_json::Value::Null
+                )
+                .await
+                .is_err()
+            );
+        })
+        .await;
+        assert!(granted(&host, "one").await.is_err());
     }
 }

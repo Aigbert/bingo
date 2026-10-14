@@ -53,8 +53,10 @@ These are the kernel's and the surface's — every other is a plugin's.
 - `/permission [mode]` — read or set this session's permission mode.
 - `/plugins [enable|disable <name>]`, alias `/modules` — a table of every
   plugin: version, state, why one is off, where it came from. A switch writes
-  `enabledPlugins` in the user layer and is in force at the next start, never
-  mid-session; `bingo plugins list|enable|disable` says the same from a shell.
+  `enabledPlugins` in the user layer. Drawing and command-only plugins switch
+  now; request-shaping contributions wait until next start with a reason.
+  `bingo plugins list|enable|disable` writes the next-start wish from a shell.
+  See `guide-mods-switches` for switching and repository approval.
 - `/status` — cwd, provider and model, mode, context against the window, tokens.
 - `/login <provider> [browser|device|paste]`, `/logout <provider>` — the
   credential of a provider that signs in rather than take a key; `bingo login

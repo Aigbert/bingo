@@ -114,6 +114,9 @@ impl Manager {
             .write()
             .unwrap_or_else(|error| error.into_inner())
             .retain(|entry| !Arc::ptr_eq(entry, module));
+        self.clear_signals(&module.found.name).await;
+    }
+    pub(super) async fn clear_signals(&self, name: &str) {
         if let Some(host) = self.host.get() {
             for session in host
                 .sessions(SessionFilter::default())
@@ -125,13 +128,11 @@ impl Manager {
                 {
                     for kind in state
                         .signals
-                        .get(&module.found.name)
+                        .get(name)
                         .into_iter()
                         .flat_map(|values| values.keys())
                     {
-                        let _ = host
-                            .signal(&session.id, &module.found.name, kind, Value::Null)
-                            .await;
+                        let _ = host.signal(&session.id, name, kind, Value::Null).await;
                     }
                 }
             }
@@ -153,7 +154,11 @@ impl Manager {
             .get(&found.name)
             .cloned()
             .unwrap_or_else(|| serde_json::json!({}));
-        let off = self.switched_off.contains(&found.name);
+        let off = self
+            .switched_off
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(&found.name);
         let module = Module::load(found, config, self.limits.clone(), &self.env, off).await;
         if let Some(old) = old {
             self.replace(old, module.clone());

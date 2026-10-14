@@ -22,6 +22,12 @@ impl Registry {
             .unwrap_or_else(|error| error.into_inner())
             .insert(plugin, executor);
     }
+    pub fn remove(&self, plugin: &str) {
+        self.0
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(plugin);
+    }
     pub fn get(&self, plugin: &str) -> Result<Arc<dyn Executor>, String> {
         self.0
             .read()

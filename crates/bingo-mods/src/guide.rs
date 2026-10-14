@@ -11,6 +11,11 @@ pub static PAGES: Pages = Pages(&[
         body: include_str!("guide.md"),
     },
     Page {
+        name: "mods-switches",
+        description: "List, enable and disable plugins; immediate switches, next-start reasons, and repository approval.",
+        body: include_str!("switches.md"),
+    },
+    Page {
         name: "mods-keys",
         description: "Bind a key to a command, own a focused pane's keys with onKey, or wrap a built-in feature's drawing from a mod.",
         body: include_str!("keys.md"),
@@ -27,7 +32,7 @@ mod tests {
     use super::*;
 
     fn page() -> &'static Page {
-        let [page, _] = PAGES.0 else {
+        let [page, ..] = PAGES.0 else {
             panic!("the mods page, then the keys page");
         };
         page
@@ -87,7 +92,7 @@ mod tests {
 
     #[test]
     fn the_keys_page_names_the_setting_the_handler_and_the_placement() {
-        let [_, keys] = PAGES.0 else {
+        let [_, _, keys] = PAGES.0 else {
             panic!("the mods page, then the keys page");
         };
         for subject in ["`keys`", "`onKey`", "Placement::Builtin", "bingo-mod-hello"] {

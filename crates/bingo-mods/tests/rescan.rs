@@ -69,11 +69,13 @@ impl Running {
         .unwrap();
     }
     async fn reload(&mut self) -> String {
+        self.command("/plugins reload").await
+    }
+    async fn command(&mut self, line: &str) -> String {
         let intent = IntentId::mint();
-        self.attachment.handle.submit(
-            intent.clone(),
-            Input::text("/plugins reload", Origin::surface("test")),
-        );
+        self.attachment
+            .handle
+            .submit(intent.clone(), Input::text(line, Origin::surface("test")));
         tokio::time::timeout(Duration::from_secs(15), async {
             while let Some(frame) = self.attachment.events.next().await {
                 if let Event::IntentAck {
@@ -260,6 +262,21 @@ async fn waiting_project_cannot_shadow_user_and_edits_need_a_fresh_yes() {
         run.listed("plugins:same").await.unwrap()["state"],
         json!({"kind":"waiting","changed":false})
     );
+    assert!(
+        run.command("/plugins enable plugins:same")
+            .await
+            .contains("waits for your yes")
+    );
+    assert_eq!(run.listed("same").await.unwrap()["state"]["kind"], "on");
+    let callbacks = run
+        .host
+        .handle()
+        .service(&bingo_plugin_host::callback::KEY)
+        .unwrap();
+    assert!(
+        callbacks.get("same").is_ok(),
+        "the waiting namesake leaves personal callbacks standing"
+    );
     // A successfully loaded generation replaces the user's only after approval.
     std::fs::write(project.join("main.ts"), SOURCE).unwrap();
     run.approve("same").await;
@@ -274,6 +291,71 @@ async fn waiting_project_cannot_shadow_user_and_edits_need_a_fresh_yes() {
     assert_eq!(run.listed("same").await.unwrap()["origin"], "user");
     assert_eq!(
         run.listed("plugins:same").await.unwrap()["state"],
+        json!({"kind":"waiting","changed":true})
+    );
+    run.host.shutdown().await;
+}
+
+#[tokio::test]
+async fn switches_preserve_state_and_store_and_never_replace_repository_approval() {
+    let mut run = Running::new().await;
+    let root = fixture(&run.project(), "project", SOURCE);
+    run.reload().await;
+    assert!(
+        run.command("/plugins enable plugins:project")
+            .await
+            .contains("waits for your yes")
+    );
+    assert_eq!(
+        run.listed("plugins:project").await.unwrap()["state"]["kind"],
+        "waiting"
+    );
+    run.approve("project").await;
+    run.reload().await;
+    assert!(
+        run.command("/plugins disable project")
+            .await
+            .contains("off now")
+    );
+    assert_eq!(run.listed("project").await.unwrap()["state"]["kind"], "off");
+    assert!(
+        run.command("/plugins enable project")
+            .await
+            .contains("on now")
+    );
+    let store =
+        bingo_plugin_host::state::Store::new(&Env::rooted(run.home.path()).data_dir, "project");
+    assert_eq!(
+        store
+            .get(run.attachment.session.to_string(), "starts".into())
+            .await
+            .unwrap()
+            .unwrap()
+            .value,
+        json!(2)
+    );
+    assert_eq!(
+        store
+            .get("global".into(), "kept".into())
+            .await
+            .unwrap()
+            .unwrap()
+            .value,
+        json!("yes")
+    );
+    run.command("/plugins disable project").await;
+    std::fs::write(
+        root.join("main.ts"),
+        "throw new Error('unapproved bytes ran')",
+    )
+    .unwrap();
+    assert!(
+        run.command("/plugins enable project")
+            .await
+            .contains("changed since your yes")
+    );
+    assert_eq!(
+        run.listed("plugins:project").await.unwrap()["state"],
         json!({"kind":"waiting","changed":true})
     );
     run.host.shutdown().await;

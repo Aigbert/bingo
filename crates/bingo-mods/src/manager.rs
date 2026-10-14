@@ -16,12 +16,14 @@ use std::{
 mod directories;
 mod reload;
 mod rescan;
+mod switching;
 pub(crate) struct Manager {
     pub(crate) callbacks: Arc<bingo_plugin_host::callback::Registry>,
     env: Env,
     directories: directories::Directories,
     settings: BTreeMap<String, Value>,
-    switched_off: BTreeSet<String>,
+    switched_off: RwLock<BTreeSet<String>>,
+    retired: tokio::sync::Mutex<Vec<Arc<Module>>>,
     limits: Limits,
     modules: RwLock<Vec<Arc<Module>>>,
     host: OnceLock<HostHandle>,
@@ -47,7 +49,8 @@ impl Manager {
             env,
             directories: directories::Directories::new(directories),
             settings,
-            switched_off,
+            switched_off: RwLock::new(switched_off),
+            retired: tokio::sync::Mutex::default(),
             limits,
             modules: RwLock::new(Vec::new()),
             host: OnceLock::new(),
@@ -90,7 +93,11 @@ impl Manager {
                 .get(&found.name)
                 .cloned()
                 .unwrap_or_else(|| serde_json::json!({}));
-            let off = self.switched_off.contains(&found.name);
+            let off = self
+                .switched_off
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .contains(&found.name);
             let module = Module::load(found, config, self.limits.clone(), &self.env, off).await;
             if !off && let Err(reason) = module.admission.decision() {
                 self.notices.push(Notice::warn("PLUGIN_UNREADABLE", reason));
@@ -193,6 +200,10 @@ impl Manager {
         for module in self.modules() {
             module.close().await;
         }
+        let retired = std::mem::take(&mut *self.retired.lock().await);
+        for module in retired {
+            module.close().await;
+        }
         if let Some(dollar) = self.dollar.get() {
             dollar.stop().await;
         }
@@ -200,6 +211,12 @@ impl Manager {
 }
 #[async_trait]
 impl PluginSource for Manager {
+    async fn switch_kind(&self, name: &str) -> plugin::PluginSwitch {
+        self.module_kind(name)
+    }
+    async fn switch(&self, name: &str, enabled: bool) -> Result<plugin::PluginSwitch, KernelError> {
+        self.switch_module(name, enabled).await
+    }
     async fn approval(&self, name: &str) -> Option<Approval> {
         let modules = self.modules();
         let module = modules.iter().find(|module| {
@@ -242,7 +259,8 @@ impl PluginSource for Manager {
     }
     async fn registered(&self, name: &str, result: Result<PluginGrant, String>) {
         if let Some(module) = self.modules().iter().find(|module| {
-            module.found.name == name && matches!(module.admission.state(), PluginState::Registering)
+            module.found.name == name
+                && matches!(module.admission.state(), PluginState::Registering)
         }) {
             let denied = result.is_err();
             module.admission.finish(result);

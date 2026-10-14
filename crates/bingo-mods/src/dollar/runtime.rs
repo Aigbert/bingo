@@ -88,6 +88,12 @@ impl Runtime {
     ) -> Result<SessionState, String> {
         Ok(self.sessions.get(host, session).await?.snapshot())
     }
+    pub(crate) fn unregister(&self, plugin: &str) {
+        self.registered.remove(plugin);
+    }
+    pub(crate) fn has_tools(&self, plugin: &str) -> bool {
+        self.registered.has_tools(plugin)
+    }
     pub(crate) fn tools(&self) -> Vec<Arc<dyn Tool>> {
         self.registered.tools()
     }
