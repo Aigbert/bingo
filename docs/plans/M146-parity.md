@@ -46,10 +46,10 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
 
 2026-10-14: delegate widened scope to both validator blockers and shared loading/schema paths:
 - `crates/bingo-mods/src/validate/{dollar,source,tests}.rs`,
-  `src/{strip,load,mount,module,chain}.rs`, `src/dollar/{table,tests,callback}.rs`,
-  `tests/{strip,engine,testing}.rs`: schema-derived data reads and erased imports.
+  `src/{lib,imports,strip,load,mount,module,chain}.rs`, `src/dollar/{table,tests,callback}.rs`,
+  `tests/{strip,engine,testing,plugin}.rs`: schema-derived data reads and erased imports.
 - `schema/dollar.json`, `sdk/typescript/src/{dollar,dollar-types,plugin}.ts`,
-  `crates/bingo-plugin-rpc/src/{wire,bridge}.rs`, generated plugin schemas/wire,
+  `crates/bingo-plugin-rpc/src/{wire,bridge,validate}.rs`, generated plugin schemas/wire,
   `docs/adr/0075-plugin-protocol-2.md`: plugin metadata in both transports.
 - `crates/bingo/src/plugins/test/driver.rs`: test metadata parity.
 

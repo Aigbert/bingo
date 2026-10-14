@@ -77,7 +77,7 @@ impl Root {
         }
         let path = self.path(name)?;
         let mut source = String::new();
-        std::fs::File::open(path)
+        std::fs::File::open(&path)
             .map_err(|e| e.to_string())?
             .take(self.max_bytes.saturating_add(1))
             .read_to_string(&mut source)
@@ -85,19 +85,16 @@ impl Root {
         if source.len() as u64 > self.max_bytes {
             return Err(format!("{name}:1: module exceeds the source limit"));
         }
-        crate::strip::compile(Path::new(name), &source, self.testing).map_err(|why| why.to_string())
+        crate::strip::compile(
+            path.strip_prefix(&self.root).map_err(|e| e.to_string())?,
+            &source,
+            self.testing,
+        )
+        .map_err(|why| why.to_string())
     }
 
     fn path(&self, name: &str) -> Result<PathBuf, String> {
-        let path = self
-            .root
-            .join(name)
-            .canonicalize()
-            .map_err(|e| format!("{name}:1: {e}"))?;
-        if !path.starts_with(&self.root) {
-            return Err(format!("{name}:1: module escapes the mod root"));
-        }
-        Ok(path)
+        crate::imports::module_path(&self.root, Path::new(name))
     }
 }
 
@@ -125,8 +122,13 @@ impl Resolver for Root {
             .map_err(|why| rquickjs::Exception::throw_type(ctx, &why))?;
         let name = path.to_string_lossy().replace('\\', "/");
         if name != "bingo" {
-            self.path(&name)
+            let path = self
+                .path(&name)
                 .map_err(|why| rquickjs::Exception::throw_type(ctx, &why))?;
+            return path
+                .strip_prefix(&self.root)
+                .map(|path| path.to_string_lossy().replace('\\', "/"))
+                .map_err(|why| rquickjs::Exception::throw_type(ctx, &why.to_string()));
         }
         Ok(name)
     }

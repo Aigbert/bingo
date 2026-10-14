@@ -276,7 +276,7 @@ async fn dollar_reads_the_session_fold_and_freezes_its_plugin_identity() {
     assert_eq!(answer["config"], json!(current.snapshot.config));
     assert_eq!(
         answer["plugin"],
-        json!({"name":"fixture","root":fixture.root})
+        json!({"name":"fixture","root":fixture.root,"version":"1"})
     );
     assert_eq!(answer["frozen"], true);
     fixture.host.shutdown().await;
