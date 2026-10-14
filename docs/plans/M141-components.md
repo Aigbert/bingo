@@ -49,6 +49,7 @@ After M138 and M140; landed dependencies are recorded below.
 ## Files
 
 - `crates/bingo-sdk/src/{component.rs (new),component/,render.rs,lib.rs,intercept.rs,catalogue/matcher.rs}`
+- `crates/bingo-sdk/src/testing/{api,calls}.rs` (count `HostApi::render` in the shared test host)
 - `crates/bingo-core/src/{chain/render.rs,session.rs,session/catalogue.rs}` (config publication)
 - `crates/bingo-mods/tests/components.rs` (QuickJS helper/log contract); `crates/bingo-mods/src/` `$.ui.log`, the embedded helpers; `sdk/typescript/src/{state.ts (new),state.test.ts (new),index.ts,ui.ts}`
 - `crates/bingo-surface-tui/src/{component.rs (new),views/mod.rs,transcript.rs,transcript/{said,output}.rs,
