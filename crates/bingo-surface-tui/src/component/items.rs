@@ -136,3 +136,51 @@ fn text_of(value: &Value) -> String {
         .map(str::to_owned)
         .unwrap_or_else(|| value.to_string())
 }
+
+pub fn tail(item: &Item) -> Option<Props> {
+    let ItemBody::ToolCall {
+        call_id,
+        name,
+        progress,
+        output,
+        ..
+    } = &item.body
+    else {
+        return None;
+    };
+    if item.status == ItemStatus::Running {
+        return progress.as_ref().map(|hint| {
+            Props::ToolProgress(ToolProgressProps {
+                tool_use_id: call_id.to_string(),
+                kind: "text".into(),
+                hint: hint.clone(),
+            })
+        });
+    }
+    output.as_ref().map(|output| {
+        Props::ToolResult(ToolResultProps {
+            tool_use_id: call_id.to_string(),
+            tool: name.clone(),
+            output: serde_json::to_value(output).unwrap_or_default(),
+            is_errored: item.status.failed(Some(output)),
+        })
+    })
+}
+
+pub fn all(item: &Item, expanded: bool) -> Vec<Props> {
+    props(item, expanded)
+        .into_iter()
+        .chain(tail(item))
+        .collect()
+}
+
+pub fn group(item: &Item, expanded: bool) -> Option<Props> {
+    let Props::ToolUse(call) = props(item, expanded)? else {
+        return None;
+    };
+    Some(Props::ToolGroup(ToolGroupProps {
+        is_active: call.is_running,
+        is_expanded: expanded,
+        calls: vec![call],
+    }))
+}

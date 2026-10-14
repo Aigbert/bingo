@@ -2,7 +2,10 @@
 use bingo_sdk::{View, component::Props};
 use ratatui::text::Line;
 pub mod band;
+pub mod closing;
 pub mod items;
+pub mod pane;
+pub mod question;
 
 pub fn draw(
     props: &Props,
@@ -26,10 +29,18 @@ pub fn draw(
     };
     let mut lines = crate::views::render_with(answer, width, &engine);
     if invalid.get() {
-        lines.push(Line::from(ratatui::text::Span::styled(
-            "invalid component props; showing the original drawing",
-            crate::theme::dim(),
-        )));
+        lines.extend(crate::views::render(
+            &View::Text {
+                children: vec![bingo_sdk::view::TextChild::String(
+                    "invalid component props; showing the original drawing".into(),
+                )],
+                style: bingo_sdk::view::TextStyle {
+                    dim_color: Some(true),
+                    ..Default::default()
+                },
+            },
+            width,
+        ));
     }
     lines
 }
@@ -165,3 +176,38 @@ mod band_tests {
 
 #[cfg(test)]
 mod sites_tests;
+
+pub fn resolve(
+    state: &bingo_sdk::SessionState,
+    memo: Option<&crate::pulled::Memo>,
+    id: &str,
+    props: &Props,
+    width: usize,
+    own: impl Fn(&Props, usize) -> Vec<Line<'static>>,
+) -> Vec<Line<'static>> {
+    let key = key(state, id, props, width as u16, 0);
+    let answer = key
+        .as_ref()
+        .and_then(|key| memo.and_then(|memo| memo.get(key)));
+    draw(props, answer, width, own)
+}
+
+pub struct Site<'a> {
+    pub state: &'a bingo_sdk::SessionState,
+    pub memo: &'a crate::pulled::Memo,
+    pub width: usize,
+    pub pulls: &'a mut Vec<crate::pulled::Key>,
+}
+impl Site<'_> {
+    pub fn draw(
+        &mut self,
+        id: &str,
+        props: &Props,
+        own: impl Fn(&Props, usize) -> Vec<Line<'static>>,
+    ) -> Vec<Line<'static>> {
+        if let Some(key) = key(self.state, id, props, self.width as u16, 0) {
+            self.pulls.push(key);
+        }
+        resolve(self.state, Some(self.memo), id, props, self.width, own)
+    }
+}

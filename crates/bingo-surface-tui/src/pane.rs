@@ -1,7 +1,6 @@
 //! Pane placement and the editor belonging to the focused element.
 use crate::{
     clock::Now, composer::Composer, effect::Effect, focus::Focus, layout::Layout, theme, ui::Ui,
-    views,
 };
 use bingo_sdk::{
     Action, Input, SessionState, View,
@@ -107,7 +106,7 @@ pub fn height(ui: &Ui, state: &SessionState, screen: u16) -> u16 {
         .fold(0, u16::saturating_add)
         .min(screen / 3)
 }
-pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, now: Now) {
+pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, _now: Now) {
     let panes: Vec<_> = placed(state)
         .into_iter()
         .filter(|pane| ui.placed.panes.visible(pane))
@@ -133,7 +132,13 @@ pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, now: 
             pane.title.clone()
         };
         let mut lines = vec![Line::from(Span::styled(title, theme::bold()))];
-        if let Shown::Pull { request } = &pane.view {
+        let shown = crate::component::pane::shown(
+            &pane,
+            selected,
+            rect.width,
+            rect.height.saturating_sub(1),
+        );
+        if let Shown::Pull { request } = &shown {
             frame.pulls.push(crate::pulled::Key::new(
                 state,
                 request,
@@ -141,7 +146,7 @@ pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, now: 
                 rect.height.saturating_sub(1),
             ));
         }
-        match ui.placed.pulled.view(&pane.view, state, rect.width) {
+        match ui.placed.pulled.view(&shown, state, rect.width) {
             Some(view) => {
                 let mut view = view.clone();
                 let index = ui
@@ -158,13 +163,17 @@ pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, now: 
                     selected,
                     &mut 0,
                 );
-                lines.extend(views::marked(
-                    &view,
+                let props = crate::component::pane::props(
+                    &pane,
+                    selected,
+                    rect.width,
+                    rect.height.saturating_sub(1),
+                );
+                lines.extend(crate::component::draw(
+                    &props,
+                    Some(&view),
                     usize::from(rect.width),
-                    &views::Marks {
-                        pending: ui.pending_ui.as_ref().map(|(_, action)| action.clone()),
-                        ..views::Marks::at(now)
-                    },
+                    |_, _| Vec::new(),
                 ));
             }
             None => lines.push(Line::from(theme::ellipsis())),
@@ -314,13 +323,15 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
         }
         return Vec::new();
     }
-    let width = ui
+    let area = ui
         .shown
         .panes
         .iter()
         .find(|(id, _)| id == &focused)
-        .map_or(0, |(_, area)| area.width);
-    let Some(view) = ui.placed.pulled.view(&pane.view, state, width) else {
+        .map_or(Rect::default(), |(_, area)| *area);
+    let shown =
+        crate::component::pane::shown(&pane, true, area.width, area.height.saturating_sub(1));
+    let Some(view) = ui.placed.pulled.view(&shown, state, area.width) else {
         return Vec::new();
     };
     let mut items = Vec::new();

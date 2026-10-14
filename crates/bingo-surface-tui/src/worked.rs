@@ -16,7 +16,7 @@ pub const SAY_AFTER: Duration = Duration::from_secs(1);
 /// The verb the verdict earns, and the word before the clock: a turn that
 /// finished was *done* at that time; one that was stopped or failed was
 /// simply at it.
-fn verb(status: &TurnStatus) -> (&'static str, &'static str) {
+pub(crate) fn verb(status: &TurnStatus) -> (&'static str, &'static str) {
     match status {
         TurnStatus::Completed => ("Worked for", "done "),
         TurnStatus::Interrupted { .. } => ("Stopped after", ""),

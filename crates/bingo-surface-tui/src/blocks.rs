@@ -257,6 +257,9 @@ pub struct Blocks {
 }
 
 impl Blocks {
+    pub fn closing_start(&self) -> usize {
+        self.height.saturating_sub(self.tail.len())
+    }
     /// Bring the cache up to date with the state and answer with the height of
     /// the whole transcript, in wrapped lines.
     pub fn sync(&mut self, state: &SessionState, agents: &Agents<'_>, rows: &Rows<'_>) -> usize {

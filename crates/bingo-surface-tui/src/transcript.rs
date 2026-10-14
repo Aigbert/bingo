@@ -5,9 +5,7 @@
 
 use std::time::{Duration, Instant};
 
-use bingo_sdk::{
-    CommandSpec, DecisionKind, Item, ItemBody, ItemStatus, SessionState, ToolOutput, TurnStatus,
-};
+use bingo_sdk::{CommandSpec, DecisionKind, Item, ItemBody, ItemStatus, SessionState, ToolOutput};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use serde_json::Value;
@@ -17,7 +15,7 @@ use crate::clock::{self, Anim, Now};
 use crate::fold::{self, Fold, Folds};
 use crate::graphics::{Decoded, Linked, Picture};
 use crate::tree::{self, Agents};
-use crate::{markdown, paths, theme, thoughts, worked, wrap};
+use crate::{markdown, paths, theme, thoughts, wrap};
 
 /// What was said into a session: a person's line, a subsystem's notice, a
 /// room's conversation.
@@ -81,6 +79,7 @@ const DIFF_ROWS: usize = 12;
 const EXPAND: &str = "ctrl+o to expand";
 
 /// What every row of one transcript needs to know about where it is.
+#[derive(Clone)]
 pub struct Rows<'a> {
     pub pulled: Option<&'a crate::pulled::Memo>,
     pub state: &'a SessionState,
@@ -355,6 +354,61 @@ fn item_lines(
     cue: Cue,
     fold: Fold,
 ) -> Block {
+    let mut block = component_item(item, place, agents, rows, cue, fold);
+    if let Some(props) = crate::component::items::group(item, fold == Fold::Open) {
+        block.lines = crate::component::resolve(
+            rows.state,
+            rows.pulled,
+            &crate::component::items::id(item),
+            &props,
+            rows.width,
+            |changed, width| {
+                if changed == &props && width == rows.width {
+                    return block.lines.clone();
+                }
+                let bingo_sdk::component::Props::ToolGroup(group) = changed else {
+                    return Vec::new();
+                };
+                let rows = Rows {
+                    width,
+                    ..rows.clone()
+                };
+                group
+                    .calls
+                    .iter()
+                    .flat_map(|call| {
+                        let item = crate::component::items::changed(
+                            item,
+                            &bingo_sdk::component::Props::ToolUse(call.clone()),
+                        );
+                        component_item(
+                            &item,
+                            place,
+                            agents,
+                            &rows,
+                            cue,
+                            if group.is_expanded { Fold::Open } else { fold },
+                        )
+                        .lines
+                    })
+                    .collect()
+            },
+        );
+    }
+    match rows.placed_on(&item.id).next_back() {
+        Some(slot) => slots::placed_row(item, slot, rows, cue, block),
+        None => block,
+    }
+}
+
+fn component_item(
+    item: &Item,
+    place: &Place<'_>,
+    agents: &Agents<'_>,
+    rows: &Rows<'_>,
+    cue: Cue,
+    fold: Fold,
+) -> Block {
     let mut block = default_item_lines(item, place, agents, rows, cue, fold);
     if let Some(props) = crate::component::items::props(item, fold == Fold::Open)
         && let Some(key) = crate::component::key(
@@ -366,8 +420,12 @@ fn item_lines(
         )
         && let Some(answer) = rows.pulled.and_then(|memo| memo.get(&key))
     {
-        block.lines = crate::component::draw(&props, Some(answer), rows.width, |changed, _| {
-            if changed == &props {
+        block.lines = crate::component::draw(&props, Some(answer), rows.width, |changed, width| {
+            let rows = &Rows {
+                width,
+                ..rows.clone()
+            };
+            if changed == &props && width == key.request.viewport.columns as usize {
                 return block.lines.clone();
             }
             let changed_item = crate::component::items::changed(item, changed);
@@ -378,10 +436,7 @@ fn item_lines(
             default_item_lines(&changed_item, place, agents, rows, cue, fold).lines
         });
     }
-    match rows.placed_on(&item.id).next_back() {
-        Some(slot) => slots::placed_row(item, slot, rows, cue, block),
-        None => block,
-    }
+    block
 }
 
 fn default_item_lines(
@@ -505,7 +560,8 @@ fn called(
     };
     match agents.get(&item.id) {
         Some(child) => child_row(child, input, rows),
-        None => tool_call(
+        None => component_call(
+            item,
             Call {
                 status: item.status,
                 name,
@@ -675,6 +731,7 @@ fn cooling(back: usize, age: f32) -> Style {
 }
 
 /// One tool call, as much of it as there is yet.
+#[derive(Clone)]
 struct Call<'a> {
     status: ItemStatus,
     name: &'a str,
@@ -686,6 +743,49 @@ struct Call<'a> {
     progress: Option<&'a str>,
     /// How much of what came back is shown.
     fold: Fold,
+}
+
+fn component_call(item: &Item, call: Call<'_>, rows: &Rows<'_>, cue: Cue) -> Vec<Line<'static>> {
+    let mut head = call.clone();
+    head.output = None;
+    head.progress = None;
+    let mut out = tool_call(head, rows, cue);
+    let Some(props) = crate::component::items::tail(item) else {
+        return out;
+    };
+    out.extend(crate::component::resolve(
+        rows.state,
+        rows.pulled,
+        &crate::component::items::id(item),
+        &props,
+        rows.width,
+        |changed, width| {
+            let rows = Rows {
+                width,
+                ..rows.clone()
+            };
+            match changed {
+                bingo_sdk::component::Props::ToolResult(props) => {
+                    let output = crate::component::items::output_of(&props.output);
+                    let call = Call {
+                        output: Some(&output),
+                        status: if props.is_errored {
+                            ItemStatus::Failed
+                        } else {
+                            ItemStatus::Completed
+                        },
+                        ..call.clone()
+                    };
+                    result(&call, &rows)
+                }
+                bingo_sdk::component::Props::ToolProgress(props) => {
+                    returns(tail(&props.hint, TAIL_ROWS, rows.result_width()), &rows)
+                }
+                _ => Vec::new(),
+            }
+        },
+    ));
+    out
 }
 
 fn tool_call(call: Call<'_>, rows: &Rows<'_>, cue: Cue) -> Vec<Line<'static>> {
@@ -934,45 +1034,51 @@ fn calls(item: &Item, tool: &str) -> bool {
 /// 2026-09-08, user-directed — not a row pinned over the composer) and the
 /// next turn takes it away.
 pub fn closing(state: &SessionState, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    if state.busy() {
-        return Vec::new();
-    }
-    let mut out = failure(state, rows);
-    out.extend(worked(state, rows));
-    out
+    crate::component::closing::props(state)
+        .iter()
+        .flat_map(|props| {
+            crate::component::closing::draw(state, rows.pulled, props, rows.width, rows.now)
+        })
+        .collect()
 }
 
-/// A turn that failed says why on a `⏺` of its own.
-fn failure(state: &SessionState, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let Some(TurnStatus::Failed { error }) = state.last_status() else {
-        return Vec::new();
-    };
-    speaks(
-        theme::bad(),
-        vec![Line::from(Span::styled(
-            error.message.clone(),
+pub(crate) fn component_closing(
+    state: &SessionState,
+    props: &bingo_sdk::component::Props,
+    now: Now,
+) -> Vec<Line<'static>> {
+    match props {
+        bingo_sdk::component::Props::InfoNotice(props) => vec![Line::from(Span::styled(
+            format!(
+                "{} {}{}",
+                theme::bullet(),
+                props.text,
+                props
+                    .command
+                    .as_ref()
+                    .map(|c| format!(" /{c}"))
+                    .unwrap_or_default()
+            ),
             theme::bad(),
         ))],
-        rows,
-    )
-}
-
-/// `▍ Worked for 15m 11s · done 13:48`, dim: the verb the verdict earns, how
-/// long the turn ran, and the hour it ended on. A turn that answered at once
-/// says nothing, as it drew no row while it ran.
-fn worked(state: &SessionState, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let Some(turn) = state.last_turn.as_ref() else {
-        return Vec::new();
-    };
-    if worked::ran(turn) < worked::SAY_AFTER {
-        return Vec::new();
+        bingo_sdk::component::Props::TurnDuration(props) => {
+            let when = state
+                .last_turn
+                .as_ref()
+                .map(|turn| crate::worked::words(turn, now.wall, &jiff::tz::TimeZone::system()).1)
+                .unwrap_or_default();
+            vec![Line::from(Span::styled(
+                format!(
+                    "{} {} {}{when}",
+                    theme::mark(),
+                    props.word,
+                    crate::worked::duration(std::time::Duration::from_millis(props.duration_ms))
+                ),
+                theme::dim(),
+            ))]
+        }
+        _ => Vec::new(),
     }
-    let (what, when) = worked::words(turn, rows.now.wall, &jiff::tz::TimeZone::system());
-    vec![Line::from(vec![
-        Span::styled(format!("{} ", theme::mark()), theme::dim()),
-        Span::styled(what, theme::dim()),
-        Span::styled(when, theme::dim()),
-    ])]
 }
 
 /// A full-width divider with its reason in the middle of the left run.
@@ -2151,7 +2257,7 @@ mod tests {
                 2,
                 completed(
                     "trn_1",
-                    TurnStatus::Failed {
+                    bingo_sdk::TurnStatus::Failed {
                         error: bingo_sdk::KernelError::new(
                             bingo_sdk::ErrorCode::ProviderUnavailable,
                             "no route to the provider",

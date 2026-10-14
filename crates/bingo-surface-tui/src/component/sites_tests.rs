@@ -5,10 +5,20 @@ use serde_json::json;
 fn requests(state: &bingo_sdk::SessionState) -> Vec<Component> {
     let (mut ui, now) = scene();
     draw_tree(80, 24, &solo(state), &mut ui, later(now, 2000));
-    ui.shown.pulls.iter().map(|key| key.request.component).collect()
+    ui.shown
+        .pulls
+        .iter()
+        .map(|key| key.request.component)
+        .collect()
 }
 fn matched(state: &mut bingo_sdk::SessionState) {
-    state.config.kernel["render"] = serde_json::to_value(Component::ALL.into_iter().map(|c| (c, vec![json!({})])).collect::<std::collections::BTreeMap<_, _>>()).unwrap();
+    state.config.kernel["render"] = serde_json::to_value(
+        Component::ALL
+            .into_iter()
+            .map(|c| (c, vec![json!({})]))
+            .collect::<std::collections::BTreeMap<_, _>>(),
+    )
+    .unwrap();
 }
 #[test]
 fn unmatched_frame_has_no_component_requests() {
@@ -30,13 +40,30 @@ fn question_requests_its_typed_component() {
 }
 #[test]
 fn turn_complete_notice_and_duration_are_separate_ordered_requests() {
-    let mut closed = frame(2, completed("trn_1", TurnStatus::Failed { error: bingo_sdk::KernelError::new(bingo_sdk::ErrorCode::Internal, "completion notice") }));
+    let mut closed = frame(
+        2,
+        completed(
+            "trn_1",
+            TurnStatus::Failed {
+                error: bingo_sdk::KernelError::new(
+                    bingo_sdk::ErrorCode::Internal,
+                    "completion notice",
+                ),
+            },
+        ),
+    );
     closed.ts = ts() + jiff::SignedDuration::from_secs(2);
     let mut state = folded(vec![frame(1, started("trn_1")), closed]);
     matched(&mut state);
     let asked = requests(&state);
-    let notice = asked.iter().position(|c| *c == Component::InfoNotice).expect("notice");
-    let duration = asked.iter().position(|c| *c == Component::TurnDuration).expect("duration");
+    let notice = asked
+        .iter()
+        .position(|c| *c == Component::InfoNotice)
+        .expect("notice");
+    let duration = asked
+        .iter()
+        .position(|c| *c == Component::TurnDuration)
+        .expect("duration");
     assert!(notice < duration);
 }
 #[test]
