@@ -202,13 +202,15 @@ impl Manager {
                 model: None,
                 host: host.clone(),
             };
-            crate::link::Link(module.clone())
-                .observe(
+            render::under_input(
+                false,
+                crate::link::Link(module.clone()).observe(
                     catalogue::SESSION_START,
                     &cx,
                     &json!({"session":session.id}),
-                )
-                .await;
+                ),
+            )
+            .await;
         }
         Ok(())
     }

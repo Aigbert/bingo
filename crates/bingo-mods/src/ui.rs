@@ -13,14 +13,24 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::Arc;
 
+mod choices;
+
 pub(crate) struct Ui {
+    memory: choices::Memory,
     runtime: Arc<crate::dollar::Runtime>,
 }
 pub(crate) fn install(
     host: &HostHandle,
     runtime: Arc<crate::dollar::Runtime>,
+    env: &Env,
 ) -> Result<(), KernelError> {
-    host.open_service("bingo.plugin.ui", Arc::new(Ui { runtime }))
+    host.open_service(
+        "bingo.plugin.ui",
+        Arc::new(Ui {
+            runtime,
+            memory: choices::Memory::new(env.data_dir.join("pane-choices.json")),
+        }),
+    )
 }
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -105,8 +115,14 @@ impl WireService for Ui {
         let caller = ops::caller().map_err(ServiceError)?;
         match method {
             "status" => place(&caller, parse(params)?).await,
-            "open" => open(&caller, parse(params)?).await,
-            "close" => close(&caller, parse(params)?).await,
+            "open" => open(&self.memory, &caller, parse(params)?).await,
+            "choose" => self.choose(&caller, parse(params)?).await,
+            "close" => {
+                let input: Close = parse(params)?;
+                close(&caller, input.clone()).await?;
+                remember(&self.memory, &caller, &input.id, false).await;
+                Ok(Value::Null)
+            }
             "toast" | "notify" => toast(&caller, parse(params)?, method == "notify").await,
             "invalidate" => {
                 let input: render::Invalidate = parse(params)?;
@@ -164,7 +180,11 @@ impl WireService for Ui {
         }
     }
 }
-async fn open(caller: &Caller, input: Open) -> Result<Value, ServiceError> {
+async fn open(
+    memory: &choices::Memory,
+    caller: &Caller,
+    input: Open,
+) -> Result<Value, ServiceError> {
     let request = RenderRequest {
         component: Component::Pane,
         request_id: input.id.clone(),
@@ -182,7 +202,7 @@ async fn open(caller: &Caller, input: Open) -> Result<Value, ServiceError> {
         focus: input.focus,
         close_on_escape: input.close_on_escape,
         hold_toasts: input.hold_toasts,
-        asked: render::asked(),
+        asked: render::asked() || memory.open(&caller.plugin, &input.id),
         place: input.place,
         size: input
             .size
@@ -196,11 +216,12 @@ async fn open(caller: &Caller, input: Open) -> Result<Value, ServiceError> {
         caller,
         Place {
             session: Some(input.session),
-            slot: input.id,
+            slot: input.id.clone(),
             view: Some(slot),
         },
     )
     .await?;
+    remember(memory, caller, &input.id, true).await;
     Ok(json!({}))
 }
 async fn place(caller: &Caller, input: Place) -> Result<Value, ServiceError> {
@@ -252,6 +273,53 @@ fn failed(error: impl std::fmt::Display) -> ServiceError {
     ServiceError(error.to_string())
 }
 
+impl Ui {
+    async fn choose(&self, caller: &Caller, input: Close) -> Result<Value, ServiceError> {
+        if !render::asked() {
+            return Err(ServiceError("pane choices require person input".into()));
+        }
+        let state = self
+            .runtime
+            .snapshot(&caller.host, &input.session)
+            .await
+            .map_err(ServiceError)?;
+        let Some(mut pane) = slot::placed(&state).into_iter().find(|placed| {
+            placed.plugin == caller.plugin
+                && matches!(&placed.slot, Slot::Pane { id, .. } if id == &input.id)
+        }) else {
+            return Err(ServiceError("pane is no longer available".into()));
+        };
+        if let Slot::Pane { asked, .. } = &mut pane.slot {
+            *asked = true;
+        }
+        place(
+            caller,
+            Place {
+                session: Some(input.session),
+                slot: input.id.clone(),
+                view: Some(pane.slot),
+            },
+        )
+        .await?;
+        remember(&self.memory, caller, &input.id, true).await;
+        Ok(Value::Null)
+    }
+}
+async fn remember(memory: &choices::Memory, caller: &Caller, pane: &str, open: bool) {
+    if render::asked()
+        && let Err(error) = memory.remember(&caller.plugin, pane, open)
+    {
+        let _ = caller
+            .host
+            .notice(
+                Level::Warn,
+                "PANE_CHOICE",
+                &format!("could not keep pane choice: {error}"),
+            )
+            .await;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297,6 +365,55 @@ mod tests {
             let slot: Slot = serde_json::from_value(payload["slots"][0].clone()).unwrap();
             assert!(
                 matches!(slot, Slot::Pane {asked:was_asked, view:Shown::Pull{request}, ..} if was_asked == asked && request.request_id == "counter" && request.component == Component::Pane)
+            );
+        }
+    }
+    #[tokio::test]
+    async fn autonomous_open_and_close_never_write_choices() {
+        let root = tempfile::tempdir().unwrap();
+        let host = testing::TestHost::default();
+        host.on_signal(|_, _, _, _| async { Ok(()) });
+        let handle = host.handle();
+        crate::dollar::Runtime::install(
+            &handle,
+            root.path().into(),
+            std::time::Duration::from_secs(1),
+        )
+        .unwrap();
+        let ui = handle.service_wire("bingo.plugin.ui").unwrap();
+        let store = bingo_plugin_host::state::Store::new(root.path(), "counter");
+        let path = Env::rooted(root.path()).data_dir.join("pane-choices.json");
+        for method in ["open", "close"] {
+            ops::scope(
+                &handle,
+                "counter",
+                &store,
+                ui.call(
+                    method,
+                    json!({"session":"ses_ui","id":"counter","title":"Counter","asked":true}),
+                ),
+            )
+            .await
+            .unwrap();
+            assert!(!path.exists());
+        }
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, r#"{"counter":{"counter":true}}"#).unwrap();
+        for method in ["close", "open"] {
+            ops::scope(
+                &handle,
+                "counter",
+                &store,
+                ui.call(
+                    method,
+                    json!({"session":"ses_ui","id":"counter","title":"Counter"}),
+                ),
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                std::fs::read_to_string(&path).unwrap(),
+                r#"{"counter":{"counter":true}}"#
             );
         }
     }

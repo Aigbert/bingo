@@ -23,12 +23,25 @@ pub fn mouse(
         && let Some((key, _)) = ui.shown.waiting.iter().find(|(_, area)| area.contains(at))
     {
         let key = key.clone();
-        ui.placed.panes.opened.insert(key.clone());
         if ui.shown.seating.collapsed.contains(&key) {
             ui.placed.panes.moved.insert(key.clone(), Place::Overlay);
         }
         focus(ui, state, &key);
-        return Some(vec![]);
+        return Some(
+            placed(state)
+                .into_iter()
+                .find(|pane| pane.key == key)
+                .map(|pane| {
+                    super::submit(
+                        bingo_sdk::Action {
+                            name: format!("{}:ui", pane.plugin),
+                            args: serde_json::json!({"handler":pane.id,"event":"open"}),
+                        },
+                        None,
+                    )
+                })
+                .unwrap_or_default(),
+        );
     }
     let capture = matches!(
         event.kind,

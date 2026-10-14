@@ -17,7 +17,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Default)]
 pub struct State {
-    opened: BTreeSet<String>,
     order: Vec<String>,
     moved: BTreeMap<String, bingo_sdk::slot::Place>,
     scroll: BTreeMap<String, usize>,
@@ -76,12 +75,11 @@ pub fn placed(state: &SessionState) -> Vec<Pane> {
 }
 impl State {
     pub fn visible(&self, pane: &Pane) -> bool {
-        pane.asked || self.opened.contains(&pane.key)
+        pane.asked
     }
     pub fn sync(&mut self, state: &SessionState, focus: &mut Focus) {
         let panes = placed(state);
         let keys: BTreeSet<_> = panes.iter().map(|pane| pane.key.clone()).collect();
-        self.opened.retain(|key| keys.contains(key));
         self.order.retain(|key| keys.contains(key));
         self.scroll.retain(|key, _| keys.contains(key));
         if self
@@ -97,6 +95,9 @@ impl State {
             *focus = Focus::Composer;
         }
         for pane in panes {
+            if !pane.asked {
+                continue;
+            }
             if self.order.contains(&pane.key) {
                 continue;
             }

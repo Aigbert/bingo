@@ -45,7 +45,7 @@ fn asked_panes_are_inline_at_both_widths_and_unasked_panes_wait_for_a_click() {
     let screen = draw_tree(200, 24, &tree, &mut ui, now);
     assert!(screen.contains("1 pane waiting"), "{screen}");
     assert!(!screen.contains("Count: 0"));
-    crate::pointer::on_mouse(
+    let effects = crate::pointer::on_mouse(
         &mut ui,
         &tree,
         crossterm::event::MouseEvent {
@@ -56,6 +56,11 @@ fn asked_panes_are_inline_at_both_widths_and_unasked_panes_wait_for_a_click() {
         },
         now,
     );
+    assert!(
+        matches!(&effects[..], [crate::effect::Effect::Submit(bingo_sdk::Input::Action { action })] if action.name == "counter:ui" && action.args["event"] == "open")
+    );
+    assert!(draw_tree(200, 24, &tree, &mut ui, now).contains("1 pane waiting"));
+    let tree = solo(&with(pane(true)));
     assert!(draw_tree(200, 24, &tree, &mut ui, now).contains("Count: 0"));
 }
 #[test]

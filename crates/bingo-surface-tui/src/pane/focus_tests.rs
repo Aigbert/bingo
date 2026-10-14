@@ -57,6 +57,7 @@ fn waiting_unfocusable_pane_opens_without_taking_composer_keys() {
         let area = ui.shown.waiting[0].1;
         click(&mut ui, &tree, area, now);
         assert!(matches!(ui.focus, Focus::Composer));
+        let tree = solo(&fixture(focus, true, button));
         let screen = draw_tree(80, 24, &tree, &mut ui, now);
         assert!(
             screen.contains(if button { "Run" } else { "PANE ART" }),
