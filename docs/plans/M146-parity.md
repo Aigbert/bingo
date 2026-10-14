@@ -51,7 +51,12 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
 - `schema/dollar.json`, `sdk/typescript/src/{dollar,dollar-types,plugin}.ts`,
   `crates/bingo-plugin-rpc/src/{wire,bridge,validate}.rs`, generated plugin schemas/wire,
   `docs/adr/0075-plugin-protocol-2.md`: plugin metadata in both transports.
-- `crates/bingo/src/plugins/test/driver.rs`: test metadata parity.
+- `crates/bingo/src/plugins/test/{driver,driver/mock}.rs`, `crates/bingo-mods/js/testing.ts`:
+  test metadata, asynchronous startup and clock test controls; `tests/plugin_kit.rs`, `tests/support/nouns.rs`.
+- `crates/bingo-mods/src/{thread.rs,thread.js,load.rs}` and SDK `{ui,plugin}.ts`:
+  settle synchronous element references through the intercepted table.
+- SDK `src/{ui,state,nouns,dollar}.test.ts`, `schema/events.json`, generated SDK events;
+  `crates/bingo-plugin-rpc/src/{schema,wire}.rs`: port-required event contracts.
 - `crates/bingo-sdk/src/{catalogue,intercept}*`, `crates/bingo-core/src/chain/`:
   deny-only results and core regressions; generated catalogue/protocol types.
 - `crates/bingo-mods/src/validate/{hooks,keys}.rs`, SDK state/UI/command/clock
@@ -91,57 +96,32 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
   mount.rs folds Views, not sources; Engine/Runner share load.rs/strip.rs.
 - Delegate authorized all exposed compatibility gaps, each in its own fix commit
   after a failing test. New kernel doors/nouns or ADR Decision changes still stop.
-- Pending: deny-only results, status clear, static matchers, object atom keys,
-  numeric clock, callback-free commands, synchronous resolve, remaining parity.
+- Compatibility fixes preserve existing doors and Decisions; remaining work is
+  startup test synchronization, command event vocabulary and parity acceptance.
 
 ## Verified (2026-10-14, in progress)
 
-No live/credential tests, foreign processes, terminal apps or tmux runs.
-`cargo test -p bingo-mods --lib noun_data_reads_are_values_but_noun_and_method_aliases_are_not --locked`:
-red `FAILED. 0 passed; 1 failed` (data reads rejected as dollar-static), then
-`cargo test -p bingo-mods --lib validate::tests --locked`: `6 passed; 0 failed`.
-The import contracts then failed: `Is a directory (os error 21)`;
-`FAILED. 6 passed; 2 failed`. After the shared resolver: `8 passed; 0 failed`.
-Each contract was committed before its fix(mods) implementation.
-`BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods --lib schema_and_types_are_generated_from_the_same_rows --locked`: `1 passed; 0 failed`.
-`BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked`: `130 passed; 0 failed`.
-`cargo test -p bingo-mods --locked`: exit 0, 75 passed, 1 manual RSS test ignored.
-Mechanical fixture: tests/plugin.rs now expects manifest version in identity.
-`cargo build -p bingo --locked`: exit 0, Finished dev profile in 10.10s.
-`cargo test -p bingo --test mods_parity port_layout_changes_only_the_package_specifier --locked`:
-red while rewrite-only tests were copied; after selection fix `1 passed; 0 failed`.
-Disposable-copy `bingo plugins test` results (all original tests retained):
-```
-tool-call: new environment guard and shell status tests failed first;
-then 4 PASS (environment guard, envrc, shell status, original rewrite).
-band: new test FAIL (no per-turn count); original rewrite PASS.
-pane: new test FAIL (tool-calls not opened); original rewrite PASS.
-```
-Original input: supplied `980b9fc1-a2b6-4a4e-a594-9bd988be2aca/scratchpad/cc-examples-2.1.296/`.
-`scripts/port_examples.sh "$SOURCE" "$M146_PORTS"`: exit 1, temporary output only.
-Source-free diff evidence: tool-call.ts -1/+1, band.tsx -2/+2,
-band-state.d.ts -1/+1, pane.tsx -2/+2, pane-state.d.ts -1/+1;
-each reports `package specifier only; source unchanged`. No tool map needed.
-```
-tool-call validate: exit 0; test: exit 1 (envrc PASS; deny/status FAIL)
-hooks/band.tsx:6:14 state-key state key must be a string literal
-hooks/band.tsx:7:18 state-key state key must be a string literal
-band validate: exit 1; test: exit 1 (AbovePrompt engine fallback)
-hooks/pane.tsx:7:15 state-key state key must be a string literal
-hooks/pane.tsx:37:3 on-literal on matcher must be literal
-pane validate: exit 1; test: exit 1 (tool-calls not opened)
-```
-The script now runs only committed *.parity.test.ts on originals; independent
-rewrite-only behavior tests still run on the committed examples.
-Gate commands/results: pending completion of compatibility fixes.
-- `cargo fmt --all -- --check`: prior-run pass; formatting applied this run.
-- `cargo check --workspace --all-targets --locked`: not run.
-- `cargo clippy --workspace --all-targets --locked -- -D warnings`: not run.
-- `cargo test --workspace --locked`: not run; new band/pane contracts fail.
-- `scripts/check_discipline.sh`: not run.
-- `scripts/budget.sh`: not run; no new dependencies.
-- `cargo deny check`: not run.
-- `scripts/tui-smoke.sh`: not run.
-- `cargo check -p bingo -p bingo-mods -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc`: not run.
-Temporary ports/copies cleaned; originals unchanged. No logs/captures committed.
-No matrix awk/rg counts, Node parity or TUI evidence claimed.
+- `cargo test -p bingo-mods --lib validate::tests --locked`: data reads red, then 6 pass; erased imports red (directory load), then 8 pass.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods --lib schema_and_types_are_generated_from_the_same_rows --locked`: 1 pass.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked`: 130 pass.
+- `cargo test -p bingo-mods --locked`: prior run 75 pass, 1 manual RSS ignored; mechanical identity fixture adds version.
+- `cargo test -p bingo --test mods_parity port_layout_changes_only_the_package_specifier --locked`: red, then 1 pass; only parity tests copied to ports.
+- Disposable-copy `bingo plugins test`: own tool-call 4 pass; band/pane new contracts red, original contracts pass.
+- `scripts/port_examples.sh <supplied-originals> /tmp/m146-ports-current`: exit 1, temporary ports only; deny Edit incorrectly completed, status failed to clear, band/pane blocked.
+- Source-free diff evidence: tool-call.ts -1/+1; band.tsx -2/+2; band-state.d.ts -1/+1; pane.tsx -2/+2; pane-state.d.ts -1/+1; package specifiers only, source unchanged, no tool mapping needed.
+- `cargo test -p bingo-core --lib a_json_deny_only_answer_never_runs_the_tool --locked`: red, execution count 1; `cargo test -p bingo-core --lib chain::tests --locked`: 8 pass, zero executions for deny at all tiers.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk catalogue:: --locked`: pass; `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib events_ts:: --locked`: 1 pass.
+- `HOME=<isolated-home> target/debug/bingo plugins test /tmp/m146-ports-current/tool-call`: denial and envrc pass; status still red before its fix.
+- `node --test --test-name-pattern='undefined status' sdk/typescript/src/ui.test.ts`: red; `node --test sdk/typescript/src/ui.test.ts`: 5 pass after fix.
+- `cargo test -p bingo-mods --lib module_constant_matchers --locked`: red, then 1 pass.
+- `cargo fmt --all -- --check`: pending final gate.
+- `cargo check --workspace --all-targets --locked`: pending.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: pending.
+- `cargo test --workspace --locked`: pending.
+- `scripts/check_discipline.sh`: pending.
+- `scripts/budget.sh`: pending; no new dependencies.
+- `cargo deny check`: pending.
+- `scripts/tui-smoke.sh`: pending.
+- `cargo check -p bingo -p bingo-mods -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc`: pending.
+- `cargo test -p bingo-mods --lib object_atom_keys --locked`: assertion-wrapped key red, then 1 pass.
+- Matrix awk/rg, Node parity and TUI captures: pending; no logs/captures committed.
