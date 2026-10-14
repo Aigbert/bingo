@@ -186,11 +186,27 @@ mod terminal_commands {
     use super::*;
     #[test]
     fn terminal_commands_are_not_published_to_chat() {
-        let catalog = Catalog { kind: CatalogKind::Commands, entries: vec![
-            bingo_sdk::CatalogEntry { id: "help".into(), label: "keys".into(), meta: serde_json::json!({"family":"terminal"}) },
-            bingo_sdk::CatalogEntry { id: "status".into(), label: "status".into(), meta: serde_json::json!({"family":"session"}) },
-        ] };
+        let catalog = Catalog {
+            kind: CatalogKind::Commands,
+            entries: vec![
+                bingo_sdk::CatalogEntry {
+                    id: "help".into(),
+                    label: "keys".into(),
+                    meta: serde_json::json!({"family":"terminal"}),
+                },
+                bingo_sdk::CatalogEntry {
+                    id: "status".into(),
+                    label: "status".into(),
+                    meta: serde_json::json!({"family":"session"}),
+                },
+            ],
+        };
         let (menu, _) = entries(&catalog, vec![]);
-        assert_eq!(menu.iter().map(|entry| entry.name.as_str()).collect::<Vec<_>>(), ["status"]);
+        assert_eq!(
+            menu.iter()
+                .map(|entry| entry.name.as_str())
+                .collect::<Vec<_>>(),
+            ["status"]
+        );
     }
 }
