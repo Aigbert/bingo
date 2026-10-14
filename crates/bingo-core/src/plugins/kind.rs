@@ -7,7 +7,7 @@ use bingo_sdk::plugin::PluginSwitch;
 pub enum ContributionKind {
     Commands,
     Catalogue,
-    Interceptor { shapes_request: bool },
+    Interceptor { request_point: Option<&'static str> },
     Tools,
     Providers,
     Store,
@@ -35,11 +35,11 @@ fn reason(kind: &ContributionKind) -> Option<&'static str> {
         ContributionKind::Commands
         | ContributionKind::Catalogue
         | ContributionKind::Interceptor {
-            shapes_request: false,
+            request_point: None,
         } => return None,
         ContributionKind::Interceptor {
-            shapes_request: true,
-        } => "prompt.compose",
+            request_point: Some(point),
+        } => point,
         ContributionKind::Tools => "tools",
         ContributionKind::Providers => "providers",
         ContributionKind::Store => "store",
@@ -65,13 +65,13 @@ mod tests {
             (Catalogue, None),
             (
                 Interceptor {
-                    shapes_request: false,
+                    request_point: None,
                 },
                 None,
             ),
             (
                 Interceptor {
-                    shapes_request: true,
+                    request_point: Some("prompt.compose"),
                 },
                 Some("prompt.compose"),
             ),
@@ -99,13 +99,27 @@ mod tests {
             }
         );
         assert_eq!(switch_kind(&[]), PluginSwitch::Now);
+        for point in [
+            catalogue::PROMPT_COMPOSE,
+            catalogue::TOOL_DESCRIBE,
+            catalogue::TURN_STEP,
+        ] {
+            assert_eq!(
+                switch_kind(&[Interceptor {
+                    request_point: point.shapes_request.then_some(point.name.as_ref())
+                }]),
+                PluginSwitch::NextStart {
+                    why: point.name.to_string()
+                }
+            );
+        }
         assert_eq!(
             catalogue::ALL
                 .iter()
                 .filter(|e| e.shapes_request)
                 .map(|e| e.name.as_ref())
                 .collect::<Vec<_>>(),
-            ["prompt.compose"]
+            ["turn.step", "prompt.compose", "tool.describe"]
         );
     }
 }

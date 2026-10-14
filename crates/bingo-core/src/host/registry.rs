@@ -87,10 +87,11 @@ fn contribution_kind(contribution: &Contribution) -> ContributionKind {
             }
             let matcher = link.matcher();
             ContributionKind::Interceptor {
-                shapes_request: catalogue::ALL.iter().any(|entry| {
-                    entry.shapes_request
+                request_point: catalogue::ALL.iter().find_map(|entry| {
+                    (entry.shapes_request
                         && (matcher.patterns.is_empty()
-                            || matcher.patterns.iter().any(|p| p.matches(&entry.name)))
+                            || matcher.patterns.iter().any(|p| p.matches(&entry.name))))
+                    .then_some(entry.name.as_ref())
                 }),
             }
         }

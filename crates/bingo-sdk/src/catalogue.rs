@@ -136,11 +136,11 @@ catalogue! {
     TOOL_CHECK: "tool.check", Chain, ToolCall => crate::CheckResult, &["tool"], &["/tool", "/tool_use_id"], PASS;
     TOOL_CALL: "tool.call", Chain, ToolCall => ToolCallResult, &["tool"], &["/tool", "/tool_use_id"], WRAP;
     MODEL_COMPLETE: "model.complete", Chain, Complete => Vec<crate::ModelEvent>, &["plugin"], &["/plugin"], WRAP;
-    TURN_STEP: "turn.step", Chain, crate::ModelRequest => Result<Vec<crate::ModelEvent>, crate::ProviderError>, &[], &[], WRAP;
+    TURN_STEP: "turn.step", Chain, crate::ModelRequest => Result<Vec<crate::ModelEvent>, crate::ProviderError>, &[], &[], WRAP, true;
     PROMPT_COMPOSE: "prompt.compose", Chain, crate::ModelRequest => crate::ModelRequest, &[], &[], WRAP, true;
     SESSION_COMPACT: "session.compact", Chain, crate::CompactInput => Result<crate::Compaction, crate::CompactError>, &[], &[], WRAP;
     TURN_STOP: "turn.stop", Chain, () => crate::StopResult, &[], &[], PASS;
-    TOOL_DESCRIBE: "tool.describe", Chain, crate::ToolSpec => Option<crate::ToolSpec>, &["name"], &["/name"], WRAP;
+    TOOL_DESCRIBE: "tool.describe", Chain, crate::ToolSpec => Option<crate::ToolSpec>, &["name"], &["/name"], WRAP, true;
     PROMPT_AUTOCOMPLETE: "prompt.autocomplete", Chain, crate::Catalog => crate::Catalog, &["kind"], &["/kind"], WRAP;
     SESSION_SEND: "session.send", Chain, Send => (), &["to"], &[], PASS;
     SESSION_RECEIVE: "session.receive", Chain, crate::Input => crate::Input, &["origin.surface"], &[], PASS;
