@@ -123,3 +123,32 @@ async fn fifty_idle_modules_rss() {
         engine.close().await;
     }
 }
+
+#[tokio::test]
+async fn an_unawaited_dollar_call_finishes_before_the_hook_returns() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("main.ts"), "export const register = on => on('tool.call', $ => { void $.ui.status('queued'); return {parts:[]}; });").unwrap();
+    let engine = Engine::start(root.path(), "main.ts", json!({}), Limits::default())
+        .await
+        .unwrap();
+    let mut call = engine
+        .call("tool.call", json!({}), json!({"session":"s"}))
+        .unwrap();
+    let operation = tokio::select! {
+        biased;
+        result = &mut call.result => panic!("hook returned before its dollar call: {result:?}"),
+        operation = call.operations.recv() => operation.unwrap(),
+    };
+    assert_eq!(operation.method, "host/place");
+    tokio::task::yield_now().await;
+    assert!(matches!(
+        call.result.try_recv(),
+        Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+    ));
+    operation.reply.send(Ok(Value::Null)).unwrap();
+    assert_eq!(
+        (&mut call.result).await.unwrap().unwrap(),
+        json!({"parts":[]})
+    );
+    engine.close().await;
+}

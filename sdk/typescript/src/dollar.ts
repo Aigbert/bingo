@@ -5,7 +5,21 @@ import type { ProcessOutput, DollarInputs, DollarResults, DollarData } from './d
 import type { Rpc } from './rpc.ts';
 import type { HookSite, StateValue, ModelRequest, Completed, Input, ToolSpec, CommandSpec } from './wire.ts';
 
+const flights = new WeakMap<object, Set<Promise<unknown>>>();
+export async function settleDollar(api: object): Promise<void> {
+  const pending = flights.get(api);
+  while (pending?.size) await Promise.allSettled([...pending]);
+}
+
 export function dollar(rpc: Rpc, site: HookSite, identity: DollarData['plugin'] = { name: '', root: '' }, callbacks?: Callbacks): Dollar {
+  const pending = new Set<Promise<unknown>>();
+  const transport = rpc;
+  rpc = {...transport, request: <T>(method: string, params: unknown): Promise<T> => {
+    const operation = transport.request<T>(method, params);
+    pending.add(operation);
+    void operation.then(() => pending.delete(operation), () => pending.delete(operation));
+    return operation;
+  }};
   const store = (scope: string) => ({
     get: (key: string) => rpc.request<StateValue | null>('host/state/get', { scope, key }),
     set: (key: string, value: unknown, ifVersion?: number) =>
@@ -72,7 +86,7 @@ export function dollar(rpc: Rpc, site: HookSite, identity: DollarData['plugin'] 
     });
   };
   Object.defineProperty(hostApi, 'plugin', { value: Object.freeze({ ...identity }), enumerable: true });
-  return new Proxy(hostApi, {
+  const result = new Proxy(hostApi, {
     get(target, noun: string) {
       if (Object.hasOwn(target, noun)) return target[noun as keyof typeof target];
       if (noun === 'then' || typeof noun !== 'string') return undefined;
@@ -80,6 +94,8 @@ export function dollar(rpc: Rpc, site: HookSite, identity: DollarData['plugin'] 
         rpc.request<{ result: unknown }>('service/call', { key: noun, method, params }).then(reply => reply.result) });
     },
   }) as Dollar;
+  flights.set(result, pending);
+  return result;
 }
 
 type Operation = keyof DollarInputs;

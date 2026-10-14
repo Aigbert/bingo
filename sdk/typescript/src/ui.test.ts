@@ -95,3 +95,25 @@ test('denied resolution cannot publish an unresolved element', async () => {
   const {Box} = ui(rpc, {session:'s'} as any).resolve({surface:'terminal'});
   await assert.rejects(resolveElements({kind:Box}), /resolve denied/);
 });
+
+test('the Node hook waits for an unawaited status publication', async () => {
+  const {Peer} = await import('./rpc.ts');
+  const {runtime} = await import('./plugin.ts');
+  let process: InstanceType<typeof Peer>;
+  const host = new Peer(message => {void process.receive(message);});
+  process = new Peer(message => {void host.receive(message);});
+  const running = runtime(process, on => {on('tool.call', $ => {void $.ui.status('queued');return {parts:[]};});});
+  let release!: () => void;
+  let started!: () => void;
+  const ready = new Promise<void>(resolve => {started = resolve;});
+  host.handlers.set('host/place', () => new Promise(resolve => {release = () => resolve(null);started();}));
+  try {
+    await host.request('initialize', {protocol:2,pluginName:'fixture',pluginRoot:'.',config:{},capabilities:['intercept/*','host/place']});
+    let returned = false;
+    const answer = host.request('intercept/tool.call', {chain:'c',input:{tool:'Example',tool_use_id:'1'},site:{session:'s'},tier:'rewrite'}).then(value => {returned = true;return value;});
+    await ready;
+    assert.equal(returned,false);
+    release();
+    assert.deepEqual(await answer,{answer:{parts:[]}});
+  } finally {running.close();process.close();host.close();}
+});
