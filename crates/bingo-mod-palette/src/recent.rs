@@ -12,7 +12,16 @@ impl Recent {
             .unwrap_or_default();
         Self {
             path,
-            names: names.into_iter().take(5).collect(),
+            names: names
+                .into_iter()
+                .filter_map(|line| {
+                    line.trim_start_matches('/')
+                        .split_whitespace()
+                        .next()
+                        .map(str::to_owned)
+                })
+                .take(5)
+                .collect(),
         }
     }
     pub fn names(&self) -> &[String] {
@@ -56,6 +65,42 @@ mod tests {
         assert_eq!(
             Recent::load(path).names(),
             ["two", "six", "five", "four", "three"]
+        );
+    }
+}
+
+#[cfg(test)]
+mod review_tests {
+    use super::*;
+    #[test]
+    fn provider_and_login_arguments_never_reach_the_recent_file() {
+        let home = tempfile::tempdir().unwrap();
+        let path = home.path().join("recent.json");
+        let mut recent = Recent::load(path.clone());
+        for line in [
+            "/provider add private --key provider-secret",
+            "/login pasted-login-secret",
+        ] {
+            recent.remember(line).unwrap();
+            let disk = std::fs::read_to_string(&path).unwrap();
+            assert!(!disk.contains("secret"), "{disk}");
+        }
+        assert_eq!(Recent::load(path).names(), ["login", "provider"]);
+    }
+    #[test]
+    fn loaded_entries_are_normalized_before_the_next_write() {
+        let home = tempfile::tempdir().unwrap();
+        let path = home.path().join("recent.json");
+        std::fs::write(
+            &path,
+            r#"["/provider add --key old-secret","login pasted-secret"]"#,
+        )
+        .unwrap();
+        let mut recent = Recent::load(path.clone());
+        recent.remember("/status").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(path).unwrap(),
+            r#"["status","provider","login"]"#
         );
     }
 }
