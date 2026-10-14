@@ -47,6 +47,7 @@ pub struct Switches {
     /// The resolved enabledPlugins wish, represented by its disabled names.
     pub wishes: RwLock<BTreeSet<String>>,
     pub kinds: BTreeMap<String, plugin::PluginSwitch>,
+    pub unavailable: RwLock<BTreeMap<String, String>>,
 }
 
 #[derive(Default)]
@@ -165,15 +166,6 @@ impl Registry {
         for (plugin, reason) in plugins.iter().zip(standing(plugins, switched_off)) {
             let manifest = plugin.manifest();
             if let Some(reason) = reason {
-                if reason == SWITCHED_OFF {
-                    registry.register(plugin.as_ref(), slices, env, switched_off, layers, &reserved)?;
-                    registry
-                        .switches
-                        .running
-                        .write()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .insert(manifest.id.into());
-                }
                 tracing::warn!(plugin = manifest.id, %reason, "plugin disabled");
                 registry
                     .plugins
@@ -189,6 +181,23 @@ impl Registry {
                 &reserved,
             )?;
             registry.plugins.push(PluginStatus::loaded(manifest));
+        }
+        for plugin in plugins
+            .iter()
+            .filter(|p| switched_off.contains(p.manifest().id) && needed(p.manifest()).is_none())
+        {
+            let id = plugin.manifest().id;
+            registry
+                .switches
+                .running
+                .write()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(id.into());
+            if let Err(error) = registry.register(plugin.as_ref(), slices, env, switched_off, layers, &reserved) {
+                registry.commands.retain(|entry| entry.plugin != id);
+                registry.links.retain(|link| link.plugin != id);
+                registry.unavailable(id, error.to_string());
+            }
         }
         for plugin in plugins.iter().filter(|p| needed(p.manifest()).is_some()) {
             registry
@@ -222,12 +231,7 @@ impl Registry {
             ));
         if let Err(source) = plugin.register(&mut registrar) {
             if switched_off.contains(manifest.id) {
-                self.switches.kinds.insert(
-                    manifest.id.into(),
-                    plugin::PluginSwitch::NextStart {
-                        why: "registration unavailable".into(),
-                    },
-                );
+                self.unavailable(manifest.id, source.to_string());
                 return Ok(());
             }
             return Err(HostError::Register {
@@ -542,8 +546,44 @@ impl Registry {
         sources
     }
 
+    pub(crate) fn switch_kind(&self, plugin: &str) -> Option<plugin::PluginSwitch> {
+        if let Some(why) = self
+            .switches
+            .unavailable
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(plugin)
+        {
+            return Some(plugin::PluginSwitch::NextStart { why: why.clone() });
+        }
+        self.switches.kinds.get(plugin).cloned()
+    }
+
+    pub(super) fn unavailable(&self, plugin: &str, why: String) {
+        self.switches
+            .unavailable
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(plugin.into(), why);
+    }
+
+    pub(super) fn unavailable_notices(&self) -> Vec<(String, String)> {
+        self.switches
+            .unavailable
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .map(|(name, why)| {
+                (
+                    "PLUGIN_DISABLED".into(),
+                    format!("{name} stays off until next start: {why}"),
+                )
+            })
+            .collect()
+    }
+
     pub(super) fn enabled(&self, plugin: &str) -> bool {
-        if self.switches.kinds.get(plugin) == Some(&plugin::PluginSwitch::Now) {
+        if self.switch_kind(plugin) == Some(plugin::PluginSwitch::Now) {
             return true;
         }
         self.plugins

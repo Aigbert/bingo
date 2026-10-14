@@ -70,8 +70,7 @@ pub async fn listing(registry: &Registry) -> Vec<PluginStatus> {
         .read()
         .unwrap_or_else(|e| e.into_inner());
     for status in &mut listed {
-        let now = if registry.switches.kinds.get(&status.id)
-            == Some(&bingo_sdk::plugin::PluginSwitch::Now)
+        let now = if registry.switch_kind(&status.id) == Some(bingo_sdk::plugin::PluginSwitch::Now)
         {
             !registry
                 .switches
@@ -222,8 +221,8 @@ async fn apply(
     enabled: bool,
 ) -> Result<bingo_sdk::plugin::PluginSwitch, bingo_sdk::KernelError> {
     use bingo_sdk::plugin::PluginSwitch;
-    if let Some(kind) = registry.switches.kinds.get(name) {
-        if kind == &PluginSwitch::Now {
+    if let Some(kind) = registry.switch_kind(name) {
+        if kind == PluginSwitch::Now {
             let mut off = registry
                 .switches
                 .running

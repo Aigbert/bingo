@@ -209,13 +209,26 @@ impl Host {
             if !self.registry.enabled(manifest.id) {
                 continue;
             }
-            plugin
-                .start(self.plugin_host.clone())
-                .await
-                .map_err(|source| HostError::Start {
-                    plugin: manifest.id.to_string(),
+            if let Err(source) = plugin.start(self.plugin_host.clone()).await {
+                if self
+                    .registry
+                    .switches
+                    .running
+                    .read()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .contains(manifest.id)
+                {
+                    self.registry.unavailable(manifest.id, source.to_string());
+                    if let Err(error) = plugin.stop().await {
+                        tracing::warn!(plugin = manifest.id, %error, "disabled plugin cleanup failed");
+                    }
+                    continue;
+                }
+                return Err(HostError::Start {
+                    plugin: manifest.id.into(),
                     source,
-                })?;
+                });
+            }
         }
         Ok(())
     }
@@ -263,6 +276,7 @@ impl Host {
             .chain(self.settings.notices.iter().cloned())
             .chain(self.registry.notices.iter().cloned())
             .chain(self.registry.provider_state.instances.notices())
+            .chain(self.registry.unavailable_notices())
             .collect()
     }
 

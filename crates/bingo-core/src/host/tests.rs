@@ -13,6 +13,7 @@ mod commands;
 mod complete;
 mod instance_origin;
 mod instances;
+mod disabled;
 mod latest;
 mod login;
 mod model_choice;
@@ -230,11 +231,10 @@ impl Plugin for Lifecycle {
     }
 }
 
-/// A switch is taken at the load, once: the plugin is listed off, nothing it
-/// would have contributed is registered, and it is neither started nor
-/// stopped — there is nothing running to stop (ADR-0057 §2).
+/// A tool-bearing plugin stays unloaded while off. Eligible plugins may be
+/// resident, but request-shaping contributions still wait until next start.
 #[tokio::test]
-async fn a_switched_off_plugin_is_neither_registered_nor_started_nor_stopped() {
+async fn a_switched_off_tool_plugin_is_neither_started_nor_stopped() {
     let counted = |switches: Value| async move {
         let started = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let stopped = Arc::new(std::sync::atomic::AtomicUsize::new(0));
