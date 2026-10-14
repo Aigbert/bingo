@@ -113,18 +113,17 @@ impl CredentialStore {
         Ok(Snapshot(stored))
     }
 
+    /// False means the snapshot changed; an error means persistence failed.
     pub(crate) fn replace(
         &self,
         name: &str,
         previous: &Snapshot,
         entry: Option<Entry>,
-    ) -> Result<(), AuthError> {
+    ) -> Result<bool, AuthError> {
         let _guard = self.locked();
         let mut entries = self.load()?;
         if entries.get(name) != Some(&previous.0) {
-            return Err(AuthError::Binding(format!(
-                "{name}: the credential changed during refresh; choose it again or sign in."
-            )));
+            return Ok(false);
         }
         if let Some(entry) = entry {
             entries.insert(
@@ -137,7 +136,8 @@ impl CredentialStore {
         } else {
             entries.remove(name);
         }
-        self.save(&entries)
+        self.save(&entries)?;
+        Ok(true)
     }
 
     pub fn new(data_dir: PathBuf) -> Self {

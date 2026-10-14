@@ -276,14 +276,14 @@ impl TokenSource {
             other => return Self::usable(other),
         };
         let Some(refresh_token) = tokens.refresh.clone() else {
-            return Err(self.expire(
+            return self.expire(
                 "the stored credential has no refresh token".into(),
                 &snapshot,
-            ));
+            );
         };
         match exchange::refresh(&self.http, &self.issuer, &refresh_token).await {
             Ok(reply) => self.renewed(reply, &tokens, &snapshot),
-            Err(AuthError::Expired(reason)) => Err(self.expire(reason, &snapshot)),
+            Err(AuthError::Expired(reason)) => self.expire(reason, &snapshot),
             Err(error) => Err(error),
         }
     }
@@ -296,8 +296,12 @@ impl TokenSource {
     ) -> Result<String, AuthError> {
         let tokens = Tokens::from_response(&reply, unix_now()).merged(previous);
         let access = tokens.access.clone();
-        self.store
-            .replace(&self.provider, snapshot, Some(tokens.entry()))?;
+        if !self
+            .store
+            .replace(&self.provider, snapshot, Some(tokens.entry()))?
+        {
+            return self.replacement();
+        }
         self.remember(Cached::Tokens(tokens));
         Ok(access)
     }
@@ -316,12 +320,41 @@ impl TokenSource {
 
     /// A credential the issuer has retired is removed, not kept around to
     /// fail again: the way back is a login, and `status()` now says so.
-    fn expire(&self, reason: String, snapshot: &Snapshot) -> AuthError {
-        if let Err(error) = self.store.replace(&self.provider, snapshot, None) {
-            return error;
+    fn expire(&self, reason: String, snapshot: &Snapshot) -> Result<String, AuthError> {
+        if !self.store.replace(&self.provider, snapshot, None)? {
+            return self.replacement();
         }
         self.remember(Cached::Expired(reason.clone()));
-        AuthError::Expired(reason)
+        Err(AuthError::Expired(reason))
+    }
+
+    fn replacement(&self) -> Result<String, AuthError> {
+        self.forget();
+        let stored = self
+            .store
+            .read(&self.provider)?
+            .ok_or(AuthError::SignedOut)?;
+        let entry = Self::usable_replacement(stored)?;
+        let access = Self::usable(Some(entry.clone()))?;
+        self.remember(entry);
+        Ok(access)
+    }
+
+    fn usable_replacement(entry: Entry) -> Result<Cached, AuthError> {
+        if let Entry::Api { key } = entry {
+            return if key.is_empty() {
+                Err(AuthError::SignedOut)
+            } else {
+                Ok(Cached::Key(key))
+            };
+        }
+        let tokens = Tokens::from_entry(&entry).ok_or(AuthError::SignedOut)?;
+        if tokens.access.is_empty() || tokens.expires_at.is_none_or(|at| at <= unix_now()) {
+            return Err(AuthError::Expired(
+                "the replacement credential has no usable access token".into(),
+            ));
+        }
+        Ok(Cached::Tokens(tokens))
     }
 
     fn usable(entry: Option<Cached>) -> Result<String, AuthError> {
