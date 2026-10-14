@@ -240,3 +240,49 @@ async fn retirement_closes_the_engine_and_reaps_its_process() {
             .is_err()
     );
 }
+
+#[tokio::test]
+async fn next_start_enable_does_not_change_reload_state() {
+    let (_root, manager, old) = fixture().await;
+    runtime(&manager);
+    manager.switch("fixture", false).await.unwrap();
+    let root = old.found.root.clone();
+    drop(old);
+    reap(&manager).await;
+    std::fs::write(
+        root.join("main.ts"),
+        "export function register(on) { on('prompt.compose', async ($, e, next) => next(e)); }",
+    )
+    .unwrap();
+    assert!(matches!(
+        manager.switch("fixture", true).await.unwrap(),
+        PluginSwitch::NextStart { .. }
+    ));
+    assert!(
+        manager.switches.off.read().unwrap().contains("fixture"),
+        "rejected enable changed reload state"
+    );
+    manager.reload_root(&root).await.unwrap();
+    assert!(manager.modules()[0].engine.is_none());
+    manager.stop().await;
+}
+
+#[tokio::test]
+async fn failed_enable_does_not_change_reload_state() {
+    let (_root, manager, old) = fixture().await;
+    runtime(&manager);
+    manager.switch("fixture", false).await.unwrap();
+    drop(old);
+    reap(&manager).await;
+    let guard = manager.reloading.lock().await;
+    let mut enable = Box::pin(manager.switch("fixture", true));
+    assert!(futures::poll!(&mut enable).is_pending());
+    manager.modules.write().unwrap().clear();
+    drop(guard);
+    assert!(enable.await.is_err());
+    assert!(
+        manager.switches.off.read().unwrap().contains("fixture"),
+        "failed enable changed reload state"
+    );
+    manager.stop().await;
+}

@@ -6,6 +6,42 @@ use bingo_sdk::plugin::PluginSwitch;
 pub(super) struct State {
     pub off: RwLock<BTreeSet<String>>,
     pub retired: tokio::sync::Mutex<Vec<Arc<Module>>>,
+    pub requests: Mutex<BTreeMap<String, Arc<Request>>>,
+}
+pub(super) struct Request {
+    pub enabled: bool,
+}
+pub(super) fn begin(manager: &Manager, name: &str, enabled: bool) -> Arc<Request> {
+    let request = Arc::new(Request { enabled });
+    manager
+        .switches
+        .requests
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .insert(name.into(), request.clone());
+    request
+}
+fn current(manager: &Manager, name: &str, request: &Arc<Request>) -> bool {
+    manager
+        .switches
+        .requests
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(name)
+        .is_some_and(|latest| Arc::ptr_eq(latest, request))
+}
+pub(super) fn finish(manager: &Manager, name: &str, request: &Arc<Request>) {
+    let mut requests = manager
+        .switches
+        .requests
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    if requests
+        .get(name)
+        .is_some_and(|latest| Arc::ptr_eq(latest, request))
+    {
+        requests.remove(name);
+    }
 }
 pub(super) fn module_kind(manager: &Manager, name: &str) -> PluginSwitch {
     manager
@@ -65,22 +101,15 @@ pub(super) fn wish(manager: &Manager, name: &str, enabled: bool) {
 pub(super) async fn switch_module(
     manager: &Manager,
     name: &str,
-    enabled: bool,
+    request: &Arc<Request>,
     deferred: tokio::sync::oneshot::Sender<()>,
 ) -> Result<PluginSwitch, KernelError> {
+    let enabled = request.enabled;
     if enabled {
-        defer_retirement(manager, name, deferred).await;
+        defer_retirement(manager, name, request, deferred).await;
     }
     let _guard = manager.reloading.lock().await;
-    let bare = name.strip_prefix("plugins:").unwrap_or(name);
-    if manager
-        .switches
-        .off
-        .read()
-        .unwrap_or_else(|e| e.into_inner())
-        .contains(bare)
-        == enabled
-    {
+    if !current(manager, name, request) {
         return Ok(PluginSwitch::Now);
     }
     let old = manager
@@ -118,24 +147,31 @@ pub(super) async fn switch_module(
         module.close().await;
         return Ok(kind);
     }
+    module.admission.decision().map_err(reload::failed)?;
     activate_switch(manager, old, module).await?;
+    wish(
+        manager,
+        name.strip_prefix("plugins:").unwrap_or(name),
+        enabled,
+    );
     Ok(PluginSwitch::Now)
 }
 async fn defer_retirement(
     manager: &Manager,
     name: &str,
+    request: &Arc<Request>,
     deferred: tokio::sync::oneshot::Sender<()>,
 ) {
     let bare = name.strip_prefix("plugins:").unwrap_or(name);
     if tokio::time::timeout(
         std::time::Duration::from_secs(5),
-        wait_retired(manager, bare),
+        wait_retired(manager, name, bare, request),
     )
     .await
     .is_err()
     {
         let _ = deferred.send(());
-        wait_retired(manager, bare).await;
+        wait_retired(manager, name, bare, request).await;
     }
 }
 async fn activate_switch(
@@ -174,15 +210,9 @@ fn switch_found(manager: &Manager, old: &Module) -> discovery::Found {
     }
     found
 }
-async fn wait_retired(manager: &Manager, name: &str) {
+async fn wait_retired(manager: &Manager, id: &str, name: &str, request: &Arc<Request>) {
     loop {
-        if manager
-            .switches
-            .off
-            .read()
-            .unwrap_or_else(|e| e.into_inner())
-            .contains(name)
-        {
+        if !current(manager, id, request) {
             return;
         }
         if !manager

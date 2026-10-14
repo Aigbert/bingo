@@ -221,21 +221,22 @@ impl PluginSource for Manager {
         if kind != plugin::PluginSwitch::Now {
             return Ok(kind);
         }
-        switching::wish(self, name.strip_prefix("plugins:").unwrap_or(name), enabled);
         let manager = self
             .this
             .get()
             .and_then(Weak::upgrade)
             .ok_or_else(|| reload::failed("module manager unavailable"))?;
+        let request = switching::begin(self, name, enabled);
         let name = name.to_owned();
         let asked = render::asked();
         let (deferred, waiting) = tokio::sync::oneshot::channel();
         let mut work = tokio::spawn(async move {
             let result = render::under_input(
                 asked,
-                switching::switch_module(&manager, &name, enabled, deferred),
+                switching::switch_module(&manager, &name, &request, deferred),
             )
             .await;
+            switching::finish(&manager, &name, &request);
             if let Err(error) = &result {
                 manager
                     .notices
@@ -276,12 +277,13 @@ impl PluginSource for Manager {
                         .admission
                         .status(&module.found, PluginRuntime::Module, "bingo.mods");
                 if matches!(&status.state, PluginState::Off { why } if why == SWITCHED_OFF)
-                    && !self
+                    && self
                         .switches
-                        .off
-                        .read()
+                        .requests
+                        .lock()
                         .unwrap_or_else(|e| e.into_inner())
-                        .contains(&module.found.name)
+                        .get(&status.id)
+                        .is_some_and(|request| request.enabled)
                     && retired
                         .iter()
                         .any(|old| old.found.name == module.found.name)
