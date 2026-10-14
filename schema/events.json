@@ -180,6 +180,7 @@
             "type": "string",
             "enum": [
               "Browse",
+              "Plugins",
               "Palette",
               "Sessions",
               "Question",
@@ -1312,6 +1313,7 @@
             "type": "string",
             "enum": [
               "Browse",
+              "Plugins",
               "Palette",
               "Sessions",
               "Question",
@@ -3408,6 +3410,7 @@
             "type": "string",
             "enum": [
               "Browse",
+              "Plugins",
               "Palette",
               "Sessions",
               "Question",
@@ -7379,6 +7382,7 @@
             "type": "string",
             "enum": [
               "Browse",
+              "Plugins",
               "Palette",
               "Sessions",
               "Question",
@@ -10268,6 +10272,7 @@
             "type": "string",
             "enum": [
               "Browse",
+              "Plugins",
               "Palette",
               "Sessions",
               "Question",

@@ -754,6 +754,7 @@
       "type": "string",
       "enum": [
         "Browse",
+        "Plugins",
         "Palette",
         "Sessions",
         "Question",
@@ -4006,6 +4007,39 @@
         }
       ]
     },
+    "PluginsOpen": {
+      "type": "string",
+      "enum": [
+        "plugins",
+        "mcp"
+      ]
+    },
+    "PluginsProps": {
+      "type": "object",
+      "properties": {
+        "open": {
+          "$ref": "#/$defs/PluginsOpen"
+        },
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CatalogEntry"
+          }
+        },
+        "action": {
+          "$ref": "#/$defs/Action"
+        }
+      },
+      "required": [
+        "open",
+        "session",
+        "plugins",
+        "action"
+      ]
+    },
     "Preview": {
       "oneOf": [
         {
@@ -4098,6 +4132,22 @@
             },
             "props": {
               "$ref": "#/$defs/BrowseProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Plugins"
+            },
+            "props": {
+              "$ref": "#/$defs/PluginsProps"
             }
           },
           "required": [
