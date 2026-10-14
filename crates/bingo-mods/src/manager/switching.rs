@@ -50,15 +50,49 @@ fn classify(manager: &Manager, module: &Arc<Module>) -> PluginSwitch {
     }
     PluginSwitch::Now
 }
+pub(super) fn wish(manager: &Manager, name: &str, enabled: bool) {
+    let mut off = manager
+        .switches
+        .off
+        .write()
+        .unwrap_or_else(|e| e.into_inner());
+    if enabled {
+        off.remove(name);
+    } else {
+        off.insert(name.into());
+    }
+}
 pub(super) async fn switch_module(
     manager: &Manager,
     name: &str,
     enabled: bool,
+    deferred: tokio::sync::oneshot::Sender<()>,
 ) -> Result<PluginSwitch, KernelError> {
     if enabled {
-        wait_retired(manager, name.strip_prefix("plugins:").unwrap_or(name)).await;
+        let bare = name.strip_prefix("plugins:").unwrap_or(name);
+        if tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            wait_retired(manager, bare),
+        )
+        .await
+        .is_err()
+        {
+            let _ = deferred.send(());
+            wait_retired(manager, bare).await;
+        }
     }
     let _guard = manager.reloading.lock().await;
+    let bare = name.strip_prefix("plugins:").unwrap_or(name);
+    if manager
+        .switches
+        .off
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .contains(bare)
+        == enabled
+    {
+        return Ok(PluginSwitch::Now);
+    }
     let old = manager
         .modules()
         .into_iter()
@@ -106,18 +140,6 @@ async fn activate_switch(
     enabled: bool,
 ) -> Result<(), KernelError> {
     let name = module.found.name.as_str();
-    {
-        let mut off = manager
-            .switches
-            .off
-            .write()
-            .unwrap_or_else(|e| e.into_inner());
-        if enabled {
-            off.remove(name);
-        } else {
-            off.insert(name.into());
-        }
-    }
     let owned = old.engine.is_some();
     if owned {
         manager.callbacks.remove(name);
@@ -153,7 +175,15 @@ fn switch_found(manager: &Manager, old: &Module) -> discovery::Found {
 }
 async fn wait_retired(manager: &Manager, name: &str) {
     loop {
-        reap(manager).await;
+        if manager
+            .switches
+            .off
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(name)
+        {
+            return;
+        }
         if !manager
             .switches
             .retired

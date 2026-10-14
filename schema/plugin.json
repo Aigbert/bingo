@@ -5705,7 +5705,8 @@
     "NextStart": {
       "type": "string",
       "enum": [
-        "nextStart"
+        "nextStart",
+        "afterTurn"
       ]
     },
     "NoticeParams": {

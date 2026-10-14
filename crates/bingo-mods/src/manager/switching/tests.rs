@@ -111,3 +111,37 @@ async fn retirement_does_not_hold_the_list_while_awaiting_host_cleanup() {
     cleanup.await.unwrap();
     assert!(available, "retired list locked across host I/O");
 }
+
+#[tokio::test]
+async fn enabling_a_held_generation_replies_without_holding_other_switches() {
+    let (_root, manager, old) = fixture().await;
+    let host = bingo_sdk::testing::TestHost::default();
+    host.on_catalog(|kind| async move {
+        Ok(Catalog {
+            kind,
+            entries: vec![],
+        })
+    });
+    manager.host.set(host.handle()).unwrap();
+    manager.this.set(Arc::downgrade(&manager)).unwrap();
+    manager.switch("fixture", false).await.unwrap();
+    tokio::time::pause();
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(6),
+        manager.switch("fixture", true),
+    )
+    .await;
+    assert!(result.is_ok(), "enable held the command indefinitely");
+    let result = result.unwrap().unwrap();
+    assert!(format!("{result:?}").contains("AfterTurn"));
+    assert!(matches!(
+        manager.plugins().await[0].state,
+        PluginState::Pending { now: false, .. }
+    ));
+    manager.switch("fixture", false).await.unwrap();
+    drop(old);
+    reap(&manager).await;
+    // The later wish must win when the queued enable can finally proceed.
+    tokio::time::advance(std::time::Duration::from_secs(1)).await;
+    assert!(manager.modules()[0].engine.is_none());
+}

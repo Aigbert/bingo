@@ -3274,7 +3274,8 @@
     "NextStart": {
       "type": "string",
       "enum": [
-        "nextStart"
+        "nextStart",
+        "afterTurn"
       ]
     },
     "OmittedField": {

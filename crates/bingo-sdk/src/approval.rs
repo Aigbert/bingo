@@ -56,6 +56,13 @@ mod tests {
             (PluginState::Registering, json!({"kind":"registering"})),
             (
                 PluginState::Pending {
+                    now: false,
+                    at: crate::plugin::NextStart::AfterTurn,
+                },
+                json!({"kind":"pending","now":false,"at":"afterTurn"}),
+            ),
+            (
+                PluginState::Pending {
                     now: true,
                     at: crate::plugin::NextStart::NextStart,
                 },

@@ -217,6 +217,11 @@ impl PluginSource for Manager {
         switching::module_kind(self, name)
     }
     async fn switch(&self, name: &str, enabled: bool) -> Result<plugin::PluginSwitch, KernelError> {
+        let kind = switching::module_kind(self, name);
+        if kind != plugin::PluginSwitch::Now {
+            return Ok(kind);
+        }
+        switching::wish(self, name.strip_prefix("plugins:").unwrap_or(name), enabled);
         let manager = self
             .this
             .get()
@@ -224,11 +229,27 @@ impl PluginSource for Manager {
             .ok_or_else(|| reload::failed("module manager unavailable"))?;
         let name = name.to_owned();
         let asked = render::asked();
-        tokio::spawn(async move {
-            render::under_input(asked, switching::switch_module(&manager, &name, enabled)).await
-        })
-        .await
-        .map_err(reload::failed)?
+        let (deferred, waiting) = tokio::sync::oneshot::channel();
+        let mut work = tokio::spawn(async move {
+            let result = render::under_input(
+                asked,
+                switching::switch_module(&manager, &name, enabled, deferred),
+            )
+            .await;
+            if let Err(error) = &result {
+                manager
+                    .notices
+                    .push(Notice::warn("PLUGIN_SWITCH", &error.message));
+            }
+            result
+        });
+        tokio::select! {
+            result = &mut work => result.map_err(reload::failed)?,
+            deferred = waiting => match deferred {
+                Ok(()) => Ok(plugin::PluginSwitch::AfterTurn),
+                Err(_) => work.await.map_err(reload::failed)?,
+            },
+        }
     }
     async fn approval(&self, name: &str) -> Option<Approval> {
         let modules = self.modules();
@@ -246,15 +267,35 @@ impl PluginSource for Manager {
         self.rescan(true).await
     }
     async fn plugins(&self) -> Vec<PluginStatus> {
+        let retired = self.switches.retired.lock().await;
         self.modules()
             .iter()
             .map(|module| {
-                module
-                    .admission
-                    .status(&module.found, PluginRuntime::Module, "bingo.mods")
+                let mut status =
+                    module
+                        .admission
+                        .status(&module.found, PluginRuntime::Module, "bingo.mods");
+                if matches!(&status.state, PluginState::Off { why } if why == SWITCHED_OFF)
+                    && !self
+                        .switches
+                        .off
+                        .read()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .contains(&module.found.name)
+                    && retired
+                        .iter()
+                        .any(|old| old.found.name == module.found.name)
+                {
+                    status.state = PluginState::Pending {
+                        now: false,
+                        at: plugin::NextStart::AfterTurn,
+                    };
+                }
+                status
             })
             .collect()
     }
+
     async fn registrations(
         &self,
         trust: &BTreeMap<String, PluginTrust>,

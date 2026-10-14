@@ -11,23 +11,27 @@ A running turn keeps the chain it started with, including its completion hooks.
 A command already dispatched finishes with the command it resolved.
 
 A plugin contributing tools, providers, stores, surfaces, services, context
-contributors or a `prompt.compose` interceptor waits for the next start.
+contributors or `prompt.compose`, `tool.describe`, or `turn.step` interceptors
+waits for the next start.
 The response names the first reason, for example `off at next start (tools)`.
 Legacy hooks, permission policies, compactors, native dependency requirements
 and unknown late contributions also require a restart. Process plugins always
 require a restart. Stores and surfaces needed by this build refuse disabling.
 
 The listing derives `pending` from the saved wish and what is running.
-Its reason says `off at next start` or `on at next start`; reversing a pending
+Its reason names the next start or the running turn; reversing a pending
 switch clears the difference. `registering` means admission is still running.
 Neither state grants repository approval or overrides a failed admission.
 
 JavaScript modules switch through their reload lifecycle. Disabling removes
 future dispatch and retires the old generation after its in-flight work ends.
 Enabling loads a new generation with admission and current repository approval.
-`$.state` and `$.store` survive; session-start hooks run again. A module declaring
+If the old generation still serves a turn after five seconds, enable replies
+that it is queued after the running turn. Other switches remain available;
+a later disable supersedes that queued enable.
+`$.state` and `$.store` survive; session-start hooks run again. A module holding declared or trust-granted
 `tool` authority is conservatively held until next start because it can register
-tools after loading. An unloaded module's `prompt.compose` hooks are checked
+tools after loading. An unloaded module's request-shaping hooks are checked
 before it can join the running chain.
 
 `/plugins enable plugins:<name>` can save the wish for a waiting repository mod,

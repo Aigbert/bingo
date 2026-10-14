@@ -164,6 +164,14 @@ impl PluginState {
             Self::Waiting { changed: true } => Some("changed since your yes"),
             Self::Waiting { changed: false } => Some("waits for your yes"),
             Self::Registering => Some("registration pending"),
+            Self::Pending {
+                now: true,
+                at: NextStart::AfterTurn,
+            } => Some("off after the running turn"),
+            Self::Pending {
+                now: false,
+                at: NextStart::AfterTurn,
+            } => Some("on after the running turn"),
             Self::Pending { now: true, .. } => Some("off at next start"),
             Self::Pending { now: false, .. } => Some("on at next start"),
         }
@@ -176,12 +184,14 @@ impl PluginState {
 #[serde(rename_all = "camelCase")]
 pub enum NextStart {
     NextStart,
+    AfterTurn,
 }
 
 /// When a contribution set can honor a switch.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PluginSwitch {
     Now,
+    AfterTurn,
     NextStart { why: String },
 }
 

@@ -173,6 +173,7 @@ async fn switched(
     let name = name.strip_prefix("plugins:").unwrap_or(name);
     let when = match kind {
         plugin::PluginSwitch::Now => "now".into(),
+        plugin::PluginSwitch::AfterTurn => "after the running turn; switch queued".into(),
         plugin::PluginSwitch::NextStart { why } => format!("at next start ({why})"),
     };
     let listed = listing(host.registry()).await;
