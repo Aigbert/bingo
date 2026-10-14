@@ -53,7 +53,7 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
         return effects;
     }
     match owner {
-        crate::focus::Owner::Pane => crate::pane::key(ui, tree.viewed(), key),
+        crate::focus::Owner::Pane => pane_keys(ui, tree, key, now),
         crate::focus::Owner::Select => selecting(ui, tree, key, now),
         crate::focus::Owner::Search => searching(ui, key, now),
         crate::focus::Owner::Layer => {
@@ -62,6 +62,14 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
         crate::focus::Owner::Interaction => interaction_keys(ui, tree, key, now),
         _ => composer_keys(ui, tree, key, now),
     }
+}
+
+fn pane_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
+    let effects = crate::pane::key(ui, tree.viewed(), key);
+    if key.code != KeyCode::Esc && matches!(ui.focus, crate::focus::Focus::Composer) {
+        return composer_keys(ui, tree, key, now);
+    }
+    effects
 }
 
 fn interaction_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {

@@ -310,6 +310,7 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
     let mut items = Vec::new();
     controls(view, &mut items);
     if items.is_empty() {
+        ui.focus = Focus::Composer;
         return Vec::new();
     }
     let selected = ui.placed.panes.selected.entry(focused.clone()).or_default();
@@ -419,3 +420,6 @@ mod tests;
 
 #[cfg(test)]
 mod integration_tests;
+
+#[cfg(test)]
+mod focus_tests;

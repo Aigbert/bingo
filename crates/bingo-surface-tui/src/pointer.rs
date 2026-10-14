@@ -79,6 +79,9 @@ fn layer_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent) -> Vec<Effect> {
 /// A press lands on whatever is under it: a card's option answers, a block
 /// takes the focus, opens what is folded under it and starts a run.
 fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect> {
+    if matches!(ui.focus, crate::focus::Focus::Pane(_)) {
+        ui.focus = crate::focus::Focus::Composer;
+    }
     if let Some(effects) = crate::component::band::press(ui, Position::new(mouse.column, mouse.row))
     {
         return effects;

@@ -119,7 +119,16 @@ fn floating_pointer_events_reach_the_topmost_pane_and_never_select_the_transcrip
         vec![3]
     );
     crate::pointer::on_mouse(&mut ui, &tree, mouse(Down(Left), area.x, area.y + 1), now);
-    assert!(matches!(&ui.focus,crate::focus::Focus::Pane(key) if key.ends_with("/newest")));
+    assert!(matches!(ui.focus, crate::focus::Focus::Composer));
+    assert!(
+        ui.placed
+            .panes
+            .selection
+            .as_ref()
+            .unwrap()
+            .0
+            .ends_with("/newest")
+    );
     crate::pointer::on_mouse(
         &mut ui,
         &tree,
@@ -140,7 +149,14 @@ fn collapse_click_and_title_and_key_cycle_fit_without_changing_session_data() {
     use crossterm::event::{
         KeyCode, KeyEvent, KeyModifiers, MouseButton::Left, MouseEventKind::Down,
     };
-    let state = with_text(state_with(json!(["side", "above"])));
+    let mut state = with_text(state_with(json!(["side", "above"])));
+    state
+        .signals
+        .get_mut("counter")
+        .unwrap()
+        .get_mut("pane")
+        .unwrap()["slots"][0]["view"] =
+        json!({"kind":"Button","label":"Run","onPress":{"name":"counter:run","args":{}}});
     let tree = solo(&state);
     let (mut ui, now) = scene();
     draw_tree(60, 15, &tree, &mut ui, now);
