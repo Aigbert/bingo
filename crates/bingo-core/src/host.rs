@@ -594,12 +594,13 @@ impl Host {
         self.live(id)?.mailbox.compact(instructions).await
     }
 
-    /// The directories this process runs in; what a command that writes a
-    /// settings file needs to find one (ADR-0008 §8).
+    /// The settings layers used to resolve a live configuration change.
     pub(crate) fn settings_layers(&self) -> &[settings::Layer] {
         &self.config.layers
     }
 
+    /// The directories this process runs in; what a command that writes a
+    /// settings file needs to find one (ADR-0008 §8).
     pub fn env(&self) -> &Env {
         &self.config.env
     }
@@ -839,9 +840,7 @@ impl HostApi for Host {
             .await
     }
 
-    /// The session must be live and running a turn: one that is only stored
-    /// is answering nobody, and reopening it would open a session with no
-    /// turn to serve the call anyway (ADR-0036 §2).
+    /// Transfer live signal ownership without changing the payload.
     async fn transfer_signals(
         &self,
         session: &SessionId,
@@ -855,6 +854,9 @@ impl HostApi for Host {
             .await
     }
 
+    /// The session must be live and running a turn: one that is only stored
+    /// is answering nobody, and reopening it would open a session with no
+    /// turn to serve the call anyway (ADR-0036 §2).
     async fn invoke(
         &self,
         session: &SessionId,
