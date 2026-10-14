@@ -42,6 +42,9 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
         return Vec::new();
     }
     ui.prepare(&tree.viewed().summary.cwd);
+    if crate::palette::active(ui) {
+        return crate::palette::key(ui, tree, key, now);
+    }
     if key.code == KeyCode::Esc && tree.open_interaction().is_some() {
         return cancel(ui, tree);
     }
@@ -63,9 +66,6 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
         && let Some(action) = crate::pane::key_handler(ui, tree.viewed(), key)
     {
         return vec![Effect::SiteKey { action, key }];
-    }
-    if crate::palette::active(ui) {
-        return crate::palette::key(ui, tree, key, now);
     }
     match owner {
         crate::focus::Owner::Pane => pane_keys(ui, tree, key, now),

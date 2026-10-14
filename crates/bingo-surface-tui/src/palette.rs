@@ -45,6 +45,7 @@ pub fn close(ui: &mut Ui, now: Now) {
         ui.composer.set(&draft);
     }
     ui.focus.close(now.instant);
+    ui.dialog.aside = false;
     ui.edited();
 }
 pub fn active(ui: &Ui) -> bool {
@@ -144,11 +145,15 @@ fn handler(ui: &Ui) -> Option<Action> {
     layout.on_key.clone()
 }
 pub fn waiting(ui: &Ui, state: &SessionState) -> bool {
-    if !active(ui)
-        || !render::matched(&state.config)
-            .0
-            .contains_key(&render::Component::Palette)
-    {
+    if !active(ui) {
+        return false;
+    }
+    let Open::Palette(open) = ui.focus.open() else {
+        return false;
+    };
+    let area = ui.shown.canvas.area();
+    let props = Props::Palette(Box::new(props(ui, state, open)));
+    if crate::component::key(state, &open.id, &props, area.width, area.height / 2).is_none() {
         return false;
     }
     let Some(key) = ui

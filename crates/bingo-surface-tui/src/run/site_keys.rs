@@ -44,14 +44,6 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
 }
 
 fn target(run: &Run) -> Option<(SessionId, String, bool)> {
-    if let Some((owner, open)) = run
-        .session
-        .tree
-        .open_interaction()
-        .filter(|_| !run.ui.dialog.aside)
-    {
-        return Some((owner.summary.id.clone(), open.id.to_string(), true));
-    }
     if crate::palette::active(&run.ui) {
         return crate::palette::request(&run.ui).map(|id| {
             (
@@ -60,6 +52,14 @@ fn target(run: &Run) -> Option<(SessionId, String, bool)> {
                 false,
             )
         });
+    }
+    if let Some((owner, open)) = run
+        .session
+        .tree
+        .open_interaction()
+        .filter(|_| !run.ui.dialog.aside)
+    {
+        return Some((owner.summary.id.clone(), open.id.to_string(), true));
     }
     if let crate::focus::Focus::Pane(focus) = &run.ui.focus {
         return Some((
@@ -200,28 +200,10 @@ pub(super) fn notices(run: &mut Run) {
 }
 
 fn focus(run: &Run) -> Option<String> {
-    if let Some((_, open)) = run
-        .session
-        .tree
-        .open_interaction()
-        .filter(|_| !run.ui.dialog.aside)
-    {
-        return Some(open.id.to_string());
-    }
-    if crate::palette::active(&run.ui) {
-        return crate::palette::request(&run.ui).map(str::to_owned);
-    }
-    if let Some((_, open)) = run.session.tree.open_interaction() {
-        return Some(open.id.to_string());
-    }
-    if let crate::focus::Focus::Pane(focus) = &run.ui.focus {
-        return Some(focus.clone());
-    }
-    None
+    target(run).map(|(_, focus, _)| focus)
 }
 fn palette_waiting(run: &Run) -> bool {
-    (run.ui.dialog.aside || run.session.tree.open_interaction().is_none())
-        && crate::palette::waiting(&run.ui, run.session.tree.viewed())
+    crate::palette::waiting(&run.ui, run.session.tree.viewed())
 }
 pub(super) fn blocked(run: &Run) -> bool {
     if palette_waiting(run) {
@@ -249,7 +231,7 @@ pub(super) fn drain(run: &mut Run) {
         if run.site_keys.values().any(|p| p.focus == site) {
             break;
         }
-        if !run.ui.dialog.aside
+        if crate::focus::owner(&run.ui, &run.session.tree) == crate::focus::Owner::Interaction
             && run
                 .session
                 .tree
