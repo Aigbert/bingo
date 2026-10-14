@@ -249,3 +249,35 @@ async fn directory_value_imports_resolve_but_declarations_never_execute() {
         );
     }
 }
+
+#[test]
+fn module_constant_matchers_are_static_but_computed_matchers_are_not() {
+    for source in [
+        "const pane = 'activity'; export const register = on => on('ui.render', {component:'Pane',requestId:pane}, () => {});",
+        "const match = {component:'Pane',requestId:'activity'}; export const register = on => on('ui.render', match, () => {});",
+    ] {
+        let result = checked(source, "");
+        assert!(
+            !result.findings.iter().any(|f| f.rule == Rule::OnLiteral),
+            "{:?}",
+            result.findings
+        );
+    }
+    for source in [
+        "const match = {component:'Pane'}; match.component = compute(); export const register = on => on('ui.render', match, () => {});",
+        "let match = {component:'Pane'}; export const register = on => on('ui.render', match, () => {});",
+        "const match = compute(); export const register = on => on('ui.render', match, () => {});",
+        "const match = {requestId: compute()}; export const register = on => on('ui.render', match, () => {});",
+        "const key = 'component'; const match = {[key]:'Pane'}; export const register = on => on('ui.render', match, () => {});",
+        "const base = {component:'Pane'}; const match = {...base}; export const register = on => on('ui.render', match, () => {});",
+        "const match = {component:'Pane'}; export const register = on => { const match = compute(); on('ui.render', match, () => {}); };",
+    ] {
+        assert!(
+            checked(source, "")
+                .findings
+                .iter()
+                .any(|f| f.rule == Rule::OnLiteral),
+            "{source}"
+        );
+    }
+}
