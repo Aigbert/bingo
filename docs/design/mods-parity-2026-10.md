@@ -46,7 +46,7 @@
 - **Re-entry.** A hook never runs under its own frame. A `$` call raises
   the chain again, skipping only the calling hook.
 
-bingo today: seven planned chain points (ADR-0074) with
+Before Phase 7: seven chain points (ADR-0074) with
 `(cx, input, next)` links and trust tiers. Phase 7 adds the event
 catalogue, the module, matchers over `e`, `.catch`, budgets on a
 hook's own time, and re-entry.
@@ -60,31 +60,31 @@ noun events on top.
 
 | Claude Code | bingo before Phase 7 | Phase 7 | M | Status |
 |---|---|---|---|---|
-| `tool.call` | tool.run point | `tool.call` | 131 (renamed) | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified); M146 port regressions |
-| `tool.check` | tool.gate point; policy then person | `tool.check`; the policy link stays fixed | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `tool.describe` | — | chain over each round's tool specs | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `prompt.submit` | submit point | `prompt.submit` | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `prompt.compose`, `.section`, `.context` | context.compose point; contributors | `prompt.compose`; one contributor piece is a section | 131, 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `tool.call` | tool.run point | `tool.call` | 131 (renamed) | done — [M136 Verified](../plans/M136-the-event-catalogue.md); M146 port regressions |
+| `tool.check` | tool.gate point; policy then person | `tool.check`; the policy link stays fixed | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `tool.describe` | — | chain over each round's tool specs | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `prompt.submit` | submit point | `prompt.submit` | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `prompt.compose`, `.section`, `.context` | context.compose point; contributors | `prompt.compose`; one contributor piece is a section | 131, 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
 | `prompt.attachment`, `.mention` | surfaces resolve `@` | **gap**: a hook sees mentions in `prompt.submit`'s input | — | gap — non-goal in M136 (surface/hooks-shell ownership) |
-| `prompt.autocomplete` | argument completion (M100) | chain over completion | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `prompt.fill`, `.suggest` | — | `Slot::Prompt { fill, suggest }`, pushed | 140 | done — [M140 Verified](../plans/M140-elements-and-pulled-views.md#verified) |
+| `prompt.autocomplete` | argument completion (M100) | chain over completion | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `prompt.fill`, `.suggest` | — | `Slot::Prompt { fill, suggest }`, pushed | 140 | done — [M140 Verified](../plans/M140-elements-and-pulled-views.md) |
 | `prompt.edit` (each keystroke) | — | **gap**: the composer belongs to the surface | — | gap — non-goal in M136 (surface/hooks-shell ownership) |
-| `turn.start` | `Turn` notification | observation | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `turn.step` | model.request point | `turn.step` | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `turn.complete` | `Stop` hook | `turn.stop` (may ask for another round) plus `turn.complete` (text drawn under the answer) | 131, 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `session.start`, `.end`, `.attach`, `.detach` | `Session` notification | observations | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `session.compact` | compact point | `session.compact` | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `session.receive`, `.send` | deliver | chains on deliver, in and out | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `session.append` | extend | chain; only a plugin's own rows are rewritable | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `session.measure` | the ruler | observation | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `command.run`, `.describe` | commands | chains | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified); M146 port regressions |
-| `config.set`, `.describe` | settings writes | chains | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `plugin.register` | `standing()` | chain judging tier and `uses` | 137 | done — [M137 Verified](../plans/M137-the-mod-runtime.md#verified) |
+| `turn.start` | `Turn` notification | observation | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `turn.step` | model.request point | `turn.step` | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `turn.complete` | `Stop` hook | `turn.stop` (may ask for another round) plus `turn.complete` (text drawn under the answer) | 131, 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `session.start`, `.end`, `.attach`, `.detach` | `Session` notification | observations | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `session.compact` | compact point | `session.compact` | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `session.receive`, `.send` | deliver | chains on deliver, in and out | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `session.append` | extend | chain; only a plugin's own rows are rewritable | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `session.measure` | the ruler | observation | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `command.run`, `.describe` | commands | chains | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md); M146 port regressions |
+| `config.set`, `.describe` | settings writes | chains | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `plugin.register` | `standing()` | chain judging tier and `uses` | 137 | done — [M137 Verified](../plans/M137-the-mod-runtime.md) |
 | `engine.create` | — | no equivalent: a noun comes from a declared service | 136 | n/a — declared service nouns (ADR-0078) |
-| `agent.spawn`, `.offer`, `skill.prompt` | the agents and skills plugins | noun events from those plugins' services | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
-| `ui.*` (9 events) | — | ADR-0079 | 140, 141 | done — [M140 Verified](../plans/M140-elements-and-pulled-views.md#verified) |
-| op events (62) | — | one chain per `$` method, raised by the runtime | 138, 139 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
-| noun events | services (ADR-0069) | `<noun>.<method>` over a service's wire face | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `agent.spawn`, `.offer`, `skill.prompt` | the agents and skills plugins | noun events from those plugins' services | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
+| `ui.*` (9 events) | — | ADR-0079 | 140, 141 | done — [M140 Verified](../plans/M140-elements-and-pulled-views.md) |
+| op events (62) | — | one chain per `$` method, raised by the runtime | 138, 139 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md) |
+| noun events | services (ADR-0069) | `<noun>.<method>` over a service's wire face | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md) |
 | `classic.*` (33) | hooks-shell, run through the `Hook` adapter | **gap**: shell hooks are not mod events | — | gap — non-goal in M136 (surface/hooks-shell ownership) |
 | `telemetry.*`, `attribution.text` | — | not applicable: bingo has neither | — | n/a — no corresponding feature |
 
@@ -96,25 +96,25 @@ kernel events.
 
 | Noun | Claude Code methods | bingo source | M | Status |
 |---|---|---|---|---|
-| `session` | messages, cwd, root, model, turns, id, repo, surface(s), usage, version, compact, send, append, authorize | `HostApi` sessions, history, deliver, extend | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified); gap — non-goal in M138 (§8) |
-| `turn` | abort | interrupt | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
-| `prompt` | submit, read, fill, suggest, compose | submit, `Slot::Prompt`, compose | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified); gap — non-goal in M138 (§8) |
-| `tool` | list, call, check, register | `HostApi::invoke`, a mod's `ToolSource` | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified); gap — non-goal in M138 (§8) |
-| `command` | list, run, register | the actor's commands, a mod's command source | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
-| `config`, `settings` | list, set, read | the settings view and layers | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
-| `model` | complete, classify, fork | `HostApi::complete` (ADR-0075) | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
-| `state` | get, set (versioned) | `host/state` (ADR-0075 §2), session scope | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
-| `store` | get, set, delete, keys | `host/state`, global scope | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
-| `clock` | now, sleep, after, every | tokio time, paused in tests (M111) | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
-| `plugin` | name, root | the mod's manifest | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
-| `ui` | status, toast, open, close, panes, invalidate, resolve, notice, log, ask, notify | ADR-0079; ask is `ToolHost::ask` | 140, 141 | done — [M140 Verified](../plans/M140-elements-and-pulled-views.md#verified); gap — isPlaced in M151 |
+| `session` | messages, cwd, root, model, turns, id, repo, surface(s), usage, version, compact, send, append, authorize | `HostApi` sessions, history, deliver, extend | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md); gap — non-goal in M138 (§8) |
+| `turn` | abort | interrupt | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md) |
+| `prompt` | submit, read, fill, suggest, compose | submit, `Slot::Prompt`, compose | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md); gap — non-goal in M138 (§8) |
+| `tool` | list, call, check, register | `HostApi::invoke`, a mod's `ToolSource` | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md); gap — non-goal in M138 (§8) |
+| `command` | list, run, register | the actor's commands, a mod's command source | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md) |
+| `config`, `settings` | list, set, read | the settings view and layers | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md) |
+| `model` | complete, classify, fork | `HostApi::complete` (ADR-0075) | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md) |
+| `state` | get, set (versioned) | `host/state` (ADR-0075 §2), session scope | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md) |
+| `store` | get, set, delete, keys | `host/state`, global scope | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md) |
+| `clock` | now, sleep, after, every | tokio time, paused in tests (M111) | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md) |
+| `plugin` | name, root | the mod's manifest | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md) |
+| `ui` | status, toast, open, close, panes, invalidate, resolve, notice, log, ask, notify | ADR-0079; ask is `ToolHost::ask` | 140, 141 | done — [M140 Verified](../plans/M140-elements-and-pulled-views.md); gap — isPlaced in M151 |
 | `ui` | scroll, focus, copy, selection | **gap**: these are the surface's own | — | gap — non-goal in M140/M141 (surface ownership) |
-| `fs` | read, write, list, exists, stat, ancestors (4 MiB) | scoped to the project and the mod's data | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
-| `http` | fetch | `bingo-http` (M127) | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
-| `process` | run, spawn | `bingo-process` (M128), behind a grant | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
-| `env` | get, set | behind a grant; names are literals | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
-| `mcp` | call, connect | the MCP plugin's noun | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
-| `agent` | spawn, list, register | the agents plugin's noun | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
+| `fs` | read, write, list, exists, stat, ancestors (4 MiB) | scoped to the project and the mod's data | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md) |
+| `http` | fetch | `bingo-http` (M127) | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md) |
+| `process` | run, spawn | `bingo-process` (M128), behind a grant | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md) |
+| `env` | get, set | behind a grant; names are literals | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md) |
+| `mcp` | call, connect | the MCP plugin's noun | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md) |
+| `agent` | spawn, list, register | the agents plugin's noun | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md) |
 | `audio` | play, speak | **gap** | — | gap — non-goal in M139 (no audio stack) |
 | `telemetry` | log, mark | not applicable | — | n/a — no corresponding feature |
 

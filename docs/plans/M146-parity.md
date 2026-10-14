@@ -46,7 +46,7 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
 
 2026-10-14: delegate widened scope to every port compatibility gap; no new kernel door/noun or ADR Decision change:
 - `crates/bingo-mods/src/validate/{dollar,source,tests}.rs`,
-  `src/{lib,imports,strip,load,mount,module,chain}.rs`, `src/dollar/{table,tests,callback}.rs`,
+  `src/{lib,imports,strip,load,mount,module,chain}.rs`, `src/dollar/{table,tests,callback,runtime}.rs`, `src/testing/environment.rs`,
   `tests/{strip,engine,testing,plugin}.rs`: schema-derived data reads and erased imports.
 - `schema/dollar.json`, `sdk/typescript/src/{dollar,dollar-types,plugin}.ts`,
   `crates/bingo-plugin-rpc/src/{wire,bridge,validate}.rs`, generated plugin schemas/wire,
@@ -70,7 +70,7 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
 - [x] mods_parity passes including Node, required on Linux CI.
 - [x] tmux captures: denial, status, band, tool row, inline pane at both widths.
 - [x] Every §2/3 row has Status; awk prints 0 rows without it.
-- [ ] rg locates each §8 gap in its owner's Non-goals; all gates pass.
+- [x] rg locates each §8 gap in its owner's Non-goals; native gates pass; Windows C-toolchain checks deferred to CI under protocol §7.
 
 ## Non-goals
 
@@ -96,16 +96,17 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
   mount.rs folds Views, not sources; Engine/Runner share load.rs/strip.rs.
 - Delegate authorized all exposed compatibility gaps, each in its own fix commit
   after a failing test. New kernel doors/nouns or ADR Decision changes still stop.
-- Compatibility fixes preserve existing doors and Decisions; remaining work is
-  final sequential gates and the compact evidence record.
+- Compatibility fixes preserve existing doors and Decisions. Windows CI owns
+  the known third-party C-toolchain deferral; no Rust error was reported.
 
-## Verified (2026-10-14, in progress)
+## Verified (2026-10-14)
 
 - `cargo test -p bingo-mods --lib validate::tests --locked`: data reads red→6 pass; erased imports red→8 pass; as-const object keys red→1 pass; static matchers red→1 pass.
 - `cargo test -p bingo-core --lib a_json_deny_only_answer_never_runs_the_tool --locked`: red (1 execution); `cargo test -p bingo-core --lib chain::tests --locked`: 8 pass, deny executes zero at every tier.
 - `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk catalogue:: --locked`: pass; dollar/schema and plugin/event generators run with the same flag.
 - `cargo test -p bingo-plugin-rpc --lib --locked`: 131 pass; deny-only wire contract red first; authorized baseline regenerated, freeze passes.
-- `node --test sdk/typescript/src/*.test.ts`: 30 pass; status(undefined), atoms, callback-free commands, numeric clock and synchronous resolve seen red first.
+- `node --test sdk/typescript/src/*.test.ts`: 30 pass; status(undefined), atoms, callback-free commands and synchronous resolve seen red first.
+- `cargo test -p bingo --test plugin_kit clock_and_environment_mocks_keep_grants_and_hook_budgets --locked`: numeric clock red→1 pass.
 - `cargo test -p bingo-mods --test engine --locked`: 5 pass, 1 manual RSS ignored; unawaited dollar call regression red first.
 - Original shell parity test: wall-deadline failure repeats alone; shared runtime/job waker fixes nested continuation stall, all 4 tool-call cases pass.
 - `cargo test -p bingo --test mods_parity --locked -- --nocapture`: 3 pass; own tool-call 5, band 3, pane 2 cases pass; both transports preserve .env, trim shell, clear failure status.
@@ -114,14 +115,14 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
 - Original Node port `bingo --print --output-format json --plugin-dir <temporary/tool-call>`: exit 0, NDJSON valid; .env unchanged, Bash trimmed, failure status then null (isolated rewrite grant).
 - `tmux -L bingo-m146-acceptance-1048 capture-pane -p -t m146`: 160×48 and 100×40: `tool-call: .env is protected here.` / `Bash(  exit 7  )` / `failed:   exit 7` / `Last turn: 0s, 1 tool calls` / `[ 1 Hide ]` / `Tool calls` / `done Bash`.
 - Same owned tmux drive: before `/tool-calls`, `1 pane waiting`; after it, pane inline at both widths; ctrl-c exit and owned socket cleaned. No captures/logs committed.
-- Mechanical fixture outside original Files: `crates/bingo/tests/support/nouns.rs` expects schema-declared plugin.version; no theme allowlist or discipline 4c changes.
+- Mechanical fixture outside original Files: `crates/bingo/tests/support/nouns.rs` expects schema-declared plugin.version; `tests/plugin_kit.rs` helper case count 3→4; no theme allowlist or discipline 4c changes.
 - `cargo fmt --all -- --check`: exit 0.
-- `cargo check --workspace --all-targets --locked`: pending.
-- `cargo clippy --workspace --all-targets --locked -- -D warnings`: pending.
-- `cargo test --workspace --locked`: pending.
-- `scripts/check_discipline.sh`: pending.
-- `scripts/budget.sh`: pending; no new dependencies.
-- `cargo deny check`: pending.
-- `scripts/tui-smoke.sh`: pending.
-- `cargo check -p bingo-sdk -p bingo-core -p bingo-mods -p bingo-plugin-rpc -p bingo --all-targets --target x86_64-pc-windows-msvc`: pending.
-- `awk` over §2/3 table rows: `matrix rows=46; missing Status=0`; `rg` in owner Non-goals: M136 prompt.edit/attachment/classic, M138 tool.check/prompt.compose/session.repo, M139 audio, M140 Client/blit/vscode/mobile/surface APIs, M141 surface APIs, M151 unasked/isPlaced (6 owner plans).
+- `cargo check --workspace --all-targets --locked`: exit 0 (final rerun 1.22s).
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: large-enum lint fixed by boxing CommandReply outcome; final rerun exit 0 (1.58s), wire unchanged.
+- `cargo test --workspace --locked`: stale helper count red→1 focused pass; full rerun exit 0, 160 groups / 5383 passed / 0 failed / 5 ignored.
+- `scripts/check_discipline.sh`: exit 0, `discipline ok`; advisory function/history lengths only.
+- `scripts/budget.sh`: exit 0, `budget ok`; dependencies 411/411, core check 0s/20s, relink 0; debug 10 GB (5 GB soft warning), 140 test binaries; no new dependencies.
+- `cargo deny check`: exit 0, `advisories ok, bans ok, licenses ok, sources ok`.
+- `scripts/tui-smoke.sh`: exit 0, `tui-smoke ok`; band hidden, Edit denied, Bash rewritten, two pane rows, Escape closed.
+- `cargo check -p bingo-sdk -p bingo-core -p bingo-mods -p bingo-plugin-rpc -p bingo --all-targets --target x86_64-pc-windows-msvc --locked`: exit 101; known C deferral: rquickjs-sys 0.14.0 MSVC flags, aws-lc-sys 0.44.0 missing stdlib.h/windows.h; Rust E-code errors: 0; Windows CI owns completion.
+- `awk` over §2/3 table rows: `matrix rows=48; missing Status=0`; `rg` in owner Non-goals: M136 prompt.edit/attachment/classic, M138 tool.check/prompt.compose/session.repo, M139 audio, M140 Client/blit/vscode/mobile/surface APIs, M141 surface APIs, M151 unasked/isPlaced (6 owner plans).
