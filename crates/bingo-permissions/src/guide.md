@@ -41,6 +41,10 @@ nowhere, and nowhere is inside nothing.
 
 ## Rules
 
+`/permission forget <rule>` removes one rule accepted for this session.
+The status card lists these rules and can forget the selected one with Enter.
+Configured rules and other sessions are unchanged.
+
 `permissions.allow`, `permissions.deny` and `permissions.ask` are lists of rule
 lines. `--allowed-tools <rule,rule>` adds to the allow list for one run. One
 form per line:

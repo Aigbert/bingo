@@ -44,6 +44,18 @@ impl Sessions {
         true
     }
 
+    pub fn forget(&self, session: &SessionId, raw: &str) -> bool {
+        let Ok(mut sessions) = self.by_session.lock() else {
+            return false;
+        };
+        let Some(decided) = sessions.get_mut(session) else {
+            return false;
+        };
+        let before = decided.rules.len();
+        decided.rules.retain(|rule| rule.raw() != raw);
+        before != decided.rules.len()
+    }
+
     pub fn rules(&self, session: &SessionId) -> Vec<Rule> {
         self.read(session, |decided| decided.rules.clone())
             .unwrap_or_default()

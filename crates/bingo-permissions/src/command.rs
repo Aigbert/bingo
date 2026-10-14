@@ -68,9 +68,15 @@ impl Command for PermissionCommand {
             hint: "show or change the permission mode".into(),
             args: ArgSpec::Words {
                 person: vec![],
-                alone: vec![],
-                values: Mode::ALL.map(|mode| mode.as_str().to_string()).to_vec(),
-                then: None,
+                alone: Mode::ALL.map(|mode| mode.as_str().to_string()).to_vec(),
+                values: Mode::ALL
+                    .iter()
+                    .map(|mode| mode.as_str().to_string())
+                    .chain(["forget".into()])
+                    .collect(),
+                then: Some(Box::new(ArgSpec::Free {
+                    hint: "<session rule>".into(),
+                })),
             },
             // Reading and setting the mode touch nothing the turn is using; the
             // mode the next call is decided against is the one set last.
@@ -84,6 +90,18 @@ impl Command for PermissionCommand {
         if asked.is_empty() {
             return Ok(CommandOutcome::View {
                 view: View::text(self.listing(&cx.session)),
+            });
+        }
+        if let Some(rule) = asked.strip_prefix("forget ") {
+            let rule = rule.trim();
+            if !self.policy.sessions.forget(&cx.session, rule) {
+                return Err(KernelError::new(
+                    ErrorCode::InvalidInput,
+                    format!("no session rule: {rule}"),
+                ));
+            }
+            return Ok(CommandOutcome::Applied {
+                message: Some(format!("forgot: {rule} · asks again")),
             });
         }
         let mode: Mode = asked.parse().map_err(|unknown: crate::UnknownMode| {
@@ -336,7 +354,40 @@ mod tests {
         let ArgSpec::Words { values, then, .. } = spec.args else {
             panic!("a mode is one of the words");
         };
-        assert_eq!(then, None, "a mode is the whole of the argument");
-        assert_eq!(values, Mode::ALL.map(|mode| mode.as_str().to_string()));
+        assert!(then.is_some());
+        assert!(values.contains(&"forget".into()));
+    }
+}
+
+#[cfg(test)]
+mod forget_tests {
+    use super::*;
+    use bingo_sdk::{PermissionPolicy, testing::NoHost};
+    #[tokio::test]
+    async fn forget_removes_only_the_named_session_rule() {
+        let policy = Arc::new(PermissionsPolicy::new(Default::default(), None).unwrap());
+        let session = SessionId::from_raw("one");
+        let other = SessionId::from_raw("other");
+        for s in [&session, &other] {
+            policy.sessions.install(s, "Bash(cargo:*)");
+            policy.sessions.install(s, "Edit(src/**)");
+        }
+        let cx = CommandContext {
+            session: session.clone(),
+            cwd: "/unused".into(),
+            host: NoHost::handle(),
+            cancel: Default::default(),
+        };
+        let command = PermissionCommand::new(policy.clone());
+        assert!(matches!(
+            command.run("forget Bash(cargo:*)", &cx).await.unwrap(),
+            CommandOutcome::Applied { .. }
+        ));
+        assert_eq!(
+            policy.describe(&session)["rules"],
+            serde_json::json!(["Edit(src/**)"])
+        );
+        assert_eq!(policy.sessions.rules(&other).len(), 2);
+        assert!(command.run("forget Bash(cargo:*)", &cx).await.is_err());
     }
 }
