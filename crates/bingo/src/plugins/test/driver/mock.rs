@@ -4,7 +4,10 @@ impl Driver {
         match method {
             "session.submit" => self.submit(params).await,
             "session.waitForSlot" => self.wait_for_slot(params).await,
-            "session.snapshot" => serde_json::to_value(&self.session.snapshot).map_err(error),
+            "session.snapshot" => {
+                self.settle().await?;
+                serde_json::to_value(&self.session.snapshot).map_err(error)
+            }
             "session" => self.replace_session(params).await,
             "clock.set" => {
                 self.pause();

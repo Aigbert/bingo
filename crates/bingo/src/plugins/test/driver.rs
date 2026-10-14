@@ -56,6 +56,15 @@ impl Driver {
             self.fold(&frame);
         }
     }
+    /// A signal is a fire-and-forget send to the session's mailbox, so a
+    /// resolved `$.ui.toast` may not be folded yet; a round trip through the
+    /// same mailbox answers only after every earlier message is applied.
+    pub async fn settle(&mut self) -> Result<(), String> {
+        let id = self.session.snapshot.summary.id.clone();
+        self.host.session_state(&id).await.map_err(error)?;
+        self.drain();
+        Ok(())
+    }
     pub async fn wait(&mut self, intent: IntentId, turn: bool) -> Result<(), String> {
         while let Some(frame) = self.session.events.next().await {
             self.fold(&frame);
