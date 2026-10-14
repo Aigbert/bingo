@@ -221,3 +221,65 @@ async fn storage_failure_stops_a_batch_before_spawning_a_turn() {
     assert!(actor.state.transcript.items().is_empty());
     assert!(actor.running.is_none());
 }
+
+#[tokio::test]
+async fn a_missing_bridged_snapshot_keeps_live_hooks() {
+    let (mut actor, _) = failing_actor().await;
+    let mut cfg = config(ScriptedProvider::new(vec![]), vec![], Arc::new(NoHost));
+    cfg.hooks = crate::turn::HookSet::fixed(vec![RecordingHook::new(false)]);
+    actor.config = Arc::new(cfg);
+    let mut running = Running::spawn(
+        &actor,
+        TurnId::mint(),
+        CancellationToken::new(),
+        TurnKind::Respond,
+    );
+    assert!(running.hooks.get().is_none());
+    running.door.set(true);
+    running.tools.push(Arc::new(EchoTool { read_only: true }));
+    actor.running = Some(running);
+    let serving = actor.serving("Echo").unwrap();
+    assert!(!serving.hooks.is_empty());
+    actor.running.take().unwrap().cancel.cancel();
+}
+
+struct CompletionSignal(Arc<tokio::sync::Notify>);
+#[async_trait::async_trait]
+impl Interceptor for CompletionSignal {
+    fn id(&self) -> &str {
+        "completion"
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher::at(bingo_sdk::catalogue::TURN_COMPLETE)
+    }
+    async fn chain(
+        &self,
+        _: &bingo_sdk::catalogue::Entry,
+        _: &HookContext,
+        input: Value,
+        next: Next<'_, Value, Value>,
+    ) -> Result<Value, KernelError> {
+        self.0.notify_one();
+        next.run(input).await
+    }
+}
+#[tokio::test(start_paused = true)]
+async fn completion_without_a_snapshot_keeps_live_hooks() {
+    let (mut actor, _) = failing_actor().await;
+    let called = Arc::new(tokio::sync::Notify::new());
+    let mut cfg = config(ScriptedProvider::new(vec![]), vec![], Arc::new(NoHost));
+    cfg.hooks.links.push(crate::chain::Link {
+        plugin: "completion".into(),
+        external: None,
+        tier: Tier::Full,
+        placement: bingo_sdk::plugin::Placement::Outer,
+        interceptor: Arc::new(CompletionSignal(called.clone())),
+    });
+    actor.config = Arc::new(cfg);
+    super::super::catalogue::complete(&actor, TurnId::mint(), TurnStatus::Completed, vec![]);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_secs(1), called.notified())
+            .await
+            .is_ok()
+    );
+}

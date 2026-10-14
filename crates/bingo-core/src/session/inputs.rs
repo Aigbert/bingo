@@ -337,7 +337,7 @@ impl Actor {
     /// is not open is no turn in flight to a caller: before it the turn has
     /// not asked anything, and after it the turn is deciding on what it heard
     /// and will serve no call from outside again.
-    fn serving(&self, name: &str) -> Result<invoke::Serving, KernelError> {
+    pub(super) fn serving(&self, name: &str) -> Result<invoke::Serving, KernelError> {
         let Some(running) = self.running.as_ref().filter(|r| r.door.is_open()) else {
             return Err(KernelError::new(
                 ErrorCode::NotReady,
@@ -361,7 +361,11 @@ impl Actor {
             stopped: running.stopped.clone(),
             door: running.door.clone(),
             config: Arc::clone(&running.config),
-            hooks: running.hooks.get().cloned().unwrap_or_default(),
+            hooks: running
+                .hooks
+                .get()
+                .cloned()
+                .unwrap_or_else(|| running.config.hooks.clone()),
             tool,
         })
     }
