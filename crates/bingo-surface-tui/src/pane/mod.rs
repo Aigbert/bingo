@@ -153,7 +153,7 @@ fn view<'a>(
             };
             ui.placed
                 .pulled
-                .answer_for(&crate::pulled::Key::seated(state, &request, seated))
+                .display(&crate::pulled::Key::seated(state, &request, seated))
         }
     }
 }

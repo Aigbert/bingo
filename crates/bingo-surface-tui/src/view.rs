@@ -519,7 +519,7 @@ fn component_requests(state: &SessionState, ui: &Ui, frame: &mut Layout, area: R
                 ) && ui
                     .placed
                     .pulled
-                    .get(&key)
+                    .display(&key)
                     .is_some_and(|view| !crate::component::has_engine(view, props.component()));
                 frame.pulls.push(key);
                 if hides_children {

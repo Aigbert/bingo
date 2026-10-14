@@ -77,7 +77,7 @@ fn component_item(
             rows.width as u16,
             0,
         )
-        && let Some(answer) = rows.pulled.and_then(|memo| memo.get(&key))
+        && let Some(answer) = rows.pulled.and_then(|memo| memo.display(&key))
     {
         block.lines = crate::component::draw(&props, Some(answer), rows.width, |changed, width| {
             let rows = &Rows {

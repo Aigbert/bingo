@@ -226,3 +226,53 @@ fn escape_closes_a_focused_pane_despite_a_retained_or_late_answer() {
     assert!(ui.shown.seating.panes.is_empty());
     assert!(ui.shown.pulls.is_empty());
 }
+
+#[test]
+fn revalidating_pane_keeps_art_and_clips_to_the_current_seat() {
+    let mut state =
+        state_with(json!([{"rect":{"anchor":"bottomRight","width":"40%","height":"40%"}}]));
+    let (mut ui, now) = scene();
+    state
+        .signals
+        .get_mut("counter")
+        .unwrap()
+        .get_mut("pane")
+        .unwrap()["slots"][0]["size"] =
+        json!({"rows":{"min":2,"ideal":8,"max":20},"columns":{"min":8,"ideal":22,"max":80}});
+    let first_screen = draw_sized(120, 40, &state, &mut ui, now);
+    assert!(first_screen.contains(crate::theme::ellipsis()));
+    let first = ui.shown.pulls[0].clone();
+    ui.placed.pulled.request(&first);
+    ui.placed
+        .pulled
+        .answer(first.clone(), bingo_sdk::View::text("OLD ART".repeat(20)));
+    assert!(draw_sized(120, 40, &state, &mut ui, now).contains("OLD ART"));
+    state.invalidated.insert("counter".into(), 1);
+    draw_sized(80, 24, &state, &mut ui, now);
+    let next = ui.shown.pulls[0].clone();
+    ui.placed.pulled.retain(std::slice::from_ref(&next));
+    ui.placed.pulled.request(&next);
+    ui.placed
+        .pulled
+        .answer(first, bingo_sdk::View::text("LATE ART"));
+    let screen = draw_sized(80, 24, &state, &mut ui, now);
+    assert!(screen.contains("OLD ART"), "{screen}");
+    assert!(!screen.contains(crate::theme::ellipsis()), "{screen}");
+    let area = ui.shown.seating.panes[0].area;
+    for row in screen
+        .lines()
+        .skip(usize::from(area.y + 1))
+        .take(usize::from(area.height - 1))
+    {
+        assert!(
+            row.trim_matches('"')
+                .chars()
+                .skip(usize::from(area.right()))
+                .all(|c| c == ' ')
+        );
+    }
+    ui.placed
+        .pulled
+        .answer(next, bingo_sdk::View::text("NEW ART"));
+    assert!(draw_sized(80, 24, &state, &mut ui, now).contains("NEW ART"));
+}

@@ -38,7 +38,7 @@ pub fn draw(
     };
     let mut lines = super::draw(
         &props,
-        ui.placed.pulled.get(&key),
+        ui.placed.pulled.display(&key),
         usize::from(area.width),
         |_, _| Vec::new(),
     );
@@ -47,7 +47,7 @@ pub fn draw(
     let (mask, actions) = ui
         .placed
         .pulled
-        .get(&key)
+        .display(&key)
         .map(|view| crate::views::targets::render(view, usize::from(area.width)))
         .unwrap_or_default();
     Drawing {

@@ -41,11 +41,14 @@ impl Key {
         key.request.viewport.place = Some(pane.place);
         key
     }
-    fn same(&self, other: &Self) -> bool {
+    fn same_request(&self, other: &Self) -> bool {
         self.session == other.session
-            && self.generation == other.generation
             && self.request.component == other.request.component
             && self.request.request_id == other.request.request_id
+    }
+    fn same(&self, other: &Self) -> bool {
+        self.same_request(other)
+            && self.generation == other.generation
             && self.request.props == other.request.props
             && self.request.viewport.columns == other.request.viewport.columns
             && self.request.viewport.place == other.request.viewport.place
@@ -53,31 +56,42 @@ impl Key {
                 || self.request.viewport.rows == other.request.viewport.rows)
     }
 }
+#[derive(Debug)]
+struct Entry {
+    key: Key,
+    answer: Option<(Key, View)>,
+    version: u64,
+}
 #[derive(Debug, Default)]
 pub struct Memo {
-    entries: Vec<(Key, Option<View>, u64)>,
+    entries: Vec<Entry>,
     next: u64,
 }
 impl Memo {
     pub fn request(&mut self, key: &Key) -> bool {
-        if self.entries.iter().any(|(one, _, _)| one.same(key)) {
-            return false;
+        if let Some(entry) = self
+            .entries
+            .iter_mut()
+            .find(|entry| entry.key.same_request(key))
+        {
+            if entry.key.same(key) {
+                return false;
+            }
+            entry.key = key.clone();
+        } else {
+            self.entries.push(Entry {
+                key: key.clone(),
+                answer: None,
+                version: 0,
+            });
         }
-        self.entries.retain(|(one, _, _)| {
-            one.session != key.session
-                || one.request.component != key.request.component
-                || one.request.request_id != key.request.request_id
-        });
-        self.entries.push((key.clone(), None, 0));
         true
     }
     pub fn answer(&mut self, key: Key, view: View) {
-        if let Some((_, answer, version)) =
-            self.entries.iter_mut().find(|(one, _, _)| one.same(&key))
-        {
+        if let Some(entry) = self.entries.iter_mut().find(|entry| entry.key.same(&key)) {
             self.next += 1;
-            *version = self.next;
-            *answer = Some(view);
+            entry.version = self.next;
+            entry.answer = Some((key, view));
         }
     }
     pub fn view<'a>(
@@ -88,36 +102,43 @@ impl Memo {
     ) -> Option<&'a View> {
         match shown {
             Shown::View(view) => Some(view),
-            Shown::Pull { request } => {
-                let key = Key::new(state, request, columns, 0);
-                self.entries
-                    .iter()
-                    .find(|(one, _, _)| one.same(&key))
-                    .and_then(|(_, view, _)| view.as_ref())
-            }
+            Shown::Pull { request } => self.display(&Key::new(state, request, columns, 0)),
         }
     }
     pub fn get(&self, key: &Key) -> Option<&View> {
         self.entries
             .iter()
-            .find(|(held, _, _)| held.same(key))
-            .and_then(|(_, answer, _)| answer.as_ref())
+            .find(|entry| entry.key.same(key))
+            .and_then(|entry| entry.answer.as_ref())
+            .filter(|(answered, _)| answered.same(key))
+            .map(|(_, view)| view)
     }
-    pub fn answer_for(&self, key: &Key) -> Option<&View> {
-        self.get(key)
+    /// Draw the last accepted answer, including the frame before dispatching a new key.
+    pub fn display(&self, key: &Key) -> Option<&View> {
+        self.get(key).or_else(|| {
+            self.entries
+                .iter()
+                .find(|entry| entry.key.same_request(key))
+                .and_then(|entry| entry.answer.as_ref())
+                .map(|(_, view)| view)
+        })
     }
     pub fn version(&self, id: &str) -> u64 {
         self.entries
             .iter()
-            .filter(|(key, _, _)| key.request.request_id == id)
-            .map(|(_, _, version)| *version)
+            .filter(|entry| entry.key.request.request_id == id)
+            .map(|entry| entry.version)
             .max()
             .unwrap_or_default()
     }
     pub fn retain(&mut self, drawn: &[Key]) {
-        self.entries.retain(|(key, answer, _)| {
-            (answer.is_some() && key.request.component != bingo_sdk::render::Component::Pane)
-                || drawn.iter().any(|one| one.same(key))
+        self.entries.retain(|entry| {
+            let answered = entry
+                .answer
+                .as_ref()
+                .is_some_and(|(key, _)| key.same(&entry.key));
+            (answered && entry.key.request.component != bingo_sdk::render::Component::Pane)
+                || drawn.iter().any(|key| key.same_request(&entry.key))
         });
     }
 }
@@ -149,16 +170,7 @@ mod tests {
         let next = Key::new(&state, &request, 80, 8);
         assert!(memo.request(&next));
         memo.answer(first, View::text("stale"));
-        assert!(
-            memo.view(
-                &Shown::Pull {
-                    request: request.clone()
-                },
-                &state,
-                80
-            )
-            .is_none()
-        );
+        assert!(memo.get(&next).is_none());
         memo.answer(next, View::text("new"));
         assert_eq!(
             memo.view(
@@ -209,9 +221,9 @@ mod pane_tests {
         moved.request.viewport.place = Some(Place::Above);
         assert!(memo.request(&moved));
         memo.answer(height, View::text("stale"));
-        assert!(memo.answer_for(&moved).is_none());
+        assert!(memo.get(&moved).is_none());
         memo.answer(moved.clone(), View::text("new"));
-        assert_eq!(memo.answer_for(&moved).unwrap().fold(), "new");
+        assert_eq!(memo.get(&moved).unwrap().fold(), "new");
         assert!(!memo.request(&moved));
     }
 }
@@ -247,5 +259,53 @@ mod lifecycle_tests {
                 assert!(memo.get(&key).is_none());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod revalidation_tests {
+    use super::*;
+    use bingo_sdk::render::{Component, Viewport};
+
+    #[test]
+    fn invalidation_keeps_last_answer_until_current_answer_arrives() {
+        let mut state = crate::test_support::state();
+        let request = RenderRequest {
+            component: Component::Pane,
+            request_id: "art".into(),
+            surface: SurfaceName::Terminal,
+            props: serde_json::json!({}),
+            viewport: Viewport {
+                columns: 80,
+                rows: 12,
+                place: None,
+            },
+        };
+        let first = Key::new(&state, &request, 80, 12);
+        let mut memo = Memo::default();
+        memo.request(&first);
+        assert!(memo.display(&first).is_none());
+        memo.answer(first.clone(), View::text("old art"));
+        state.invalidated.insert("art".into(), 1);
+        let next = Key::new(&state, &request, 22, 8);
+        assert_eq!(memo.display(&next).unwrap().fold(), "old art");
+        memo.retain(std::slice::from_ref(&next));
+        memo.request(&next);
+        memo.answer(first, View::text("late art"));
+        assert!(memo.get(&next).is_none());
+        assert_eq!(memo.display(&next).unwrap().fold(), "old art");
+        let mut other = next.clone();
+        other.session = SessionId::from_raw("other");
+        assert!(memo.display(&other).is_none());
+        other = next.clone();
+        other.request.component = Component::AbovePrompt;
+        assert!(memo.display(&other).is_none());
+        other = next.clone();
+        other.request.request_id = "other".into();
+        assert!(memo.display(&other).is_none());
+        memo.answer(next.clone(), View::text("new art"));
+        assert_eq!(memo.display(&next).unwrap().fold(), "new art");
+        memo.retain(&[]);
+        assert!(memo.display(&next).is_none());
     }
 }

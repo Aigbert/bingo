@@ -47,7 +47,7 @@ pub fn rows(
         return original;
     };
     pulls.push(key.clone());
-    let Some(answer) = ui.placed.pulled.get(&key) else {
+    let Some(answer) = ui.placed.pulled.display(&key) else {
         return original;
     };
     let options = std::cell::RefCell::new(Vec::new());

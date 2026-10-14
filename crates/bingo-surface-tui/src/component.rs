@@ -199,7 +199,7 @@ pub fn resolve(
     let key = key(state, id, props, width as u16, 0);
     let answer = key
         .as_ref()
-        .and_then(|key| memo.and_then(|memo| memo.get(key)));
+        .and_then(|key| memo.and_then(|memo| memo.display(key)));
     draw(props, answer, width, own)
 }
 
