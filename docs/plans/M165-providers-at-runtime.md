@@ -9,13 +9,15 @@ Add, re-address, check and remove named providers without restarting. Sessions k
 ## Bricks
 
 1. SDK `ProviderShape`: id, settings key, public spec construction and credential operations.
-2. Shared plugin constructors; `credential_origin` and `retire` enforce address changes.
+2. Shared plugin constructors; `credential_origin` and `retire` enforce address changes. Readdress receives fresh settings provenance, not a retained configured key.
 3. Runtime replacements/tombstones overlay gathered providers; sessions keep their Arc.
 4. Additive `AuthStatus::Ready { from }`: store, setting or env, never the credential.
 5. Fallible `probe_models` updates reach and catalogues; no credential means no probe.
 6. Provider catalogue: shape, sanitized address, instance and reach; generated wire fixtures.
 7. Runtime add → persist → paste → probe; set and remove serialize settings/live edits.
 8. CLI add shares validation/persistence; keys go only to auth.json.
+9. HTTP redirect policy defaults to same-origin, with bounded credential-free opt-ins.
+10. Refresh replaces or expires only the stored credential snapshot it started with.
 
 ## Decisions
 
@@ -34,16 +36,19 @@ Add, re-address, check and remove named providers without restarting. Sessions k
 - Registration receives provenance only for its claimed settings, plus user-instance counts for unambiguous adoption. Unreadable auth.json produces one notice and supplies no keys; invalid names and foreign owners name the skipped declaration file.
 - Login answers are private. Journal, queue previews and TUI history redact every `/provider` argument before validation. Reach exposes categories; addresses strip secrets.
 - ProviderState groups registry facts; mutation/command locks serialize edits. Project-only instances must be edited there. CredentialStore's shared lock prevents lost writes.
-- Round 4 binds configured keys too: environment keys use the default or their BASE_URL variable; settings keys use addresses from their own or more trusted layers. One request-time guard also applies after readdressing. Directly embedded keys have no store binding and are dropped on an origin change. SDK provenance is an origin enum, so user/repository/explicit cannot contradict each other.
+- Round 4 binds configured keys too: environment keys use the default or their BASE_URL variable; settings keys use addresses from their own or more trusted layers. One request-time guard also applies after readdressing. Round 5 drops directly embedded keys on every readdress because they have no settings source to re-read. SDK provenance is an origin enum, so user/repository/explicit cannot contradict each other.
 - Boot, migration and provider construction share address resolution, including environment URLs and blank-as-unset. Invalid origins retain a refusal, never a binding or credential write. Canonical tests cover case, userinfo, IPv6 and trailing dots (distinct, failing closed).
 - Repository-controlled sign-in first asks for destination confirmation showing canonical origin and source file, before paste, browser or device flows. Cancellation writes nothing and sends no HTTP. Same-origin rebinding retains provenance; a changed origin gets its new source. Reserved-name notices use the declaring manifest even when disabled; composition-only reservations name the binary.
+- Round 5 fails closed on HTTP redirects: scheme, host and effective port must match the initial request, with the existing ten-hop bound. Only credential-free page fetching and public release downloads opt into cross-origin redirects; Brave search keeps a separate same-origin client. Same-origin OAuth 307 bodies still replay.
+- Every readdress discards the configured key and resolves current settings through the existing trust/origin policy. The settings writer returns the document it just persisted, replacing the boot user-layer snapshot without a second read race; only the owning family's values cross the SDK boundary. A→B→A cannot revive a removed key, and same-origin edits pick up newly configured keys.
+- OAuth refresh compares the complete stored entry (credential, owner, issuer origin and resource origin) under the shared lock before replacement or expiry deletion. A late response cannot overwrite or remove a newer sign-in. This is process-local compare-and-set, consistent with the store's existing concurrency boundary.
 - Follow-ups: replacing `default_cleared` with mutable settings affects selection and approval consumers (>40 lines). SDK argument secrecy also needs declaration access in history/queue readers plus constructors/wire fixtures (>40 lines). Defer both optional cleanups; retain tested redaction and cleared-default behavior.
 - Guides use the owning crate's Page (ADR-0054), never docs/guide/. No dependencies or allowlist changes. HTTP tests use local fakes/wiremock with provider environment unset.
 
 ## Files
 
 - SDK provider/plugin/command contracts; core host, commands, settings/instances, session input recording and turn/endpoint; provider-openai and provider-anthropic.
-- Auth library key/source/store/lifetime; bin provider writer and RPC/CLI tests; plugin-rpc provider attribution and its fixture.
+- HTTP client/redirect policy and credential-free consumer opt-ins; auth library key/source/store/lifetime; bin provider writer and RPC/CLI tests; plugin-rpc provider attribution and its fixture.
 - TUI guide/history; existing AuthStatus consumers; schema/ and sdk/typescript/.
 
 ## Exit criteria
@@ -52,6 +57,7 @@ Add, re-address, check and remove named providers without restarting. Sessions k
 - [x] Wiremock RPC add → paste → catalogue → same-session model answer; no pre-paste HTTP.
 - [x] Strict names; user-only legacy adoption; no foreign-key adoption/deletion; safe orphan recovery.
 - [x] Stored and configured origins checked at boot/request/refresh; origin changes require a new paste and repository sign-ins show the destination.
+- [x] Cross-origin redirects are refused; removed configured keys cannot revive; late refresh writes cannot replace new credentials or bindings.
 - [x] Fresh plugin Arcs publish lists/reach; stale probes are discarded; collisions name plugin/file.
 - [x] Codex fallback survives failed catalogue while live probes report failure.
 - [x] Remove clears provider/model default and pins; live sessions get named AuthRequired.
@@ -181,3 +187,36 @@ before the final run. No wall-clock flake occurred. No dependencies were added.
 Native-only review: prior Windows/toolchain and TUI-smoke records remain unchanged.
 Final `cargo clean` follows this verification commit to remove the build-directory
 soft warning. Historical verification is retained despite the plan-length advisory.
+
+## Verified — 2026-10-15 (review round 5)
+
+Cross-origin refresh-token and provider redirect regressions failed before the
+policy fix; A→B→A configured-key revival and the late-refresh overwrite also
+failed before their fixes. Wiremock covers 307/308 token bodies, Anthropic and
+OpenAI redirects, same-origin 307 replay, credential-free page redirects and
+the ten-hop limit. RPC covers both families after the user apiKey is removed,
+and a same-origin edit reading a freshly changed key. Late success and expired
+refresh replies both preserve the replacement resource credential. Anthropic
+BASE_URL legacy adoption and HTTP default port 80 have explicit coverage.
+
+All commands ran sequentially, with ambient OPENAI_* / ANTHROPIC_* removed,
+`RUST_TEST_THREADS=4` and Cargo offline. Tests set only synthetic credentials
+and local endpoint overrides; no real credentials or provider network calls.
+
+```text
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-mods -p bingo-store-jsonl --locked => 608 passed, 3 ignored; schema/TS unchanged
+cargo fmt --all -- --check => exit 0
+cargo check --workspace --all-targets --locked => exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings => exit 0
+cargo test --workspace --locked => 5697 passed, 5 ignored, 169 groups
+bash scripts/check_discipline.sh => discipline ok (advisory warnings)
+bash scripts/budget.sh => dependencies 413; warm core 0s; isolation 0; target 23 GB; 328 test binaries; budget ok
+cargo deny --offline check => advisories ok, bans ok, licenses ok, sources ok
+```
+
+CLI: 286 passed; runtime-provider RPC: 8 passed. No wall-clock flake occurred.
+The first discipline run refused a fourth CredentialStore implementation file;
+its refresh persistence methods now live in store.rs. Check, Clippy, the full
+workspace tests and discipline passed again after that structural correction.
+No dependencies or allowlists changed. Native-only review: earlier Windows and
+TUI-smoke records stand. Final `cargo clean` follows this verification commit.
