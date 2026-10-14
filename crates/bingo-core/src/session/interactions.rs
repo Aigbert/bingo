@@ -161,12 +161,13 @@ impl Actor {
         let Some(pending) = self.pending.remove(&id) else {
             return Ok(());
         };
-        let receipt = receipt::answered(&pending.interaction, &answer);
-        let _ = pending.reply.send(Ok(answer.clone()));
+        let recorded = recorded_answer(&pending.interaction.kind, &answer);
+        let receipt = receipt::answered(&pending.interaction, &recorded);
+        let _ = pending.reply.send(Ok(answer));
         self.publish(
             Event::InteractionResolved {
                 id,
-                answer,
+                answer: recorded,
                 by: if plugin {
                     ResolvedBy::Plugin {
                         name: who.name,
@@ -235,5 +236,37 @@ impl Actor {
             self.publish_summary(self.state.summary.clone()).await?;
         }
         Ok(())
+    }
+}
+
+/// Login text is a credential, delivered only on the private reply channel.
+fn recorded_answer(kind: &InteractionKind, answer: &Answer) -> Answer {
+    match (kind, answer) {
+        (InteractionKind::Login { .. }, Answer::Text { .. }) => Answer::Text {
+            text: "[redacted]".into(),
+        },
+        _ => answer.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn login_text_is_redacted_but_cancellation_is_preserved() {
+        let kind = InteractionKind::Login {
+            provider: "local".into(),
+            flow: LoginFlow::Paste,
+        };
+        let answer = Answer::Text {
+            text: "a-secret".into(),
+        };
+        assert_eq!(
+            recorded_answer(&kind, &answer),
+            Answer::Text {
+                text: "[redacted]".into()
+            }
+        );
+        assert_eq!(recorded_answer(&kind, &Answer::Cancel), Answer::Cancel);
     }
 }
