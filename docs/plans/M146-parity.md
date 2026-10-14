@@ -6,8 +6,8 @@ The Phase 7 acceptance test. Claude Code's three example mods (the
 tool-call guard, the band above the prompt, the tool-calls pane) run in
 process (QuickJS, M137) in the TUI. A port changes
 only its import specifier, plus the tool names and inputs it matches
-where bingo's differ (ADR-0079 §1), and each port's diff is pasted.
-`bingo plugins test` passes a test for each. `design/mods-parity-2026-10.md`
+where bingo's differ (ADR-0079 §1), and each port's import-only diff is checked.
+`bingo plugins test` passes a test for each. `docs/design/mods-parity-2026-10.md`
 gains a Status column, and every row names its evidence: a test, a
 drive, or the non-goal that owns the gap. Every gap in its §8 is written
 down as a non-goal with its reason. After M139, M141 and M142. The
@@ -38,7 +38,7 @@ desktop half was dropped on 2026-10-13 with M143–M145 (ADR-0080).
      - tool calls are counted per turn;
      - moving `mock.clock` past 120 s toasts once;
      - `$.ui.mount` draws `AbovePrompt`;
-     - the button resets the count.
+     - the button hides the summary; the next prompt resets the count.
    - **pane:**
      - `session.start` registers `tool-calls` and opens the pane;
      - each call is listed, and the done ones are dim;
@@ -80,7 +80,7 @@ desktop half was dropped on 2026-10-13 with M143–M145 (ADR-0080).
   test cases added)
 - `scripts/port_examples.sh` (new)
 - `crates/bingo/tests/mods_parity.rs` (new): `bingo plugins test` on
-  each example, and on `tool-call` under node
+  each example, and equivalent black-box calls on `tool-call` under node
 - `docs/design/mods-parity-2026-10.md` (Status)
 
 ## Exit criteria
@@ -88,8 +88,8 @@ desktop half was dropped on 2026-10-13 with M143–M145 (ADR-0080).
 - [ ] `bingo plugins validate` and `bingo plugins test` exit 0 on each
       `examples/plugins/{tool-call,band,pane}` (pasted).
 - [ ] `scripts/port_examples.sh <Claude Code 2.1.296 examples> "$TMP"`
-      passes. `diff -r` of each original against its port is pasted,
-      and shows only the specifier and any tool map lines.
+      passes. `diff` evidence for each original against its port is pasted
+      without source text, proving only specifier/tool-map changes.
 - [ ] `cargo test -p bingo --test mods_parity` passes, and the node run
       is not skipped on CI's Linux job.
 - [ ] The tmux drive's `capture-pane` output is pasted: the denial, the
@@ -129,18 +129,33 @@ JSX mods out of process; and type-checking a port against props that
 only Claude Code has, such as `AbovePrompt`'s `hasSurvey`, which reads
 `undefined` here, so the band draws as it would without a survey.
 
+## Re-verified (2026-10-14, `3b10b522`)
+
+- Landed dependencies: M136 (`3dd2c95a`), M137 (`c1d95e8c`), M138
+  (`5581b978`), M139 (`686ad289`), M140 (`ba70fdf6`), M141 (`a88a5363`),
+  M142 (`3b10b522`); M147 (`6e3b1b03`), M148 (`fddb62f3`), M149
+  (`b2bee6f4`), M150 (`a2f77d96`), M151 (`6fad64ce`). M143–M145 dropped.
+- Read all five 2.1.296 originals from the supplied temporary directory.
+  Existing examples are independent rewrites; retain their coverage. The
+  original band hides (does not reset); pane command/id is `tool-calls`.
+- Edit/file_path and Bash/command agree; no tool mapping is needed.
+  Catalogue pins tool/tool_use_id and uses isError; turn.complete exists.
+  Register/helpers, JSX stripping, bingo/testing/mount and plugin metadata
+  exist. `plugins test` requires a module: Node parity uses the SDK and
+  the binary, not a process manifest passed to that command. CI already
+  pins Node 24 and BINGO_REQUIRE_NODE=1 on Linux.
+- ADR-0081 §7 requires opening the waiting pane by the person's command
+  before captures at 160/100 columns. No unasked docking is expected.
+
 ## Risks
 
-- M141's examples are bingo's own rewrites under Claude Code's names
-  (fixed 2026-10-13). If a copied file or a renamed field lands anyway,
-  brick 1 here replaces it, and the conflict goes back to M141.
-- The examples sit in a temporary skill bundle whose path changes with
-  each build. The script takes the directory as an argument, and the
-  evidence names build 2.1.296.
-- Driving the 120 s toast means waiting 120 s. `mock.clock` proves it in
-  the test, and the drive shows that a short turn draws no toast.
-- Re-verify at start: M136's `tool.call` shape and `turn.complete`;
-  `$.plugin` and the `$` methods (M138, M139); element, prop and
-  component names (M140, M141); `'bingo'`'s exports, the `*.test.ts`
-  runner, `bingo/testing` and what sits in `examples/plugins/` (M141,
-  M142); bingo's `Edit` and `Bash` inputs; the parity doc's rows.
+- Candidate port gaps: object-form atom keys (M142), numeric clock.now
+  (M138), synchronous ui.resolve (M140), command registration without a
+  callback (M138), and tool.call deny answers (M136). Reproduce through
+  the unmodified temporary ports; report to owners, never alter originals.
+- Runtime/SDK files are outside Files. A failing gate requiring them stops
+  under protocol §6; a new door/noun or changed Decision also stops.
+- Protocol 2 is unreleased (latest v0.6.5); only scoped amendments with a
+  dated ADR-0075 line are authorized. Generated files use BINGO_UPDATE_SCHEMA=1.
+- Original source, captures and logs stay outside the repository. Every
+  process/home/journal in a drive is isolated; no live/credential tests.
