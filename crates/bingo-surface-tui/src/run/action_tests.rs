@@ -288,3 +288,49 @@ async fn switching_discards_only_an_empty_bare_resume_bootstrap() {
         );
     }
 }
+
+#[tokio::test]
+async fn queued_edits_hold_pane_callbacks_but_not_question_drawings() {
+    use bingo_sdk::render::{Component, RenderRequest, SurfaceName, Viewport};
+    let now = still(scene().1);
+    let session = Arc::new(TestSession::default());
+    let mut run = tests::idle_in(counter(""), session.clone(), now.instant);
+    run.paint(&mut Recorder::default(), Wake::Frame, now)
+        .unwrap();
+    for letter in "Ada".chars() {
+        run.heard(Term::Key(typed(letter)));
+    }
+    let host = bingo_sdk::testing::TestHost::default();
+    host.on_render(|_, _| async { Ok(bingo_sdk::View::text("new callbacks")) });
+    run.host = host.handle();
+    let request = |component, id: &str| {
+        crate::pulled::Key::new(
+            run.session.tree.viewed(),
+            &RenderRequest {
+                component,
+                request_id: id.into(),
+                surface: SurfaceName::Terminal,
+                props: json!({}),
+                viewport: Viewport {
+                    place: None,
+                    columns: 80,
+                    rows: 8,
+                },
+            },
+            80,
+            8,
+        )
+    };
+    let pane = request(Component::Pane, "counter");
+    let question = request(Component::Question, "question");
+    assert!(!pulling::request(&mut run, std::slice::from_ref(&pane)));
+    assert!(pulling::request(&mut run, &[question, pane.clone()]));
+    assert!(run.ui.placed.pulled.get(&pane).is_none());
+    let (saved, _) = finish_newest(&mut run, &session);
+    assert_eq!(saved, "Ada");
+    assert!(pulling::request(&mut run, std::slice::from_ref(&pane)));
+    assert_eq!(
+        run.ui.placed.pulled.get(&pane).unwrap().fold(),
+        "new callbacks"
+    );
+}
