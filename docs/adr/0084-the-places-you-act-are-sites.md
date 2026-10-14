@@ -1,6 +1,6 @@
 # ADR-0084 — The places you act are sites
 
-Status: proposed · 2026-10-14 · each site accepted with its screen's prototype; first: `ModelPicker` (M166) · Amends: ADR-0079 §4, ADR-0082 Consequences · §3 rewritten for ADR-0086
+Status: proposed · 2026-10-14 · each site accepted with its screen's prototype; `ModelPicker` approved (M166); `Palette` and the asks approved 2026-10-14 (M168, M169) · Amends: ADR-0079 §4, ADR-0082 Consequences · §3 rewritten for ADR-0086
 
 ## Context
 
