@@ -2,7 +2,7 @@
   {
     "file": "register.tsx",
     "line": 1,
-    "column": 56,
+    "column": 59,
     "rule": "prop-subset",
     "severity": "warning",
     "text": "terminal ignores Text.backgroundColor"

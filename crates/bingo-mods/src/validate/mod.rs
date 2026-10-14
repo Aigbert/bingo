@@ -45,11 +45,31 @@ impl Validation {
             .any(|finding| finding.severity == Severity::Error)
     }
 }
+mod contract;
+mod dollar;
+mod hooks;
+mod keys;
+mod props;
+mod source;
+mod uses;
 pub fn validate(
-    _root: &Path,
-    _manifest: &bingo_plugin_host::manifest::Manifest,
+    root: &Path,
+    manifest: &bingo_plugin_host::manifest::Manifest,
 ) -> Result<Validation, String> {
-    Ok(Validation::default())
+    let bingo_plugin_host::manifest::Launch::Module(entry) = &manifest.launch else {
+        return Err("module validation requires a module manifest".into());
+    };
+    let mut output = Validation {
+        uses: manifest.uses.iter().cloned().collect(),
+        ..Default::default()
+    };
+    let declared = contract::read(root, &manifest.name, &mut output)?;
+    source::graph(root, entry, &manifest.name, declared.as_ref(), &mut output)?;
+    uses::unused(&mut output);
+    output
+        .findings
+        .sort_by(|a, b| (&a.file, a.line, a.column).cmp(&(&b.file, b.line, b.column)));
+    Ok(output)
 }
 #[cfg(test)]
 mod tests;
