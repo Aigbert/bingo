@@ -64,10 +64,23 @@ struct Entry {
 }
 #[derive(Debug, Default)]
 pub struct Memo {
+    epoch: u64,
     entries: Vec<Entry>,
     next: u64,
 }
 impl Memo {
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+    pub fn invalidate(&mut self) {
+        self.entries.clear();
+        self.epoch += 1;
+    }
+    pub fn answer_at(&mut self, epoch: u64, key: Key, view: View) {
+        if epoch == self.epoch {
+            self.answer(key, view);
+        }
+    }
     pub fn request(&mut self, key: &Key) -> bool {
         if let Some(entry) = self
             .entries
@@ -312,5 +325,24 @@ mod revalidation_tests {
         assert_eq!(memo.display(&next).unwrap().fold(), "new art");
         memo.retain(&[]);
         assert!(memo.display(&next).is_none());
+    }
+}
+
+#[cfg(test)]
+mod switching_tests {
+    use super::*;
+    #[test]
+    fn a_reply_from_before_invalidation_cannot_replace_the_new_drawing() {
+        let state = crate::test_support::state();
+        let request: RenderRequest = serde_json::from_value(serde_json::json!({"component":"Toast","requestId":"one","surface":"terminal","props":{},"viewport":{"columns":80,"rows":4}})).unwrap();
+        let key = Key::new(&state, &request, 80, 4);
+        let mut memo = Memo::default();
+        let old = memo.epoch();
+        memo.request(&key);
+        memo.invalidate();
+        memo.request(&key);
+        memo.answer_at(memo.epoch(), key.clone(), View::text("new"));
+        memo.answer_at(old, key.clone(), View::text("old"));
+        assert_eq!(memo.get(&key).unwrap().fold(), "new");
     }
 }

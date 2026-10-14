@@ -496,3 +496,44 @@ fn repository_acp_adapter_waits_before_model_catalogue_probe() {
     let root = bingo_core::approval::root_key(repo.path()).unwrap();
     assert!(settings_json(home.path())["approved"][root]["acp.adapters:repository"].is_string());
 }
+
+#[test]
+fn a_session_switch_keeps_ndjson_stdout_pure_and_reports_timing() {
+    for (name, source, expected) in [
+        (
+            "drawing",
+            "export function register(on) { on('ui.render', () => h('Text',{},'hello')); }",
+            "drawing is off now.",
+        ),
+        (
+            "compose",
+            "export function register(on) { on('prompt.compose', ($, e, next) => next(e)); }",
+            "compose is off at next start (prompt.compose).",
+        ),
+    ] {
+        let home = tempfile::tempdir().unwrap();
+        let root = home.path().join(".bingo/plugins").join(name);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            root.join("plugin.json"),
+            serde_json::json!({"name":name,"version":"1","module":"main.ts","uses":[]}).to_string(),
+        )
+        .unwrap();
+        std::fs::write(root.join("main.ts"), source).unwrap();
+        let fake = script(UNUSED);
+        let output = run(bingo()
+            .envs(home_env(home.path()))
+            .env("BINGO_FAKE_SCRIPT", fake.path())
+            .arg("--cwd")
+            .arg(home.path())
+            .args(["--print", "--output-format", "json"])
+            .arg(format!("/plugins disable {name}")));
+        assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+        let text = stdout(&output);
+        assert!(text.contains(expected), "{text}");
+        for line in text.lines() {
+            serde_json::from_str::<serde_json::Value>(line).expect("pure NDJSON");
+        }
+        assert_eq!(settings_json(home.path())["enabledPlugins"][name], false);
+    }
+}

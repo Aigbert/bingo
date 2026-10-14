@@ -74,7 +74,7 @@ pub(crate) type Keys = Pin<Box<dyn Stream<Item = Term> + Send>>;
 
 /// The results of the host calls the loop spawns.
 enum Reply {
-    Rendered(crate::pulled::Key, Box<bingo_sdk::View>),
+    Rendered(u64, crate::pulled::Key, Box<bingo_sdk::View>),
     Attached(Box<Attachment>),
     /// A child's mailbox, so a line typed in its view reaches it. The
     /// attachment's own stream is dropped: the tree's carries the child.
@@ -860,6 +860,7 @@ impl Run {
     /// serves (ADR-0026 §4) — is read again, and only that one.
     fn catalog_changed(&mut self, kind: CatalogKind) {
         if kind == CatalogKind::Commands {
+            self.ui.placed.pulled.invalidate();
             self.fetch_commands();
             return;
         }
@@ -898,11 +899,11 @@ impl Run {
 
     fn reply(&mut self, reply: Reply, events: &mut Option<FrameStream>) {
         match reply {
-            Reply::Rendered(key, view) => {
+            Reply::Rendered(epoch, key, view) => {
                 if palette::retired(self, &key, &view) {
                     return;
                 }
-                self.ui.placed.pulled.answer(key, *view);
+                self.ui.placed.pulled.answer_at(epoch, key, *view);
                 site_keys::drain(self);
             }
             Reply::Attached(attachment) => self.attach(*attachment, events),

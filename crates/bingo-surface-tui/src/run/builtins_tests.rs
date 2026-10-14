@@ -665,3 +665,147 @@ async fn a_late_owner_handle_cannot_revive_a_resolved_question() {
     assert!(run.site_keys.is_empty());
     assert!(run.mine.is_empty());
 }
+
+async fn switch(host: &bingo_core::Host, attachment: &mut bingo_sdk::Attachment, enabled: bool) {
+    use futures::StreamExt;
+    let intent = bingo_sdk::IntentId::mint();
+    attachment.handle.submit(
+        intent.clone(),
+        Input::text(
+            format!(
+                "/plugins {} hello",
+                if enabled { "enable" } else { "disable" }
+            ),
+            bingo_sdk::Origin::surface("test"),
+        ),
+    );
+    loop {
+        let frame = attachment.events.next().await.unwrap();
+        if let bingo_sdk::Event::IntentAck {
+            intent: ack,
+            outcome,
+        } = frame.event
+            && ack == intent
+        {
+            assert!(
+                matches!(outcome, IntentOutcome::Applied { .. }),
+                "{outcome:?}"
+            );
+            break;
+        }
+    }
+    let catalogue = bingo_sdk::HostApi::catalog(host, CatalogKind::Commands)
+        .await
+        .unwrap();
+    assert_eq!(
+        catalogue.entries.iter().any(|entry| entry.id == "hello"),
+        enabled
+    );
+}
+
+async fn live_hello(home: &std::path::Path) -> (Arc<bingo_core::Host>, bingo_sdk::Attachment) {
+    use bingo_sdk::{
+        ClientIdentity, Driver, Env, HostApi, OpenOptions, SessionSelector, SessionSpec,
+    };
+    let host = bingo_core::Host::build(
+        vec![Box::new(bingo_mod_hello::Hello)],
+        bingo_core::HostConfig::new(Env::rooted(home)),
+    )
+    .await
+    .unwrap();
+    let attachment = host
+        .open(
+            SessionSelector::Create {
+                spec: SessionSpec {
+                    driver: Driver::Log,
+                    cwd: home.into(),
+                    ..Default::default()
+                },
+            },
+            ClientIdentity {
+                name: "test".into(),
+                surface: "terminal".into(),
+            },
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap();
+    (host, attachment)
+}
+
+fn toast_run(
+    host: &bingo_core::Host,
+    attachment: &bingo_sdk::Attachment,
+    home: &std::path::Path,
+    now: Now,
+) -> (Run, Arc<TestSession>) {
+    let mut state = attachment.snapshot.clone();
+    state.config.kernel["render"] = json!({"Toast":[{}]});
+    state.signals.entry("fixture".into()).or_default().insert(
+        "toast".into(),
+        bingo_sdk::slot::with(
+            json!({}),
+            [bingo_sdk::slot::Slot::Toast {
+                text: "Surface fallback".into(),
+                until: now.wall.checked_add(Duration::from_secs(60)).unwrap(),
+                alert: false,
+            }],
+        ),
+    );
+    let session = Arc::new(TestSession::default());
+    let mut run = tests::idle_in(state, session.clone(), now.instant);
+    run.host = host.handle();
+    run.data_dir = home.into();
+    (run, session)
+}
+
+#[tokio::test]
+async fn plugin_switch_redraws_the_toast_and_refreshes_default_keys() {
+    use bingo_sdk::HostApi;
+    use futures::StreamExt;
+    let home = tempfile::tempdir().unwrap();
+    let (host, mut attachment) = live_hello(home.path()).await;
+    let mut gateway = host.gateway_events();
+    let now = scene().1;
+    let (mut run, session) = toast_run(&host, &attachment, home.path(), now);
+    let (sender, mut replies) = mpsc::channel(32);
+    run.replies = sender;
+    let mut screen = Recorder::default();
+    for enabled in [true, false, true] {
+        switch(&host, &mut attachment, enabled).await;
+        loop {
+            if let Some(bingo_sdk::GatewayEvent::CatalogChanged {
+                kind: CatalogKind::Commands,
+            }) = gateway.next().await
+            {
+                run.catalog_changed(CatalogKind::Commands);
+                break;
+            }
+        }
+        loop {
+            let reply = replies.recv().await.unwrap();
+            let commands = matches!(reply, Reply::Commands(_));
+            run.reply(reply, &mut None);
+            if commands {
+                break;
+            }
+        }
+        run.paint(&mut screen, Wake::Frame, now).unwrap();
+        assert_eq!(
+            screen.last().contains("Hello from a built-in mod"),
+            enabled,
+            "{}",
+            screen.last()
+        );
+        assert_eq!(
+            screen.last().contains("Surface fallback"),
+            !enabled,
+            "{}",
+            screen.last()
+        );
+        let before = session.submitted().len();
+        run.terminal_event(Term::Key(ctrl('x')));
+        assert_eq!(session.submitted().len() - before, usize::from(enabled));
+    }
+    host.shutdown().await;
+}

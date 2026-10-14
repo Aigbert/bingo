@@ -21,6 +21,7 @@ pub(super) fn request(run: &mut Run, keys: &[crate::pulled::Key]) -> bool {
         if !run.ui.placed.pulled.request(key) {
             continue;
         }
+        let epoch = run.ui.placed.pulled.epoch();
         let key = key.clone();
         let host = run.host.clone();
         let mut pending = Box::pin(async move {
@@ -28,14 +29,14 @@ pub(super) fn request(run: &mut Run, keys: &[crate::pulled::Key]) -> bool {
                 .render(&key.session, key.request.clone())
                 .await
                 .unwrap_or_else(|_| key.request.engine());
-            Ok(Reply::Rendered(key, Box::new(view)))
+            Ok(Reply::Rendered(epoch, key, Box::new(view)))
         });
         match pending
             .as_mut()
             .poll(&mut Context::from_waker(Waker::noop()))
         {
-            Poll::Ready(Ok(Reply::Rendered(key, view))) => {
-                run.ui.placed.pulled.answer(key, *view);
+            Poll::Ready(Ok(Reply::Rendered(epoch, key, view))) => {
+                run.ui.placed.pulled.answer_at(epoch, key, *view);
                 answered = true;
             }
             Poll::Pending => run.spawn(pending),

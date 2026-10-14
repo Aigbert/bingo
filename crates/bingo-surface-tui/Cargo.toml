@@ -66,6 +66,7 @@ libc = "0.2"
 
 [dev-dependencies]
 bingo-mod-ask.workspace = true
+bingo-core.workspace = true
 bingo-mod-hello.workspace = true
 bingo-mod-palette.workspace = true
 bingo-sdk = { workspace = true, features = ["testing"] }
