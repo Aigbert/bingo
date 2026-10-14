@@ -3,6 +3,7 @@ impl Driver {
     pub(super) async fn mock(&mut self, method: &str, params: Value) -> Result<Value, String> {
         match method {
             "session.submit" => self.submit(params).await,
+            "session.waitForSlot" => self.wait_for_slot(params).await,
             "session.snapshot" => serde_json::to_value(&self.session.snapshot).map_err(error),
             "session" => self.replace_session(params).await,
             "clock.set" => {
@@ -46,6 +47,25 @@ impl Driver {
             "mount" => self.mount(params),
             _ if method.starts_with("mount.") => self.mounted(&method[6..], params).await,
             _ => Err(format!("unknown testing operation {method}")),
+        }
+    }
+    async fn wait_for_slot(&mut self, params: Value) -> Result<Value, String> {
+        let plugin = params["plugin"].as_str().ok_or("plugin is required")?;
+        let key = params["slot"].as_str().ok_or("slot is required")?;
+        loop {
+            if bingo_sdk::slot::placed(&self.session.snapshot)
+                .iter()
+                .any(|placed| placed.plugin == plugin && placed.kind == key)
+            {
+                return Ok(Value::Null);
+            }
+            let frame = self
+                .session
+                .events
+                .next()
+                .await
+                .ok_or("session stream ended")?;
+            self.fold(&frame);
         }
     }
     async fn submit(&mut self, params: Value) -> Result<Value, String> {

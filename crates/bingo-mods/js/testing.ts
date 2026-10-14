@@ -72,7 +72,7 @@ export const mock = {
   clock: {set: (value: string) => request('clock.set',value), advance: (ms: number) => request('clock.advance',ms)},
   store: {seed: (values: Record<string, unknown>) => request('store.seed',values), read: (key: string) => request('store.read',key)},
   env: (values: Record<string,string>) => request('env',values),
-  session: Object.assign(async (options: unknown) => { const site = await request('session',options); Object.assign(context!.site,site); }, { snapshot: () => request('session.snapshot'), submit: (text: string) => request('session.submit',text) }),
+  session: Object.assign(async (options: unknown) => { const site = await request('session',options); Object.assign(context!.site,site); }, { waitForSlot: (plugin: string, slot: string) => request('session.waitForSlot',{plugin,slot}), snapshot: () => request('session.snapshot'), submit: (text: string) => request('session.submit',text) }),
 };
 export const reload = () => request('reload');
 export const list = () => cases.map(({name,skip,at}) => ({name,skip,at}));
