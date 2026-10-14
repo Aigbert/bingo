@@ -303,3 +303,85 @@ async fn a_corner_declares_a_rect_and_fills_its_received_viewport() {
             .success()
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn unrelated_pane_mods_pass_through_each_others_handlers_without_notices() {
+    let home = tempfile::tempdir().unwrap();
+    for name in ["counter", "corner"] {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/mods")
+            .join(name);
+        let installed = home.path().join(".bingo/plugins").join(name);
+        std::fs::create_dir_all(&installed).unwrap();
+        for file in ["plugin.json", "main.ts"] {
+            std::fs::copy(fixture.join(file), installed.join(file)).unwrap();
+        }
+    }
+    let mut server = Server::spawn_at(
+        home,
+        r#"{"responses":[{"steps":[{"text":"Ready."}]}]}"#,
+        &["--provider", "fake"],
+    );
+    let kernel = ready(&mut server).await;
+    let mut attachment = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    tokio::time::timeout(LIMIT, async {
+        loop {
+            let commands = kernel.catalog(CatalogKind::Commands).await.unwrap();
+            if ["counter", "corner"]
+                .iter()
+                .all(|name| commands.entries.iter().any(|entry| entry.id == *name))
+            {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    let intent = IntentId::mint();
+    attachment.handle.submit(
+        intent.clone(),
+        Input::text("/counter", Origin::surface("test")),
+    );
+    assert!(matches!(
+        ack_for(&mut attachment, &intent).await,
+        IntentOutcome::Applied { .. }
+    ));
+    let request = RenderRequest {
+        component: Component::Pane,
+        request_id: "counter".into(),
+        surface: SurfaceName::Terminal,
+        props: serde_json::json!({}),
+        viewport: Viewport {
+            place: Some(slot::Place::Side),
+            columns: 64,
+            rows: 43,
+        },
+    };
+    let view = kernel
+        .render(&attachment.snapshot.summary.id, request)
+        .await
+        .unwrap();
+    assert!(view.fold().contains("Count: 0"));
+    let history = attachment
+        .handle
+        .history(HistoryPage::default())
+        .await
+        .unwrap();
+    let wire = serde_json::to_string(&history).unwrap();
+    kernel.shutdown().await.unwrap();
+    assert!(
+        tokio::time::timeout(LIMIT, server.child.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        !wire.contains("handler belongs to another command"),
+        "valid inherited handler rejected: {wire}"
+    );
+}
