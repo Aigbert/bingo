@@ -44,15 +44,20 @@ async fn applied(session: &mut Attachment, text: &str) {
     );
 }
 
-async fn add(session: &mut Attachment, url: &str) {
+async fn add(session: &mut Attachment, endpoint: &MockServer) {
+    login_command(
+        session,
+        &format!("/provider add work openai {}", endpoint.uri()),
+        endpoint,
+    )
+    .await;
+}
+
+async fn login_command(session: &mut Attachment, text: &str, endpoint: &MockServer) {
     let intent = IntentId::mint();
-    session.handle.submit(
-        intent.clone(),
-        Input::text(
-            format!("/provider add work openai {url}"),
-            Origin::surface("test"),
-        ),
-    );
+    session
+        .handle
+        .submit(intent.clone(), Input::text(text, Origin::surface("test")));
     let dialog = tokio::time::timeout(LIMIT, async {
         loop {
             let frame = session.events.next().await.unwrap();
@@ -71,6 +76,10 @@ async fn add(session: &mut Attachment, url: &str) {
             ..
         }
     ));
+    assert!(
+        endpoint.received_requests().await.unwrap().is_empty(),
+        "no probe before paste"
+    );
     session.handle.answer(
         IntentId::mint(),
         dialog.id,
@@ -92,6 +101,17 @@ async fn answer(session: &mut Attachment, expected: &str) {
     let text = serde_json::to_string(&frames).unwrap();
     assert!(text.contains(expected), "{text}");
     assert!(!text.contains(KEY));
+}
+
+async fn auth_required(session: &mut Attachment, reason: &str) {
+    session.handle.submit(
+        IntentId::mint(),
+        Input::text("hello", Origin::surface("test")),
+    );
+    let frames = until_completed(session).await;
+    let text = serde_json::to_string(&frames).unwrap();
+    assert!(text.contains("AUTH_REQUIRED"), "{text}");
+    assert!(text.contains(reason), "{text}");
 }
 
 async fn meta(kernel: &impl HostApi) -> serde_json::Value {
@@ -123,18 +143,19 @@ async fn add_readdress_and_remove_without_restarting_or_rebinding_sessions() {
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    add(&mut session, &first.uri()).await;
+    add(&mut session, &first).await;
     saved(&server, &first.uri());
     assert_eq!(meta(&kernel).await["reach"]["kind"], "ok");
     assert_eq!(meta(&kernel).await["auth"]["from"], "store");
     applied(&mut session, "/model work/local-model").await;
     answer(&mut session, "First").await;
-    applied(
+    login_command(
         &mut session,
         &format!("/provider set work url {}", second.uri()),
+        &second,
     )
     .await;
-    answer(&mut session, "First").await;
+    auth_required(&mut session, "changed origin").await;
     let mut newer = kernel
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
@@ -147,6 +168,7 @@ async fn add_readdress_and_remove_without_restarting_or_rebinding_sessions() {
         IntentOutcome::Applied { .. }
     ));
     applied(&mut newer, "/provider remove work").await;
+    auth_required(&mut newer, "work was removed").await;
     assert!(
         !kernel
             .catalog(CatalogKind::Providers)
@@ -208,7 +230,7 @@ async fn failed_reach_is_redacted_and_readdressing_repairs_it() {
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    add(&mut session, &bad.uri()).await;
+    add(&mut session, &bad).await;
     let failed = meta(&kernel).await;
     assert_eq!(failed["reach"]["kind"], "down");
     assert!(!failed.to_string().contains(KEY));
@@ -217,9 +239,10 @@ async fn failed_reach_is_redacted_and_readdressing_repairs_it() {
             .unwrap()
             .contains("work")
     );
-    applied(
+    login_command(
         &mut session,
         &format!("/provider set work url {}", good.uri()),
+        &good,
     )
     .await;
     assert_eq!(meta(&kernel).await["reach"]["kind"], "ok");
@@ -246,4 +269,58 @@ fn saved(server: &Server, url: &str) {
     )
     .unwrap();
     assert_eq!(auth["work"]["key"], KEY);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn adding_refuses_foreign_credentials_and_invalid_secret_arguments() {
+    let endpoint = endpoint("unused").await;
+    let home = tempfile::tempdir().unwrap();
+    let data = home.path().join(".bingo/data");
+    std::fs::create_dir_all(&data).unwrap();
+    let original = json!({"occupied":{"type":"api", "key":KEY}, "channels.telegram":{"type":"api", "key":KEY}}).to_string();
+    std::fs::write(data.join("auth.json"), &original).unwrap();
+    let mut server = Server::spawn_at(home, IDLE, &[]);
+    let kernel = ready(&mut server).await;
+    let mut session = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    for name in ["occupied", "channels.telegram", "service:key"] {
+        let outcome = command(
+            &mut session,
+            &format!("/provider add {name} openai {}", endpoint.uri()),
+        )
+        .await;
+        assert!(!matches!(outcome, IntentOutcome::Applied { .. }));
+        if name == "occupied" {
+            assert!(
+                serde_json::to_string(&outcome)
+                    .unwrap()
+                    .contains("remove it first")
+            );
+        }
+    }
+    for text in [
+        format!("/provider add work openai http://u:{KEY}@localhost"),
+        format!("/provider add work openai {} {KEY}", endpoint.uri()),
+    ] {
+        assert!(!matches!(
+            command(&mut session, &text).await,
+            IntentOutcome::Applied { .. }
+        ));
+    }
+    assert!(endpoint.received_requests().await.unwrap().is_empty());
+    assert_eq!(
+        std::fs::read_to_string(data.join("auth.json")).unwrap(),
+        original
+    );
+    kernel.shutdown().await.unwrap();
+    assert!(
+        tokio::time::timeout(LIMIT, server.child.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
+    );
+    no_secret(&server.sessions_dir());
 }

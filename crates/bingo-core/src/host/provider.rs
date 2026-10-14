@@ -75,7 +75,16 @@ pub(crate) async fn set_provider(
             images: Some(old.endpoint("").images),
         };
         let provider = old.readdress(&spec).map_err(|_| invalid("could not build provider; use an http(s) URL without credentials, query or fragment"))?;
+        instances::ensure_user(&settings::user_path(host.env()), shape.settings_key(), name)?;
         let changed_origin = old.credential_origin() != provider.credential_origin();
+        if changed_origin {
+            old.retire(&format!(
+                "Provider {name} changed origin; choose it again and sign in."
+            ));
+            old.logout().await.map_err(|_| {
+                invalid("address unchanged; the old credential could not be removed")
+            })?;
+        }
         instances::change_address(
             &settings::user_path(host.env()),
             shape.settings_key(),
@@ -83,14 +92,6 @@ pub(crate) async fn set_provider(
             url,
             changed_origin,
         )?;
-        if changed_origin {
-            old.retire(&format!(
-                "Provider {name} changed origin; choose it again and sign in."
-            ));
-            old.logout().await.map_err(|_| {
-                invalid("address saved, but the old credential could not be removed")
-            })?;
-        }
         install_provider(host, name, Some(provider.clone()));
         (provider, changed_origin)
     };
@@ -122,6 +123,9 @@ pub(crate) async fn remove_provider(host: &Host, name: &str) -> Result<String, K
         None,
     )?;
     install_provider(host, name, None);
+    provider.retire(&format!(
+        "Provider {name} was removed; choose another provider."
+    ));
     let forgotten = provider.logout().await;
     forgotten
         .map_err(|_| invalid("instance removed, but its stored credential could not be removed"))?;
