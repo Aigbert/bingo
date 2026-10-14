@@ -1,125 +1,84 @@
 # M168 — One palette
 
 ADR-0084 (`Palette`), ADR-0086 (built-in mod). Needs M167.
-Approved prototype (2026-10-14, "命令面板" tab):
-https://claude.ai/artifact/XWoqqyP8Jch6p5889dL1ZB
+Approved prototype (2026-10-14, "命令面板" tab): https://claude.ai/artifact/XWoqqyP8Jch6p5889dL1ZB
 
 ## Goal
 
-`/`, `?` and `ctrl+r` open one list above the prompt: commands, keys and
-sessions, the opener's group first. Typing searches all three; rows show current
-values; command arguments open in place. The built-in `bingo-mod-palette`
-replaces the terminal's completion menu, `?` help and `ctrl+g` switcher.
+`/`, `?` and `ctrl+r` open one list above the prompt: commands, keys and sessions, the opener's group first.
+Typing searches all three; rows show current values; arguments open in place. `bingo-mod-palette`
+replaces completion/help drawing and takes over live navigation without removing it.
 
 ## Bricks
 
-1. **A command's current value.** `Command::now(&self, &SessionView)
-   -> Option<String>` (sdk, default `None`), surfaced as `now` in
-   session-scoped Commands metadata (see Decisions): `/model` the model, `/think` the effort,
-   `/permission` the mode, `/rename` the title, `/compact` tokens used,
-   `/login` how many providers are signed out. Key-set test, fixture.
-2. **Rows, pure.** `rows(opened, query, commands, bindings, sessions,
-   recent) -> Vec<Group>`: empty query shows the opener's group (`/`:
-   recent then commands; `?`: keys; `ctrl+r`: sessions); a query
-   searches all three, the opener's group first, matched letters
-   marked. Hidden commands never listed. Table tests.
-3. **Recent.** The mod keeps the last five commands run from the
-   palette in its plugin store; `recent` reads them. Test with a
-   temp store.
-4. **Arguments in place.** A command whose `ArgSpec` lists values opens
-   a second level: the values, the current one selected (`now`); a free
-   text argument (`/rename`) shows an input row with what ⏎ will do.
-   `esc` goes back one level. Table tests over `ArgSpec` kinds.
-5. **Acting.** ⏎ on a command runs it (with its argument); on a key
-   runs its bound command line (M167 bindings); on a session asks the
-   surface to open it (a handler the surface mints; ADR-0086
-   Consequences). Opening the session already in view says so.
-6. **Sessions.** `HostApi::sessions` for this workspace, newest first:
-   title, last time, message count (see Decisions). `ctrl+r` is the default key of
-   `/resume`; `ctrl+g` only returns to a pending ask.
-7. **Drawing.** `Palette` site as a `View` tree: group headers dim,
-   one `❯` row, the value right-aligned, a footer line for the query
-   hint; grows up from the prompt, at most half the screen. Snapshot
-   per prototype scenario at 108×30 and 80×24.
-8. **Keys.** `/` or `?` on an empty prompt and `ctrl+r` open it;
-   `↑↓` move, `⏎` act, `esc` back or close, typing filters (never acts).
-   `shift+tab` still cycles the permission mode without opening it.
-9. **Deletions.** `commands.rs`'s argument menu, the `?` help view, the
-   switcher (`input/switcher.rs`, `view.rs` parts) and the TUI-local
-   `/help` and `/resume` go; `/help` becomes a palette command.
+1. **Current values.** `Command::now(&SessionView) -> Option<String>` defaults to `None`.
+   Model, thinking, permission, title, tokens and signed-out providers get fixtures and session-scoped metadata.
+2. **Pure rows.** Empty query shows the opener's group; search spans commands, keys and sessions.
+   Recent commands lead `/`; hidden commands stay hidden; matched letters are marked. Table tests.
+3. **Recent.** Last five distinct command names in plugin storage; never arguments, including on load. Temp-store tests.
+4. **Arguments.** `ArgSpec` values open a second level with the current value selected. Free text shows what Enter runs.
+   Escape backs one level; free text remains one level even with spaces. Table tests for each kind.
+5. **Acting.** Enter runs commands or bound command lines; sessions return a surface-minted action.
+   Live navigation emits `Effect::View`, stored resume opens a session, and the current row says it is already in view.
+6. **Stored sessions.** Read `HostApi::sessions` at the root's cwd, retain roots only, newest 20.
+   Show title, timestamp and message count. Ctrl+R defaults to `/resume`; Ctrl+G returns to a pending ask.
+7. **Drawing.** A shared `View` tree above the prompt, at most half the screen: dim headings, one `❯`,
+   right-aligned values and a query footer. Prototype snapshots at 108×30 and 80×24.
+8. **Keys.** `/`, `?`, Ctrl+R open; arrows select, Enter acts, Escape backs/closes, typing filters.
+   Shift+Tab still cycles permission. Composite and interrupt hints are dim, informational and skipped.
+9. **Navigation, preserved.** Delete old argument/help/switcher drawing, not navigation. “This conversation”
+   comes first: root, children and rooms, with status, unread and owed; the current view is marked.
+   The crew strip opens this group. Stored roots follow. Keep native names-only navigation when disabled.
+   Review correction: the original brick wrongly treated live navigation and the roster as disposable drawing.
 
 ## Files
 
-- `crates/bingo-sdk/src/command.rs`; `crates/bingo-core/src/host/
-  catalog.rs`, `commands/{model.rs,think.rs,rename.rs,compact.rs,
-  login.rs}`; `crates/bingo-permissions/src/command.rs`.
-- New `crates/bingo-mod-palette/src/{lib.rs,rows.rs,args.rs,
-  recent.rs,draw.rs,keys.rs,hints.rs,lifecycle.rs}`; listed in `crates/bingo/src/main.rs`.
-- `crates/bingo-surface-tui/src/{complete.rs,view.rs,input.rs,
-  input/switcher.rs,commands.rs,keys.rs}` (deletions, session handler).
-- `schema/`, `sdk/typescript/`, `crates/bingo-mod-palette/src/{guide.rs,guide.md}`.
-- SDK `component/palette.rs`, `render.rs`; core `session/inputs.rs`, `host.rs`;
-  TUI `palette.rs`, `palette/tests.rs`, `run/{palette.rs,site_keys.rs,palette_tests.rs}`,
-  layer/input/key routing and deletion of `roster.rs`; binary/workspace registration.
-- `crates/bingo-mods/tests/builtins.rs`, `crates/bingo/tests/cli/palette.rs`,
-  `bingo-surface-print/src/lib.rs`, TUI snapshots and `scripts/tui-smoke.sh`.
+- SDK `command.rs`, `component/{palette.rs,props.json}`, `render.rs`; core `host{,/catalog}.rs`,
+  `session/inputs.rs`, `commands/{model,think,rename,compact,login}.rs`; permissions `command.rs`.
+- New `bingo-mod-palette` crate, its registered guide page and workspace/binary registration.
+- TUI palette, input, keys, focus/layout/view, crew pointer, tree/seats, run/site-key routing and tests;
+  remove old command argument/help/switcher/roster drawing. Keep `complete.rs` for `@` names/paths.
+- Mods built-in integration, CLI palette tests, print receipt handling, chat menu, snapshots and `scripts/tui-smoke.sh`.
+- `schema/`, `sdk/typescript/`; guides belong to the owning crate's registered `Page` (ADR-0054), not `docs/guide/`.
 
 ## Exit criteria
 
-- [x] Table tests for rows, args and recent; `now` fixture.
-- [x] Snapshots per scenario (`/`, `?`, `ctrl+r`, `/mo`, `/think`
-      args, `/rename`, `/permission` args) at both sizes.
-- [x] `TestBackend`: each opener, search across groups, resume a
-      session, `esc` back a level, `shift+tab` without the list.
-- [x] An outside JS mod adds a command and it is listed with its keys;
-      another wraps `Palette` with `next`.
-- [x] `bingo-mod-palette` switched off: `/` still runs typed commands
-      (the surface's fallback lists names only).
-- [x] tmux drive in a temp HOME, captured and compared with the
-      prototype; tui-smoke; native gates as M167.
-- [ ] Windows all-target checks for every touched crate: C prerequisites block
-      five crates (see Verified); the SDK, core and palette pass.
+- [x] Row/argument/recent tables and current-value fixture; every prototype scene at both sizes.
+- [x] TestBackend openers, cross-group search, resume, Escape back and Shift+Tab without opening.
+- [x] Outside JS command/keys appear; another mod wraps `Palette` with `next`.
+- [x] Disabled `bingo.mod.palette`: typed commands, `?`, Ctrl+R and `/resume` work with names-only fallback.
+- [x] Conversation roster, child/root routing, retained transcripts, store fill and picture-overlay tests.
+- [x] Ask overlap, narrow-filter replacement, aliases, inert key rows and recent-secret regressions.
+- [x] Isolated tmux/temp HOME captures match the prototype; tui-smoke and native gates pass.
+- [ ] Windows all-target checks: SDK/core/palette pass; other touched crates await C toolchains (Verified).
 
 ## Non-goals
 
-Mouse; fuzzy scoring beyond subsequence matching; searching transcript text
-(browse, later); the desktop palette.
+New mouse interactions, fuzzy scoring beyond subsequence matching, transcript search and the desktop palette.
 
 ## Risks
 
-- Deleting the old menu breaks muscle memory for `ctrl+g`: the first
-  run after the change shows one toast naming `ctrl+r`.
-- `now` must stay cheap: it reads session state only, never I/O; a
-  test runs every command's `now` under a deadline-free fake host.
+- Changed muscle memory: claim one startup toast in plugin data naming Ctrl+R.
+- Current values must remain cheap: borrowed state/provider facts, no I/O; deadline-free fake-host tests.
 
 ## Decisions
 
-- `SessionView` is a new borrowed view of the existing `SessionState` and provider
-  auth facts: login cannot derive provider status from a session fold alone.
-  The global catalogue has no session parameter. A typed `CommandCatalog` service
-  overlays `now` on that catalogue for a supplied state, through the existing service
-  door. No HostApi method is added and no arbitrary live session is chosen.
-- Session summaries have messages, not turns or crew glyphs; show their actual count.
-- Guide pages live in the owning crate and are registered through `Pages` (ADR-0054).
-- Only workspace edges are new; member budget grows 413 → 414 (ADR-0086).
-- The session-open callback travels back in `CommandOutcome::Surface` on the
-  existing intent acknowledgement, not through a new HostApi door. Site keys use
-  the M163 FIFO; M169 question/form keys retain their bypass. Query-matched render
-  replies and opening IDs prevent stale keys or session-list results from acting.
-- Static surface key hints join actual M167 command bindings. Existing controls
-  remain truthful (no prototype-only model-cycle bindings are invented).
-- Recent stores names only, never arguments; the migration toast is claimed once
-  in the plugin data directory. A free-text argument is one level even with spaces.
-- Palette props include folded mode signals; no separate mode cache. Model current
-  values use the catalogue's qualified `provider/model` ID to select the right row.
-- `complete.rs` owns `@` names/paths, so it remains. The command argument menu was
-  in `commands.rs`; that is deleted, retaining the specified names-only fallback.
-- Exact names, then name matches, precede contiguous description matches. The PTY
-  smoke caught `/board` selecting `/agents` through a loose description match.
-- Print treats a client-action acknowledgement as a completed command receipt;
-  the black-box CLI test caught a headless `/help` waiting for a nonexistent turn.
-- The prototype's common commands lead the raw registration order; extension
-  commands follow. Otherwise the first screen can hide model and thinking controls.
+- Global catalogues have no session. Typed `CommandCatalog` overlays `now` using a caller-supplied borrowed
+  `SessionView` and provider auth facts through the existing service door. No new HostApi or hidden active session.
+- The surface projects compact display facts directly from its fold; no partial `SessionState` in the mod.
+  Model IDs remain qualified `provider/model`. Stored rows use actual message counts and are capped before props.
+- Surface actions return in the existing intent acknowledgement. M163 FIFO remains the action path;
+  M169 question/form keys retain their bypass. Opening IDs and query-matched replies reject stale results.
+- The topmost palette owns keys even when an ask arrives after 900 ms; closing it restores ask focus.
+  Waiting uses the same render predicate as drawing, so a narrower replacement cannot queue keys forever.
+- Static surface hints join real M167 bindings; no prototype-only bindings are invented. Aliases are searchable.
+  Exact names and name matches precede descriptions: PTY smoke caught `/board` selecting `/agents`.
+- Common prototype commands lead registration order so model/thinking controls stay on the first screen.
+- Specs lack a surface restriction: terminal-family commands stay out of chat menus and carry a one-line
+  fallback in their receipt. Print considers that receipt complete; TUI consumes its supported action.
+- Refresh only the catalogue named by `CatalogChanged`; ordinary acknowledgements cause no catalogue I/O.
+  Current-value lookup is linear. Cursor entries are removed when an opening closes, including Ctrl+C.
+- Only workspace edges are added; dependency budget grows 413 → 414 (ADR-0086).
 
 ## Verified — 2026-10-15
 
@@ -146,3 +105,37 @@ rquickjs-sys (MSVC flags rejected by clang); bingo-permissions stops in
 tree-sitter/tree-sitter-bash (stdio.h/stdlib.h absent). Rust checking remains deferred.
 No timing-flake retry was needed in the final run. Budget warned at 10 GB of debug
 output; final cleanup is `cargo clean`. No live/credential tests were run.
+
+## Verified — 2026-10-15 (review fixes)
+
+Rebased onto dev `dbdc5952`; the ready-provider fixture first failed with E0533, then passed.
+Red runs before fixes: focus 2 failed; resume/props 3; minor rows/recents 4; linear lookup 1;
+child routing 1; catalogue refetch 1. All pass in the final suite, including restored roster tests.
+Sequential native gate output summaries (all exit 0):
+```text
+cargo fmt --all -- --check: no output
+cargo check --workspace --all-targets --locked: Finished dev profile (4.49s)
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev profile (5.10s)
+RUST_TEST_THREADS=4 cargo test --workspace --locked: 5644 passed; 0 failed; 5 ignored (aggregate)
+bash scripts/check_discipline.sh: discipline ok
+bash scripts/budget.sh: 414/414 dependencies; core 0s; isolation 0; budget ok
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok
+bash scripts/tui-smoke.sh: tui-smoke ok
+cd sdk/typescript && npm test: tests 31; pass 31; fail 0
+```
+`BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked`: 196 passed.
+The same flag with `cargo test -p bingo-plugin-rpc -p bingo-surface-rpc -p bingo-store-jsonl
+-p bingo-mods --locked --lib`: 267 passed, 1 ignored. Schema/TypeScript regenerated.
+TUI: 1145 passed, 2 ignored; palette mod: 14 passed. Fresh isolated tmux/temp HOME captures:
+16 scenes at 108×30/80×24, inspected for layout, wording, selection and current values.
+Windows command: `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked`.
+Exit 0: bingo-{sdk,core,mod-palette}. Exit 101: bingo-{channels,surface-tui,surface-print}
+in aws-lc-sys (missing Windows headers); bingo and bingo-mods in aws-lc-sys/rquickjs-sys
+(MSVC flags rejected by clang); bingo-permissions in tree-sitter/tree-sitter-bash
+(missing stdio.h/stdlib.h). Those six Rust checks remain deferred; the criterion stays unticked.
+The first workspace run failed in M165's local origin fixture: inherited `OPENAI_BASE_URL`
+redirected its dummy key outside the mock and returned AUTH_REQUIRED. No real key was passed.
+A command-environment regression failed before the fixture cleared endpoint variables, then passed;
+the origin test passed against its local server. Final gates/captures also cleared provider key
+and endpoint variables. This was not a timing flake; no wall-clock retry was needed.
+Budget warned about 12 GB of debug output. Final cleanup is `cargo clean` after this record's commit.

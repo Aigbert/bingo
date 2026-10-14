@@ -84,6 +84,8 @@ existing supervised action mailbox; ready render answers need no channel hop.
 - M168 adds `bingo-mod-palette`; the member budget grows 413 → 414 without
   external dependencies. `CommandOutcome::Surface` carries a client action in
   the existing intent acknowledgement. The host never dispatches that action.
+  An optional fallback message explains terminal-only actions on other surfaces;
+  terminal-family commands are excluded from chat menus.
 - The global command catalogue has no session. `CommandCatalog`, a typed service,
   overlays `Command::now` using a borrowed `SessionView` supplied by its caller;
   current values do not trigger I/O or select a hidden active session.
