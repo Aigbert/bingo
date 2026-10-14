@@ -61,7 +61,7 @@ export function runtime(peer: Peer, register: Register) {
   peer.handlers.set('initialize', async (params: InitializeParams): Promise<InitializeResult> => {
     if (params.protocol !== 2) throw new Error(`plugin protocol 2 required; host speaks ${params.protocol}`);
     pluginName = params.pluginName;
-    identity = Object.freeze({ name: params.pluginName, root: params.pluginRoot, version: params.pluginVersion });
+    identity = Object.freeze({ name: params.pluginName, root: params.pluginRoot, ...(params.pluginVersion === undefined ? {} : {version:params.pluginVersion}) });
     await register(hooks.on, params.config);
     for (const entry of hooks.entries) {
       entry.hook = wrap(entry.hook);
