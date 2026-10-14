@@ -1,7 +1,7 @@
 import { stdout } from 'node:process';
 import { Hooks } from './cross.ts';
 import type { Register, Entry } from './on.ts';
-import { patternMatches } from './on.ts';
+import { patternMatches, renderMatcher } from './on.ts';
 import { Callbacks } from './callbacks.ts';
 import { dollar } from './dollar.ts';
 import { Handlers } from './ui.ts';
@@ -90,7 +90,7 @@ export function runtime(peer: Peer, register: Register) {
     return { protocol: 2, name: params.pluginName, version: '0.1.0', capabilities,
       commands: negotiated.has('callback/run') ? [{name:`${params.pluginName}:ui`,aliases:[],hint:'',args:{kind:'none'},instant:true,hidden:true,family:'ui'}] : [],
       links: catalogue ? [] : [...hooked, ...observed].map(point => ({ point, after: true })),
-      subscriptions: catalogue && hooks.entries.length ? [{ patterns: [...new Set(hooks.entries.map(entry => entry.pattern))], prefilter: null }] : [] } as InitializeResult;
+      subscriptions: catalogue && hooks.entries.length ? [{ patterns: [...new Set(hooks.entries.map(entry => entry.pattern))], prefilter: null, render: hooks.entries.filter(entry => patternMatches(entry.pattern, "ui.render")).map(entry => renderMatcher(entry.matcher)) }] : [] } as InitializeResult;
   });
   peer.handlers.set('hook/observe', request => {
     const { dollarFor, skip } = invocation(request);

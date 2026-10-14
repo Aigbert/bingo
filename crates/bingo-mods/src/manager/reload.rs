@@ -224,6 +224,7 @@ impl Interceptor for Boundary {
     }
     fn matcher(&self) -> LinkMatcher {
         LinkMatcher {
+            render: None,
             patterns: [
                 "turn.complete",
                 "session.start",

@@ -1,4 +1,4 @@
-export const metadata = () => JSON.stringify(hooks.entries.map(entry => ({pattern:entry.pattern, recover:!!entry.recover})));
+export const metadata = () => JSON.stringify(hooks.entries.map(entry => ({pattern:entry.pattern, recover:!!entry.recover, matcher:renderMatcher(entry.matcher)})));
 export async function run(event, input, site, ask, cancelled, remaining) {
   const controller = new AbortController();
   Object.defineProperty(controller.signal, 'aborted', { get: cancelled });

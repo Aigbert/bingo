@@ -15,6 +15,19 @@ impl Interceptor for Link {
     }
     fn matcher(&self) -> LinkMatcher {
         LinkMatcher {
+            render: Some(
+                self.0
+                    .engine
+                    .as_ref()
+                    .into_iter()
+                    .flat_map(|engine| engine.hooks())
+                    .filter(|hook| {
+                        catalogue::Pattern::parse(&hook.pattern)
+                            .is_ok_and(|pattern| pattern.matches("ui.render"))
+                    })
+                    .map(|hook| hook.matcher.clone())
+                    .collect(),
+            ),
             patterns: self
                 .0
                 .engine

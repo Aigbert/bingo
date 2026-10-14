@@ -13,7 +13,11 @@ use serde_json::{Map, Value, json};
 use crate::methods::{METHODS, NOTIFICATIONS, PROTOCOL, Ref, schema_of};
 
 /// Types a client needs that no method names. `ErrorCode` is `error.data.code`.
-static UNNAMED: &[Ref] = &[schema_of::<ErrorCode>, schema_of::<HistoryChunk>, schema_of::<bingo_sdk::component::Props>];
+static UNNAMED: &[Ref] = &[
+    schema_of::<ErrorCode>,
+    schema_of::<HistoryChunk>,
+    schema_of::<bingo_sdk::component::Props>,
+];
 
 pub fn document() -> Value {
     let mut generator = generator();

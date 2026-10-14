@@ -10,8 +10,13 @@ pub fn matched(config: &crate::ConfigView) -> Matched {
 }
 impl Matched {
     pub fn asks(&self, component: Component, request: &RenderRequest) -> bool {
-        let _ = (component, request);
-        false
+        component == request.component
+            && self.0.get(&component).is_some_and(|partials| {
+                let event = serde_json::to_value(request).unwrap_or_default();
+                partials.iter().any(|partial| {
+                    partial.is_null() || crate::catalogue::prefilter(partial, &event)
+                })
+            })
     }
 }
 
@@ -26,10 +31,14 @@ mod tests {
             plugins: Default::default(),
         };
         let mut request = RenderRequest {
-            component: Component::ToolUse, request_id:"call".into(),
+            component: Component::ToolUse,
+            request_id: "call".into(),
             surface: SurfaceName::Terminal,
             props: json!({"tool":"sample","input":{}}),
-            viewport: Viewport {columns:80,rows:8},
+            viewport: Viewport {
+                columns: 80,
+                rows: 8,
+            },
         };
         let selected = matched(&config);
         assert!(selected.asks(Component::ToolUse, &request));

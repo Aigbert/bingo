@@ -42,6 +42,17 @@ export function matches(matcher: Matcher, event: unknown): boolean {
   return Object.is(matcher, event);
 }
 
+/** Host prefilters contain data only; an opaque predicate widens the request. */
+export function renderMatcher(matcher: Matcher): unknown {
+  const plain = (value: unknown): boolean => value === null || ['string', 'number', 'boolean'].includes(typeof value)
+    || Array.isArray(value) && value.every(plain)
+    || typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype && Object.values(value).every(plain);
+  if (matcher === undefined) return {};
+  if (plain(matcher)) return matcher;
+  const component = matcher && typeof matcher === 'object' && (matcher as Record<string, unknown>).component;
+  return typeof component === 'string' ? { component } : {};
+}
+
 export function frozen<T>(value: T): T {
   if (value !== null && typeof value === 'object') {
     Object.values(value).forEach(frozen);

@@ -47,6 +47,25 @@ pub struct RenderRequest {
     pub props: Value,
     pub viewport: Viewport,
 }
+impl Component {
+    pub const ALL: [Self; 15] = [
+        Self::Question,
+        Self::UserMessage,
+        Self::AssistantMessage,
+        Self::ToolUse,
+        Self::ToolResult,
+        Self::ToolGroup,
+        Self::ToolProgress,
+        Self::CommandOutput,
+        Self::Spinner,
+        Self::TurnDuration,
+        Self::InfoNotice,
+        Self::SessionMode,
+        Self::PromptHint,
+        Self::AbovePrompt,
+        Self::Pane,
+    ];
+}
 impl RenderRequest {
     pub fn engine(&self) -> crate::View {
         crate::View::Engine {

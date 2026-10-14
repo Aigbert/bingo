@@ -4698,6 +4698,14 @@
     "LinkMatcher": {
       "type": "object",
       "properties": {
+        "render": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": true,
+          "description": "Per-hook render partials, when one link contains several hooks."
+        },
         "patterns": {
           "type": "array",
           "items": {
