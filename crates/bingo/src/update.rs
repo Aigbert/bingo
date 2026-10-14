@@ -113,6 +113,8 @@ async fn latest(client: &reqwest::Client) -> Result<Release, KernelError> {
 fn client(timeout: std::time::Duration) -> Result<reqwest::Client, KernelError> {
     bingo_http::client(bingo_http::Bounds {
         connect: bingo_http::CONNECT_TIMEOUT,
+        // Public release assets redirect to a CDN; this client carries no credentials.
+        redirects: bingo_http::Redirects::FollowAny,
         call: Some(timeout),
     })
     .map_err(|e| internal(e.to_string()))

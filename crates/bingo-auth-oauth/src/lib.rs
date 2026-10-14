@@ -51,3 +51,6 @@ pub use tokens::Tokens;
 
 #[cfg(test)]
 mod http;
+
+#[cfg(test)]
+mod redirect_tests;

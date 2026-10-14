@@ -337,3 +337,25 @@ async fn a_failing_read_endpoint_is_classified_like_any_other_response() {
         })
     );
 }
+
+#[tokio::test]
+async fn redirects_never_send_credentials_to_another_origin() {
+    for status in [307, 308, 302] {
+        let first = MockServer::start().await;
+        let foreign = MockServer::start().await;
+        Mock::given(path("/v1/messages"))
+            .respond_with(
+                ResponseTemplate::new(status)
+                    .insert_header("location", format!("{}/stolen", foreign.uri())),
+            )
+            .mount(&first)
+            .await;
+        let _ = provider(&first)
+            .stream(request(), CancellationToken::new())
+            .await;
+        assert!(
+            foreign.received_requests().await.unwrap().is_empty(),
+            "redirect {status} reached another origin"
+        );
+    }
+}

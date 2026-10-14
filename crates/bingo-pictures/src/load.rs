@@ -125,6 +125,7 @@ async fn fetch(url: &str) -> Result<Vec<u8>, PictureError> {
 fn client() -> Result<reqwest::Client, PictureError> {
     bingo_http::client(bingo_http::Bounds {
         connect: bingo_http::CONNECT_TIMEOUT,
+        redirects: bingo_http::Redirects::SameOrigin,
         call: Some(TIMEOUT),
     })
     .map_err(|e| shorn(e.0))

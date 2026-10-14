@@ -36,6 +36,7 @@ pub(super) fn spawn(replies: mpsc::Sender<Reply>, data_dir: PathBuf) {
 async fn fetch(url: String) -> Result<String, String> {
     let client = bingo_http::client(bingo_http::Bounds {
         connect: bingo_http::CONNECT_TIMEOUT,
+        redirects: bingo_http::Redirects::SameOrigin,
         call: Some(bingo_update::api::TIMEOUT),
     })
     .map_err(|e| e.to_string())?;

@@ -1,11 +1,9 @@
 //! Web tools: one page read as markdown, a search for pages, and one page put
 //! in front of the person.
 //!
-//! The first two share one HTTP client, built here — the timeout, the redirect
-//! bound and the user agent are one fact, and a connection pool is worth more
-//! than two of them. Which service answers a search is the plugin's one
-//! setting. The third makes no request at all: it serves a page on a loopback
-//! port and waits for what the person does with it (ADR-0042).
+//! Page fetching may follow redirects across sites without credentials. Search
+//! uses a separate client so subscription headers cannot follow those redirects.
+//! ShowPage serves local HTML without fetching it (ADR-0042).
 
 mod approved;
 mod backend;
@@ -110,18 +108,30 @@ impl Plugin for WebPlugin {
         let settings: Settings = registrar.config()?;
         let http = client().map_err(|e| PluginError::Failed(format!("the http client: {e}")))?;
         let searcher = backend(&settings.web, brave_key(&settings.web), http.clone())?;
-        registrar.tool(Arc::new(WebFetchTool::new(http)) as Arc<dyn Tool>);
+        let pages =
+            page_client().map_err(|e| PluginError::Failed(format!("the http client: {e}")))?;
+        registrar.tool(Arc::new(WebFetchTool::new(pages)) as Arc<dyn Tool>);
         registrar.tool(Arc::new(WebSearchTool::new(searcher)) as Arc<dyn Tool>);
         registrar.tool(Arc::new(ShowPageTool::new()) as Arc<dyn Tool>);
         Ok(())
     }
 }
 
-/// The client both tools make their requests with.
+/// The search client may carry a subscription key.
 pub fn client() -> Result<Client, bingo_http::HttpError> {
     bingo_http::client(bingo_http::Bounds {
         connect: bingo_http::CONNECT_TIMEOUT,
+        redirects: bingo_http::Redirects::SameOrigin,
         call: Some(TIMEOUT),
+    })
+}
+
+/// Fetch refuses credential-bearing URLs and attaches no credential headers.
+fn page_client() -> Result<Client, bingo_http::HttpError> {
+    bingo_http::client(bingo_http::Bounds {
+        call: Some(TIMEOUT),
+        redirects: bingo_http::Redirects::FollowAny,
+        ..bingo_http::Bounds::CALL
     })
 }
 
@@ -309,3 +319,6 @@ pub(crate) mod tests {
         assert_eq!(resolve(None, None), None);
     }
 }
+
+#[cfg(test)]
+mod redirect_tests;
