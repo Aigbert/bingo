@@ -38,3 +38,5 @@ the kernel stamps the trait in the item when the call opens for replay.
 Plan §2.10's "`View` generic rendering plus a `Widget` extension point; plugin widgets in their own `*-tui` crates". ADR-0011 §2's generic fold stands as the fallback.
 
 **2026-10-14 (M140, ADR-0079 §§1,3,6):** canonical elements replace written Stack/Columns while legacy views still read; styled Text carries children, Code carries source/language. Pulled placements and element handlers reuse View and Input::Action; hidden runtime UI commands own their handlers.
+
+**2026-10-14 (M141, ADR-0079 §4):** matched typed components may substitute the TUI’s own drawings through Engine; permission prompts remain engine-only.
