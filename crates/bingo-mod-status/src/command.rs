@@ -26,6 +26,9 @@ impl Interceptor for Open {
             .lock()
             .map_err(error)?
             .insert(cx.session.clone(), "session".into());
+        cx.host
+            .invalidate(&cx.session, vec![REQUEST.into()])
+            .await?;
         cx.host.signal(&cx.session, ID, REQUEST, slot()).await?;
         serde_json::to_value(CommandOutcome::Applied { message: None }).map_err(error)
     }

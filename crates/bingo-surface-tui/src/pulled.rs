@@ -185,7 +185,11 @@ impl Memo {
                 .answer
                 .as_ref()
                 .is_some_and(|(key, _)| key.same(&entry.key));
-            (answered && entry.key.request.component != bingo_sdk::render::Component::Pane)
+            (answered
+                && !matches!(
+                    entry.key.request.component,
+                    bingo_sdk::render::Component::Pane | bingo_sdk::render::Component::Status
+                ))
                 || drawn.iter().any(|key| key.same_request(&entry.key))
         });
     }
@@ -284,7 +288,7 @@ mod lifecycle_tests {
     #[test]
     fn an_undrawn_pane_reasks_on_reopen_but_scrolled_messages_keep_answers() {
         let state = crate::test_support::state();
-        for component in [Component::Pane, Component::UserMessage] {
+        for component in [Component::Pane, Component::Status, Component::UserMessage] {
             let request = RenderRequest {
                 component,
                 request_id: "one".into(),
@@ -302,8 +306,8 @@ mod lifecycle_tests {
             memo.answer(key.clone(), View::text("before"));
             memo.retain(&[]);
             memo.answer(key.clone(), View::text("late"));
-            assert_eq!(memo.request(&key), component == Component::Pane);
-            if component == Component::Pane {
+            assert_eq!(memo.request(&key), component != Component::UserMessage);
+            if component != Component::UserMessage {
                 assert!(memo.get(&key).is_none());
             }
         }
