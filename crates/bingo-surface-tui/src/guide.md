@@ -152,7 +152,9 @@ input keeps pictures in the transcript and warns that the model cannot see them.
 
 `/provider add work openai https://proxy.example` adds a named instance
 immediately. Names use only ASCII letters, digits, `_` and `-`; an existing
-stored credential must be removed before its name can be reused. Shapes are `openai`, `anthropic`, and `codex`. Key-based shapes
+stored credential must be removed before its name can be reused. With no active
+provider, `/provider remove work` deletes that orphaned credential. Shapes are
+`openai`, `anthropic`, and `codex`. Key-based shapes
 open a paste dialog; the key goes only to `auth.json`. Cancelling sign-in
 keeps the instance, and `/login work` can finish later. URLs must use HTTP(S)
 and contain no userinfo, query, or fragment; paste credentials into login.
@@ -162,13 +164,20 @@ its last reach result and whether its credential came from the store,
 settings, or environment. A failed check keeps the instance and its previous
 model list. `/provider set work url https://new.example` replaces its address.
 A same-origin path change keeps the key. Changing the scheme, host, or port
-clears the key and opens a paste dialog. Existing sessions keep their resolved
+clears the key and opens a paste dialog. If a project, local, or other non-user
+settings file holds its `apiKey`, the change is refused and names that file;
+remove the key there first. Existing sessions keep their resolved
 endpoint, but a retired origin stops at its next request; choose the provider
 again to use its new address.
 
 `/provider remove work` removes its user settings entry and stored credential
-and clears its saved default and model pins. Live sessions using it stop at
-their next request with `AUTH_REQUIRED` naming the removal; choose another
+and clears its saved provider, model, and matching model pins. Live sessions
+using it stop at their next request with `AUTH_REQUIRED` naming the removal; choose another
 provider to continue. Default providers cannot be removed.
 Instances supplied only by another settings layer must be edited there.
 `bingo provider add` uses the same settings writer before a session starts.
+
+Boot skips invalid or colliding instance names with a notice. Stored named
+credentials carry their provider family; another or unknown owner is skipped
+until the stored credential is removed and sign-in is repeated. Shipped provider
+family names remain reserved even when their plugins are switched off.
