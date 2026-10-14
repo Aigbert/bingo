@@ -119,7 +119,7 @@ pub(crate) enum Msg {
     },
     Receipt {
         item: Item,
-        reply: oneshot::Sender<Item>,
+        reply: oneshot::Sender<Result<Item, KernelError>>,
     },
     Record {
         body: ItemBody,
@@ -523,7 +523,7 @@ impl TurnHost for TurnMail {
     async fn receipt(&self, item: Item) -> Result<Item, KernelError> {
         self.mailbox
             .call(|reply| Msg::Receipt { item, reply })
-            .await
+            .await?
     }
 
     fn stopped(&self) -> bool {

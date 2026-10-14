@@ -25,11 +25,22 @@ pub(super) struct Pending {
 }
 
 impl Actor {
-    pub(super) async fn receipt(&mut self, item: Item) -> Result<Item, KernelError> {
+    pub(super) async fn receipt(
+        &mut self,
+        item: Item,
+        reply: oneshot::Sender<Result<Item, KernelError>>,
+    ) -> Result<(), KernelError> {
         let recorded = self
             .recorded_denial(&item.body)
             .and_then(|id| self.state.transcript.get(&id))
             .cloned();
+        if recorded.is_none() && item.turn.as_ref().is_none_or(|turn| !self.is_running(turn)) {
+            let _ = reply.send(Err(KernelError::new(
+                ErrorCode::Interrupted,
+                "the receipt's turn has ended",
+            )));
+            return Ok(());
+        }
         let canonical = if let Some(recorded) = recorded {
             recorded
         } else {
@@ -38,7 +49,8 @@ impl Actor {
             item
         };
         self.refresh_config().await?;
-        Ok(canonical)
+        let _ = reply.send(Ok(canonical));
+        Ok(())
     }
 
     pub(super) fn recorded_denial(&self, body: &ItemBody) -> Option<ItemId> {

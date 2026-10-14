@@ -218,7 +218,7 @@ impl Actor {
             } => self.open_interaction(item, kind, answers, reply).await?,
             Msg::Absorb { turn, reply } => drop(reply.send(self.absorb(&turn).await?)),
             Msg::TurnFinished { turn, outcome } => return self.turn_finished(turn, outcome).await,
-            Msg::Receipt { item, reply } => drop(reply.send(self.receipt(item).await?)),
+            Msg::Receipt { item, reply } => self.receipt(item, reply).await?,
             Msg::Record { body, reply } => drop(reply.send(self.record(body).await?)),
             Msg::Progress { item, tail } => self.progress(item, tail).await?,
             Msg::CommandFinished { intent, outcome } => {
