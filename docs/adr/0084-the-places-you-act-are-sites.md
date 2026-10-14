@@ -1,6 +1,6 @@
 # ADR-0084 — The places you act are sites
 
-Status: proposed · 2026-10-14 · each site accepted with its screen's prototype; first: `ModelPicker` (M166) · Amends: ADR-0079 §4, ADR-0082 Consequences
+Status: proposed · 2026-10-14 · each site accepted with its screen's prototype; first: `ModelPicker` (M166) · Amends: ADR-0079 §4, ADR-0082 Consequences · §3 rewritten for ADR-0086
 
 ## Context
 
@@ -29,11 +29,13 @@ record adds component names and props to the sdk.
    are catalogue ids with the catalogue's meta as read at ask time; an
    action is its name and its bound keys from the keymap, never a
    label laid out for a width.
-3. **Input stays with the surface.** A mod draws a site; keys, the
-   cursor, filtering and selection are the surface's. A mod acts only
-   through minted handlers (ADR-0079 §6). Entries come from catalogues
-   (a mod's commands appear because it registered them), not from a
-   drawing.
+3. **Editing stays with the surface; the rest is the owner's.** The
+   composer's editing core (buffer, cursor, IME, history, paste) and
+   focus are the surface's. Each other site is drawn and driven by the
+   built-in mod that owns its feature (ADR-0086): selection, filter and
+   keys while it holds focus. A mod acts only through minted handlers
+   (ADR-0079 §6). Entries come from catalogues (a mod's commands appear
+   because it registered them), not from a drawing.
 4. **`KeyBar` is sealed while an interaction is open** (ADR-0082 §6):
    the keys that answer a permission ask, a question or a sign-in are
    the host's drawing.
@@ -46,8 +48,9 @@ record adds component names and props to the sdk.
 - Each site is added in the milestone that redraws its screen, after
   the person approves that screen's prototype; until then it stays the
   surface's private drawing.
-- A mod can restyle the picker or the ledger without forking the
-  terminal surface; it cannot change what a key does.
+- A mod can restyle or replace the picker or the ledger without
+  forking the terminal surface; it changes what a key does only by
+  replacing the built-in that owns it, at its tier (ADR-0086 §3).
 - Snapshot tests per site, as ADR-0082 had.
 
-Refs: ADR-0064, ADR-0079, ADR-0082, ADR-0085.
+Refs: ADR-0064, ADR-0079, ADR-0082, ADR-0085, ADR-0086.

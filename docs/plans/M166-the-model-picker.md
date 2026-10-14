@@ -1,6 +1,7 @@
 # M166 — The model picker
 
-ADR-0085 §8, ADR-0084 (`ModelPicker`, first interaction site).
+ADR-0085 §8, ADR-0084 (`ModelPicker`, first interaction site),
+ADR-0086 (the first built-in mod). Needs M167's seam.
 Approved prototype: https://claude.ai/artifact/XWoqqyP8Jch6p5889dL1ZB
 
 ## Goal
@@ -9,14 +10,16 @@ The terminal draws the approved model setup: alt+m and alt+t with no
 panel, `/model <filter>` as a list and a fact card grown up from the
 prompt, and provider sheets (manage, sign in, add by pasting) in the
 same panel. Every fact comes from the catalogues M164 and M165 fill.
+The feature is the built-in mod `bingo-mod-models`; the terminal
+surface gains no picker code.
 
 ## Bricks
 
 1. **Site.** `Component::ModelPicker`, props
    `{ filter, selected, scope, effort, sheet }` (ADR-0084 §1),
    `surfaces()` terminal and desktop; schema and TypeScript; snapshot.
-2. **Catalogue with meta.** `run.rs::fetch_catalogue` keeps `meta`
-   (today only ids), one store per catalogue kind, refreshed on
+2. **Catalogue with meta.** The mod reads `catalog(Models)` and
+   `catalog(Providers)` with `meta` through the host, refreshed on
    `CatalogChanged`.
 3. **List, pure.** `picker::rows(models, providers, filter, show_all)
    -> Vec<Row>`: pinned group first, then one group per provider with
@@ -31,9 +34,10 @@ same panel. Every fact comes from the catalogues M164 and M165 fill.
 5. **The ⏎ label, pure.** `use here | use and keep | sign in, then use
    | fix <provider> | check, then use | compact, then use`, from the
    row, reach, auth and window vs usage. Table test.
-6. **Keys.** `↑↓` pick, `←→` effort, `tab` scope, `*` pin, `+` add,
-   `⏎` act, `esc` back one layer; alt+m (`/model <next pinned>`) and
-   alt+t (`/think <next of efforts>`, wrapping) in `keys.rs` BINDINGS.
+6. **Keys.** While open, the site's handlers take `↑↓` pick, `←→`
+   effort, `tab` scope, `*` pin, `+` add, `⏎` act, `esc` back one layer
+   (ADR-0086 §6). `/model next` (next pin) and `/think next` (next of
+   `efforts`, wrapping) declare `alt+m` and `alt+t` (ADR-0086 §5).
    Opening the picker sends `/models refresh <id>` for each unchecked
    provider. Typing a filter never acts.
 7. **Sheets.** Manage (test, change address, replace key, refresh,
@@ -44,8 +48,9 @@ same panel. Every fact comes from the catalogues M164 and M165 fill.
    `:1234` or http(s) address prefills name, shape and address
    (`picker::guess`, pure, table test), then `/provider add`, then the
    pasted key answers the paste interaction, then "pick one".
-8. **Transcript line.** The `⇄` outcome lines of M164 drawn dim with
-   the glyph in ember; footer shows `model ∴ effort`.
+8. **Transcript line.** The mod draws the `⇄` outcome lines of M164
+   dim with the glyph in ember; the `SessionStatus` drawing shows
+   `model ∴ effort`.
 9. **Direct entries.** `/think`, `/login <id>`, `/logout <id>`,
    `/models` open the panel at the matching place when given no
    arguments; with arguments they act as today.
@@ -54,9 +59,10 @@ same panel. Every fact comes from the catalogues M164 and M165 fill.
 
 - `crates/bingo-sdk/src/{render.rs,component.rs}`; `schema/`,
   `sdk/typescript/`.
-- `crates/bingo-surface-tui/src/{run.rs,keys.rs,input.rs,commands.rs}`,
-  new `picker/{mod.rs,rows.rs,card.rs,label.rs,guess.rs,sheet.rs,
-  draw.rs}`, `status.rs` footer.
+- New `crates/bingo-mod-models/src/{lib.rs,rows.rs,card.rs,label.rs,
+  guess.rs,sheet.rs,draw.rs,keys.rs}`; listed in
+  `crates/bingo/src/main.rs`.
+- `crates/bingo-core/src/commands/{model.rs,think.rs}`: `next`.
 - `scripts/tui-smoke.sh` scenario; snapshots.
 
 ## Exit criteria
@@ -65,6 +71,9 @@ same panel. Every fact comes from the catalogues M164 and M165 fill.
       scenario (9) at 108×30 and 80×24.
 - [ ] `TestBackend`: alt+m cycles pins, alt+t wraps, a picker open →
       unchecked providers asked once.
+- [ ] An outside JS mod wraps `ModelPicker` with `next` and gets the
+      built-in's tree; with `bingo-mod-models` switched off, `/model`
+      still lists and switches through the surface's fallback.
 - [ ] tmux drive in a temp HOME against wiremock providers, captured:
       switch, keep, pin, sign-in chain, add by paste, down provider,
       compact-before-switch. Screenshots compared with the prototype.
