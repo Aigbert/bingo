@@ -20,14 +20,17 @@ pub mod bootstrap;
 pub mod card;
 pub mod chunks;
 pub mod content;
+mod drawing;
 pub mod event;
 mod footer;
 pub mod frame;
+mod menu;
 pub mod merged;
 pub mod posted;
 pub mod send;
 pub mod token;
 pub mod upload;
+mod view;
 pub mod ws;
 
 use std::collections::{BTreeMap, HashMap};
@@ -122,6 +125,7 @@ pub struct Feishu {
     /// again from an edit that carries only the handle.
     chats: Mutex<HashMap<String, String>>,
     command_mappings: BTreeMap<String, String>,
+    menu: menu::Publisher,
 }
 
 impl std::fmt::Debug for Feishu {
@@ -135,7 +139,9 @@ impl Feishu {
 
     pub fn new(http: reqwest::Client, config: Config) -> Self {
         let command_mappings = with_default_command_mappings(config.command_mappings);
+        let menu = menu::Publisher::new(&config.attachments, &config.app_id);
         Self {
+            menu,
             api: Api::new(http, config.base, &config.app_id, &config.app_secret),
             app_secret: config.app_secret,
             attachments: config.attachments,
@@ -479,6 +485,30 @@ impl ChannelAdapter for Feishu {
         Ok(handle.posted())
     }
 
+    fn menu(&self) -> Option<&dyn bingo_channel_adapter::adapter::Menu> {
+        Some(self)
+    }
+
+    fn mapped_commands(&self) -> Vec<bingo_channel_adapter::adapter::MenuEntry> {
+        self.command_mappings
+            .keys()
+            .filter_map(|name| {
+                let description = match self.command(name)? {
+                    ChannelCommand::NewSession => "Start a new session",
+                    ChannelCommand::Stop => "Stop the current turn",
+                };
+                Some(bingo_channel_adapter::adapter::MenuEntry {
+                    name: name.trim_start_matches('/').into(),
+                    description: description.into(),
+                })
+            })
+            .collect()
+    }
+
+    fn view_footer(&self, state: &SessionState) -> String {
+        footer::line(state)
+    }
+
     fn edit(&self) -> Option<&dyn Edit> {
         Some(self)
     }
@@ -559,6 +589,16 @@ impl Edit for Feishu {
 
 #[async_trait]
 impl Buttons for Feishu {
+    async fn draw(
+        &self,
+        to: &Conversation,
+        parent: Option<&Posted>,
+        at: Option<&Posted>,
+        drawing: &bingo_channel_adapter::drawing::Drawing,
+    ) -> Result<Posted, ChannelError> {
+        self.draw(to, parent, at, drawing).await
+    }
+
     /// Its own card, sent in full rather than by id: a card sent by id cannot
     /// be edited through `im/v1`, and this one has to be, to settle it.
     async fn ask(&self, to: &Conversation, question: &Question) -> Result<Posted, ChannelError> {

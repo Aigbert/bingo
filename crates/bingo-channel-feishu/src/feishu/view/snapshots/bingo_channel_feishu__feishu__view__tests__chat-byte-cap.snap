@@ -1,0 +1,13 @@
+---
+source: crates/bingo-channel-feishu/src/feishu/view/tests.rs
+assertion_line: 66
+expression: "json!({\"bytes\":large.to_string().len(),\"elements\":large[\"body\"][\"elements\"].as_array().unwrap().len(),\"footer\":large[\"body\"][\"elements\"][1]})"
+---
+{
+  "bytes": 21429,
+  "elements": 2,
+  "footer": {
+    "tag": "markdown",
+    "content": "---\nmodel · out 10"
+  }
+}

@@ -70,7 +70,7 @@ fn open_fence(text: &str) -> Option<&str> {
     open
 }
 
-fn line(state: &SessionState) -> String {
+pub(super) fn line(state: &SessionState) -> String {
     let mut parts = vec![
         state
             .summary

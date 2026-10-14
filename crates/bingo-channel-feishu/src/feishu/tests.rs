@@ -10,7 +10,7 @@ use bingo_channel_adapter::conversation::Conversation;
 use bingo_channel_adapter::question::Choice;
 use bingo_sdk::{Answer, InteractionId};
 
-async fn ok(server: &MockServer, verb: &str, at: &str, data: serde_json::Value) {
+pub(super) async fn ok(server: &MockServer, verb: &str, at: &str, data: serde_json::Value) {
     Mock::given(method(verb))
         .and(path(at))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "code": 0, "data": data })))
@@ -18,7 +18,7 @@ async fn ok(server: &MockServer, verb: &str, at: &str, data: serde_json::Value) 
         .await;
 }
 
-async fn signed_in(server: &MockServer) {
+pub(super) async fn signed_in(server: &MockServer) {
     Mock::given(method("POST"))
         .and(path("/open-apis/auth/v3/tenant_access_token/internal"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
@@ -28,7 +28,7 @@ async fn signed_in(server: &MockServer) {
         .await;
 }
 
-async fn feishu(server: &MockServer) -> Feishu {
+pub(super) async fn feishu(server: &MockServer) -> Feishu {
     signed_in(server).await;
     Feishu::new(
         bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
@@ -42,7 +42,7 @@ async fn feishu(server: &MockServer) -> Feishu {
     )
 }
 
-async fn bodies(server: &MockServer, at: &str) -> Vec<serde_json::Value> {
+pub(super) async fn bodies(server: &MockServer, at: &str) -> Vec<serde_json::Value> {
     server
         .received_requests()
         .await
