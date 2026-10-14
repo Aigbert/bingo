@@ -1,0 +1,10 @@
+[
+  {
+    "file": "register.tsx",
+    "line": 1,
+    "column": 31,
+    "rule": "on-literal",
+    "severity": "error",
+    "text": "on pattern must be a literal or a const string"
+  }
+]

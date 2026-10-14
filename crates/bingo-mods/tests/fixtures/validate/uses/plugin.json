@@ -1,0 +1,6 @@
+{
+  "name": "uses",
+  "version": "1",
+  "module": "register.tsx",
+  "uses": []
+}

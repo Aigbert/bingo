@@ -19,3 +19,6 @@ mod module;
 mod handlers;
 
 mod ui;
+
+pub mod testing;
+pub mod validate;

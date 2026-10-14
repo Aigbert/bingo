@@ -1,7 +1,5 @@
 # M142 — The mod kit
-
 ## Goal
-
 ADR-0078 §8 for a mod. `bingo plugins validate` reads the module the way
 the runtime will (oxc), lists what it hooks and calls, and refuses what
 cannot be checked statically. `bingo plugins test` runs `*.test.ts` in
@@ -16,9 +14,7 @@ M147 (`6e3b1b03`), M148 (`fddb62f3`), M149 (`b2bee6f4`), M150
 M141's helpers and `tool-call`, `band`, `pane` examples are absent:
 finish all independent work (including ts-status and type output) first;
 then stop if dev lacks `merge: M141`, pending the person's merge instruction.
-
 ## Bricks, in build order
-
 1. **Contract: findings and reports, tests first.** `bingo-mods`
    `validate/` answers `Finding { file, line, column, rule, text }`, rule
    one of `on-literal`, `dollar-static`, `state-key`, `env-name`, `uses`,
@@ -95,9 +91,7 @@ then stop if dev lacks `merge: M141`, pending the person's merge instruction.
    M141's helpers under `bingo plugins test sdk/typescript` (the
    `ifVersion` retry, `derive`'s memo, `memberOf`); `tool-call`, `band`
    and `pane` each gain a `*.test.ts` that M146 runs again.
-
 ## Files
-
 - `crates/bingo-mods/src/validate/`, `{testing,mount,types}/` or `.rs`,
   `js/testing.ts`, `tests/fixtures/validate/` and kit contract tests (new)
 - `crates/bingo-mods/src/{lib,load,strip,engine,thread,module,manager,plugin}.rs`,
@@ -112,9 +106,7 @@ then stop if dev lacks `merge: M141`, pending the person's merge instruction.
 - `examples/plugins/ts-status/` (`hooks/register.test.ts` new, `scenarios/` deleted);
   `examples/plugins/{tool-call,band,pane}/` (one `*.test.ts` each)
 - `crates/bingo/tests/plugin_kit.rs`
-
 ## Exit criteria
-
 - [ ] `cargo test -p bingo-mods validate::`: each rule's fixture yields
       its `expected.json`; the examples and `counter` yield none.
 - [ ] `bingo plugins validate examples/plugins/pane` exits 0 with its
@@ -131,17 +123,13 @@ then stop if dev lacks `merge: M141`, pending the person's merge instruction.
 - [ ] `rg -n 'plugin-scenario|scenario::' crates schema` prints nothing.
 - [ ] Every gate; `scripts/budget.sh` unchanged in crates (oxc came with
       M137); the Windows check of `bingo-mods` and `bingo`.
-
 ## Non-goals
-
 - Hot reload itself (ADR-0078 §7, M137); `bingo plugins new`; publishing.
 - Snapshot files (`toMatchSnapshot`), coverage, watch mode, npm imports.
 - `mount` drawing the desktop table; `tsc` in CI (it is a dependency).
 - Tests for a process plugin in another language: it tests itself with
   its own tools, and the scenarios are not kept for it.
-
 ## Risks
-
 - **validate is a lint, not a sandbox.** `$` passed into a function and
   used dynamically there is caught only because that file is read too;
   an escape through data (`$` stored in an object) is refused as an

@@ -1,0 +1,10 @@
+[
+  {
+    "file": "register.tsx",
+    "line": 1,
+    "column": 42,
+    "rule": "state-contract",
+    "severity": "error",
+    "text": "state key missing is absent from PluginState['state-contract']"
+  }
+]

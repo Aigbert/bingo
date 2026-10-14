@@ -1,0 +1,8 @@
+{
+  "name": "env-name",
+  "version": "1",
+  "module": "register.tsx",
+  "uses": [
+    "env"
+  ]
+}
