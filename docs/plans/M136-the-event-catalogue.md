@@ -50,7 +50,7 @@ JSON Schema and TypeScript, and raises chains and observations at existing doors
 
 ## Non-goals
 
-Embedded runtime/registration, op/UI events, mention/attachment resolution and typed-service interception. No live/credential tests, publishing or foreign processes.
+Embedded runtime/registration, op/UI events, mention/attachment resolution (surfaces resolve @), prompt.edit (composer ownership), classic.* (hooks-shell owns settings hooks), and typed-service interception. No live/credential tests, publishing or foreign processes.
 
 ## Risks
 
