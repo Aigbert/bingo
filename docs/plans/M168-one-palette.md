@@ -11,25 +11,15 @@ replaces completion/help drawing and takes over live navigation without removing
 
 ## Bricks
 
-1. **Current values.** `Command::now(&SessionView) -> Option<String>` defaults to `None`.
-   Model, thinking, permission, title, tokens and signed-out providers get fixtures and session-scoped metadata.
-2. **Pure rows.** Empty query shows the opener's group; search spans commands, keys and sessions.
-   Recent commands lead `/`; hidden commands stay hidden; matched letters are marked. Table tests.
+1. **Current values.** `Command::now(&SessionView) -> Option<String>` defaults to `None`. Model, thinking, permission, title, tokens and signed-out providers get fixtures and session-scoped metadata.
+2. **Pure rows.** Empty query shows the opener's group; search spans commands, keys and sessions. Recent commands lead `/`; hidden commands stay hidden; matched letters are marked. Table tests.
 3. **Recent.** Last five distinct command names in plugin storage; never arguments, including on load. Temp-store tests.
-4. **Arguments.** `ArgSpec` values open a second level with the current value selected. Free text shows what Enter runs.
-   Escape backs one level; free text remains one level even with spaces. Table tests for each kind.
-5. **Acting.** Enter runs commands or bound command lines; sessions return a surface-minted action.
-   Live navigation emits `Effect::View`, stored resume opens a session, and the current row says it is already in view.
-6. **Stored sessions.** Read `HostApi::sessions` at the root's cwd, retain roots only, newest 20.
-   Show title, timestamp and message count. Ctrl+R defaults to `/resume`; Ctrl+G returns to a pending ask.
-7. **Drawing.** A shared `View` tree above the prompt, at most half the screen: dim headings, one `❯`,
-   right-aligned values and a query footer. Prototype snapshots at 108×30 and 80×24.
-8. **Keys.** `/`, `?`, Ctrl+R open; arrows select, Enter acts, Escape backs/closes, typing filters.
-   Shift+Tab still cycles permission. Composite and interrupt hints are dim, informational and skipped.
-9. **Navigation, preserved.** Delete old argument/help/switcher drawing, not navigation. “This conversation”
-   comes first: root, children and rooms, with status, unread and owed; the current view is marked.
-   The crew strip opens this group. Stored roots follow. Keep native names-only navigation when disabled.
-   Review correction: the original brick wrongly treated live navigation and the roster as disposable drawing.
+4. **Arguments.** `ArgSpec` values open a second level with the current value selected. Free text shows what Enter runs. Escape backs one level; free text remains one level even with spaces. Table tests for each kind.
+5. **Acting.** Enter runs commands or bound command lines; sessions return a surface-minted action. Live navigation emits `Effect::View`, stored resume opens a session, and the current row says it is already in view.
+6. **Stored sessions.** Read `HostApi::sessions` at the root's cwd, retain roots only, newest 20. Show title, timestamp and message count. Ctrl+R defaults to `/resume`; Ctrl+G returns to a pending ask.
+7. **Drawing.** A shared `View` tree above the prompt, at most half the screen: dim headings, one `❯`, right-aligned values and a query footer. Prototype snapshots at 108×30 and 80×24.
+8. **Keys.** `/`, `?`, Ctrl+R open; arrows select, Enter acts, Escape backs/closes, typing filters. Shift+Tab still cycles permission. Composite and interrupt hints are dim, informational and skipped.
+9. **Navigation, preserved.** Delete old argument/help/switcher drawing, not navigation. “This conversation” comes first: root, children and rooms, with status, unread and owed; the current view is marked. The crew strip opens this group. Stored roots follow. Keep native names-only navigation when disabled. Review correction: the original brick wrongly treated live navigation and the roster as disposable drawing.
 
 ## Files
 
@@ -76,8 +66,8 @@ New mouse interactions, fuzzy scoring beyond subsequence matching, transcript se
 - Common prototype commands lead registration order so model/thinking controls stay on the first screen.
 - Specs lack a surface restriction: terminal-family commands stay out of chat menus and carry a one-line
   fallback in their receipt. Print considers that receipt complete; TUI consumes its supported action.
-- Refresh only the catalogue named by `CatalogChanged`; ordinary acknowledgements cause no catalogue I/O.
-  Current-value lookup is linear. Cursor entries are removed when an opening closes, including Ctrl+C.
+- Refresh Plugins once after acknowledgements until plugin switches emit `CatalogChanged`; other catalogues follow that event.
+  Current-value lookup is linear. Ctrl+C retires the owner through the action FIFO, including late render replies.
 - Only workspace edges are added; dependency budget grows 413 → 414 (ADR-0086).
 
 ## Verified — 2026-10-15
@@ -139,3 +129,19 @@ A command-environment regression failed before the fixture cleared endpoint vari
 the origin test passed against its local server. Final gates/captures also cleared provider key
 and endpoint variables. This was not a timing flake; no wall-clock retry was needed.
 Budget warned about 12 GB of debug output. Final cleanup is `cargo clean` after this record's commit.
+
+## Verified — 2026-10-15 (final small round)
+
+- Plugins: two regressions failed before restoring its single acknowledgement refresh; all nine palette routing tests pass afterward. Reload updates the waiting count; no core plugin event changes.
+- Ctrl+C: two run-loop regressions failed before the fix, then passed. Idle drafts survive; busy turns interrupt; real mod commands clear cursors, including late render replies, through the FIFO.
+- Shared bin fixture: its environment regression failed before isolation, then passed 20 times across 20 bin test targets. Sync, Tokio, PTY and copied-binary launchers clear both providers' key/base-URL variables.
+Requested gates ran sequentially with provider variables unset and `RUST_TEST_THREADS=4` (all exit 0):
+```text
+cargo fmt --all -- --check: no output
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev profile (6.09s)
+cargo test -p bingo-surface-tui -p bingo-mod-palette -p bingo --locked: 1622 passed; 0 failed; 2 ignored
+bash scripts/check_discipline.sh: discipline ok
+bash scripts/tui-smoke.sh: tui-smoke ok
+```
+The smoke used its own isolated tmux socket and temporary HOME/data. No timing-flake retry was needed.
+Final cleanup is `cargo clean` after committing this verification record.
