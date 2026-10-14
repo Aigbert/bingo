@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 /// A denial is an answer, never an invalid output that falls through to execution.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
+#[schemars(rename = "ToolCallAnswer")]
 pub enum ToolCallResult {
     Denied { deny: String },
     Output(crate::ToolOutput),

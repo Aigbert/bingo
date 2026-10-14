@@ -118,7 +118,7 @@
           "type": "string"
         },
         "result": {
-          "$ref": "#/$defs/ToolOutput"
+          "$ref": "#/$defs/ToolCallAnswer"
         }
       },
       "required": [
@@ -4406,7 +4406,7 @@
           "type": "object",
           "properties": {
             "answer": {
-              "$ref": "#/$defs/ToolOutput"
+              "$ref": "#/$defs/ToolCallAnswer"
             }
           },
           "required": [
@@ -5112,7 +5112,7 @@
       "type": "object",
       "properties": {
         "result": {
-          "$ref": "#/$defs/ToolOutput"
+          "$ref": "#/$defs/ToolCallAnswer"
         }
       },
       "required": [
@@ -5917,8 +5917,7 @@
         "tool",
         "tool_use_id"
       ],
-      "additionalProperties": true,
-      "description": "Catalogue spelling: tool input fields live beside the pinned identity."
+      "additionalProperties": true
     },
     "ToolOutput": {
       "type": "object",
@@ -7411,6 +7410,25 @@
         "site",
         "input"
       ]
+    },
+    "ToolCallAnswer": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "deny": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "deny"
+          ]
+        },
+        {
+          "$ref": "#/$defs/ToolOutput"
+        }
+      ],
+      "description": "A denial is an answer, never an invalid output that falls through to execution."
     }
   },
   "manifest": {

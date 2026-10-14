@@ -624,12 +624,17 @@ pub static METHODS: &[Method] = &[
     (
         "intercept/tool.call",
         schema_of::<crate::intercept::Before<crate::intercept::ToolEvent>>,
-        schema_of::<crate::intercept::Proceed<crate::intercept::ToolEvent, ToolOutput>>,
+        schema_of::<
+            crate::intercept::Proceed<
+                crate::intercept::ToolEvent,
+                bingo_sdk::catalogue::ToolCallResult,
+            >,
+        >,
     ),
     (
         "intercept/tool.call/after",
-        schema_of::<crate::intercept::After<ToolOutput>>,
-        schema_of::<crate::intercept::ResultValue<ToolOutput>>,
+        schema_of::<crate::intercept::After<bingo_sdk::catalogue::ToolCallResult>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::catalogue::ToolCallResult>>,
     ),
     (
         "intercept/turn.step",

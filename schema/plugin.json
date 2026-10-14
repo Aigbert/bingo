@@ -330,7 +330,7 @@
           "type": "string"
         },
         "result": {
-          "$ref": "#/$defs/ToolOutput"
+          "$ref": "#/$defs/ToolCallAnswer"
         }
       },
       "required": [
@@ -6131,7 +6131,7 @@
           "type": "object",
           "properties": {
             "answer": {
-              "$ref": "#/$defs/ToolOutput"
+              "$ref": "#/$defs/ToolCallAnswer"
             }
           },
           "required": [
@@ -7472,7 +7472,7 @@
       "type": "object",
       "properties": {
         "result": {
-          "$ref": "#/$defs/ToolOutput"
+          "$ref": "#/$defs/ToolCallAnswer"
         }
       },
       "required": [
@@ -8495,6 +8495,25 @@
         "input"
       ],
       "description": "A call the model asked for, before or after the gate."
+    },
+    "ToolCallAnswer": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "deny": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "deny"
+          ]
+        },
+        {
+          "$ref": "#/$defs/ToolOutput"
+        }
+      ],
+      "description": "A denial is an answer, never an invalid output that falls through to execution."
     },
     "ToolCallParams": {
       "type": "object",

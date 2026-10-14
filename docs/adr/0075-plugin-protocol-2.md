@@ -143,3 +143,5 @@ Verified 2026-10-14 (M139, ADR-0078): QuickJS and Node world fixtures agree thro
 2026-10-14, delegate, M146: add optional initialize.pluginVersion for schema-declared plugin data reads in both transports; protocol 2 remains unreleased (latest tag v0.6.5).
 
 2026-10-14, delegate, M146: pre-release command.run uses command and accepts text replies; regenerate only its interception schemas and referenced definitions (protocol 2 unreleased).
+
+2026-10-14, delegate, M146: pre-release tool.call interception accepts deny-only results; regenerate only its method schemas and referenced definitions.
