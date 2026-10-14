@@ -122,3 +122,5 @@ Styling beyond the table.
 2026-10-14, person's delegate: pre-release, M140: the AskUserQuestion component is Question; the kernel names no tool (check_discipline 4c).
 
 2026-10-14, M151 (ADR-0081 §7): §3 pane declarations carry place/size; legacy rows normalize on read. §5 pane memo keys include seated place and content rows as well as columns; collapsed panes are not asked. Other components retain height-independent memo keys.
+
+2026-10-14, ADR-0082 (M159, M160): every place on screen becomes a site; §2 gains `Component::surfaces()`, §4 gains bingo's fact-only sites, and the permission prompt and sign-in become sealed sites a mod draws around, never draws.

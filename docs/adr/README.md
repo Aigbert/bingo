@@ -65,3 +65,4 @@ first record; 0036 §2 answered it before it was named).
 - [0079 — A view is drawn where it is asked for](0079-a-view-is-drawn-where-it-is-asked-for.md)
 - [0080 — The desktop app is a surface in this repository](0080-the-desktop-app-is-a-surface-in-this-repository.md) — rejected
 - [0081 — The screen is the person's](0081-the-screen-is-the-persons.md)
+- [0082 — Every place on screen is a site](0082-every-place-on-screen-is-a-site.md)
