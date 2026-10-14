@@ -38,7 +38,7 @@ pub struct Configured {
 
 /// One endpoint's key: the store a paste writes to, and what was configured
 /// before any paste.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ApiKey {
     provider: String,
     places: Places,
@@ -80,6 +80,7 @@ impl ApiKey {
     /// The bearer for one request, or the line that says where a key goes.
     pub fn bearer(&self) -> Result<String, ProviderError> {
         self.resolve()
+            .map(|(key, _)| key)
             .map_err(|message| ProviderError::Auth { message })
     }
 
@@ -87,7 +88,7 @@ impl ApiKey {
     /// the same process read the same file.
     pub fn status(&self) -> AuthStatus {
         match self.resolve() {
-            Ok(_) => AuthStatus::Ready,
+            Ok((_, from)) => AuthStatus::Ready { from: Some(from) },
             Err(hint) => AuthStatus::Missing { hint },
         }
     }
@@ -163,9 +164,9 @@ impl ApiKey {
 
     /// `auth.json`, then what was configured; the error is what a person does
     /// about it.
-    fn resolve(&self) -> Result<String, String> {
+    fn resolve(&self) -> Result<(String, bingo_sdk::KeySource), String> {
         match self.stored() {
-            Ok(Some(key)) => Ok(key),
+            Ok(Some(key)) => Ok((key, bingo_sdk::KeySource::Store)),
             Ok(None) => self.configured_key().ok_or_else(|| self.hint()),
             // An unreadable store is not a key; a configured one still is,
             // and when there is none the store's error is what to fix.
@@ -185,8 +186,19 @@ impl ApiKey {
         }
     }
 
-    fn configured_key(&self) -> Option<String> {
-        self.configured.as_ref().map(|held| held.key.clone())
+    fn configured_key(&self) -> Option<(String, bingo_sdk::KeySource)> {
+        self.configured.as_ref().map(|held| {
+            let from = if self
+                .places
+                .variable
+                .is_some_and(|variable| variable == held.place)
+            {
+                bingo_sdk::KeySource::Env
+            } else {
+                bingo_sdk::KeySource::Setting
+            };
+            (held.key.clone(), from)
+        })
     }
 
     fn store(&self) -> Result<&Arc<CredentialStore>, ProviderError> {
@@ -253,6 +265,41 @@ mod tests {
 
     /// The order ADR-0017 §3 fixes, read off one provider as the store fills
     /// and empties under it.
+    #[test]
+    fn status_reports_the_place_that_actually_supplies_the_key() {
+        use bingo_sdk::KeySource;
+        let directory = tempfile::tempdir().unwrap();
+        let store = store(&directory);
+        for (place, source) in [
+            ("ANTHROPIC_API_KEY", KeySource::Env),
+            ("anthropic.apiKey", KeySource::Setting),
+        ] {
+            let key = ApiKey::new(
+                "anthropic",
+                places(Some("ANTHROPIC_API_KEY")),
+                store.clone(),
+                configured("test-key", place),
+            );
+            assert_eq!(key.status(), AuthStatus::Ready { from: Some(source) });
+            store
+                .write(
+                    "anthropic",
+                    Entry::Api {
+                        key: "stored".into(),
+                    },
+                )
+                .unwrap();
+            assert_eq!(
+                key.status(),
+                AuthStatus::Ready {
+                    from: Some(KeySource::Store)
+                }
+            );
+            store.remove("anthropic").unwrap();
+            assert_eq!(key.status(), AuthStatus::Ready { from: Some(source) });
+        }
+    }
+
     #[test]
     fn the_store_is_read_before_what_was_configured() {
         let directory = tempfile::tempdir().expect("a temporary directory");

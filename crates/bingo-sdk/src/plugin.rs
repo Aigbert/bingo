@@ -20,7 +20,7 @@ use crate::contributor::ContextContributor;
 use crate::hook::Hook;
 use crate::host::HostHandle;
 use crate::policy::PermissionPolicy;
-use crate::provider::Provider;
+use crate::provider::{Provider, ProviderShape};
 use crate::service::WireService;
 use crate::store::SessionStore;
 use crate::surface::Surface;
@@ -330,6 +330,7 @@ pub enum Contribution {
     /// Tools resolved late, from a source that does its I/O elsewhere.
     Tools(Arc<dyn ToolSource>),
     Provider(Arc<dyn Provider>),
+    ProviderShape(Arc<dyn ProviderShape>),
     Agent(Arc<dyn crate::Agent>),
     /// Providers resolved late, from a source that does its I/O elsewhere.
     Providers(Arc<dyn ProviderSource>),
@@ -388,6 +389,7 @@ impl fmt::Debug for Contribution {
             Contribution::Tool(t) => write!(f, "Tool({})", t.spec().name),
             Contribution::Tools(s) => write!(f, "Tools({})", s.id()),
             Contribution::Agent(a) => write!(f, "Agent({})", a.id()),
+            Contribution::ProviderShape(p) => write!(f, "ProviderShape({})", p.id()),
             Contribution::Provider(p) => write!(f, "Provider({})", p.id()),
             Contribution::Providers(s) => write!(f, "Providers({})", s.id()),
             Contribution::Policy(p) => write!(f, "Policy({})", p.id()),
@@ -493,6 +495,10 @@ impl Registrar {
 
     pub fn tool(&mut self, tool: Arc<dyn Tool>) {
         self.add(Contribution::Tool(tool));
+    }
+
+    pub fn provider_shape(&mut self, shape: Arc<dyn ProviderShape>) {
+        self.add(Contribution::ProviderShape(shape));
     }
 
     pub fn provider(&mut self, provider: Arc<dyn Provider>) {

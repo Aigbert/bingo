@@ -43,6 +43,7 @@ pub struct Sources {
 pub struct Registry {
     pub tools: Vec<Arc<dyn Tool>>,
     pub providers: Vec<Arc<dyn Provider>>,
+    pub(super) provider_state: super::instances::ProviderState,
     pub agents: Vec<Arc<dyn Agent>>,
     pub policy: Option<Arc<dyn PermissionPolicy>>,
     pub hooks: Vec<Arc<dyn Hook>>,
@@ -156,6 +157,19 @@ impl Registry {
                 Ok(())
             }
             Contribution::Agent(agent) => self.add_agent(agent),
+            Contribution::ProviderShape(shape) => {
+                if self.provider_state.shapes.contains_key(shape.id()) {
+                    Err(format!(
+                        "provider shape {} is already registered",
+                        shape.id()
+                    ))
+                } else {
+                    self.provider_state
+                        .shapes
+                        .insert(shape.id().to_string(), shape);
+                    Ok(())
+                }
+            }
             Contribution::Provider(provider) => self.add_provider(provider),
             Contribution::Providers(source) => {
                 self.sources.providers.push(source);
@@ -230,6 +244,10 @@ impl Registry {
         }
         self.tools.push(tool);
         Ok(())
+    }
+
+    pub(super) fn endpoint_name_taken(&self, name: &str) -> bool {
+        self.agents.iter().any(|endpoint| endpoint.id() == name)
     }
 
     fn add_provider(&mut self, provider: Arc<dyn Provider>) -> Result<(), String> {

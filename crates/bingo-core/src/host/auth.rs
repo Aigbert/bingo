@@ -14,7 +14,7 @@ use bingo_sdk::{AuthStatus, ErrorCode, KernelError, Provider};
 pub(super) fn signed_in(provider: &dyn Provider) -> bool {
     matches!(
         provider.auth(),
-        AuthStatus::Ready | AuthStatus::NotApplicable
+        AuthStatus::Ready { .. } | AuthStatus::NotApplicable
     )
 }
 
@@ -24,7 +24,7 @@ pub(super) fn signed_in(provider: &dyn Provider) -> bool {
 pub(super) fn check(provider: &dyn Provider) -> Result<(), KernelError> {
     let refuse = |message: String| Err(KernelError::new(ErrorCode::AuthRequired, message));
     match provider.auth() {
-        AuthStatus::Ready | AuthStatus::NotApplicable => Ok(()),
+        AuthStatus::Ready { .. } | AuthStatus::NotApplicable => Ok(()),
         AuthStatus::Missing { hint } => refuse(format!(
             "The {} provider has no credentials. {hint}",
             provider.id()
@@ -53,7 +53,7 @@ fn wants(provider: &dyn Provider) -> String {
     match provider.auth() {
         AuthStatus::Missing { hint } => format!("{id} — {hint}"),
         AuthStatus::Expired { hint } => format!("{id} — credentials expired. {hint}"),
-        AuthStatus::Ready | AuthStatus::NotApplicable => id.to_string(),
+        AuthStatus::Ready { .. } | AuthStatus::NotApplicable => id.to_string(),
     }
 }
 

@@ -13,6 +13,7 @@ pub mod instances;
 pub mod models;
 pub mod request;
 pub mod settings;
+mod shape;
 #[cfg(test)]
 mod stream_tests;
 use bingo_http::stream;
@@ -52,7 +53,7 @@ const BASE_URL_ENV: &str = "ANTHROPIC_BASE_URL";
 
 /// One endpoint, one key, one name. Cheap to clone through the `Arc` the
 /// registry holds.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AnthropicProvider {
     http: reqwest::Client,
     /// What `--provider`, `/model <id>/<model>` and `auth.json` call this
@@ -165,6 +166,28 @@ impl AnthropicProvider {
 impl Provider for AnthropicProvider {
     fn id(&self) -> &str {
         &self.id
+    }
+
+    fn readdress(&self, spec: &bingo_sdk::InstanceSpec) -> Result<Arc<dyn Provider>, PluginError> {
+        shape::validate(spec)?;
+        let mut provider = self.clone();
+        if let Some(url) = &spec.base_url {
+            provider.base_url = url.trim_end_matches('/').into();
+        }
+        if let Some(images) = spec.images {
+            provider.images = images;
+        }
+        Ok(Arc::new(provider))
+    }
+
+    fn shape(&self) -> Option<&str> {
+        Some(self.family())
+    }
+    fn address(&self) -> Option<&str> {
+        Some(&self.base_url)
+    }
+    fn instance(&self) -> bool {
+        self.id() != self.family()
     }
 
     /// A named instance serves the same models the default does (ADR-0017).
@@ -287,6 +310,7 @@ impl Plugin for AnthropicPlugin {
         let settings: Settings = registrar.config()?;
         let http = bingo_http::client(bingo_http::Bounds::STREAMED)
             .map_err(|e| PluginError::Failed(e.to_string()))?;
+        registrar.provider_shape(Arc::new(shape::Shape::new(http.clone(), registrar.env())));
         for provider in instances::providers(http, settings, registrar.env())? {
             registrar.provider(provider);
         }
@@ -330,11 +354,66 @@ pub(crate) mod tests {
         registrar
             .into_contributions()
             .into_iter()
-            .map(|contribution| match contribution {
-                Contribution::Provider(provider) => provider,
-                other => panic!("expected a provider, got {other:?}"),
+            .filter_map(|contribution| match contribution {
+                Contribution::Provider(provider) => Some(provider),
+                Contribution::ProviderShape(_) => None,
+                other => panic!("expected a provider or shape, got {other:?}"),
             })
             .collect()
+    }
+
+    #[test]
+    fn readdress_keeps_configuration_but_a_new_instance_has_no_old_key() {
+        let directory = tempfile::tempdir().unwrap();
+        let configured = providers(
+            &directory,
+            json!({"anthropic":{"instances":{"work":{"apiKey":"configured-secret", "images":false}}}}),
+        );
+        let old = configured.iter().find(|p| p.id() == "work").unwrap();
+        let spec = bingo_sdk::InstanceSpec {
+            base_url: Some("http://localhost:1234".into()),
+            images: None,
+        };
+        let changed = old.readdress(&spec).unwrap();
+        assert_eq!(
+            changed.auth(),
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Setting)
+            }
+        );
+        assert!(!changed.endpoint("m").images);
+        assert_eq!(changed.address(), Some("http://localhost:1234"));
+        assert_ne!(old.address(), changed.address());
+        let mut registrar = Registrar::new(
+            "test",
+            json!({}),
+            bingo_sdk::Env::rooted(directory.path()),
+            Default::default(),
+        );
+        AnthropicPlugin.register(&mut registrar).unwrap();
+        let shape = registrar
+            .into_contributions()
+            .into_iter()
+            .find_map(|c| match c {
+                Contribution::ProviderShape(s) if s.id() == "anthropic" => Some(s),
+                _ => None,
+            })
+            .unwrap();
+        assert!(matches!(
+            shape.build("work", &spec).unwrap().auth(),
+            AuthStatus::Missing { .. }
+        ));
+        let refused = bingo_sdk::InstanceSpec {
+            base_url: Some("https://user:secret@host?key=secret".into()),
+            images: None,
+        };
+        assert!(
+            !old.readdress(&refused)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("secret")
+        );
     }
 
     fn ids(providers: &[Arc<dyn Provider>]) -> Vec<String> {
@@ -406,7 +485,12 @@ pub(crate) mod tests {
             &directory,
             json!({ "anthropic": { "apiKey": "sk-ant-from-settings" } }),
         );
-        assert_eq!(providers[0].auth(), AuthStatus::Ready);
+        assert_eq!(
+            providers[0].auth(),
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Setting)
+            }
+        );
     }
 
     /// Each instance's credential is its own: the store entry under its name,
@@ -438,11 +522,18 @@ pub(crate) mod tests {
                 .unwrap_or_else(|| panic!("no {id}"))
                 .clone()
         };
-        assert_eq!(by_id("proxy1").auth(), AuthStatus::Ready);
+        assert_eq!(
+            by_id("proxy1").auth(),
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Setting)
+            }
+        );
         assert!(!by_id("proxy1").endpoint("claude-sonnet-4-5").images);
         assert_eq!(
             by_id("proxy2").auth(),
-            AuthStatus::Ready,
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Store)
+            },
             "the store entry under the instance's own name is its key"
         );
         assert!(
@@ -456,7 +547,12 @@ pub(crate) mod tests {
     #[test]
     fn no_key_anywhere_leaves_authentication_missing() {
         assert!(matches!(hermetic(None).auth(), AuthStatus::Missing { .. }));
-        assert_eq!(hermetic(Some("sk-ant-test")).auth(), AuthStatus::Ready);
+        assert_eq!(
+            hermetic(Some("sk-ant-test")).auth(),
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Setting)
+            }
+        );
     }
 
     #[tokio::test]

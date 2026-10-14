@@ -473,6 +473,8 @@ impl HostApi for TestHost {
                 label: "the fake provider".into(),
                 meta: if kind == CatalogKind::Models {
                     model_meta()
+                } else if kind == CatalogKind::Providers {
+                    serde_json::json!({"auth":{"kind":"ready","from":"store"}, "shape":"openai", "address":"http://localhost/v1", "instance":true, "reach":{"kind":"ok","ms":2,"at":"2026-10-15T00:00:00Z"}})
                 } else {
                     Value::Null
                 },

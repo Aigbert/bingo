@@ -147,3 +147,22 @@ switch waits behind the active turn and compacts on the current model first.
 The outcome reports the before and after token counts. Failed or insufficient
 compaction leaves the model unchanged. Switching to a model without image
 input keeps pictures in the transcript and warns that the model cannot see them.
+
+## Managing providers
+
+`/provider add work openai https://proxy.example` adds a named instance
+immediately. Shapes are `openai`, `anthropic`, and `codex`. Key-based shapes
+open a paste dialog; the key goes only to `auth.json`. Cancelling sign-in
+keeps the instance, and `/login work` can finish later. URLs must use HTTP(S)
+and contain no userinfo, query, or fragment; paste credentials into login.
+
+`/models refresh work` checks one endpoint. The providers catalogue reports
+its last reach result and whether its credential came from the store,
+settings, or environment. A failed check keeps the instance and its previous
+model list. `/provider set work url https://new.example` replaces its address.
+Existing sessions keep their resolved endpoint; new choices use the new one.
+
+`/provider remove work` removes its user settings entry and stored credential
+and withdraws it from new choices. Default providers cannot be removed.
+Instances supplied only by another settings layer must be edited there.
+`bingo provider add` uses the same settings writer before a session starts.

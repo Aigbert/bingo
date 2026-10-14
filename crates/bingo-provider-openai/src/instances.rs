@@ -36,7 +36,7 @@ pub fn providers(
     let mut providers = vec![
         registered(default_openai(
             http.clone(),
-            settings.openai.endpoint,
+            settings.openai.endpoint.clone(),
             &file,
             &store,
         )),
@@ -44,7 +44,7 @@ pub fn providers(
             http.clone(),
             oauth.clone(),
             Variant::Codex.provider_id(),
-            settings.codex.endpoint,
+            settings.codex.endpoint.clone(),
             store.clone(),
         )),
     ];
@@ -111,7 +111,7 @@ fn default_openai(
 
 /// One more OpenAI-shaped endpoint under its own name. Its key is its own:
 /// the store entry under that name, else the instance's `apiKey`.
-fn keyed(
+pub(crate) fn keyed(
     http: reqwest::Client,
     name: String,
     endpoint: OpenAiEndpoint,

@@ -33,7 +33,7 @@ pub fn providers(
     let mut named = BTreeSet::new();
     let mut providers: Vec<Arc<dyn Provider>> = vec![Arc::new(default_anthropic(
         http.clone(),
-        settings.anthropic.endpoint,
+        settings.anthropic.endpoint.clone(),
         &file,
         &store,
     ))];
@@ -80,7 +80,7 @@ fn default_anthropic(
 
 /// One more Anthropic-shaped endpoint under its own name. Its key is its own:
 /// the store entry under that name, else the instance's `apiKey`.
-fn keyed(
+pub(crate) fn keyed(
     http: reqwest::Client,
     name: String,
     endpoint: AnthropicEndpoint,

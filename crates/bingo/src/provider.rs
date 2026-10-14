@@ -116,7 +116,7 @@ async fn ask_base_url(protocol: Protocol) -> Result<Option<String>, KernelError>
         return Ok(None);
     }
     if !url.starts_with("http://") && !url.starts_with("https://") {
-        return Err(invalid(format!("`{url}` is not an http(s) address")));
+        return Err(invalid("the base URL is not an http(s) address"));
     }
     Ok(Some(url))
 }
@@ -186,34 +186,15 @@ fn insert(
     name: &str,
     base_url: Option<String>,
 ) -> Result<(), KernelError> {
-    let key = protocol.key();
-    let object = document
-        .entry(key)
-        .or_insert_with(|| Value::Object(Map::new()))
-        .as_object_mut()
-        .ok_or_else(|| invalid(format!("`{key}` in the settings is not an object")))?;
-    let instances = object
-        .entry("instances")
-        .or_insert_with(|| Value::Object(Map::new()))
-        .as_object_mut()
-        .ok_or_else(|| {
-            invalid(format!(
-                "`{key}.instances` in the settings is not an object"
-            ))
-        })?;
-    let instance = match protocol {
-        Protocol::OpenAi => serde_json::to_value(bingo_provider_openai::OpenAiEndpoint {
+    bingo_core::settings::instances::insert(
+        document,
+        protocol.key(),
+        name,
+        &bingo_sdk::InstanceSpec {
             base_url,
-            ..Default::default()
-        }),
-        Protocol::Anthropic => serde_json::to_value(bingo_provider_anthropic::AnthropicEndpoint {
-            base_url,
-            ..Default::default()
-        }),
-    }
-    .map_err(|e| internal(e.to_string()))?;
-    instances.insert(name.to_string(), instance);
-    Ok(())
+            images: None,
+        },
+    )
 }
 
 pub(crate) fn write(path: &Path, document: &Map<String, Value>) -> Result<(), KernelError> {
@@ -312,7 +293,10 @@ mod tests {
         let refused = insert(&mut document, Protocol::OpenAi, "proxy1", None)
             .expect_err("a refusal")
             .message;
-        assert!(refused.contains("`openai`"), "{refused}");
+        assert!(
+            refused.contains("provider settings must be an object"),
+            "{refused}"
+        );
     }
 
     #[test]

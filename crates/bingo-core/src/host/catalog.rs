@@ -45,7 +45,7 @@ pub(super) async fn entries(
     let mut entries = match kind {
         CatalogKind::Events => events(registry),
         CatalogKind::Models => models(resolved, model, served),
-        CatalogKind::Providers => providers(resolved),
+        CatalogKind::Providers => providers(registry, resolved),
         CatalogKind::Tools => tools(registry).await,
         CatalogKind::Commands => commands(registry).await,
         CatalogKind::Plugins => plugins(registry).await,
@@ -55,7 +55,7 @@ pub(super) async fn entries(
             CatalogKind::Providers => entries.push(CatalogEntry {
                 id: agent.id().into(),
                 label: agent.id().into(),
-                meta: json!({"auth": AuthStatus::NotApplicable}),
+                meta: json!({"auth": AuthStatus::NotApplicable, "shape":null, "address":null, "instance":false, "reach":registry.provider_state.reach.get(agent.id())}),
             }),
             CatalogKind::Models => {
                 for offer in served::merge(served.get(agent.id()).as_ref(), &[], model) {
@@ -166,13 +166,15 @@ fn model_meta(provider: &str, source: Source, facts: Option<ModelFacts>) -> Valu
     Value::Object(meta)
 }
 
-fn providers(resolved: &[Arc<dyn Provider>]) -> Vec<CatalogEntry> {
+fn providers(registry: &Registry, resolved: &[Arc<dyn Provider>]) -> Vec<CatalogEntry> {
     resolved
         .iter()
         .map(|p| CatalogEntry {
             id: p.id().to_string(),
             label: p.id().to_string(),
-            meta: json!({ "auth": p.auth() }),
+            meta: json!({ "auth": p.auth(), "shape": p.shape(),
+                "address": p.address().and_then(super::instances::address),
+                "instance": p.instance(), "reach": registry.provider_state.reach.get(p.id()) }),
         })
         .collect()
 }

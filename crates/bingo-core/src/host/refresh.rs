@@ -7,7 +7,9 @@
 //! down is not held open by an endpoint that has stopped answering, and what
 //! comes back for it is dropped.
 
+use super::reach::Reach;
 use std::sync::{Arc, Weak};
+use std::time::Instant;
 
 use bingo_sdk::{CatalogKind, GatewayEvent, Provider};
 use jiff::Timestamp;
@@ -70,28 +72,66 @@ fn usable(providers: &[Arc<dyn Provider>]) -> Vec<Arc<dyn Provider>> {
 /// keeps whatever was cached: an endpoint that could not be reached has not
 /// withdrawn its models.
 async fn ask(host: Weak<Host>, provider: Endpoint) -> Refreshed {
-    let answer = provider.models().await;
-    let refreshed = |answer| Refreshed {
-        provider: provider.id().to_string(),
-        answer,
-    };
-    let models = match answer {
-        Ok(models) => models,
-        Err(error) => {
-            tracing::warn!(provider = provider.id(), %error, "the model list was not refreshed");
-            return refreshed(Err(error.to_string()));
+    let started = Instant::now();
+    let answer = provider
+        .models()
+        .await
+        .map_err(|error| format!("model list failed ({:?})", error.code()));
+    if let Some(host) = host.upgrade() {
+        let _edit = host.registry.provider_state.instances.edit.lock().await;
+        if !current(&host, &provider).await {
+            return Refreshed {
+                provider: provider.id().into(),
+                answer: answer.map(|models| models.len()),
+            };
         }
-    };
-    let Some(host) = host.upgrade() else {
-        return refreshed(Ok(models.len()));
-    };
-    let count = models.len();
-    if host.served.record(provider.id(), models, Timestamp::now()) {
+        let at = Timestamp::now();
+        let reach = match &answer {
+            Ok(_) => Reach::Ok {
+                ms: started.elapsed().as_millis() as u64,
+                at,
+            },
+            Err(error) => Reach::Down {
+                error: error.clone(),
+                at,
+            },
+        };
+        host.registry
+            .provider_state
+            .reach
+            .record(provider.id(), reach);
         let _ = host.gateway.send(GatewayEvent::CatalogChanged {
-            kind: CatalogKind::Models,
+            kind: CatalogKind::Providers,
         });
+        if let Ok(models) = &answer
+            && host
+                .served
+                .record(provider.id(), models.clone(), Timestamp::now())
+        {
+            let _ = host.gateway.send(GatewayEvent::CatalogChanged {
+                kind: CatalogKind::Models,
+            });
+        }
     }
-    refreshed(Ok(count))
+    Refreshed {
+        provider: provider.id().into(),
+        answer: answer.map(|models| models.len()),
+    }
+}
+
+async fn current(host: &Host, endpoint: &Endpoint) -> bool {
+    match endpoint {
+        Endpoint::Provider(provider) => host
+            .providers()
+            .await
+            .iter()
+            .any(|p| Arc::ptr_eq(p, provider)),
+        Endpoint::Agent(_) => true,
+    }
+}
+
+pub(super) async fn one(host: &Arc<Host>, provider: Arc<dyn Provider>) -> Refreshed {
+    ask(Arc::downgrade(host), Endpoint::Provider(provider)).await
 }
 
 async fn endpoints(host: &Host) -> Vec<Endpoint> {

@@ -228,7 +228,7 @@ async fn an_exported_key_does_not_feed_a_named_instance() {
     let home = tempfile::tempdir().unwrap();
     let file = settings(
         home.path(),
-        serde_json::json!({ "openai": { "instances": { "proxy1": { "baseUrl": server.uri() } } } }),
+        serde_json::json!({ "openai": { "baseUrl": server.uri(), "instances": { "proxy1": { "baseUrl": server.uri() } } } }),
     );
 
     let (h, f) = (home.path().to_path_buf(), file);

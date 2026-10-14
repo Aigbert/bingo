@@ -10,6 +10,7 @@
 mod approval;
 mod edit;
 mod format;
+pub mod instances;
 mod merge;
 mod migrate;
 

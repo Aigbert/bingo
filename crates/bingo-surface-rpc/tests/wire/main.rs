@@ -456,6 +456,10 @@ async fn history_and_catalog_answer_sdk_types() {
         .expect("the catalogue is read");
     assert_eq!(catalog["kind"], json!("providers"));
     assert_eq!(catalog["entries"][0]["id"], json!("fake"));
+    assert_eq!(
+        catalog["entries"][0]["meta"],
+        json!({"auth":{"kind":"ready","from":"store"}, "shape":"openai", "address":"http://localhost/v1", "instance":true, "reach":{"kind":"ok","ms":2,"at":"2026-10-15T00:00:00Z"}})
+    );
     let sessions = wire
         .call(name::SESSION_LIST, json!({ "filter": {} }))
         .await

@@ -14,12 +14,13 @@ const IDLE: &str = r#"{"responses":[{"steps":[{"text":"unused"}]}]}"#;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn the_catalogue_lists_each_instance_with_its_own_credential() {
+    let endpoint = wiremock::MockServer::start().await;
     let home = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
     std::fs::write(
         home.path().join(".bingo/settings.json"),
         serde_json::json!({
-            "openai": { "instances": { "proxy1": { "apiKey": "sk-one" }, "proxy2": {} } },
+            "openai": { "instances": { "proxy1": { "apiKey": "sk-one", "baseUrl": endpoint.uri() }, "proxy2": {} } },
             "codex": { "instances": { "work": {} } },
         })
         .to_string(),
@@ -50,7 +51,13 @@ async fn the_catalogue_lists_each_instance_with_its_own_credential() {
             .unwrap_or_else(|| panic!("no {id}"));
         serde_json::from_value::<AuthStatus>(entry.meta["auth"].clone()).unwrap()
     };
-    assert_eq!(auth("proxy1"), AuthStatus::Ready, "its own `apiKey`");
+    assert_eq!(
+        auth("proxy1"),
+        AuthStatus::Ready {
+            from: Some(bingo_sdk::KeySource::Setting)
+        },
+        "its own `apiKey`"
+    );
     assert!(
         matches!(auth("proxy2"), AuthStatus::Missing { hint } if hint.contains("/login proxy2")),
         "an instance with no key of its own says how to give it one: {:?}",

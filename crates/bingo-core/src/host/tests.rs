@@ -12,6 +12,7 @@ mod checkpoint;
 mod commands;
 mod complete;
 mod latest;
+mod instances;
 mod login;
 mod model_choice;
 mod models;
@@ -303,7 +304,9 @@ async fn a_second_policy_is_a_conflict() {
 #[tokio::test]
 async fn open_create_runs_a_turn_and_the_session_is_findable_afterwards() {
     let (host, provider) = host_with(vec![Script::Events(text("hello"))]).await;
-    let mut gateway = host.gateway_events();
+    let mut gateway = host.gateway_events().filter(|event| {
+        futures::future::ready(!matches!(event, GatewayEvent::CatalogChanged { .. }))
+    });
     let Attachment {
         session,
         mut snapshot,

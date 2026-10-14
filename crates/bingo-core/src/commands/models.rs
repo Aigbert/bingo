@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use bingo_sdk::*;
 use jiff::{SignedDuration, Timestamp};
 
-use crate::host::{Host, Refreshed};
+use crate::host::{Host, Refreshed, provider};
 
 pub(super) struct ModelsCommand {
     pub(super) host: Weak<Host>,
@@ -26,7 +26,9 @@ impl Command for ModelsCommand {
             ArgSpec::Words {
                 alone: vec![],
                 values: vec![REFRESH.into()],
-                then: None,
+                then: Some(Box::new(ArgSpec::Catalog {
+                    source: "providers".into(),
+                })),
             },
             true,
         )
@@ -41,6 +43,12 @@ impl Command for ModelsCommand {
             REFRESH => Ok(CommandOutcome::Applied {
                 message: Some(counted(&host.refresh_models().await)),
             }),
+            other if other.starts_with("refresh ") => {
+                let id = other.trim_start_matches("refresh ").trim();
+                Ok(CommandOutcome::Applied {
+                    message: Some(counted(&[provider::refresh_provider(&host, id).await?])),
+                })
+            }
             other => Err(KernelError::new(
                 ErrorCode::InvalidInput,
                 format!("unknown argument `{other}`; usage: /models [{REFRESH}]"),

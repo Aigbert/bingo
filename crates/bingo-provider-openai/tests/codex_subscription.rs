@@ -126,7 +126,12 @@ async fn a_refused_request_is_retried_once_with_a_renewed_bearer() {
             .any(|event| matches!(event, ModelEvent::TextDelta { .. })),
         "the second attempt streamed a body: {events:?}"
     );
-    assert_eq!(provider.auth(), AuthStatus::Ready);
+    assert_eq!(
+        provider.auth(),
+        AuthStatus::Ready {
+            from: Some(bingo_sdk::KeySource::Store)
+        }
+    );
 }
 
 #[tokio::test]
@@ -189,7 +194,7 @@ async fn the_model_menu_is_the_subscriptions_own_catalogue() {
 }
 
 #[tokio::test]
-async fn a_catalogue_that_will_not_answer_leaves_the_static_list() {
+async fn a_catalogue_that_will_not_answer_reports_failed_reach() {
     let server = MockServer::start().await;
     let directory = tempfile::tempdir().expect("a temporary directory");
     Mock::given(method("GET"))
@@ -198,13 +203,12 @@ async fn a_catalogue_that_will_not_answer_leaves_the_static_list() {
         .mount(&server)
         .await;
 
-    let models = signed_in(&server, &directory, "at-1")
-        .models()
-        .await
-        .expect("the static list rather than a failure");
-    assert_eq!(models.len(), 9);
-    assert_eq!(models[0].id, "gpt-5.6-sol");
-    assert_eq!(models[8].id, "codex-auto-review");
+    assert!(
+        signed_in(&server, &directory, "at-1")
+            .models()
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]

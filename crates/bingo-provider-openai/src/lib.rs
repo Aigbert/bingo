@@ -29,6 +29,7 @@ pub mod instances;
 pub mod models;
 pub mod request;
 pub mod settings;
+mod shape;
 #[cfg(test)]
 mod stream_tests;
 use bingo_http::stream;
@@ -81,7 +82,7 @@ const CODEX_MODELS_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// One endpoint, one credential, one name. Cheap to clone through the `Arc`
 /// the registry holds.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct OpenAiProvider {
     http: reqwest::Client,
     /// What `--provider`, `/model <id>/<model>` and `auth.json` call this
@@ -292,15 +293,6 @@ impl OpenAiProvider {
         })
     }
 
-    /// The subscription catalogue, or the list M2 recorded when it cannot be
-    /// read: a `/model` menu must not go down with a catalogue endpoint.
-    async fn codex_models(&self) -> Vec<ModelInfo> {
-        match self.codex_catalogue().await {
-            Ok(models) if !models.is_empty() => models,
-            _ => models::codex_fallback(),
-        }
-    }
-
     async fn codex_catalogue(&self) -> Result<Vec<ModelInfo>, ProviderError> {
         let request = self.get(CODEX_MODELS_PATH).await?;
         let body = tokio::time::timeout(CODEX_MODELS_TIMEOUT, self.json(request))
@@ -340,6 +332,28 @@ impl Provider for OpenAiProvider {
 
     /// A named instance serves its variant's models (ADR-0017): an
     /// OpenAI-shaped proxy answers `openai`, a second subscription `codex`.
+    fn readdress(&self, spec: &bingo_sdk::InstanceSpec) -> Result<Arc<dyn Provider>, PluginError> {
+        shape::validate(spec)?;
+        let mut provider = self.clone();
+        if let Some(url) = &spec.base_url {
+            provider.base_url = url.trim_end_matches('/').into();
+        }
+        if let Some(images) = spec.images {
+            provider.images = images;
+        }
+        Ok(Arc::new(provider))
+    }
+
+    fn shape(&self) -> Option<&str> {
+        Some(self.family())
+    }
+    fn address(&self) -> Option<&str> {
+        Some(&self.base_url)
+    }
+    fn instance(&self) -> bool {
+        self.id() != self.family()
+    }
+
     fn family(&self) -> &str {
         self.variant.provider_id()
     }
@@ -379,7 +393,7 @@ impl Provider for OpenAiProvider {
 
     async fn models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
         match self.variant {
-            Variant::Codex => Ok(self.codex_models().await),
+            Variant::Codex => self.codex_catalogue().await,
             Variant::Default => Ok(models::parse(
                 &self.json(self.get("/v1/models").await?).await?,
             )),
@@ -525,6 +539,18 @@ impl Plugin for OpenAiPlugin {
             .map_err(|e| PluginError::Failed(e.to_string()))?;
         let oauth = bingo_http::client(bingo_http::Bounds::CALL)
             .map_err(|e| PluginError::Failed(e.to_string()))?;
+        registrar.provider_shape(Arc::new(shape::Shape::new(
+            http.clone(),
+            oauth.clone(),
+            false,
+            registrar.env(),
+        )));
+        registrar.provider_shape(Arc::new(shape::Shape::new(
+            http.clone(),
+            oauth.clone(),
+            true,
+            registrar.env(),
+        )));
         for provider in instances::providers(http, oauth, settings, registrar.env())? {
             registrar.provider(provider);
         }
@@ -618,11 +644,66 @@ pub(crate) mod tests {
     fn providers(directory: &tempfile::TempDir, settings: Value) -> Vec<Arc<dyn Provider>> {
         registered(directory, settings)
             .into_iter()
-            .map(|contribution| match contribution {
-                Contribution::Provider(provider) => provider,
-                other => panic!("expected a provider, got {other:?}"),
+            .filter_map(|contribution| match contribution {
+                Contribution::Provider(provider) => Some(provider),
+                Contribution::ProviderShape(_) => None,
+                other => panic!("expected a provider or shape, got {other:?}"),
             })
             .collect()
+    }
+
+    #[test]
+    fn readdress_keeps_configuration_but_a_new_instance_has_no_old_key() {
+        let directory = tempfile::tempdir().unwrap();
+        let configured = providers(
+            &directory,
+            json!({"openai":{"instances":{"work":{"apiKey":"configured-secret", "images":false}}}}),
+        );
+        let old = configured.iter().find(|p| p.id() == "work").unwrap();
+        let spec = bingo_sdk::InstanceSpec {
+            base_url: Some("http://localhost:1234".into()),
+            images: None,
+        };
+        let changed = old.readdress(&spec).unwrap();
+        assert_eq!(
+            changed.auth(),
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Setting)
+            }
+        );
+        assert!(!changed.endpoint("m").images);
+        assert_eq!(changed.address(), Some("http://localhost:1234"));
+        assert_ne!(old.address(), changed.address());
+        let mut registrar = Registrar::new(
+            "test",
+            json!({}),
+            bingo_sdk::Env::rooted(directory.path()),
+            Default::default(),
+        );
+        OpenAiPlugin.register(&mut registrar).unwrap();
+        let shape = registrar
+            .into_contributions()
+            .into_iter()
+            .find_map(|c| match c {
+                Contribution::ProviderShape(s) if s.id() == "openai" => Some(s),
+                _ => None,
+            })
+            .unwrap();
+        assert!(matches!(
+            shape.build("work", &spec).unwrap().auth(),
+            AuthStatus::Missing { .. }
+        ));
+        let refused = bingo_sdk::InstanceSpec {
+            base_url: Some("https://user:secret@host?key=secret".into()),
+            images: None,
+        };
+        assert!(
+            !old.readdress(&refused)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("secret")
+        );
     }
 
     fn ids(providers: &[Arc<dyn Provider>]) -> Vec<String> {
@@ -708,11 +789,18 @@ pub(crate) mod tests {
                 .unwrap_or_else(|| panic!("no {id}"))
                 .clone()
         };
-        assert_eq!(by_id("proxy1").auth(), AuthStatus::Ready);
+        assert_eq!(
+            by_id("proxy1").auth(),
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Setting)
+            }
+        );
         assert!(!by_id("proxy1").endpoint("gpt-5.4").images);
         assert_eq!(
             by_id("proxy2").auth(),
-            AuthStatus::Ready,
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Store)
+            },
             "the store entry under the instance's own name is its key"
         );
         assert!(
@@ -741,7 +829,12 @@ pub(crate) mod tests {
     fn a_claimed_api_key_reaches_the_provider() {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let providers = providers(&directory, json!({ "openai": { "apiKey": "sk-settings" } }));
-        assert_eq!(providers[0].auth(), AuthStatus::Ready);
+        assert_eq!(
+            providers[0].auth(),
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Setting)
+            }
+        );
     }
 
     #[test]
@@ -795,7 +888,12 @@ pub(crate) mod tests {
     #[test]
     fn no_key_anywhere_leaves_authentication_missing() {
         assert!(matches!(hermetic(None).auth(), AuthStatus::Missing { .. }));
-        assert_eq!(hermetic(Some("sk-test")).auth(), AuthStatus::Ready);
+        assert_eq!(
+            hermetic(Some("sk-test")).auth(),
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Setting)
+            }
+        );
     }
 
     /// The default instance is the one the variable feeds, and the hint says
@@ -843,7 +941,9 @@ pub(crate) mod tests {
         let held = tempfile::tempdir().expect("a temporary directory");
         assert_eq!(
             subscribed(&held, Some(signed_in("at-1"))).auth(),
-            AuthStatus::Ready
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Store)
+            }
         );
 
         // The third status needs the issuer to retire the refresh token.

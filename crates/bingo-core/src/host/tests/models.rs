@@ -215,7 +215,7 @@ async fn an_endpoint_that_cannot_be_asked_keeps_the_list_it_gave() {
         .answer
         .clone()
         .expect_err("it could not be asked");
-    assert!(failure.contains("connection refused"), "{failure}");
+    assert_eq!(failure, "model list failed (InvalidInput)");
     assert_eq!(
         as_pairs(&offered(&host).await),
         [("m", "configured"), ("fake-1", "endpoint")]
@@ -229,7 +229,14 @@ async fn a_changed_list_is_announced_and_an_unchanged_one_is_not() {
     let dir = tempfile::tempdir().unwrap();
     let provider = ScriptedProvider::new(vec![]);
     let host = host_keeping(dir.path(), &provider).await;
-    let mut gateway = host.gateway_events();
+    let mut gateway = host.gateway_events().filter(|event| {
+        futures::future::ready(!matches!(
+            event,
+            GatewayEvent::CatalogChanged {
+                kind: CatalogKind::Providers
+            }
+        ))
+    });
 
     provider.serves(&["fake-1"]);
     host.refresh_models().await;

@@ -146,6 +146,12 @@ impl ServedModels {
         changed
     }
 
+    pub fn remove(&self, provider: &str) {
+        let mut lists = self.lock();
+        lists.remove(provider);
+        self.save(&lists);
+    }
+
     fn lock(&self) -> std::sync::MutexGuard<'_, BTreeMap<String, Served>> {
         self.lists.lock().unwrap_or_else(|p| p.into_inner())
     }

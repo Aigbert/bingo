@@ -40,7 +40,7 @@ impl Provider for Signing {
     }
 
     fn auth(&self) -> AuthStatus {
-        AuthStatus::Ready
+        AuthStatus::Ready { from: None }
     }
 
     async fn login(

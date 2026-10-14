@@ -14,7 +14,7 @@ use bingo_sdk::{AuthStatus, ProviderError};
 
 use bingo_auth_oauth::key::ApiKey;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Credential {
     /// An API key: the store, then the settings or the environment
     /// (ADR-0017 §3).
@@ -41,7 +41,9 @@ impl Credential {
         match self {
             Credential::Key(key) => key.status(),
             Credential::Tokens(source) => match source.status() {
-                Status::SignedIn { .. } => AuthStatus::Ready,
+                Status::SignedIn { .. } => AuthStatus::Ready {
+                    from: Some(bingo_sdk::KeySource::Store),
+                },
                 Status::SignedOut => AuthStatus::Missing {
                     hint: sign_in(source.provider()),
                 },

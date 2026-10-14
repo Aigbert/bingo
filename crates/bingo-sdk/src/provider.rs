@@ -14,7 +14,10 @@ use crate::model::{Effort, EndpointCapabilities, ModelRequest, ModelStream, Prov
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AuthStatus {
     NotApplicable,
-    Ready,
+    Ready {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<KeySource>,
+    },
     /// No credentials; `hint` says where to put them, in the user's words.
     Missing {
         hint: String,
@@ -23,6 +26,39 @@ pub enum AuthStatus {
     Expired {
         hint: String,
     },
+}
+
+/// The place supplying a usable credential; never its value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum KeySource {
+    Store,
+    Setting,
+    Env,
+}
+
+/// Public configuration for one named endpoint.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InstanceSpec {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub images: Option<bool>,
+}
+
+/// One constructor for boot and runtime instances of a wire protocol.
+pub trait ProviderShape: Send + Sync {
+    fn id(&self) -> &str;
+    fn settings_key(&self) -> &str;
+    fn build(
+        &self,
+        name: &str,
+        spec: &InstanceSpec,
+    ) -> Result<Arc<dyn Provider>, crate::PluginError>;
+    fn takes_key(&self) -> bool {
+        false
+    }
 }
 
 /// How a person wants to sign in (ADR-0012 §4); `None` is the provider's
@@ -68,6 +104,27 @@ pub trait Provider: Send + Sync {
     /// is where the built-ins are filed.
     fn family(&self) -> &str {
         self.id()
+    }
+
+    /// The registered constructor, if this provider supports named instances.
+    fn shape(&self) -> Option<&str> {
+        None
+    }
+
+    /// The configured address. Catalogue readers must strip credentials.
+    fn address(&self) -> Option<&str> {
+        None
+    }
+
+    fn instance(&self) -> bool {
+        false
+    }
+
+    /// Replace endpoint options while retaining this instance's credential configuration.
+    fn readdress(&self, _spec: &InstanceSpec) -> Result<Arc<dyn Provider>, crate::PluginError> {
+        Err(crate::PluginError::Config(
+            "this provider cannot be re-addressed".into(),
+        ))
     }
 
     /// What this endpoint does with a request for `model`. Fails closed: a
@@ -119,5 +176,46 @@ pub trait Provider: Send + Sync {
         Err(ProviderError::Unsupported {
             message: "logout".into(),
         })
+    }
+}
+
+#[cfg(test)]
+mod runtime_contract {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn ready_is_additive_and_names_only_the_source() {
+        assert_eq!(
+            serde_json::from_value::<AuthStatus>(json!({"kind":"ready"})).unwrap(),
+            AuthStatus::Ready { from: None }
+        );
+        for (source, spelling) in [
+            (KeySource::Store, "store"),
+            (KeySource::Setting, "setting"),
+            (KeySource::Env, "env"),
+        ] {
+            let status = AuthStatus::Ready { from: Some(source) };
+            assert_eq!(
+                serde_json::to_value(&status).unwrap(),
+                json!({"kind":"ready", "from":spelling})
+            );
+            assert_eq!(
+                serde_json::from_value::<AuthStatus>(serde_json::to_value(&status).unwrap())
+                    .unwrap(),
+                status
+            );
+        }
+    }
+
+    #[test]
+    fn an_instance_spec_contains_no_credential() {
+        let spec: InstanceSpec =
+            serde_json::from_value(json!({"baseUrl":"http://localhost:1234", "images":false}))
+                .unwrap();
+        assert_eq!(
+            serde_json::to_value(spec).unwrap(),
+            json!({"baseUrl":"http://localhost:1234", "images":false})
+        );
     }
 }

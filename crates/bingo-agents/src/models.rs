@@ -84,7 +84,7 @@ fn from_endpoint(model: &&CatalogEntry) -> bool {
 fn auth(meta: &Value) -> String {
     let status = meta.get("auth").cloned().unwrap_or(Value::Null);
     match serde_json::from_value::<AuthStatus>(status) {
-        Ok(AuthStatus::Ready) => "signed in".to_string(),
+        Ok(AuthStatus::Ready { .. }) => "signed in".to_string(),
         Ok(AuthStatus::NotApplicable) => "no sign-in needed".to_string(),
         Ok(AuthStatus::Missing { hint }) => format!("not signed in: {hint}"),
         Ok(AuthStatus::Expired { hint }) => format!("sign-in expired: {hint}"),

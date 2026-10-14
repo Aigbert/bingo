@@ -16,12 +16,13 @@ impl Host {
     /// sources answer with now. `provider`, the catalogue and `/model`'s
     /// reading of `<provider>/<model>` all read this and nothing else.
     pub async fn providers(&self) -> Vec<Arc<dyn Provider>> {
-        ProviderSet {
+        let providers = ProviderSet {
             fixed: self.registry.providers.clone(),
             sources: self.registry.sources.providers.clone(),
         }
         .gather()
-        .await
+        .await;
+        self.registry.provider_state.instances.gather(providers)
     }
 
     /// The provider `id` names; with none, the settings' provider; with

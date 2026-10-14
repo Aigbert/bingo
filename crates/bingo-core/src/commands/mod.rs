@@ -9,6 +9,7 @@ mod model;
 mod models;
 mod pin;
 mod plugins;
+mod provider;
 mod rename;
 mod status;
 mod think;
@@ -29,6 +30,7 @@ pub(crate) fn builtins(host: Weak<Host>) -> Vec<Arc<dyn Command>> {
         Arc::new(login::LoginCommand { host: host.clone() }),
         Arc::new(login::LogoutCommand { host: host.clone() }),
         Arc::new(plugins::PluginsCommand { host: host.clone() }),
+        Arc::new(provider::ProviderCommand { host: host.clone() }),
         Arc::new(status::StatusCommand { host }),
     ]
 }
