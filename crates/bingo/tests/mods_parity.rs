@@ -47,7 +47,8 @@ fn port_layout_changes_only_the_package_specifier() {
             std::fs::read_to_string(ports.join(name).join("hooks").join(file)).unwrap(),
             module.replace("'claude-code'", "'bingo'")
         );
-        assert!(ports.join(name).join("register.test.ts").is_file());
+        assert!(ports.join(name).join("register.parity.test.ts").is_file());
+        assert!(!ports.join(name).join("register.test.ts").exists());
     }
     assert_eq!(
         std::fs::read_to_string(ports.join("turn-band/types/index.d.ts")).unwrap(),
