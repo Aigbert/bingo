@@ -11,6 +11,7 @@ mod catalogue;
 mod checkpoint;
 mod commands;
 mod complete;
+mod instance_origin;
 mod instances;
 mod latest;
 mod login;
