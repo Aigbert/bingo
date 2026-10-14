@@ -233,6 +233,14 @@ mod tests {
     fn canonical_origins_pin_case_userinfo_ipv6_and_trailing_dot() {
         use crate::lifetime::origin;
         assert_eq!(
+            origin("http://example.com"),
+            Some("http://example.com:80".into())
+        );
+        assert_eq!(
+            origin("http://example.com"),
+            origin("http://example.com:80/path")
+        );
+        assert_eq!(
             origin("HTTPS://Example.COM/path"),
             Some("https://example.com:443".into())
         );

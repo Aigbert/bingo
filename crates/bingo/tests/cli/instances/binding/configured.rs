@@ -130,3 +130,34 @@ async fn keys_can_reach_the_origin_declared_beside_them() {
         assert!(!server.received_requests().await.unwrap().is_empty());
     }
 }
+
+#[tokio::test]
+async fn anthropic_environment_address_is_used_for_legacy_adoption() {
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{header, path},
+    };
+    let server = MockServer::start().await;
+    Mock::given(path("/v1/messages"))
+        .and(header("x-api-key", "legacy-anthropic-dummy"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            include_str!("../../../../../bingo-provider-anthropic/fixtures/text.sse"),
+            "text/event-stream",
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let home = tempfile::tempdir().unwrap();
+    write_auth(
+        home.path(),
+        json!({"anthropic":{"type":"api","key":"legacy-anthropic-dummy"}}),
+    );
+    let mut cmd = at(home.path(), home.path(), "anthropic");
+    cmd.env("ANTHROPIC_BASE_URL", server.uri());
+    let out = tokio::task::spawn_blocking(move || run(&mut cmd))
+        .await
+        .unwrap();
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(!stderr(&out).contains("not the one its key"));
+    assert_eq!(stored(home.path())["anthropic"]["origin"], server.uri());
+}
