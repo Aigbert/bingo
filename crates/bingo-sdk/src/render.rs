@@ -27,6 +27,19 @@ pub enum Component {
     Pane,
     Permission,
     SignIn,
+    Reasoning,
+    Compaction,
+    Rewind,
+    Interruption,
+    QuestionAnswer,
+    PermissionReceipt,
+    Asset,
+    ShellRun,
+    Action,
+    TurnProgress,
+    SessionStatus,
+    Toast,
+    Welcome,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -56,15 +69,46 @@ impl Component {
         matches!(self, Self::Permission | Self::SignIn)
     }
 
-    pub fn surfaces(self) -> &'static [SurfaceName] {
-        &[
-            SurfaceName::Terminal,
-            SurfaceName::Desktop,
-            SurfaceName::Text,
-        ]
+    pub const fn surfaces(self) -> &'static [SurfaceName] {
+        match self {
+            Self::Question
+            | Self::UserMessage
+            | Self::AssistantMessage
+            | Self::ToolUse
+            | Self::ToolResult
+            | Self::ToolGroup
+            | Self::ToolProgress
+            | Self::CommandOutput
+            | Self::Spinner
+            | Self::TurnDuration
+            | Self::InfoNotice
+            | Self::SessionMode
+            | Self::PromptHint
+            | Self::AbovePrompt
+            | Self::Pane
+            | Self::Permission
+            | Self::SignIn
+            | Self::Reasoning
+            | Self::Compaction
+            | Self::Rewind
+            | Self::Interruption
+            | Self::QuestionAnswer
+            | Self::PermissionReceipt
+            | Self::Asset
+            | Self::ShellRun
+            | Self::Action
+            | Self::TurnProgress
+            | Self::SessionStatus
+            | Self::Toast
+            | Self::Welcome => &[
+                SurfaceName::Terminal,
+                SurfaceName::Desktop,
+                SurfaceName::Text,
+            ],
+        }
     }
 
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 30] = [
         Self::Question,
         Self::UserMessage,
         Self::AssistantMessage,
@@ -82,6 +126,19 @@ impl Component {
         Self::Pane,
         Self::Permission,
         Self::SignIn,
+        Self::Reasoning,
+        Self::Compaction,
+        Self::Rewind,
+        Self::Interruption,
+        Self::QuestionAnswer,
+        Self::PermissionReceipt,
+        Self::Asset,
+        Self::ShellRun,
+        Self::Action,
+        Self::TurnProgress,
+        Self::SessionStatus,
+        Self::Toast,
+        Self::Welcome,
     ];
 }
 impl RenderRequest {
@@ -109,6 +166,29 @@ pub struct HandlerEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn a_pull_is_completed_by_each_asking_surface() {
+        let wire = serde_json::json!({"component":"Pane","requestId":"one","props":{},"viewport":{"columns":0,"rows":0}});
+        let pull: PullRequest = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&pull).unwrap(), wire);
+        for surface in Component::Pane.surfaces() {
+            assert_eq!(pull.on(*surface).surface, *surface);
+            assert_eq!(pull.on(*surface).props, pull.props);
+        }
+    }
+    #[test]
+    fn every_component_names_its_surfaces() {
+        for component in Component::ALL {
+            assert_eq!(
+                component.surfaces(),
+                &[
+                    SurfaceName::Terminal,
+                    SurfaceName::Desktop,
+                    SurfaceName::Text
+                ]
+            );
+        }
+    }
     #[test]
     fn pane_viewport_keeps_its_seated_place() {
         let wire = serde_json::json!({"columns":64,"rows":24,"place":"side"});
@@ -145,4 +225,35 @@ pub fn asked() -> bool {
 }
 pub async fn under_input<T>(asked: bool, future: impl std::future::Future<Output = T>) -> T {
     PERSON_INPUT.scope(asked, future).await
+}
+
+/// A placement has no asking surface until a client pulls it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PullRequest {
+    pub component: Component,
+    pub request_id: String,
+    pub props: Value,
+    pub viewport: Viewport,
+}
+impl PullRequest {
+    pub fn on(&self, surface: SurfaceName) -> RenderRequest {
+        RenderRequest {
+            component: self.component,
+            request_id: self.request_id.clone(),
+            surface,
+            props: self.props.clone(),
+            viewport: self.viewport.clone(),
+        }
+    }
+}
+impl From<RenderRequest> for PullRequest {
+    fn from(request: RenderRequest) -> Self {
+        Self {
+            component: request.component,
+            request_id: request.request_id,
+            props: request.props,
+            viewport: request.viewport,
+        }
+    }
 }

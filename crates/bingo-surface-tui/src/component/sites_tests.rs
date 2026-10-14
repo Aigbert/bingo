@@ -22,7 +22,9 @@ fn matched(state: &mut bingo_sdk::SessionState) {
 }
 #[test]
 fn unmatched_frame_has_no_component_requests() {
-    assert!(requests(&state()).is_empty());
+    for component in Component::ALL {
+        assert!(requests(&site(component)).is_empty(), "{component:?}");
+    }
 }
 #[test]
 fn permission_never_requests_question_even_with_unrestricted_hook() {
@@ -74,16 +76,10 @@ fn working_frame_requests_spinner() {
 }
 
 fn site(component: Component) -> bingo_sdk::SessionState {
-    use bingo_sdk::{
-        ItemStatus, ToolOutput,
-        render::{RenderRequest, SurfaceName, Viewport},
-        slot::{Shown, Slot},
-    };
+    use bingo_sdk::{ItemStatus, ToolOutput};
     let completed_item = |item| folded(vec![frame(1, Event::ItemCompleted { item })]);
     match component {
-        Component::Permission | Component::SignIn => {
-            unreachable!("sealed sites have dedicated tests")
-        }
+        Component::Permission | Component::SignIn => sealed_site(component),
         Component::Question => folded(vec![frame(
             1,
             Event::InteractionOpened {
@@ -102,9 +98,15 @@ fn site(component: Component) -> bingo_sdk::SessionState {
             ItemStatus::Completed,
         )),
         Component::ToolProgress => completed_item(running_tool("itm_one", "sample", "original")),
-        Component::CommandOutput => {
-            completed_item(shell("itm_one", "echo original", "original", Some(0)))
-        }
+        Component::CommandOutput => completed_item(item(
+            "itm_one",
+            ItemStatus::Completed,
+            bingo_sdk::ItemBody::Action {
+                name: "sample".into(),
+                args: json!({}),
+                result: Some(json!("original")),
+            },
+        )),
         Component::InfoNotice => completed_item(item(
             "itm_one",
             ItemStatus::Completed,
@@ -114,46 +116,27 @@ fn site(component: Component) -> bingo_sdk::SessionState {
                 code: String::new(),
             },
         )),
-        Component::Spinner => folded(vec![frame(1, started("trn_one"))]),
+        Component::Spinner | Component::TurnProgress => folded(vec![frame(1, started("trn_one"))]),
         Component::TurnDuration => {
             let mut closed = frame(2, completed("trn_one", bingo_sdk::TurnStatus::Completed));
             closed.ts = ts() + jiff::SignedDuration::from_secs(2);
             folded(vec![frame(1, started("trn_one")), closed])
         }
         Component::SessionMode => with_permission_mode("plan"),
-        Component::PromptHint | Component::AbovePrompt => state(),
-        Component::Pane => {
-            let mut state = state();
-            let slot = Slot::Pane {
-                id: "one".into(),
-                title: "original".into(),
-                focus: false,
-                close_on_escape: true,
-                hold_toasts: false,
-                asked: true,
-                place: vec![bingo_sdk::slot::Place::Above],
-                size: bingo_sdk::slot::PaneSize::from_rows(5),
-                view: Shown::Pull {
-                    request: RenderRequest {
-                        component,
-                        request_id: "one".into(),
-                        surface: SurfaceName::Terminal,
-                        props: json!({}),
-                        viewport: Viewport {
-                            place: None,
-                            columns: 0,
-                            rows: 0,
-                        },
-                    },
-                },
-            };
-            state
-                .signals
-                .entry("fixture".into())
-                .or_default()
-                .insert("one".into(), bingo_sdk::slot::with(json!({}), [slot]));
-            state
-        }
+        Component::PromptHint
+        | Component::AbovePrompt
+        | Component::SessionStatus
+        | Component::Welcome => state(),
+        Component::Toast | Component::Pane => placed_site(component),
+        Component::Reasoning
+        | Component::Compaction
+        | Component::Rewind
+        | Component::Interruption
+        | Component::QuestionAnswer
+        | Component::PermissionReceipt
+        | Component::Asset
+        | Component::ShellRun
+        | Component::Action => fact_site(component),
     }
 }
 fn replaces_drawn_site(component: Component) {
@@ -324,4 +307,300 @@ fn revalidating_above_prompt_keeps_previous_art() {
         .pulled
         .answer(next, bingo_sdk::View::text("NEW BAND"));
     assert!(draw_sized(40, 24, &state, &mut ui, now).contains("NEW BAND"));
+}
+
+fn fact_site(component: Component) -> bingo_sdk::SessionState {
+    let fixtures: Vec<serde_json::Value> =
+        serde_json::from_str(include_str!("../../../bingo-sdk/src/component/props.json")).unwrap();
+    let props: bingo_sdk::component::Props = serde_json::from_value(
+        fixtures
+            .into_iter()
+            .find(|f| f["component"] == json!(component))
+            .unwrap(),
+    )
+    .unwrap();
+    let mut record = item(
+        "itm_one",
+        bingo_sdk::ItemStatus::Completed,
+        bingo_sdk::ItemBody::Reasoning {
+            text: String::new(),
+            provider_metadata: Default::default(),
+        },
+    );
+    super::facts::change(&mut record, &props);
+    folded(vec![frame(1, Event::ItemCompleted { item: record })])
+}
+
+#[test]
+fn every_known_item_body_has_a_site() {
+    use bingo_sdk::ItemBody;
+    for component in Component::ALL {
+        let state = site(component);
+        for item in state.transcript.items() {
+            let known = match item.body {
+                ItemBody::User { .. }
+                | ItemBody::Assistant { .. }
+                | ItemBody::Reasoning { .. }
+                | ItemBody::ToolCall { .. }
+                | ItemBody::Shell { .. }
+                | ItemBody::Action { .. }
+                | ItemBody::Compaction { .. }
+                | ItemBody::Rewind { .. }
+                | ItemBody::Interruption { .. }
+                | ItemBody::Notice { .. }
+                | ItemBody::QuestionAnswer { .. }
+                | ItemBody::PermissionReceipt { .. }
+                | ItemBody::Asset { .. } => true,
+                ItemBody::Unknown { .. } => false,
+            };
+            assert_eq!(super::items::props(item, false).is_some(), known);
+        }
+    }
+}
+
+#[test]
+fn spinner_and_progress_keep_meaning_and_tick_once_per_second() {
+    let mut state = site(Component::Spinner);
+    matched(&mut state);
+    let (mut ui, now) = scene();
+    let tree = solo(&state);
+    draw_tree(80, 24, &tree, &mut ui, later(now, 2000));
+    let spinner = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == Component::Spinner)
+        .unwrap();
+    assert_eq!(spinner.request.props["message"], json!(null));
+    assert_eq!(spinner.request.props["suffix"], json!("…"));
+    let first = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == Component::TurnProgress)
+        .unwrap()
+        .clone();
+    assert!(ui.placed.pulled.request(&first));
+    draw_tree(80, 24, &tree, &mut ui, later(now, 2099));
+    let second = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == Component::TurnProgress)
+        .unwrap();
+    assert!(!ui.placed.pulled.request(second));
+    draw_tree(80, 24, &tree, &mut ui, later(now, 3000));
+    let third = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == Component::TurnProgress)
+        .unwrap();
+    assert!(ui.placed.pulled.request(third));
+    ui.stop_asked = state.turn.as_ref().map(|turn| turn.id.clone());
+    draw_tree(80, 24, &tree, &mut ui, later(now, 3000));
+    let spinner = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == Component::Spinner)
+        .unwrap();
+    assert_eq!(
+        spinner.request.props["message"],
+        json!(crate::activity::STOPPING)
+    );
+    assert_ne!(
+        spinner.request.props["word"],
+        spinner.request.props["message"]
+    );
+}
+screen_test!(reasoning_backend, Reasoning);
+screen_test!(compaction_backend, Compaction);
+screen_test!(rewind_backend, Rewind);
+screen_test!(interruption_backend, Interruption);
+screen_test!(questionanswer_backend, QuestionAnswer);
+screen_test!(permissionreceipt_backend, PermissionReceipt);
+screen_test!(asset_backend, Asset);
+screen_test!(shellrun_backend, ShellRun);
+screen_test!(action_backend, Action);
+screen_test!(turnprogress_backend, TurnProgress);
+screen_test!(sessionstatus_backend, SessionStatus);
+screen_test!(toast_backend, Toast);
+screen_test!(welcome_backend, Welcome);
+
+#[test]
+fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
+    for component in Component::ALL {
+        // A pulled pane waits for its first answer; it has no built-in body.
+        if component == Component::Pane {
+            continue;
+        }
+        let mut state = site(component);
+        matched(&mut state);
+        let (mut ui, now) = scene();
+        let now = later(now, 2000);
+        let tree = solo(&state);
+        let original = drawn(80, 30, &tree, &mut ui, now);
+        let key = ui
+            .shown
+            .pulls
+            .iter()
+            .find(|key| key.request.component == component)
+            .unwrap()
+            .clone();
+        ui.placed.pulled.request(&key);
+        let answer = key.request.engine();
+        ui.placed.pulled.answer(key, answer);
+        let wrapped = drawn(80, 30, &tree, &mut ui, now);
+        assert_eq!(original.buffer(), wrapped.buffer(), "{component:?}");
+    }
+}
+
+#[test]
+fn a_rewritten_fact_reaches_the_own_drawing() {
+    let mut state = site(Component::Compaction);
+    matched(&mut state);
+    let (mut ui, now) = scene();
+    let tree = solo(&state);
+    draw_tree(80, 30, &tree, &mut ui, now);
+    let key = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == Component::Compaction)
+        .unwrap()
+        .clone();
+    let mut props = key.request.props.clone();
+    props["before"] = json!(1234);
+    props["after"] = json!(432);
+    ui.placed.pulled.request(&key);
+    ui.placed.pulled.answer(
+        key,
+        bingo_sdk::View::Engine {
+            component: Component::Compaction,
+            props,
+        },
+    );
+    let screen = draw_tree(80, 30, &tree, &mut ui, now);
+    assert!(screen.contains("1234 → 432"), "{screen}");
+}
+
+fn placed_site(component: Component) -> bingo_sdk::SessionState {
+    use bingo_sdk::{
+        render::{RenderRequest, SurfaceName, Viewport},
+        slot::{Shown, Slot},
+    };
+    match component {
+        Component::Toast => {
+            let mut state = state();
+            state.signals.entry("fixture".into()).or_default().insert(
+                "toast".into(),
+                bingo_sdk::slot::with(
+                    json!({}),
+                    [Slot::Toast {
+                        text: "original".into(),
+                        until: ts() + std::time::Duration::from_secs(10),
+                        alert: false,
+                    }],
+                ),
+            );
+            state
+        }
+        Component::Pane => {
+            let mut state = state();
+            let slot = Slot::Pane {
+                id: "one".into(),
+                title: "original".into(),
+                focus: false,
+                close_on_escape: true,
+                hold_toasts: false,
+                asked: true,
+                place: vec![bingo_sdk::slot::Place::Above],
+                size: bingo_sdk::slot::PaneSize::from_rows(5),
+                view: Shown::Pull {
+                    request: RenderRequest {
+                        component,
+                        request_id: "one".into(),
+                        surface: SurfaceName::Terminal,
+                        props: json!({}),
+                        viewport: Viewport {
+                            place: None,
+                            columns: 0,
+                            rows: 0,
+                        },
+                    }
+                    .into(),
+                },
+            };
+            state
+                .signals
+                .entry("fixture".into())
+                .or_default()
+                .insert("one".into(), bingo_sdk::slot::with(json!({}), [slot]));
+            state
+        }
+        _ => unreachable!(),
+    }
+}
+
+#[test]
+fn session_status_replacement_owns_the_child_identity() {
+    let mut state = site(Component::SessionStatus);
+    state.config.kernel["render"] = json!({"SessionStatus":[{}]});
+    let mut tree = folded_tree(vec![
+        child_frame(1, announced("reviewer")),
+        child_frame(
+            2,
+            Event::ConfigChanged {
+                config: state.config,
+            },
+        ),
+    ]);
+    tree.show(&child_id());
+    let (mut ui, now) = scene();
+    let original = draw_tree(80, 30, &tree, &mut ui, now);
+    assert!(original.contains("in reviewer"));
+    let key = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == Component::SessionStatus)
+        .unwrap()
+        .clone();
+    assert_eq!(key.request.props["title"], json!("reviewer"));
+    assert_eq!(key.request.props["cwd"], json!(tree.viewed().summary.cwd));
+    ui.placed.pulled.request(&key);
+    ui.placed
+        .pulled
+        .answer(key, bingo_sdk::View::text("replacement status"));
+    let screen = draw_tree(80, 30, &tree, &mut ui, now);
+    assert!(screen.contains("replacement status"));
+    assert!(!screen.contains("in reviewer"));
+    assert!(!screen.contains("fake/fake-1"));
+}
+
+fn sealed_site(component: Component) -> bingo_sdk::SessionState {
+    let interaction = if component == Component::Permission {
+        interaction(
+            bingo_sdk::InteractionKind::Permission {
+                tool: "sample".into(),
+                summary: "sample operation".into(),
+                preview: None,
+                session_scope: None,
+            },
+            vec![
+                bingo_sdk::AnswerSpec::AllowOnce,
+                bingo_sdk::AnswerSpec::Deny,
+            ],
+        )
+    } else {
+        login(bingo_sdk::LoginFlow::Device {
+            url: "https://example.test/device".into(),
+            code: "ABCD".into(),
+        })
+    };
+    folded(vec![
+        started_tool(1, running_tool("itm_2", "sample", "original")),
+        frame(2, opened(interaction)),
+    ])
 }

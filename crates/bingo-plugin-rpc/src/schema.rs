@@ -20,6 +20,7 @@ use crate::wire::{METHODS, NOTIFICATIONS, PROTOCOL, Ref, schema_of};
 static UNNAMED: &[Ref] = &[
     schema_of::<Manifest>,
     schema_of::<bingo_sdk::component::Props>,
+    schema_of::<bingo_sdk::render::RenderRequest>,
     schema_of::<crate::context::Context>,
     schema_of::<crate::wire::ServiceMethod>,
 ];
@@ -317,7 +318,8 @@ mod tests {
     }
 
     fn amend_elements(baseline: &mut Value, current: &Value) {
-        for name in ["View", "Slot", "Component"] {
+        // ADR-0082: a pulled placement is completed by its asking surface.
+        for name in ["View", "Slot", "Shown", "Component"] {
             baseline["$defs"][name] = current["$defs"][name].clone();
         }
         if let Some(method) = current["methods"].get("host/ui/invalidate") {

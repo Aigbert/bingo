@@ -219,3 +219,54 @@ async fn wait_command(kernel: &bingo_surface_rpc::RemoteKernel, name: &str) {
     .await
     .expect("module command registers");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fact_sites_replace_and_wrap_over_rpc_on_each_surface() {
+    let home = tempfile::tempdir().unwrap();
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mods/sites");
+    let target = home.path().join("sites");
+    std::fs::create_dir(&target).unwrap();
+    for file in ["plugin.json", "register.ts"] {
+        std::fs::copy(source.join(file), target.join(file)).unwrap();
+    }
+    let config = settings(home.path(), &[target]);
+    let mut server = Server::spawn_at(
+        home,
+        r#"{"responses":[]}"#,
+        &["--provider", "fake", "--settings", config.to_str().unwrap()],
+    );
+    let kernel = ready(&mut server).await;
+    let attachment = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    for surface in Component::Compaction.surfaces() {
+        let mut compact = request(
+            Component::Compaction,
+            "compacted",
+            json!({"summary":"summary","replaced":3,"before":100,"after":20,"durationMs":500}),
+        );
+        compact.surface = *surface;
+        let view = kernel.render(&attachment.session, compact).await.unwrap();
+        let name = serde_json::to_value(surface).unwrap();
+        assert_eq!(
+            view.fold(),
+            format!("Compacted 100 to 20 on {}", name.as_str().unwrap())
+        );
+        let mut reasoning = request(
+            Component::Reasoning,
+            "thought",
+            json!({"text":"original","status":"completed"}),
+        );
+        reasoning.surface = *surface;
+        let view = kernel.render(&attachment.session, reasoning).await.unwrap();
+        let View::Box { children, .. } = view else {
+            panic!("wrapped drawing");
+        };
+        assert_eq!(children[0].fold(), "Thinking follows");
+        assert!(
+            matches!(&children[1], View::Engine {component: Component::Reasoning, props} if props["text"] == "revised thought")
+        );
+    }
+    stop(&kernel, &mut server).await;
+}

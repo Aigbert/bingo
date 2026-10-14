@@ -33,6 +33,7 @@ components! {
     InfoNotice(InfoNoticeProps), SessionMode(SessionModeProps),
     PromptHint(PromptHintProps), AbovePrompt(AbovePromptProps), Pane(PaneProps),
     Permission(PermissionProps), SignIn(SignInProps),
+    Reasoning(ReasoningProps), Compaction(CompactionProps), Rewind(RewindProps), Interruption(InterruptionProps), QuestionAnswer(QuestionAnswerProps), PermissionReceipt(PermissionReceiptProps), Asset(AssetProps), ShellRun(ShellRunProps), Action(ActionProps), TurnProgress(TurnProgressProps), SessionStatus(SessionStatusProps), Toast(ToastProps), Welcome(Box<WelcomeProps>),
 }
 impl Props {
     pub fn parse(component: Component, props: Value) -> Result<Self, serde_json::Error> {
@@ -47,7 +48,13 @@ mod tests {
     fn every_component_has_a_golden_prop_contract() {
         let fixtures: Vec<Value> =
             serde_json::from_str(include_str!("component/props.json")).unwrap();
-        assert_eq!(fixtures.len(), 15);
+        assert_eq!(
+            fixtures.len(),
+            Component::ALL
+                .into_iter()
+                .filter(|component| !component.sealed())
+                .count()
+        );
         let mut components = std::collections::BTreeSet::new();
         for fixture in fixtures {
             let props: Props = serde_json::from_value(fixture.clone()).unwrap();

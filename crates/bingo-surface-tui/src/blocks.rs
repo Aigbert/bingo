@@ -25,6 +25,7 @@ use crate::fold::{self, Fold};
 use crate::graphics::Picture;
 use crate::transcript::{self, Cue, Place, Rows};
 use crate::tree::Agents;
+#[cfg(test)]
 use crate::welcome;
 
 /// What can change about an item's block while it is on the screen. A
@@ -259,6 +260,10 @@ pub struct Blocks {
 }
 
 impl Blocks {
+    pub fn welcome_rows(&self) -> usize {
+        self.head.len()
+    }
+
     pub fn closing_start(&self) -> usize {
         self.height.saturating_sub(self.tail.len())
     }
@@ -266,7 +271,7 @@ impl Blocks {
     /// the whole transcript, in wrapped lines.
     pub fn sync(&mut self, state: &SessionState, agents: &Agents<'_>, rows: &Rows<'_>) -> usize {
         self.relaid(rows);
-        let boxed = welcome::draw(state, rows.width, rows.entrance, rows.update, rows.now.wall);
+        let boxed = crate::component::welcome::draw(rows);
         // The opening plays in the welcome box's place and lands on it, so while
         // it runs the box *is* the frame (M70, M72; design §11).
         self.head = match rows.opening {

@@ -7075,7 +7075,7 @@
           "type": "object",
           "properties": {
             "request": {
-              "$ref": "#/$defs/RenderRequest"
+              "$ref": "#/$defs/PullRequest"
             }
           },
           "required": [
@@ -7106,7 +7106,20 @@
         "AbovePrompt",
         "Pane",
         "Permission",
-        "SignIn"
+        "SignIn",
+        "Reasoning",
+        "Compaction",
+        "Rewind",
+        "Interruption",
+        "QuestionAnswer",
+        "PermissionReceipt",
+        "Asset",
+        "ShellRun",
+        "Action",
+        "TurnProgress",
+        "SessionStatus",
+        "Toast",
+        "Welcome"
       ]
     },
     "Invalidate": {
@@ -7431,6 +7444,28 @@
         }
       ],
       "description": "A denial is an answer, never an invalid output that falls through to execution."
+    },
+    "PullRequest": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "$ref": "#/$defs/Component"
+        },
+        "requestId": {
+          "type": "string"
+        },
+        "props": true,
+        "viewport": {
+          "$ref": "#/$defs/Viewport"
+        }
+      },
+      "required": [
+        "component",
+        "requestId",
+        "props",
+        "viewport"
+      ],
+      "description": "A placement has no asking surface until a client pulls it."
     }
   },
   "manifest": {

@@ -41,7 +41,15 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let band_offset = activity.len();
     let band = crate::component::band::draw(state, ui, frame);
     activity.extend(band.lines.iter().cloned());
-    let toasts = ui.placed.toasts.lines(state, now, usize::from(area.width));
+    let toasts = ui.placed.toasts.components(
+        now,
+        &mut crate::component::Site {
+            state,
+            memo: &ui.placed.pulled,
+            width: usize::from(area.width),
+            pulls: &mut frame.pulls,
+        },
+    );
     let toast_rows = (toasts.len() as u16).min(area.height / 3);
     let reduced = Rect::new(
         area.x,
@@ -68,7 +76,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
             {
                 frame.pulls.push(crate::pulled::Key::new(
                     state,
-                    &request,
+                    &request.on(bingo_sdk::render::SurfaceName::Terminal),
                     area.width,
                     regions.activity.height,
                 ));
@@ -466,25 +474,27 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     }
     let rows = area.height as usize;
     let state = tree.viewed();
-    frame.height = frame.blocks.sync(
+    let rows_config = transcript::Rows::of(
         state,
-        &tree.agents(),
-        &transcript::Rows::of(
-            state,
-            area.width as usize,
-            &ui.folds,
-            &ui.catalogs.commands,
-            &frame.measurements,
-            &ui.linked,
-            now,
-        )
-        .in_tree(tree)
-        .components(&ui.placed.pulled)
-        .saying(ui.welcome.update.as_deref())
-        .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
-        .opening(ui.focus.intro().map(|intro| intro.seconds(now)))
-        .measuring(ui.measure),
-    );
+        area.width as usize,
+        &ui.folds,
+        &ui.catalogs.commands,
+        &frame.measurements,
+        &ui.linked,
+        now,
+    )
+    .in_tree(tree)
+    .components(&ui.placed.pulled)
+    .saying(ui.welcome.update.as_deref())
+    .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
+    .opening(ui.focus.intro().map(|intro| intro.seconds(now)))
+    .measuring(ui.measure);
+    frame.height = frame.blocks.sync(state, &tree.agents(), &rows_config);
+    if ui.scroll.top(frame.height, rows, now.instant) < frame.blocks.welcome_rows()
+        && let Some(key) = crate::component::welcome::request(&rows_config)
+    {
+        frame.pulls.push(key);
+    }
     frame.top = ui.scroll.top(frame.height, rows, now.instant);
     component_requests(state, ui, frame, area);
     crate::component::closing::requests(state, ui, frame, area.width, area.height, now);

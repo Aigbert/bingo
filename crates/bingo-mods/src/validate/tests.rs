@@ -334,3 +334,33 @@ fn sealed_site_diagnostics_name_the_contract_at_the_matcher() {
     );
     assert!(!result.findings.iter().any(|f| f.rule == Rule::SealedSite));
 }
+
+#[test]
+fn component_surface_warning_names_the_unasked_site() {
+    let result = checked(
+        "const matcher = {component: ['Compaction', 'Reasoning'], surface: ['desktop', 'paper']}; export const register = on => on('ui.render', matcher, ($, e, next) => next(e));",
+        "",
+    );
+    let warnings: Vec<_> = result
+        .findings
+        .iter()
+        .filter(|finding| finding.rule == Rule::ComponentSurface)
+        .collect();
+    assert_eq!(warnings.len(), 2);
+    assert!(
+        warnings
+            .iter()
+            .all(|finding| finding.severity == Severity::Warning
+                && finding.text.starts_with("paper never asks for "))
+    );
+    let supported = checked(
+        "export const register = on => on('ui.render', {component:'Compaction', surface:['terminal','desktop','text']}, ($, e, next) => next(e));",
+        "",
+    );
+    assert!(
+        !supported
+            .findings
+            .iter()
+            .any(|finding| finding.rule == Rule::ComponentSurface)
+    );
+}

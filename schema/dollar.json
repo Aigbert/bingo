@@ -1194,7 +1194,20 @@
         "AbovePrompt",
         "Pane",
         "Permission",
-        "SignIn"
+        "SignIn",
+        "Reasoning",
+        "Compaction",
+        "Rewind",
+        "Interruption",
+        "QuestionAnswer",
+        "PermissionReceipt",
+        "Asset",
+        "ShellRun",
+        "Action",
+        "TurnProgress",
+        "SessionStatus",
+        "Toast",
+        "Welcome"
       ]
     },
     "Session": {

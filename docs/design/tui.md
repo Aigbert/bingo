@@ -534,3 +534,5 @@ A collapsed pane is `<title> ▸` on the status right; clicking tries an overlay
 Unasked panes wait as `1 pane waiting`. The focused title’s `place ▾` and
 `alt+p` cycle fitting places; moves last for the surface process. Pointer
 scrolling and selection belong to the topmost pane under the pointer.
+
+2026-10-14 · M159 (ADR-0082 §§1–5): transcript facts, turn progress, session status, toasts and welcome are component sites; Spinner keeps its word/message/ellipsis contract, pulled requests name the asking surface, and the built-in pixels stay unchanged.

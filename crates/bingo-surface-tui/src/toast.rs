@@ -80,12 +80,43 @@ impl State {
         let until = toast.until.checked_add(paused).ok()?;
         (until > now.wall).then(|| until.duration_since(now.wall).unsigned_abs())
     }
-    pub fn lines(&self, state: &SessionState, now: Now, width: usize) -> Vec<Line<'static>> {
-        placed(state)
+    pub fn components(
+        &self,
+        now: Now,
+        site: &mut crate::component::Site<'_>,
+    ) -> Vec<Line<'static>> {
+        placed(site.state)
             .iter()
             .filter(|toast| self.remaining(toast, now).is_some())
-            .map(|toast| Line::from(Span::styled(views::clip(&toast.text, width), theme::text())))
+            .flat_map(|toast| {
+                let props = bingo_sdk::component::Props::Toast(bingo_sdk::component::ToastProps {
+                    text: toast.text.clone(),
+                    until: toast.until,
+                    alert: toast.alert,
+                });
+                site.draw(&toast.key, &props, |props, width| {
+                    let bingo_sdk::component::Props::Toast(props) = props else {
+                        return Vec::new();
+                    };
+                    vec![Line::from(Span::styled(
+                        views::clip(&props.text, width),
+                        theme::text(),
+                    ))]
+                })
+            })
             .collect()
+    }
+    #[cfg(test)]
+    pub fn lines(&self, state: &SessionState, now: Now, width: usize) -> Vec<Line<'static>> {
+        self.components(
+            now,
+            &mut crate::component::Site {
+                state,
+                memo: &crate::pulled::Memo::default(),
+                width,
+                pulls: &mut Vec::new(),
+            },
+        )
     }
     pub fn next(&self, state: &SessionState, now: Now) -> Option<Instant> {
         placed(state)
