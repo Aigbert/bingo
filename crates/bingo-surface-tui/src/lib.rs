@@ -334,3 +334,14 @@ mod identity;
 
 #[cfg(test)]
 mod crew_contract;
+
+/// Draw a mod test's terminal tree without exposing terminal-library types.
+pub fn drawn(_view: &bingo_sdk::View, _width: usize) -> Vec<String> { Vec::new() }
+#[cfg(test)]
+mod author_kit_tests {
+    #[test]
+    fn drawn_uses_terminal_layout_and_marks_nested_engine_nodes() {
+        let view = bingo_sdk::View::column(vec![bingo_sdk::View::text("header"), bingo_sdk::View::Engine { component: bingo_sdk::render::Component::AbovePrompt, props: serde_json::json!({}) }]);
+        assert_eq!(super::drawn(&view,80),["header","⟨AbovePrompt⟩"]);
+    }
+}

@@ -454,3 +454,44 @@ fn the_models_spawn_agent_call_crosses_the_agent_noun_chain() {
         .collect();
     assert!(frames.iter().any(|frame| matches!(&frame.event,bingo_sdk::Event::ItemCompleted {item} if matches!(&item.body,bingo_sdk::ItemBody::ToolCall {output:Some(output),..} if output.parts.iter().any(|part|part.as_text()==Some("agent noun intercepted"))))));
 }
+
+#[test]
+fn module_tests_report_ndjson_and_use_the_real_host() {
+    let home = tempfile::tempdir().unwrap();
+    let plugin = home.path().join("kit");
+    std::fs::create_dir(&plugin).unwrap();
+    std::fs::write(
+        plugin.join("plugin.json"),
+        r#"{"name":"kit","version":"1","module":"main.ts","uses":["session"]}"#,
+    )
+    .unwrap();
+    std::fs::write(plugin.join("main.ts"), "export const register = on => {};").unwrap();
+    std::fs::write(plugin.join("main.test.ts"), "import {test,expect} from 'bingo/testing'; test('real host', async $ => expect(await $.session.id()).not.toBe(undefined)); test('wrong', () => expect(1).toBe(2));").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+        .args(["plugins", "test"])
+        .arg(&plugin)
+        .arg("--json")
+        .envs(home::home_env(home.path()))
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let lines: Vec<serde_json::Value> = String::from_utf8(output.stdout)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(
+        lines.len(),
+        2,
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(lines[0]["outcome"]["status"], "pass");
+    assert_eq!(lines[1]["outcome"]["status"], "fail");
+    assert!(
+        lines[1]["outcome"]["at"]
+            .as_str()
+            .unwrap()
+            .contains("main.test.ts:")
+    );
+}
