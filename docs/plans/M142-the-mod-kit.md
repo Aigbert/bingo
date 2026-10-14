@@ -1,101 +1,61 @@
 # M142 — The mod kit
 ## Goal
-ADR-0078 §8 for a mod. `bingo plugins validate` reads the module the way
-the runtime will (oxc), lists what it hooks and calls, and refuses what
-cannot be checked statically. `bingo plugins test` runs `*.test.ts` in
-process against the real host and the fake provider; `bingo/testing`
-supplies `test`, `expect`, `mock.*` and `$.ui.mount`. Types land in
-`.bingo/types/` on load: `'bingo'` exports `Register`, each event's types
-under Claude Code's names, and the helpers M141 shipped. M133's
-scenarios give way to tests. Re-verified at `ba70fdf6` (2026-10-14). Landed dependencies: M137
+ADR-0078 §8: AST validation, isolated in-process tests against the real host,
+and live author types on module load. Replace M133 scenarios with tests.
+Re-verified at `ba70fdf6` (2026-10-14). Landed dependencies: M137
 (`c1d95e8c`), M138 (`5581b978`), M139 (`686ad289`), M140 (`ba70fdf6`),
 M147 (`6e3b1b03`), M148 (`fddb62f3`), M149 (`b2bee6f4`), M150
-(`a2f77d96`); M133's author CLI and M136's catalogue are also present.
-M141's helpers and `tool-call`, `band`, `pane` examples are absent:
-finish all independent work (including ts-status and type output) first;
-then stop if dev lacks `merge: M141`, pending the person's merge instruction.
+(`a2f77d96`); M133/M136 are present. M141 helpers/examples are absent:
+finish independent work first, then stop pending the person's merge instruction.
 ## Bricks, in build order
-1. **Contract: findings and reports, tests first.** `bingo-mods`
-   `validate/` answers `Finding { file, line, column, rule, text }`, rule
-   one of `on-literal`, `dollar-static`, `state-key`, `env-name`, `uses`,
-   `state-contract`, `prop-subset`, `import`. One fixture mod per rule in
-   `crates/bingo-mods/tests/fixtures/validate/<rule>/` with its
-   `expected.json`; M141's examples and M140's `counter` come out clean.
-   A test run answers `Report { file, test, outcome: Pass | Fail {
-   message, at } | Skip }`, one line each or NDJSON (`--json`). All fail
-   first.
-2. **The reader, pure over the AST.** One walker per rule, over oxc's AST
-   at M137's pinned version, reading every file of the module graph:
-   `hooks.rs` (each `on(…)` in `register`: a literal pattern or a `const`
-   bound to one, a literal matcher), `dollar.rs` (every `$` chain static;
-   no `$[x]`; `$` never aliased to a variable; passing `$` to a function
-   is allowed, since that function's file is read too), `keys.rs` (the
-   first argument of `$.state.*`, `$.store.*`, `$.env.*` and `atom(…)` a
-   literal), `uses.rs` (an unsafe noun of ADR-0078 §5 called but not in
-   the manifest's `uses` is an error; a `uses` never called, a warning),
-   `contract.rs` (`types/index.d.ts`'s `interface PluginState { '<plugin>':
-   {…} }` holds every literal state key; no file, a warning), `props.rs`
-   (a JSX prop outside M140's drawn subset, read from `bingo_sdk`'s table,
-   is named as a warning: the surface ignores it). Alongside the findings
-   it lists hooked events, `$` calls, keys and `uses`.
-3. **`bingo plugins validate <dir>`** dispatches on the manifest:
-   `entry.command` keeps M133's spawn-and-handshake, `module` runs brick 2 and
-   spawns nothing. One `file:line:col rule text` line per finding, then
-   the listing; exit 0 or 1.
-4. **`bingo/testing`.** A built-in module of the runtime (beside M137's
-   `bingo`), `crates/bingo-mods/js/testing.ts` embedded with
-   `include_str!`, its host half in `testing.rs`. `test`, `describe`;
-   `expect(v)` with `toBe`, `toEqual`, `toMatchObject`, `toContain`,
-   `toThrow`, `rejects`, `not`. `mock.clock` (`set`, `advance`: tokio's
-   paused time, which M138's `$.clock` runs on), `mock.store` (seed, read back), `mock.env` (the map
-   `$.env` reads under test), `mock.session({ model, cwd })` (the
-   `bingo-provider-fake` script and the session's facts), and `reload()`
-   (M137's reload path, now, so no test waits on a poll). The module
-   exists only under `plugins test`; a session never sees it.
-5. **`$.ui.mount`**, in `mount.rs`: `mount(component | { pane: id }, props?,
-   { columns = 80, rows = 24 })` asks `HostApi::render` as the `terminal`
-   surface and answers a handle: `tree()`, `drawn()`, `find(text | key)`,
-   `press(key)`, `input(key, text)`, `select(key, value)`, `advance(ms)`,
-   `resize(columns, rows)`. A press fires the minted `Action` through
-   `Input::Action`, as the TUI does, then renders again on
-   `Invalidated`. `drawn()` is the TUI's own drawing as plain text: the
-   TUI crate exports `pub fn drawn(&View, width) -> Vec<String>` (no
-   ratatui type crosses), and the bin hands it to `bingo-mods` as a
-   function, so the plugin imports no surface. An `Engine` node draws as
-   `⟨Component⟩`, so a test can see what a hook wrapped.
-6. **`bingo plugins test <dir> [--json]`.** The bin's `plugins/test.rs`
-   builds the real host with `FakeProvider` as M133's scenario runner
-   did, finds `**/*.test.{ts,tsx}` outside `.bingo/`, and runs each file
-   in a fresh `Runtime` and session. Budgets hold as in a session: a hung
-   test dies at the hook budget, named. Exit 0, or 1 naming each failing
-   test with `file:line`.
-7. **Scenarios go.** `ts-status`'s `scenarios/acceptance.json` becomes
-   `hooks/register.test.ts`, run in process though the example still
-   ships its node entry (one module, two transports). Deleted:
-   `crates/bingo/src/plugins/scenario.rs`, `schema/plugin-scenario.json`
-   and their cases in `tests/plugin_kit.rs`, which now runs `plugins
-   test`.
-8. **Types on load.** `types.rs` renders through `bingo-schema-ts`
-   (M133), writing only when the bytes differ:
-   `.bingo/types/bingo/index.d.ts` — `'bingo'` exports `Register`, each
-   event's types under Claude Code's names (the live catalogue's kernel,
-   op and noun events), `$`, the elements with M140's drawn subset, and
-   `atom`/`derive`/`read`/`update`/`memberOf`, as M137 brick 6 says;
-   `bingo/testing.d.ts`; `bingo-tools/index.d.ts` (this host's tool
-   inputs, from their schemas); `.bingo/tsconfig.json` (`jsxFactory: h`,
-   `jsxFragmentFactory: Fragment`, `paths` for `bingo`, `bingo-tools`);
-   `.bingo/.gitignore` of `*`. A root `tsconfig.json` extending it only
-   when the mod has none. A failed write is one notice, never a failed
-   load.
-9. **Tests for what exists.** `sdk/typescript/src/state.test.ts` tests
-   M141's helpers under `bingo plugins test sdk/typescript` (the
-   `ifVersion` retry, `derive`'s memo, `memberOf`); `tool-call`, `band`
-   and `pane` each gain a `*.test.ts` that M146 runs again.
+1. **Contracts first.** `Finding { file, line, column, rule, severity, text }`;
+   rules: `on-literal`, `dollar-static`, `state-key`, `env-name`, `uses`,
+   `state-contract`, `prop-subset`, `import`. Each has an `expected.json`
+   fixture; counter and the examples are clean. `Report { file, test,
+   outcome: Pass | Fail { message, at } | Skip }` emits text or NDJSON.
+2. **AST reader.** Reuse M137's pinned oxc across the resolved module graph.
+   `hooks.rs` resolves literal/const patterns and literal matchers;
+   `dollar.rs` refuses computed access, aliases and stored members, permits
+   passing `$`; `keys.rs` requires literal state/store/env/atom keys;
+   `uses.rs` checks unsafe nouns against declared uses and warns on unused
+   uses; `contract.rs` checks state keys against `types/index.d.ts`'s
+   `PluginState` (missing file warns); `props.rs` warns outside the SDK's
+   drawn JSX subset. List hooked events, calls, keys and uses.
+3. **Validate CLI.** Module manifests use the AST reader without spawning;
+   process manifests keep M133's handshake. Emit `file:line:col rule text`
+   and the listing, exit 0 or 1.
+4. **Test runtime.** Embed `bingo/testing` only for `plugins test`, with
+   `test`, `describe`, `expect` (`toBe`, `toEqual`, `toMatchObject`,
+   `toContain`, `toThrow`, `rejects`, `not`), `mock.clock.set/advance`,
+   `mock.store.seed/read`, `mock.env`, `mock.session({ model, cwd })`,
+   and immediate `reload()`. Use real grants and isolated state; tokio
+   paused time drives timers, and the mock clock supplies wall timestamps.
+5. **Mount.** `$.ui.mount(component | { pane: id }, props?, size?)` pulls
+   `HostApi::render` as terminal (default 80x24). Handle: `tree`, `drawn`,
+   `find`, `press`, `input`, `select`, `advance`, `resize`; dispatch minted
+   actions via `Input::Action` and rerender on `Invalidated`. The bin
+   injects TUI `drawn(&View, width) -> Vec<String>`; no plugin imports a
+   surface. Engine nodes draw as `⟨Component⟩`; no style snapshot.
+6. **Test CLI.** The bin builds the real host with FakeProvider, discovers
+   `**/*.test.{ts,tsx}` outside generated/vendor trees, and runs each file
+   in a fresh runtime/session. Hook budgets name hung tests. Exit 1 names
+   the failing test and `file:line`; `--json` emits one report per line.
+7. **Replace scenarios.** ts-status gains `hooks/register.test.ts` while
+   retaining its node transport. Delete scenario runner/schema/assertion
+   helpers and `schema/plugin-scenario.json`; migrate plugin-kit cases.
+8. **Types on load.** Use `bingo-schema-ts` and write only changed bytes:
+   `.bingo/types/bingo/` exports Register, live kernel/op/noun event types,
+   Dollar, the drawn elements and M141's atom/derive/read/update/memberOf;
+   also emit testing types, `bingo-tools` input schemas, `.bingo/tsconfig.json`
+   (h/Fragment JSX factories and paths) and `.bingo/.gitignore` (`*`).
+   Create a root extending config only if absent. Write failure is a notice.
+9. **M141 last.** Add helper tests in `sdk/typescript/src/state.test.ts`
+   (`ifVersion` retry, derive memo, memberOf) and tool-call/band/pane tests.
 ## Files
 - `crates/bingo-mods/src/validate/`, `{testing,mount,types}/` or `.rs`,
   `js/testing.ts`, `tests/fixtures/validate/` and kit contract tests (new)
 - `crates/bingo-mods/src/{lib,load,strip,engine,thread,module,manager,plugin}.rs`,
-  `thread.js`, `dollar/{runtime,env,clock}.rs`: load/test/type integration
+  `thread.js`, `manager/reload.rs`, `dollar/runtime.rs`: load/test/type integration
 - `crates/bingo-mods/Cargo.toml`: promote existing `bingo-schema-ts` to
   a normal library dependency for types on load; enable tokio test-util
   for the isolated test clock (no new external crate)
@@ -114,22 +74,15 @@ then stop if dev lacks `merge: M141`, pending the person's merge instruction.
 - `crates/bingo/tests/plugin_kit.rs`; `tests/fixtures/mods/counter/types/index.d.ts`
   adds the state contract required for the existing counter to validate cleanly.
 ## Exit criteria
-- [ ] `cargo test -p bingo-mods validate::`: each rule's fixture yields
-      its `expected.json`; the examples and `counter` yield none.
-- [ ] `bingo plugins validate examples/plugins/pane` exits 0 with its
-      listing; the `on-literal` fixture exits 1 at `file:line:col`. Pasted.
-- [ ] `bingo plugins test` exits 0 on `band`, `pane`, `tool-call`,
-      `ts-status` and `sdk/typescript`; a wrong `expect` exits 1 naming
-      the test and `file:line`; `--json` output parses line by line.
-      Pasted.
-- [ ] `pane.test.ts` mounts the pane, runs two tool calls through the
-      fake provider, presses, and asserts `drawn()`. Pasted.
-- [ ] A second load of a mod leaves `.bingo/types` untouched (mtimes
-      pasted); `tsc --noEmit -p examples/plugins/pane` passes on a local
-      run, pasted once.
-- [ ] `rg -n 'plugin-scenario|scenario::' crates schema` prints nothing.
-- [ ] Every gate; `scripts/budget.sh` unchanged in crates (oxc came with
-      M137); the Windows check of `bingo-mods` and `bingo`.
+- [x] Validator fixtures, counter and ts-status pass; invalid on-literal exits 1.
+- [x] ts-status acceptance, wrong expect/source position, NDJSON and mount actions pass.
+- [x] Second load preserves generated-type mtimes; isolated sample passes tsc.
+- [x] Old scenario references are absent; native gates and isolated TUI smoke pass.
+- [ ] M141 band/pane/tool-call validate and pass their new tests; dependency absent.
+- [ ] Pane test runs two fake tool calls, presses and asserts drawn(); dependency absent.
+- [ ] `bingo plugins test sdk/typescript` covers helpers; M141 helpers absent.
+- [ ] `tsc --noEmit -p examples/plugins/pane`; M141 pane absent.
+- [ ] Full Windows checks: SDK/core pass; native C dependencies deferred to Windows CI.
 ## Non-goals
 - Hot reload itself (ADR-0078 §7, M137); `bingo plugins new`; publishing.
 - Snapshot files (`toMatchSnapshot`), coverage, watch mode, npm imports.
@@ -137,31 +90,50 @@ then stop if dev lacks `merge: M141`, pending the person's merge instruction.
 - Tests for a process plugin in another language: it tests itself with
   its own tools, and the scenarios are not kept for it.
 ## Risks
-- **validate is a lint, not a sandbox.** `$` passed into a function and
-  used dynamically there is caught only because that file is read too;
-  an escape through data (`$` stored in an object) is refused as an
-  alias. The grants (ADR-0078 §5) still enforce at run time.
-- **`drawn()` drops style.** A test about colour asserts `tree()`.
-- **`mock.clock` and budgets.** Budgets count a hook's own time through
-  the interrupt handler, not tokio time, so `advance` cannot trip
-  one; a test pins that.
-- **Writing into a project.** A project mod gains `.bingo/` on load; its
-  `.gitignore` keeps it out of commits.
-- Runtime seams verified: `load::Root` embeds `bingo`; `thread::initialize`
-  registers hooks; `ModsPlugin::reload` uses the existing manager boundary.
-  `strip` already builds oxc semantic nodes; reuse that pinned AST version.
-  `dollar::table::ROWS` owns unsafe methods; `view::table::ELEMENTS` owns
-  drawn props. `views::render` can stay private behind `drawn` in TUI lib.
-  M138 timers use tokio time, but `clock.now` uses a wall timestamp:
-  the test clock must supply both through a test-only runtime seam.
-- Standing delegate decisions: scoped pre-release protocol-2 amendments
-  may regenerate the baseline with a dated ADR-0075 line; exhaustive-match
-  arms outside Files are mechanical and recorded. Keep discipline 4c;
-  neither sdk nor kernel names a tool. No live/credential tests.
-- Generated files use `BINGO_UPDATE_SCHEMA=1`. M141/M151 generated-file
-  overlap is reconciled only after the person authorizes merging dev.
+- Validation is a lint, not a sandbox; runtime grants remain authoritative.
+  Passing `$` is allowed; storing it or a noun/method alias is rejected.
+- `drawn()` drops style; inspect tree() for style. Mock clock advances tokio
+  time and wall timestamps; hook/host-operation budgets use real elapsed time.
+- Types write into `.bingo/`, ignored locally; existing author tsconfig is preserved.
+- Scoped protocol-2 amendments use a dated ADR-0075 note and BINGO_UPDATE_SCHEMA=1.
+  No SDK/kernel tool names, discipline 4c changes, live or credential tests.
+- Live type schemas need enumeration: additive `CatalogKind::Events` on
+  HostApi::catalog reads kernel entries and registered faces, without a new verb.
+- **Stopped 2026-10-14:** dev `6fad64ce` has no `merge: M141`. Independent
+  work is verified. Wait for the person's instruction to merge dev, then add
+  the three example tests and helper tests, reconcile shared generated files,
+  and rerun affected verification. No merge, push or PR performed; ADR §8 stays pending.
 
-Re-verification (2026-10-14): `HostApi::service_wire(key)` resolves a known
-noun but cannot enumerate live faces. Type output uses an additive `events`
-catalogue kind on the existing read door. Exhaustive consumer arms are
-mechanical; generated files are regenerated, not hand-edited.
+## Verified (2026-10-14)
+- `cargo test -p bingo-mods fixtures_pin_each_rule_and_its_source_location --locked` → red before implementation: empty findings, expected on-literal finding.
+- `cargo test -p bingo-mods --test testing testing_module_runs_matchers_and_reports_each_outcome --locked` → red: test runtime is not installed; implemented suite now passes.
+- `cargo test -p bingo-mods interaction_keeps_the_minted_action_and_sets_only_its_value --locked` → red: no matching handler; implemented test passes.
+- `cargo test -p bingo --test plugin_kit module_tests_report_ndjson_and_use_the_real_host --locked` → red: unknown --json, exit 2; implemented test passes.
+- `cargo test -p bingo-surface-tui drawn_uses_terminal_layout_and_marks_nested_engine_nodes --locked` → red: empty drawing; implemented test passes.
+- `cargo test -p bingo-core event_catalogue_includes_kernel_and_late_service_schemas --locked` → red: unknown events catalogue kind; implemented test passes.
+- `cargo test -p bingo-mods writes_event_and_tool_types_once_and_keeps_the_authors_tsconfig --locked` → red: missing generated file; implemented test passes.
+- `cargo test -p bingo-mods passing_a_noun_or_method --locked` → red: 0 findings, expected 2; fixed and passed.
+- `cargo test -p bingo-mods validate:: --locked` → 5 passed, including all eight rule fixtures, counter and ts-status.
+- `cargo test -p bingo --test plugin_kit --locked` → 18 passed; ts-status, NDJSON, wrong expect, mounted actions, mock clock/env, grants and equal second-load mtimes.
+- `target/debug/bingo plugins validate examples/plugins/ts-status` → exit 0; tool.call/tool.check; store.get/store.set/ui.status; store:calls; uses store/ui.
+- `target/debug/bingo plugins validate crates/bingo-mods/tests/fixtures/validate/on-literal` → exit 1; register.tsx:1:31 on-literal.
+- `node /Users/yexrob/.npm/_npx/397d2194ba975aaa/node_modules/typescript/bin/tsc --noEmit -p /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/bingo-m142-types-qabrvd1_/typed` → exit 0; disposable generated-type sample.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk the_committed_catalogue_is_generated --locked` → passed; regenerated catalogue.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc the_committed_schema_is_this_document --locked` → passed; regenerated protocol schemas.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc '_ts::' --locked` → 2 passed; regenerated TypeScript.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods schema_and_types_are_generated_from_the_same_rows --locked` → passed; regenerated dollar files.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc schema:: --locked` → 4 passed; regenerated RPC schema.
+- `cargo fmt --all -- --check` → exit 0.
+- `cargo check --workspace --all-targets --locked` → exit 0.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings` → exit 0 after fixing new-code cast, slice clone and item-order lints.
+- `cargo test --workspace --locked` → exit 0; 5312 passed, 0 failed, 5 existing manual/stress/storyboard tests ignored; final rerun passed.
+- `scripts/check_discipline.sh` → exit 0; discipline ok; kernel names no tool; no new test-driver length warnings.
+- `scripts/budget.sh` → exit 0; 411/411 dependencies, core 0s, relink 0; target/debug 9 GB soft-limit warning.
+- `cargo deny check` → exit 0; advisories, bans, licenses and sources ok.
+- `cargo check -p bingo-sdk -p bingo-core -p bingo-mods -p bingo-plugin-rpc -p bingo-surface-tui -p bingo --all-targets --locked --target x86_64-pc-windows-msvc` → exit 101; aws-lc-sys missing Windows headers; rquickjs-sys MSVC flags require clang driver mode.
+- `cargo check -p bingo-sdk -p bingo-core --all-targets --locked --target x86_64-pc-windows-msvc` → exit 0.
+- `CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo-mods --all-targets --locked --target x86_64-pc-windows-msvc` → exit 101; rquickjs-sys stdlib.h and aws-lc-sys windows.h absent; deferred to Windows CI.
+- `cargo check -p bingo-plugin-rpc -p bingo-surface-tui --all-targets --locked --target x86_64-pc-windows-msvc` → exit 101; aws-lc-sys headers absent; these crates and bin deferred to Windows CI.
+- `scripts/tui-smoke.sh` → exit 0; tui-smoke ok; private tmux socket/temp home cleaned by the script.
+- `rg -n 'plugin-scenario|scenario::' crates schema` → exit 1, no matches.
+- `git log dev --oneline --grep='merge: M141'` → no matches at dev 6fad64ce; M141-dependent work deferred.
