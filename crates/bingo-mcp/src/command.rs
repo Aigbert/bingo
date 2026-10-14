@@ -94,8 +94,11 @@ impl McpCommand {
                         "approval requires person input",
                     ));
                 }
-                self.manager.approve(server, &cx.host).await?;
-                format!("approved {server}; dialling it")
+                if self.manager.approve(server, &cx.host).await? {
+                    format!("approved {server}; dialling it")
+                } else {
+                    format!("approved {server}; remains disabled")
+                }
             }
             Verb::Tools => return self.tools(server).await,
             Verb::Login => self.login(server, cx).await?,

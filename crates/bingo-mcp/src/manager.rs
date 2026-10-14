@@ -23,7 +23,6 @@ use crate::tool::McpTool;
 /// answering, waiting for a person to sign in, out of action with a reason, or
 /// switched off.
 enum State {
-    Waiting(bingo_sdk::Waiting),
     Connecting,
     Connected(Box<Connection>),
     /// The server answered `401` and this run holds no credential it accepts
@@ -43,6 +42,7 @@ enum State {
 struct Slot {
     epoch: u64,
     state: State,
+    waiting: Option<bingo_sdk::Waiting>,
 }
 
 /// What `/mcp` says about a server: the state with the live connection left
@@ -104,7 +104,14 @@ impl Manager {
                 } else {
                     State::Connecting
                 };
-                (name.clone(), Slot { epoch: 0, state })
+                (
+                    name.clone(),
+                    Slot {
+                        epoch: 0,
+                        state,
+                        waiting: None,
+                    },
+                )
             })
             .collect();
         let auth = crate::auth::handles(
@@ -127,7 +134,7 @@ impl Manager {
             .filter(|entry| entry.key == crate::SETTING)
         {
             if let Some(slot) = self.slots.get_mut().get_mut(&entry.name) {
-                slot.state = State::Waiting(entry);
+                slot.waiting = Some(entry);
             }
         }
         self
@@ -136,12 +143,13 @@ impl Manager {
         self: &Arc<Self>,
         name: &str,
         host: &bingo_sdk::HostHandle,
-    ) -> Result<(), bingo_sdk::KernelError> {
+    ) -> Result<bool, bingo_sdk::KernelError> {
         let (request, epoch) = {
             let slots = self.slots.read().await;
             let Some(Slot {
-                state: State::Waiting(entry),
+                waiting: Some(entry),
                 epoch,
+                ..
             }) = slots.get(name)
             else {
                 return Err(bingo_sdk::KernelError::new(
@@ -162,18 +170,26 @@ impl Manager {
             let mut slots = self.slots.write().await;
             slots
                 .get_mut(name)
-                .filter(|slot| slot.epoch == epoch && matches!(slot.state, State::Waiting(_)))
-                .map(begin)
+                .filter(|slot| slot.epoch == epoch && slot.waiting.is_some())
+                .and_then(|slot| {
+                    slot.waiting = None;
+                    if matches!(slot.state, State::Disabled) {
+                        None
+                    } else {
+                        Some(begin(slot))
+                    }
+                })
         };
-        self.spawn_dial(name, claimed);
-        Ok(())
+        Ok(self.spawn_dial(name, claimed))
     }
     pub async fn waiting(&self, name: &str) -> bool {
-        matches!(
-            self.slots.read().await.get(name).map(|slot| &slot.state),
-            Some(State::Waiting(_))
-        )
+        self.slots
+            .read()
+            .await
+            .get(name)
+            .is_some_and(|slot| slot.waiting.is_some())
     }
+
     pub fn bind(&self, host: &bingo_sdk::HostHandle) {
         let _ = self.host.set(Arc::downgrade(&host.0));
     }
@@ -211,12 +227,12 @@ impl Manager {
             let slot = slots.get_mut(name).ok_or_else(|| {
                 bingo_sdk::ServiceError(format!("MCP server {name} is not configured"))
             })?;
+            if slot.waiting.is_some() {
+                return Err(bingo_sdk::ServiceError(format!(
+                    "MCP server {name} waits for your yes; /mcp approve {name}"
+                )));
+            }
             match slot.state {
-                State::Waiting(_) => {
-                    return Err(bingo_sdk::ServiceError(format!(
-                        "MCP server {name} waits for your yes; /mcp approve {name}"
-                    )));
-                }
                 State::Disabled => {
                     return Err(bingo_sdk::ServiceError(format!(
                         "MCP server {name} is disabled"
@@ -314,7 +330,7 @@ impl Manager {
             .iter()
             .map(|(name, slot)| Line {
                 server: name.clone(),
-                status: status_of(&slot.state),
+                status: status_of(slot),
                 auth: self.auth.get(name).map(|auth| auth.status()),
             })
             .collect()
@@ -355,9 +371,7 @@ impl Manager {
         let claimed = {
             let mut slots = self.slots.write().await;
             match slots.get_mut(name) {
-                Some(slot) if !matches!(slot.state, State::Disabled | State::Waiting(_)) => {
-                    Some(begin(slot))
-                }
+                Some(slot) if !off(slot) => Some(begin(slot)),
                 _ => None,
             }
         };
@@ -369,7 +383,9 @@ impl Manager {
         let claimed = {
             let mut slots = self.slots.write().await;
             match slots.get_mut(name) {
-                Some(slot) if matches!(slot.state, State::Disabled) => Some(begin(slot)),
+                Some(slot) if slot.waiting.is_none() && matches!(slot.state, State::Disabled) => {
+                    Some(begin(slot))
+                }
                 _ => None,
             }
         };
@@ -384,7 +400,7 @@ impl Manager {
         let Some(slot) = slots.get_mut(name) else {
             return false;
         };
-        if matches!(slot.state, State::Disabled | State::Waiting(_)) {
+        if off(slot) {
             return false;
         }
         slot.epoch += 1;
@@ -419,7 +435,7 @@ impl Manager {
         let slots = self.slots.read().await;
         slots
             .iter()
-            .filter(|(_, slot)| matches!(slot.state, State::Connecting))
+            .filter(|(_, slot)| slot.waiting.is_none() && matches!(slot.state, State::Connecting))
             .map(|(name, slot)| (name.clone(), slot.epoch))
             .collect()
     }
@@ -552,14 +568,16 @@ fn first_line(description: &str) -> String {
 
 /// Whether a person has switched this server off.
 fn off(slot: &Slot) -> bool {
-    matches!(slot.state, State::Disabled | State::Waiting(_))
+    slot.waiting.is_some() || matches!(slot.state, State::Disabled)
 }
 
-fn status_of(state: &State) -> Status {
-    match state {
-        State::Waiting(entry) => Status::Waiting {
+fn status_of(slot: &Slot) -> Status {
+    if let Some(entry) = &slot.waiting {
+        return Status::Waiting {
             changed: entry.changed,
-        },
+        };
+    }
+    match &slot.state {
         State::Connecting => Status::Connecting,
         State::Connected(connection) => Status::Connected {
             tools: connection.tools.len(),
@@ -780,6 +798,49 @@ mod tests {
 #[cfg(test)]
 mod approval_tests {
     use super::*;
+    #[tokio::test]
+    async fn approving_a_disabled_server_records_yes_without_dialling() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = Arc::new(
+            Manager::new(
+                bingo_http::client(bingo_http::Bounds::CALL).unwrap(),
+                BTreeMap::from([(
+                    "repo".into(),
+                    Server::Stdio {
+                        command: "must-never-spawn".into(),
+                        args: vec![],
+                        env: BTreeMap::new(),
+                        cwd: None,
+                        tool_timeout: None,
+                    },
+                )]),
+                &["repo".into()],
+                dir.path().into(),
+            )
+            .with_waiting(vec![bingo_sdk::Waiting {
+                root: dir.path().into(),
+                key: crate::SETTING.into(),
+                name: "repo".into(),
+                changed: false,
+            }]),
+        );
+        assert!(manager.waiting("repo").await);
+        assert!(!manager.enable("repo").await);
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_approve(|request| async move {
+            assert_eq!(request.what, "mcpServers:repo");
+            Ok("sha256:yes".into())
+        });
+        manager.approve("repo", &host.handle()).await.unwrap();
+        assert!(!manager.waiting("repo").await);
+        assert_eq!(manager.lines().await[0].status, Status::Disabled);
+        assert!(manager.pending().await.is_empty());
+        assert!(manager.rows().await.is_empty());
+        assert!(manager.connect("repo").await.is_err());
+        assert!(!manager.reconnect("repo").await);
+        manager.shutdown().await;
+    }
+
     #[tokio::test]
     async fn every_dial_and_export_path_refuses_a_waiting_server() {
         let dir = tempfile::tempdir().unwrap();
