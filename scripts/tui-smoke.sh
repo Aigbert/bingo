@@ -521,8 +521,7 @@ keys 'pick a route' Enter
 await 'Which route?'
 if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
 await 'something else'
-keys x
-await 'ctrl+g back to it'
+press_until x 'ctrl+g back to it'
 pane
 keys C-g
 press_until '2' 'Question done.'
