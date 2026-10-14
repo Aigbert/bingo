@@ -319,7 +319,11 @@ fn a_colliding_instance_name_is_skipped_and_named() {
         ),
     ] {
         let file = settings(home.path(), value);
-        let out = run(bingo_with(home.path(), &file).args(["--print", "--provider", "fake", "hi"]));
+        let script = home.path().join("script.json");
+        std::fs::write(&script, r#"{"responses":[{"steps":[{"text":"hello"}]}]}"#).unwrap();
+        let out = run(bingo_with(home.path(), &file)
+            .env("BINGO_FAKE_SCRIPT", &script)
+            .args(["--print", "--provider", "fake", "hi"]));
         assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
         let notice = stderr(&out);
         assert!(

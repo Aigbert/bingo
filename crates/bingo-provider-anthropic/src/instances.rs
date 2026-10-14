@@ -16,10 +16,8 @@ use crate::settings::{AnthropicEndpoint, Settings};
 use crate::{API_KEY_ENV, AnthropicProvider, BASE_URL_ENV, DEFAULT_BASE_URL, PROVIDER_ID};
 use bingo_auth_oauth::key::{ApiKey, Configured, Places};
 
-/// The ids this build answers to before any instance is read. A plugin sees
-/// its own settings only, so a name that collides with *another* plugin's
-/// instance is caught one layer up, where the registry refuses the second
-/// provider of a name and the boot fails with it.
+/// Local reservations are checked before construction; the host skips any
+/// remaining collision across plugins without preventing unrelated providers.
 const BUILT_IN: [&str; 4] = ["anthropic", "codex", "fake", "openai"];
 
 /// Every provider the `anthropic` key names, the default first.

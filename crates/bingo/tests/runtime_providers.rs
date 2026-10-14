@@ -367,3 +367,63 @@ async fn adding_refuses_foreign_credentials_and_invalid_secret_arguments() {
     );
     no_secret(&server.sessions_dir());
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn boot_skips_foreign_credentials_and_reserves_disabled_families() {
+    let endpoint = endpoint("unused").await;
+    let home = tempfile::tempdir().unwrap();
+    let data = home.path().join(".bingo/data");
+    std::fs::create_dir_all(&data).unwrap();
+    let original = json!({
+        "channels.telegram":{"type":"api", "key":KEY},
+        "occupied":{"type":"api", "key":KEY,"owner":"another-service"}
+    })
+    .to_string();
+    std::fs::write(data.join("auth.json"), &original).unwrap();
+    std::fs::write(
+        home.path().join(".bingo/settings.json"),
+        json!({
+            "enabledPlugins":{"bingo.provider.openai":false},
+            "anthropic":{"instances":{
+                "channels.telegram":{"baseUrl":endpoint.uri()},
+                "occupied":{"baseUrl":endpoint.uri()}
+            }}
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let mut server = Server::spawn_at(home, IDLE, &[]);
+    let kernel = ready(&mut server).await;
+    let listed = kernel.catalog(CatalogKind::Providers).await.unwrap();
+    for name in ["channels.telegram", "occupied", "openai", "codex"] {
+        assert!(
+            !listed.entries.iter().any(|entry| entry.id == name),
+            "unexpected provider {name}"
+        );
+    }
+    let mut session = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    let outcome = command(
+        &mut session,
+        &format!("/provider add openai anthropic {}", endpoint.uri()),
+    )
+    .await;
+    assert!(!matches!(outcome, IntentOutcome::Applied { .. }));
+    applied(&mut session, "/models refresh").await;
+    assert!(endpoint.received_requests().await.unwrap().is_empty());
+    assert_eq!(
+        std::fs::read_to_string(data.join("auth.json")).unwrap(),
+        original
+    );
+    kernel.shutdown().await.unwrap();
+    assert!(
+        tokio::time::timeout(LIMIT, server.child.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
+    );
+    no_secret(&server.sessions_dir());
+}
