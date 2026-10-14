@@ -136,9 +136,22 @@ fn status_keys_preserve_escape_and_live_config_preserves_the_row() {
     assert!(
         matches!(&effects[..], [crate::effect::Effect::Submit(Input::Action { action, .. })] if action.args["event"] == "close")
     );
+    // Exercise the live pulled site, not the snapshot test's pre-rendered tree.
+    state.signals.get_mut("bingo.mod.status").unwrap().insert("status".into(), bingo_mod_status_slot());
     state.apply(&frame(2, started("running")));
     assert_eq!(
         crate::input::on_key(&mut ui, &solo(&state), escape, now),
         vec![crate::effect::Effect::Interrupt]
     );
+}
+
+fn bingo_mod_status_slot() -> serde_json::Value {
+    slot::with(json!({}), [Slot::Pane {
+        id: "status".into(), title: String::new(), focus: true, close_on_escape: true,
+        hold_toasts: true, asked: true, place: slot::above(), size: PaneSize::from_rows(12),
+        view: Shown::Pull { request: render::PullRequest {
+            component: render::Component::Status, request_id: "status".into(), props: json!({}),
+            viewport: render::Viewport { place: None, columns: 0, rows: 0 },
+        } },
+    }])
 }

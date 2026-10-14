@@ -292,3 +292,16 @@ fn revalidating_pane_keeps_art_and_clips_to_the_current_seat() {
         .answer(next, bingo_sdk::View::text("NEW ART"));
     assert!(draw_sized(80, 24, &state, &mut ui, now).contains("NEW ART"));
 }
+
+#[test]
+fn escape_keeps_an_ordinary_panes_close_behavior_during_a_turn() {
+    use crate::effect::Effect;
+    use bingo_sdk::Input;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    let mut state = state_with(json!(["above"]));
+    state.apply(&frame(1, started("running")));
+    let (mut ui, now) = scene();
+    ui.sync_panes(&state);
+    let effects = crate::input::on_key(&mut ui, &solo(&state), KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE), now);
+    assert!(matches!(&effects[..], [Effect::Submit(Input::Action { action })] if action.args["event"] == "close"));
+}

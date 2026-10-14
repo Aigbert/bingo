@@ -311,7 +311,8 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
         ui.focus = Focus::Composer;
         return Vec::new();
     };
-    if key.code == KeyCode::Esc && state.busy() {
+    if key.code == KeyCode::Esc && state.busy()
+        && matches!(&pane.view, Shown::Pull { request } if request.component == bingo_sdk::render::Component::Status) {
         return vec![Effect::Interrupt];
     }
     if key.code == KeyCode::Esc {
