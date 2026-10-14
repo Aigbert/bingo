@@ -26,12 +26,18 @@ keep their resolved endpoint; credentials never enter errors or recorded input.
   Existing credential entries block add and name `/provider remove <name>` as recovery.
 - Round 2 moves the nonempty `[A-Za-z0-9_-]+` rule to SDK, shared by core and boot claims.
   Invalid names are skipped before construction, with notices that cannot echo secrets.
-- Named stored credentials now carry a family owner. Foreign or unmarked legacy entries
-  skip boot construction; ownership cannot safely be inferred. Built-in formats stay
-  compatible. Scoped reads/writes/removal reject another owner; CLI also stamps ownership.
+- Round 3 binds stored keys to canonical scheme/host/port, and OAuth to issuer plus
+  resource origins. Paste, wizard, login and refresh stamp metadata; every request checks
+  it, including cached tokens. Mismatches keep providers built but signed out and name
+  the resolved origin and override file. No repository baseUrl approval is needed.
+- Legacy named entries gain missing metadata only from exactly one user-layer family
+  declaration, using that layer's addresses before merging. Project/local never adopt.
+  Default legacy entries use user-layer addresses or the shipped defaults; never overrides.
+  Existing metadata is retained. Explicit legacy API-key and Codex regressions remain.
 - Reserved names include registered providers/shapes and all shipped families, switched
   on or off, supplied by binary config. Boot collisions skip instances with notices;
-  late providers take precedence. The kernel contains no vendor name list.
+  late providers take precedence. Notices name the instance, winning plugin/family and
+  declaration file to rename/delete. The kernel contains no vendor name list.
 - Scheme/host/port changes clear stored and user-layer keys and request Login Paste;
   same-origin paths retain them. No keep-key option. Any non-user layer holding apiKey
   blocks an origin change and names its file, including keys shadowed by higher layers.
@@ -42,10 +48,14 @@ keep their resolved endpoint; credentials never enter errors or recorded input.
   installed Arc, rejecting stale results while accepting plugin-rpc's fresh adapters.
 - Removal clears the saved provider/model default and matching pins in one write, and
   names the cleared fields. Live pins clear under their writer lock. Re-adding a name
-  cannot revive the boot default. With no registered provider, remove deletes an orphan.
+  cannot revive the boot default. Orphan removal also checks the owner family's declarations
+  in every layer, including disabled families, and compares ownership again at deletion.
 - Removal stops live sessions at their next request with AuthRequired naming removal,
   including configured keys and same-origin clones. The guide states this limitation.
 - Codex session selection retains ADR-0012's fallback; live probes still report failure.
+- Registration receives provenance only for its claimed settings, plus user-instance
+  counts for unambiguous adoption. Unreadable auth.json produces one notice and supplies
+  no keys; invalid names and foreign owners name the skipped declaration file.
 - Login answers are private. Journal, queue previews and TUI history redact every
   `/provider` argument before validation. Reach exposes categories; addresses strip secrets.
 - ProviderState groups registry facts; mutation/command locks serialize edits. Project-only

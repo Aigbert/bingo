@@ -65,6 +65,9 @@ impl RemoteProvider {
 
 #[async_trait]
 impl Provider for RemoteProvider {
+    fn plugin(&self) -> Option<&str> {
+        Some(&self.plugin)
+    }
     fn id(&self) -> &str {
         &self.spec.id
     }

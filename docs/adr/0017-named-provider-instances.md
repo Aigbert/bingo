@@ -13,6 +13,8 @@ The settings hold one endpoint per wire shape — `openai`, `anthropic`, `codex`
 5. **A codex instance logs in exactly as `codex` does** — same issuer and flows, its own store entry. Nothing about OAuth changes but the key under which the tokens rest.
 6. **`bingo provider add` writes the settings entry a person would otherwise edit in.** At the binary edge (the `bingo login` precedent: a terminal prompter, `anyhow` allowed), it asks for a name, a shape (`openai` | `anthropic`), a base url and — optionally, hidden — a key; the instance lands in the **user** settings layer, the key in `auth.json`, and the closing line says `bingo --provider <name>`. Registration stays a boot-time fact: the command runs before a kernel exists, so nothing is hot-added and no provider source is invented. The settings file is round-tripped as JSON (`preserve_order`); a file that does not parse is left untouched and the command says so.
 
+**M165 amendment (2026-10-15):** Stored credentials carry their family owner and canonical origin (`scheme://host:port`); OAuth also binds the resource-server origin. Every resolution, request and refresh checks those bindings. An address override leaves the provider built but signed out and names the override file. Legacy named entries may acquire missing metadata only from an unambiguous user-layer declaration, never from project/local layers.
+
 ## Consequences
 
 - Crates touched: `bingo-provider-openai`, `bingo-provider-anthropic` (instance loops, paste login, resolution order), black-box tests in `crates/bingo/tests/cli/login.rs` territory. `bingo-auth-oauth`, `bingo-core`, `bingo-sdk`, the bin: untouched.

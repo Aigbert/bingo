@@ -121,6 +121,11 @@ pub struct ModelInfo {
 
 #[async_trait]
 pub trait Provider: Send + Sync {
+    /// The external plugin that contributed this provider, when applicable.
+    fn plugin(&self) -> Option<&str> {
+        None
+    }
+
     /// The provider id configuration refers to (`anthropic`, `openai`, `codex`, `fake`).
     fn id(&self) -> &str;
 

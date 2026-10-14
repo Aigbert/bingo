@@ -1,6 +1,6 @@
 //! Live replacements and removals; sessions keep their previously resolved Arc.
 use bingo_sdk::{Provider, ProviderShape};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
@@ -14,19 +14,23 @@ pub(super) struct ProviderState {
 #[derive(Default)]
 pub(super) struct Instances {
     entries: Mutex<BTreeMap<String, Option<Arc<dyn Provider>>>>,
-    skipped: Mutex<BTreeSet<String>>,
+    skipped: Mutex<BTreeMap<String, String>>,
     pub edit: tokio::sync::Mutex<()>,
     pub command: tokio::sync::Mutex<()>,
 }
 
 impl Instances {
-    pub fn gather(&self, mut providers: Vec<Arc<dyn Provider>>) -> Vec<Arc<dyn Provider>> {
+    pub fn gather(
+        &self,
+        mut providers: Vec<Arc<dyn Provider>>,
+        message: impl Fn(&dyn Provider, &dyn Provider) -> String,
+    ) -> Vec<Arc<dyn Provider>> {
         let entries = self.entries.lock().unwrap_or_else(|p| p.into_inner());
         providers.retain(|p| !p.instance() || !entries.contains_key(p.id()));
         for (name, entry) in entries.iter() {
-            if providers.iter().any(|p| p.id() == name && !p.instance()) {
-                if entry.is_some() {
-                    self.skip(name);
+            if let Some(winner) = providers.iter().find(|p| p.id() == name && !p.instance()) {
+                if let Some(held) = entry {
+                    self.skip(name, message(held.as_ref(), winner.as_ref()));
                 }
             } else if let Some(provider) = entry {
                 providers.push(provider.clone());
@@ -35,26 +39,19 @@ impl Instances {
         providers
     }
 
-    pub fn skip(&self, name: &str) {
+    pub fn skip(&self, name: &str, message: String) {
         self.skipped
             .lock()
             .unwrap_or_else(|p| p.into_inner())
-            .insert(name.into());
+            .insert(name.into(), message);
     }
 
     pub fn notices(&self) -> Vec<(String, String)> {
         self.skipped
             .lock()
             .unwrap_or_else(|p| p.into_inner())
-            .iter()
-            .map(|name| {
-                (
-                    "provider.instance".into(),
-                    format!(
-                        "Skipped instance `{name}`: that name belongs to a registered provider."
-                    ),
-                )
-            })
+            .values()
+            .map(|message| ("provider.instance".into(), message.clone()))
             .collect()
     }
 
@@ -91,6 +88,32 @@ pub(super) fn address(raw: &str) -> Option<String> {
             format!("/{path}")
         }
     ))
+}
+
+pub(super) fn collision(
+    instance: &dyn Provider,
+    winner: &str,
+    layers: &[crate::settings::Layer],
+    fallback: &str,
+) -> String {
+    let name = instance.id();
+    let family = instance.shape().unwrap_or_else(|| instance.family());
+    let file = layers
+        .iter()
+        .rev()
+        .find(|layer| {
+            layer
+                .value
+                .get(family)
+                .and_then(|v| v.get("instances"))
+                .and_then(|v| v.get(name))
+                .is_some()
+        })
+        .map(|layer| layer.source.as_str())
+        .unwrap_or(fallback);
+    format!(
+        "Skipped instance `{name}` in family `{family}`: plugin `{winner}` provides that name; rename or delete the `{family}` declaration in {file}."
+    )
 }
 
 #[cfg(test)]

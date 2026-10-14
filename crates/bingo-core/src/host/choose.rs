@@ -24,14 +24,28 @@ impl Host {
         .await;
         let instances = &self.registry.provider_state.instances;
         for held in self.registry.providers.iter().filter(|p| p.instance()) {
-            if providers
+            if let Some(winner) = providers
                 .iter()
-                .any(|p| p.id() == held.id() && !p.instance())
+                .find(|p| p.id() == held.id() && !p.instance())
             {
-                instances.skip(held.id());
+                instances.skip(
+                    held.id(),
+                    self.instance_collision(held.as_ref(), winner.as_ref()),
+                );
             }
         }
-        instances.gather(providers)
+        instances.gather(providers, |held, winner| {
+            self.instance_collision(held, winner)
+        })
+    }
+
+    fn instance_collision(&self, held: &dyn Provider, winner: &dyn Provider) -> String {
+        super::instances::collision(
+            held,
+            winner.plugin().unwrap_or_else(|| winner.family()),
+            &self.config.layers,
+            &self.config.env.user_settings().display().to_string(),
+        )
     }
 
     /// The provider `id` names; with none, the settings' provider; with

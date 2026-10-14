@@ -329,6 +329,15 @@ async fn colliding_boot_instances_never_prevent_a_host_build() {
 async fn a_late_provider_takes_precedence_over_a_boot_instance() {
     let dir = tempfile::tempdir().unwrap();
     let source = ScriptedProviderSource::new(vec![]);
+    let mut config = HostConfig::new(Env::rooted(dir.path()));
+    config.layers.push(settings::Layer::new(
+        settings::LayerOrigin::Explicit,
+        "/repo/provider-settings.toml",
+        json!({"local":{"instances":{"scripted":{}}}})
+            .as_object()
+            .unwrap()
+            .clone(),
+    ));
     let host = Host::build(
         vec![TestPlugin::boxed(
             &PROVIDER,
@@ -340,12 +349,23 @@ async fn a_late_provider_takes_precedence_over_a_boot_instance() {
                 Contribution::Providers(source.clone()),
             ],
         )],
-        HostConfig::new(Env::rooted(dir.path())),
+        config,
     )
     .await
     .unwrap();
     source.set(vec![ScriptedProvider::new(vec![])]);
     assert!(!host.provider(Some("scripted")).await.unwrap().instance());
+    let notices = host.notices();
+    let notice = notices
+        .iter()
+        .find(|(code, _)| code == "provider.instance")
+        .unwrap();
+    assert!(
+        notice.1.contains("/repo/provider-settings.toml"),
+        "{notice:?}"
+    );
+    assert!(notice.1.contains("plugin `scripted`"), "{notice:?}");
+    assert!(notice.1.contains("rename or delete"), "{notice:?}");
 }
 
 #[tokio::test]

@@ -88,6 +88,7 @@ async fn a_plugin_s_provider_serves_the_models_it_declared() {
     let (manager, _home, _project) = started(&[]).await;
     let provider = only_provider(&manager).await;
     assert_eq!(provider.id(), "stub");
+    assert_eq!(provider.plugin(), Some("stub"));
     assert_eq!(provider.family(), "stub", "it declared no other shelf");
     let models = provider.models().await.expect("the declared models");
     assert_eq!(models.len(), 1);

@@ -144,7 +144,7 @@ impl Registry {
         }
         for contribution in registrar.into_contributions() {
             declared_service(manifest, &contribution)?;
-            self.add(manifest.id, contribution)?;
+            self.add(manifest.id, contribution, layers)?;
         }
         Ok(())
     }
@@ -153,6 +153,7 @@ impl Registry {
         &mut self,
         plugin: &str,
         contribution: Contribution,
+        layers: &[crate::settings::Layer],
     ) -> Result<(), HostError> {
         let conflict = |what: String| HostError::Conflict {
             plugin: plugin.to_string(),
@@ -164,7 +165,7 @@ impl Registry {
                 self.sources.tools.push(source);
                 Ok(())
             }
-            Contribution::Agent(agent) => self.add_agent(agent),
+            Contribution::Agent(agent) => self.add_agent(agent, plugin, layers),
             Contribution::ProviderShape(shape) => {
                 if self.provider_state.shapes.contains_key(shape.id()) {
                     Err(format!(
@@ -178,7 +179,7 @@ impl Registry {
                     Ok(())
                 }
             }
-            Contribution::Provider(provider) => self.add_provider(provider),
+            Contribution::Provider(provider) => self.add_provider(provider, plugin, layers),
             Contribution::Providers(source) => {
                 self.sources.providers.push(source);
                 Ok(())
@@ -258,15 +259,27 @@ impl Registry {
         self.agents.iter().any(|endpoint| endpoint.id() == name)
     }
 
-    fn add_provider(&mut self, provider: Arc<dyn Provider>) -> Result<(), String> {
-        let collision = self.providers.iter().find(|p| p.id() == provider.id());
+    fn add_provider(
+        &mut self,
+        provider: Arc<dyn Provider>,
+        plugin: &str,
+        layers: &[crate::settings::Layer],
+    ) -> Result<(), String> {
+        let collision = self
+            .providers
+            .iter()
+            .find(|p| p.id() == provider.id())
+            .cloned();
         if collision.is_some() || self.endpoint_name_taken(provider.id()) {
             if provider.instance() {
-                self.skip_instance(provider.id());
+                let winner = collision
+                    .as_ref()
+                    .map_or(plugin, |p| p.plugin().unwrap_or_else(|| p.family()));
+                self.skip_instance(provider.as_ref(), winner, layers);
                 return Ok(());
             }
-            if collision.is_some_and(|p| p.instance()) {
-                self.skip_instance(provider.id());
+            if let Some(held) = collision.filter(|p| p.instance()) {
+                self.skip_instance(held.as_ref(), plugin, layers);
                 self.providers.retain(|p| p.id() != provider.id());
             } else {
                 return Err(format!("provider {} is already registered", provider.id()));
@@ -276,34 +289,49 @@ impl Registry {
         Ok(())
     }
 
-    fn skip_instance(&mut self, id: &str) {
+    fn skip_instance(
+        &mut self,
+        instance: &dyn Provider,
+        winner: &str,
+        layers: &[crate::settings::Layer],
+    ) {
         self.notices.push((
             "provider.instance".into(),
-            format!("Skipped instance `{id}`: that name belongs to a registered provider."),
+            super::instances::collision(instance, winner, layers, "the user settings file"),
         ));
     }
 
-    pub(super) fn reserve_providers(&mut self, names: &BTreeSet<String>) {
-        let skipped: Vec<String> = self
+    pub(super) fn reserve_providers(
+        &mut self,
+        names: &BTreeSet<String>,
+        layers: &[crate::settings::Layer],
+    ) {
+        let skipped: Vec<_> = self
             .providers
             .iter()
             .filter(|p| p.instance() && names.contains(p.id()))
-            .map(|p| p.id().to_string())
+            .cloned()
             .collect();
         self.providers
             .retain(|p| !p.instance() || !names.contains(p.id()));
-        for name in skipped {
-            self.skip_instance(&name);
+        for instance in skipped {
+            self.skip_instance(instance.as_ref(), instance.id(), layers);
         }
     }
 
-    fn add_agent(&mut self, agent: Arc<dyn Agent>) -> Result<(), String> {
-        if self
+    fn add_agent(
+        &mut self,
+        agent: Arc<dyn Agent>,
+        plugin: &str,
+        layers: &[crate::settings::Layer],
+    ) -> Result<(), String> {
+        if let Some(held) = self
             .providers
             .iter()
-            .any(|p| p.id() == agent.id() && p.instance())
+            .find(|p| p.id() == agent.id() && p.instance())
+            .cloned()
         {
-            self.skip_instance(agent.id());
+            self.skip_instance(held.as_ref(), plugin, layers);
             self.providers.retain(|p| p.id() != agent.id());
         }
         if self.providers.iter().any(|p| p.id() == agent.id())
@@ -677,7 +705,7 @@ mod tests {
             let mut registry = Registry::default();
             for _ in 0..2 {
                 registry
-                    .add("test.late", contribute())
+                    .add("test.late", contribute(), &[])
                     .expect("a source never conflicts");
             }
             assert_eq!(count(&registry), 2, "{:?}", contribute());
