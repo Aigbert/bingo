@@ -21,6 +21,19 @@ use crate::settings::{self, SettingsError};
 /// runs. Absent is on (ADR-0057 §1).
 pub const KEY: &str = "enabledPlugins";
 
+pub(crate) fn effective_switches(
+    plugins: &[Box<dyn bingo_sdk::Plugin>],
+    mut off: std::collections::BTreeSet<String>,
+) -> std::collections::BTreeSet<String> {
+    for plugin in plugins
+        .iter()
+        .filter(|plugin| needed(plugin.manifest()).is_some())
+    {
+        off.remove(plugin.manifest().id);
+    }
+    off
+}
+
 /// What a plugin that ignored its switch is said under (ADR-0057 §3).
 pub const NEEDED: &str = "PLUGIN_NEEDED";
 
@@ -169,7 +182,7 @@ pub(crate) async fn switch_in(
         .switches
         .wishes
         .write()
-        .unwrap_or_else(|e| e.into_inner()) = merged.switched_off();
+        .unwrap_or_else(|e| e.into_inner()) = host.effective_switches(merged.switched_off());
     if effective != enabled {
         host.plugins_changed();
         return Ok(Switched::Overridden(effective, source));

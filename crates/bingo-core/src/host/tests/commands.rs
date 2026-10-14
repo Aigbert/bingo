@@ -756,3 +756,39 @@ async fn commented_layers_allow_switches_and_invalid_layers_leave_no_write() {
         host.shutdown().await;
     }
 }
+
+#[tokio::test]
+async fn switching_another_plugin_keeps_required_surfaces_on() {
+    static SURFACE: PluginManifest = PluginManifest {
+        id: "test.surface",
+        version: "0",
+        uses: &[],
+        provides: &["surface:test"],
+        requires: &[],
+        config: None,
+    };
+    let home = tempfile::tempdir().unwrap();
+    let host = Host::build(
+        vec![
+            TestPlugin::boxed(&SURFACE, vec![]),
+            TestPlugin::boxed(&PROVIDER, vec![]),
+        ],
+        HostConfig::new(env_in(home.path()))
+            .with_layer("cli", json!({"enabledPlugins":{"test.surface":false}})),
+    )
+    .await
+    .unwrap();
+    crate::plugins::switch_in(&host, &SessionId::mint(), "test.provider", false)
+        .await
+        .unwrap();
+    let listed = crate::plugins::listing(host.registry()).await;
+    assert_eq!(
+        listed
+            .iter()
+            .find(|row| row.id == "test.surface")
+            .unwrap()
+            .state,
+        PluginState::On
+    );
+    host.shutdown().await;
+}

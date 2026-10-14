@@ -158,7 +158,7 @@ impl Registry {
         let mut registry = Registry {
             notices: ignored_switches(plugins, switched_off),
             switches: Switches {
-                wishes: RwLock::new(switched_off.clone()),
+                wishes: RwLock::new(plugins::effective_switches(plugins, switched_off.clone())),
                 ..Switches::default()
             },
             ..Registry::default()
@@ -198,14 +198,6 @@ impl Registry {
                 registry.links.retain(|link| link.plugin != id);
                 registry.unavailable(id, error.to_string());
             }
-        }
-        for plugin in plugins.iter().filter(|p| needed(p.manifest()).is_some()) {
-            registry
-                .switches
-                .wishes
-                .get_mut()
-                .unwrap_or_else(|e| e.into_inner())
-                .remove(plugin.manifest().id);
         }
         Ok(registry)
     }

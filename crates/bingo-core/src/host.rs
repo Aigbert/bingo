@@ -222,6 +222,12 @@ impl Host {
         }
     }
 
+    pub(crate) fn effective_switches(
+        &self,
+        off: std::collections::BTreeSet<String>,
+    ) -> std::collections::BTreeSet<String> {
+        crate::plugins::effective_switches(&self.plugins, off)
+    }
     pub(crate) fn plugins_changed(&self) {
         for kind in [CatalogKind::Plugins, CatalogKind::Commands] {
             let _ = self.gateway.send(GatewayEvent::CatalogChanged { kind });
