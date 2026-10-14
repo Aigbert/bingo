@@ -241,3 +241,6 @@ mod plugin_tests {
         }
     }
 }
+
+mod menu;
+mod sites;

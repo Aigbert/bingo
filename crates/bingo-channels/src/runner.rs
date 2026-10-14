@@ -36,7 +36,10 @@ struct Asked {
     native: bool,
 }
 
+mod drawing;
+
 pub struct Runner {
+    menu_changes: Option<tokio::sync::watch::Sender<bool>>,
     host: HostHandle,
     adapter: Arc<dyn ChannelAdapter>,
     conversation: Conversation,
@@ -58,6 +61,7 @@ pub struct Runner {
     /// this chat started is running (ADR-0051 §5).
     working: Option<(Posted, Mark)>,
     asked: BTreeMap<InteractionId, Asked>,
+    drawn: BTreeMap<String, (bingo_channel_adapter::drawing::Drawing, Posted)>,
     inbound: mpsc::Receiver<Incoming>,
 }
 
@@ -92,6 +96,7 @@ impl Runner {
             },
         );
         Ok(Self {
+            menu_changes: None,
             host: host.clone(),
             adapter,
             conversation,
@@ -104,9 +109,15 @@ impl Runner {
             directory,
             working: None,
             asked: BTreeMap::new(),
+            drawn: BTreeMap::new(),
             key,
             inbound,
         })
+    }
+
+    pub(crate) fn menus(mut self, changes: tokio::sync::watch::Sender<bool>) -> Self {
+        self.menu_changes = Some(changes);
+        self
     }
 
     pub fn key(&self) -> &str {
@@ -147,11 +158,38 @@ impl Runner {
         if !self.concerns_this_chat(frame) {
             return;
         }
+        if (matches!(&frame.event, Event::CatalogChanged { kind } if kind == "commands")
+            || matches!(frame.event, Event::ConfigChanged { .. }))
+            && let Some(changes) = &self.menu_changes
+        {
+            changes.send_modify(|value| *value = !*value);
+        }
         let Some(state) = self.tree.get(&frame.session) else {
             return;
         };
-        let ops = self.deliverer.apply(frame, state, Instant::now());
+        let input = match &frame.event {
+            Event::IntentAck { intent, .. } => self.deliverer.input(intent).cloned(),
+            _ => None,
+        };
+        let ops = self
+            .deliverer
+            .apply(frame, state, Instant::now())
+            .into_iter()
+            .chain(crate::sites::action_notice(frame, state, input.as_ref()))
+            .map(
+                |op| match crate::sites::request(frame, state, &op, input.as_ref()) {
+                    Some(request) => Op::Site {
+                        request,
+                        fallback: Box::new(op),
+                    },
+                    None => op,
+                },
+            )
+            .collect();
         self.perform(ops).await;
+        if let Event::Invalidated { requests } = &frame.event {
+            self.redraw(requests).await;
+        }
     }
 
     /// A sub-session's prose is its parent's to report; its questions are
@@ -179,6 +217,7 @@ impl Runner {
 
     async fn deliver(&mut self, op: Op) -> Result<(), ChannelError> {
         match op {
+            Op::Site { request, fallback } => self.draw_site(request, *fallback).await,
             Op::Open => self.begin().await,
             Op::Replace { full } => self.replace(&full).await,
             Op::Finalize { text, question } => self.finalize(&text, question).await,
@@ -430,6 +469,13 @@ impl Runner {
             Incoming::Click {
                 question, choice, ..
             } => self.clicked(&question, &choice).await,
+            Incoming::Action {
+                session,
+                request_id,
+                action,
+                value,
+                ..
+            } => self.pressed(session, &request_id, action, value).await,
         }
     }
 
@@ -445,16 +491,14 @@ impl Runner {
             Some((id, answer)) => self.settles(id, answer).await,
             None => {
                 let intent = IntentId::mint();
-                self.handle.submit(
-                    intent.clone(),
-                    Input::Text {
-                        text,
-                        images,
-                        origin: incoming_origin(principal, &self.key),
-                        delivery: Delivery::Wake,
-                    },
-                );
-                self.deliverer.expecting(intent);
+                let input = Input::Text {
+                    text,
+                    images,
+                    origin: incoming_origin(principal, &self.key),
+                    delivery: Delivery::Wake,
+                };
+                self.handle.submit(intent.clone(), input.clone());
+                self.deliverer.expecting_input(intent, input);
                 self.acknowledge().await;
             }
         }
@@ -566,6 +610,7 @@ impl Runner {
         self.streaming = None;
         self.working = None;
         self.asked.clear();
+        self.drawn.clear();
     }
 
     fn answering(&self, text: &str) -> Option<(InteractionId, Answer)> {

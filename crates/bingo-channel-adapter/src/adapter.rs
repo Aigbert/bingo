@@ -33,6 +33,14 @@ pub enum Incoming {
         /// The message a reply would hang under, where the platform threads.
         parent: Option<Posted>,
     },
+    Action {
+        conversation: Conversation,
+        principal: String,
+        session: bingo_sdk::SessionId,
+        request_id: String,
+        action: bingo_sdk::Action,
+        value: Option<serde_json::Value>,
+    },
     Click {
         conversation: Conversation,
         principal: String,
@@ -123,6 +131,18 @@ pub trait ChannelAdapter: Send + Sync {
         text.to_string()
     }
 
+    fn menu(&self) -> Option<&dyn Menu> {
+        None
+    }
+
+    fn mapped_commands(&self) -> Vec<MenuEntry> {
+        Vec::new()
+    }
+
+    fn view_footer(&self, _state: &SessionState) -> String {
+        String::new()
+    }
+
     fn edit(&self) -> Option<&dyn Edit> {
         None
     }
@@ -163,6 +183,16 @@ pub trait Edit: Send + Sync {
 /// Native buttons under a question, and taking them off again.
 #[async_trait]
 pub trait Buttons: Send + Sync {
+    async fn draw(
+        &self,
+        _to: &Conversation,
+        _parent: Option<&Posted>,
+        _at: Option<&Posted>,
+        _drawing: &crate::drawing::Drawing,
+    ) -> Result<Posted, ChannelError> {
+        Err(ChannelError::Unsupported("drawing a view"))
+    }
+
     async fn ask(&self, to: &Conversation, question: &Question) -> Result<Posted, ChannelError>;
 
     /// Buttons stripped, outcome appended (ADR-0016 §3).
@@ -244,4 +274,16 @@ pub struct Mark(pub String);
 pub enum Outcome {
     Done,
     Failed,
+}
+
+/// A platform's per-app command menu. Names do not include the slash.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct MenuEntry {
+    pub name: String,
+    pub description: String,
+}
+
+#[async_trait]
+pub trait Menu: Send + Sync {
+    async fn publish(&self, entries: &[MenuEntry]) -> Result<(), ChannelError>;
 }

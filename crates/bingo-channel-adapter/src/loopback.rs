@@ -22,8 +22,8 @@ use tokio::net::TcpStream;
 use tokio::sync::{mpsc, watch};
 
 use crate::adapter::{
-    Acknowledge, Buttons, ChannelAdapter, ChannelCommand, Edit, Files, Inbox, Incoming, Mark, Mode,
-    Outcome, Outgoing, Threads, Typing,
+    Acknowledge, Buttons, ChannelAdapter, ChannelCommand, Edit, Files, Inbox, Incoming, Mark, Menu,
+    MenuEntry, Mode, Outcome, Outgoing, Threads, Typing,
 };
 use crate::conversation::{Conversation, Posted};
 use crate::error::ChannelError;
@@ -35,6 +35,7 @@ use crate::question::{Choice, Question};
 #[derive(Clone, Debug)]
 pub struct Config {
     pub limits: Limits,
+    pub menu: bool,
     pub edits: bool,
     pub buttons: bool,
     pub typing: bool,
@@ -56,6 +57,7 @@ impl Default for Config {
                 max_actions: 3,
                 max_label: 40,
             },
+            menu: false,
             edits: true,
             buttons: true,
             typing: true,
@@ -71,6 +73,14 @@ impl Default for Config {
 /// One call this adapter was asked to make.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Record {
+    Menu {
+        entries: Vec<MenuEntry>,
+    },
+    Draw {
+        to: Conversation,
+        at: Posted,
+        drawing: crate::drawing::Drawing,
+    },
     Send {
         to: Conversation,
         id: Posted,
@@ -236,6 +246,14 @@ impl Loopback {
                     images: Vec::new(),
                 })
             }
+            "action" => Some(Incoming::Action {
+                conversation,
+                principal,
+                session: serde_json::from_value(value["session"].clone()).ok()?,
+                request_id: value["requestId"].as_str()?.into(),
+                action: serde_json::from_value(value["action"].clone()).ok()?,
+                value: value.get("value").cloned(),
+            }),
             "click" => Some(Incoming::Click {
                 question: InteractionId::from_raw(value["question"].as_str()?),
                 choice: value["choice"].as_str()?.to_string(),
@@ -309,6 +327,10 @@ fn locked<T>(slot: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 /// is a change to what `crates/bingo/tests/channels.rs` asserts.
 fn spoken(record: &Record) -> Value {
     match record {
+        Record::Menu { entries } => json!({"op":"menu","entries":entries}),
+        Record::Draw { to, at, drawing } => {
+            json!({"op":"draw","chat":to.chat,"id":at.as_str(),"drawing":drawing})
+        }
         Record::Send { to, id, text, mode } => json!({
             "op": "send", "chat": to.chat, "thread": to.thread, "id": id.as_str(),
             "text": text, "mode": mode_name(*mode),
@@ -410,6 +432,21 @@ impl ChannelAdapter for Loopback {
         Ok(id)
     }
 
+    fn menu(&self) -> Option<&dyn Menu> {
+        self.config.menu.then_some(self as &dyn Menu)
+    }
+    fn mapped_commands(&self) -> Vec<MenuEntry> {
+        vec![
+            MenuEntry {
+                name: "new".into(),
+                description: "Start a new session".into(),
+            },
+            MenuEntry {
+                name: "stop".into(),
+                description: "Stop the current turn".into(),
+            },
+        ]
+    }
     fn edit(&self) -> Option<&dyn Edit> {
         self.config.edits.then_some(self as &dyn Edit)
     }
@@ -483,6 +520,23 @@ impl Edit for Loopback {
 
 #[async_trait]
 impl Buttons for Loopback {
+    async fn draw(
+        &self,
+        to: &Conversation,
+        _parent: Option<&Posted>,
+        at: Option<&Posted>,
+        drawing: &crate::drawing::Drawing,
+    ) -> Result<Posted, ChannelError> {
+        self.refused("draw")?;
+        let at = at.cloned().unwrap_or_else(|| self.mint());
+        self.record(Record::Draw {
+            to: to.clone(),
+            at: at.clone(),
+            drawing: drawing.clone(),
+        });
+        Ok(at)
+    }
+
     async fn ask(&self, to: &Conversation, question: &Question) -> Result<Posted, ChannelError> {
         self.refused("ask")?;
         let id = self.mint();
@@ -556,6 +610,17 @@ impl Files for Loopback {
             caption: file.caption,
         });
         Ok(id)
+    }
+}
+
+#[async_trait]
+impl Menu for Loopback {
+    async fn publish(&self, entries: &[MenuEntry]) -> Result<(), ChannelError> {
+        self.refused("menu")?;
+        self.record(Record::Menu {
+            entries: entries.to_vec(),
+        });
+        Ok(())
     }
 }
 

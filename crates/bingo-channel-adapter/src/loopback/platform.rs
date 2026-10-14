@@ -55,6 +55,8 @@ pub struct LoopbackChannel {
     pub peer: Option<String>,
     #[serde(default = "yes")]
     pub edits: bool,
+    #[serde(default)]
+    pub menu: bool,
     #[serde(default = "yes")]
     pub buttons: bool,
     #[serde(default = "yes")]
@@ -101,6 +103,7 @@ impl LoopbackChannel {
                 max_actions: self.max_actions,
                 max_label: 40,
             },
+            menu: self.menu,
             edits: self.edits,
             buttons: self.buttons,
             typing: self.typing,

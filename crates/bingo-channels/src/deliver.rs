@@ -26,6 +26,10 @@ use crate::question::{Question, ladder, withdrawn};
 /// What a conversation is asked to do next.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Op {
+    Site {
+        request: bingo_sdk::render::RenderRequest,
+        fallback: Box<Op>,
+    },
     /// A message begins here; the answer streams into it.
     Open,
     /// The whole answer so far — never a delta.
@@ -117,7 +121,7 @@ pub struct Deliverer {
     /// Writes this chat made that the kernel has not answered yet, so a
     /// command's result is posted here and a result earned elsewhere is not
     /// (ADR-0016: the ack carries the intent that caused it).
-    pending: Vec<IntentId>,
+    pending: Vec<(IntentId, Option<bingo_sdk::Input>)>,
 }
 
 impl std::fmt::Debug for Deliverer {
@@ -152,7 +156,21 @@ impl Deliverer {
         if self.pending.len() >= REMEMBERED {
             self.pending.remove(0);
         }
-        self.pending.push(intent);
+        self.pending.push((intent, None));
+    }
+
+    pub fn expecting_input(&mut self, intent: IntentId, input: bingo_sdk::Input) {
+        self.expecting(intent);
+        if let Some((_, saved)) = self.pending.last_mut() {
+            *saved = Some(input);
+        }
+    }
+
+    pub fn input(&self, intent: &IntentId) -> Option<&bingo_sdk::Input> {
+        self.pending
+            .iter()
+            .find(|(id, _)| id == intent)
+            .and_then(|(_, input)| input.as_ref())
     }
 
     /// One frame, already folded into `state` by the caller. For a frame from
@@ -184,7 +202,11 @@ impl Deliverer {
     /// refusal — an unknown command answers nothing else, so dropping the
     /// refusal would leave whoever typed it with silence.
     fn acknowledged(&mut self, intent: &IntentId, outcome: &IntentOutcome) -> Vec<Op> {
-        let Some(at) = self.pending.iter().position(|pending| pending == intent) else {
+        let Some(at) = self
+            .pending
+            .iter()
+            .position(|(pending, _)| pending == intent)
+        else {
             return Vec::new();
         };
         // Queued commands answer again under the same intent when they run.

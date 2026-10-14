@@ -20,3 +20,5 @@ pub use platform::{Platform, Platforms};
 pub mod testing;
 
 pub mod loopback;
+
+pub mod drawing;

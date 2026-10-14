@@ -44,6 +44,7 @@ pub struct ChannelsSurface {
     /// Which chat each of this surface's sessions sits in, for whoever has
     /// only a session id: the tool that posts a file (ADR-0051 §3).
     directory: Directory,
+    menu_changes: tokio::sync::watch::Sender<bool>,
 }
 
 impl std::fmt::Debug for ChannelsSurface {
@@ -68,6 +69,7 @@ impl ChannelsSurface {
             gate,
             access,
             directory: Directory::default(),
+            menu_changes: tokio::sync::watch::channel(false).0,
         }
     }
 
@@ -146,7 +148,7 @@ impl ChannelsSurface {
         )
         .await?;
         let key = runner.key().to_string();
-        tokio::spawn(runner.run());
+        tokio::spawn(runner.menus(self.menu_changes.clone()).run());
         Ok((key, chat))
     }
 
@@ -164,6 +166,11 @@ impl ChannelsSurface {
             } => self.admits(adapter, conversation, principal, *addressed),
             // A click came off a button this surface put there.
             Incoming::Click { conversation, .. } => Some(conversation),
+            Incoming::Action {
+                conversation,
+                principal,
+                ..
+            } => self.admits(adapter, conversation, principal, true),
         }
     }
 
@@ -220,7 +227,9 @@ impl Surface for ChannelsSurface {
         let pumping = futures::future::try_join_all(pumps);
         drop(post);
         let routing = self.route(&host, opts.cwd, arrivals);
+        let menus = crate::menu::run(&host, &self.adapters, &self.menu_changes);
         let outcome = tokio::select! {
+            () = menus => Ok(()),
             outcome = pumping => outcome.map(drop),
             // Every adapter hung up: there is nothing left to listen to.
             () = routing => Ok(()),
