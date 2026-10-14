@@ -377,3 +377,21 @@ fn corrupt_credentials_report_once_without_skipping_instances() {
 }
 
 mod binding;
+
+#[test]
+fn invalid_name_notice_does_not_echo_url_userinfo() {
+    let home = tempfile::tempdir().unwrap();
+    let file = settings(
+        home.path(),
+        serde_json::json!({
+            "openai": {"instances": {"https://user:SECRET@host/path?key=SECRET": {}}}
+        }),
+    );
+    let out = run(bingo_with(home.path(), &file).args(["--print", "--provider", "openai", "hi"]));
+    let notice = stderr(&out);
+    assert!(!notice.contains("SECRET"), "{notice}");
+    assert!(
+        notice.contains("host") && notice.contains(&file.display().to_string()),
+        "{notice}"
+    );
+}

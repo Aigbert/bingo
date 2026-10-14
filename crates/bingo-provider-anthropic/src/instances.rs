@@ -163,6 +163,7 @@ fn allowed(
         .unwrap_or("settings")
         .to_string();
     if let Err(error) = claim(named, name) {
+        let name = bingo_auth_oauth::lifetime::origin(name).unwrap_or_else(|| name.to_string());
         registrar.notice(
             "provider.instance",
             format!("Skipped instance `{name}` in {file}: {error}; rename or delete it there."),

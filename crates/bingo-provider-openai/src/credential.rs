@@ -40,23 +40,25 @@ impl Credential {
     pub fn status(&self) -> AuthStatus {
         match self {
             Credential::Key(key) => key.status(),
-            Credential::Tokens(source) if source.credential_hint().is_some() => {
-                AuthStatus::Missing {
-                    hint: source.credential_hint().unwrap_or_default(),
-                }
-            }
-            Credential::Tokens(source) => match source.status() {
-                Status::SignedIn { .. } => AuthStatus::Ready {
-                    from: Some(bingo_sdk::KeySource::Store),
-                },
-                Status::SignedOut => AuthStatus::Missing {
-                    hint: sign_in(source.provider()),
-                },
-                Status::Expired { .. } => AuthStatus::Expired {
-                    hint: sign_in_again(source.provider()),
-                },
-            },
+            Credential::Tokens(source) => token_status(source),
         }
+    }
+}
+
+fn token_status(source: &TokenSource) -> AuthStatus {
+    if let Some(hint) = source.credential_hint() {
+        return AuthStatus::Missing { hint };
+    }
+    match source.status() {
+        Status::SignedIn { .. } => AuthStatus::Ready {
+            from: Some(bingo_sdk::KeySource::Store),
+        },
+        Status::SignedOut => AuthStatus::Missing {
+            hint: sign_in(source.provider()),
+        },
+        Status::Expired { .. } => AuthStatus::Expired {
+            hint: sign_in_again(source.provider()),
+        },
     }
 }
 

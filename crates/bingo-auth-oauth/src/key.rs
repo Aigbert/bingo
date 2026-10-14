@@ -11,7 +11,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::{CredentialStore, Entry};
+use crate::{AuthError, CredentialStore, Entry};
 use bingo_sdk::{
     Answer, AnswerSpec, AuthStatus, InteractionKind, LoginFlow, LoginMethod, Prompter,
     ProviderError,
@@ -191,11 +191,12 @@ impl ApiKey {
             Ok(None) => self.configured_key().ok_or_else(|| self.hint()),
             // An unreadable store is not a key; a configured one still is,
             // and when there is none the store's error is what to fix.
-            Err(unreadable) => Err(unreadable),
+            Err(AuthError::Binding(message)) => Err(message),
+            Err(error) => self.configured_key().ok_or_else(|| error.to_string()),
         }
     }
 
-    fn stored(&self) -> Result<Option<String>, String> {
+    fn stored(&self) -> Result<Option<String>, AuthError> {
         let Some(store) = &self.store else {
             return Ok(None);
         };
@@ -203,7 +204,7 @@ impl ApiKey {
             Ok(Some(Entry::Api { key })) => Ok(Some(key)),
             // A token set under a key provider's name is not a key.
             Ok(_) => Ok(None),
-            Err(error) => Err(error.to_string()),
+            Err(error) => Err(error),
         }
     }
 
@@ -264,6 +265,42 @@ fn spelling(method: LoginMethod) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unreadable_store_allows_a_configured_key_but_wrong_origin_does_not() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = store(&directory);
+        let scoped = Arc::new(
+            store
+                .owned_by("family")
+                .at_origin("https://one.example", "project.toml"),
+        );
+        let key = ApiKey::new(
+            "work",
+            places(None),
+            scoped.clone(),
+            configured("configured", "settings"),
+        );
+        std::fs::write(store.path(), "{broken").unwrap();
+        assert_eq!(key.bearer().unwrap(), "configured");
+        std::fs::remove_file(store.path()).unwrap();
+        scoped
+            .at_origin("https://two.example", "user.toml")
+            .write(
+                "work",
+                Entry::Api {
+                    key: "stored".into(),
+                },
+            )
+            .unwrap();
+        assert!(matches!(key.status(), AuthStatus::Missing { .. }));
+        assert!(
+            key.bearer()
+                .unwrap_err()
+                .to_string()
+                .contains("project.toml")
+        );
+    }
 
     fn places(variable: Option<&'static str>) -> Places {
         Places {
