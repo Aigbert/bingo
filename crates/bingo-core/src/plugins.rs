@@ -142,14 +142,8 @@ pub fn waiting_reason(id: &str, state: &bingo_sdk::PluginState) -> Option<String
         return None;
     }
     let (command, name) = id.split_once(':')?;
-    if command == "acp" {
-        return Some(format!(
-            "{}; /acp approve {name}",
-            state.reason().unwrap_or_default()
-        ));
-    }
     Some(format!(
-        "{}; /{command} approve {name} (bingo {command} approve {name})",
+        "{}; /{command} approve {name}",
         state.reason().unwrap_or_default()
     ))
 }
@@ -158,6 +152,18 @@ pub fn waiting_reason(id: &str, state: &bingo_sdk::PluginState) -> Option<String
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn waiting_hints_do_not_invent_a_binary_subcommand() {
+        assert_eq!(
+            waiting_reason(
+                "extension:p",
+                &bingo_sdk::PluginState::Waiting { changed: false }
+            )
+            .unwrap(),
+            "waits for your yes; /extension approve p"
+        );
+    }
 
     fn manifest(provides: &'static [&'static str]) -> PluginManifest {
         PluginManifest {

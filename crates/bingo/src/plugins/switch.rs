@@ -306,7 +306,7 @@ fn row(status: &PluginStatus) -> String {
         status.id,
         status.version,
         status.state.label(),
-        bingo_core::plugins::waiting_reason(&status.id, &status.state).unwrap_or_else(|| status
+        super::waiting_reason(status).unwrap_or_else(|| status
             .state
             .reason()
             .unwrap_or_default()

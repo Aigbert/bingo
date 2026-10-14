@@ -24,3 +24,22 @@ pub async fn author(action: &Action) -> Option<Result<i32, KernelError>> {
 fn invalid(why: impl std::fmt::Display) -> KernelError {
     KernelError::new(bingo_sdk::ErrorCode::InvalidInput, why.to_string())
 }
+
+/// Only this binary knows which session commands have a headless twin.
+fn approval_hint(line: String, id: &str) -> String {
+    match id.split_once(':') {
+        Some((command @ ("plugins" | "mcp"), name)) => {
+            format!("{line} (bingo {command} approve {name})")
+        }
+        _ => line,
+    }
+}
+
+pub fn waiting_line(entry: &bingo_sdk::CatalogEntry) -> Option<String> {
+    bingo_core::plugins::waiting_line(entry).map(|line| approval_hint(line, &entry.id))
+}
+
+fn waiting_reason(status: &bingo_sdk::PluginStatus) -> Option<String> {
+    bingo_core::plugins::waiting_reason(&status.id, &status.state)
+        .map(|line| approval_hint(line, &status.id))
+}

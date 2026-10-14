@@ -415,7 +415,7 @@ async fn report_notices(host: &Host) {
         let waiting: Vec<_> = catalog
             .entries
             .iter()
-            .filter_map(bingo_core::plugins::waiting_line)
+            .filter_map(plugins::waiting_line)
             .collect();
         if !waiting.is_empty() {
             eprintln!(
