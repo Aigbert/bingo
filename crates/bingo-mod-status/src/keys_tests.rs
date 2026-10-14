@@ -157,3 +157,23 @@ async fn editable_rows_prefill_instead_of_submitting_bare_commands() {
         assert!(inputs.lock().unwrap().is_empty());
     }
 }
+
+#[tokio::test]
+async fn a_visible_key_resumes_an_expired_card_without_a_session_read() {
+    let state = crate::tests::state();
+    let host = testing::TestHost::default();
+    let cx = CommandContext {
+        session: state.summary.id.clone(),
+        cwd: "/unused".into(),
+        host: host.handle(),
+        cancel: Default::default(),
+    };
+    let selections = Selections::default();
+    let outcome = keys::Handler(selections.clone()).run(&json!({"handler":"status","event":"press","value":{"key":"down"},"selected":"model","rows":rows::rows(&(&state).into(), &[], &[], None)}).to_string(), &cx).await.unwrap();
+    assert_eq!(outcome, CommandOutcome::Handled { handled: true });
+    assert_eq!(selections.lock().unwrap()[&cx.session].label, "context");
+    assert!(matches!(
+        host.calls().as_slice(),
+        [testing::HostCall::Invalidate { .. }]
+    ));
+}

@@ -39,15 +39,13 @@ impl Command for Handler {
         if args["event"] != "press" || !["up", "down", "enter"].contains(&key) {
             return Ok(CommandOutcome::Handled { handled: false });
         }
-        let Some(label) = self
+        let label = self
             .0
             .lock()
             .map_err(error)?
             .get(&cx.session)
             .map(|selection| selection.label.clone())
-        else {
-            return Ok(CommandOutcome::Handled { handled: false });
-        };
+            .unwrap_or_else(|| args["selected"].as_str().unwrap_or("session").into());
         let rows: Vec<Row> = serde_json::from_value(args["rows"].clone()).map_err(error)?;
         if key == "enter" {
             return enter(&rows, &label, cx, &self.0).await;

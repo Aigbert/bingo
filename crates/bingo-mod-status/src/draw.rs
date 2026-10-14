@@ -96,7 +96,7 @@ pub fn tree(rows: &[Row], selected: &str, columns: u16, height: u16, uptime: u64
         layout: Box::new(BoxStyle {
             on_key: Some(Action {
                 name: format!("{ID}:ui"),
-                args: json!({"handler":REQUEST,"event":"press","rows":rows}),
+                args: json!({"handler":REQUEST,"event":"press","rows":rows,"selected":rows.get(selected).map(|row| &row.label)}),
             }),
             ..Default::default()
         }),
