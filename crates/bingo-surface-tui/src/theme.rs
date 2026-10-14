@@ -1031,6 +1031,7 @@ mod tests {
                     "layers.rs",
                     "markdown.rs",
                     "pager.rs",
+                    "pane/draw.rs",
                     "preview.rs",
                     "rewind.rs",
                     "roster.rs",

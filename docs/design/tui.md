@@ -522,3 +522,15 @@ through 1.56 seconds it blinks twice; three embers fade over the following
 0.6 seconds. Facts arrive on a beam from 0.5 to 2.0 seconds. At 2.4 seconds
 the mark rests. Every frame holds the resting row count; a late frame is
 skipped, and the composer never moves.
+
+### 2026-10-14 — Pane places (M151)
+
+An asked pane declares `above`, `side`, `overlay` or an anchored rect, in
+preference order, with row/column minimum, ideal and maximum sizes. Above
+and side leave the transcript 60 columns and 8 rows; one of each fits, with
+at most three floating panes, newest on top. Panes occupy the transcript
+area; the composer, status, permission prompt and toasts remain above them.
+A collapsed pane is `<title> ▸` on the status right; clicking tries an overlay.
+Unasked panes wait as `1 pane waiting`. The focused title’s `place ▾` and
+`alt+p` cycle fitting places; moves last for the surface process. Pointer
+scrolling and selection belong to the topmost pane under the pointer.

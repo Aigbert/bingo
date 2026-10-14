@@ -34,16 +34,17 @@ struct Open {
     close_on_escape: bool,
     #[serde(default)]
     hold_toasts: bool,
-    #[serde(default = "rows")]
-    rows: u16,
+    #[serde(default)]
+    rows: Option<u16>,
+    #[serde(default = "bingo_sdk::slot::above")]
+    place: Vec<bingo_sdk::slot::Place>,
+    #[serde(default)]
+    size: Option<bingo_sdk::slot::PaneSize>,
     #[serde(default)]
     props: Value,
 }
 fn yes() -> bool {
     true
-}
-fn rows() -> u16 {
-    8
 }
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 struct Close {
@@ -164,8 +165,9 @@ async fn open(caller: &Caller, input: Open) -> Result<Value, ServiceError> {
         surface: SurfaceName::Terminal,
         props: input.props,
         viewport: Viewport {
+            place: None,
             columns: 0,
-            rows: input.rows,
+            rows: 0,
         },
     };
     let slot = Slot::Pane {
@@ -175,9 +177,15 @@ async fn open(caller: &Caller, input: Open) -> Result<Value, ServiceError> {
         close_on_escape: input.close_on_escape,
         hold_toasts: input.hold_toasts,
         asked: render::asked(),
-        rows: input.rows,
+        place: input.place,
+        size: input
+            .size
+            .unwrap_or_else(|| bingo_sdk::slot::PaneSize::from_rows(input.rows.unwrap_or(8))),
         view: Shown::Pull { request },
     };
+    if !slot.published_ok() {
+        return Err(ServiceError("invalid pane place or size".into()));
+    }
     place(
         caller,
         Place {

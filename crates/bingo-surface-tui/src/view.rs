@@ -40,26 +40,22 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let activity = activity::lines(tree, ui, area.width as usize, now);
     let toasts = ui.placed.toasts.lines(state, now, usize::from(area.width));
     let toast_rows = (toasts.len() as u16).min(area.height / 3);
-    let pane_rows = crate::pane::height(ui, state, area.height);
     let reduced = Rect::new(
         area.x,
         area.y,
         area.width,
-        area.height.saturating_sub(toast_rows + pane_rows),
+        area.height.saturating_sub(toast_rows),
     );
     let mut regions = frame::regions(reduced, demand(&draft, &strip, &activity));
-    let pane_area = Rect::new(area.x, regions.strip.y, area.width, pane_rows);
-    regions.strip.y += pane_rows;
-    regions.composer.y += pane_rows;
-    regions.status.y += pane_rows + toast_rows;
+    regions.status.y += toast_rows;
     let toast_area = Rect::new(
         area.x,
         regions.status.y.saturating_sub(toast_rows),
         area.width,
         toast_rows,
     );
-    frame.render_widget(Paragraph::new(toasts), toast_area);
-    crate::pane::draw(ui, state, frame, pane_area, now);
+    frame.seating = crate::pane::seating(ui, state, regions.transcript);
+    regions.transcript = frame.seating.transcript;
     if !ui.activity_hidden {
         for placed in bingo_sdk::slot::placed(state) {
             if let bingo_sdk::slot::Slot::Activity {
@@ -81,11 +77,13 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     render_activity(ui, frame, regions.activity, activity);
     render_strip(frame, regions.strip, strip);
     render_composer(tree.viewed(), ui, frame, regions.composer, now, draft);
+    crate::pane::draw(ui, state, frame, now);
     render_status(tree, ui, frame, regions.status, now);
     if matches!(ui.focus, crate::focus::Focus::Pane(_)) {
         frame.cursor = None;
     }
     layers(tree, ui, frame, regions, now);
+    frame.render_widget(Paragraph::new(toasts), toast_area);
 }
 
 /// What the frame must make room for before the transcript is given the rest.
@@ -129,26 +127,8 @@ fn render_status(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now)
     if area.height == 0 {
         return;
     }
+    let area = crate::pane::status(ui, tree.viewed(), frame, area);
     let width = area.width as usize;
-    let waiting = crate::pane::waiting(ui, tree.viewed());
-    if !waiting.is_empty() && ui.focus.search().is_none() {
-        let mut x = area.x;
-        let mut spans = Vec::new();
-        for pane in waiting {
-            let text = views::clip(
-                &format!("{} (waiting)  ", pane.title),
-                usize::from(area.right().saturating_sub(x)),
-            );
-            let cells = text.width() as u16;
-            frame
-                .waiting
-                .push((pane.key, Rect::new(x, area.y, cells, 1)));
-            spans.push(Span::styled(text, theme::dim()));
-            x += cells;
-        }
-        frame.render_widget(Paragraph::new(Line::from(spans)), area);
-        return;
-    }
     let line = match ui.focus.search() {
         Some(search) => search::row(search),
         None => {
