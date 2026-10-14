@@ -79,6 +79,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn component_props_are_published_for_wire_clients() {
+        let schema = document();
+        for name in [
+            "QuestionProps",
+            "UserMessageProps",
+            "AssistantMessageProps",
+            "ToolUseProps",
+            "ToolResultProps",
+            "ToolGroupProps",
+            "ToolProgressProps",
+            "CommandOutputProps",
+            "SpinnerProps",
+            "TurnDurationProps",
+            "InfoNoticeProps",
+            "SessionModeProps",
+            "PromptHintProps",
+            "AbovePromptProps",
+            "PaneProps",
+        ] {
+            assert!(schema["$defs"].get(name).is_some(), "missing {name}");
+        }
+    }
+
+    #[test]
     fn ui_render_is_an_additive_protocol_one_method() {
         let schema = document();
         assert_eq!(schema["protocol"], 1);

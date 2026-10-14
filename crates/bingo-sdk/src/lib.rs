@@ -9,6 +9,7 @@ pub mod agent;
 pub mod bytes;
 pub mod command;
 pub mod compactor;
+pub mod component;
 pub mod contributor;
 pub mod error;
 pub mod event;

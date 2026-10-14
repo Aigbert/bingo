@@ -1,0 +1,136 @@
+[
+  {
+    "component": "Question",
+    "props": {
+      "tool": "question",
+      "questions": []
+    }
+  },
+  {
+    "component": "UserMessage",
+    "props": {
+      "text": "hello",
+      "origin": {
+        "surface": "terminal"
+      },
+      "isExpanded": false
+    }
+  },
+  {
+    "component": "AssistantMessage",
+    "props": {
+      "text": "answer",
+      "isFirstOfReply": true
+    }
+  },
+  {
+    "component": "ToolUse",
+    "props": {
+      "tool_use_id": "call",
+      "tool": "sample",
+      "input": {},
+      "isRunning": true,
+      "isErrored": false,
+      "isInterrupted": false
+    }
+  },
+  {
+    "component": "ToolResult",
+    "props": {
+      "tool_use_id": "call",
+      "tool": "sample",
+      "output": "done",
+      "isErrored": false
+    }
+  },
+  {
+    "component": "ToolGroup",
+    "props": {
+      "calls": [],
+      "isActive": false,
+      "isExpanded": false
+    }
+  },
+  {
+    "component": "ToolProgress",
+    "props": {
+      "tool_use_id": "call",
+      "kind": "background_hint",
+      "hint": "wait"
+    }
+  },
+  {
+    "component": "CommandOutput",
+    "props": {
+      "command": "sample",
+      "args": "",
+      "text": "done",
+      "isErrored": false
+    }
+  },
+  {
+    "component": "Spinner",
+    "props": {
+      "word": "Kindling",
+      "message": null,
+      "suffix": "…",
+      "mode": "requesting"
+    }
+  },
+  {
+    "component": "TurnDuration",
+    "props": {
+      "word": "Worked",
+      "durationMs": 3000
+    }
+  },
+  {
+    "component": "InfoNotice",
+    "props": {
+      "text": "ready",
+      "command": null
+    }
+  },
+  {
+    "component": "SessionMode",
+    "props": {
+      "modes": []
+    }
+  },
+  {
+    "component": "PromptHint",
+    "props": {
+      "isDraft": false,
+      "isWorking": false,
+      "hint": "? for shortcuts"
+    }
+  },
+  {
+    "component": "AbovePrompt",
+    "props": {
+      "hasSurvey": false,
+      "isWorking": false,
+      "maxRows": 8,
+      "bodyColumns": 80,
+      "scroll": {
+        "offset": 0,
+        "bodyRows": 8
+      },
+      "view": {}
+    }
+  },
+  {
+    "component": "Pane",
+    "props": {
+      "title": "Calls",
+      "isFocused": true,
+      "bodyColumns": 80,
+      "placement": "inline",
+      "scroll": {
+        "offset": 0,
+        "bodyRows": 8
+      },
+      "view": {}
+    }
+  }
+]
