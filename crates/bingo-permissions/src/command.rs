@@ -126,7 +126,8 @@ mod tests {
                         current: "plan".into(),
                         modes: vec![],
                     }],
-                ),
+                )
+                .into(),
             );
         let policy = Arc::new(PermissionsPolicy::new(crate::Permissions::default(), None).unwrap());
         let command = PermissionCommand::new(policy);
