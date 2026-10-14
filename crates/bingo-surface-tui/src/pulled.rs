@@ -29,12 +29,12 @@ impl Key {
     }
     pub fn seated(
         state: &SessionState,
-        request: &RenderRequest,
+        request: &bingo_sdk::render::PullRequest,
         pane: &crate::pane::seat::Seated,
     ) -> Self {
         let mut key = Self::new(
             state,
-            request,
+            &request.on(SurfaceName::Terminal),
             pane.area.width,
             pane.area.height.saturating_sub(1),
         );
@@ -102,7 +102,12 @@ impl Memo {
     ) -> Option<&'a View> {
         match shown {
             Shown::View(view) => Some(view),
-            Shown::Pull { request } => self.display(&Key::new(state, request, columns, 0)),
+            Shown::Pull { request } => self.display(&Key::new(
+                state,
+                &request.on(SurfaceName::Terminal),
+                columns,
+                0,
+            )),
         }
     }
     pub fn get(&self, key: &Key) -> Option<&View> {
@@ -175,7 +180,7 @@ mod tests {
         assert_eq!(
             memo.view(
                 &Shown::Pull {
-                    request: request.clone()
+                    request: request.clone().into()
                 },
                 &state,
                 80

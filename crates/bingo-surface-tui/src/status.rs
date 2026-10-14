@@ -41,7 +41,7 @@ pub fn components(
         width,
         pulls,
     };
-    let right = clip(right(tree), width);
+    let right = clip(right(tree, &mut site), width);
     let left = clip(
         mode(tree.viewed(), &mut site),
         width.saturating_sub(cells(&right)),
@@ -232,8 +232,8 @@ fn placed_status(state: &SessionState, now: Now) -> Vec<Span<'static>> {
 /// turn has run, because how much room is left is a fact a person wants
 /// without asking; it warms from `dim` towards `bad` across the last fifth of
 /// the compaction trigger and, past [`CONTEXT_BAD`], says the way out.
-fn usage(state: &SessionState) -> Option<Span<'static>> {
-    let context = state.context.filter(|c| c.window > 0)?;
+fn usage(context: Option<bingo_sdk::ContextUsage>) -> Option<Span<'static>> {
+    let context = context.filter(|c| c.window > 0)?;
     let share = context
         .used
         .saturating_mul(100)
@@ -296,17 +296,43 @@ fn notice(ui: &Ui, now: Now) -> Vec<Span<'static>> {
 /// kernel stamps from the choice a turn will actually run on, and the config
 /// view's `thinking`, which is the one place a client reads the level
 /// (ADR-0008 §4). Nothing here is a second copy of either.
-fn right(tree: &Tree) -> Vec<Span<'static>> {
+fn right(tree: &Tree, site: &mut crate::component::Site<'_>) -> Vec<Span<'static>> {
     let state = tree.viewed();
-    let mut parts: Vec<Span<'static>> = Vec::new();
-    parts.extend(
-        tree.viewing()
-            .map(|child| dimmed(format!("in {}", tree::name(child)))),
-    );
-    parts.extend(usage(state));
-    parts.extend(answering(state).map(dimmed));
-    parts.extend(effort(state).map(dimmed));
-    join(parts)
+    let props = bingo_sdk::component::Props::SessionStatus(session_facts(state));
+    let lines = site.draw("SessionStatus", &props, |props, _| {
+        let bingo_sdk::component::Props::SessionStatus(props) = props else {
+            return Vec::new();
+        };
+        let mut facts = Vec::new();
+        if tree.viewing().is_some() {
+            let name = props
+                .title
+                .clone()
+                .unwrap_or_else(|| tree::directory(&props.cwd));
+            facts.push(dimmed(format!("in {name}")));
+        }
+        facts.extend(usage(props.context));
+        facts.extend(answering(props).map(dimmed));
+        facts.extend(props.effort.map(|level| dimmed(level.name().into())));
+        vec![Line::from(join(facts))]
+    });
+    lines.into_iter().next().unwrap_or_default().spans
+}
+
+pub(crate) fn session_facts(state: &SessionState) -> bingo_sdk::component::SessionStatusProps {
+    bingo_sdk::component::SessionStatusProps {
+        title: state.summary.title.clone(),
+        cwd: state.summary.cwd.clone(),
+        provider: state.summary.provider.clone(),
+        model: state.summary.model.clone(),
+        effort: state
+            .config
+            .kernel
+            .get("thinking")
+            .and_then(|level| serde_json::from_value::<Effort>(level.clone()).ok()),
+        context: state.context,
+        usage: state.summary.usage,
+    }
 }
 
 fn dimmed(text: String) -> Span<'static> {
@@ -315,22 +341,13 @@ fn dimmed(text: String) -> Span<'static> {
 
 /// `provider/model`, or the model alone where no provider is named — an
 /// older journal's summary, or a session nothing answers.
-fn answering(state: &SessionState) -> Option<String> {
-    let model = state.summary.model.clone().filter(|m| !m.is_empty())?;
-    let provider = state.summary.provider.as_deref().filter(|p| !p.is_empty());
+fn answering(props: &bingo_sdk::component::SessionStatusProps) -> Option<String> {
+    let model = props.model.clone().filter(|m| !m.is_empty())?;
+    let provider = props.provider.as_deref().filter(|p| !p.is_empty());
     Some(match provider {
         Some(provider) => format!("{provider}/{model}"),
         None => model,
     })
-}
-
-/// The reasoning effort the next turn will ask for; `off` publishes no
-/// level, so the slot says nothing.
-fn effort(state: &SessionState) -> Option<String> {
-    let level = state.config.kernel.get("thinking")?.clone();
-    serde_json::from_value::<Effort>(level)
-        .ok()
-        .map(|level| level.name().to_string())
 }
 
 fn join(parts: Vec<Span<'static>>) -> Vec<Span<'static>> {

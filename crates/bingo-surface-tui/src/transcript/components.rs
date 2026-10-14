@@ -69,31 +69,31 @@ fn component_item(
     fold: Fold,
 ) -> Block {
     let mut block = default_item_lines(item, place, agents, rows, cue, fold);
-    if let Some(props) = crate::component::items::props(item, fold == Fold::Open)
-        && let Some(key) = crate::component::key(
+    if let Some(props) = crate::component::items::props(item, fold == Fold::Open) {
+        block.lines = crate::component::resolve(
             rows.state,
+            rows.pulled,
             &crate::component::items::id(item),
             &props,
-            rows.width as u16,
-            0,
-        )
-        && let Some(answer) = rows.pulled.and_then(|memo| memo.display(&key))
-    {
-        block.lines = crate::component::draw(&props, Some(answer), rows.width, |changed, width| {
-            let rows = &Rows {
-                width,
-                ..rows.clone()
-            };
-            if changed == &props && width == key.request.viewport.columns as usize {
-                return block.lines.clone();
-            }
-            let changed_item = crate::component::items::changed(item, changed);
-            let fold = match changed {
-                bingo_sdk::component::Props::UserMessage(props) if props.is_expanded => Fold::Open,
-                _ => fold,
-            };
-            default_item_lines(&changed_item, place, agents, rows, cue, fold).lines
-        });
+            rows.width,
+            |changed, width| {
+                if changed == &props && width == rows.width {
+                    return block.lines.clone();
+                }
+                let rows = &Rows {
+                    width,
+                    ..rows.clone()
+                };
+                let changed_item = crate::component::items::changed(item, changed);
+                let fold = match changed {
+                    bingo_sdk::component::Props::UserMessage(props) if props.is_expanded => {
+                        Fold::Open
+                    }
+                    _ => fold,
+                };
+                default_item_lines(&changed_item, place, agents, rows, cue, fold).lines
+            },
+        );
     }
     block
 }

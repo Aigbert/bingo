@@ -44,8 +44,9 @@ pub fn shown(
 pub fn matched(state: &bingo_sdk::SessionState, shown: &Shown) -> bool {
     match shown {
         Shown::View(_) => true,
-        Shown::Pull { request } => {
-            bingo_sdk::render::matched(&state.config).asks(request.component, request)
-        }
+        Shown::Pull { request } => bingo_sdk::render::matched(&state.config).asks(
+            request.component,
+            &request.on(bingo_sdk::render::SurfaceName::Terminal),
+        ),
     }
 }

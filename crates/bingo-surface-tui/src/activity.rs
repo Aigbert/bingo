@@ -10,7 +10,7 @@
 //! changes. Everything here is derived from the tree of states and the clock,
 //! so a frame is a pure function of the two.
 
-use bingo_sdk::{LiveTurn, Origin, QueueEntry, SessionState};
+use bingo_sdk::{Origin, QueueEntry, SessionState};
 use ratatui::text::{Line, Span};
 
 use crate::clock::{self, Now};
@@ -283,45 +283,33 @@ fn working(
     if elapsed < ACTIVITY_AFTER && !stopping {
         return Vec::new();
     }
-    let (verb, hint) = match stopping {
-        true => (STOPPING, ""),
-        false => (
-            placed_verb.unwrap_or_else(|| verb(&turn.id)),
-            "esc to interrupt · ",
-        ),
-    };
     let props = bingo_sdk::component::Props::Spinner(bingo_sdk::component::SpinnerProps {
-        word: verb.into(),
-        message: Some(hint.into()),
-        suffix: written(turn),
+        word: placed_verb.unwrap_or_else(|| verb(&turn.id)).into(),
+        message: stopping.then(|| STOPPING.into()),
+        suffix: "…".into(),
         mode: if stopping { "stopping" } else { "working" }.into(),
     });
-    site.draw("Spinner", &props, |props, _| {
-        let bingo_sdk::component::Props::Spinner(props) = props else {
-            return Vec::new();
-        };
-        let mut spans = vec![Span::styled(
-            format!("{} ", theme::mark()),
-            caret_style(state, stopping, now),
-        )];
-        spans.extend(beamed(format!("{}{}", props.word, theme::ellipsis()), now));
-        spans.push(Span::styled(
-            format!(
-                " ({}{}s{})",
-                props.message.as_deref().unwrap_or_default(),
-                elapsed.as_secs(),
-                props.suffix
-            ),
-            theme::dim(),
+    let mut lines = site.draw("Spinner", &props, |props, _| {
+        spinner(props, state, stopping, now)
+    });
+    let facts =
+        bingo_sdk::component::Props::TurnProgress(bingo_sdk::component::TurnProgressProps {
+            elapsed_ms: elapsed.as_secs().saturating_mul(1000),
+            tokens_out: turn.usage.output_tokens,
+            interruptible: !stopping,
+            stopping,
+        });
+    let tail = site.draw(&format!("TurnProgress:{}", turn.id), &facts, progress);
+    append_tail(&mut lines, tail);
+    if let Some(retry) = turn.retrying
+        && let Some(last) = lines.last_mut()
+    {
+        last.spans.push(Span::styled(
+            format!(" retrying {}/{}", retry.attempt, retry.max),
+            theme::presence(),
         ));
-        if let Some(retry) = turn.retrying {
-            spans.push(Span::styled(
-                format!(" retrying {}/{}", retry.attempt, retry.max),
-                theme::presence(),
-            ));
-        }
-        vec![Line::from(spans)]
-    })
+    }
+    lines
 }
 
 /// `▍ Waiting for 2 background agents to finish` — what an idle session says
@@ -386,13 +374,63 @@ fn beamed(word: String, now: Now) -> Vec<Span<'static>> {
         .collect()
 }
 
-/// What the turn has said so far, in the thousands §6 writes it in — and
-/// nothing at all before it has said anything.
-fn written(turn: &LiveTurn) -> String {
-    match turn.usage.output_tokens {
+fn spinner(
+    props: &bingo_sdk::component::Props,
+    state: &SessionState,
+    stopping: bool,
+    now: Now,
+) -> Vec<Line<'static>> {
+    let bingo_sdk::component::Props::Spinner(props) = props else {
+        return Vec::new();
+    };
+    let mut spans = vec![Span::styled(
+        format!("{} ", theme::mark()),
+        caret_style(state, stopping, now),
+    )];
+    let suffix = if props.suffix == "…" {
+        theme::ellipsis()
+    } else {
+        &props.suffix
+    };
+    spans.extend(beamed(
+        format!(
+            "{}{suffix}",
+            props.message.as_deref().unwrap_or(&props.word)
+        ),
+        now,
+    ));
+    vec![Line::from(spans)]
+}
+
+fn progress(props: &bingo_sdk::component::Props, _: usize) -> Vec<Line<'static>> {
+    let bingo_sdk::component::Props::TurnProgress(props) = props else {
+        return Vec::new();
+    };
+    let hint = if props.interruptible && !props.stopping {
+        "esc to interrupt · "
+    } else {
+        ""
+    };
+    let tokens = match props.tokens_out {
         0 => String::new(),
         tokens => format!(" · ↓ {}", crate::count::count(tokens)),
+    };
+    vec![Line::from(Span::styled(
+        format!(" ({hint}{}s{tokens})", props.elapsed_ms / 1000),
+        theme::dim(),
+    ))]
+}
+
+fn append_tail(lines: &mut Vec<Line<'static>>, tail: Vec<Line<'static>>) {
+    let mut tail = tail.into_iter();
+    if let Some(first) = tail.next() {
+        if let Some(last) = lines.last_mut() {
+            last.spans.extend(first.spans);
+        } else {
+            lines.push(first);
+        }
     }
+    lines.extend(tail);
 }
 
 /// bingo's own word for what it is doing (§4), drawn once per turn from the

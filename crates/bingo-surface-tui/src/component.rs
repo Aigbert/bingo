@@ -3,10 +3,12 @@ use bingo_sdk::{View, component::Props};
 use ratatui::text::Line;
 pub mod band;
 pub mod closing;
+mod facts;
 pub mod items;
 pub mod pane;
 pub mod question;
 pub mod sealed;
+pub mod welcome;
 
 pub fn draw(
     props: &Props,
@@ -111,6 +113,10 @@ pub fn key(
     rows: u16,
 ) -> Option<crate::pulled::Key> {
     use bingo_sdk::render::{RenderRequest, SurfaceName, Viewport};
+    let matched = bingo_sdk::render::matched(&state.config);
+    if !matched.0.contains_key(&props.component()) {
+        return None;
+    }
     let request = RenderRequest {
         component: props.component(),
         request_id: id.into(),
@@ -122,7 +128,7 @@ pub fn key(
             rows,
         },
     };
-    bingo_sdk::render::matched(&state.config)
+    matched
         .asks(request.component, &request)
         .then(|| crate::pulled::Key::new(state, &request, width, rows))
 }
@@ -197,11 +203,14 @@ pub fn resolve(
     width: usize,
     own: impl Fn(&Props, usize) -> Vec<Line<'static>>,
 ) -> Vec<Line<'static>> {
-    let key = key(state, id, props, width as u16, 0);
-    let answer = key
-        .as_ref()
-        .and_then(|key| memo.and_then(|memo| memo.display(key)));
-    draw(props, answer, width, own)
+    let empty = crate::pulled::Memo::default();
+    Site {
+        state,
+        memo: memo.unwrap_or(&empty),
+        width,
+        pulls: &mut Vec::new(),
+    }
+    .draw(id, props, own)
 }
 
 pub struct Site<'a> {
@@ -217,10 +226,12 @@ impl Site<'_> {
         props: &Props,
         own: impl Fn(&Props, usize) -> Vec<Line<'static>>,
     ) -> Vec<Line<'static>> {
-        if let Some(key) = key(self.state, id, props, self.width as u16, 0) {
-            self.pulls.push(key);
-        }
-        resolve(self.state, Some(self.memo), id, props, self.width, own)
+        let Some(key) = key(self.state, id, props, self.width as u16, 0) else {
+            return own(props, self.width);
+        };
+        let answer = self.memo.display(&key);
+        self.pulls.push(key);
+        draw(props, answer, self.width, own)
     }
 }
 
