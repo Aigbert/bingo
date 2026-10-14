@@ -379,11 +379,13 @@ impl Manager {
             .collect()
     }
     pub async fn registered(&self, name: &str, result: Result<bingo_sdk::PluginGrant, String>) {
-        if let Some(installed) = self
-            .discovered()
-            .iter()
-            .find(|installed| installed.registration.name == name)
-        {
+        if let Some(installed) = self.discovered().iter().find(|installed| {
+            installed.registration.name == name
+                && matches!(
+                    installed.registration.admission.state(),
+                    bingo_sdk::PluginState::Pending
+                )
+        }) {
             let denied = result.is_err();
             installed.registration.admission.finish(result);
             if denied && let Some(bridge) = &installed.bridge {
@@ -463,6 +465,53 @@ mod tests {
             .unwrap();
         assert_eq!(personal.registration.status(ID).version, "0.4.2");
         manager.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn registration_finishes_only_the_pending_namesake() {
+        use bingo_sdk::{PluginGrant, PluginOrigin, PluginRuntime, PluginState, Tier};
+        let home = tempfile::tempdir().unwrap();
+        installed(home.path(), "same");
+        let notices = Notices::default();
+        let mut found =
+            discovery::read(&home.path().join(".bingo/plugins/same"), &notices).unwrap();
+        found.origin = PluginOrigin::Project;
+        for state in [
+            PluginState::Waiting { changed: false },
+            PluginState::Off { why: "off".into() },
+            PluginState::On,
+        ] {
+            let waiting = Arc::new(Registration::new(&found, PluginRuntime::Process));
+            waiting.admission.stop(state.clone());
+            let pending = Arc::new(Registration::new(&found, PluginRuntime::Process));
+            let manager = Manager::new(Env::rooted(home.path()), BTreeMap::new(), BTreeSet::new());
+            assert!(
+                manager
+                    .installed
+                    .set(vec![
+                        Installed {
+                            registration: waiting.clone(),
+                            bridge: None
+                        },
+                        Installed {
+                            registration: pending.clone(),
+                            bridge: None
+                        },
+                    ])
+                    .is_ok()
+            );
+            manager
+                .registered(
+                    "same",
+                    Ok(PluginGrant {
+                        tier: Tier::Tighten,
+                        uses: Default::default(),
+                    }),
+                )
+                .await;
+            assert_eq!(waiting.admission.state(), state);
+            assert_eq!(pending.admission.state(), PluginState::On);
+        }
     }
 
     #[tokio::test]
