@@ -1918,7 +1918,9 @@
         "SessionMode",
         "PromptHint",
         "AbovePrompt",
-        "Pane"
+        "Pane",
+        "Permission",
+        "SignIn"
       ]
     },
     "ConfigSet": {
@@ -5638,6 +5640,30 @@
     "Pattern": {
       "type": "string"
     },
+    "PermissionProps": {
+      "type": "object",
+      "properties": {
+        "interactionId": {
+          "$ref": "#/$defs/InteractionId"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "input": true,
+        "answers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AnswerSpec"
+          }
+        }
+      },
+      "required": [
+        "interactionId",
+        "tool",
+        "input",
+        "answers"
+      ]
+    },
     "Phase": {
       "type": "string",
       "enum": [
@@ -6690,6 +6716,38 @@
             },
             "props": {
               "$ref": "#/$defs/PaneProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Permission"
+            },
+            "props": {
+              "$ref": "#/$defs/PermissionProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "SignIn"
+            },
+            "props": {
+              "$ref": "#/$defs/SignInProps"
             }
           },
           "required": [
@@ -7908,6 +7966,25 @@
         {
           "$ref": "#/$defs/View"
         }
+      ]
+    },
+    "SignInProps": {
+      "type": "object",
+      "properties": {
+        "interactionId": {
+          "$ref": "#/$defs/InteractionId"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "flow": {
+          "$ref": "#/$defs/LoginFlow"
+        }
+      },
+      "required": [
+        "interactionId",
+        "provider",
+        "flow"
       ]
     },
     "SiteScroll": {

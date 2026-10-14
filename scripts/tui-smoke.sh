@@ -438,4 +438,50 @@ vanish 'Tool ledger'
 finish 'Example calls: 2'
 step 'M141: band hidden; Edit denied; Bash rewritten; two pane rows; Escape closed'
 
+# Every sealed fixture runs in this harness's socket and disposable home.
+sealed_card() {
+  local fixture="$1" width="$2" height="$3" answer="$4"
+  tmux -L "$SOCKET" resize-window -t "$SESSION" -x "$width" -y "$height"
+  rm -f "$WORK/cwd/sealed.txt"
+  local installed="$WORK/$fixture"
+  mkdir -p "$installed"
+  cp "$ROOT/crates/bingo/tests/fixtures/mods/$fixture/"{plugin.json,main.ts} "$installed/"
+  step "M160: $fixture at ${width}x${height}, answer $answer"
+  start '{"responses":[
+    {"steps":[{"toolCall":{"name":"Write","input":{"file_path":"sealed.txt","content":"sealed input"}}}]},
+    {"steps":[{"text":"Sealed done."}]}]}' 'BINGO_MOTION=off' "--plugin-dir $installed"
+  keys 'write sealed input' Enter
+  await 'Do you want to '
+  case "$fixture" in
+    sealed-frame)
+      await 'SEALED FRAME'
+      await '"content": "sealed input"'
+      ;;
+    sealed-clip|sealed-hide|sealed-zero)
+      await 'showing host card'
+      [ "$(pane | grep -cF 'showing host card')" -eq 1 ]
+      ;;
+    *) ;; # The built-in card may cover the transcript notice until answered.
+  esac
+  press_until "$answer" 'Sealed done.'
+  case "$fixture" in
+    sealed-rewrite|sealed-omit|sealed-duplicate)
+      await "$fixture (ui.render)"
+      [ "$(pane | grep -cF "$fixture (ui.render)")" -eq 1 ]
+      ;;
+  esac
+  if [ "$answer" = y ]; then
+    [ "$(cat "$WORK/cwd/sealed.txt")" = 'sealed input' ]
+  else
+    [ ! -f "$WORK/cwd/sealed.txt" ]
+  fi
+  finish
+}
+for fixture in sealed-frame sealed-rewrite sealed-omit sealed-clip sealed-duplicate sealed-hide sealed-zero; do
+  sealed_card "$fixture" 80 24 y
+done
+sealed_card sealed-frame 80 24 Escape
+sealed_card sealed-frame 200 50 y
+sealed_card sealed-frame 200 50 Escape
+
 echo 'tui-smoke ok'

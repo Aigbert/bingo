@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 mod props;
+mod sealed;
 pub use props::*;
+pub use sealed::*;
 
 macro_rules! components {
     ($($name:ident($props:ty)),+ $(,)?) => {
@@ -30,6 +32,7 @@ components! {
     Spinner(SpinnerProps), TurnDuration(TurnDurationProps),
     InfoNotice(InfoNoticeProps), SessionMode(SessionModeProps),
     PromptHint(PromptHintProps), AbovePrompt(AbovePromptProps), Pane(PaneProps),
+    Permission(PermissionProps), SignIn(SignInProps),
 }
 impl Props {
     pub fn parse(component: Component, props: Value) -> Result<Self, serde_json::Error> {
@@ -57,7 +60,7 @@ mod tests {
         }
     }
     #[test]
-    fn invalid_props_and_permissions_have_no_component_contract() {
+    fn invalid_props_are_rejected() {
         assert!(Props::parse(Component::ToolUse, serde_json::json!({})).is_err());
         assert!(
             serde_json::from_value::<Props>(

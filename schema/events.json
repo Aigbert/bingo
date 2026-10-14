@@ -169,7 +169,9 @@
               "SessionMode",
               "PromptHint",
               "AbovePrompt",
-              "Pane"
+              "Pane",
+              "Permission",
+              "SignIn"
             ]
           },
           "SurfaceName": {
@@ -1272,7 +1274,9 @@
               "SessionMode",
               "PromptHint",
               "AbovePrompt",
-              "Pane"
+              "Pane",
+              "Permission",
+              "SignIn"
             ]
           }
         }
@@ -3336,7 +3340,9 @@
               "SessionMode",
               "PromptHint",
               "AbovePrompt",
-              "Pane"
+              "Pane",
+              "Permission",
+              "SignIn"
             ]
           }
         }
@@ -7255,7 +7261,9 @@
               "SessionMode",
               "PromptHint",
               "AbovePrompt",
-              "Pane"
+              "Pane",
+              "Permission",
+              "SignIn"
             ]
           },
           "Level": {
@@ -9900,7 +9908,9 @@
               "SessionMode",
               "PromptHint",
               "AbovePrompt",
-              "Pane"
+              "Pane",
+              "Permission",
+              "SignIn"
             ]
           },
           "ItemBody": {

@@ -10,6 +10,7 @@ pub(super) fn check(semantic: &Semantic<'_>, source: &mut Source<'_>) {
         if !matches!(&call.callee, Expression::Identifier(id) if id.name == "on") {
             continue;
         }
+        sealed(call, semantic, source);
         match call
             .arguments
             .first()
@@ -113,5 +114,45 @@ fn literal(value: &Expression<'_>, semantic: &Semantic<'_>, depth: usize) -> boo
         Expression::ArrayExpression(array) => array.elements.iter().all(|item| item.as_expression().is_some_and(child)),
         Expression::ObjectExpression(object) => object.properties.iter().all(|property| matches!(property, ObjectPropertyKind::ObjectProperty(p) if !p.computed && !p.shorthand && child(&p.value))),
         _ => false,
+    }
+}
+
+fn sealed(call: &CallExpression<'_>, semantic: &Semantic<'_>, source: &mut Source<'_>) {
+    if call
+        .arguments
+        .first()
+        .and_then(|arg| pattern(arg, semantic))
+        .as_deref()
+        != Some("ui.render")
+    {
+        return;
+    }
+    let Some(value) = call.arguments.get(1).and_then(Argument::as_expression) else {
+        return;
+    };
+    let value = match value {
+        Expression::Identifier(id) => constant(id, semantic).unwrap_or(value),
+        _ => value,
+    };
+    let Expression::ObjectExpression(object) = value else {
+        return;
+    };
+    for property in &object.properties {
+        let ObjectPropertyKind::ObjectProperty(property) = property else {
+            continue;
+        };
+        if property.computed || property.key.static_name().as_deref() != Some("component") {
+            continue;
+        }
+        let Expression::StringLiteral(name) = &property.value else {
+            continue;
+        };
+        let component = serde_json::from_value::<bingo_sdk::render::Component>(serde_json::json!(
+            name.value.as_str()
+        ));
+        if component.is_ok_and(|component| component.sealed()) {
+            source.finding(property.span.start, Rule::SealedSite, Severity::Warning,
+                format!("{} is sealed: wrap next(e) exactly once with unchanged props; the host keeps its keys and falls back if clipped", name.value));
+        }
     }
 }

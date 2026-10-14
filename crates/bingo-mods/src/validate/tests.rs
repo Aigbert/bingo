@@ -307,3 +307,30 @@ fn object_atom_keys_use_the_same_declared_key_and_owner() {
         );
     }
 }
+
+#[test]
+fn sealed_site_diagnostics_name_the_contract_at_the_matcher() {
+    for name in ["Permission", "SignIn"] {
+        let result = checked(
+            &format!(
+                "export const register = on => on('ui.render', {{component:'{name}'}}, ($, e, next) => next(e));"
+            ),
+            "",
+        );
+        let finding = result
+            .findings
+            .iter()
+            .find(|f| f.rule == Rule::SealedSite)
+            .unwrap();
+        assert_eq!(finding.line, 1);
+        assert!(finding.column > 1);
+        assert_eq!(finding.severity, Severity::Warning);
+        assert!(finding.text.contains(name));
+        assert!(result.valid());
+    }
+    let result = checked(
+        "export const register = on => on('ui.render', {component:'Pane'}, ($, e, next) => next(e));",
+        "",
+    );
+    assert!(!result.findings.iter().any(|f| f.rule == Rule::SealedSite));
+}

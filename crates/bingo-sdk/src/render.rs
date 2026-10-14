@@ -25,6 +25,8 @@ pub enum Component {
     PromptHint,
     AbovePrompt,
     Pane,
+    Permission,
+    SignIn,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -50,7 +52,19 @@ pub struct RenderRequest {
     pub viewport: Viewport,
 }
 impl Component {
-    pub const ALL: [Self; 15] = [
+    pub fn sealed(self) -> bool {
+        matches!(self, Self::Permission | Self::SignIn)
+    }
+
+    pub fn surfaces(self) -> &'static [SurfaceName] {
+        &[
+            SurfaceName::Terminal,
+            SurfaceName::Desktop,
+            SurfaceName::Text,
+        ]
+    }
+
+    pub const ALL: [Self; 17] = [
         Self::Question,
         Self::UserMessage,
         Self::AssistantMessage,
@@ -66,6 +80,8 @@ impl Component {
         Self::PromptHint,
         Self::AbovePrompt,
         Self::Pane,
+        Self::Permission,
+        Self::SignIn,
     ];
 }
 impl RenderRequest {
@@ -109,13 +125,16 @@ mod tests {
     }
 
     #[test]
-    fn render_request_round_trips_and_permission_is_not_a_component() {
+    fn render_request_round_trips() {
         let wire = serde_json::json!({"component":"Pane","requestId":"counter","surface":"terminal",
             "props":{},"viewport":{"columns":80,"rows":8}});
         let request: RenderRequest = serde_json::from_value(wire.clone()).unwrap();
         assert_eq!(serde_json::to_value(&request).unwrap(), wire);
         assert_eq!(request.engine().fold(), "");
-        assert!(serde_json::from_value::<Component>(serde_json::json!("Permission")).is_err());
+        assert!(Component::Permission.sealed());
+        assert!(Component::SignIn.sealed());
+        assert!(!Component::Question.sealed());
+        assert_eq!(Component::Permission.surfaces().len(), 3);
     }
 }
 

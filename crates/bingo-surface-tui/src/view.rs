@@ -311,22 +311,16 @@ fn card(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
     // The shape's own rows and the title it keeps: what is left is what the
     // answers have to be walked in, and what a card lays itself out within.
     let room = usize::from(above.height).saturating_sub(usize::from(shape.chrome()) + 1);
-    let rows: Vec<(Line<'static>, Option<usize>)> = crate::component::question::rows(
-        owner,
+    let mut drawing = crate::component::sealed::Site {
+        state: owner,
         ui,
         interaction,
-        agent.as_deref(),
+        agent: agent.as_deref(),
         width,
-        room,
-        &mut frame.pulls,
-    )
-    .into_iter()
-    .flat_map(|(line, option)| {
-        wrap::wrap_all(std::slice::from_ref(&line), width)
-            .into_iter()
-            .map(move |wrapped| (wrapped, option))
-    })
-    .collect();
+        room: room + 1,
+    }
+    .rows(&mut frame.pulls, opening(interaction, now).moving());
+    let rows = wrapped_card_rows(std::mem::take(&mut drawing.rows), width);
     let rows = fitted_answers(rows, ui.dialog.focus, room);
     let lines: Vec<Line<'static>> = rows.iter().map(|(line, _)| line.clone()).collect();
     // Only a row of the transcript on screen can anchor it: a child's item
@@ -335,9 +329,17 @@ fn card(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
         .then(|| asking_row(frame, interaction))
         .flatten();
     let at = layers::under(above, anchor, shape.height(lines.len(), above));
+    drawing.place(Rect::new(
+        at.x + shape.inset(),
+        at.y + 1,
+        width as u16,
+        room as u16,
+    ));
+    frame.card_actions = drawing.actions;
     frame.card = Some(Card {
         area: at,
         options: rows.iter().map(|(_, option)| *option).collect(),
+        sealed_options: drawing.options,
     });
     layers::dim(frame);
     layers::card(
@@ -349,6 +351,19 @@ fn card(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
         guarded(interaction, now),
         now,
     );
+}
+
+fn wrapped_card_rows(
+    rows: Vec<(Line<'static>, Option<usize>)>,
+    width: usize,
+) -> Vec<(Line<'static>, Option<usize>)> {
+    rows.into_iter()
+        .flat_map(|(line, option)| {
+            wrap::wrap_all(std::slice::from_ref(&line), width)
+                .into_iter()
+                .map(move |wrapped| (wrapped, option))
+        })
+        .collect()
 }
 
 /// The card's answers in the room the box has to walk them in: a question with
