@@ -47,9 +47,9 @@ its step and in the turn's folded line.
   `crates/bingo-core/src/gate{.rs,/prompt.rs}`; answer mapping through existing RPC/ACP serde paths;
   fixtures in `bingo-surface-print` and `crates/bingo/tests/acp_asked.rs`.
 - `crates/bingo-permissions/src/{lib.rs,decide.rs,caution.rs}`; SDK policy, state and component props;
-  core session interactions and receipt recording.
+  core session interactions, receipt recording and `host/plugin.rs` provenance adapter.
 - `crates/bingo-surface-tui/src/{component/sealed.rs,activity.rs,
-  input.rs,view.rs,transcript.rs,blocks.rs,run/site_keys.rs}`, new `ask/`; fallback drawings in
+  input{.rs,/interaction.rs},view.rs,transcript.rs,blocks.rs,run/{site_keys,interactions}.rs}`, new `ask/`; fallback drawings in
   `dialog.rs`, `component/question.rs`.
 - New `crates/bingo-mod-ask/`; `bingo-channel-adapter/src/question.rs` does not offer `AllowChanged` (the
   chat keeps its buttons).
@@ -62,6 +62,7 @@ its step and in the turn's folded line.
 - [x] `TestBackend`: arrow and number answers, No with a reason, change then run, danger starts on No, esc
   stops the turn, typed `x` sets aside and `ctrl+g` returns.
 - [x] An outside mod cannot replace the permission list (sealed test); it can wrap `Question` with `next`.
+- [x] All nine review findings have failing-before/passing-after regression coverage.
 - [x] tmux drive against the fake provider in a temp HOME, captured; tui-smoke and all native gates as
   M167.
 - [ ] Complete Windows compilation of every touched crate: blocked by missing Windows C headers in
@@ -81,83 +82,66 @@ write's whole file in place.
 
 ## Decisions
 
-- Review: queue keys until the site's view is available and allow one key request in flight per site.
-  A resize cannot hand selection to a fallback cursor; an unhandled character is folded before the
-  next queued key. Recent typing uses the surface's reception time, including asks waiting their turn.
-
-- Review: Escape always ends the asking session’s turn, including aside and change editing; Ctrl+G
-  backs out without answering. The old Escape-to-return prototype conflicted with AGENTS.md.
-  A single owner-targeted operation sends both the denial and interrupt (ADR-0084).
-
-- Options read `Interaction`: accepted answer specs are stored there, not on `InteractionKind`. This
-  preserves the kernel's authoritative answer list.
-- A denied replacement is asked again with only Change and No. Approval never overrides a deny rule. Every
-  replacement repeats hooks and policy checks.
-- Review: each permission interaction carries the gate’s current input after hooks/interceptors.
-  The sealed card and editor read that input. Only `ItemUpdated` changes the transcript call;
-  resolving an edit merely proposes a replacement, which has not passed the gate yet.
-- `PermissionPolicy::caution` is a defaulted, synchronous policy hook: shell analysis stays in
-  permissions, while the gate also reads destructive traits. A default-false `allows_replacement` hook
-  keeps tool names out of the kernel.
-- Keep forms on the existing `Question` site (already a vector of questions), adding optional interaction
-  identity and form mode. A second site would duplicate this contract. The built-in owns its cursor, ticks
-  and text.
-- Register the guide in `bingo-mod-ask/src/guide.rs` with a crate-local page.
-- Workspace edges: the binary adds `bingo-mod-ask`; its sdk, async-trait and serde_json dependencies
-  already exist. No external dependency is added. Tests in mods and the TUI add a dev edge to ask, as M167
-  did for hello. The normal-tree member count grows 412 → 413 (ADR-0086).
-
-- Receipts gain an optional source item: the old permission receipt named only a placeholder interaction,
-  which cannot locate the step after it closes. Question/form receipts are recorded by the interaction
-  actor on resolution.
-- Keep the surface's old question/form machinery only as the disabled-mod fallback required by ADR-0086;
-  the active builtin draws and drives the new list and field layout. No new host door is needed: handlers
-  return a chosen answer in the supervised action acknowledgement; the surface resolves it.
-- Review: plugin handles carry unforgeable provenance; Permission answers from plugins are refused
-  even with a terminal identity. ADR-0086 now states this boundary. Mod key requests contain the
-  minted question props, so no per-key session snapshot is needed. An event hook releases state at
-  resolution/cancellation. Tests enable the existing SDK testing feature; no new dependency.
-
-- The existing Question site represents both forms and questions. A single, untitled form uses the choice
-  list while still returning `Answer::Form`; AskUserQuestion uses that wire shape even when it asks one
-  question.
-- Preserve the existing y/a/n permission aliases alongside numbers. They remain explicit answers; other
-  printable keys set the ask aside.
-- Cancellation bypasses the stray-key guard. The actor records a denial before interruption can drop the
-  caller. Review: the turn now asks for and folds that canonical receipt instead of minting a second
-  unpublished item. `AllowChangedSession` preserves both the edit and the installed session rule.
-
-- RPC and ACP already deserialize the shared answer enum; their generic doors need no branch. Regenerated
-  wire contracts and existing black-box suites cover the additive answer.
+- Options read the accepted specs in `Interaction`, the kernel's authoritative answer list.
+- A denied replacement offers only Change and No. Every replacement repeats hooks and policy checks;
+  approval never overrides a deny rule.
+- Review: permission interactions carry the current input after hooks/interceptors. The card and editor
+  use it. Only `ItemUpdated` changes transcript input: an edit answer has not passed the gate yet.
+- Review: plugin handles carry kernel-stamped provenance, independent of claimed identity or activation.
+  Permission answers from plugins are refused; accepted answers record their source (ADR-0086).
+  The host owns one stable adapter with a weak backlink: plugin weak handles survive startup without
+  forming a cycle. This preserves the boundary without adding a `HostApi` door.
+- The mod returns its chosen answer in the supervised command acknowledgement; the surface resolves it
+  through the person's handle. Minted question props avoid opening a session snapshot per key.
+  An event hook releases mod state on resolution/cancellation, without waiting for another key.
+- Review: hold keys until the view arrives and allow one request in flight per site. Resize cannot move
+  a fallback cursor; an unhandled character is folded before the next queued key is interpreted.
+- Recent typing uses the surface's reception time, including asks waiting their turn, not the kernel clock.
+  The reception regression supplies an explicit clock, so scheduler load cannot change its result.
+- Review: Escape always ends the asking session's turn, including aside and change editing; Ctrl+G backs
+  out without answering. The old prototype conflicted with AGENTS.md. Both denial and interrupt use
+  the owning session's handle (ADR-0084).
+- `PermissionPolicy::caution` and default-false `allows_replacement` keep shell analysis and tool names
+  in permissions. Caution removes session scope and starts the cursor on No.
+- Forms share `Question`; a single untitled form uses choices but returns `Answer::Form`. The mod owns
+  selection, ticks and text. The old surface machinery remains only as the disabled-mod fallback.
+- The guide is the registered crate-local page in `bingo-mod-ask/src/guide.rs` (ADR-0054).
+- No new external dependency: the binary adds ask; mods/TUI tests add its dev edge, as M167 did for hello.
+  Ask tests enable the SDK's existing testing feature. Normal-tree members grow 412 → 413 (ADR-0086).
+- Receipts link their source item; the actor records question/form answers and early denials. Review:
+  the turn folds the actor's canonical receipt instead of minting an unpublished duplicate. A receipt
+  queued after interruption cannot publish under the closed turn. `AllowChangedSession` reports both
+  the edit and installed rule. Cancellation bypasses the stray-key guard.
+- Keep y/a/n alongside numbers. RPC/ACP already deserialize shared answers; their generic doors stay.
 
 ## Verified — 2026-10-15
 
-Sequential native gates; local/fake fixtures only. Command-output summaries:
+Review verification; local/fake fixtures only. Each finding was reproduced by a failing regression before its fix.
+Gates ran sequentially. Final command-output summaries:
 
 ```text
 cargo fmt --all -- --check -> exit 0
 cargo check --workspace --all-targets --locked -> Finished dev profile; exit 0
 cargo clippy --workspace --all-targets --locked -- -D warnings -> Finished dev profile; exit 0
-cargo test --workspace --locked -> 5531 passed; 0 failed; 5 ignored (168 suites)
-bash scripts/check_discipline.sh -> discipline ok (existing advisory warnings)
-bash scripts/budget.sh -> dependencies 413/413; core check 0s; relink 0 crates; budget ok
+cargo test --workspace --locked -> 5569 passed; 0 failed; 5 ignored (168 suites)
+bash scripts/check_discipline.sh -> discipline ok (advisories remain)
+bash scripts/budget.sh -> dependencies 413/413; core check 1s; relink 0 crates; budget ok
 cargo deny check -> advisories ok, bans ok, licenses ok, sources ok
 bash scripts/tui-smoke.sh -> tui-smoke ok
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked -> 190 passed
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked -> 191 passed
 BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc -p bingo-surface-rpc -p bingo-store-jsonl -p bingo-mods --lib --locked -> 264 passed; 1 ignored
-cargo test -p bingo-surface-tui --locked -> 1200 passed; 0 failed; 2 ignored
 cd sdk/typescript && npm test -> 31 pass; 0 fail
 ```
 
-The 16 scenario snapshots include three child askers ordered moss → coda → fern. The final TUI run
-includes the child whole-preview regression. Smoke captures in `/tmp/m169-smoke.log` show changed
-input rechecked, `x` set aside, Escape return, numeric answer and receipts; the sealed fixtures also pass.
-Budget reports a 9 GB target/debug soft warning; no external dependency was added. No timing retry was needed.
+World-parity initially exposed the temporary plugin adapter's lifetime; the retained adapter and regression fix it.
+The first smoke run timed out on one-shot `x`; the existing guard-aware `press_until` fixes the driver, and the full
+rerun passes. No wall-clock unit-test flake was observed. Budget warns at 12 GB; no external dependency was added.
+Discipline retains an advisory for the production provenance adapter; its purpose is recorded above, without an allowlist.
 
 For each touched crate: `cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc`:
 
 - `bingo-sdk`, `bingo-core`, `bingo-mod-ask`, `bingo-hooks-shell`: `Finished dev profile`, exit 0.
 - `bingo-permissions`: exit 101; tree-sitter/tree-sitter-bash cannot find Windows `stdio.h`/`stdlib.h`.
 - `bingo-surface-tui`, `bingo-channel-adapter`, `bingo-surface-print`, `bingo-mods`, `bingo`: exit 101;
-  aws-lc-sys cannot find `windows.h`/CRT headers; mods also reaches the rquickjs-sys C-toolchain failure.
-  These are host toolchain deferrals, not verified Windows builds; the Windows criterion remains open.
+  aws-lc-sys cannot find `windows.h`/CRT headers; mods and bin also hit the rquickjs-sys C-toolchain failure.
+  These are toolchain deferrals, not verified Windows builds; the Windows criterion remains open.
