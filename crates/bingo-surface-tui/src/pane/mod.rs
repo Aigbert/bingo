@@ -270,7 +270,7 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
         }
         return Vec::new();
     }
-    if key.code == KeyCode::Char('p') && key.modifiers == KeyModifiers::CONTROL {
+    if key.code == KeyCode::Char('p') && key.modifiers == KeyModifiers::ALT {
         moved::cycle(ui, state, &focused);
         return Vec::new();
     }

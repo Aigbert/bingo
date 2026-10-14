@@ -532,5 +532,5 @@ at most three floating panes, newest on top. Panes occupy the transcript
 area; the composer, status, permission prompt and toasts remain above them.
 A collapsed pane is `<title> ▸` on the status right; clicking tries an overlay.
 Unasked panes wait as `1 pane waiting`. The focused title’s `place ▾` and
-`ctrl+p` cycle fitting places; moves last for the surface process. Pointer
+`alt+p` cycle fitting places; moves last for the surface process. Pointer
 scrolling and selection belong to the topmost pane under the pointer.

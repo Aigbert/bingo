@@ -135,7 +135,7 @@ newest draws last. The composer and status remain available.
 
 The first fitting place wins. A pane that cannot fit becomes `<title> ▸`
 in status; click it to try an overlay. Click the focused title's `place ▾`
-or press `ctrl+p` to cycle fitting places. Moves last for this TUI process.
+or press `alt+p` to cycle fitting places. Moves last for this TUI process.
 A collapsed pane receives no render request. Moving or resizing a seated
 pane asks again when its place, content width or content height changes.
 Old `rows` options still read as the ideal row count; new code uses `size`.

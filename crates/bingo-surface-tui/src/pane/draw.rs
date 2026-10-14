@@ -44,7 +44,7 @@ fn draw_one(
         let label = super::moved::label(seated.place);
         let width = (label.width() as u16).min(area.width);
         frame.render_widget(
-            Paragraph::new(Span::styled(label, theme::presence())),
+            Paragraph::new(Span::styled(label, theme::dim())),
             Rect::new(area.right() - width, area.y, width, area.height.min(1)),
         );
     }
