@@ -211,7 +211,20 @@ impl Registry {
         layers: &[crate::settings::Layer],
         reserved: &BTreeSet<String>,
     ) {
-        let id = plugin.manifest().id;
+        let manifest = plugin.manifest();
+        let id = manifest.id;
+        // Provider registration may bind credentials even before startup.
+        if manifest
+            .provides
+            .iter()
+            .any(|name| name.starts_with("provider:"))
+        {
+            self.switches.kinds.insert(
+                id.into(),
+                plugins::switch_kind(&[ContributionKind::Providers]),
+            );
+            return;
+        }
         self.switches
             .running
             .write()
