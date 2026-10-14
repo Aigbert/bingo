@@ -44,6 +44,15 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
 - `docs/design/mods-parity-2026-10.md`: matrix evidence.
 - Owner plans, only to record missing §8 Non-goals (brick 6).
 
+2026-10-14: delegate widened scope to both validator blockers and shared loading/schema paths:
+- `crates/bingo-mods/src/validate/{dollar,source,tests}.rs`,
+  `src/{strip,load,mount,module,chain}.rs`, `src/dollar/{table,tests,callback}.rs`,
+  `tests/{strip,engine,testing}.rs`: schema-derived data reads and erased imports.
+- `schema/dollar.json`, `sdk/typescript/src/{dollar,dollar-types,plugin}.ts`,
+  `crates/bingo-plugin-rpc/src/{wire,bridge}.rs`, generated plugin schemas/wire,
+  `docs/adr/0075-plugin-protocol-2.md`: plugin metadata in both transports.
+- `crates/bingo/src/plugins/test/driver.rs`: test metadata parity.
+
 ## Exit criteria
 
 - [x] Each committed example's validate and test commands exit 0 (below).
@@ -70,39 +79,22 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
 - Committing originals, JSX under Node, or type-checking Claude-only props
   such as AbovePrompt.hasSurvey (undefined means no survey here).
 
-## Re-verified (2026-10-14, `3b10b522`)
+## Re-verified / Risks (2026-10-14)
 
-- Landed: M136 `3dd2c95a`, M137 `c1d95e8c`, M138 `5581b978`, M139
-  `686ad289`, M140 `ba70fdf6`, M141 `a88a5363`, M142 `3b10b522`;
-  M147 `6e3b1b03`, M148 `fddb62f3`, M149 `b2bee6f4`, M150 `a2f77d96`,
-  M151 `6fad64ce`. M143–M145 dropped. Clean branch m146-parity at start.
-- Read all five originals at the supplied scratchpad cc-examples-2.1.296
-  directory. Current examples are independent rewrites with different
-  behavior. Original band hides rather than resets; pane uses tool-calls.
-- Catalogue tool.call/turn.complete, plugin metadata, Register/helpers,
-  JSX stripping and bingo/testing/mount exist. Edit/Bash inputs agree.
-  Linux CI already pins Node 24.17.0 and BINGO_REQUIRE_NODE=1.
-- No new dependencies, kernel nouns/doors, theme allowlists or schema
-  changes. Scoped pre-release schema edits would require a dated ADR-0075
-  line and BINGO_UPDATE_SCHEMA=1. No outside-Files mechanical arms changed.
+- Base `3b10b522`; M136–M142 and M147–M151 landed; M143–M145 dropped.
+  All five originals read; Edit/file_path and Bash/command already agree.
+  Linux CI pins Node 24.17.0 and requires it. Committed examples are rewrites.
+- Previous stop: validator misclassified plugin data reads and traversed
+  erased imports. Delegate authorized fixing both here; M142 has no owner.
+- Remaining candidate gaps: object atom keys (M142), numeric clock.now and
+  callback-free command.register (M138), synchronous ui.resolve (M140),
+  tool.call deny (M136). Reproduce; never change originals or Decisions.
+- No new dependency, kernel door/noun or theme allowlist widening. Scoped
+  schema changes use BINGO_UPDATE_SCHEMA=1 and a dated ADR-0075 line.
+- Existing rewrite tests have different expectations. Brick 2 still needs
+  behavior coverage; old port test failures alone do not prove runtime gaps.
 
-## Risks — STOP (2026-10-14, protocol step 6)
-
-- M142 owner: validate rejects direct $.plugin.name reads as dollar-static
-  aliases (`crates/bingo-mods/src/validate/dollar.rs`). It also traverses
-  the originals' type-only ../types import as a file, then reads a directory
-  (`validate/source.rs`). Both fixes are outside Files; no fix attempted.
-- Options: owner follow-up fixes first, then resume M146; or explicitly
-  expand M146 Files to those validator paths and their contract tests.
-- Still only source-inspected candidates: object-form atom keys (M142),
-  numeric clock.now and callback-free command.register (M138), synchronous
-  ui.resolve (M140), tool.call deny answers (M136). After validator fixes,
-  test these; a new door/noun or changed Decision requires another stop.
-- Existing rewrite tests expect protected.txt, an initial banner and ledger.
-  Their port failures do not alone prove runtime defects. Missing behavior
-  cases, Node parity, TUI drive, matrix and owner Non-goals remain pending.
-
-## Verified (2026-10-14, incomplete; stopped)
+## Verified (2026-10-14, incomplete; resumed)
 
 `cargo build -p bingo --locked`: exit 0, Finished dev profile in 1m 02s.
 All plugin commands used disposable homes; no live/credential tests.
