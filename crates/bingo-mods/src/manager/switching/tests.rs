@@ -142,7 +142,7 @@ async fn enabling_a_held_generation_replies_without_holding_other_switches() {
     drop(old);
     reap(&manager).await;
     // The later wish must win when the queued enable can finally proceed.
-    tokio::time::advance(std::time::Duration::from_secs(1)).await;
+    finish_workers(&manager).await;
     assert!(manager.modules()[0].engine.is_none());
 }
 
@@ -352,4 +352,24 @@ async fn deferred_switch_notifies_after_its_worker_finishes() {
         "background completion did not notify catalogues"
     );
     manager.stop().await;
+}
+
+#[tokio::test]
+async fn periodic_watch_reaps_a_released_generation() {
+    let (_root, manager, old) = fixture().await;
+    runtime(&manager);
+    let stopped = old.engine.as_ref().unwrap().stopped();
+    manager.switch("fixture", false).await.unwrap();
+    assert!(!stopped.is_cancelled());
+    drop(old);
+    tokio::time::pause();
+    manager.watch();
+    let closed = tokio::time::timeout(std::time::Duration::from_secs(3), stopped.cancelled())
+        .await
+        .is_ok();
+    manager.stop().await;
+    assert!(
+        closed,
+        "periodic watcher did not retire the released generation"
+    );
 }
