@@ -144,7 +144,7 @@ impl Host {
             &config.layers,
             &config.reserved_providers,
         )?;
-        registry.reserve_providers(&config.reserved_providers, &config.layers);
+        registry.reserve_providers(&config.reserved_providers, &plugins, &config.layers);
         for link in &mut registry.links {
             if let Some(name) = &link.external {
                 link.tier = settings

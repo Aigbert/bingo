@@ -378,3 +378,49 @@ async fn setting_an_invalid_name_never_echoes_url_credentials() {
         .unwrap();
     assert!(!error.message.contains("SECRET"));
 }
+
+#[tokio::test]
+async fn reserved_collision_names_the_disabled_provider_plugin() {
+    static OWNER: PluginManifest = PluginManifest {
+        id: "vendor.actual",
+        provides: &["provider:claimed"],
+        ..PROVIDER
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = HostConfig::new(Env::rooted(dir.path()));
+    config.reserved_providers.insert("claimed".into());
+    config.layers.push(settings::Layer::new(
+        settings::LayerOrigin::User,
+        "user.json",
+        json!({
+            "enabledPlugins":{"vendor.actual":false},
+            "local":{"instances":{"claimed":{}}}
+        })
+        .as_object()
+        .unwrap()
+        .clone(),
+    ));
+    let host = Host::build(
+        vec![
+            TestPlugin::boxed(&OWNER, vec![]),
+            TestPlugin::boxed(
+                &PROVIDER,
+                vec![Contribution::Provider(Arc::new(Local {
+                    name: "claimed".into(),
+                    url: "http://up".into(),
+                }))],
+            ),
+        ],
+        config,
+    )
+    .await
+    .unwrap();
+    assert!(
+        host.notices()
+            .iter()
+            .any(|(_, notice)| notice.contains("plugin `vendor.actual`")
+                && notice.contains("user.json")),
+        "{:?}",
+        host.notices()
+    );
+}

@@ -327,6 +327,7 @@ impl Registry {
     pub(super) fn reserve_providers(
         &mut self,
         names: &BTreeSet<String>,
+        plugins: &[Box<dyn Plugin>],
         layers: &[crate::settings::Layer],
     ) {
         let skipped: Vec<_> = self
@@ -338,7 +339,24 @@ impl Registry {
         self.providers
             .retain(|p| !p.instance() || !names.contains(p.id()));
         for instance in skipped {
-            self.skip_instance(instance.as_ref(), instance.id(), layers);
+            let capability = format!("provider:{}", instance.id());
+            let owner = plugins
+                .iter()
+                .map(|plugin| plugin.manifest())
+                .find(|manifest| manifest.provides.contains(&capability.as_str()));
+            if let Some(owner) = owner {
+                self.skip_instance(instance.as_ref(), owner.id, layers);
+            } else {
+                self.notices.push((
+                    "provider.instance".into(),
+                    super::instances::collision_reason(
+                        instance.as_ref(),
+                        "this binary reserves that provider name",
+                        layers,
+                        "the user settings file",
+                    ),
+                ));
+            }
         }
     }
 

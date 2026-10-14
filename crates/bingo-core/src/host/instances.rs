@@ -96,6 +96,20 @@ pub(super) fn collision(
     layers: &[crate::settings::Layer],
     fallback: &str,
 ) -> String {
+    collision_reason(
+        instance,
+        &format!("plugin `{winner}` provides that name"),
+        layers,
+        fallback,
+    )
+}
+
+pub(super) fn collision_reason(
+    instance: &dyn Provider,
+    reason: &str,
+    layers: &[crate::settings::Layer],
+    fallback: &str,
+) -> String {
     let name = instance.id();
     let family = instance.shape().unwrap_or_else(|| instance.family());
     let file = layers
@@ -112,7 +126,7 @@ pub(super) fn collision(
         .map(|layer| layer.source.as_str())
         .unwrap_or(fallback);
     format!(
-        "Skipped instance `{name}` in family `{family}`: plugin `{winner}` provides that name; rename or delete the `{family}` declaration in {file}."
+        "Skipped instance `{name}` in family `{family}`: {reason}; rename or delete the `{family}` declaration in {file}."
     )
 }
 
