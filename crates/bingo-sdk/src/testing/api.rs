@@ -8,6 +8,11 @@ use std::sync::Arc;
 
 #[async_trait]
 impl HostApi for TestHost {
+    async fn invalidate(&self, session: &SessionId, requests: Vec<String>) -> Result<(), KernelError> {
+        self.record(HostCall::Invalidate { session: session.clone(), requests });
+        Ok(())
+    }
+
     async fn approve(&self, request: Approval) -> Result<String, KernelError> {
         self.record(HostCall::Approve {
             request: request.clone(),

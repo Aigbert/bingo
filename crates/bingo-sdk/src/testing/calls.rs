@@ -5,6 +5,7 @@ use std::sync::Arc;
 /// Every HostApi verb, with the arguments supplied by its caller.
 #[derive(Clone)]
 pub enum HostCall {
+    Invalidate { session: SessionId, requests: Vec<String> },
     Approve {
         request: Approval,
     },
@@ -115,6 +116,7 @@ pub enum HostCall {
 impl std::fmt::Debug for HostCall {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Invalidate { session, requests } => fields(f, "Invalidate", &[("session", session), ("requests", requests)]),
             Self::Approve { request } => f.debug_tuple("Approve").field(request).finish(),
             Self::Render { session, request } => {
                 fields(f, "Render", &[("session", session), ("request", request)])
@@ -140,11 +142,9 @@ impl std::fmt::Debug for HostCall {
                 "Open",
                 &[("selector", selector), ("who", who), ("options", options)],
             ),
-            Self::Close { session, reason } => f
-                .debug_struct("Close")
-                .field("session", session)
-                .field("reason", reason)
-                .finish(),
+            Self::Close { session, reason } => {
+                fields(f, "Close", &[("session", session), ("reason", reason)])
+            }
             Self::Read { session } => fields(f, "SessionRead", &[("session", session)]),
             Self::Summary { session } => fields(f, "Summary", &[("session", session)]),
             Self::CheckDelete { session } => fields(f, "CheckDelete", &[("session", session)]),
@@ -175,11 +175,9 @@ impl std::fmt::Debug for HostCall {
                 kind,
                 payload,
             } => extension(f, "Signal", session, plugin, kind, payload),
-            Self::Invoke { session, call } => f
-                .debug_struct("Invoke")
-                .field("session", session)
-                .field("call", call)
-                .finish(),
+            Self::Invoke { session, call } => {
+                fields(f, "Invoke", &[("session", session), ("call", call)])
+            }
             Self::Ask {
                 session,
                 kind,
@@ -190,11 +188,9 @@ impl std::fmt::Debug for HostCall {
                 .field("kind", kind)
                 .field("answers", answers)
                 .finish(),
-            Self::Rewind { session, to_turn } => f
-                .debug_struct("Rewind")
-                .field("session", session)
-                .field("to_turn", to_turn)
-                .finish(),
+            Self::Rewind { session, to_turn } => {
+                fields(f, "Rewind", &[("session", session), ("to_turn", to_turn)])
+            }
             Self::Withdraw {
                 session,
                 intent,
@@ -205,11 +201,11 @@ impl std::fmt::Debug for HostCall {
                 .field("intent", intent)
                 .field("who", who)
                 .finish(),
-            Self::Reconfigure { session, change } => f
-                .debug_struct("Reconfigure")
-                .field("session", session)
-                .field("change", change)
-                .finish(),
+            Self::Reconfigure { session, change } => fields(
+                f,
+                "Reconfigure",
+                &[("session", session), ("change", change)],
+            ),
             Self::Catalog { kind } => f.debug_struct("Catalog").field("kind", kind).finish(),
             Self::Notice { level, code, text } => f
                 .debug_struct("Notice")

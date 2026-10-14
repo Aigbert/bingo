@@ -1,7 +1,7 @@
 use super::*;
 use serde_json::json;
 
-fn state() -> SessionState {
+pub(crate) fn state() -> SessionState {
     let Event::SessionUpdated { summary } = serde_json::from_str(include_str!(
         "../../bingo-sdk/fixtures/record/event/sessionUpdated.json"
     ))
@@ -98,9 +98,17 @@ async fn config_frames_invalidate_an_open_card_without_changing_selection() {
         host: host.handle(),
     };
     let frame: Frame = serde_json::from_value(json!({"session":state.summary.id, "seq":1,"ts":"2026-10-15T00:00:00Z","event":{"type":"configChanged","config":state.config}})).unwrap();
-    live::Refresh(selections.clone())
-        .on_event(&frame, &cx)
-        .await;
+    let status = Status { selections: selections.clone(), ..Default::default() };
+    let mut registrar = Registrar::new(ID, json!({}), Env::rooted("/unused"), Default::default());
+    status.register(&mut registrar).unwrap();
+    for contribution in registrar.into_contributions() {
+        if let Contribution::Hook(hook) = contribution {
+            hook.on_event(&frame, &cx).await;
+        }
+    }
+    assert!(host.calls().iter().any(|call| matches!(call,
+        testing::HostCall::Invalidate { session, requests } if session == &state.summary.id && requests == &[REQUEST.to_string()]
+    )));
     assert_eq!(selections.lock().unwrap()[&state.summary.id], "plugins");
 }
 #[test]
