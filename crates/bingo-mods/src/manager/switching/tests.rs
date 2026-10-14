@@ -165,21 +165,24 @@ fn runtime(manager: &Arc<Manager>) -> Arc<crate::dollar::Runtime> {
     assert!(manager.dollar.set(runtime.clone()).is_ok());
     runtime
 }
-fn process(runtime: &crate::dollar::Runtime, module: &Module) -> (String, SessionId) {
+async fn process(runtime: &crate::dollar::Runtime, module: &Module) -> (String, SessionId) {
     let session = SessionId::mint();
     let input = serde_json::from_value(json!({"session":session,"argv":[
         bingo_process::shell::resolve().unwrap().path(), "-c", "cat"]}))
     .unwrap();
-    let id = runtime
-        .processes_for_test()
-        .spawn(
-            "fixture",
-            &input,
-            &module.found.root,
-            Default::default(),
-            module.engine.as_ref().unwrap().stopped(),
-        )
-        .unwrap();
+    let id = generation::scope("fixture", &module.generation, async {
+        runtime
+            .processes_for_test()
+            .spawn(
+                "fixture",
+                &input,
+                &module.found.root,
+                Default::default(),
+                module.engine.as_ref().unwrap().stopped(),
+            )
+            .unwrap()
+    })
+    .await;
     (id, session)
 }
 
@@ -188,7 +191,7 @@ async fn reloading_an_off_module_preserves_the_retired_generations_process() {
     for rescan in [false, true] {
         let (_root, manager, old) = fixture().await;
         let runtime = runtime(&manager);
-        let (id, session) = process(&runtime, &old);
+        let (id, session) = process(&runtime, &old).await;
         manager.switch("fixture", false).await.unwrap();
         if rescan {
             std::fs::write(
@@ -200,10 +203,17 @@ async fn reloading_an_off_module_preserves_the_retired_generations_process() {
         } else {
             manager.reload_root(&old.found.root).await.unwrap();
         }
-        let alive = runtime
-            .processes_for_test()
-            .write("fixture", &session, &id, Some("still alive\n".into()))
-            .await;
+        let alive = generation::scope(
+            "fixture",
+            &old.generation,
+            runtime.processes_for_test().write(
+                "fixture",
+                &session,
+                &id,
+                Some("still alive\n".into()),
+            ),
+        )
+        .await;
         drop(old);
         reap(&manager).await;
         assert!(
@@ -217,9 +227,14 @@ async fn reloading_an_off_module_preserves_the_retired_generations_process() {
 async fn retirement_closes_the_engine_and_reaps_its_process() {
     let (_root, manager, old) = fixture().await;
     let runtime = runtime(&manager);
-    let (id, session) = process(&runtime, &old);
+    let (id, session) = process(&runtime, &old).await;
     let stopped = old.engine.as_ref().unwrap().stopped();
-    let mut output = Box::pin(runtime.processes_for_test().read("fixture", &session, &id));
+    let identity = old.generation.clone();
+    let mut output = Box::pin(generation::scope(
+        "fixture",
+        &identity,
+        runtime.processes_for_test().read("fixture", &session, &id),
+    ));
     assert!(futures::poll!(&mut output).is_pending());
     manager.switch("fixture", false).await.unwrap();
     assert!(!stopped.is_cancelled());
@@ -372,4 +387,76 @@ async fn periodic_watch_reaps_a_released_generation() {
         closed,
         "periodic watcher did not retire the released generation"
     );
+}
+
+#[tokio::test]
+async fn retiring_an_old_generation_preserves_the_new_generations_process() {
+    let (_root, manager, old) = fixture().await;
+    let runtime = runtime(&manager);
+    let new = Module::load(
+        old.found.clone(),
+        json!({}),
+        Limits::default(),
+        &manager.env,
+        false,
+    )
+    .await;
+    manager.publish_callbacks(old.clone());
+    manager.publish_callbacks(new.clone());
+    let old_id = old.generation.clone();
+    manager.modules.write().unwrap()[0] = new.clone();
+    manager.switches.retired.lock().await.push(old);
+    let (id, session) = process(&runtime, &new).await;
+    reap(&manager).await;
+    let alive = generation::scope(
+        "fixture",
+        &new.generation,
+        runtime.processes_for_test().write(
+            "fixture",
+            &session,
+            &id,
+            Some("new generation\n".into()),
+        ),
+    )
+    .await;
+    assert_eq!(
+        manager.callbacks.get("fixture").unwrap().generation(),
+        Some(new.generation.clone())
+    );
+    let old_callback = generation::scope("fixture", &old_id, async {
+        manager.callbacks.get("fixture")
+    })
+    .await;
+    assert!(old_callback.is_err());
+    let foreign = generation::scope(
+        "fixture",
+        &old_id,
+        runtime
+            .processes_for_test()
+            .write("fixture", &session, &id, Some("foreign".into())),
+    )
+    .await;
+    assert!(foreign.is_err(), "old generation accessed the new handle");
+    manager.stop().await;
+    assert!(
+        alive.is_ok(),
+        "old retirement destroyed the new process: {alive:?}"
+    );
+}
+
+#[tokio::test]
+async fn retired_callbacks_require_their_generations_scope() {
+    let (_root, manager, old) = fixture().await;
+    runtime(&manager);
+    manager.publish_callbacks(old.clone());
+    assert!(manager.callbacks.get("fixture").is_ok());
+    manager.switch("fixture", false).await.unwrap();
+    let ordinary = manager.callbacks.get("fixture");
+    let captured = generation::scope("fixture", &old.generation, async {
+        manager.callbacks.get("fixture")
+    })
+    .await;
+    manager.stop().await;
+    assert!(ordinary.is_err(), "retired callback accepted new dispatch");
+    assert!(captured.is_ok(), "captured generation lost its callback");
 }

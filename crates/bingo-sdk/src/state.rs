@@ -51,7 +51,47 @@ pub struct SessionState {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub invalidated: BTreeMap<String, u64>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub signals: BTreeMap<String, BTreeMap<String, Value>>,
+    pub signals: BTreeMap<String, BTreeMap<String, LiveSignal>>,
+}
+
+/// Ownership travels with the payload, including attachment snapshots.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct LiveSignal {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    generation: Option<ItemId>,
+    payload: Value,
+}
+impl LiveSignal {
+    pub fn generation(&self) -> Option<&ItemId> {
+        self.generation.as_ref()
+    }
+    pub fn payload(&self) -> &Value {
+        &self.payload
+    }
+}
+impl std::ops::Deref for LiveSignal {
+    type Target = Value;
+    fn deref(&self) -> &Value {
+        self.payload()
+    }
+}
+impl std::ops::DerefMut for LiveSignal {
+    fn deref_mut(&mut self) -> &mut Value {
+        &mut self.payload
+    }
+}
+impl From<Value> for LiveSignal {
+    fn from(payload: Value) -> Self {
+        Self {
+            generation: None,
+            payload,
+        }
+    }
+}
+impl PartialEq<Value> for LiveSignal {
+    fn eq(&self, value: &Value) -> bool {
+        self.payload() == value
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -206,10 +246,11 @@ impl SessionState {
                 payload,
             } => self.extended(plugin, kind, payload),
             Event::Signal {
+                generation,
                 plugin,
                 kind,
                 payload,
-            } => self.signalled(plugin, kind, payload),
+            } => self.signalled(plugin, kind, payload, generation.as_ref()),
             Event::Invalidated { requests } => {
                 for request in requests {
                     let generation = self.invalidated.entry(request.clone()).or_default();
@@ -238,19 +279,33 @@ impl SessionState {
         Applied::Extension
     }
 
-    fn signalled(&mut self, plugin: &str, kind: &str, payload: &Value) -> Applied {
+    fn signalled(
+        &mut self,
+        plugin: &str,
+        kind: &str,
+        payload: &Value,
+        generation: Option<&ItemId>,
+    ) -> Applied {
         if payload.is_null() {
             if let Some(kinds) = self.signals.get_mut(plugin) {
+                if generation.is_some_and(|id| {
+                    kinds.get(kind).and_then(|signal| signal.generation()) != Some(id)
+                }) {
+                    return Applied::Nothing;
+                }
                 kinds.remove(kind);
                 if kinds.is_empty() {
                     self.signals.remove(plugin);
                 }
             }
         } else {
-            self.signals
-                .entry(plugin.to_string())
-                .or_default()
-                .insert(kind.to_string(), payload.clone());
+            self.signals.entry(plugin.to_string()).or_default().insert(
+                kind.to_string(),
+                LiveSignal {
+                    generation: generation.cloned(),
+                    payload: payload.clone(),
+                },
+            );
         }
         Applied::Signal
     }
@@ -912,10 +967,50 @@ mod tests {
         assert_eq!(st.transcript.generation(), 1);
     }
 
+    #[test]
+    fn generation_ownership_survives_snapshots_and_rejects_old_cleanup() {
+        let mut st = SessionState::new(summary());
+        let old = ItemId::mint();
+        let new = ItemId::mint();
+        for (seq, generation, payload) in [
+            (1, old.clone(), serde_json::json!({"slots":[]})),
+            (2, new.clone(), serde_json::json!({"slots":[]})),
+            (3, old.clone(), Value::Null),
+        ] {
+            st.apply(&frame(
+                seq,
+                Event::Signal {
+                    plugin: "fixture".into(),
+                    kind: "pane".into(),
+                    generation: Some(generation),
+                    payload,
+                },
+            ));
+        }
+        let wire = serde_json::to_value(&st).unwrap();
+        assert_eq!(
+            wire["signals"]["fixture"]["pane"]["generation"],
+            serde_json::json!(new)
+        );
+        let mut restored: SessionState = serde_json::from_value(wire).unwrap();
+        assert_eq!(restored.signals["fixture"]["pane"].generation(), Some(&new));
+        restored.apply(&frame(
+            4,
+            Event::Signal {
+                plugin: "fixture".into(),
+                kind: "pane".into(),
+                generation: Some(new),
+                payload: Value::Null,
+            },
+        ));
+        assert!(restored.signals.is_empty());
+    }
+
     fn signal(seq: u64, kind: &str, payload: Value) -> Frame {
         frame(
             seq,
             Event::Signal {
+                generation: None,
                 plugin: "bingo.demo.ui".into(),
                 kind: kind.into(),
                 payload,

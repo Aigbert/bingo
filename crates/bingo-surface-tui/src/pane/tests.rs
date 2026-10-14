@@ -20,7 +20,7 @@ fn with(slot: Slot) -> bingo_sdk::SessionState {
     let mut state = state();
     state.signals.entry("counter".into()).or_default().insert(
         "pane".into(),
-        bingo_sdk::slot::with(serde_json::json!({}), [slot]),
+        bingo_sdk::slot::with(serde_json::json!({}), [slot]).into(),
     );
     state
 }

@@ -159,12 +159,16 @@ impl Manager {
         if !module.admission.allowed() {
             return Err("module is not admitted".into());
         }
-        bingo_plugin_host::ops::call(
-            self.host.get().ok_or("host is not ready")?,
-            name,
-            &module.store,
-            method,
-            params,
+        generation::scope(
+            &module.found.name,
+            &module.generation,
+            bingo_plugin_host::ops::call(
+                self.host.get().ok_or("host is not ready")?,
+                name,
+                &module.store,
+                method,
+                params,
+            ),
         )
         .await
     }
@@ -181,10 +185,18 @@ impl Manager {
         self.callbacks.insert(
             module.found.name.clone(),
             Arc::new(crate::dollar::callback::Native {
-                module,
+                generation: module.generation.clone(),
+                module: Arc::downgrade(&module),
                 manager: self.this.get().cloned().unwrap_or_default(),
             }),
         );
+    }
+    pub(crate) fn has_generation(&self, id: &ItemId) -> bool {
+        self.modules
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .iter()
+            .any(|module| &module.generation == id)
     }
     fn modules(&self) -> Vec<Arc<Module>> {
         self.modules

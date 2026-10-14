@@ -140,6 +140,18 @@ impl HostApi for PluginHost {
         self.inner().signal(session, plugin, kind, payload).await
     }
 
+    async fn transfer_signals(
+        &self,
+        session: &SessionId,
+        plugin: &str,
+        from: &ItemId,
+        to: &ItemId,
+    ) -> Result<(), KernelError> {
+        self.inner()
+            .transfer_signals(session, plugin, from, to)
+            .await
+    }
+
     async fn invoke(
         &self,
         _session: &SessionId,
@@ -245,5 +257,19 @@ impl SessionPort for PluginPort {
 
     async fn events_since(&self, since: Seq) -> Result<FrameStream, KernelError> {
         self.0.events_since(since).await
+    }
+}
+
+impl super::Host {
+    pub(crate) fn effective_switches(
+        &self,
+        off: std::collections::BTreeSet<String>,
+    ) -> std::collections::BTreeSet<String> {
+        crate::plugins::effective_switches(&self.plugins, off)
+    }
+    pub(crate) fn plugins_changed(&self) {
+        for kind in [CatalogKind::Plugins, CatalogKind::Commands] {
+            self.catalog_changed(kind);
+        }
     }
 }

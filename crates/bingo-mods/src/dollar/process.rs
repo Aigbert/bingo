@@ -19,6 +19,7 @@ use tokio::{
 const GRACE: Duration = Duration::from_millis(100);
 struct Held {
     owner: String,
+    identity: Option<bingo_sdk::ItemId>,
     generation: bingo_sdk::CancellationToken,
     watcher: Mutex<Option<tokio::task::JoinHandle<()>>>,
     session: SessionId,
@@ -62,7 +63,10 @@ impl Processes {
             .unwrap_or_else(|e| e.into_inner())
             .get(id)
             .filter(|held| {
-                held.owner == plugin && held.session == *session && !held.generation.is_cancelled()
+                held.owner == plugin
+                    && held.identity == bingo_sdk::generation::current(plugin)
+                    && held.session == *session
+                    && !held.generation.is_cancelled()
             })
             .cloned()
             .ok_or_else(|| "process handle is not owned by this plugin and session".into())
@@ -116,13 +120,19 @@ impl Processes {
             .map_err(failed)?;
         Ok(())
     }
-    pub async fn remove(&self, plugin: Option<&str>, session: Option<&SessionId>) {
+    pub async fn remove(
+        &self,
+        plugin: Option<&str>,
+        generation: Option<&bingo_sdk::ItemId>,
+        session: Option<&SessionId>,
+    ) {
         let removed = {
             let mut map = self.0.lock().unwrap_or_else(|e| e.into_inner());
             let ids: Vec<_> = map
                 .iter()
                 .filter(|(_, held)| {
                     plugin.is_none_or(|p| held.owner == p)
+                        && generation.is_none_or(|id| held.identity.as_ref() == Some(id))
                         && session.is_none_or(|s| held.session == *s)
                 })
                 .map(|(id, _)| id.clone())
@@ -180,6 +190,7 @@ fn start(
         generation: Default::default(),
         watcher: Default::default(),
         owner: plugin.into(),
+        identity: bingo_sdk::generation::current(plugin),
         session: input.session.clone(),
         stdin: AsyncMutex::new(tree.take_stdin()),
         stdout: AsyncMutex::new(tree.take_stdout()),
@@ -287,6 +298,6 @@ mod tests {
             .await
             .expect("tree descendants close stdout")
             .unwrap();
-        processes.remove(None, None).await;
+        processes.remove(None, None, None).await;
     }
 }

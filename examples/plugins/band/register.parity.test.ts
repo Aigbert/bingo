@@ -31,7 +31,7 @@ test('only a turn beyond two minutes publishes a toast', async $ => {
   await mock.clock.advance(120000);
   await hooks.get('turn.complete')(api, {}, async () => null);
   const toasts = async () => Object.values((await mock.session.snapshot() as any).signals?.[$.plugin.name] ?? {})
-    .flatMap((value: any) => value.slots ?? []).filter((slot:any) => slot.kind === 'toast');
+    .flatMap((value: any) => value.payload.slots ?? []).filter((slot:any) => slot.kind === 'toast');
   expect((await toasts()).length).toBe(0);
   await mock.clock.advance(1000);
   await hooks.get('turn.complete')(api, {}, async () => null);

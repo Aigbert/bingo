@@ -3,24 +3,32 @@ use crate::{manager::Manager, module::Module};
 use bingo_plugin_host::callback::Executor;
 use bingo_sdk::*;
 use serde_json::{Value, json};
-use std::sync::{Arc, Weak};
+use std::sync::Weak;
 
 pub(crate) struct Native {
-    pub module: Arc<Module>,
+    pub module: Weak<Module>,
+    pub generation: ItemId,
     pub manager: Weak<Manager>,
 }
 #[async_trait::async_trait]
 impl Executor for Native {
     fn stopped(&self) -> CancellationToken {
         self.module
-            .engine
-            .as_ref()
-            .map(|engine| engine.stopped())
+            .upgrade()
+            .and_then(|module| module.engine.as_ref().map(|engine| engine.stopped()))
             .unwrap_or_else(|| {
                 let stop = CancellationToken::new();
                 stop.cancel();
                 stop
             })
+    }
+    fn is_current(&self) -> bool {
+        self.manager
+            .upgrade()
+            .is_some_and(|manager| manager.has_generation(&self.generation))
+    }
+    fn generation(&self) -> Option<ItemId> {
+        Some(self.generation.clone())
     }
     async fn prepare(&self) -> Result<(), String> {
         self.manager
@@ -31,7 +39,11 @@ impl Executor for Native {
         Ok(())
     }
     async fn call(&self, id: &str, input: Value, cx: &HookContext) -> Result<Value, String> {
-        if !self.module.admission.allowed() {
+        let module = self
+            .module
+            .upgrade()
+            .ok_or("module generation is unavailable")?;
+        if !module.admission.allowed() {
             return Err("module is not admitted".into());
         }
         if id == "__ui__" && input["event"] == "open" {
@@ -39,21 +51,25 @@ impl Executor for Native {
                 .host
                 .service_wire("bingo.plugin.ui")
                 .ok_or("ui is unavailable")?;
-            return bingo_plugin_host::ops::scope(
-                &cx.host,
-                &self.module.found.name,
-                &self.module.store,
-                ui.call(
-                    "choose",
-                    json!({"session":cx.session,"id":input["handler"]}),
+            return generation::scope(
+                &module.found.name,
+                &module.generation,
+                bingo_plugin_host::ops::scope(
+                    &cx.host,
+                    &module.found.name,
+                    &module.store,
+                    ui.call(
+                        "choose",
+                        json!({"session":cx.session,"id":input["handler"]}),
+                    ),
                 ),
             )
             .await
             .map_err(|error| error.to_string());
         }
-        let engine = self.module.engine.as_ref().ok_or("module is unavailable")?;
+        let engine = module.engine.as_ref().ok_or("module is unavailable")?;
         let site = json!({"callback":id,"session":cx.session,"turn":cx.turn,"cwd":cx.cwd,
-            "plugin":self.module.identity()});
+            "plugin":module.identity()});
         let mut call = engine
             .call("callback", input, site)
             .map_err(|error| error.to_string())?;
@@ -61,7 +77,7 @@ impl Executor for Native {
             tokio::select! {
                 biased;
                 Some(operation) = call.operations.recv() => {
-                    let result = call.reads.scope(crate::link::operation(&self.module, cx, usize::MAX,
+                    let result = call.reads.scope(crate::link::operation(&module, cx, usize::MAX,
                         &operation.method, operation.params)).await;
                     let _ = operation.reply.send(result);
                 }

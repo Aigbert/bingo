@@ -222,18 +222,6 @@ impl Host {
         }
     }
 
-    pub(crate) fn effective_switches(
-        &self,
-        off: std::collections::BTreeSet<String>,
-    ) -> std::collections::BTreeSet<String> {
-        crate::plugins::effective_switches(&self.plugins, off)
-    }
-    pub(crate) fn plugins_changed(&self) {
-        for kind in [CatalogKind::Plugins, CatalogKind::Commands] {
-            self.catalog_changed(kind);
-        }
-    }
-
     pub fn registry(&self) -> &Registry {
         &self.registry
     }
@@ -854,6 +842,19 @@ impl HostApi for Host {
     /// The session must be live and running a turn: one that is only stored
     /// is answering nobody, and reopening it would open a session with no
     /// turn to serve the call anyway (ADR-0036 §2).
+    async fn transfer_signals(
+        &self,
+        session: &SessionId,
+        plugin: &str,
+        from: &ItemId,
+        to: &ItemId,
+    ) -> Result<(), KernelError> {
+        self.mailbox_of(session)
+            .await?
+            .transfer_signals(plugin.into(), from.clone(), to.clone())
+            .await
+    }
+
     async fn invoke(
         &self,
         session: &SessionId,

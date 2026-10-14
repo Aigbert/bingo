@@ -147,20 +147,24 @@ pub(crate) async fn operation(
     params: Value,
 ) -> Result<Value, String> {
     // Keep the large host future off the stack when grant scopes compose.
-    let operation = Box::pin(invocation::from(&module.found.name, hook, async {
-        tokio::time::timeout(
-            HOOK_DEADLINE,
-            bingo_plugin_host::ops::call(
-                &cx.host,
-                &module.found.name,
-                &module.store,
-                method,
-                params,
-            ),
-        )
-        .await
-        .map_err(|_| format!("{method}: host operation deadline exceeded"))?
-    }));
+    let operation = Box::pin(generation::scope(
+        &module.found.name,
+        &module.generation,
+        invocation::from(&module.found.name, hook, async {
+            tokio::time::timeout(
+                HOOK_DEADLINE,
+                bingo_plugin_host::ops::call(
+                    &cx.host,
+                    &module.found.name,
+                    &module.store,
+                    method,
+                    params,
+                ),
+            )
+            .await
+            .map_err(|_| format!("{method}: host operation deadline exceeded"))?
+        }),
+    ));
     match module.admission.decision()? {
         Some(grant) => bingo_plugin_host::grant::scope(&module.found.name, grant, operation).await,
         None => operation.await,

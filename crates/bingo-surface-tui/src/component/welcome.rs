@@ -78,7 +78,8 @@ fn changed_state(facts: &WelcomeProps) -> SessionState {
                     current: current.clone(),
                     modes: Vec::new(),
                 }),
-        ),
+        )
+        .into(),
     );
     state
 }

@@ -211,6 +211,7 @@ impl Journals {
                     session: session.clone(),
                     cause: None,
                     event: Event::Signal {
+                        generation: None,
                         plugin: plugin.to_string(),
                         kind: kind.to_string(),
                         payload,

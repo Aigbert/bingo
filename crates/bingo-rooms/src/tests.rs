@@ -225,6 +225,7 @@ impl Fleet {
                     plugin,
                     kind: said,
                     payload,
+                    ..
                 } if plugin == PLUGIN && said == kind => Some(payload.clone()),
                 _ => None,
             })
@@ -383,6 +384,7 @@ impl Fleet {
                 fixture.remember(
                     session,
                     Event::Signal {
+                        generation: None,
                         plugin: plugin.to_string(),
                         kind: kind.to_string(),
                         payload,

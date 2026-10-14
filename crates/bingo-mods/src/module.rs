@@ -7,6 +7,7 @@ use std::sync::{Arc, OnceLock};
 
 pub(crate) struct Module {
     pub found: Found,
+    pub generation: ItemId,
     pub admission: Admission,
     pub engine: Option<Arc<Engine>>,
     pub store: Store,
@@ -46,6 +47,7 @@ impl Module {
             None
         };
         Arc::new(Self {
+            generation: ItemId::mint(),
             store: Store::new(&env.data_dir, &found.name),
             found,
             admission,

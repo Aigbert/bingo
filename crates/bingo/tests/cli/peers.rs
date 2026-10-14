@@ -237,6 +237,7 @@ fn owed(out: &Output) -> Vec<String> {
                 plugin,
                 kind,
                 payload,
+                ..
             } if plugin == "bingo.rooms" && kind == "owed" => {
                 Some(payload["rows"][0][1].as_str()?.to_string())
             }

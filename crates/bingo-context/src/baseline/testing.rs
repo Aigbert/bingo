@@ -134,6 +134,7 @@ impl Journal {
                 let kind = &kind;
                 assert_eq!(session, &fixture.state().summary.id);
                 fixture.apply(Event::Signal {
+                    generation: None,
                     plugin: plugin.into(),
                     kind: kind.into(),
                     payload,

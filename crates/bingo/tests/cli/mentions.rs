@@ -87,6 +87,7 @@ fn cards(out: &Output) -> Vec<Value> {
                 plugin,
                 kind,
                 payload,
+                ..
             } if plugin == "bingo.rooms" && kind == "owed" => Some(payload),
             _ => None,
         })

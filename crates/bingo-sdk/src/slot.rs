@@ -139,15 +139,19 @@ pub fn with(mut payload: Value, slots: impl IntoIterator<Item = Slot>) -> Value 
 /// Read all three lanes in plugin and kind order, preserving each slot's order.
 /// An unreadable slot is skipped without losing its readable neighbours.
 pub fn placed(state: &SessionState) -> Vec<Placed> {
-    let mut payloads: Vec<(&str, &str, &Value)> = [&state.signals, &state.extensions]
-        .into_iter()
-        .flat_map(|lane| {
-            lane.iter().flat_map(|(plugin, kinds)| {
-                kinds
-                    .iter()
-                    .map(move |(kind, payload)| (plugin.as_str(), kind.as_str(), payload))
-            })
+    let mut payloads: Vec<(&str, &str, &Value)> = state
+        .signals
+        .iter()
+        .flat_map(|(plugin, kinds)| {
+            kinds
+                .iter()
+                .map(move |(kind, signal)| (plugin.as_str(), kind.as_str(), signal.payload()))
         })
+        .chain(state.extensions.iter().flat_map(|(plugin, kinds)| {
+            kinds
+                .iter()
+                .map(move |(kind, payload)| (plugin.as_str(), kind.as_str(), payload))
+        }))
         .chain(
             state
                 .config
@@ -250,7 +254,7 @@ mod tests {
         let good = serde_json::to_value(&slots()[0]).unwrap();
         state.signals.entry("stranger".into()).or_default().insert(
             "live".into(),
-            json!({"slots": [{"kind":"future"}, good, {"kind":"status"}]}),
+            json!({"slots": [{"kind":"future"}, good, {"kind":"status"}]}).into(),
         );
         assert_eq!(
             placed(&state),
@@ -270,12 +274,12 @@ mod tests {
             .signals
             .entry("z".into())
             .or_default()
-            .insert("a".into(), payload.clone());
+            .insert("a".into(), payload.clone().into());
         state
             .signals
             .entry("a".into())
             .or_default()
-            .insert("z".into(), payload.clone());
+            .insert("z".into(), payload.clone().into());
         state
             .extensions
             .entry("a".into())

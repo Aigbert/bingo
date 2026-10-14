@@ -28,7 +28,7 @@ impl Live {
                 if value.is_null() {
                     held.is_none()
                 } else {
-                    held == Some(value)
+                    held.map(|signal| signal.payload()) == Some(value)
                 }
             })
             .await

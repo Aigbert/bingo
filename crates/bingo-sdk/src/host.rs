@@ -507,6 +507,20 @@ pub trait HostApi: Send + Sync {
         payload: Value,
     ) -> Result<(), KernelError>;
 
+    /// Transfer only live signals still owned by `from` to its replacement.
+    async fn transfer_signals(
+        &self,
+        _session: &SessionId,
+        _plugin: &str,
+        _from: &ItemId,
+        _to: &ItemId,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::new(
+            ErrorCode::Unsupported,
+            "signal transfer is unavailable",
+        ))
+    }
+
     /// Hand a tool call to a session's running turn and wait for what it comes
     /// to (ADR-0036 §2). The turn's own machinery serves it: the same gate, a
     /// real tool item journaled under the turn, a cancel token that is a child

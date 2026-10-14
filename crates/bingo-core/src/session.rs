@@ -16,6 +16,7 @@ mod mailbox;
 mod past;
 mod queue;
 mod running;
+mod signals;
 mod spawn;
 mod storage;
 mod subscribers;
@@ -178,10 +179,17 @@ impl Actor {
                 self.publish(Event::Invalidated { requests }, None).await?;
             }
             Msg::Signal {
+                generation,
                 plugin,
                 kind,
                 payload,
-            } => self.signal(plugin, kind, payload).await?,
+            } => signals::publish(self, plugin, kind, payload, generation).await?,
+            Msg::TransferSignals {
+                plugin,
+                from,
+                to,
+                reply,
+            } => signals::transfer(self, plugin, from, to, reply).await,
             Msg::Interrupt { intent, scope } => self.interrupt(intent, scope).await?,
             Msg::Withdraw {
                 intent,
@@ -275,23 +283,6 @@ impl Actor {
         } else {
             self.publish(event, None).await?;
         }
-        Ok(())
-    }
-
-    /// A plugin's live state as an ephemeral frame (ADR-0013 §2): `publish`
-    /// keeps it off the journal because `Event::Signal` is not durable.
-    async fn signal(
-        &mut self,
-        plugin: String,
-        kind: String,
-        payload: Value,
-    ) -> Result<(), KernelError> {
-        let event = Event::Signal {
-            plugin,
-            kind,
-            payload,
-        };
-        self.publish(event, None).await?;
         Ok(())
     }
 

@@ -545,6 +545,7 @@ fn cards(lines: &[serde_json::Value]) -> Vec<serde_json::Value> {
                 plugin,
                 kind,
                 payload,
+                ..
             } if plugin == "bingo.rooms" && kind == "owed" => Some(payload),
             _ => None,
         })
@@ -944,6 +945,7 @@ fn ears(frames: &[Frame]) -> Vec<(String, u64)> {
                 plugin,
                 kind,
                 payload,
+                ..
             } if plugin == "bingo.rooms" && kind.starts_with("ear:") => {
                 Some((kind.clone(), payload["patience_s"].as_u64()?))
             }

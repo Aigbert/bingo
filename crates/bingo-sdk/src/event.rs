@@ -182,6 +182,8 @@ pub enum Event {
         requests: Vec<String>,
     },
     Signal {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        generation: Option<ItemId>,
         plugin: String,
         kind: String,
         payload: Value,
@@ -1033,6 +1035,7 @@ mod tests {
             frame(
                 25,
                 Event::Signal {
+                    generation: None,
                     plugin: "bingo.demo.ui".into(),
                     kind: "progress".into(),
                     payload: serde_json::json!({"kind": "progress", "value": 3, "total": 10}),

@@ -30,7 +30,9 @@ future dispatch and retires the old generation after its in-flight work ends.
 Enabling loads a new generation with admission and current repository approval.
 If the old generation still serves a turn after five seconds, enable replies
 that it is queued after the running turn. Other switches remain available;
-a later disable supersedes that queued enable.
+a later disable supersedes that queued enable. The listing and command
+completions refresh when it finishes, including after the command is cancelled.
+Retirement releases only that generation's processes, signals and callbacks.
 `$.state` and `$.store` survive; session-start hooks run again.
 A module holding declared or trust-granted
 `tool` authority is conservatively held until next start because it can register

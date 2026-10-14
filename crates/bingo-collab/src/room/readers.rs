@@ -207,5 +207,9 @@ fn published<'a>(state: &'a SessionState, kind: &str) -> Option<&'a Value> {
 /// is named for the lane rather than the call, so the fixture that writes one
 /// keeps the plugin's own word for it.
 fn live(state: &SessionState, kind: &str) -> Option<Value> {
-    state.signals.get(PLUGIN)?.get(kind).cloned()
+    state
+        .signals
+        .get(PLUGIN)?
+        .get(kind)
+        .map(|signal| signal.payload().clone())
 }

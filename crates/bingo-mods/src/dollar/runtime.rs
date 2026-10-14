@@ -105,17 +105,19 @@ impl Runtime {
         &self.processes
     }
 
-    pub async fn reload(&self, plugin: &str) {
-        self.processes.remove(Some(plugin), None).await;
-        self.env.remove(plugin);
+    pub async fn reload(&self, plugin: &str, generation: &ItemId) {
+        self.processes
+            .remove(Some(plugin), Some(generation), None)
+            .await;
+        self.env.remove(plugin, generation);
     }
     pub async fn stop(&self) {
-        self.processes.remove(None, None).await;
+        self.processes.remove(None, None, None).await;
         self.timers.stop().await;
         self.sessions.stop().await;
     }
     pub async fn end(&self, session: &SessionId) {
-        self.processes.remove(None, Some(session)).await;
+        self.processes.remove(None, None, Some(session)).await;
         self.audit.end(session);
         self.timers.end(session).await;
         self.sessions.remove(session).await;

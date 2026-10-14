@@ -96,11 +96,10 @@ async fn default_rebound_and_static_keys_use_the_command_catalogue() {
 fn pane(view: View) -> SessionState {
     let mut state = state();
     let slot: bingo_sdk::slot::Slot = serde_json::from_value(json!({"kind":"pane","id":"keys","title":"Keys","focus":true,"asked":true,"closeOnEscape":true,"holdToasts":false,"rows":8,"view":view})).unwrap();
-    state
-        .signals
-        .entry("hello".into())
-        .or_default()
-        .insert("pane".into(), bingo_sdk::slot::with(json!({}), [slot]));
+    state.signals.entry("hello".into()).or_default().insert(
+        "pane".into(),
+        bingo_sdk::slot::with(json!({}), [slot]).into(),
+    );
     state
 }
 #[tokio::test]
@@ -750,7 +749,8 @@ fn toast_run(
                 until: now.wall.checked_add(Duration::from_secs(60)).unwrap(),
                 alert: false,
             }],
-        ),
+        )
+        .into(),
     );
     let session = Arc::new(TestSession::default());
     let mut run = tests::idle_in(state, session.clone(), now.instant);

@@ -16,7 +16,8 @@ fn fixture(focus: bool, asked: bool, button: bool) -> bingo_sdk::SessionState {
             "closeOnEscape":true,"holdToasts":false,"place":["above"],
             "size":{"rows":{"min":2,"ideal":4,"max":4},"columns":{"min":8,"ideal":22,"max":"100%"}},
             "view":view
-        }]}),
+        }]})
+        .into(),
     );
     state
 }

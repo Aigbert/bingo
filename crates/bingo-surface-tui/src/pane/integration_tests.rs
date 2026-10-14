@@ -12,11 +12,10 @@ fn state_with(place: serde_json::Value) -> bingo_sdk::SessionState {
         "view":{"request":{"component":"Pane","requestId":"counter","surface":"terminal",
         "props":{},"viewport":{"columns":0,"rows":0}}}}))
     .unwrap();
-    state
-        .signals
-        .entry("counter".into())
-        .or_default()
-        .insert("pane".into(), bingo_sdk::slot::with(json!({}), [slot]));
+    state.signals.entry("counter".into()).or_default().insert(
+        "pane".into(),
+        bingo_sdk::slot::with(json!({}), [slot]).into(),
+    );
     state
 }
 #[test]
@@ -225,6 +224,7 @@ fn escape_closes_a_focused_pane_despite_a_retained_or_late_answer() {
     state.apply(&frame(
         1,
         Event::Signal {
+            generation: None,
             plugin: "counter".into(),
             kind: "pane".into(),
             payload: serde_json::Value::Null,

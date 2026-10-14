@@ -190,6 +190,7 @@ impl Journals {
                 fixture.fold(
                     session,
                     Event::Signal {
+                        generation: None,
                         plugin: plugin.to_string(),
                         kind: kind.to_string(),
                         payload,

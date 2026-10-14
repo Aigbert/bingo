@@ -124,17 +124,7 @@ pub(super) async fn switch_module(
     if !current(manager, name, request) {
         return Ok(PluginSwitch::Now);
     }
-    let old = manager
-        .modules()
-        .into_iter()
-        .find(|module| {
-            module
-                .admission
-                .status(&module.found, PluginRuntime::Module, "bingo.mods")
-                .id
-                == name
-        })
-        .ok_or_else(|| reload::failed("module unavailable"))?;
+    let old = resident(manager, name)?;
     let kind = classify(manager, &old);
     if kind != PluginSwitch::Now {
         return Ok(kind);
@@ -168,6 +158,19 @@ pub(super) async fn switch_module(
     );
     Ok(PluginSwitch::Now)
 }
+fn resident(manager: &Manager, name: &str) -> Result<Arc<Module>, KernelError> {
+    manager
+        .modules()
+        .into_iter()
+        .find(|module| {
+            module
+                .admission
+                .status(&module.found, PluginRuntime::Module, "bingo.mods")
+                .id
+                == name
+        })
+        .ok_or_else(|| reload::failed("module unavailable"))
+}
 async fn defer_retirement(
     manager: &Manager,
     name: &str,
@@ -193,11 +196,8 @@ async fn activate_switch(
 ) -> Result<(), KernelError> {
     let name = module.found.name.as_str();
     let owned = old.engine.is_some();
-    if owned {
-        manager.callbacks.remove(name);
-        if let Some(dollar) = manager.dollar.get() {
-            dollar.unregister(name);
-        }
+    if owned && let Some(dollar) = manager.dollar.get() {
+        dollar.unregister(name);
     }
     manager.replace(&old, module.clone());
     if owned {
@@ -253,34 +253,24 @@ pub(super) async fn reap(manager: &Manager) {
         .collect();
     for module in ready {
         module.close().await;
-        // The reload lock keeps enable out until name-scoped cleanup finishes.
+        // Release only this generation after its last running reference ends.
         manager
             .switches
             .retired
             .lock()
             .await
             .retain(|entry| !Arc::ptr_eq(entry, &module));
-        cleanup(manager, &module.found.name).await;
+        cleanup(manager, &module).await;
     }
 }
-pub(super) async fn cleanup(manager: &Manager, name: &str) {
-    // Name-scoped state may still belong to a turn using a retired generation.
-    if retired(manager, name).await {
-        return;
-    }
-    manager.clear_signals(name).await;
-    if let Some(dollar) = manager.dollar.get() {
-        dollar.reload(name).await;
-    }
-}
-pub(super) async fn retired(manager: &Manager, name: &str) -> bool {
+pub(super) async fn cleanup(manager: &Manager, module: &Module) {
     manager
-        .switches
-        .retired
-        .lock()
-        .await
-        .iter()
-        .any(|module| module.found.name == name)
+        .callbacks
+        .remove_generation(&module.found.name, &module.generation);
+    manager.clear_signals(module).await;
+    if let Some(dollar) = manager.dollar.get() {
+        dollar.reload(&module.found.name, &module.generation).await;
+    }
 }
 fn next(why: &str) -> PluginSwitch {
     PluginSwitch::NextStart { why: why.into() }

@@ -4,8 +4,9 @@ use super::{
     world::{EnvGet, EnvSet},
 };
 use std::{collections::BTreeMap, sync::Mutex};
+type Values = BTreeMap<(String, Option<bingo_sdk::ItemId>), BTreeMap<String, String>>;
 #[derive(Default)]
-pub struct Overlay(Mutex<BTreeMap<String, BTreeMap<String, String>>>);
+pub struct Overlay(Mutex<Values>);
 impl Overlay {
     pub fn get(&self, input: EnvGet) -> Result<Option<String>, String> {
         identifier(&input.name)?;
@@ -24,7 +25,7 @@ impl Overlay {
         self.0
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .entry(plugin.into())
+            .entry((plugin.into(), bingo_sdk::generation::current(plugin)))
             .or_default()
             .insert(input.name, input.value);
         Ok(())
@@ -33,15 +34,15 @@ impl Overlay {
         self.0
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .get(plugin)
+            .get(&(plugin.into(), bingo_sdk::generation::current(plugin)))
             .cloned()
             .unwrap_or_default()
     }
-    pub fn remove(&self, plugin: &str) {
+    pub fn remove(&self, plugin: &str, generation: &bingo_sdk::ItemId) {
         self.0
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .remove(plugin);
+            .remove(&(plugin.into(), Some(generation.clone())));
     }
 }
 fn identifier(name: &str) -> Result<(), String> {

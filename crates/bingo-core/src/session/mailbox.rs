@@ -60,9 +60,16 @@ pub(crate) enum Msg {
     /// A plugin's live state onto the stream, never the journal (ADR-0013 §2).
     Invalidated(Vec<String>),
     Signal {
+        generation: Option<ItemId>,
         plugin: String,
         kind: String,
         payload: Value,
+    },
+    TransferSignals {
+        plugin: String,
+        from: ItemId,
+        to: ItemId,
+        reply: oneshot::Sender<Result<(), KernelError>>,
     },
     Interrupt {
         intent: IntentId,
@@ -283,6 +290,7 @@ impl Mailbox {
 
     pub fn signal(&self, plugin: String, kind: String, payload: Value) {
         self.send(Msg::Signal {
+            generation: generation::current(&plugin),
             plugin,
             kind,
             payload,
@@ -296,6 +304,21 @@ impl Mailbox {
     /// Take the line `intent` named back out of the queue and answer with it
     /// (ADR-0008 §2, amended M68). Refused when it is no longer queued, and
     /// when `surface` is not the one that put it there.
+    pub async fn transfer_signals(
+        &self,
+        plugin: String,
+        from: ItemId,
+        to: ItemId,
+    ) -> Result<(), KernelError> {
+        self.call(|reply| Msg::TransferSignals {
+            plugin,
+            from,
+            to,
+            reply,
+        })
+        .await?
+    }
+
     pub async fn withdraw(&self, intent: IntentId, surface: String) -> Result<Input, KernelError> {
         self.call(|reply| Msg::Withdraw {
             intent,

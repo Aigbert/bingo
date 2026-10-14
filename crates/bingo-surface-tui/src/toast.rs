@@ -151,7 +151,8 @@ mod tests {
                     until: now.wall + std::time::Duration::from_secs(4),
                     alert: false,
                 }],
-            ),
+            )
+            .into(),
         );
         let tree = solo(&state);
         assert!(draw_tree(80, 24, &tree, &mut ui, now).contains("Saved counter"));
@@ -182,7 +183,7 @@ mod tests {
         slots.swap(0, 1);
         state.signals.entry("counter".into()).or_default().insert(
             "held".into(),
-            bingo_sdk::slot::with(serde_json::json!({}), slots),
+            bingo_sdk::slot::with(serde_json::json!({}), slots).into(),
         );
         assert!(ui.placed.panes.holding(&state));
         assert!(

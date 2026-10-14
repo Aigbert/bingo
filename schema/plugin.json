@@ -3268,6 +3268,16 @@
         {
           "type": "object",
           "properties": {
+            "generation": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ItemId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "plugin": {
               "type": "string"
             },

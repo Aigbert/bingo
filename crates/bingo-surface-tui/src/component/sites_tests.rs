@@ -506,7 +506,8 @@ fn placed_site(component: Component) -> bingo_sdk::SessionState {
                         until: ts() + std::time::Duration::from_secs(10),
                         alert: false,
                     }],
-                ),
+                )
+                .into(),
             );
             state
         }
@@ -536,11 +537,10 @@ fn placed_site(component: Component) -> bingo_sdk::SessionState {
                     .into(),
                 },
             };
-            state
-                .signals
-                .entry("fixture".into())
-                .or_default()
-                .insert("one".into(), bingo_sdk::slot::with(json!({}), [slot]));
+            state.signals.entry("fixture".into()).or_default().insert(
+                "one".into(),
+                bingo_sdk::slot::with(json!({}), [slot]).into(),
+            );
             state
         }
         _ => unreachable!(),

@@ -12,6 +12,7 @@ use crate::test_support::{extended, folded, frame, user};
 /// a resume, replaced in place by the next one (ADR-0013 §2).
 pub fn signalled(plugin: &str, kind: &str, payload: Value) -> Event {
     Event::Signal {
+        generation: None,
         plugin: plugin.into(),
         kind: kind.into(),
         payload,

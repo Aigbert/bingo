@@ -107,13 +107,13 @@ impl Manager {
     }
     async fn remove_module(&self, module: &Arc<Module>) {
         module.close().await;
-        switching::cleanup(self, &module.found.name).await;
+        switching::cleanup(self, module).await;
         self.modules
             .write()
             .unwrap_or_else(|error| error.into_inner())
             .retain(|entry| !Arc::ptr_eq(entry, module));
     }
-    pub(super) async fn clear_signals(&self, name: &str) {
+    pub(super) async fn clear_signals(&self, module: &Module) {
         if let Some(host) = self.host.get() {
             for session in host
                 .sessions(SessionFilter::default())
@@ -125,15 +125,44 @@ impl Manager {
                 {
                     for kind in state
                         .signals
-                        .get(name)
+                        .get(&module.found.name)
                         .into_iter()
-                        .flat_map(|values| values.keys())
+                        .flat_map(|values| values.iter())
+                        .filter_map(|(kind, signal)| {
+                            (signal.generation() == Some(&module.generation)).then_some(kind)
+                        })
                     {
-                        let _ = host.signal(&session.id, name, kind, Value::Null).await;
+                        let _ = generation::scope(
+                            &module.found.name,
+                            &module.generation,
+                            host.signal(&session.id, &module.found.name, kind, Value::Null),
+                        )
+                        .await;
                     }
                 }
             }
         }
+    }
+    async fn handoff_signals(
+        &self,
+        host: &HostHandle,
+        old: &Module,
+        module: &Module,
+    ) -> Result<(), KernelError> {
+        if !module.admission.allowed() {
+            self.clear_signals(old).await;
+            return Ok(());
+        }
+        for session in host.sessions(SessionFilter::default()).await? {
+            host.transfer_signals(
+                &session.id,
+                &module.found.name,
+                &old.generation,
+                &module.generation,
+            )
+            .await?;
+        }
+        Ok(())
     }
     pub(super) async fn install_generation(
         &self,
@@ -142,10 +171,10 @@ impl Manager {
     ) -> Result<(), KernelError> {
         if let Some(old) = old {
             old.close().await;
-            if !switching::retired(self, &old.found.name).await
-                && let Some(dollar) = self.dollar.get()
-            {
-                dollar.reload(&old.found.name).await;
+            self.callbacks
+                .remove_generation(&old.found.name, &old.generation);
+            if let Some(dollar) = self.dollar.get() {
+                dollar.reload(&old.found.name, &old.generation).await;
             }
         }
         let config = self
@@ -174,6 +203,9 @@ impl Manager {
             .get()
             .ok_or_else(|| reload::failed("module host is unavailable"))?;
         host.catalog(CatalogKind::Plugins).await?;
+        if let Some(old) = old {
+            self.handoff_signals(host, old, &module).await?;
+        }
         module.admission.decision().map_err(reload::failed)?;
         self.restart_sessions(&module, host).await?;
         Ok(())

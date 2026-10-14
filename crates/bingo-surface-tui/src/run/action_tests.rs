@@ -12,11 +12,10 @@ fn counter(name: &str) -> SessionState {
             "onInput":{"name":"counter:ui", "args":{"handler":"name", "event":"input"}}}
     }))
     .unwrap();
-    state
-        .signals
-        .entry("counter".into())
-        .or_default()
-        .insert("pane".into(), bingo_sdk::slot::with(json!({}), [slot]));
+    state.signals.entry("counter".into()).or_default().insert(
+        "pane".into(),
+        bingo_sdk::slot::with(json!({}), [slot]).into(),
+    );
     state
 }
 
