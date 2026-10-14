@@ -102,6 +102,11 @@ then stop if dev lacks `merge: M141`, pending the person's merge instruction.
 - `crates/bingo/src/plugins/{mod,switch,validate,test}.rs`, `test/`, `main.rs`;
   `{scenario,schema,expect}.rs` and `schema/plugin-scenario.json` deleted
 - `crates/bingo-surface-tui/src/lib.rs` (`pub fn drawn`)
+- `crates/bingo-sdk/src/host.rs`, `crates/bingo-core/src/host/catalog.rs`:
+  `CatalogKind::Events` reads kernel entries and registered faces through
+  the existing `HostApi::catalog` door; no new host verb or plugin import.
+- Generated `schema/{rpc,plugin,plugin-2,events,mods-dollar}.json` and
+  `sdk/typescript/src/{wire,events,dollar-types}.ts`; ADR-0075 dated note.
 - `sdk/typescript/src/state.test.ts` (new)
 - `examples/plugins/ts-status/` (`hooks/register.test.ts` new, `scenarios/` deleted);
   `examples/plugins/{tool-call,band,pane}/` (one `*.test.ts` each)
@@ -154,3 +159,8 @@ then stop if dev lacks `merge: M141`, pending the person's merge instruction.
   neither sdk nor kernel names a tool. No live/credential tests.
 - Generated files use `BINGO_UPDATE_SCHEMA=1`. M141/M151 generated-file
   overlap is reconciled only after the person authorizes merging dev.
+
+Re-verification (2026-10-14): `HostApi::service_wire(key)` resolves a known
+noun but cannot enumerate live faces. Type output uses an additive `events`
+catalogue kind on the existing read door. Exhaustive consumer arms are
+mechanical; generated files are regenerated, not hand-edited.
