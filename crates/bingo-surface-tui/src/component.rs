@@ -162,3 +162,6 @@ mod band_tests {
             "the drawn band button must dispatch its handler; effects: {effects:?}");
     }
 }
+
+#[cfg(test)]
+mod sites_tests;
