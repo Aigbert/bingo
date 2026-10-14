@@ -7301,6 +7301,116 @@
         "commands",
         "plugins"
       ]
+    },
+    "ResultValue14": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/CommandReply"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "CommandReply": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CommandOutcome"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      ]
+    },
+    "After14": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/CommandReply"
+        }
+      },
+      "required": [
+        "chain",
+        "result"
+      ]
+    },
+    "Proceed14": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "next": {
+              "$ref": "#/$defs/CommandRun"
+            }
+          },
+          "required": [
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "$ref": "#/$defs/CommandReply"
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CommandRun": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "args": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "command",
+        "args"
+      ]
+    },
+    "Before11": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "site": {
+          "$ref": "#/$defs/HookSite"
+        },
+        "input": {
+          "$ref": "#/$defs/CommandRun"
+        }
+      },
+      "required": [
+        "chain",
+        "tier",
+        "site",
+        "input"
+      ]
     }
   },
   "manifest": {
@@ -7552,6 +7662,22 @@
       },
       "result": {
         "type": "null"
+      }
+    },
+    "intercept/command.run": {
+      "params": {
+        "$ref": "#/$defs/Before11"
+      },
+      "result": {
+        "$ref": "#/$defs/Proceed14"
+      }
+    },
+    "intercept/command.run/after": {
+      "params": {
+        "$ref": "#/$defs/After14"
+      },
+      "result": {
+        "$ref": "#/$defs/ResultValue14"
       }
     }
   },

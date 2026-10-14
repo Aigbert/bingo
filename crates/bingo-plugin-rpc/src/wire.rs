@@ -811,12 +811,17 @@ pub static METHODS: &[Method] = &[
     (
         "intercept/command.run",
         schema_of::<crate::intercept::Before<bingo_sdk::catalogue::CommandRun>>,
-        schema_of::<crate::intercept::Proceed<bingo_sdk::catalogue::CommandRun, CommandOutcome>>,
+        schema_of::<
+            crate::intercept::Proceed<
+                bingo_sdk::catalogue::CommandRun,
+                bingo_sdk::catalogue::CommandReply,
+            >,
+        >,
     ),
     (
         "intercept/command.run/after",
-        schema_of::<crate::intercept::After<CommandOutcome>>,
-        schema_of::<crate::intercept::ResultValue<CommandOutcome>>,
+        schema_of::<crate::intercept::After<bingo_sdk::catalogue::CommandReply>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::catalogue::CommandReply>>,
     ),
     (
         "intercept/command.describe",

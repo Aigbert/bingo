@@ -8810,7 +8810,7 @@
         "title": "CommandRun",
         "type": "object",
         "properties": {
-          "name": {
+          "command": {
             "type": "string"
           },
           "args": {
@@ -8818,84 +8818,102 @@
           }
         },
         "required": [
-          "name",
+          "command",
           "args"
         ]
       },
       "result": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "CommandOutcome",
-        "oneOf": [
+        "title": "CommandReply",
+        "anyOf": [
           {
-            "type": "object",
-            "properties": {
-              "message": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "kind": {
-                "type": "string",
-                "const": "applied"
-              }
-            },
-            "required": [
-              "kind"
-            ]
+            "$ref": "#/$defs/CommandOutcome"
           },
           {
-            "type": "object",
-            "properties": {
-              "view": {
-                "$ref": "#/$defs/View"
-              },
-              "kind": {
-                "type": "string",
-                "const": "view"
-              }
-            },
-            "required": [
-              "kind",
-              "view"
-            ]
-          },
-          {
-            "description": "Becomes a turn, submitted with the command's own intent and origin.",
             "type": "object",
             "properties": {
               "text": {
                 "type": "string"
-              },
-              "kind": {
-                "type": "string",
-                "const": "prompt"
               }
             },
             "required": [
-              "kind",
               "text"
-            ]
-          },
-          {
-            "description": "One completed item the kernel records in the transcript (a shell\nline's output, a login's receipt); the ack carries its id.",
-            "type": "object",
-            "properties": {
-              "body": {
-                "$ref": "#/$defs/ItemBody"
-              },
-              "kind": {
-                "type": "string",
-                "const": "record"
-              }
-            },
-            "required": [
-              "kind",
-              "body"
             ]
           }
         ],
         "$defs": {
+          "CommandOutcome": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "applied"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "view": {
+                    "$ref": "#/$defs/View"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "view"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "view"
+                ]
+              },
+              {
+                "description": "Becomes a turn, submitted with the command's own intent and origin.",
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "prompt"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "text"
+                ]
+              },
+              {
+                "description": "One completed item the kernel records in the transcript (a shell\nline's output, a login's receipt); the ack carries its id.",
+                "type": "object",
+                "properties": {
+                  "body": {
+                    "$ref": "#/$defs/ItemBody"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "record"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "body"
+                ]
+              }
+            ]
+          },
           "View": {
             "oneOf": [
               {
@@ -10480,10 +10498,10 @@
         }
       },
       "matcher": [
-        "name"
+        "command"
       ],
       "pinned": [
-        "/name"
+        "/command"
       ],
       "acts": {
         "deny": true,

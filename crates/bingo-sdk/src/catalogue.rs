@@ -143,7 +143,7 @@ catalogue! {
     SESSION_RECEIVE: "session.receive", Chain, crate::Input => crate::Input, &["origin.surface"], &[], PASS;
     SESSION_APPEND: "session.append", Chain, Append => Append, &["plugin", "kind"], &["/plugin", "/kind"], PASS;
     TURN_COMPLETE: "turn.complete", Chain, Turn => Option<String>, &[], &["/turn", "/outcome", "/usage", "/answer"], WRAP;
-    COMMAND_RUN: "command.run", Chain, CommandRun => crate::CommandOutcome, &["name"], &["/name"], WRAP;
+    COMMAND_RUN: "command.run", Chain, CommandRun => CommandReply, &["command"], &["/command"], WRAP;
     COMMAND_DESCRIBE: "command.describe", Chain, crate::CommandSpec => Option<crate::CommandSpec>, &["name"], &["/name"], WRAP;
     CONFIG_SET: "config.set", Chain, ConfigSet => ConfigSet, &["key"], &["/key"], PASS;
     CONFIG_DESCRIBE: "config.describe", Chain, crate::ConfigView => crate::ConfigView, &[], &[], WRAP;
@@ -198,6 +198,23 @@ mod tests {
             events.get("turn.complete").is_some(),
             "completion is distinct"
         );
+    }
+
+    #[test]
+    fn command_hooks_use_the_command_field_and_text_answers() {
+        let input = CommandRun {
+            name: "inspect".into(),
+            args: "".into(),
+        };
+        assert_eq!(
+            serde_json::to_value(input).unwrap(),
+            serde_json::json!({"command":"inspect","args":""})
+        );
+        assert!((COMMAND_RUN.valid_result)(
+            &serde_json::json!({"text":"opened"})
+        ));
+        assert_eq!(COMMAND_RUN.matcher, &["command"]);
+        assert_eq!(COMMAND_RUN.pinned, &["/command"]);
     }
 
     #[test]

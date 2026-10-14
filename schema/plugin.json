@@ -236,7 +236,7 @@
           "type": "string"
         },
         "result": {
-          "$ref": "#/$defs/CommandOutcome"
+          "$ref": "#/$defs/CommandReply"
         }
       },
       "required": [
@@ -1467,10 +1467,28 @@
         "isErrored"
       ]
     },
+    "CommandReply": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CommandOutcome"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      ]
+    },
     "CommandRun": {
       "type": "object",
       "properties": {
-        "name": {
+        "command": {
           "type": "string"
         },
         "args": {
@@ -1478,7 +1496,7 @@
         }
       },
       "required": [
-        "name",
+        "command",
         "args"
       ]
     },
@@ -5942,7 +5960,7 @@
           "type": "object",
           "properties": {
             "answer": {
-              "$ref": "#/$defs/CommandOutcome"
+              "$ref": "#/$defs/CommandReply"
             }
           },
           "required": [
@@ -7386,7 +7404,7 @@
       "type": "object",
       "properties": {
         "result": {
-          "$ref": "#/$defs/CommandOutcome"
+          "$ref": "#/$defs/CommandReply"
         }
       },
       "required": [

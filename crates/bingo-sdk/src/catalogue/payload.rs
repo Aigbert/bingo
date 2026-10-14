@@ -77,8 +77,26 @@ pub struct Append {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct CommandRun {
+    #[serde(rename = "command", alias = "name")]
     pub name: String,
     pub args: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum CommandReply {
+    Outcome(crate::CommandOutcome),
+    Text { text: String },
+}
+impl From<CommandReply> for crate::CommandOutcome {
+    fn from(reply: CommandReply) -> Self {
+        match reply {
+            CommandReply::Outcome(outcome) => outcome,
+            CommandReply::Text { text } => Self::Applied {
+                message: Some(text),
+            },
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]

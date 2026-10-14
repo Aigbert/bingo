@@ -247,6 +247,7 @@ mod tests {
             }
             std::fs::write(&path, rendered()).expect("the schema is writable");
             let mut baseline = frozen();
+            amend_command(&mut baseline, &document());
             amend_elements(&mut baseline, &document());
             // M142: the authorized pre-release events catalogue kind.
             baseline["$defs"]["CatalogKind"] = document()["$defs"]["CatalogKind"].clone();
@@ -266,6 +267,24 @@ mod tests {
     }
 
     // The person's M140 amendment is restricted to these roots and new referenced types.
+    fn amend_command(baseline: &mut Value, current: &Value) {
+        let mut pending = Vec::new();
+        for method in ["intercept/command.run", "intercept/command.run/after"] {
+            baseline["methods"][method] = current["methods"][method].clone();
+            references(&current["methods"][method], &mut pending);
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        while let Some(reference) = pending.pop() {
+            let Some(name) = reference.strip_prefix("#/$defs/") else {
+                continue;
+            };
+            if seen.insert(name.to_owned()) {
+                baseline["$defs"][name] = current["$defs"][name].clone();
+                references(&current["$defs"][name], &mut pending);
+            }
+        }
+    }
+
     fn amend_elements(baseline: &mut Value, current: &Value) {
         for name in ["View", "Slot", "Component"] {
             baseline["$defs"][name] = current["$defs"][name].clone();

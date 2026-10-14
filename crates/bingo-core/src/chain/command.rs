@@ -13,15 +13,21 @@ pub(crate) async fn run(
         name: command.spec().name,
         args,
     };
-    json::dispatch(
+    let reply: catalogue::CommandReply = json::dispatch(
         catalogue::COMMAND_RUN,
         &hooks.links().await,
         hook_cx,
         input,
         Next::new(|input: catalogue::CommandRun| {
-            Box::pin(async move { command.run(&input.args, cx).await })
+            Box::pin(async move {
+                command
+                    .run(&input.args, cx)
+                    .await
+                    .map(catalogue::CommandReply::Outcome)
+            })
         }),
         report,
     )
-    .await
+    .await?;
+    Ok(reply.into())
 }
