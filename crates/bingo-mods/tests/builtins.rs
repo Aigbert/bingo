@@ -11,6 +11,7 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
         Box::new(bingo_mod_ask::Ask),
         Box::new(bingo_mod_palette::Palette),
         Box::new(bingo_mod_sessions::Sessions),
+        Box::new(bingo_mod_plugins::Plugins),
     ];
     if let Some(source) = source {
         let root = home.join("outside");
@@ -28,7 +29,13 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
         ));
     }
     let env = Env::rooted(home);
-    for name in ["hello", "ask", "bingo.mod.palette", "bingo.mod.sessions"] {
+    for name in [
+        "hello",
+        "ask",
+        "bingo.mod.palette",
+        "bingo.mod.sessions",
+        "bingo.mod.plugins",
+    ] {
         bingo_core::plugins::switch(&env, name, !disabled).unwrap();
     }
     let path = bingo_core::settings::user_path(&env);
@@ -303,6 +310,12 @@ async fn a_js_command_and_its_keys_appear_inside_a_wrapped_palette() {
     })
     .await
     .unwrap();
+    let entries = host.catalog(CatalogKind::Plugins).await.unwrap().entries;
+    assert!(entries.iter().any(|entry| {
+        entry.meta["commands"]
+            .as_array()
+            .is_some_and(|commands| commands.iter().any(|command| command["name"] == "sample"))
+    }));
     let request = palette_request(&host, &attachment).await;
     let tree = host.render(&attachment.session, request).await.unwrap();
     assert!(tree.fold().contains("Outside frame"));
@@ -413,4 +426,71 @@ async fn sessions_obeys_the_same_switch_for_commands_and_rendering() {
         assert_eq!(view == request.engine(), disabled);
         host.shutdown().await;
     }
+}
+
+#[tokio::test]
+async fn outside_mod_wraps_the_plugins_site_and_disabled_commands_keep_tables() {
+    let home = tempfile::tempdir().unwrap();
+    let source = r#"export function register(on) {
+        on('ui.render',{component:'Plugins'},async ($,e,next)=>{const tree=await next(e);return {...tree,children:[h('Text',{},'Outside plugins frame'),...tree.children]};});
+    }"#;
+    let (host, mut attachment) = start(home.path(), Some(source), false).await;
+    let props = component::PluginsProps {
+        open: component::PluginsOpen::Plugins,
+        session: attachment.session.clone(),
+        plugins: host.catalog(CatalogKind::Plugins).await.unwrap().entries,
+        action: Action {
+            name: "surface:plugins".into(),
+            args: json!({"handler":"panel"}),
+        },
+    };
+    let tree = host
+        .render(
+            &attachment.session,
+            render::RenderRequest {
+                component: render::Component::Plugins,
+                request_id: "panel".into(),
+                surface: render::SurfaceName::Terminal,
+                props: serde_json::to_value(props).unwrap(),
+                viewport: render::Viewport {
+                    place: None,
+                    columns: 108,
+                    rows: 18,
+                },
+            },
+        )
+        .await
+        .unwrap();
+    assert!(
+        tree.fold().contains("Outside plugins frame"),
+        "{}",
+        tree.fold()
+    );
+    assert!(tree.fold().contains("one list"));
+    let opened = command(
+        &mut attachment,
+        Input::text("/modules", Origin::surface("test")),
+    )
+    .await;
+    assert!(
+        matches!(opened,IntentOutcome::Applied {result} if result["surface"]["name"]=="Plugins")
+    );
+    command(
+        &mut attachment,
+        Input::text(
+            "/plugins disable bingo.mod.plugins",
+            Origin::surface("test"),
+        ),
+    )
+    .await;
+    let plain = command(
+        &mut attachment,
+        Input::text("/plugins", Origin::surface("test")),
+    )
+    .await;
+    assert!(
+        matches!(plain,IntentOutcome::Applied {ref result} if result["view"]["kind"]=="table"),
+        "{plain:?}"
+    );
+    host.shutdown().await;
 }

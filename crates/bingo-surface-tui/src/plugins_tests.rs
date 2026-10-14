@@ -1,0 +1,159 @@
+use crate::test_support::*;
+use bingo_mod_plugins::{Cursor, draw, trust};
+use bingo_sdk::{
+    component::{PluginsOpen, PluginsProps},
+    *,
+};
+use bingo_services::mcp::ServerRow;
+use serde_json::json;
+fn fixture() -> (PluginsProps, Vec<ServerRow>) {
+    let value: serde_json::Value =
+        serde_json::from_str(include_str!("../../bingo-mod-plugins/fixtures/panel.json")).unwrap();
+    let mut plugins: Vec<CatalogEntry> = serde_json::from_value(value["plugins"].clone()).unwrap();
+    for (at, order) in [(0, 0), (4, 1)] {
+        plugins[at].meta["links"] = json!([{"order":order,"matcher":LinkMatcher{prefilter:json!({"component":"Palette"}),..LinkMatcher::at(catalogue::UI_RENDER)}}]);
+    }
+    (
+        PluginsProps {
+            open: PluginsOpen::Plugins,
+            session: SessionId::from_raw("ses_1"),
+            plugins,
+            action: Action {
+                name: "surface:plugins".into(),
+                args: json!({"handler":"opening"}),
+            },
+        },
+        serde_json::from_value(value["servers"].clone()).unwrap(),
+    )
+}
+fn painted(
+    props: &PluginsProps,
+    servers: &[ServerRow],
+    cursor: &mut Cursor,
+    width: u16,
+    height: u16,
+) -> String {
+    let (mut ui, now) = scene();
+    let now = still(now);
+    let mut state = state();
+    state.config.kernel["render"] = json!({"Plugins":[{}]});
+    ui.catalogs.plugins = props.plugins.clone();
+    crate::plugins::open(&mut ui, props.open, now);
+    let tree = solo(&state);
+    draw_tree(width, height, &tree, &mut ui, now);
+    let key = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == render::Component::Plugins)
+        .unwrap()
+        .clone();
+    let view = draw::tree(
+        props,
+        servers,
+        cursor,
+        &key.request.request_id,
+        key.request.viewport.columns,
+        key.request.viewport.rows,
+    );
+    assert!(
+        view::answer_ok(
+            render::Component::Plugins,
+            &key.request.props,
+            "plugins",
+            None,
+            &view
+        )
+        .is_ok()
+    );
+    ui.placed.pulled.request(&key);
+    ui.placed.pulled.answer(key, view);
+    draw_tree(width, height, &tree, &mut ui, now)
+}
+#[test]
+fn prototype_scenarios_at_both_terminal_sizes() {
+    for (width, height) in [(108, 30), (80, 24)] {
+        for (scene, selected, first, expanded, trust) in [
+            ("plugins", "p:my-picker", PluginsOpen::Plugins, false, false),
+            ("failed", "p:weather", PluginsOpen::Plugins, false, false),
+            (
+                "waiting",
+                "p:plugins:demo-lint",
+                PluginsOpen::Plugins,
+                false,
+                true,
+            ),
+            (
+                "builtin",
+                "p:bingo.mod.palette",
+                PluginsOpen::Plugins,
+                true,
+                false,
+            ),
+            ("mcp", "m:github", PluginsOpen::Mcp, false, false),
+            ("signin", "m:linear", PluginsOpen::Mcp, false, false),
+        ] {
+            let (mut props, servers) = fixture();
+            props.open = first;
+            let mut cursor = Cursor {
+                selected: selected.into(),
+                expanded,
+                trust: trust.then(trust::Choice::default),
+            };
+            let output = painted(&props, &servers, &mut cursor, width, height);
+            insta::assert_snapshot!(format!("plugins_{scene}_{width}x{height}"), output);
+        }
+    }
+}
+#[test]
+fn client_actions_are_bound_to_the_opening_and_keep_the_panel_for_switches() {
+    let (mut ui, now) = scene();
+    let tree = solo(&state());
+    crate::plugins::open(&mut ui, PluginsOpen::Plugins, now);
+    let id = crate::plugins::request(&ui).unwrap().to_string();
+    let action = Action {
+        name: "surface:plugins".into(),
+        args: json!({"handler":"old","value":{"run":"/plugins disable demo"}}),
+    };
+    assert!(crate::plugins::result(&mut ui, &tree, &action, now).is_empty());
+    let action = Action {
+        name: "surface:plugins".into(),
+        args: json!({"handler":id,"value":{"run":"/plugins disable demo"}}),
+    };
+    let effects = crate::plugins::result(&mut ui, &tree, &action, now);
+    assert!(
+        effects
+            .iter()
+            .any(|e| matches!(e, crate::effect::Effect::Submit(_)))
+    );
+    assert!(crate::plugins::active(&ui));
+}
+
+#[test]
+fn an_engine_fallback_does_not_block_escape_and_the_draft_returns() {
+    let (mut ui, now) = scene();
+    let mut state = state();
+    state.config.kernel["render"] = json!({"Plugins":[{}]});
+    ui.composer.set("kept draft");
+    crate::plugins::open(&mut ui, PluginsOpen::Plugins, now);
+    let tree = solo(&state);
+    draw_tree(80, 24, &tree, &mut ui, now);
+    let key = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == render::Component::Plugins)
+        .unwrap()
+        .clone();
+    assert!(crate::plugins::waiting(&ui));
+    ui.placed.pulled.request(&key);
+    ui.placed.pulled.answer(key.clone(), key.request.engine());
+    assert!(!crate::plugins::waiting(&ui));
+    crate::plugins::key(
+        &mut ui,
+        crossterm::event::KeyEvent::from(crossterm::event::KeyCode::Esc),
+        now,
+    );
+    assert!(!crate::plugins::active(&ui));
+    assert_eq!(ui.composer.text(), "kept draft");
+}

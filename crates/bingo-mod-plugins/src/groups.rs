@@ -1,0 +1,211 @@
+use bingo_sdk::{BUILT_IN, CatalogEntry, PluginState, component::PluginsOpen};
+use bingo_services::mcp::{ServerRow, Status};
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Plugin(usize),
+    Server(usize),
+    Builtins,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Row {
+    pub key: String,
+    pub label: String,
+    pub glyph: &'static str,
+    pub tag: String,
+    pub kind: Kind,
+}
+#[derive(Clone, Debug)]
+pub struct Group {
+    pub name: &'static str,
+    pub hint: &'static str,
+    pub rows: Vec<Row>,
+}
+pub fn state(plugin: &CatalogEntry) -> PluginState {
+    serde_json::from_value(plugin.meta["state"].clone()).unwrap_or(PluginState::Registering)
+}
+pub fn builtin(plugin: &CatalogEntry) -> bool {
+    plugin.meta["from"] == BUILT_IN
+}
+pub fn name(plugin: &CatalogEntry) -> &str {
+    plugin.id.strip_prefix("plugins:").unwrap_or(&plugin.id)
+}
+pub fn groups(
+    open: PluginsOpen,
+    plugins: &[CatalogEntry],
+    servers: &[ServerRow],
+    expanded: bool,
+) -> Vec<Group> {
+    let mut groups = vec![];
+    if open == PluginsOpen::Mcp {
+        groups.push(server_group(servers));
+    }
+    for (project, title, hint) in [
+        (false, "plugins · yours", "~/.bingo/plugins"),
+        (true, "plugins · this project", ".bingo/plugins"),
+    ] {
+        let rows = plugins
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| {
+                !builtin(p)
+                    && !p.id.starts_with("mcp:")
+                    && (p.meta["origin"] == "project") == project
+            })
+            .map(|(i, p)| plugin_row(i, p, plugins))
+            .collect::<Vec<_>>();
+        if !rows.is_empty() {
+            groups.push(Group {
+                name: title,
+                hint,
+                rows,
+            });
+        }
+    }
+    groups.push(builtin_group(plugins, expanded));
+    if open != PluginsOpen::Mcp {
+        groups.push(server_group(servers));
+    }
+    groups
+}
+fn plugin_row(index: usize, p: &CatalogEntry, plugins: &[CatalogEntry]) -> Row {
+    let state = state(p);
+    let glyph = match state {
+        PluginState::Failed { .. } => "✗",
+        PluginState::Waiting { .. } | PluginState::Registering => "◌",
+        _ if state.is_on() => "●",
+        _ => "○",
+    };
+    let tag = match &state {
+        PluginState::Waiting { changed: true } => "changed since your yes".into(),
+        PluginState::Waiting { .. } => "waits for your yes".into(),
+        PluginState::Failed { .. } => "failed to load".into(),
+        PluginState::Registering => "loading …".into(),
+        PluginState::Off { .. } => "off".into(),
+        PluginState::Pending { now, at } => format!(
+            "{} {}",
+            if *now { "off" } else { "on" },
+            match at {
+                bingo_sdk::plugin::NextStart::NextStart => "at next start",
+                bingo_sdk::plugin::NextStart::AfterTurn => "after this turn",
+            }
+        ),
+        PluginState::On if builtin(p) => crate::chain::drawn_over(p, plugins)
+            .map(|owner| format!("under {owner}"))
+            .unwrap_or_else(|| {
+                if p.meta["needed"].is_string() {
+                    "needed".into()
+                } else {
+                    String::new()
+                }
+            }),
+        PluginState::On => p.meta["tier"].as_str().unwrap_or("tighten").into(),
+    };
+    Row {
+        key: format!("p:{}", p.id),
+        label: name(p).into(),
+        glyph,
+        tag,
+        kind: Kind::Plugin(index),
+    }
+}
+fn server_group(servers: &[ServerRow]) -> Group {
+    Group {
+        name: "MCP servers",
+        hint: "their tools always ask",
+        rows: servers
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                let (glyph, tag) = match &s.status {
+                    Status::Connected { tools } => ("●", format!("{tools} tools")),
+                    Status::NeedsAuth { .. } => ("○", "sign in".into()),
+                    Status::Failed { .. } => ("✗", "failed".into()),
+                    Status::Disabled => ("○", "off".into()),
+                    Status::Waiting { changed } => (
+                        "◌",
+                        if *changed {
+                            "changed since your yes"
+                        } else {
+                            "waits for your yes"
+                        }
+                        .into(),
+                    ),
+                    Status::Connecting => ("◌", "connecting …".into()),
+                    Status::SigningIn => ("◌", "in the browser …".into()),
+                };
+                Row {
+                    key: format!("m:{}", s.name),
+                    label: s.name.clone(),
+                    glyph,
+                    tag: format!("{} · {tag}", s.transport.name()),
+                    kind: Kind::Server(i),
+                }
+            })
+            .collect(),
+    }
+}
+pub fn selected<'a>(groups: &'a [Group], cursor: &mut crate::Cursor) -> Option<&'a Row> {
+    let row = groups
+        .iter()
+        .flat_map(|group| &group.rows)
+        .find(|row| row.key == cursor.selected)
+        .or_else(|| groups.iter().flat_map(|group| &group.rows).next())?;
+    if cursor.selected != row.key {
+        cursor.trust = None;
+        cursor.selected = row.key.clone();
+    }
+    Some(row)
+}
+
+fn builtin_group(plugins: &[CatalogEntry], expanded: bool) -> Group {
+    let builtins = plugins
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| builtin(p))
+        .collect::<Vec<_>>();
+    let off = builtins
+        .iter()
+        .filter(|(_, p)| !matches!(state(p), PluginState::On))
+        .count();
+    let under = builtins
+        .iter()
+        .filter(|(_, p)| crate::chain::drawn_over(p, plugins).is_some())
+        .count();
+    let tag = format!(
+        "{}{}",
+        if off == 0 {
+            "all on".into()
+        } else {
+            format!("{off} off")
+        },
+        if under > 0 {
+            format!(" · {under} drawn over")
+        } else {
+            String::new()
+        }
+    );
+    let mut rows = if expanded {
+        builtins
+            .iter()
+            .map(|(i, p)| plugin_row(*i, p, plugins))
+            .collect()
+    } else {
+        vec![]
+    };
+    rows.push(Row {
+        key: "builtins".into(),
+        label: if expanded {
+            "▴ fold".into()
+        } else {
+            format!("▸ {} built in", builtins.len())
+        },
+        glyph: "",
+        tag,
+        kind: Kind::Builtins,
+    });
+    Group {
+        name: "plugins · built in",
+        hint: "compiled into bingo",
+        rows,
+    }
+}

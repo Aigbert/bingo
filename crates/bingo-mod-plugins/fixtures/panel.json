@@ -1,0 +1,189 @@
+{
+  "plugins": [
+    {
+      "id": "my-picker",
+      "label": "my-picker",
+      "meta": {
+        "state": {
+          "kind": "on"
+        },
+        "from": "bingo.mods",
+        "origin": "user",
+        "runtime": "module",
+        "version": "0.3.1",
+        "tier": "tighten",
+        "links": []
+      }
+    },
+    {
+      "id": "weather",
+      "label": "weather",
+      "meta": {
+        "state": {
+          "kind": "failed",
+          "why": "register.ts:14:9  TypeError: cannot read\n  properties of undefined (reading 'temp')"
+        },
+        "from": "bingo.mods",
+        "origin": "user",
+        "runtime": "module",
+        "version": "0.3.1",
+        "tier": "tighten",
+        "links": []
+      }
+    },
+    {
+      "id": "translate",
+      "label": "translate",
+      "meta": {
+        "state": {
+          "kind": "off",
+          "why": "switched off in the settings"
+        },
+        "from": "bingo.mods",
+        "origin": "user",
+        "runtime": "module",
+        "version": "0.3.1",
+        "tier": "tighten",
+        "links": []
+      }
+    },
+    {
+      "id": "plugins:demo-lint",
+      "label": "plugins:demo-lint",
+      "meta": {
+        "state": {
+          "kind": "waiting",
+          "changed": false
+        },
+        "from": "bingo.mods",
+        "origin": "project",
+        "runtime": "process",
+        "version": "0.3.1",
+        "tier": "tighten",
+        "links": []
+      }
+    },
+    {
+      "id": "bingo.mod.palette",
+      "label": "bingo.mod.palette",
+      "meta": {
+        "state": {
+          "kind": "on"
+        },
+        "from": "built in",
+        "origin": "builtin",
+        "runtime": "module",
+        "version": "0.3.1",
+        "tier": "full",
+        "links": []
+      }
+    },
+    {
+      "id": "bingo.store.jsonl",
+      "label": "bingo.store.jsonl",
+      "meta": {
+        "state": {
+          "kind": "on"
+        },
+        "from": "built in",
+        "origin": "builtin",
+        "runtime": "module",
+        "version": "0.3.1",
+        "tier": "full",
+        "links": [],
+        "needed": "provides the session store"
+      }
+    },
+    {
+      "id": "bingo.tools.bash",
+      "label": "bingo.tools.bash",
+      "meta": {
+        "state": {
+          "kind": "pending",
+          "now": true,
+          "at": "nextStart"
+        },
+        "from": "built in",
+        "origin": "builtin",
+        "runtime": "module",
+        "version": "0.3.1",
+        "tier": "full",
+        "links": [],
+        "provides": [
+          "tool:bash"
+        ]
+      }
+    }
+  ],
+  "servers": [
+    {
+      "name": "github",
+      "status": {
+        "kind": "connected",
+        "tools": 26
+      },
+      "transport": {
+        "type": "stdio",
+        "command": "local-fixture",
+        "args": [],
+        "env": {},
+        "cwd": null
+      },
+      "auth": null,
+      "origin": "~/.bingo/settings.toml",
+      "latency": null,
+      "signInFrom": null
+    },
+    {
+      "name": "linear",
+      "status": {
+        "kind": "needsAuth",
+        "why": "not signed in"
+      },
+      "transport": {
+        "type": "http",
+        "url": "http://127.0.0.1/mcp",
+        "headers": {}
+      },
+      "auth": {
+        "kind": "signedOut"
+      },
+      "origin": "~/.bingo/settings.toml",
+      "latency": null,
+      "signInFrom": null
+    },
+    {
+      "name": "postgres",
+      "status": {
+        "kind": "failed",
+        "why": "exited with status 1 after 0.4 s\nconnection refused: localhost:5432"
+      },
+      "transport": {
+        "type": "stdio",
+        "command": "fixture-postgres",
+        "args": [],
+        "env": {},
+        "cwd": null
+      },
+      "auth": null,
+      "origin": "~/.bingo/settings.toml",
+      "latency": null,
+      "signInFrom": null
+    },
+    {
+      "name": "figma",
+      "status": {
+        "kind": "disabled"
+      },
+      "transport": {
+        "type": "http",
+        "url": "http://127.0.0.1:3845/mcp",
+        "headers": {}
+      },
+      "auth": null,
+      "origin": "~/.bingo/settings.toml",
+      "latency": null,
+      "signInFrom": null
+    }
+  ]
+}

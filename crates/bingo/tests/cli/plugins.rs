@@ -537,3 +537,37 @@ fn a_session_switch_keeps_ndjson_stdout_pure_and_reports_timing() {
         assert_eq!(settings_json(home.path())["enabledPlugins"][name], false);
     }
 }
+
+#[test]
+fn panel_commands_keep_print_output_and_ndjson_when_disabled() {
+    let home = tempfile::tempdir().unwrap();
+    let unused = script(UNUSED);
+    for enabled in [true, false] {
+        std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
+        std::fs::write(
+            user_settings(home.path()),
+            format!("[enabledPlugins]\n\"bingo.mod.plugins\" = {enabled}\n"),
+        )
+        .unwrap();
+        for command in ["/plugins", "/modules", "/mcp"] {
+            let result = run(bingo()
+                .env("BINGO_FAKE_SCRIPT", unused.path())
+                .envs(home_env(home.path()))
+                .args(["--print", "--cwd"])
+                .arg(home.path())
+                .arg(command));
+            assert_eq!(result.status.code(), Some(0), "{}", stderr(&result));
+            assert!(!stdout(&result).contains("\x1b["));
+            if command != "/mcp" {
+                assert!(stdout(&result).contains("bingo.mod.plugins"));
+            }
+            let result = scripted(home.path(), &unused, command);
+            assert_eq!(result.status.code(), Some(0), "{}", stderr(&result));
+            let frames = stdout(&result)
+                .lines()
+                .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("valid NDJSON"))
+                .collect::<Vec<_>>();
+            assert!(!frames.is_empty());
+        }
+    }
+}

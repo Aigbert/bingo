@@ -20,8 +20,9 @@ the plain fallback.
 ## Bricks
 
 1. **Typed server rows.** `bingo_services::mcp::Servers::rows() ->
-   Vec<ServerRow { name, transport, origin, status, auth, tools,
-   latency, runs, sign_in_from }>` replaces the untyped map (wire face
+   Vec<ServerRow { name, transport, origin, status, auth,
+   latency, sign_in_from }>`; tools/runs derive from status/transport.
+   This replaces the untyped map (wire face
    and fixture updated; the ACP crossing reads the same rows).
 2. **Draw chain, pure.** `chain_of(site, links) -> Vec<String>` from
    the catalogue's `ui.render` links in dispatch order, ending in
@@ -57,7 +58,10 @@ the plain fallback.
   rows.rs}`; `crates/bingo-provider-acp/src/crossing.rs`.
 - New `crates/bingo-mod-plugins/src/{lib.rs,groups.rs,cards.rs,chain.rs,
   verbs.rs,trust.rs,draw.rs,keys.rs}`; listed in `crates/bingo/src/main.rs`.
-- `crates/bingo-core/src/host/catalog.rs` (link order in `Plugins` meta).
+- Core catalogue/commands: link order, owned contributions and person-owned trust.
+- SDK `Plugins` site/props and `PluginSource::contents`; modules/process source projections.
+- TUI site placement/keys/lifecycle, binary registration, fixtures, CLI and TestBackend tests.
+- `crates/bingo-mod-plugins/src/guide.md` registered by `guide.rs`; generated schema/TypeScript.
 
 ## Exit criteria
 

@@ -1,5 +1,19 @@
 [
   {
+    "component": "Plugins",
+    "props": {
+      "open": "plugins",
+      "session": "s",
+      "plugins": [],
+      "action": {
+        "name": "surface:plugins",
+        "args": {
+          "handler": "opening"
+        }
+      }
+    }
+  },
+  {
     "component": "Question",
     "props": {
       "tool": "question",

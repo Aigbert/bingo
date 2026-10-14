@@ -1,0 +1,18 @@
+[package]
+name = "bingo-mod-plugins"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Plugins and MCP servers in one panel"
+
+[lints]
+workspace = true
+
+[dependencies]
+bingo-sdk.workspace = true
+bingo-services.workspace = true
+async-trait.workspace = true
+serde_json.workspace = true

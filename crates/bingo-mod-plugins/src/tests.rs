@@ -1,0 +1,176 @@
+use super::*;
+use bingo_services::mcp::{Auth, ServerRow, Status};
+use serde_json::json;
+fn fixture() -> (Vec<CatalogEntry>, Vec<ServerRow>) {
+    let v: serde_json::Value =
+        serde_json::from_str(include_str!("../fixtures/panel.json")).unwrap();
+    (
+        serde_json::from_value(v["plugins"].clone()).unwrap(),
+        serde_json::from_value(v["servers"].clone()).unwrap(),
+    )
+}
+#[test]
+fn groups_keep_the_opener_first_and_cursor_on_its_name() {
+    let (plugins, mut servers) = fixture();
+    let groups = groups::groups(component::PluginsOpen::Plugins, &plugins, &servers, false);
+    assert_eq!(
+        groups.iter().map(|g| g.name).collect::<Vec<_>>(),
+        [
+            "plugins · yours",
+            "plugins · this project",
+            "plugins · built in",
+            "MCP servers"
+        ]
+    );
+    assert_eq!(groups[1].rows[0].tag, "waits for your yes");
+    let mut cursor = Cursor {
+        selected: "m:linear".into(),
+        ..Default::default()
+    };
+    servers.reverse();
+    let groups = groups::groups(component::PluginsOpen::Mcp, &plugins, &servers, false);
+    assert_eq!(groups[0].name, "MCP servers");
+    assert_eq!(
+        groups::selected(&groups, &mut cursor).unwrap().label,
+        "linear"
+    );
+}
+#[test]
+fn every_server_primary_action_is_a_command_and_reconnect_is_guarded() {
+    let (_, mut servers) = fixture();
+    let server = &mut servers[0];
+    for (status, verb) in [
+        (Status::Connected { tools: 3 }, "tools"),
+        (Status::NeedsAuth { why: "401".into() }, "login"),
+        (Status::Failed { why: "exit".into() }, "reconnect"),
+        (Status::Disabled, "enable"),
+        (Status::Waiting { changed: false }, "approve"),
+    ] {
+        server.status = status;
+        assert_eq!(
+            verbs::server(server, "enter"),
+            verbs::Verb::Line(format!("/mcp {verb} github"))
+        );
+    }
+    for status in [
+        Status::Connecting,
+        Status::SigningIn,
+        Status::Disabled,
+        Status::NeedsAuth { why: "401".into() },
+    ] {
+        server.status = status;
+        assert!(matches!(
+            verbs::server(server, "r"),
+            verbs::Verb::Message(_)
+        ));
+    }
+    server.auth = Some(Auth::SignedIn);
+    assert_eq!(
+        verbs::server(server, "o"),
+        verbs::Verb::Line("/mcp logout github".into())
+    );
+}
+#[test]
+fn switches_use_the_wish_and_needed_plugins_are_refused() {
+    let (plugins, _) = fixture();
+    assert_eq!(
+        verbs::plugin(&plugins[0], "space"),
+        verbs::Verb::Line("/plugins disable my-picker".into())
+    );
+    assert_eq!(
+        verbs::plugin(&plugins[6], "space"),
+        verbs::Verb::Line("/plugins enable bingo.tools.bash".into())
+    );
+    assert!(matches!(
+        verbs::plugin(&plugins[5], "space"),
+        verbs::Verb::Message(_)
+    ));
+    assert_eq!(verbs::plugin(&plugins[3], "enter"), verbs::Verb::Trust);
+    assert_eq!(
+        verbs::plugin(&plugins[1], "r"),
+        verbs::Verb::Line("/plugins reload".into())
+    );
+}
+#[test]
+fn full_requires_two_enters_and_moving_resets_confirmation() {
+    let (plugins, _) = fixture();
+    let p = &plugins[3];
+    let mut choice = trust::Choice {
+        selected: 2,
+        confirm: false,
+    };
+    assert_eq!(trust::press(&mut choice, p, "enter"), None);
+    assert!(choice.confirm);
+    assert_eq!(
+        trust::press(&mut choice, p, "enter"),
+        Some(verbs::Verb::Line(
+            "/plugins approve plugins:demo-lint full".into()
+        ))
+    );
+    trust::press(&mut choice, p, "up");
+    assert!(!choice.confirm);
+    choice.selected = 3;
+    assert!(matches!(
+        trust::press(&mut choice, p, "enter"),
+        Some(verbs::Verb::Message(_))
+    ));
+}
+#[test]
+fn cards_preserve_errors_and_name_trust_storage() {
+    let (plugins, servers) = fixture();
+    let error = cards::plugin_card(&plugins[1], &plugins, None)
+        .into_iter()
+        .find(|line| line.error)
+        .unwrap();
+    assert_eq!(error.text, plugins[1].meta["state"]["why"]);
+    let card = cards::plugin_card(&plugins[3], &plugins, Some(&trust::Choice::default()));
+    assert!(
+        card.iter()
+            .any(|line| line.text.contains("~/.bingo/settings.toml, never the repo"))
+    );
+    assert!(cards::server_card(&servers[0]).iter().any(|line| {
+        line.text
+            .contains("always ask; an MCP tool is never trusted")
+    }));
+}
+#[test]
+fn handlers_retire_the_opening_and_return_only_command_lines() {
+    let (plugins, servers) = fixture();
+    let props = component::PluginsProps {
+        open: component::PluginsOpen::Plugins,
+        session: SessionId::from_raw("s"),
+        plugins,
+        action: Action {
+            name: "surface:plugins".into(),
+            args: json!({"handler":"a"}),
+        },
+    };
+    let state = Shared::default();
+    let handler = keys::Handler(state.clone());
+    assert_eq!(
+        handler.press("a", "space", &props, &servers).unwrap(),
+        json!({"run":"/plugins disable my-picker"})
+    );
+    assert_eq!(
+        handler.press("a", "esc", &props, &servers).unwrap(),
+        json!({"close":true})
+    );
+    assert!(state.lock().unwrap().is_empty());
+}
+
+#[test]
+fn removing_the_selected_row_drops_its_unconfirmed_trust_choice() {
+    let (mut plugins, servers) = fixture();
+    let mut cursor = Cursor {
+        selected: "p:plugins:demo-lint".into(),
+        trust: Some(trust::Choice {
+            selected: 2,
+            confirm: true,
+        }),
+        ..Default::default()
+    };
+    plugins.retain(|p| p.id != "plugins:demo-lint");
+    let rows = groups::groups(component::PluginsOpen::Plugins, &plugins, &servers, false);
+    groups::selected(&rows, &mut cursor);
+    assert!(cursor.trust.is_none());
+}

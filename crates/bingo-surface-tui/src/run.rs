@@ -882,6 +882,9 @@ impl Run {
     /// A catalogue the host rebuilt — a provider's endpoint answered what it
     /// serves (ADR-0026 §4) — is read again, and only that one.
     fn catalog_changed(&mut self, kind: CatalogKind) {
+        if kind == CatalogKind::Plugins && crate::plugins::active(&self.ui) {
+            self.ui.placed.pulled.invalidate();
+        }
         if kind == CatalogKind::Commands {
             self.ui.placed.pulled.invalidate();
             self.fetch_commands();

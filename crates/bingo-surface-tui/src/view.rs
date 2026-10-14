@@ -259,6 +259,10 @@ fn layer(
                 over(frame, above, lines.into_iter().skip(1).collect());
             }
         }
+        Open::Plugins(_) => {
+            let lines = crate::plugins::draw(ui, tree, frame, above.width, above.height);
+            over(frame, above, lines);
+        }
         Open::Palette(_) => {
             let lines = crate::palette::draw(
                 ui,

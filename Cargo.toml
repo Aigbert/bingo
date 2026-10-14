@@ -13,6 +13,7 @@ publish = false
 [workspace.dependencies]
 bingo-mod-sessions = { path = "crates/bingo-mod-sessions" }
 bingo-mod-memory = { path = "crates/bingo-mod-memory" }
+bingo-mod-plugins = { path = "crates/bingo-mod-plugins" }
 bingo-mod-palette = { path = "crates/bingo-mod-palette" }
 bingo-mod-browse = { path = "crates/bingo-mod-browse" }
 bingo-mod-ask = { path = "crates/bingo-mod-ask" }

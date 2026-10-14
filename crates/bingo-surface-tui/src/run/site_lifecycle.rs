@@ -2,12 +2,16 @@ use super::*;
 fn request(ui: &Ui) -> Option<&str> {
     crate::sessions::request(ui)
         .or_else(|| crate::browse::request(ui))
+        .or_else(|| crate::plugins::request(ui))
         .or_else(|| crate::palette::request(ui))
 }
 
 /// Whether one of the drawn sites that Ctrl+C closes is open; Esc is its own.
 pub(super) fn open(ui: &Ui) -> bool {
-    crate::palette::active(ui) || crate::sessions::active(ui) || crate::browse::active(ui)
+    crate::palette::active(ui)
+        || crate::sessions::active(ui)
+        || crate::browse::active(ui)
+        || crate::plugins::active(ui)
 }
 
 /// Closing consumes Ctrl+C at idle; a running turn still gets its interrupt.
@@ -34,6 +38,8 @@ pub(super) fn ctrl_c(run: &mut Run, key: crossterm::event::KeyEvent) -> bool {
         crate::sessions::close(&mut run.ui, now);
     } else if crate::browse::active(&run.ui) {
         run.ui.focus.close(now.instant);
+    } else if crate::plugins::active(&run.ui) {
+        crate::plugins::close(&mut run.ui, now);
     } else {
         crate::palette::close(&mut run.ui, now);
     }
@@ -61,6 +67,7 @@ pub(super) fn retired(run: &mut Run, key: &crate::pulled::Key, view: &View) -> b
         bingo_sdk::render::Component::Palette
             | bingo_sdk::render::Component::Sessions
             | bingo_sdk::render::Component::Browse
+            | bingo_sdk::render::Component::Plugins
     ) || current(&run.ui, &key.request.request_id)
     {
         return false;

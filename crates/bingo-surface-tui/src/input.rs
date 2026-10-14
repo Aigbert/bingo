@@ -51,6 +51,9 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if crate::browse::active(ui) {
         return crate::browse::key(ui, tree, key, now);
     }
+    if crate::plugins::active(ui) {
+        return crate::plugins::key(ui, key, now);
+    }
     if crate::palette::active(ui) {
         return crate::palette::key(ui, tree, key, now);
     }

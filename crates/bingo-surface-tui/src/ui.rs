@@ -153,6 +153,7 @@ pub enum Open {
     Palette(crate::palette::Opened),
     Sessions(crate::sessions::Opened),
     Browse(crate::browse::Opened),
+    Plugins(crate::plugins::Opened),
     /// One block, whole, as a sheet.
     Pager(Pager),
     /// The turns of this transcript, as a card above the input box.
@@ -166,6 +167,7 @@ impl Open {
         matches!(
             self,
             Open::Sessions(_)
+                | Open::Plugins(_)
                 | Open::Browse(_)
                 | Open::Palette(_)
                 | Open::Pager(_)
@@ -176,7 +178,7 @@ impl Open {
     /// How many frames its arrival takes: a card comes down, a sheet rises.
     fn frames(&self) -> u16 {
         match self {
-            Open::Palette(_) | Open::Rewind(_) => layers::CARD_FRAMES,
+            Open::Plugins(_) | Open::Palette(_) | Open::Rewind(_) => layers::CARD_FRAMES,
             _ => layers::SHEET_FRAMES,
         }
     }

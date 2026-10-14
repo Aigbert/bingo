@@ -110,6 +110,7 @@
 # M175 (ADR-0089): bingo-mod-sessions adds one member, no external crate.
 # M177: bingo-mod-browse adds one member, no external crate.
 # M178: bingo-mod-memory adds one member, no external crate.
-max_dependencies = 417
+# M173: bingo-mod-plugins adds one member, no external crate.
+max_dependencies = 418
 max_core_check_seconds = 20
 max_target_gb = 5

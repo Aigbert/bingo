@@ -52,6 +52,10 @@ fn target(run: &Run) -> Option<(SessionId, String, bool)> {
         return crate::browse::request(&run.ui)
             .map(|id| (run.session.tree.view().clone(), id.into(), false));
     }
+    if crate::plugins::active(&run.ui) {
+        return crate::plugins::request(&run.ui)
+            .map(|id| (run.session.tree.view().clone(), id.into(), false));
+    }
     if crate::palette::active(&run.ui) {
         return crate::palette::request(&run.ui).map(|id| {
             (
@@ -149,6 +153,23 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
         && crate::browse::request(&run.ui) == Some(pending.focus.as_str())
     {
         browse_answer(run, outcome);
+        return;
+    }
+    if crate::plugins::active(&run.ui)
+        && crate::plugins::request(&run.ui) == Some(pending.focus.as_str())
+    {
+        if let IntentOutcome::Applied { result } = outcome
+            && let Ok(action) =
+                serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
+        {
+            let effects = crate::plugins::result(
+                &mut run.ui,
+                &run.session.tree,
+                &action,
+                run.detection.now(),
+            );
+            run.apply(effects);
+        }
         return;
     }
     if crate::palette::active(&run.ui)
@@ -281,6 +302,7 @@ fn focus(run: &Run) -> Option<String> {
 }
 fn palette_waiting(run: &Run) -> bool {
     crate::browse::waiting(&run.ui, &run.session.tree)
+        || crate::plugins::waiting(&run.ui)
         || crate::palette::waiting(&run.ui, &run.session.tree, run.detection.now())
 }
 pub(super) fn blocked(run: &Run) -> bool {

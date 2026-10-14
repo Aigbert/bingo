@@ -11,6 +11,7 @@ pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
         }
         "Pager" => page(run, &action.args, now),
         "Pane" => focus(run, &action.args),
+        "Plugins" => plugins(run, &action.args, now),
         _ => palette::surface_action(run, action),
     }
 }
@@ -18,6 +19,12 @@ pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
 fn page(run: &mut Run, args: &Value, now: crate::clock::Now) {
     if let Ok(page) = serde_json::from_value(args.clone()) {
         crate::pager::page::open(&mut run.ui, &run.session.tree, page, now);
+    }
+}
+/// `/plugins` answers with the panel to open and the group it opens on.
+fn plugins(run: &mut Run, args: &Value, now: crate::clock::Now) {
+    if let Ok(first) = serde_json::from_value(args["open"].clone()) {
+        crate::plugins::open(&mut run.ui, first, now);
     }
 }
 fn focus(run: &mut Run, args: &Value) {

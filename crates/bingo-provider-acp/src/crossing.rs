@@ -18,6 +18,7 @@ use std::sync::Arc;
 use agent_client_protocol_schema::v1::{AgentCapabilities, McpCapabilities, McpServer};
 use bingo_sdk::{HostHandle, Level, SessionId};
 use bingo_services::mcp;
+#[cfg(test)]
 use serde_json::Value;
 
 use crate::bridge::{Bridge, Token};

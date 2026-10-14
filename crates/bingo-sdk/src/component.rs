@@ -6,6 +6,8 @@ use serde_json::Value;
 
 mod browse;
 pub use browse::*;
+mod plugins;
+pub use plugins::*;
 mod palette;
 mod sessions;
 pub use sessions::*;
@@ -32,6 +34,7 @@ macro_rules! components {
 }
 components! {
     Browse(Box<BrowseProps>),
+    Plugins(PluginsProps),
     Palette(Box<PaletteProps>),
     Sessions(Box<SessionsProps>),
     Question(QuestionProps), UserMessage(UserMessageProps),

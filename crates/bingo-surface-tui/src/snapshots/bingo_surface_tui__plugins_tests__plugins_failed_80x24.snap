@@ -1,0 +1,28 @@
+---
+source: crates/bingo-surface-tui/src/plugins_tests.rs
+expression: output
+---
+"                                                                                "
+" plugins   7 plugins · 4 MCP servers · one list                                 "
+" ● on   ○ off   ✗ failed   ◌ waiting                                            "
+"   plugins · yours  ~/.bingo/plugins                                            "
+"   ● my-picker            tighten                                               "
+" ❯ ✗ weather              failed to load                                        "
+"   ○ translate            off                                                   "
+"   plugins · this project  .bingo/plugins                                       "
+"────────────────────────────────────────────────────────────────────────────────"
+" weather                                                                        "
+" kind     js mod                                                                "
+"                                                                                "
+" state    ✗ failed to load                                                      "
+" version  0.3.1                                                                 "
+" from     ~/.bingo/plugins/weather                                              "
+" trust    tighten · deny, ask, change your prompt                               "
+"                                                                                "
+"register.ts:14:9  TypeError: cannot read                                        "
+"  properties of undefined (reading 'temp')                                      "
+" ↑↓ pick · space turn on · r reload · t trust · esc close                       "
+"╭──────────────────────────────────────────────────────────────────────────────╮"
+"│ > ask anything · / for commands · ! for shell                                │"
+"╰──────────────────────────────────────────────────────────────────────────────╯"
+"1 from this repo waits for you                                       fake/fake-1"

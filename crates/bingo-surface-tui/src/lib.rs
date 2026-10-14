@@ -90,6 +90,7 @@ mod palette;
 mod pane;
 mod paths;
 mod pictures;
+mod plugins;
 mod pointer;
 mod preview;
 mod pulled;
@@ -393,3 +394,9 @@ mod person_surface {
         assert!(bingo_sdk::PERSON_SURFACES.contains(&super::SURFACE_ID));
     }
 }
+
+#[cfg(test)]
+mod plugins_tests;
+
+#[cfg(test)]
+mod plugins_keys_tests;
