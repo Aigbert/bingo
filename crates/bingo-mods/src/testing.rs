@@ -122,6 +122,8 @@ impl Runner {
     }
 }
 
+mod discover;
+pub use discover::imports_testing;
 mod environment;
 pub use environment::{Environment, Paused};
 

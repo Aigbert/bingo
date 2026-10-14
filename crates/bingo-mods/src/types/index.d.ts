@@ -5,13 +5,8 @@ export { h, Fragment } from './elements';
 export type { Element } from './elements';
 import type { Dollar } from './dollar.ts';
 export interface PluginState {}
-export interface Atom<T> { readonly key: string; readonly initial: T }
-export interface Derived<T> { readonly compute: ($: Dollar) => T | Promise<T> }
-export declare function atom<T>(key: string, initial: T): Atom<T>;
-export declare function derive<T>(fn: ($: Dollar) => T | Promise<T>): Derived<T>;
-export declare function read<T>($: Dollar, atom: Atom<T> | Derived<T>): Promise<T>;
-export declare function update<T>($: Dollar, atom: Atom<T>, fn: (value: T) => T): Promise<T>;
-export declare function memberOf<T>(atom: Atom<Record<string,T>>, id: string): Atom<T>;
+export {atom, derive, read, update, memberOf} from './state.ts';
+export type {Atom, Derived} from './state.ts';
 declare global {
   interface AbortSignal { readonly aborted: boolean }
   class AbortController { readonly signal: AbortSignal; abort(reason?: unknown): void }

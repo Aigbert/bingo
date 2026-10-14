@@ -145,11 +145,12 @@ async fn build(
     let plugins: Vec<Box<dyn Plugin>> = vec![
         Box::new(FakePlugin::new(Arc::new(FakeProvider::new(script)))),
         Box::new(bingo_tool_fs::FsPlugin),
+        Box::new(bingo_permissions::PermissionsPlugin),
         Box::new(bingo_tool_bash::BashPlugin::default()),
         Box::new(modules.clone()),
     ];
     let config = HostConfig::new(Env::rooted(home))
-        .with_layer("test", json!({"provider":"fake","model":"fake-1"}));
+        .with_layer("test", json!({"provider":"fake","model":"fake-1","permissions":options.get("permissions").cloned().unwrap_or_else(||json!({}))}));
     let host = Host::build(plugins, config).await.map_err(error)?;
     admitted(&host, root).await?;
     let session = host

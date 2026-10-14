@@ -1,1 +1,1 @@
-export interface PluginState { calls: number }
+export interface PluginState { 'tool-call': { calls: number } }

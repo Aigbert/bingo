@@ -37,7 +37,7 @@ impl Mount {
         let pane = component.get("pane").and_then(Value::as_str);
         let request = serde_json::from_value(serde_json::json!({
             "component":if pane.is_some() { Value::String("Pane".into()) } else { component.clone() },
-            "requestId":pane.map(str::to_string).unwrap_or_else(|| ItemId::mint().to_string()),
+            "requestId":pane.or_else(|| component.as_str()).map(str::to_string).unwrap_or_else(|| ItemId::mint().to_string()),
             "surface":"terminal", "props":props,
             "viewport":{"columns":viewport.get("columns").cloned().unwrap_or(serde_json::json!(80)),"rows":viewport.get("rows").cloned().unwrap_or(serde_json::json!(24))}
         })).map_err(|e| e.to_string())?;
@@ -52,7 +52,7 @@ impl Mount {
         }
     }
     pub fn resize(&mut self, columns: u16, rows: u16) {
-        if self.request.viewport.columns != columns {
+        if self.request.viewport.columns != columns || self.request.viewport.rows != rows {
             self.tree = None;
         }
         self.request.viewport.columns = columns;

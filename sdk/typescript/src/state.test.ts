@@ -1,6 +1,6 @@
 import { test, expect } from 'bingo/testing';
-import { atom, derive, read, update, memberOf } from './state.ts';
-import type { Dollar } from './dollar.ts';
+import { atom, derive, read, update, memberOf } from 'bingo';
+import type { Dollar } from 'bingo';
 
 function host(conflicts = 0) {
   let gets = 0, sets = 0;

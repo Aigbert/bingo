@@ -35,6 +35,8 @@ pub(super) fn check(semantic: &Semantic<'_>, source: &mut Source<'_>) {
                 if let Some(name) = chain(&call.callee, semantic) {
                     source.output.calls.insert(name.clone());
                     super::uses::call(&name, call, source);
+                } else {
+                    super::helpers::calls(call, semantic, source);
                 }
             }
             AstKind::IdentifierReference(id) if is_dollar(id, semantic) => {

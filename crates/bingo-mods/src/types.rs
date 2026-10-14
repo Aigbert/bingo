@@ -34,6 +34,7 @@ fn sources(events: &Catalog, tools: &Catalog) -> Vec<(&'static str, String)> {
         };
     }
     source!("on.ts");
+    source!("state.ts");
     files.push(("types/bingo/dollar.ts",include_str!("../../../sdk/typescript/src/dollar.ts").replace("export type Dollar =", "type HostDollar =") + "\nexport type Dollar = Omit<HostDollar,keyof import('./services.ts').Services> & import('./services.ts').Services;\n"));
     source!("dollar-types.ts");
     source!("callbacks.ts");

@@ -47,6 +47,7 @@ impl Validation {
 }
 mod contract;
 mod dollar;
+mod helpers;
 mod hooks;
 mod keys;
 mod props;

@@ -20,5 +20,5 @@ export declare const mock: {
   clock: {set(time: string): Promise<void>; advance(ms: number): Promise<void>};
   store: {seed(values: Record<string,unknown>): Promise<void>; read(key: string): Promise<{value:unknown;version:number}|null>};
   env(values: Record<string,string>): Promise<void>;
-  session: { (options: {model?: unknown; cwd?:string}): Promise<void>; submit(text: string): Promise<void>; snapshot(): Promise<unknown> };
+  session: { (options: {model?: unknown; cwd?:string; permissions?: {allow?:string[];deny?:string[];ask?:string[]}}): Promise<void>; submit(text: string): Promise<void>; snapshot(): Promise<unknown> };
 };

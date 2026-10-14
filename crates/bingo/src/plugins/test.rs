@@ -1,33 +1,33 @@
 //! A disposable real host and a fresh QuickJS test runtime for each file.
 mod driver;
 mod mounts;
+mod suite;
 use bingo_mods::testing::{Outcome, Report, Runner};
 use bingo_sdk::KernelError;
 use std::path::{Path, PathBuf};
 
 pub async fn run(root: &Path, json: bool) -> Result<(), KernelError> {
     let root = root.canonicalize().map_err(super::invalid)?;
-    let manifest = bingo_plugin_rpc::validate::read(&root)?;
-    if !matches!(
-        manifest.launch,
-        bingo_plugin_host::manifest::Launch::Module(_)
-    ) {
-        return Err(super::invalid("plugins test requires a module manifest"));
-    }
+    let suite = suite::Suite::read(&root).map_err(super::invalid)?;
     let files = files(&root).map_err(super::invalid)?;
+    let (files, mut skipped) = suite.select(&root, files).map_err(super::invalid)?;
     if files.is_empty() {
-        return Err(super::invalid("no *.test.ts or *.test.tsx files found"));
+        return Err(super::invalid(
+            "no bingo/testing *.test.ts or *.test.tsx files found",
+        ));
     }
     let reports = tokio::task::spawn_blocking(move || {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .map_err(|e| e.to_string())?;
-        runtime.block_on(execute(&root, &manifest.name, files))
+        runtime.block_on(execute(&root, &suite, files))
     })
     .await
     .map_err(super::invalid)?
     .map_err(super::invalid)?;
+    skipped.extend(reports);
+    let reports = skipped;
     let failed = reports
         .iter()
         .any(|report| matches!(report.outcome, Outcome::Fail { .. }));
@@ -66,11 +66,15 @@ fn files(root: &Path) -> Result<Vec<String>, String> {
     files.sort();
     Ok(files)
 }
-async fn execute(root: &Path, name: &str, files: Vec<String>) -> Result<Vec<Report>, String> {
+async fn execute(
+    root: &Path,
+    suite: &suite::Suite,
+    files: Vec<String>,
+) -> Result<Vec<Report>, String> {
     let mut reports = Vec::new();
     for file in files {
         let runner = Runner::load(root, &file, Default::default()).await?;
-        let mut driver = driver::Driver::new(root, name).await?;
+        let mut driver = driver::Driver::new(&suite.module, &suite.name).await?;
         let result = runner.run(&mut driver, serde_json::json!({})).await;
         runner.close().await;
         driver.close().await;
