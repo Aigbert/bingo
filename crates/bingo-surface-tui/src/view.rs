@@ -232,7 +232,7 @@ fn layer(
             let lines = switcher_lines(tree, ui, switcher, now, above, frame);
             over(frame, above, lines)
         }
-        Open::Help => sheet(frame, above, help(width), reveal),
+        Open::Help => sheet(frame, above, help(width, ui, tree.viewed()), reveal),
         Open::Picker(picker) => sheet(frame, above, picker_lines(picker, now, rows), reveal),
         Open::Pager(open) => paged(tree, frame, above, open, reveal),
         // A dropdown above the input box, like the switcher's.
@@ -589,8 +589,14 @@ fn lined(area: Rect, padding: usize) -> Rect {
 }
 
 /// The binding table answers keys; the command menu answers commands.
-fn help(width: usize) -> Vec<Line<'static>> {
+fn help(width: usize, ui: &Ui, state: &SessionState) -> Vec<Line<'static>> {
     let mut out = keys::help_lines(width);
+    for (key, command) in keys::commands::bindings(ui, state).commands {
+        out.extend(crate::wrap::wrap(
+            &Line::from(format!("{key}  {command}")),
+            width,
+        ));
+    }
     out.push(Line::default());
     out.push(Line::from(Span::styled(
         "/ for commands · ! for a shell line",

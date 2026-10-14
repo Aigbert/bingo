@@ -11,6 +11,7 @@ repository = "https://github.com/yexrob/bingo"
 publish = false
 
 [workspace.dependencies]
+bingo-mod-hello = { path = "crates/bingo-mod-hello" }
 bingo-mods = { path = "crates/bingo-mods" }
 # M137 / ADR-0078: sandbox memory/time caps and the TS/TSX compiler.
 rquickjs = { version = "=0.14.0", features = ["futures", "loader", "parallel"] }

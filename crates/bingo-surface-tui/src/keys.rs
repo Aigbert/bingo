@@ -5,6 +5,7 @@ use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
 use crate::theme;
+pub mod commands;
 
 pub struct Binding {
     /// The chord, lowercase and `+`-joined; ` · ` separates alternatives.

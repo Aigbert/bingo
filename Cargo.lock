@@ -626,6 +626,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bingo-mod-hello"
+version = "0.6.6"
+dependencies = [
+ "async-trait",
+ "bingo-sdk",
+ "serde_json",
+]
+
+[[package]]
 name = "bingo-mods"
 version = "0.6.6"
 dependencies = [
@@ -634,6 +643,7 @@ dependencies = [
  "bingo-core",
  "bingo-digest",
  "bingo-http",
+ "bingo-mod-hello",
  "bingo-plugin-host",
  "bingo-process",
  "bingo-schema-ts",
@@ -1003,6 +1013,7 @@ dependencies = [
  "bingo-collab",
  "bingo-http",
  "bingo-loopback",
+ "bingo-mod-hello",
  "bingo-pictures",
  "bingo-sdk",
  "bingo-update",

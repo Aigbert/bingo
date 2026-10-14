@@ -27,6 +27,7 @@ mod opening;
 mod pulling;
 /// The pictures a frame drew, on their way to the terminal.
 mod showing;
+mod site_keys;
 /// A line on its way out of the composer, and the pictures it named.
 mod submit;
 /// Whether a newer release is out, asked once at start (M63).
@@ -165,6 +166,7 @@ struct Run {
     /// meant for another client is not reported here and a refusal can name
     /// what was refused.
     mine: HashMap<IntentId, Option<String>>,
+    site_keys: HashMap<IntentId, site_keys::Pending>,
     replies: mpsc::Sender<Reply>,
     /// A selection a key asked for, handed to the terminal between frames.
     clipboard: Option<String>,
@@ -310,6 +312,7 @@ async fn attach(
         session: Attached::new(attachment.snapshot, attachment.handle),
         ui: Ui::new(history::load(&opts.env.data_dir), Instant::now()),
         mine: HashMap::new(),
+        site_keys: HashMap::new(),
         replies,
         clipboard: None,
         opener: viewer::system(),
@@ -483,6 +486,7 @@ impl Run {
                 self.ui.notify(*level, text.clone(), Instant::now())
             }
             Event::IntentAck { intent, outcome } => self.ack(intent, outcome),
+            Event::ConfigChanged { .. } => site_keys::notices(self),
             Event::SessionClosed { .. } => self.closed(&frame.session),
             _ => {}
         }
@@ -579,6 +583,7 @@ impl Run {
 
     /// Only this client's intents have a line to restore on refusal.
     fn ack(&mut self, intent: &IntentId, outcome: &IntentOutcome) {
+        site_keys::answered(self, intent, outcome);
         if self
             .ui
             .pending_ui
@@ -665,6 +670,12 @@ impl Run {
     fn terminal_event(&mut self, event: Term) {
         match event {
             Term::Key(key) => {
+                if matches!(
+                    crate::keys::commands::chord(key).as_deref(),
+                    Some("esc" | "ctrl+c")
+                ) {
+                    self.site_keys.clear();
+                }
                 self.session.tree.mark_read();
                 let effects =
                     input::on_key(&mut self.ui, &self.session.tree, key, self.detection.now());
@@ -702,6 +713,7 @@ impl Run {
     fn effect(&mut self, effect: Effect) {
         match effect {
             Effect::Submit(input) => self.submit(input),
+            Effect::SiteKey { action, key } => site_keys::send(self, action, key),
             Effect::Withdraw(intent) => withdraw::ask(self, intent),
             Effect::Interrupt => self.interrupt(),
             Effect::Answer {
@@ -905,7 +917,10 @@ impl Run {
                 }
             }
             Reply::Stored(sessions) => self.fill_switcher(sessions),
-            Reply::Commands(specs) => self.ui.catalogs.commands = specs,
+            Reply::Commands(specs) => {
+                self.ui.catalogs.commands = specs;
+                site_keys::notices(self);
+            }
             Reply::Catalogue(source, ids) => {
                 self.ui.catalogs.values.insert(source, ids);
             }
@@ -1837,6 +1852,7 @@ mod tests {
             session: Attached::new(state, SessionHandle(session)),
             ui: Ui::new(Vec::new(), at),
             mine: HashMap::new(),
+            site_keys: HashMap::new(),
             replies: mpsc::channel(1).0,
             clipboard: None,
             opener: viewer::system(),
@@ -2886,3 +2902,6 @@ mod tests {
         });
     }
 }
+
+#[cfg(test)]
+mod builtins_tests;

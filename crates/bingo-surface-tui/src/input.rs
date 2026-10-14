@@ -52,6 +52,11 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if let Some(effects) = leaving(ui, tree.viewed(), key, now) {
         return effects;
     }
+    if owner == crate::focus::Owner::Pane
+        && let Some(action) = crate::pane::key_handler(ui, tree.viewed(), key)
+    {
+        return vec![Effect::SiteKey { action, key }];
+    }
     match owner {
         crate::focus::Owner::Pane => pane_keys(ui, tree, key, now),
         crate::focus::Owner::Select => selecting(ui, tree, key, now),
@@ -64,7 +69,7 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     }
 }
 
-fn pane_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
+pub(crate) fn pane_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     let effects = crate::pane::key(ui, tree.viewed(), key);
     if key.code != KeyCode::Esc && matches!(ui.focus, crate::focus::Focus::Composer) {
         return composer_keys(ui, tree, key, now);
@@ -85,6 +90,9 @@ fn interaction_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Ef
 }
 
 fn composer_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
+    if let Some(line) = keys::commands::line(ui, tree.viewed(), key) {
+        return command_line(ui, tree, now, line);
+    }
     if let Some(effects) = layered(ui, tree, key, now) {
         return effects;
     }
@@ -796,6 +804,14 @@ fn enter(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 ///
 /// `delivery` is the whole of the difference between the two keys that send:
 /// `⏎` steers a running turn at its next barrier, `tab` waits for it to end.
+fn command_line(ui: &mut Ui, tree: &Tree, now: Now, line: String) -> Vec<Effect> {
+    let composer = std::mem::take(&mut ui.composer);
+    ui.composer.set(&line);
+    let effects = submit(ui, tree, now, Delivery::default());
+    ui.composer = composer;
+    effects
+}
+
 fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect> {
     let text = ui.composer.take();
     // The gesture is answered on its own frame, whatever the line turns out

@@ -117,3 +117,16 @@ test('the Node hook waits for an unawaited status publication', async () => {
     assert.deepEqual(await answer,{answer:{parts:[]}});
   } finally {running.close();process.close();host.close();}
 });
+
+test('root onKey mints an owned press handler and preserves unhandled', async () => {
+  const handlers = new Handlers();
+  const port = {request:async () => null} as any;
+  const dispatch = async (_event: string, _input: any, next: () => Promise<unknown>) => next();
+  const tree = handlers.mint('keys','session','pane','one',
+    {kind:'Box',children:[],onKey:(event: any) => ({handled:event.key === 'x'})},port);
+  assert.equal(tree.onKey.name, 'keys:ui');
+  for (const key of ['x','y']) {
+    assert.deepEqual(await handlers.fire('session',{...tree.onKey.args,value:{key}},port,dispatch),
+      {stale:false,handled:key === 'x'});
+  }
+});

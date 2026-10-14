@@ -65,6 +65,7 @@ thiserror.workspace = true
 libc = "0.2"
 
 [dev-dependencies]
+bingo-mod-hello.workspace = true
 bingo-sdk = { workspace = true, features = ["testing"] }
 # The pictures the transcript's tests hand over, drawn by the crate that
 # reads them back rather than pasted into a source file.

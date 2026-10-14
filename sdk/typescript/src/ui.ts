@@ -1,7 +1,7 @@
 import type { Rpc } from './rpc.ts';
 type Port = Rpc;
 type Handler = { session: string; site: string; event: string; callback: (value: unknown) => unknown; port: Port };
-const events: Record<string, string> = {onPress:'press', onInput:'input', onSubmit:'input', onSelect:'select'};
+const events: Record<string, string> = {onKey:'press', onPress:'press', onInput:'input', onSubmit:'input', onSelect:'select'};
 
 export class Handlers {
   private readonly tokens = new Map<string, Handler>();
@@ -45,8 +45,8 @@ export class Handlers {
       const old = handler.port.request;
       handler.port.request = port.request;
       try {
-        await dispatch(`ui.${handler.event}`, input, async () => handler.callback(input.value));
-        return {stale:false};
+        const result = await dispatch(`ui.${handler.event}`, input, async () => handler.callback(input.value));
+        return {stale:false, ...(result && typeof result === "object" && "handled" in result ? {handled:result.handled !== false} : {})};
       } finally { handler.port.request = old; }
     });
     this.pending.set(handler.port, run);

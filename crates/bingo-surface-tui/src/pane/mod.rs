@@ -269,6 +269,35 @@ fn caret(editor: Option<&Composer>, value: &str) -> String {
     }
     lines.join("\n")
 }
+pub fn key_handler(ui: &Ui, state: &SessionState, key: KeyEvent) -> Option<Action> {
+    if key.code == KeyCode::Esc
+        || (key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL))
+    {
+        return None;
+    }
+    let Focus::Pane(focused) = &ui.focus else {
+        return None;
+    };
+    let pane = placed(state)
+        .into_iter()
+        .find(|pane| &pane.key == focused)?;
+    let seated = ui
+        .shown
+        .seating
+        .panes
+        .iter()
+        .find(|seat| &seat.key == focused)?;
+    let View::Box { layout, .. } = view(ui, state, &pane, seated)? else {
+        return None;
+    };
+    let mut action = layout.on_key.clone()?;
+    action.args.as_object_mut()?.insert(
+        "value".into(),
+        serde_json::json!({"key": crate::keys::commands::chord(key)?}),
+    );
+    Some(action)
+}
+
 pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
     let Focus::Pane(focused) = &ui.focus else {
         return Vec::new();

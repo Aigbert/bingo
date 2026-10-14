@@ -9,6 +9,10 @@ use crate::graphics::picture::Source;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Effect {
     Submit(Input),
+    SiteKey {
+        action: bingo_sdk::Action,
+        key: crossterm::event::KeyEvent,
+    },
     /// Take one of this surface's own queued lines back out of the session it
     /// waits in and into the composer (ADR-0008 §2, amended M68). The kernel
     /// answers with the line, or says it is no longer there to take.

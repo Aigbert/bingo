@@ -10,21 +10,39 @@ pub(super) fn sync(run: &mut Run, screen: &mut dyn Screen, now: Now) -> Result<(
     Ok(())
 }
 
-pub(super) fn request(run: &mut Run, keys: &[crate::pulled::Key]) {
+pub(super) fn request(run: &mut Run, keys: &[crate::pulled::Key]) -> bool {
+    use std::{
+        future::Future,
+        task::{Context, Poll, Waker},
+    };
+    let mut answered = false;
     run.ui.placed.pulled.retain(keys);
     for key in keys {
-        if run.ui.placed.pulled.request(key) {
-            let key = key.clone();
-            let host = run.host.clone();
-            run.spawn(async move {
-                let view = host
-                    .render(&key.session, key.request.clone())
-                    .await
-                    .unwrap_or_else(|_| key.request.engine());
-                Ok(Reply::Rendered(key, Box::new(view)))
-            });
+        if !run.ui.placed.pulled.request(key) {
+            continue;
+        }
+        let key = key.clone();
+        let host = run.host.clone();
+        let mut pending = Box::pin(async move {
+            let view = host
+                .render(&key.session, key.request.clone())
+                .await
+                .unwrap_or_else(|_| key.request.engine());
+            Ok(Reply::Rendered(key, Box::new(view)))
+        });
+        match pending
+            .as_mut()
+            .poll(&mut Context::from_waker(Waker::noop()))
+        {
+            Poll::Ready(Ok(Reply::Rendered(key, view))) => {
+                run.ui.placed.pulled.answer(key, *view);
+                answered = true;
+            }
+            Poll::Pending => run.spawn(pending),
+            _ => {}
         }
     }
+    answered
 }
 
 pub(super) fn paint(
@@ -48,7 +66,7 @@ pub(super) fn paint(
     pulling::sync(run, screen, now)?;
     run.ui.prepare(&run.session.tree.viewed().summary.cwd);
     let previous = std::mem::take(&mut run.ui.shown);
-    let layout = crate::layout::layout(
+    let mut layout = crate::layout::layout(
         previous,
         &run.session.tree,
         &run.ui,
@@ -56,6 +74,16 @@ pub(super) fn paint(
         now,
         &run.detection.render(),
     );
+    if request(run, &layout.pulls) {
+        layout = crate::layout::layout(
+            layout,
+            &run.session.tree,
+            &run.ui,
+            ratatui::layout::Rect::new(0, 0, width, height),
+            now,
+            &run.detection.render(),
+        );
+    }
     screen
         .draw(&layout, &run.detection.render())
         .map_err(stdio)?;

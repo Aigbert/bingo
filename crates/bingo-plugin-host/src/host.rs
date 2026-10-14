@@ -242,6 +242,11 @@ pub async fn handler(
         Ok(value) if value["stale"].as_bool() == Some(true) => {
             Some("This control belongs to an earlier drawing; try the current one.".to_string())
         }
+        Ok(value) if value.get("handled").and_then(Value::as_bool).is_some() => {
+            return Ok(CommandOutcome::Handled {
+                handled: value["handled"] != false,
+            });
+        }
         Ok(_) => None,
         Err(error) => Some(error),
     };

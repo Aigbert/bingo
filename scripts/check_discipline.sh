@@ -24,6 +24,9 @@ libraries = {n for n in ws if (members[n].get("metadata") or {}).get("bingo", {}
 compositions = {n for n in ws if (members[n].get("metadata") or {}).get("bingo", {}).get("tier") == "composition"}
 plugins = {n for n in ws if n not in ("bingo", "bingo-sdk", "bingo-core") and n not in libraries and n not in compositions}
 bad = []
+for n in ws:
+    if n.startswith("bingo-mod-") and n not in plugins:
+        bad.append(f"{n} must be a plugin, never a library or composition")
 for n in libraries:
     for d in deps(n) & ws:
         if d != "bingo-sdk" and d not in libraries:
@@ -174,7 +177,7 @@ for path in root.rglob("*.rs"):
         if line.lstrip().startswith("//"):
             continue
         for literal in re.findall(r'"([^"\n]*)"', line):
-            if literal in tools or (literal.startswith(("bingo.", "_bingo.")) and not (path.name == "lib.rs" and literal == "bingo.surface.tui")):
+            if literal in tools or (literal.startswith(("bingo.", "_bingo.", "bingo-mod-", "bingo_mod_")) and not (path.name == "lib.rs" and literal == "bingo.surface.tui")):
                 bad.append(f"{path}:{number}: {literal}")
 if bad:
     print("TUI names a plugin or tool:")
