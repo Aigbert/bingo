@@ -24,7 +24,12 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
             key,
         },
     );
-    handle.submit(intent, Input::Action { action });
+    run.ui.actions.push(
+        run.session.tree.viewed().summary.id.clone(),
+        handle,
+        intent,
+        action,
+    );
 }
 
 pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome) {

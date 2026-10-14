@@ -544,6 +544,7 @@ impl Run {
             self.exit = Some(Exit { code: 0 });
             return;
         }
+        self.discard_actions(std::slice::from_ref(session));
         self.session.handles.remove(session);
     }
 
@@ -566,6 +567,7 @@ impl Run {
     }
 
     fn forget(&mut self, removed: &[SessionId]) {
+        self.discard_actions(removed);
         self.session.tree.forget(removed);
         for id in removed {
             self.session.handles.remove(id);
@@ -584,14 +586,7 @@ impl Run {
     /// Only this client's intents have a line to restore on refusal.
     fn ack(&mut self, intent: &IntentId, outcome: &IntentOutcome) {
         site_keys::answered(self, intent, outcome);
-        if self
-            .ui
-            .pending_ui
-            .as_ref()
-            .is_some_and(|(pending, _)| pending == intent)
-        {
-            self.ui.pending_ui = None;
-        }
+        self.ui.actions.acknowledge(intent);
         let Some(about) = self.mine.remove(intent) else {
             return;
         };
@@ -756,6 +751,8 @@ impl Run {
         let Some(handle) = self.session.writer() else {
             return self.not_yet();
         };
+        let session = self.session.tree.viewed().summary.id.clone();
+        self.discard_actions(&[session]);
         let intent = self.mint(None);
         handle.interrupt(intent, InterruptScope::Head);
     }
@@ -955,6 +952,8 @@ impl Run {
         let host = self.host.clone();
         let old = self.session.tree.root_id().clone();
         tokio::spawn(async move { host.close(&old, CloseReason::Client).await });
+        let sessions: Vec<_> = self.session.handles.keys().cloned().collect();
+        self.discard_actions(&sessions);
         self.session = Attached::new(attachment.snapshot, attachment.handle);
         *events = Some(attachment.events);
         self.ui.opening = false;
@@ -2910,3 +2909,6 @@ mod tests {
 
 #[cfg(test)]
 mod builtins_tests;
+
+#[cfg(test)]
+mod action_tests;

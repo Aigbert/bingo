@@ -26,7 +26,7 @@ pub struct TestSession {
     /// How long each frame waits before it arrives, so a test can be a storm
     /// rather than a burst.
     pace: std::time::Duration,
-    submitted: Mutex<Vec<Input>>,
+    submitted: Mutex<Vec<(IntentId, Input)>>,
     answers: Mutex<Vec<(bingo_sdk::InteractionId, bingo_sdk::Answer, Activation)>>,
     interrupts: Mutex<usize>,
 }
@@ -45,6 +45,13 @@ impl TestSession {
     }
 
     pub fn submitted(&self) -> Vec<Input> {
+        self.submissions()
+            .into_iter()
+            .map(|(_, input)| input)
+            .collect()
+    }
+
+    pub fn submissions(&self) -> Vec<(IntentId, Input)> {
         self.submitted.lock().expect("no poisoned lock").clone()
     }
 
@@ -59,8 +66,11 @@ impl TestSession {
 
 #[async_trait]
 impl SessionPort for TestSession {
-    fn submit(&self, _intent: IntentId, input: Input) {
-        self.submitted.lock().expect("no poisoned lock").push(input);
+    fn submit(&self, intent: IntentId, input: Input) {
+        self.submitted
+            .lock()
+            .expect("no poisoned lock")
+            .push((intent, input));
     }
 
     fn interrupt(&self, _intent: IntentId, _scope: InterruptScope) {

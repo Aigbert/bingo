@@ -46,6 +46,7 @@
 
 /// The rows between the transcript and the input box: the verb row, the task
 /// list and the queue (design §3).
+mod actions;
 mod activity;
 mod blocks;
 mod clipboard;

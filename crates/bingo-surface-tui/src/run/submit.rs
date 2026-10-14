@@ -35,6 +35,13 @@ pub(super) struct Mentioned {
 }
 
 impl Run {
+    pub(super) fn discard_actions(&mut self, sessions: &[bingo_sdk::SessionId]) {
+        for intent in self.ui.actions.discard(sessions) {
+            self.mine.remove(&intent);
+            self.site_keys.remove(&intent);
+        }
+    }
+
     pub(super) fn submit(&mut self, input: Input) {
         let Some(handle) = self.session.writer() else {
             return self.not_yet();
@@ -46,12 +53,14 @@ impl Run {
                 origin,
                 delivery,
             } => self.submit_text(handle, text, images, origin, delivery),
-            action => {
+            Input::Action { action } => {
                 let intent = self.mint(None);
-                if let Input::Action { action: ref value } = action {
-                    self.ui.pending_ui = Some((intent.clone(), value.clone()));
-                }
-                handle.submit(intent, action);
+                self.ui.actions.push(
+                    self.session.tree.viewed().summary.id.clone(),
+                    handle,
+                    intent,
+                    action,
+                );
             }
         }
     }

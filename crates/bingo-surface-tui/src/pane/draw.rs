@@ -129,7 +129,7 @@ pub(super) fn lines(
         Some(&view),
         usize::from(seated.area.width),
         &views::Marks {
-            pending: ui.pending_ui.as_ref().map(|(_, action)| action.clone()),
+            pending: ui.actions.action().cloned(),
             ..views::Marks::at(now)
         },
         |_, _| Vec::new(),
