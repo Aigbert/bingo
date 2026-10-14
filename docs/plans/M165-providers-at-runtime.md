@@ -63,6 +63,8 @@ its key came from, and never restarts.
   publish `[redacted]` for login text; this necessary fix extends the file scope.
 - Reach errors expose error categories, never arbitrary endpoint text, which
   can echo URL or header credentials. Addresses omit userinfo, query and fragment.
+- Provider registry facts share one `ProviderState`; runtime verbs are free host
+  functions, keeping Registry and Host within the existing cohesion limits.
 - Runtime mutations are serialized; replacements/removals shadow boot entries.
   Refresh results are accepted only for the same provider Arc, so an old probe
   cannot overwrite the replacement's list. Sessions retain their resolved Arc.
@@ -94,17 +96,19 @@ its key came from, and never restarts.
 
 ## Exit criteria
 
-- [ ] Shape contract test; boot instances unchanged (existing tests).
-- [ ] Black-box (temp HOME, wiremock as the endpoint): `/provider add`
+- [x] Shape contract test; boot instances unchanged (existing tests).
+- [x] Black-box (temp HOME, wiremock as the endpoint): `/provider add`
       → the provider is in `catalog(Providers)` with `reach: ok`,
       `/model <name>/<id>` answers in the same session, the settings
       leaf is written with comments preserved, the key is only in
       `auth.json`.
-- [ ] Unreachable address: `reach: down` with a redacted error; the
+- [x] Unreachable address: `reach: down` with a redacted error; the
       instance stays and `/provider set … url` fixes it.
-- [ ] `remove` refuses a boot provider; removes an instance everywhere.
-- [ ] Journal grep in the black-box test finds no key text.
-- [ ] Gates as M164, plus Windows check of `bingo-core`.
+- [x] `remove` refuses a boot provider; removes an instance everywhere.
+- [x] Journal grep in the black-box test finds no key text.
+- [x] Native gates and isolated TUI smoke; final full suite passes.
+- [x] Windows: SDK, core, agents and RPC pass.
+- [ ] Windows: auth, both providers, TUI and bin deferred for missing C headers/toolchain.
 
 ## Non-goals
 
@@ -120,3 +124,26 @@ for new issuers.
   (ADR-0057): its shape goes with it; the instance stays in settings
   and is skipped with a notice, as at boot.
 - Probing a local server (`:11434`) from CI: tests use wiremock only.
+
+## Verified — 2026-10-15
+
+Sequential gates; provider credential/URL environment removed; local fixtures only.
+
+```text
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-mods --locked => 527 passed, 2 ignored
+cargo fmt --all -- --check => exit 0
+cargo check --workspace --all-targets --locked => exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings => exit 0
+cargo test --workspace --locked --no-fail-fast => 5542 passed; 5 ignored; 167 groups
+bash scripts/check_discipline.sh => discipline ok (advisory warnings)
+bash scripts/budget.sh => dependencies 412; warm core 0s; isolation 0; target 9 GB; budget ok
+cargo deny check => advisories ok, bans ok, licenses ok, sources ok
+bash scripts/tui-smoke.sh => tui-smoke ok; known Name: Ad failure did not reproduce
+cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc:
+  bingo-sdk, bingo-core, bingo-agents, bingo-surface-rpc => exit 0
+  bingo-auth-oauth, bingo-provider-openai, bingo-provider-anthropic, bingo-surface-tui => exit 101: aws-lc-sys
+  bingo => exit 101: aws-lc-sys and rquickjs-sys; Windows C headers/toolchain absent
+```
+Generators left schema/ and sdk/typescript unchanged: provider meta is extensible JSON; SDK and RPC fixtures pin the added fields.
+Earlier workspace runs intermittently failed `mentions::a_question_left_unanswered_is_chased_when_the_next_process_opens_the_room` (--continue session IDs); two isolated reruns also failed. The final unchanged test passed; no unrelated test fix is retained.
+The budget's build-directory soft warning is addressed by final `cargo clean` after commits.
