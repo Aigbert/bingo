@@ -211,10 +211,20 @@ async fn the_ask_handler_returns_an_answer_for_the_surface_to_send() {
     let mut action = layout.on_key.clone().unwrap();
     action.args["value"] = json!({"key":"2"});
     let outcome = command(&mut attachment, Input::Action { action }).await;
-    let IntentOutcome::Applied { result } = outcome else { panic!("applied") };
+    let IntentOutcome::Applied { result } = outcome else {
+        panic!("applied")
+    };
     assert_eq!(result["handled"], true);
-    assert!(!asking.is_finished(), "the mod cannot resolve the interaction");
-    attachment.handle.answer(IntentId::mint(), open.id.clone(), serde_json::from_value(result["answer"].clone()).unwrap(), Activation::Keyboard);
+    assert!(
+        !asking.is_finished(),
+        "the mod cannot resolve the interaction"
+    );
+    attachment.handle.answer(
+        IntentId::mint(),
+        open.id.clone(),
+        serde_json::from_value(result["answer"].clone()).unwrap(),
+        Activation::Keyboard,
+    );
     assert_eq!(
         tokio::time::timeout(std::time::Duration::from_secs(10), asking)
             .await

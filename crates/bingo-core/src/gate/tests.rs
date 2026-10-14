@@ -82,6 +82,13 @@ impl Prompter for Person {
     }
 }
 async fn run(command: &str, replies: Vec<Answer>) -> (Gated, Person) {
+    with_hooks(command, replies, &[]).await
+}
+async fn with_hooks(
+    command: &str,
+    replies: Vec<Answer>,
+    hooks: &[Arc<dyn Hook>],
+) -> (Gated, Person) {
     let person = Person {
         replies: Mutex::new(replies.into()),
         ..Default::default()
@@ -108,7 +115,7 @@ async fn run(command: &str, replies: Vec<Answer>) -> (Gated, Person) {
             tool: Some(Arc::new(Shell)),
             policy: &Policy,
             links: &[],
-            hooks: &[],
+            hooks,
             hook_cx: &cx,
         },
         &person,
@@ -201,4 +208,33 @@ async fn changed_session_approval_keeps_both_receipt_facts() {
     .await;
     let receipt = serde_json::to_value(result.receipt.unwrap()).unwrap();
     assert_eq!(receipt["decision"], "allowChangedSession");
+}
+
+struct Rewrite;
+#[async_trait]
+impl Hook for Rewrite {
+    fn id(&self) -> &str {
+        "rewrite"
+    }
+    fn matcher(&self) -> HookMatcher {
+        HookMatcher {
+            points: vec![HookPoint::BeforeTool],
+            tool: None,
+        }
+    }
+    async fn before_tool(&self, call: &mut ToolCall, _: &HookContext) -> HookOutcome {
+        call.input = json!({"command":"cargo check"});
+        HookOutcome::Continue
+    }
+}
+#[tokio::test]
+async fn permission_input_is_the_call_after_pre_tool_hooks() {
+    let (result, person) =
+        with_hooks("cargo build", vec![Answer::AllowOnce], &[Arc::new(Rewrite)]).await;
+    let asks = person.asks.lock().unwrap();
+    let InteractionKind::Permission { input, .. } = &asks[0].0 else {
+        panic!("permission")
+    };
+    assert_eq!(input, &json!({"command":"cargo check"}));
+    assert_eq!(input, &result.call.input);
 }

@@ -1,13 +1,17 @@
 //! Plugin handles preserve provenance even when a client identity is forged.
+use async_trait::async_trait;
 use bingo_sdk::*;
 use serde_json::Value;
 use std::{any::Any, cell::Cell, sync::Arc};
-use async_trait::async_trait;
 
 thread_local! { static ANSWERING: Cell<bool> = const { Cell::new(false) }; }
-pub(crate) fn answering() -> bool { ANSWERING.get() }
+pub(crate) fn answering() -> bool {
+    ANSWERING.get()
+}
 
-pub(crate) fn handle(host: HostHandle) -> HostHandle { HostHandle(Arc::new(PluginHost(host))) }
+pub(crate) fn handle(host: HostHandle) -> HostHandle {
+    HostHandle(Arc::new(PluginHost(host)))
+}
 struct PluginHost(HostHandle);
 #[async_trait]
 impl HostApi for PluginHost {
@@ -154,7 +158,11 @@ impl HostApi for PluginHost {
 
 struct PluginPort(SessionHandle);
 struct Answering(bool);
-impl Drop for Answering { fn drop(&mut self) { ANSWERING.set(self.0); } }
+impl Drop for Answering {
+    fn drop(&mut self) {
+        ANSWERING.set(self.0);
+    }
+}
 #[async_trait]
 impl SessionPort for PluginPort {
     fn submit(&self, intent: IntentId, input: Input) {

@@ -299,37 +299,123 @@ async fn a_session_this_host_does_not_run_is_never_answered_for() {
 struct BorrowedHost(Arc<std::sync::Mutex<Option<HostHandle>>>);
 #[async_trait]
 impl Plugin for BorrowedHost {
-    fn manifest(&self) -> &'static PluginManifest { &STANCE }
-    fn register(&self, _: &mut Registrar) -> Result<(), PluginError> { Ok(()) }
+    fn manifest(&self) -> &'static PluginManifest {
+        &STANCE
+    }
+    fn register(&self, _: &mut Registrar) -> Result<(), PluginError> {
+        Ok(())
+    }
     async fn start(&self, host: HostHandle) -> Result<(), PluginError> {
         *self.0.lock().unwrap() = Some(host);
         Ok(())
     }
 }
 
-#[tokio::test]
-async fn a_plugins_host_handle_cannot_approve_a_permission() {
+async fn plugin_host() -> (Arc<Host>, HostHandle) {
     let borrowed = Arc::new(std::sync::Mutex::new(None));
     let plugins: Vec<Box<dyn Plugin>> = vec![
-        TestPlugin::boxed(&PROVIDER, vec![Contribution::Provider(ScriptedProvider::new(vec![]))]),
+        TestPlugin::boxed(
+            &PROVIDER,
+            vec![Contribution::Provider(ScriptedProvider::new(vec![]))],
+        ),
         Box::new(BorrowedHost(borrowed.clone())),
     ];
-    let host = Host::build(plugins, HostConfig::new(env()).with_layer("cli", json!({"model":"m"}))).await.unwrap();
+    let host = Host::build(
+        plugins,
+        HostConfig::new(env()).with_layer("cli", json!({"model":"m"})),
+    )
+    .await
+    .unwrap();
+    let plugin = borrowed.lock().unwrap().clone().unwrap();
+    (host, plugin)
+}
+
+#[tokio::test]
+async fn a_plugins_host_handle_cannot_approve_a_permission() {
+    let (host, plugin) = plugin_host().await;
     let mut person = attach(&host).await;
     let session = person.session.clone();
     let asking = host.clone();
-    let pending = tokio::spawn(async move { asking.ask(&session,
-        serde_json::from_value(json!({"kind":"permission","tool":"Echo","summary":"may I?"})).unwrap(),
-        vec![AnswerSpec::AllowOnce, AnswerSpec::Deny]).await });
+    let pending = tokio::spawn(async move {
+        asking
+            .ask(
+                &session,
+                serde_json::from_value(
+                    json!({"kind":"permission","tool":"Echo","summary":"may I?"}),
+                )
+                .unwrap(),
+                vec![AnswerSpec::AllowOnce, AnswerSpec::Deny],
+            )
+            .await
+    });
     let id = opened(&mut person).await;
-    let plugin = borrowed.lock().unwrap().clone().unwrap();
-    let forged = plugin.open(SessionSelector::ById { id: person.session.clone() },
-        ClientIdentity { name: "ask".into(), surface: "terminal".into() }, OpenOptions { children: true, ..Default::default() }).await.unwrap();
-    let intent = IntentId::mint();
-    forged.handle.answer(intent.clone(), id.clone(), Answer::AllowOnce, Activation::Programmatic);
+    let forged = forged(&plugin, &person.session).await;
+    for activation in [
+        Activation::Programmatic,
+        Activation::Keyboard,
+        Activation::Pointer,
+    ] {
+        let intent = IntentId::mint();
+        forged
+            .handle
+            .answer(intent.clone(), id.clone(), Answer::AllowOnce, activation);
+        let events = frames_to_the_mark(&host, &mut person).await;
+        assert!(events.iter().any(|e| matches!(e, Event::IntentAck { intent: i, outcome: IntentOutcome::Rejected { error } } if i == &intent && error.code == ErrorCode::PermissionDenied)), "{events:?}");
+    }
+    person.handle.answer(
+        IntentId::mint(),
+        id,
+        Answer::Deny { feedback: None },
+        Activation::Programmatic,
+    );
+    assert!(matches!(
+        pending.await.unwrap().unwrap(),
+        Answer::Deny { .. }
+    ));
+    host.shutdown().await;
+}
+
+async fn forged(plugin: &HostHandle, session: &SessionId) -> Attachment {
+    plugin
+        .open(
+            SessionSelector::ById {
+                id: session.clone(),
+            },
+            ClientIdentity {
+                name: "ask".into(),
+                surface: "terminal".into(),
+            },
+            OpenOptions {
+                children: true,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap()
+}
+#[tokio::test]
+async fn accepted_plugin_answers_record_their_source() {
+    let (host, plugin) = plugin_host().await;
+    let mut person = attach(&host).await;
+    let asking = host.clone();
+    let session = person.session.clone();
+    let pending = tokio::spawn(async move { asking.ask(&session, marked(), answers()).await });
+    let id = opened(&mut person).await;
+    let forged = forged(&plugin, &person.session).await;
+    forged.handle.answer(
+        IntentId::mint(),
+        id,
+        picked("allow_once"),
+        Activation::Programmatic,
+    );
     let events = frames_to_the_mark(&host, &mut person).await;
-    assert!(events.iter().any(|e| matches!(e, Event::IntentAck { intent: i, outcome: IntentOutcome::Rejected { error } } if i == &intent && error.code == ErrorCode::PermissionDenied)), "{events:?}");
-    person.handle.answer(IntentId::mint(), id, Answer::Deny { feedback: None }, Activation::Programmatic);
-    assert!(matches!(pending.await.unwrap().unwrap(), Answer::Deny { .. }));
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::InteractionResolved {
+            by: ResolvedBy::Plugin { .. },
+            ..
+        }
+    )));
+    assert_eq!(pending.await.unwrap().unwrap(), picked("allow_once"));
     host.shutdown().await;
 }

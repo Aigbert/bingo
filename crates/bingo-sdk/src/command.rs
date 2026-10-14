@@ -105,7 +105,9 @@ impl std::fmt::Debug for CommandContext {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum CommandOutcome {
     /// A site key chose an answer; the surface decides whether to send it.
-    Answer { answer: crate::Answer },
+    Answer {
+        answer: crate::Answer,
+    },
     Handled {
         handled: bool,
     },

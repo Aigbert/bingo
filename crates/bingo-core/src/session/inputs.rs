@@ -105,7 +105,8 @@ impl Actor {
         }
         match outcome {
             Ok(CommandOutcome::Answer { answer }) => {
-                self.applied(intent, json!({"handled": true, "answer": answer})).await?;
+                self.applied(intent, json!({"handled": true, "answer": answer}))
+                    .await?;
             }
             Ok(CommandOutcome::Handled { handled }) => {
                 self.applied(intent, json!({"handled": handled})).await?;
