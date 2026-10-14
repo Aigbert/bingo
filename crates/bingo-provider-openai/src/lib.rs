@@ -191,6 +191,7 @@ impl OpenAiProvider {
     /// The header table for one bearer, so a retry after a refresh writes the
     /// new token into exactly the headers the first attempt carried.
     fn compose(&self, bearer: &str) -> Result<HeaderMap, ProviderError> {
+        self.lifetime.check()?;
         let mut headers = HeaderMap::new();
         headers.insert(
             AUTHORIZATION,
@@ -682,6 +683,17 @@ pub(crate) mod tests {
                 other => panic!("expected a provider or shape, got {other:?}"),
             })
             .collect()
+    }
+
+    #[test]
+    fn retired_endpoints_cannot_compose_retry_headers() {
+        let provider = OpenAiProvider::with_endpoint(
+            reqwest::Client::new(),
+            Some("old".into()),
+            "http://localhost:1",
+        );
+        provider.retire("Provider work was removed");
+        assert!(provider.compose("replacement-secret").is_err());
     }
 
     #[test]
