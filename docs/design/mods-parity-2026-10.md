@@ -58,35 +58,35 @@ Claude Code has 141 fixed events: 46 engine call sites, 62 op events
 answerable) and 33 `classic.*` settings-hook events. Each plugin adds
 noun events on top.
 
-| Claude Code | bingo before Phase 7 | Phase 7 | M |
-|---|---|---|---|
-| `tool.call` | tool.run point | `tool.call` | 131 (renamed) |
-| `tool.check` | tool.gate point; policy then person | `tool.check`; the policy link stays fixed | 131 |
-| `tool.describe` | — | chain over each round's tool specs | 136 |
-| `prompt.submit` | submit point | `prompt.submit` | 131 |
-| `prompt.compose`, `.section`, `.context` | context.compose point; contributors | `prompt.compose`; one contributor piece is a section | 131, 136 |
-| `prompt.attachment`, `.mention` | surfaces resolve `@` | **gap**: a hook sees mentions in `prompt.submit`'s input | — |
-| `prompt.autocomplete` | argument completion (M100) | chain over completion | 136 |
-| `prompt.fill`, `.suggest` | — | `Slot::Prompt { fill, suggest }`, pushed | 140 |
-| `prompt.edit` (each keystroke) | — | **gap**: the composer belongs to the surface | — |
-| `turn.start` | `Turn` notification | observation | 136 |
-| `turn.step` | model.request point | `turn.step` | 131 |
-| `turn.complete` | `Stop` hook | `turn.stop` (may ask for another round) plus `turn.complete` (text drawn under the answer) | 131, 136 |
-| `session.start`, `.end`, `.attach`, `.detach` | `Session` notification | observations | 136 |
-| `session.compact` | compact point | `session.compact` | 131 |
-| `session.receive`, `.send` | deliver | chains on deliver, in and out | 136 |
-| `session.append` | extend | chain; only a plugin's own rows are rewritable | 136 |
-| `session.measure` | the ruler | observation | 136 |
-| `command.run`, `.describe` | commands | chains | 136 |
-| `config.set`, `.describe` | settings writes | chains | 136 |
-| `plugin.register` | `standing()` | chain judging tier and `uses` | 137 |
-| `engine.create` | — | no equivalent: a noun comes from a declared service | 136 |
-| `agent.spawn`, `.offer`, `skill.prompt` | the agents and skills plugins | noun events from those plugins' services | 136 |
-| `ui.*` (9 events) | — | ADR-0079 | 140, 141 |
-| op events (62) | — | one chain per `$` method, raised by the runtime | 138, 139 |
-| noun events | services (ADR-0069) | `<noun>.<method>` over a service's wire face | 136 |
-| `classic.*` (33) | hooks-shell, run through the `Hook` adapter | **gap**: shell hooks are not mod events | — |
-| `telemetry.*`, `attribution.text` | — | not applicable: bingo has neither | — |
+| Claude Code | bingo before Phase 7 | Phase 7 | M | Status |
+|---|---|---|---|---|
+| `tool.call` | tool.run point | `tool.call` | 131 (renamed) | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified); M146 port regressions |
+| `tool.check` | tool.gate point; policy then person | `tool.check`; the policy link stays fixed | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `tool.describe` | — | chain over each round's tool specs | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `prompt.submit` | submit point | `prompt.submit` | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `prompt.compose`, `.section`, `.context` | context.compose point; contributors | `prompt.compose`; one contributor piece is a section | 131, 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `prompt.attachment`, `.mention` | surfaces resolve `@` | **gap**: a hook sees mentions in `prompt.submit`'s input | — | gap — non-goal in M136 (surface/hooks-shell ownership) |
+| `prompt.autocomplete` | argument completion (M100) | chain over completion | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `prompt.fill`, `.suggest` | — | `Slot::Prompt { fill, suggest }`, pushed | 140 | done — [M140 Verified](../plans/M140-elements-and-pulled-views.md#verified) |
+| `prompt.edit` (each keystroke) | — | **gap**: the composer belongs to the surface | — | gap — non-goal in M136 (surface/hooks-shell ownership) |
+| `turn.start` | `Turn` notification | observation | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `turn.step` | model.request point | `turn.step` | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `turn.complete` | `Stop` hook | `turn.stop` (may ask for another round) plus `turn.complete` (text drawn under the answer) | 131, 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `session.start`, `.end`, `.attach`, `.detach` | `Session` notification | observations | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `session.compact` | compact point | `session.compact` | 131 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `session.receive`, `.send` | deliver | chains on deliver, in and out | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `session.append` | extend | chain; only a plugin's own rows are rewritable | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `session.measure` | the ruler | observation | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `command.run`, `.describe` | commands | chains | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified); M146 port regressions |
+| `config.set`, `.describe` | settings writes | chains | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `plugin.register` | `standing()` | chain judging tier and `uses` | 137 | done — [M137 Verified](../plans/M137-the-mod-runtime.md#verified) |
+| `engine.create` | — | no equivalent: a noun comes from a declared service | 136 | n/a — declared service nouns (ADR-0078) |
+| `agent.spawn`, `.offer`, `skill.prompt` | the agents and skills plugins | noun events from those plugins' services | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `ui.*` (9 events) | — | ADR-0079 | 140, 141 | done — [M140 Verified](../plans/M140-elements-and-pulled-views.md#verified) |
+| op events (62) | — | one chain per `$` method, raised by the runtime | 138, 139 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
+| noun events | services (ADR-0069) | `<noun>.<method>` over a service's wire face | 136 | done — [M136 Verified](../plans/M136-the-event-catalogue.md#verified) |
+| `classic.*` (33) | hooks-shell, run through the `Hook` adapter | **gap**: shell hooks are not mod events | — | gap — non-goal in M136 (surface/hooks-shell ownership) |
+| `telemetry.*`, `attribution.text` | — | not applicable: bingo has neither | — | n/a — no corresponding feature |
 
 The kernel owns no feature nouns. `agent`, `skill`, `mcp` and `rooms`
 reach a mod as noun events from the plugin that owns them, never as
@@ -94,29 +94,29 @@ kernel events.
 
 ## 3. `$`
 
-| Noun | Claude Code methods | bingo source | M |
-|---|---|---|---|
-| `session` | messages, cwd, root, model, turns, id, repo, surface(s), usage, version, compact, send, append, authorize | `HostApi` sessions, history, deliver, extend | 138 |
-| `turn` | abort | interrupt | 138 |
-| `prompt` | submit, read, fill, suggest, compose | submit, `Slot::Prompt`, compose | 138 |
-| `tool` | list, call, check, register | `HostApi::invoke`, a mod's `ToolSource` | 138 |
-| `command` | list, run, register | the actor's commands, a mod's command source | 138 |
-| `config`, `settings` | list, set, read | the settings view and layers | 138 |
-| `model` | complete, classify, fork | `HostApi::complete` (ADR-0075) | 138 |
-| `state` | get, set (versioned) | `host/state` (ADR-0075 §2), session scope | 138 |
-| `store` | get, set, delete, keys | `host/state`, global scope | 138 |
-| `clock` | now, sleep, after, every | tokio time, paused in tests (M111) | 138 |
-| `plugin` | name, root | the mod's manifest | 138 |
-| `ui` | status, toast, open, close, panes, invalidate, resolve, notice, log, ask, notify | ADR-0079; ask is `ToolHost::ask` | 140, 141 |
-| `ui` | scroll, focus, copy, selection | **gap**: these are the surface's own | — |
-| `fs` | read, write, list, exists, stat, ancestors (4 MiB) | scoped to the project and the mod's data | 139 |
-| `http` | fetch | `bingo-http` (M127) | 139 |
-| `process` | run, spawn | `bingo-process` (M128), behind a grant | 139 |
-| `env` | get, set | behind a grant; names are literals | 139 |
-| `mcp` | call, connect | the MCP plugin's noun | 139 |
-| `agent` | spawn, list, register | the agents plugin's noun | 139 |
-| `audio` | play, speak | **gap** | — |
-| `telemetry` | log, mark | not applicable | — |
+| Noun | Claude Code methods | bingo source | M | Status |
+|---|---|---|---|---|
+| `session` | messages, cwd, root, model, turns, id, repo, surface(s), usage, version, compact, send, append, authorize | `HostApi` sessions, history, deliver, extend | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified); gap — non-goal in M138 (§8) |
+| `turn` | abort | interrupt | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
+| `prompt` | submit, read, fill, suggest, compose | submit, `Slot::Prompt`, compose | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified); gap — non-goal in M138 (§8) |
+| `tool` | list, call, check, register | `HostApi::invoke`, a mod's `ToolSource` | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified); gap — non-goal in M138 (§8) |
+| `command` | list, run, register | the actor's commands, a mod's command source | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
+| `config`, `settings` | list, set, read | the settings view and layers | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
+| `model` | complete, classify, fork | `HostApi::complete` (ADR-0075) | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
+| `state` | get, set (versioned) | `host/state` (ADR-0075 §2), session scope | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
+| `store` | get, set, delete, keys | `host/state`, global scope | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
+| `clock` | now, sleep, after, every | tokio time, paused in tests (M111) | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
+| `plugin` | name, root | the mod's manifest | 138 | done — [M138 Verified](../plans/M138-the-hosts-nouns.md#verified) |
+| `ui` | status, toast, open, close, panes, invalidate, resolve, notice, log, ask, notify | ADR-0079; ask is `ToolHost::ask` | 140, 141 | done — [M140 Verified](../plans/M140-elements-and-pulled-views.md#verified); gap — isPlaced in M151 |
+| `ui` | scroll, focus, copy, selection | **gap**: these are the surface's own | — | gap — non-goal in M140/M141 (surface ownership) |
+| `fs` | read, write, list, exists, stat, ancestors (4 MiB) | scoped to the project and the mod's data | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
+| `http` | fetch | `bingo-http` (M127) | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
+| `process` | run, spawn | `bingo-process` (M128), behind a grant | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
+| `env` | get, set | behind a grant; names are literals | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
+| `mcp` | call, connect | the MCP plugin's noun | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
+| `agent` | spawn, list, register | the agents plugin's noun | 139 | done — [M139 Verified](../plans/M139-the-worlds-nouns.md#verified) |
+| `audio` | play, speak | **gap** | — | gap — non-goal in M139 (no audio stack) |
+| `telemetry` | log, mark | not applicable | — | n/a — no corresponding feature |
 
 ## 4. Drawing
 
@@ -152,6 +152,13 @@ render's `viewport` (ADR-0081 §7, M151, the person's word of 2026-10-13).
 M151 adds seated place and content height to pane invalidation; other
 components still ignore height-only changes.
 
+M146 evidence (2026-10-14): temporary 2.1.296 ports validate; tool-call 4,
+band 2 and pane 1 behavior tests pass. The owned tmux drive at 160×48 and
+100×40 shows the protected-file denial, failure status, turn band, native
+Bash row and inline Tool calls pane after `/tool-calls`; before that it says
+`1 pane waiting`. No theme token allowlist changed. Node covers tool-call;
+JSX stays in the in-process transport. See [M146](../plans/M146-parity.md).
+
 ## 5. State
 
 - **`$.state`** holds versioned values per session. They survive a hot
@@ -171,6 +178,10 @@ components still ignore height-only changes.
 In bingo, `host/state` with versions arrives in M132. The read
 tracking, the refusal while drawing and the helpers arrive in M138 and
 M142.
+
+M146 evidence: object atom keys, including `as const`, normalize to the
+same string-backed Atom; owner checks and static-key validation pass.
+The band hide and pane reload cases retain their existing state assertions.
 
 ## 6. Lifecycle and isolation
 
@@ -198,6 +209,11 @@ M142.
 - **Test** runs `*.test.ts` against the engine's own `$`. It provides
   `mock.clock`, `mock.store`, `mock.env` and `mock.session`, and
   `$.ui.mount` for driving a drawing.
+
+M146 evidence: schema-derived data reads, erased type-only imports,
+directory index.d.ts resolution, static constant matchers and validate-then-load
+regressions pass. Unawaited dollar calls settle before hook completion;
+the runtime and hook jobs share a waker for nested continuations.
 
 ## 7. Where bingo differs on purpose
 
