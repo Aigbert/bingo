@@ -16,11 +16,14 @@ pub(super) struct Binding {
 }
 
 impl Binding {
-    fn new(address: &str, file: &str) -> Self {
-        Self {
-            origin: crate::lifetime::origin(address).unwrap_or_else(|| "invalid address".into()),
+    fn new(address: &str, file: &str) -> Result<Self, String> {
+        let origin = crate::lifetime::origin(address).ok_or_else(|| {
+            format!("Invalid credential address in {file}; fix it before signing in.")
+        })?;
+        Ok(Self {
+            origin,
             file: file.into(),
-        }
+        })
     }
 
     fn check(&self, name: &str, stored: Option<&str>) -> Result<(), AuthError> {
@@ -35,17 +38,34 @@ impl Binding {
 }
 
 impl CredentialStore {
+    pub fn validate_address(&self) -> Result<(), AuthError> {
+        for binding in [&self.binding, &self.resource] {
+            if let Err(message) = binding {
+                return Err(AuthError::Binding(message.clone()));
+            }
+        }
+        Ok(())
+    }
+
     pub fn origin_file(&self) -> Option<&str> {
-        self.binding.as_ref().map(|binding| binding.file.as_str())
+        self.binding
+            .as_ref()
+            .ok()
+            .and_then(Option::as_ref)
+            .map(|binding| binding.file.as_str())
     }
 
     pub fn resource_file(&self) -> Option<&str> {
-        self.resource.as_ref().map(|binding| binding.file.as_str())
+        self.resource
+            .as_ref()
+            .ok()
+            .and_then(Option::as_ref)
+            .map(|binding| binding.file.as_str())
     }
 
     pub fn at_origin(&self, address: &str, file: &str) -> Self {
         Self {
-            binding: Some(Binding::new(address, file)),
+            binding: Binding::new(address, file).map(Some),
             ..self.clone()
         }
     }
@@ -53,7 +73,7 @@ impl CredentialStore {
     /// OAuth also sends access tokens to a resource server, separate from its issuer.
     pub fn at_resource(&self, address: &str, file: &str) -> Self {
         Self {
-            resource: Some(Binding::new(address, file)),
+            resource: Binding::new(address, file).map(Some),
             ..self.clone()
         }
     }
@@ -82,6 +102,7 @@ impl CredentialStore {
 
     /// Call only with an unambiguous user-layer declaration and its own addresses.
     pub fn adopt(&self, name: &str) -> Result<(), AuthError> {
+        self.validate_address()?;
         let _guard = self.locked();
         let mut entries = self.load()?;
         let Some(stored) = entries.get_mut(name) else {
@@ -92,38 +113,53 @@ impl CredentialStore {
         }
         if stored.owner.is_some()
             && stored.origin.is_some()
-            && (self.resource.is_none() || stored.resource_origin.is_some())
+            && (self.resource.as_ref().is_ok_and(Option::is_none)
+                || stored.resource_origin.is_some())
         {
             return Ok(());
         }
         stored.owner = stored.owner.clone().or(self.owner.clone());
-        stored.origin = stored
-            .origin
-            .clone()
-            .or_else(|| self.binding.as_ref().map(|b| b.origin.clone()));
-        stored.resource_origin = stored
-            .resource_origin
-            .clone()
-            .or_else(|| self.resource.as_ref().map(|b| b.origin.clone()));
+        stored.origin = stored.origin.clone().or_else(|| {
+            self.binding
+                .as_ref()
+                .ok()
+                .and_then(Option::as_ref)
+                .map(|b| b.origin.clone())
+        });
+        stored.resource_origin = stored.resource_origin.clone().or_else(|| {
+            self.resource
+                .as_ref()
+                .ok()
+                .and_then(Option::as_ref)
+                .map(|b| b.origin.clone())
+        });
         self.save(&entries)
     }
 
     pub(super) fn check_binding(&self, name: &str, stored: &Stored) -> Result<(), AuthError> {
-        if let Some(binding) = &self.binding {
+        if let Ok(Some(binding)) = &self.binding {
             binding.check(name, stored.origin.as_deref())?;
         }
-        if let Some(binding) = &self.resource {
+        if let Ok(Some(binding)) = &self.resource {
             binding.check(name, stored.resource_origin.as_deref())?;
         }
         Ok(())
     }
 
     pub(super) fn origin(&self) -> Option<String> {
-        self.binding.as_ref().map(|b| b.origin.clone())
+        self.binding
+            .as_ref()
+            .ok()
+            .and_then(Option::as_ref)
+            .map(|b| b.origin.clone())
     }
 
     pub(super) fn resource_origin(&self) -> Option<String> {
-        self.resource.as_ref().map(|b| b.origin.clone())
+        self.resource
+            .as_ref()
+            .ok()
+            .and_then(Option::as_ref)
+            .map(|b| b.origin.clone())
     }
 }
 
@@ -131,6 +167,49 @@ impl CredentialStore {
 mod tests {
     use super::*;
     use crate::Entry;
+
+    #[test]
+    fn invalid_addresses_cannot_read_write_or_adopt() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = CredentialStore::new(dir.path().into());
+        for address in ["not a URL", "https://", "file:///secret"] {
+            let invalid = store.at_origin(address, "project.toml");
+            assert!(
+                invalid
+                    .write(
+                        "work",
+                        Entry::Api {
+                            key: "secret".into()
+                        }
+                    )
+                    .is_err()
+            );
+            assert!(invalid.adopt("work").is_err());
+            assert!(invalid.read("work").is_err());
+            assert!(!store.path().exists());
+        }
+    }
+
+    #[test]
+    fn canonical_origins_pin_case_userinfo_ipv6_and_trailing_dot() {
+        use crate::lifetime::origin;
+        assert_eq!(
+            origin("HTTPS://Example.COM/path"),
+            Some("https://example.com:443".into())
+        );
+        assert_eq!(
+            origin("https://user:SECRET@example.com"),
+            origin("https://example.com")
+        );
+        assert_eq!(
+            origin("http://[::1]:123/path"),
+            Some("http://[::1]:123".into())
+        );
+        assert_ne!(
+            origin("https://example.com."),
+            origin("https://example.com")
+        );
+    }
 
     #[test]
     fn origin_checks_cover_ports_paths_and_every_read() {

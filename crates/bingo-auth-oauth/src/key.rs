@@ -137,6 +137,11 @@ impl ApiKey {
     /// own id — never to a settings file, which a project layer commits.
     async fn paste(&self, prompter: Arc<dyn Prompter>) -> Result<String, ProviderError> {
         let store = self.store()?;
+        store
+            .validate_address()
+            .map_err(|error| ProviderError::Auth {
+                message: error.to_string(),
+            })?;
         let answer = prompter
             .ask(
                 InteractionKind::Login {

@@ -73,8 +73,8 @@ pub fn mcp_key(server: &str) -> String {
 pub struct CredentialStore {
     path: PathBuf,
     owner: Option<String>,
-    binding: Option<Binding>,
-    resource: Option<Binding>,
+    binding: Result<Option<Binding>, String>,
+    resource: Result<Option<Binding>, String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -98,8 +98,8 @@ impl CredentialStore {
         Self {
             path: data_dir.join(AUTH_FILE),
             owner: None,
-            binding: None,
-            resource: None,
+            binding: Ok(None),
+            resource: Ok(None),
         }
     }
 
@@ -125,6 +125,7 @@ impl CredentialStore {
     }
 
     pub fn read(&self, provider: &str) -> Result<Option<Entry>, AuthError> {
+        self.validate_address()?;
         let _guard = self.locked();
         self.load()?
             .remove(provider)
@@ -137,6 +138,7 @@ impl CredentialStore {
     }
 
     pub fn write(&self, provider: &str, entry: Entry) -> Result<(), AuthError> {
+        self.validate_address()?;
         let _guard = self.locked();
         let mut entries = self.load()?;
         if let Some(stored) = entries.get(provider) {
