@@ -68,7 +68,7 @@ impl Command for PluginsCommand {
             });
         }
         if let Some(name) = args.trim().strip_prefix("approve ") {
-            return approve(&host, cx, name.trim()).await;
+            return approve(&host, name.trim()).await;
         }
         let listed = listing(host.registry()).await;
         match parse(args)? {
@@ -80,17 +80,20 @@ impl Command for PluginsCommand {
     }
 }
 
-async fn approve(
-    host: &Host,
-    cx: &CommandContext,
-    name: &str,
-) -> Result<CommandOutcome, KernelError> {
-    let digest = host
-        .approve(Approval {
-            root: cx.cwd.clone(),
-            what: format!("plugin:{name}"),
-        })
-        .await?;
+async fn approve(host: &Host, name: &str) -> Result<CommandOutcome, KernelError> {
+    let mut request = None;
+    for source in &host.registry().sources.plugins {
+        if let Some(found) = source.approval(name).await {
+            if request.as_ref().is_some_and(|previous| previous != &found) {
+                return Err(invalid(format!(
+                    "more than one waiting plugin named `{name}`"
+                )));
+            }
+            request = Some(found);
+        }
+    }
+    let request = request.ok_or_else(|| invalid(format!("no waiting plugin named `{name}`")))?;
+    let digest = host.approve(request).await?;
     let mut report = PluginReload::default();
     for source in &host.registry().sources.plugins {
         report.append(source.reload().await?);

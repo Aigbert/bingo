@@ -539,3 +539,49 @@ async fn rename_names_the_session_and_announces_it() {
         "a refused name changes nothing"
     );
 }
+
+struct DiscoveredApproval(bingo_sdk::Approval);
+#[async_trait]
+impl bingo_sdk::PluginSource for DiscoveredApproval {
+    fn id(&self) -> &str {
+        "discovered"
+    }
+    async fn plugins(&self) -> Vec<PluginStatus> {
+        vec![]
+    }
+    async fn approval(&self, name: &str) -> Option<bingo_sdk::Approval> {
+        (self.0.what == format!("plugin:{name}")).then(|| self.0.clone())
+    }
+}
+
+#[tokio::test]
+async fn plugin_approval_uses_discovery_root_instead_of_session_cwd() {
+    let home = tempfile::tempdir().unwrap();
+    let repo = tempfile::tempdir().unwrap();
+    let dir = repo.path().join(".bingo/plugins/p");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("plugin.json"), "{}").unwrap();
+    let request = bingo_sdk::Approval {
+        root: repo.path().into(),
+        what: "plugin:p".into(),
+    };
+    let source = Arc::new(DiscoveredApproval(request));
+    let host = Host::build(
+        vec![TestPlugin::boxed(
+            &PROVIDER,
+            vec![
+                Contribution::Provider(ScriptedProvider::new(vec![])),
+                Contribution::Plugins(source),
+            ],
+        )],
+        HostConfig::new(env_in(home.path())).with_layer("cli", json!({"model":"m"})),
+    )
+    .await
+    .unwrap();
+    let mut client = Client::open(&host).await;
+    let (ack, _) = client.ack("/plugins approve p").await;
+    assert!(message(&ack).starts_with("approved p"), "{ack:?}");
+    let saved = settings::read_document(&env_in(home.path()).user_settings()).unwrap();
+    let root = crate::approval::root_key(repo.path()).unwrap();
+    assert!(saved["approved"][root]["plugin:p"].is_string());
+}

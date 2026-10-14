@@ -286,6 +286,10 @@ pub trait HookSource: Send + Sync {
 pub trait PluginSource: Send + Sync {
     fn id(&self) -> &str;
     async fn plugins(&self) -> Vec<PluginStatus>;
+    /// The discovery record owns the repository root, independently of a session cwd.
+    async fn approval(&self, _name: &str) -> Option<crate::Approval> {
+        None
+    }
     /// Rescan reloadable plugins; sources without live reload return no changes.
     async fn reload(&self) -> Result<PluginReload, crate::KernelError> {
         Ok(PluginReload::default())

@@ -200,6 +200,15 @@ impl Manager {
 }
 #[async_trait]
 impl PluginSource for Manager {
+    async fn approval(&self, name: &str) -> Option<Approval> {
+        let modules = self.modules();
+        let module = modules.iter().find(|module| {
+            module.found.name == name
+                && module.found.origin == PluginOrigin::Project
+                && matches!(module.admission.state(), PluginState::Waiting { .. })
+        })?;
+        bingo_plugin_host::discovery::request(&module.found)
+    }
     fn id(&self) -> &str {
         "bingo.mods"
     }

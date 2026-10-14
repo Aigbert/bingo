@@ -138,6 +138,9 @@ impl PluginPlugins {
 
 #[async_trait]
 impl PluginSource for PluginPlugins {
+    async fn approval(&self, name: &str) -> Option<bingo_sdk::Approval> {
+        self.manager.approval(name)
+    }
     fn id(&self) -> &str {
         ID
     }

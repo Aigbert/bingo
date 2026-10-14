@@ -365,6 +365,25 @@ impl Manager {
             .filter(|installed| installed.registration.admission.allowed())
             .filter_map(|installed| installed.bridge.as_ref())
     }
+    pub fn approval(&self, name: &str) -> Option<bingo_sdk::Approval> {
+        let registration = &self
+            .discovered()
+            .iter()
+            .find(|installed| {
+                installed.registration.name == name
+                    && installed.registration.origin == bingo_sdk::PluginOrigin::Project
+                    && matches!(
+                        installed.registration.admission.state(),
+                        bingo_sdk::PluginState::Waiting { .. }
+                    )
+            })?
+            .registration;
+        Some(bingo_sdk::Approval {
+            root: registration.root.parent()?.parent()?.parent()?.into(),
+            what: format!("plugin:{name}"),
+        })
+    }
+
     pub async fn registrations(
         &self,
         trust: &BTreeMap<String, bingo_sdk::PluginTrust>,
@@ -457,6 +476,7 @@ mod tests {
         manager
             .start(repo.path(), bingo_sdk::testing::NoHost::handle())
             .await;
+        assert_eq!(manager.approval("same").unwrap().root, repo.path());
         assert!(manager.reload(&project).await.is_err());
         let personal = manager
             .discovered()
