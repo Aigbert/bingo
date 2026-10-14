@@ -26,10 +26,17 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
                 .with_project(home.into()),
         ));
     }
-    let config = HostConfig::new(Env::rooted(home)).with_layer(
-        "test",
-        json!({"enabledPlugins":{"hello":!disabled,"ask":!disabled,"bingo.mod.palette":!disabled}}),
-    );
+    let env = Env::rooted(home);
+    for name in ["hello", "ask", "bingo.mod.palette"] {
+        bingo_core::plugins::switch(&env, name, !disabled).unwrap();
+    }
+    let path = bingo_core::settings::user_path(&env);
+    let mut config = HostConfig::new(env);
+    config.layers.push(bingo_core::settings::Layer::new(
+        bingo_core::settings::LayerOrigin::User,
+        path.display().to_string(),
+        bingo_core::settings::read_document(&path).unwrap(),
+    ));
     let host = Host::build(plugins, config).await.unwrap();
     let attachment = host
         .open(
