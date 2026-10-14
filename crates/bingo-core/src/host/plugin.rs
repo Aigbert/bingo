@@ -178,6 +178,10 @@ impl HostApi for PluginHost {
         self.inner().reconfigure(_session, _change).await
     }
 
+    fn catalog_changed(&self, kind: CatalogKind) {
+        self.inner().catalog_changed(kind);
+    }
+
     async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
         self.inner().catalog(kind).await
     }

@@ -230,7 +230,7 @@ impl Host {
     }
     pub(crate) fn plugins_changed(&self) {
         for kind in [CatalogKind::Plugins, CatalogKind::Commands] {
-            let _ = self.gateway.send(GatewayEvent::CatalogChanged { kind });
+            self.catalog_changed(kind);
         }
     }
 
@@ -916,6 +916,10 @@ impl HostApi for Host {
         }
         live.mailbox.reconfigure(config);
         Ok(())
+    }
+
+    fn catalog_changed(&self, kind: CatalogKind) {
+        let _ = self.gateway.send(GatewayEvent::CatalogChanged { kind });
     }
 
     async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {

@@ -268,6 +268,10 @@ impl HostApi for TestHost {
         NoHost.reconfigure(session, change).await
     }
 
+    fn catalog_changed(&self, kind: CatalogKind) {
+        self.record(HostCall::CatalogChanged { kind });
+    }
+
     async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
         self.record(HostCall::Catalog { kind });
         let script = locked(&self.inner.scripts).catalog.clone();

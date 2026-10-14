@@ -80,6 +80,9 @@ pub enum HostCall {
         code: String,
         text: String,
     },
+    CatalogChanged {
+        kind: CatalogKind,
+    },
     GatewayEvents,
     ServiceAny {
         key: String,
@@ -192,6 +195,10 @@ impl std::fmt::Debug for HostCall {
                 .field("level", level)
                 .field("code", code)
                 .field("text", text)
+                .finish(),
+            Self::CatalogChanged { kind } => f
+                .debug_struct("CatalogChanged")
+                .field("kind", kind)
                 .finish(),
             Self::GatewayEvents => f.write_str("GatewayEvents"),
             Self::ServiceAny { key } => f.debug_struct("ServiceAny").field("key", key).finish(),

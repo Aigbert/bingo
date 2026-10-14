@@ -218,3 +218,20 @@ async fn a_passive_observer_cannot_hold_a_command_acknowledgement() {
     host.shutdown().await;
     assert!(matches!(ack.unwrap().0, IntentOutcome::Applied { .. }));
 }
+
+#[tokio::test]
+async fn plugin_catalogue_callback_emits_gateway_change() {
+    let home = tempfile::tempdir().unwrap();
+    let host = Host::build(vec![], HostConfig::new(env_in(home.path())))
+        .await
+        .unwrap();
+    let mut events = host.gateway_events();
+    host.plugin_host.catalog_changed(CatalogKind::Plugins);
+    assert!(matches!(
+        events.next().await,
+        Some(GatewayEvent::CatalogChanged {
+            kind: CatalogKind::Plugins
+        })
+    ));
+    host.shutdown().await;
+}

@@ -310,3 +310,46 @@ async fn queued_enable_cannot_reopen_engines_after_stop() {
             .is_none_or(|engine| engine.stopped().is_cancelled())
     }));
 }
+
+async fn finish_workers(manager: &Manager) {
+    let workers = std::mem::take(&mut *manager.tasks.lock().unwrap());
+    for worker in workers {
+        worker.await.unwrap();
+    }
+}
+#[tokio::test]
+async fn deferred_switch_notifies_after_its_worker_finishes() {
+    let (_root, manager, old) = fixture().await;
+    let host = bingo_sdk::testing::TestHost::default();
+    host.on_catalog(|kind| async move {
+        Ok(Catalog {
+            kind,
+            entries: vec![],
+        })
+    });
+    manager.host.set(host.handle()).unwrap();
+    manager.this.set(Arc::downgrade(&manager)).unwrap();
+    manager.switch("fixture", false).await.unwrap();
+    finish_workers(&manager).await;
+    let before = format!("{:?}", host.calls())
+        .matches("CatalogChanged")
+        .count();
+    tokio::time::pause();
+    assert_eq!(
+        manager.switch("fixture", true).await.unwrap(),
+        PluginSwitch::AfterTurn
+    );
+    drop(old);
+    reap(&manager).await;
+    finish_workers(&manager).await;
+    assert!(manager.modules()[0].engine.is_some());
+    let after = format!("{:?}", host.calls())
+        .matches("CatalogChanged")
+        .count();
+    assert_eq!(
+        after,
+        before + 2,
+        "background completion did not notify catalogues"
+    );
+    manager.stop().await;
+}

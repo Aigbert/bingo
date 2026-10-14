@@ -240,6 +240,11 @@ impl PluginSource for Manager {
             )
             .await;
             switching::finish(&manager, &name, &request);
+            if let Some(host) = manager.host.get() {
+                for kind in [CatalogKind::Plugins, CatalogKind::Commands] {
+                    host.catalog_changed(kind);
+                }
+            }
             if let Err(error) = &result {
                 manager
                     .notices

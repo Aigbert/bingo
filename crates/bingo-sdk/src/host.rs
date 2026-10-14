@@ -649,6 +649,9 @@ pub trait HostApi: Send + Sync {
         ))
     }
 
+    /// Notify clients after a source changes its catalogue between commands.
+    fn catalog_changed(&self, _kind: CatalogKind) {}
+
     async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError>;
 
     /// Say one line to the person, wherever they are: a transcript notice on
