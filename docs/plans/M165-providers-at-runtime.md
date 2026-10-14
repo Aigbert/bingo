@@ -151,3 +151,33 @@ CLI: 279 passed; runtime-provider RPC: 5 passed. No wall-clock flake; HTTP fixtu
 Direct-construction fixtures now carry bindings; explicit legacy API-key and Codex boot tests remain.
 Native-only review: TUI smoke and Windows checks were not rerun; earlier records and C-toolchain deferrals stand.
 Final `cargo clean` follows this verification commit to remove the build-directory soft warning.
+
+## Verified — 2026-10-15 (review round 4)
+
+Regressions reproduced configured-key redirects, environment-origin migration,
+blank addresses, invalid bindings, reserved-plugin attribution, missing sign-in
+context and embedded-key readdressing. Additional tests pin Anthropic stored-key
+overrides, canonical origins and same-layer configured credentials. RPC proves
+OpenAI, Anthropic and Codex show the destination before accepting a credential;
+cancellation sends no HTTP and writes no key.
+Sequential native gates with provider key/URL environment unset,
+`RUST_TEST_THREADS=4` and Cargo offline:
+
+```text
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-mods -p bingo-store-jsonl --locked => 608 passed, 3 ignored; schema/TS unchanged
+cargo fmt --all -- --check => exit 0
+cargo check --workspace --all-targets --locked => exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings => exit 0
+cargo test --workspace --locked => 5684 passed, 5 ignored, 169 groups
+bash scripts/check_discipline.sh => discipline ok (advisory warnings)
+bash scripts/budget.sh => dependencies 413; warm core 0s; isolation 0; target 22 GB; 322 test binaries; budget ok
+cargo deny --offline check => advisories ok, bans ok, licenses ok, sources ok
+```
+
+CLI: 285 passed; runtime-provider RPC: 6 passed. All HTTP fixtures were local.
+Initial runs exposed an old stderr-order assertion, a direct-registration fixture
+without provenance, and a JSON fixture whose filename migrated to TOML; corrected
+before the final run. No wall-clock flake occurred. No dependencies were added.
+Native-only review: prior Windows/toolchain and TUI-smoke records remain unchanged.
+Final `cargo clean` follows this verification commit to remove the build-directory
+soft warning. Historical verification is retained despite the plan-length advisory.
