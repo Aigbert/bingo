@@ -460,3 +460,24 @@ async fn retired_callbacks_require_their_generations_scope() {
     assert!(ordinary.is_err(), "retired callback accepted new dispatch");
     assert!(captured.is_ok(), "captured generation lost its callback");
 }
+
+#[tokio::test]
+async fn failed_publication_keeps_the_committed_switch_on_reload() {
+    let (_root, manager, old) = fixture().await;
+    let host = bingo_sdk::testing::TestHost::default();
+    host.on_catalog(|_| async { Err(reload::failed("catalog unavailable")) });
+    manager.host.set(host.handle()).unwrap();
+    manager.this.set(Arc::downgrade(&manager)).unwrap();
+    assert!(manager.switch("fixture", false).await.is_err());
+    assert!(manager.modules()[0].engine.is_none());
+    assert!(manager.switches.off.read().unwrap().contains("fixture"));
+    host.on_catalog(|kind| async move {
+        Ok(Catalog {
+            kind,
+            entries: vec![],
+        })
+    });
+    manager.reload_root(&old.found.root).await.unwrap();
+    assert!(manager.modules()[0].engine.is_none());
+    manager.stop().await;
+}

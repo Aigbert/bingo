@@ -150,12 +150,7 @@ pub(super) async fn switch_module(
         return Ok(kind);
     }
     module.admission.decision().map_err(reload::failed)?;
-    activate_switch(manager, old, module).await?;
-    wish(
-        manager,
-        name.strip_prefix("plugins:").unwrap_or(name),
-        enabled,
-    );
+    activate_switch(manager, old, module, enabled).await?;
     Ok(PluginSwitch::Now)
 }
 fn resident(manager: &Manager, name: &str) -> Result<Arc<Module>, KernelError> {
@@ -193,6 +188,7 @@ async fn activate_switch(
     manager: &Manager,
     old: Arc<Module>,
     module: Arc<Module>,
+    enabled: bool,
 ) -> Result<(), KernelError> {
     let name = module.found.name.as_str();
     let owned = old.engine.is_some();
@@ -200,6 +196,7 @@ async fn activate_switch(
         dollar.unregister(name);
     }
     manager.replace(&old, module.clone());
+    wish(manager, name, enabled);
     if owned {
         manager.switches.retired.lock().await.push(old);
     }
