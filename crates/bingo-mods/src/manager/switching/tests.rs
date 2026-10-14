@@ -519,3 +519,25 @@ async fn held_retirement_expires_to_next_start() {
     drop(old);
     manager.stop().await;
 }
+
+#[tokio::test]
+async fn a_new_switch_prunes_finished_workers_and_keeps_live_ones() {
+    let (_root, manager, old) = fixture().await;
+    runtime(&manager);
+    let mut done = tokio::spawn(async {});
+    (&mut done).await.unwrap();
+    manager.tasks.lock().unwrap().push(done);
+    let (release, waiting) = tokio::sync::oneshot::channel::<()>();
+    manager.tasks.lock().unwrap().push(tokio::spawn(async {
+        let _ = waiting.await;
+    }));
+    manager.switch("fixture", false).await.unwrap();
+    assert_eq!(
+        manager.tasks.lock().unwrap().len(),
+        2,
+        "finished worker retained"
+    );
+    release.send(()).unwrap();
+    drop(old);
+    manager.stop().await;
+}

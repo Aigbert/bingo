@@ -264,10 +264,11 @@ impl PluginSource for Manager {
             }
             let _ = answer.send(result);
         });
-        self.tasks
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .push(work);
+        {
+            let mut tasks = self.tasks.lock().unwrap_or_else(|e| e.into_inner());
+            tasks.retain(|task| !task.is_finished());
+            tasks.push(work);
+        }
         tokio::select! {
             result = &mut result => result.map_err(reload::failed)?,
             deferred = waiting => match deferred {
