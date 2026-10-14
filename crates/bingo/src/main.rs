@@ -699,6 +699,7 @@ fn plugins(
         Box::new(OpenAiPlugin),
         Box::new(AcpPlugin::default()),
         Box::new(PermissionsPlugin),
+        Box::new(bingo_mod_ask::Ask),
         Box::new(ShellHooksPlugin),
         Box::new(JsonlStorePlugin::default()),
         Box::new(ContextPlugin),

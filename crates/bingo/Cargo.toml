@@ -42,6 +42,7 @@ bingo-mcp.workspace = true
 bingo-plugin-rpc.workspace = true
 bingo-plugin-host.workspace = true
 bingo-mods.workspace = true
+bingo-mod-ask.workspace = true
 bingo-agents.workspace = true
 bingo-rooms.workspace = true
 bingo-tasks.workspace = true

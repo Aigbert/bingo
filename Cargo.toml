@@ -11,6 +11,7 @@ repository = "https://github.com/yexrob/bingo"
 publish = false
 
 [workspace.dependencies]
+bingo-mod-ask = { path = "crates/bingo-mod-ask" }
 bingo-mod-hello = { path = "crates/bingo-mod-hello" }
 bingo-mods = { path = "crates/bingo-mods" }
 # M137 / ADR-0078: sandbox memory/time caps and the TS/TSX compiler.

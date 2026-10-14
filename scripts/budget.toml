@@ -107,6 +107,6 @@
 # oxc compiler and shared compiler/runtime support (+50); budget.sh measures 410.
 # M139 (ADR-0078 §5): dunce adds one normal edge for Windows-safe canonicalization; zero dependencies.
 # M167 (ADR-0086): bingo-mod-hello adds one fixture member, no external crate.
-max_dependencies = 412
+max_dependencies = 413
 max_core_check_seconds = 20
 max_target_gb = 5

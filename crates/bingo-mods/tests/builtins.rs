@@ -6,7 +6,10 @@ use serde_json::json;
 use std::{path::Path, sync::Arc};
 
 async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>, Attachment) {
-    let mut plugins: Vec<Box<dyn Plugin>> = vec![Box::new(bingo_mod_hello::Hello)];
+    let mut plugins: Vec<Box<dyn Plugin>> = vec![
+        Box::new(bingo_mod_hello::Hello),
+        Box::new(bingo_mod_ask::Ask),
+    ];
     if let Some(source) = source {
         let root = home.join("outside");
         std::fs::create_dir(&root).unwrap();
@@ -22,8 +25,10 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
                 .with_project(home.into()),
         ));
     }
-    let config = HostConfig::new(Env::rooted(home))
-        .with_layer("test", json!({"enabledPlugins":{"hello":!disabled}}));
+    let config = HostConfig::new(Env::rooted(home)).with_layer(
+        "test",
+        json!({"enabledPlugins":{"hello":!disabled,"ask":!disabled}}),
+    );
     let host = Host::build(plugins, config).await.unwrap();
     let attachment = host
         .open(
@@ -153,5 +158,70 @@ async fn javascript_key_handler_preserves_handled_false() {
             matches!(outcome, IntentOutcome::Applied { result } if result == json!({"handled":expected}))
         );
     }
+    host.shutdown().await;
+}
+
+#[tokio::test]
+async fn an_outside_mod_wraps_the_question_builtin_with_next() {
+    let home = tempfile::tempdir().unwrap();
+    let source = "export function register(on) { on('ui.render', {component:'Question'}, async ($, e, next) => { const tree = await next(e); return {...tree, children:[h('Text',{},'Ask frame'), ...tree.children]}; }); }";
+    let (host, attachment) = start(home.path(), Some(source), false).await;
+    let request: render::RenderRequest = serde_json::from_value(json!({"component":"Question","requestId":"int_fixture","surface":"terminal","props":{"interactionId":"int_fixture","tool":"AskUserQuestion","questions":[{"question":"Which?","options":[{"id":"a","label":"Alpha"}],"freeText":true,"multi":false}]},"viewport":{"columns":80,"rows":24}})).unwrap();
+    let tree = host.render(&attachment.session, request).await.unwrap();
+    assert!(tree.fold().contains("Ask frame"));
+    assert!(tree.fold().contains("Alpha"));
+    assert!(matches!(tree, View::Box { layout, .. } if layout.on_key.is_some()));
+    host.shutdown().await;
+}
+
+#[tokio::test]
+async fn the_ask_handler_answers_the_live_question_through_the_existing_port() {
+    let home = tempfile::tempdir().unwrap();
+    let (host, mut attachment) = start(home.path(), None, false).await;
+    let asking = {
+        let host = host.clone();
+        let session = attachment.session.clone();
+        tokio::spawn(async move {
+            host.ask(&session, serde_json::from_value(json!({"kind":"question","question":"Which?","options":[{"id":"a","label":"Alpha"},{"id":"b","label":"Beta"}]})).unwrap(), vec![AnswerSpec::Choice, AnswerSpec::Cancel]).await
+        })
+    };
+    let open = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        while let Some(frame) = attachment.events.next().await {
+            if let Event::InteractionOpened { interaction } = frame.event {
+                return interaction;
+            }
+        }
+        panic!("question never opened")
+    })
+    .await
+    .unwrap();
+    while open
+        .guard_until
+        .is_some_and(|until| jiff::Timestamp::now() < until)
+    {
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    let InteractionKind::Question(question) = &open.kind else {
+        panic!("question")
+    };
+    let request: render::RenderRequest = serde_json::from_value(json!({"component":"Question","requestId":open.id,"surface":"terminal","props":{"interactionId":open.id,"tool":"AskUserQuestion","questions":[question]},"viewport":{"columns":80,"rows":24}})).unwrap();
+    let View::Box { layout, .. } = host.render(&attachment.session, request).await.unwrap() else {
+        panic!("Box")
+    };
+    let mut action = layout.on_key.clone().unwrap();
+    action.args["value"] = json!({"key":"2"});
+    let outcome = command(&mut attachment, Input::Action { action }).await;
+    assert!(matches!(outcome, IntentOutcome::Applied { result } if result["handled"] == true));
+    assert_eq!(
+        tokio::time::timeout(std::time::Duration::from_secs(10), asking)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+        Answer::Choice {
+            ids: vec!["b".into()],
+            other: None
+        }
+    );
     host.shutdown().await;
 }

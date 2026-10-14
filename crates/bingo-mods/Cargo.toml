@@ -47,6 +47,7 @@ jiff.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+bingo-mod-ask.workspace = true
 bingo-mod-hello.workspace = true
 # M137: exercise source registration against the real offline kernel.
 bingo-core.workspace = true
