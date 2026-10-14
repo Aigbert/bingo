@@ -105,7 +105,8 @@ then stop if dev lacks `merge: M141`, pending the person's merge instruction.
 - `crates/bingo-sdk/src/host.rs`, `crates/bingo-core/src/host/catalog.rs`:
   `CatalogKind::Events` reads kernel entries and registered faces through
   the existing `HostApi::catalog` door; no new host verb or plugin import.
-- Generated `schema/{rpc,plugin,plugin-2,events,mods-dollar}.json` and
+- `crates/bingo-plugin-rpc/src/schema.rs`: regenerate the scoped baseline.
+- Generated `schema/{rpc,plugin,plugin-2,events,dollar}.json` and
   `sdk/typescript/src/{wire,events,dollar-types}.ts`; ADR-0075 dated note.
 - `sdk/typescript/src/state.test.ts` (new)
 - `examples/plugins/ts-status/` (`hooks/register.test.ts` new, `scenarios/` deleted);

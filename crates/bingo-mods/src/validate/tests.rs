@@ -77,3 +77,21 @@ fn aliases_and_dynamic_matchers_are_errors_but_missing_contract_is_warning() {
             .any(|f| f.rule == Rule::StateContract && f.severity == Severity::Warning)
     );
 }
+
+#[test]
+fn existing_examples_and_registered_callback_parameters_validate_cleanly() {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for relative in [
+        "examples/plugins/ts-status",
+        "crates/bingo/tests/fixtures/mods/counter",
+    ] {
+        let root = workspace.join(relative);
+        let manifest =
+            serde_json::from_str(&std::fs::read_to_string(root.join("plugin.json")).unwrap())
+                .unwrap();
+        assert!(
+            validate(&root, &manifest).unwrap().findings.is_empty(),
+            "{relative}"
+        );
+    }
+}

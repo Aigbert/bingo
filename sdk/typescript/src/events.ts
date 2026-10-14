@@ -262,13 +262,13 @@ export type ToolDescribe = ToolDescribeInput.Payload;
 export namespace PromptAutocompleteInput {
 // Generated from JSON Schema. Do not edit.
 export type CatalogEntry = { "id": string; "label": string; "meta"?: unknown; [key: string]: unknown; };
-export type CatalogKind = ("models" | "providers" | "tools" | "commands" | "plugins");
+export type CatalogKind = ("events" | "models" | "providers" | "tools" | "commands" | "plugins");
 export type Payload = { "entries": Array<CatalogEntry>; "kind": CatalogKind; [key: string]: unknown; };
 }
 export namespace PromptAutocompleteResult {
 // Generated from JSON Schema. Do not edit.
 export type CatalogEntry = { "id": string; "label": string; "meta"?: unknown; [key: string]: unknown; };
-export type CatalogKind = ("models" | "providers" | "tools" | "commands" | "plugins");
+export type CatalogKind = ("events" | "models" | "providers" | "tools" | "commands" | "plugins");
 export type Payload = { "entries": Array<CatalogEntry>; "kind": CatalogKind; [key: string]: unknown; };
 }
 export type PromptAutocomplete = PromptAutocompleteInput.Payload;

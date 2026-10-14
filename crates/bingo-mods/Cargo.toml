@@ -12,6 +12,8 @@ description = "Sandboxed in-process module plugins"
 workspace = true
 
 [dependencies]
+# M142: render host schemas into author types on load.
+bingo-schema-ts.workspace = true
 # M139: reuse the bounded HTTP client, process trees and canonical paths.
 bingo-http.workspace = true
 bingo-process.workspace = true
@@ -43,8 +45,6 @@ jiff.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-# M138: render the dollar table into the author SDK.
-bingo-schema-ts.workspace = true
 # M137: exercise source registration against the real offline kernel.
 bingo-core.workspace = true
 bingo-sdk = { workspace = true, features = ["testing"] }

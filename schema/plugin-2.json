@@ -7162,6 +7162,17 @@
         "columns",
         "rows"
       ]
+    },
+    "CatalogKind": {
+      "type": "string",
+      "enum": [
+        "events",
+        "models",
+        "providers",
+        "tools",
+        "commands",
+        "plugins"
+      ]
     }
   },
   "manifest": {

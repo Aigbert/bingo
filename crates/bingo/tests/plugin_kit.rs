@@ -532,3 +532,32 @@ fn clock_and_environment_mocks_keep_grants_and_hook_budgets() {
       });"#).unwrap();
     assert!(success(&run(home.path(), "test", &plugin)).starts_with("PASS"));
 }
+
+#[test]
+fn a_second_module_load_keeps_generated_types_untouched() {
+    let home = tempfile::tempdir().unwrap();
+    let plugin = fixture(home.path(), "ts-status");
+    success(&run(home.path(), "test", &plugin));
+    let paths = [
+        "bingo/index.d.ts",
+        "bingo/events.ts",
+        "bingo/testing.d.ts",
+        "bingo-tools/index.d.ts",
+    ];
+    let metadata = || {
+        paths.map(|path| {
+            std::fs::metadata(plugin.join(".bingo/types").join(path))
+                .unwrap()
+                .modified()
+                .unwrap()
+        })
+    };
+    let first = metadata();
+    success(&run(home.path(), "test", &plugin));
+    assert_eq!(metadata(), first);
+    println!("type mtimes unchanged: {first:?}");
+    let events = std::fs::read_to_string(plugin.join(".bingo/types/bingo/events.ts")).unwrap();
+    assert!(
+        events.contains("ToolCall") && events.contains("ClockNow") && events.contains("UiRender")
+    );
+}

@@ -1,8 +1,60 @@
 //! Host-derived author types are written only when their bytes change.
 use bingo_sdk::Catalog;
 use std::path::Path;
-pub fn write(_root: &Path, _events: &Catalog, _tools: &Catalog) -> Result<(), String> {
+mod files;
+mod render;
+pub fn write(root: &Path, events: &Catalog, tools: &Catalog) -> Result<(), String> {
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    for (name, text) in sources(events, tools) {
+        files::changed(&root, &format!(".bingo/{name}"), text.as_bytes())?;
+    }
+    if !root.join("tsconfig.json").exists() {
+        files::changed(&root,"tsconfig.json", b"{\"extends\":\"./.bingo/tsconfig.json\",\"include\":[\"**/*.ts\",\"**/*.tsx\",\".bingo/types/**/*.ts\"]}\n")?;
+    }
     Ok(())
+}
+fn sources(events: &Catalog, tools: &Catalog) -> Vec<(&'static str, String)> {
+    let mut files = vec![
+        ("types/bingo/index.d.ts",include_str!("types/index.d.ts").into()),
+        ("types/bingo/testing.d.ts",include_str!("types/testing.d.ts").replace("./bingo/","./")),
+        ("types/bingo/elements.d.ts",render::elements()),
+        ("types/bingo/events.ts",render::events(events)),
+        ("types/bingo/services.ts",render::services(events)),
+        ("types/bingo-tools/index.d.ts",render::tools(tools)),
+        ("types/bingo/rpc.ts","export interface Rpc {request<T>(method: string, params: unknown): Promise<T>}\n".into()),
+        (".gitignore","*\n".into()),
+        ("tsconfig.json",serde_json::json!({"compilerOptions":{"target":"ES2023","module":"ESNext","moduleResolution":"Bundler","allowImportingTsExtensions":true,"noEmit":true,"skipLibCheck":true,"lib":["ES2023"],"jsx":"react","jsxFactory":"h","jsxFragmentFactory":"Fragment","baseUrl":".","paths":{"bingo":["types/bingo/index.d.ts"],"bingo/testing":["types/bingo/testing.d.ts"],"bingo-tools":["types/bingo-tools/index.d.ts"]}}}).to_string()),
+    ];
+    macro_rules! source {
+        ($name:literal) => {
+            files.push((
+                concat!("types/bingo/", $name),
+                include_str!(concat!("../../../sdk/typescript/src/", $name)).into(),
+            ));
+        };
+    }
+    source!("on.ts");
+    files.push(("types/bingo/dollar.ts",include_str!("../../../sdk/typescript/src/dollar.ts").replace("export type Dollar =", "type HostDollar =") + "\nexport type Dollar = Omit<HostDollar,keyof import('./services.ts').Services> & import('./services.ts').Services;\n"));
+    source!("dollar-types.ts");
+    source!("callbacks.ts");
+    source!("wire.ts");
+    let table = bingo_sdk::view::table::ELEMENTS
+        .iter()
+        .map(|element| {
+            format!(
+                "{}:{}",
+                serde_json::json!(element.kind),
+                serde_json::json!(element.kind)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(";");
+    files.push((
+        "types/bingo/ui.ts",
+        include_str!("../../../sdk/typescript/src/ui.ts")
+            .replace("Record<string,string>", &format!("{{{table}}}")),
+    ));
+    files
 }
 #[cfg(test)]
 mod tests {

@@ -43,6 +43,7 @@ pub(super) async fn entries(
     kind: CatalogKind,
 ) -> Vec<CatalogEntry> {
     let mut entries = match kind {
+        CatalogKind::Events => events(registry),
         CatalogKind::Models => models(resolved, model, served),
         CatalogKind::Providers => providers(resolved),
         CatalogKind::Tools => tools(registry).await,
@@ -69,6 +70,29 @@ pub(super) async fn entries(
         }
     }
     entries
+}
+
+fn events(registry: &Registry) -> Vec<CatalogEntry> {
+    let mut entries = catalogue::document()["events"]
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+    for key in registry.services.keys() {
+        if let Some(face) = registry.services.face(&key) {
+            for method in face.methods {
+                let entry = method.entry;
+                entries.insert(entry.name.to_string(),json!({"kind":entry.kind,"input":entry.input.schema(),"result":entry.result.schema(),"matcher":entry.matcher,"pinned":entry.pinned,"acts":entry.acts,"unsafe":method.unsafe_call}));
+            }
+        }
+    }
+    entries
+        .into_iter()
+        .map(|(id, meta)| CatalogEntry {
+            label: id.clone(),
+            id,
+            meta,
+        })
+        .collect()
 }
 
 /// Each provider's ids — the ones its endpoint answered with if it has ever

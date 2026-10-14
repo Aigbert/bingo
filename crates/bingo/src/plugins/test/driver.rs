@@ -233,6 +233,22 @@ async fn build(
     let config = HostConfig::new(Env::rooted(home))
         .with_layer("test", json!({"provider":"fake","model":"fake-1"}));
     let host = Host::build(plugins, config).await.map_err(error)?;
+    let name = bingo_plugin_rpc::validate::read(root).map_err(error)?.name;
+    let catalogue = host.catalog(CatalogKind::Plugins).await.map_err(error)?;
+    if !catalogue
+        .entries
+        .iter()
+        .any(|entry| entry.id == name && entry.meta["enabled"] == true)
+    {
+        let reason = catalogue
+            .entries
+            .iter()
+            .find(|entry| entry.id == name)
+            .map(|entry| entry.meta["reason"].to_string())
+            .unwrap_or_else(|| "module was not discovered".into());
+        host.shutdown().await;
+        return Err(format!("{name}: {reason}"));
+    }
     let session = host
         .open(
             SessionSelector::Create {

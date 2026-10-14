@@ -3062,6 +3062,7 @@
     "CatalogKind": {
       "type": "string",
       "enum": [
+        "events",
         "models",
         "providers",
         "tools",

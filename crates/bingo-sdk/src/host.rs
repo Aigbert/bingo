@@ -269,6 +269,7 @@ pub struct OversizedItem {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum CatalogKind {
+    Events,
     Models,
     Providers,
     Tools,
