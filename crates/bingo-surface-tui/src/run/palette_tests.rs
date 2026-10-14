@@ -1,6 +1,6 @@
 use super::*;
 use crate::{doubles::TestSession, test_support::*};
-use bingo_sdk::{Action, component::PaletteOpen};
+use bingo_sdk::{Action, Catalog, CatalogEntry, Origin, component::PaletteOpen};
 use crossterm::event::KeyCode;
 use serde_json::json;
 use std::sync::Arc;
@@ -243,16 +243,62 @@ fn the_palette_receives_drawing_facts_without_a_copy_of_session_state() {
 }
 
 #[tokio::test]
-async fn acknowledgements_do_not_refetch_catalogues_and_changes_fetch_only_their_kind() {
+async fn acknowledgements_refetch_only_plugins_and_changes_fetch_only_their_kind() {
     let now = still(scene().1);
     let mut run = tests::idle(now.instant);
     let senders = run.replies.strong_count();
     run.applied(&json!({"message":"renamed"}));
-    assert_eq!(run.replies.strong_count(), senders);
-    run.catalog_changed(CatalogKind::Commands);
     assert_eq!(
         run.replies.strong_count(),
         senders + 1,
+        "only Plugins is refreshed"
+    );
+    run.catalog_changed(CatalogKind::Commands);
+    assert_eq!(
+        run.replies.strong_count(),
+        senders + 2,
         "only the changed catalogue is read"
+    );
+}
+
+#[tokio::test]
+async fn an_applied_plugins_reload_refreshes_the_waiting_count() {
+    let home = tempfile::tempdir().unwrap();
+    let now = still(scene().1);
+    let session = Arc::new(TestSession::default());
+    let mut run = tests::idle_in(state(), session.clone(), now.instant);
+    let host = bingo_sdk::testing::TestHost::default();
+    host.on_catalog(|kind| async move {
+        Ok(Catalog {
+            kind,
+            entries: vec![CatalogEntry {
+                id: "repo".into(),
+                label: "repo".into(),
+                meta: json!({"state":{"kind":"waiting"}}),
+            }],
+        })
+    });
+    run.host = host.handle();
+    let (sender, mut replies) = tokio::sync::mpsc::channel(8);
+    run.replies = sender;
+    run.data_dir = home.path().into();
+    run.submit(Input::text("/plugins reload", Origin::surface("tui")));
+    let intent = session.submissions()[0].0.clone();
+    run.ack(&intent, &IntentOutcome::Applied { result: json!({}) });
+    tokio::task::yield_now().await;
+    let reply = replies
+        .try_recv()
+        .expect("reload acknowledgement refreshes Plugins");
+    run.reply(reply, &mut None);
+    assert!(matches!(
+        host.calls().as_slice(),
+        [bingo_sdk::testing::HostCall::Catalog {
+            kind: CatalogKind::Plugins
+        }]
+    ));
+    let screen = draw_tree(120, 40, &run.session.tree, &mut run.ui, now);
+    assert!(
+        screen.contains("1 from this repo waits for you"),
+        "{screen}"
     );
 }
