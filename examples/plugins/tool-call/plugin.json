@@ -1,0 +1,1 @@
+{"name":"tool-call","version":"1","module":"register.ts","uses":["state","ui"]}
