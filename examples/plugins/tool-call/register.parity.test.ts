@@ -1,3 +1,4 @@
+import {register} from './parity-entry.ts';
 import {test, expect, mock} from 'bingo/testing';
 
 const invoke = (name: string, input: unknown) => ({steps:[{toolCall:{name,input}}]});
@@ -42,4 +43,31 @@ test('shell input is trimmed and failure status clears after success', async () 
   expect(JSON.stringify(snapshot.signals)).not.toContain('failed:');
   const calls = snapshot.items.filter((item: any) => item.body.kind === 'toolCall');
   expect(JSON.stringify(calls[1].body.output)).toContain('$ echo parity');
+});
+
+test('guard recovery denies before continuation and never executes twice', async $ => {
+  let guard: any, recover: any;
+  register(((pattern: string, ...args: any[]) => {
+    const selected = pattern === 'tool.call' && args[0]?.tool === 'Edit';
+    if (selected) guard = args[args.length - 1];
+    return {catch(handler: any) {if (selected) recover = handler;}};
+  }) as any);
+  expect(typeof recover).toBe('function');
+  let executions = 0, called = false;
+  const next: any = async () => {
+    if (called) throw new Error('continuation already consumed');
+    called = true; executions++;
+    throw new Error('downstream fault');
+  };
+  Object.defineProperty(next,'called',{get:() => called});
+  const broken = {file_path:{toString() {throw new Error('invalid path');}}};
+  await expect(Promise.resolve().then(() => guard($,broken,next))).rejects.toThrow();
+  expect((await recover($,broken,next)).deny).toContain($.plugin.name);
+  expect(executions).toBe(0);
+  const normal = {file_path:'notes.txt'};
+  await expect(Promise.resolve().then(() => guard($,normal,next))).rejects.toThrow();
+  let after: any;
+  try { after = await recover($,normal,next); } catch {}
+  expect(after?.deny).toBe(undefined);
+  expect(executions).toBe(1);
 });

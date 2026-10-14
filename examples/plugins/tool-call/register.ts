@@ -7,15 +7,16 @@ export function register(on: On) {
   on('tool.check', {tool: 'Edit'}, async ($, event, next) => {
     const checked = await next(event);
     const path = String(event.file_path ?? '').replaceAll('\\', '/');
-    const basename = path.slice(path.lastIndexOf('/') + 1);
-    if (basename === '.env' || basename.startsWith('.env.')) {
-      return {...checked, decision: {kind: 'deny', reason: {kind: 'hook', hook: `${$.plugin.name}: protected environment file ${path}`}}};
-    }
     if (path === 'protected.txt' || path.endsWith('/protected.txt')) {
       return {...checked, decision: {kind: 'deny', reason: {kind: 'hook', hook: 'example-tool-call: protected file'}}};
     }
     return checked;
   });
+  on('tool.call', {tool:'Edit'}, ($, event, next) => {
+    const name = String(event.file_path).replaceAll('\\','/').split('/').pop() ?? '';
+    if (name === '.env' || name.startsWith('.env.')) return {deny:`${$.plugin.name}: protected environment file`};
+    return next(event);
+  }).catch(($, event, next) => next.called ? undefined : {deny:`${$.plugin.name}: guard stopped before execution`});
   on('tool.call', async ($, event, next) => {
     if (counted(event.tool)) {
       await update($, calls, count => count + 1);
