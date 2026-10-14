@@ -52,7 +52,7 @@ After M138 and M140; landed dependencies are recorded below.
 - `crates/bingo-sdk/src/testing/{api,calls}.rs` (count `HostApi::render` in the shared test host)
 - `crates/bingo-core/src/{chain/render.rs,session.rs,session/catalogue.rs}` (config publication)
 - `crates/bingo-mods/tests/components.rs` (QuickJS helper/log contract); `crates/bingo-mods/src/` `$.ui.log`, the embedded helpers; `sdk/typescript/src/{state.ts (new),state.test.ts (new),index.ts,ui.ts}`
-- `crates/bingo-surface-tui/src/{component.rs (new),views/mod.rs,transcript.rs,transcript/{said,output}.rs,
+- `crates/bingo-surface-tui/src/{component.rs (new),views/mod.rs,transcript.rs,transcript/{said,output,components}.rs,
   activity.rs,worked.rs,status.rs,form.rs,dialog.rs,blocks.rs,pane/,pulled.rs,view.rs,run/pulling.rs,lib.rs}`
 - `crates/bingo-{surface-rpc,plugin-rpc}/src/schema.rs`; `schema/{rpc,events,plugin,plugin-2}.json`; generated TypeScript
 - `sdk/typescript/src/{on.ts,on.test.ts,plugin.ts,rpc.test.ts}` (shared matcher metadata); `docs/adr/0075-plugin-protocol-2.md`

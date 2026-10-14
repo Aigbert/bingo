@@ -27,7 +27,6 @@ const CONTEXT_BAD: u64 = 90;
 pub const HINT: &str = keys::FOOTER_HINT;
 
 /// The status line at this width.
-
 pub fn components(
     tree: &Tree,
     ui: &Ui,
@@ -63,7 +62,7 @@ fn mode(state: &SessionState, site: &mut crate::component::Site<'_>) -> Vec<Span
         .into_iter()
         .filter_map(|placed| match placed.slot {
             bingo_sdk::slot::Slot::Mode { current, modes }
-                if !modes.first().is_some_and(|mode| mode.label == current) =>
+                if modes.first().is_none_or(|mode| mode.label != current) =>
             {
                 Some(current)
             }

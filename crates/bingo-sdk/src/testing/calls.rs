@@ -93,21 +93,18 @@ pub enum HostCall {
 impl std::fmt::Debug for HostCall {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Render { session, request } => f
-                .debug_struct("Render")
-                .field("session", session)
-                .field("request", request)
-                .finish(),
+            Self::Render { session, request } => {
+                fields(f, "Render", &[("session", session), ("request", request)])
+            }
             Self::Complete {
                 session,
                 turn,
                 request,
-            } => f
-                .debug_struct("Complete")
-                .field("session", session)
-                .field("turn", turn)
-                .field("request", request)
-                .finish(),
+            } => fields(
+                f,
+                "Complete",
+                &[("session", session), ("turn", turn), ("request", request)],
+            ),
             Self::Sessions { filter } => {
                 f.debug_struct("Sessions").field("filter", filter).finish()
             }
@@ -115,12 +112,11 @@ impl std::fmt::Debug for HostCall {
                 selector,
                 who,
                 options,
-            } => f
-                .debug_struct("Open")
-                .field("selector", selector)
-                .field("who", who)
-                .field("options", options)
-                .finish(),
+            } => fields(
+                f,
+                "Open",
+                &[("selector", selector), ("who", who), ("options", options)],
+            ),
             Self::Close { session, reason } => f
                 .debug_struct("Close")
                 .field("session", session)
@@ -215,4 +211,16 @@ impl std::fmt::Debug for HostCall {
                 .finish(),
         }
     }
+}
+
+fn fields(
+    f: &mut std::fmt::Formatter<'_>,
+    name: &str,
+    fields: &[(&str, &dyn std::fmt::Debug)],
+) -> std::fmt::Result {
+    let mut value = f.debug_struct(name);
+    for (key, field) in fields {
+        value.field(key, field);
+    }
+    value.finish()
 }
