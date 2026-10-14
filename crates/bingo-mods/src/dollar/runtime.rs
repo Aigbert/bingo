@@ -100,6 +100,11 @@ impl Runtime {
     pub(crate) fn commands(&self) -> Vec<Arc<dyn Command>> {
         self.registered.commands()
     }
+    #[cfg(test)]
+    pub(crate) fn processes_for_test(&self) -> &super::process::Processes {
+        &self.processes
+    }
+
     pub async fn reload(&self, plugin: &str) {
         self.processes.remove(Some(plugin), None).await;
         self.env.remove(plugin);

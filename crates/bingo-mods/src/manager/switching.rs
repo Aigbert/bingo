@@ -130,14 +130,13 @@ pub(super) async fn switch_module(
         module.close().await;
         return Ok(kind);
     }
-    activate_switch(manager, old, module, enabled).await?;
+    activate_switch(manager, old, module).await?;
     Ok(PluginSwitch::Now)
 }
 async fn activate_switch(
     manager: &Manager,
     old: Arc<Module>,
     module: Arc<Module>,
-    enabled: bool,
 ) -> Result<(), KernelError> {
     let name = module.found.name.as_str();
     let owned = old.engine.is_some();
@@ -158,9 +157,6 @@ async fn activate_switch(
         .ok_or_else(|| reload::failed("module host unavailable"))?;
     host.catalog(CatalogKind::Plugins).await?;
     module.admission.decision().map_err(reload::failed)?;
-    if !enabled && owned {
-        manager.clear_signals(name).await;
-    }
     manager.restart_sessions(&module, host).await?;
     manager.baseline(false);
     Ok(())
@@ -210,17 +206,31 @@ pub(super) async fn reap(manager: &Manager) {
         .collect();
     for module in ready {
         module.close().await;
-        manager.clear_signals(&module.found.name).await;
-        if let Some(dollar) = manager.dollar.get() {
-            dollar.reload(&module.found.name).await;
-        }
-        // Keep closing generations visible to enable until cleanup finishes.
+        // The reload lock keeps enable out until name-scoped cleanup finishes.
         manager
             .switches
             .retired
             .lock()
             .await
             .retain(|entry| !Arc::ptr_eq(entry, &module));
+        cleanup(manager, &module.found.name).await;
+    }
+}
+pub(super) async fn cleanup(manager: &Manager, name: &str) {
+    // Name-scoped state may still belong to a turn using a retired generation.
+    if manager
+        .switches
+        .retired
+        .lock()
+        .await
+        .iter()
+        .any(|module| module.found.name == name)
+    {
+        return;
+    }
+    manager.clear_signals(name).await;
+    if let Some(dollar) = manager.dollar.get() {
+        dollar.reload(name).await;
     }
 }
 fn next(why: &str) -> PluginSwitch {

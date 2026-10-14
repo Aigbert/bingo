@@ -107,14 +107,11 @@ impl Manager {
     }
     async fn remove_module(&self, module: &Arc<Module>) {
         module.close().await;
-        if let Some(dollar) = self.dollar.get() {
-            dollar.reload(&module.found.name).await;
-        }
+        switching::cleanup(self, &module.found.name).await;
         self.modules
             .write()
             .unwrap_or_else(|error| error.into_inner())
             .retain(|entry| !Arc::ptr_eq(entry, module));
-        self.clear_signals(&module.found.name).await;
     }
     pub(super) async fn clear_signals(&self, name: &str) {
         if let Some(host) = self.host.get() {
@@ -145,9 +142,7 @@ impl Manager {
     ) -> Result<(), KernelError> {
         if let Some(old) = old {
             old.close().await;
-            if let Some(dollar) = self.dollar.get() {
-                dollar.reload(&old.found.name).await;
-            }
+            switching::cleanup(self, &old.found.name).await;
         }
         let config = self
             .settings

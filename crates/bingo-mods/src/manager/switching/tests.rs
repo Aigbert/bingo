@@ -145,3 +145,70 @@ async fn enabling_a_held_generation_replies_without_holding_other_switches() {
     tokio::time::advance(std::time::Duration::from_secs(1)).await;
     assert!(manager.modules()[0].engine.is_none());
 }
+
+fn runtime(manager: &Arc<Manager>) -> Arc<crate::dollar::Runtime> {
+    let host = bingo_sdk::testing::TestHost::default();
+    host.on_catalog(|kind| async move {
+        Ok(Catalog {
+            kind,
+            entries: vec![],
+        })
+    });
+    let runtime = crate::dollar::Runtime::install(
+        &host.handle(),
+        manager.env.home.clone(),
+        std::time::Duration::from_secs(1),
+    )
+    .unwrap();
+    manager.host.set(host.handle()).unwrap();
+    manager.this.set(Arc::downgrade(manager)).unwrap();
+    assert!(manager.dollar.set(runtime.clone()).is_ok());
+    runtime
+}
+fn process(runtime: &crate::dollar::Runtime, module: &Module) -> (String, SessionId) {
+    let session = SessionId::mint();
+    let input = serde_json::from_value(json!({"session":session,"argv":[
+        bingo_process::shell::resolve().unwrap().path(), "-c", "cat"]}))
+    .unwrap();
+    let id = runtime
+        .processes_for_test()
+        .spawn(
+            "fixture",
+            &input,
+            &module.found.root,
+            Default::default(),
+            module.engine.as_ref().unwrap().stopped(),
+        )
+        .unwrap();
+    (id, session)
+}
+
+#[tokio::test]
+async fn reloading_an_off_module_preserves_the_retired_generations_process() {
+    for rescan in [false, true] {
+        let (_root, manager, old) = fixture().await;
+        let runtime = runtime(&manager);
+        let (id, session) = process(&runtime, &old);
+        manager.switch("fixture", false).await.unwrap();
+        if rescan {
+            std::fs::write(
+                old.found.root.join("main.ts"),
+                "export function register(on) {} // changed",
+            )
+            .unwrap();
+            manager.rescan(true).await.unwrap();
+        } else {
+            manager.reload_root(&old.found.root).await.unwrap();
+        }
+        let alive = runtime
+            .processes_for_test()
+            .write("fixture", &session, &id, Some("still alive\n".into()))
+            .await;
+        drop(old);
+        reap(&manager).await;
+        assert!(
+            alive.is_ok(),
+            "reload destroyed a running generation: {alive:?}"
+        );
+    }
+}
