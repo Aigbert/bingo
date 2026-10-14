@@ -1,4 +1,4 @@
-# Built-in mods
+# Keys and built-in mods
 
 A built-in feature is a `bingo-mod-<noun>` Rust plugin. Use
 `crates/bingo-mod-hello` as the template: its small `lib.rs` registers one

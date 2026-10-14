@@ -1,10 +1,12 @@
 # Mods
+
 A mod's `plugin.json` names a JavaScript or TypeScript `module`, run in
 sandboxed QuickJS. It can change dispatch, add tools or commands, and draw the
 interface. A skill supplies instructions (`guide-skills`), a shell hook runs a
 configured command (`guide-hooks`), and an MCP server supplies tools
 (`guide-mcp`). An external-process plugin runs its own executable and speaks the
-plugin protocol; it is the other code-authoring path, described below.
+plugin protocol; it is the other code-authoring path, described below. Keys, `onKey` and wrapping a built-in feature are on `guide-mods-keys`.
+
 ## Files and loading
 
 The user directory is `~/.bingo/plugins/<name>/`, the project layer is
@@ -195,5 +197,3 @@ Start from the repository's `examples/plugins/` and read the adjacent tests:
 - `examples/plugins/pane` — a tool ledger, commands, pane rendering, resize and Escape.
 - `examples/plugins/ts-status` — persistent call count, status and a permission hook.
 - `examples/plugins/wordcount` — the Python external-process example, with `plugin.json` and `main.py`.
-
-Built-in Rust mods use `plugin::Placement::Builtin`: `next` reaches their tree before `Engine`. `CommandSpec.keys` supplies defaults; `keys` settings override them. A focused pane's root `Box.onKey` receives `{key}` and returns `{handled:false}` to pass it back. Escape and ctrl+c stay with the surface. See `docs/guide/mods.md` and `bingo-mod-hello`.

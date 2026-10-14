@@ -284,7 +284,8 @@ pub enum Placement {
     Builtin,
 }
 
-/// What a plugin hands the host.
+/// What a plugin hands the host. One enum so the in-process path and a future
+/// out-of-process bridge share one representation.
 pub enum Contribution {
     Tool(Arc<dyn Tool>),
     /// Tools resolved late, from a source that does its I/O elsewhere.

@@ -53,7 +53,7 @@ surface's plain drawing.
 7. **Discipline.** `scripts/check_discipline.sh`: a `bingo-mod-*` crate
    is a plugin (no surface, no ratatui/crossterm, no other plugin);
    the TUI-names-no-plugin check covers it.
-8. **Docs.** `docs/guide/` mods page: placement, `keys`, `onKey`, how to
+8. **Docs.** `guide-mods-keys` page (`bingo-mods/src/keys.md`): placement, `keys`, `onKey`, how to
    replace a built-in; ADR-0084's site list notes the owner.
 
 ## Files
@@ -66,7 +66,7 @@ surface's plain drawing.
 - `crates/bingo-mods/tests/`, `sdk/typescript/src/ui.ts` (JS key handlers),
   `crates/bingo-plugin-host/src/host.rs` (handled callback acknowledgements).
 - New `crates/bingo-mod-hello/`; `scripts/check_discipline.sh`,
-  `scripts/budget.toml`; `docs/guide/`; fixture edges and patch in `Cargo.lock`.
+  `scripts/budget.toml`; `crates/bingo-mods/src/{guide.rs,keys.md}`; fixture edges and patch in `Cargo.lock`.
 
 ## Exit criteria
 
