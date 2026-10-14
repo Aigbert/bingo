@@ -49,6 +49,24 @@ pub fn change(
     edit(path, key, name, url, false)
 }
 
+pub fn ensure_user_key(layers: &[super::Layer], key: &str, name: &str) -> Result<(), KernelError> {
+    for layer in layers.iter().filter(|layer| !layer.is_user()) {
+        let held = layer
+            .value
+            .get(key)
+            .and_then(|v| v.get("instances"))
+            .and_then(|v| v.get(name))
+            .and_then(|v| v.get("apiKey"));
+        if held.is_some_and(|v| !v.is_null()) {
+            return Err(invalid(&format!(
+                "address unchanged; remove the instance apiKey from {} first",
+                layer.source
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub fn ensure_user(path: &Path, key: &str, name: &str) -> Result<(), KernelError> {
     if read(path)?
         .get(key)

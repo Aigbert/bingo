@@ -78,6 +78,7 @@ pub(crate) async fn set_provider(
         instances::ensure_user(&settings::user_path(host.env()), shape.settings_key(), name)?;
         let changed_origin = old.credential_origin() != provider.credential_origin();
         if changed_origin {
+            instances::ensure_user_key(&host.config.layers, shape.settings_key(), name)?;
             old.logout().await.map_err(|_| {
                 invalid("address unchanged; the old credential could not be removed")
             })?;

@@ -116,3 +116,38 @@ async fn failed_origin_writes_do_not_retire_the_current_provider() {
         );
     }
 }
+#[tokio::test]
+async fn origin_change_refuses_keys_in_every_non_user_layer() {
+    for origin in [
+        settings::LayerOrigin::Repository("/repo".into()),
+        settings::LayerOrigin::Explicit,
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let layer = settings::Layer::new(
+            origin,
+            "/repo/settings.local.toml",
+            json!({
+                "local": {"instances": {"work": {"apiKey":"DO-NOT-ECHO"}}}
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        );
+        let (host, old) = changing(dir.path(), false, false, Some(layer)).await;
+        let error = provider::set_provider(&host, "work", "http://new")
+            .await
+            .err()
+            .unwrap();
+        assert!(
+            error.message.contains("/repo/settings.local.toml"),
+            "{error:?}"
+        );
+        assert!(!error.message.contains("DO-NOT-ECHO"));
+        assert!(!old.retired.load(Ordering::Relaxed));
+        assert_eq!(
+            settings::read_document(&settings::user_path(host.env())).unwrap()["local"]["instances"]
+                ["work"]["baseUrl"],
+            "http://old"
+        );
+    }
+}
