@@ -47,3 +47,21 @@ test('resting reads do not write and membership is exact', async () => {
   expect(memberOf(['alpha', 'beta'])('alpha')).toBe(true);
   expect(memberOf(['alpha', 'beta'])('alphabet')).toBe(false);
 });
+
+test('object atom keys normalize once and enforce their owner before host access', async () => {
+  const value = atom({plugin:'fixture',key:'count'}, 0);
+  expect(value.key).toBe('count');
+  const one = host();
+  Object.defineProperty(one.$, 'plugin', {value:{name:'fixture'}});
+  const keys: string[] = [];
+  const get = one.$.state.get;
+  one.$.state.get = async key => {keys.push(key); return get(key);};
+  expect(await read(one.$, value)).toBe(2);
+  expect(await update(one.$, value, n => n + 1)).toBe(3);
+  expect(keys).toEqual(['count','count']);
+  const foreign = host();
+  Object.defineProperty(foreign.$, 'plugin', {value:{name:'other'}});
+  await expect(read(foreign.$, value)).rejects.toThrow('owner');
+  await expect(update(foreign.$, value, n => n + 1)).rejects.toThrow('owner');
+  expect(foreign.counts()).toEqual([0,0]);
+});

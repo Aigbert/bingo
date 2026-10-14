@@ -281,3 +281,29 @@ fn module_constant_matchers_are_static_but_computed_matchers_are_not() {
         );
     }
 }
+
+#[test]
+fn object_atom_keys_use_the_same_declared_key_and_owner() {
+    let result = checked(
+        "import {atom} from 'bingo'; const value = atom({plugin:'fixture',key:'count'}, 0);",
+        "",
+    );
+    assert!(result.keys.contains("state:count"), "{:?}", result.findings);
+    assert!(!result.findings.iter().any(|f| f.rule == Rule::StateKey));
+    for key in [
+        "{plugin:'other',key:'count'}",
+        "{plugin:owner,key:'count'}",
+        "{plugin:'fixture',key:name}",
+        "{plugin:'fixture',key:'count',extra:true}",
+        "{...key}",
+    ] {
+        let result = checked(
+            &format!("import {{atom}} from 'bingo'; const value = atom({key}, 0);"),
+            "",
+        );
+        assert!(
+            result.findings.iter().any(|f| f.rule == Rule::StateKey),
+            "{key}"
+        );
+    }
+}

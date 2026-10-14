@@ -1,13 +1,18 @@
 import type { Dollar } from './dollar.ts';
 
-export type Atom<T> = Readonly<{key: string; initial: T}>;
+export type Atom<T> = Readonly<{key: string; owner?: string; initial: T}>;
 export type Derived<T> = Readonly<{compute: ($: Dollar) => T | Promise<T>}>;
-export const atom = <T>(key: string, initial: T): Atom<T> => Object.freeze({key, initial});
+export const atom = <T>(key: string | {plugin: string; key: string}, initial: T): Atom<T> =>
+  Object.freeze(typeof key === 'string' ? {key, initial} : {key:key.key, owner:key.plugin, initial});
+function owned<T>($: Dollar, value: Atom<T>): void {
+  if (value.owner !== undefined && value.owner !== $.plugin.name) throw new Error('atom owner does not match the plugin');
+}
 export const derive = <T>(compute: ($: Dollar) => T | Promise<T>): Derived<T> => Object.freeze({compute});
 const renders = new WeakMap<Dollar, Map<Derived<unknown>, Promise<unknown>>>();
 
 export async function read<T>($: Dollar, value: Atom<T> | Derived<T>): Promise<T> {
   if ('key' in value) {
+    owned($, value);
     const held = await $.state.get(value.key);
     return held === null ? value.initial : held.value as T;
   }
@@ -18,6 +23,7 @@ export async function read<T>($: Dollar, value: Atom<T> | Derived<T>): Promise<T
 }
 
 export async function update<T>($: Dollar, value: Atom<T>, change: (held: T) => T | Promise<T>): Promise<T> {
+  owned($, value);
   for (let retry = 0; ; retry++) {
     const held = await $.state.get(value.key);
     const next = await change(held === null ? value.initial : held.value as T);
