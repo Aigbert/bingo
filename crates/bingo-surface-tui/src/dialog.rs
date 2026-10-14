@@ -8,7 +8,7 @@
 
 use bingo_sdk::{
     Activation, Answer, AnswerSpec, Interaction, InteractionId, InteractionKind, LoginFlow,
-    Preview, Question, Rung,
+    Preview, Question,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::text::{Line, Span};
@@ -19,23 +19,7 @@ use crate::effect::Effect;
 use crate::form::{self, Form};
 use crate::{layers, preview, theme};
 
-/// What one row of the dialog does when it is chosen.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Choice {
-    /// A complete answer, sent as it is.
-    Send(Answer),
-    /// Opens the row where the person says what to do instead.
-    Words,
-    /// One member of a multiple-choice set.
-    Toggle(String),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Opt {
-    pub label: String,
-    pub description: Option<String>,
-    pub choice: Choice,
-}
+pub use crate::ask::options::{Choice, Opt};
 
 /// The surface's own state for the interaction on top of the stack.
 #[derive(Clone, Debug, Default)]
@@ -43,6 +27,8 @@ pub struct Dialog {
     /// Whose state this is; a different interaction resets everything.
     current: Option<InteractionId>,
     pub focus: usize,
+    pub aside: bool,
+    pub changing: Option<serde_json::Value>,
     pub expanded: bool,
     /// The feedback or free-text row, open once the answer needs words.
     pub words: Option<Composer>,
@@ -56,23 +42,34 @@ pub struct Dialog {
 }
 
 impl Dialog {
+    pub fn current(&self) -> Option<&InteractionId> {
+        self.current.as_ref()
+    }
+
     /// Point the dialog at whatever is on top now, forgetting the last one.
     pub fn focus_on(&mut self, interaction: Option<&Interaction>) {
         let id = interaction.map(|i| i.id.clone());
         if id != self.current {
             *self = Self {
                 current: id,
+                focus: interaction.map_or(0, crate::ask::options::initial),
                 ..Self::default()
             };
         }
     }
 
     pub fn on_key(&mut self, interaction: &Interaction, key: KeyEvent, now: Now) -> Vec<Effect> {
-        if self.answered || guarded(interaction, now) {
+        if self.answered || (key.code != KeyCode::Esc && guarded(interaction, now)) {
             return Vec::new();
         }
-        if key.code == KeyCode::Char('e') && key.modifiers.contains(KeyModifiers::CONTROL) {
+        if matches!(key.code, KeyCode::Char('e' | 'o'))
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+        {
             self.expanded = !self.expanded;
+            return Vec::new();
+        }
+        if key.code == KeyCode::Esc && self.words.take().is_some() {
+            self.changing = None;
             return Vec::new();
         }
         if key.code == KeyCode::Esc {
@@ -101,7 +98,18 @@ impl Dialog {
             .take()
             .map(|w| w.text().to_string())
             .unwrap_or_default();
-        self.send(interaction, Some(words_answer(interaction, text)))
+        let answer = if let Some(mut input) = self.changing.take() {
+            let field = if input["command"].is_string() {
+                "command"
+            } else {
+                "new_string"
+            };
+            input[field] = serde_json::Value::String(text);
+            Answer::AllowChanged { input }
+        } else {
+            words_answer(interaction, text)
+        };
+        self.send(interaction, Some(answer))
     }
 
     fn choosing(&mut self, interaction: &Interaction, key: KeyEvent) -> Vec<Effect> {
@@ -148,6 +156,7 @@ impl Dialog {
     fn confirm(&mut self, interaction: &Interaction, options: &[Opt]) -> Vec<Effect> {
         match options.get(self.focus).map(|o| o.choice.clone()) {
             Some(Choice::Send(answer)) => self.send(interaction, Some(answer)),
+            Some(Choice::Change) => Vec::new(),
             Some(Choice::Words) => {
                 self.words = Some(Composer::default());
                 Vec::new()
@@ -189,6 +198,7 @@ fn words_key(words: &mut Composer, key: KeyEvent) -> bool {
     match key.code {
         KeyCode::Enter => return true,
         KeyCode::Backspace => words.backspace(),
+        KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => words.set(""),
         KeyCode::Left => words.left(),
         KeyCode::Right => words.right(),
         KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -241,7 +251,7 @@ fn letter(c: char, options: &[Opt]) -> Option<usize> {
     options.iter().position(|o| match &o.choice {
         Choice::Send(answer) => answer.spec() == wanted,
         Choice::Words => wanted == AnswerSpec::Deny,
-        Choice::Toggle(_) => false,
+        Choice::Toggle(_) | Choice::Change => false,
     })
 }
 
@@ -254,97 +264,7 @@ pub fn shape(interaction: &Interaction) -> layers::Shape {
     }
 }
 
-/// The rows this interaction offers, in the order they are shown: the rungs
-/// the kernel will accept ([`Interaction::rungs`]), each in this card's own
-/// words, and the row that takes words of one's own where it takes any.
-pub fn options(interaction: &Interaction) -> Vec<Opt> {
-    let rungs = interaction
-        .rungs()
-        .into_iter()
-        .map(|rung| row(&interaction.kind, rung));
-    match &interaction.kind {
-        // A paste flow's credential goes above the way out; a browser or
-        // device flow finishes on its own and asks for nothing.
-        InteractionKind::Login { flow, .. } => {
-            paste(interaction, flow).into_iter().chain(rungs).collect()
-        }
-        // The form has a card of its own (M53); the dialog answers no key of
-        // it, so `esc` is the only way out of one drawn here.
-        InteractionKind::Form { .. } => Vec::new(),
-        // Words of one's own are the last row, under the options they stand
-        // as an alternative to.
-        _ => rungs.chain(other(interaction)).collect(),
-    }
-}
-
-/// One rung as this card draws it. The kernel says which answers there are;
-/// the words they are put in, and the gesture each row takes, are the
-/// surface's own.
-fn row(kind: &InteractionKind, rung: Rung) -> Opt {
-    Opt {
-        label: label(&rung),
-        choice: gesture(kind, &rung.answer),
-        description: rung.description,
-    }
-}
-
-/// What this card calls a rung: a permission is a plain yes or no in the
-/// second person, and a question wears the words the asker wrote.
-fn label(rung: &Rung) -> String {
-    match &rung.answer {
-        Answer::AllowOnce => "Yes".into(),
-        Answer::AllowSession { scope } => format!("Yes, allow {scope} during this session"),
-        Answer::Deny { .. } => "No, and tell bingo what to do differently (esc)".into(),
-        Answer::Confirm => "Confirm".into(),
-        Answer::Cancel => "Cancel (esc)".into(),
-        _ => rung.label.clone(),
-    }
-}
-
-/// What choosing a row does: a refusal wants a reason, so it opens the words
-/// row rather than sending as it stands, and a member of a multiple-choice
-/// set is ticked rather than sent.
-fn gesture(kind: &InteractionKind, answer: &Answer) -> Choice {
-    match answer {
-        Answer::Deny { .. } => Choice::Words,
-        Answer::Choice { ids, .. } if ticks(kind) => match ids.first() {
-            Some(id) => Choice::Toggle(id.clone()),
-            None => Choice::Send(answer.clone()),
-        },
-        _ => Choice::Send(answer.clone()),
-    }
-}
-
-/// Whether this question is answered by ticking a set rather than by picking
-/// one of a list.
-fn ticks(kind: &InteractionKind) -> bool {
-    matches!(
-        kind,
-        InteractionKind::Question(Question { multi: true, .. })
-    )
-}
-
-/// The row for words of one's own, where the interaction takes them.
-fn other(interaction: &Interaction) -> Option<Opt> {
-    interaction
-        .answers
-        .contains(&AnswerSpec::Text)
-        .then(|| plain("Other", Choice::Words))
-}
-
-/// The row a paste flow's credential goes in.
-fn paste(interaction: &Interaction, flow: &LoginFlow) -> Option<Opt> {
-    (matches!(flow, LoginFlow::Paste) && interaction.answers.contains(&AnswerSpec::Text))
-        .then(|| plain("Paste it here", Choice::Words))
-}
-
-fn plain(label: &str, choice: Choice) -> Opt {
-    Opt {
-        label: label.to_string(),
-        description: None,
-        choice,
-    }
-}
+pub use crate::ask::options::options;
 
 /// The card, as the lines inside it (design §4): a bold title, what it is
 /// about on its own tints, the one line that asks, then the answers. The box
@@ -380,11 +300,16 @@ pub fn rows(
         return out;
     }
     let mut out = vec![(title(dialog, interaction, agent), None)];
-    out.extend(
-        body(dialog, interaction)
-            .into_iter()
-            .map(|line| (line, None)),
-    );
+    let mut preview = body(dialog, interaction);
+    let limit = room.saturating_sub(options(interaction).len() + 5).max(3);
+    if preview.len() > limit {
+        preview.truncate(limit.saturating_sub(1));
+        preview.push(Line::from(Span::styled(
+            "     ╰ … ctrl+o whole diff",
+            theme::dim(),
+        )));
+    }
+    out.extend(preview.into_iter().map(|line| (line, None)));
     if let Some(question) = question(interaction, cwd) {
         out.push((Line::default(), None));
         out.push((question, None));
@@ -396,7 +321,26 @@ pub fn rows(
                 .map(|line| (line, Some(index))),
         );
     }
+    out.extend(caution_rows(interaction));
     out.extend(answering(dialog));
+    out
+}
+
+fn caution_rows(interaction: &Interaction) -> Vec<(Line<'static>, Option<usize>)> {
+    let mut out = Vec::new();
+    if let InteractionKind::Permission {
+        caution: Some(caution),
+        ..
+    } = &interaction.kind
+    {
+        out.push((
+            Line::from(Span::styled(
+                format!("     no allow this session here: {caution}"),
+                theme::presence(),
+            )),
+            None,
+        ));
+    }
     out
 }
 
@@ -418,6 +362,17 @@ fn answering(dialog: &Dialog) -> Vec<(Line<'static>, Option<usize>)> {
 /// What kind of card this is, in one word a person reads first. A form draws
 /// its own head, which is the tab row (see [`form::rows`]).
 fn title(_dialog: &Dialog, interaction: &Interaction, agent: Option<&str>) -> Line<'static> {
+    if matches!(interaction.kind, InteractionKind::Permission { .. }) {
+        return Line::from(Span::styled(
+            format!(
+                "   {} {}{} · needs you",
+                theme::row_mark('◆'),
+                named(interaction),
+                agent.map(|name| format!(" · {name}")).unwrap_or_default()
+            ),
+            theme::presence(),
+        ));
+    }
     Line::from(form::head(&named(interaction), agent))
 }
 
@@ -450,7 +405,10 @@ fn question(interaction: &Interaction, cwd: &str) -> Option<Line<'static>> {
         InteractionKind::Confirm { detail, .. } => detail.clone(),
         InteractionKind::Login { .. } => return None,
     };
-    Some(Line::from(Span::styled(text, theme::text())))
+    Some(Line::from(Span::styled(
+        format!("     {text}"),
+        theme::text(),
+    )))
 }
 
 fn shorten(text: &str, cwd: &str) -> String {
@@ -471,13 +429,24 @@ fn body(dialog: &Dialog, interaction: &Interaction) -> Vec<Line<'static>> {
 /// The diff or the command, on the tints of what it does.
 fn preview_lines(preview: &Preview, expanded: bool) -> Vec<Line<'static>> {
     let (rows, hidden) = preview::lines(preview, expanded);
-    let mut out: Vec<Line<'static>> = rows.into_iter().map(indent).collect();
-    if hidden > 0 {
-        out.push(Line::from(Span::styled(
-            format!("  {} +{hidden} lines (ctrl+e to expand)", theme::ellipsis()),
+    let mut out = vec![Line::from(Span::styled(
+        format!("     {}", theme::glyphs().border.top_left),
+        theme::dim(),
+    ))];
+    out.extend(rows.into_iter().map(|line| {
+        let mut spans = vec![Span::styled(
+            format!("     {} ", theme::glyphs().border.vertical_left),
             theme::dim(),
-        )));
-    }
+        )];
+        spans.extend(line.spans);
+        Line::from(spans)
+    }));
+    let tail = if hidden > 0 {
+        format!("     ╰ … +{hidden} lines (ctrl+o whole diff)")
+    } else {
+        "     ╰".into()
+    };
+    out.push(Line::from(Span::styled(tail, theme::dim())));
     out
 }
 
@@ -499,29 +468,30 @@ fn login_lines(flow: &LoginFlow) -> Vec<Line<'static>> {
 fn option_lines(dialog: &Dialog, index: usize, option: &Opt) -> Vec<Line<'static>> {
     let focused = index == dialog.focus;
     let style = if focused { theme::text() } else { theme::dim() };
+    let label = if let Some(words) = dialog.words.as_ref().filter(|_| focused) {
+        let prefix = if dialog.changing.is_some() || !option.label.starts_with("No,") {
+            ""
+        } else {
+            "No, because "
+        };
+        format!("{prefix}{}{}", words.text(), theme::caret())
+    } else {
+        format!("{}{}", box_mark(dialog, option), option.label)
+    };
+    let cursor = if focused && !dialog.aside {
+        format!("   {} ", theme::cursor())
+    } else {
+        "     ".into()
+    };
     let mut out = vec![Line::from(vec![
-        theme::cursor_span(focused),
-        Span::styled(
-            format!(
-                "{}. {}{}",
-                index + 1,
-                box_mark(dialog, option),
-                option.label
-            ),
-            style,
-        ),
+        Span::styled(cursor, theme::presence()),
+        Span::styled(format!("{}  {label}", index + 1), style),
     ])];
     if let Some(description) = &option.description {
         out.push(Line::from(Span::styled(
-            format!("     {description}"),
+            format!("        {description}"),
             theme::dim(),
         )));
-    }
-    if let Some(words) = dialog.words.as_ref().filter(|_| focused) {
-        out.push(Line::from(vec![
-            Span::styled(format!("     {} ", theme::user()), theme::dim()),
-            Span::styled(words.text().to_string(), theme::text()),
-        ]));
     }
     out
 }
@@ -542,12 +512,6 @@ fn link(url: &str) -> Line<'static> {
     Line::from(Span::styled(format!("  {url}"), theme::link()))
 }
 
-fn indent(line: Line<'static>) -> Line<'static> {
-    let mut spans = vec![Span::raw("  ")];
-    spans.extend(line.spans);
-    Line::from(spans)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -560,7 +524,7 @@ mod tests {
             (None, "Do you want to allow Edit src/lib.rs?"),
         ] {
             let interaction = crate::test_support::permission(None, preview);
-            assert_eq!(question(&interaction, "/work").unwrap().to_string(), expected);
+            assert_eq!(question(&interaction, "/work").unwrap().to_string().trim(), expected);
         }
     }
 }

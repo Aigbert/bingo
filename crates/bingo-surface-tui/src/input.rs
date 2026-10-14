@@ -78,18 +78,66 @@ pub(crate) fn pane_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Ve
 }
 
 fn interaction_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
-    if let Some(effects) = layered(ui, tree, key, now) {
-        return effects;
-    }
+    let Some((owner, interaction)) = tree.open_interaction() else {
+        return Vec::new();
+    };
     if key.code == KeyCode::Esc {
         return escape(ui, tree, now);
     }
-    tree.open_interaction()
-        .map(|(_, interaction)| ui.dialog.on_key(interaction, key, now))
-        .unwrap_or_default()
+    if key.code == KeyCode::Char('o') && key.modifiers.contains(KeyModifiers::CONTROL) {
+        if let Some(item) = &interaction.item {
+            ui.focus
+                .show(Open::Pager(pager::Pager::open(item.clone())), now.instant);
+        } else {
+            ui.dialog.expanded = !ui.dialog.expanded;
+        }
+        return Vec::new();
+    }
+    if let Some(action) = crate::ask::handler(ui, interaction, key) {
+        return vec![Effect::SiteKey { action, key }];
+    }
+    interaction_fallback(ui, tree, owner, interaction, key, now)
+}
+
+pub(crate) fn interaction_fallback(
+    ui: &mut Ui,
+    tree: &Tree,
+    owner: &SessionState,
+    interaction: &bingo_sdk::Interaction,
+    key: KeyEvent,
+    now: Now,
+) -> Vec<Effect> {
+    if ui.dialog.words.is_none() && crate::ask::aside::printable(key, interaction) {
+        ui.dialog.aside = true;
+        return composer_keys(ui, tree, key, now);
+    }
+    if interaction
+        .guard_until
+        .is_none_or(|until| now.wall >= until)
+        && crate::ask::begin_change(ui, owner, interaction, key)
+    {
+        return Vec::new();
+    }
+    ui.dialog.on_key(interaction, key, now)
+}
+
+pub(crate) fn interaction_unhandled(
+    ui: &mut Ui,
+    tree: &Tree,
+    key: KeyEvent,
+    now: Now,
+) -> Vec<Effect> {
+    if matches!(key.code, KeyCode::Char(_)) && (key.modifiers - KeyModifiers::SHIFT).is_empty() {
+        ui.dialog.aside = true;
+        return composer_keys(ui, tree, key, now);
+    }
+    Vec::new()
 }
 
 fn composer_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
+    if matches!(key.code, KeyCode::Char(_)) && (key.modifiers - KeyModifiers::SHIFT).is_empty() {
+        ui.last_typed = Some(now.wall);
+    }
     if let Some(line) = keys::commands::line(ui, tree.viewed(), key) {
         return command_line(ui, tree, now, line);
     }
@@ -403,6 +451,10 @@ fn interrupt_or_exit(ui: &mut Ui, state: &SessionState, now: Now) -> Vec<Effect>
 /// order of [`keys::ESCAPES`]. Leaving a card is the card's own answer, so
 /// that rung goes back to the dialog.
 fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+    if ui.dialog.aside && tree.open_interaction().is_some() {
+        ui.dialog.aside = false;
+        return Vec::new();
+    }
     if ui.focus.row().is_some() {
         ui.focus = crate::focus::Focus::Composer;
     }
@@ -494,11 +546,21 @@ fn cancel(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     let Some((_, interaction)) = tree.open_interaction() else {
         return Vec::new();
     };
-    ui.dialog.on_key(
+    let editing = ui.dialog.words.is_some();
+    let mut effects = ui.dialog.on_key(
         interaction,
         KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
         now,
-    )
+    );
+    if !editing
+        && matches!(
+            interaction.kind,
+            bingo_sdk::InteractionKind::Permission { .. }
+        )
+    {
+        effects.extend(ask_to_stop(ui, tree.viewed()));
+    }
+    effects
 }
 
 fn picker(ui: &mut Ui, key: KeyEvent, now: Now) -> Vec<Effect> {
@@ -796,7 +858,12 @@ fn enter(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     if ui.composer.text().trim().is_empty() {
         return Vec::new();
     }
-    submit(ui, tree, now, Delivery::Wake)
+    let delivery = if ui.dialog.aside && tree.open_interaction().is_some() {
+        Delivery::Hold
+    } else {
+        Delivery::Wake
+    };
+    submit(ui, tree, now, delivery)
 }
 
 /// What a line does. `/clear` starts a fresh session beside the root's, not
@@ -1383,11 +1450,14 @@ mod tests {
 
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Esc), now),
-            vec![Effect::Answer {
-                interaction: state.interactions[0].id.clone(),
-                answer: Answer::Deny { feedback: None },
-                activation: Activation::Keyboard,
-            }],
+            vec![
+                Effect::Answer {
+                    interaction: state.interactions[0].id.clone(),
+                    answer: Answer::Deny { feedback: None },
+                    activation: Activation::Keyboard,
+                },
+                Effect::Interrupt
+            ],
             "then the card, whose own answer leaving it is"
         );
 
@@ -3322,7 +3392,7 @@ mod tests {
         let effects = on_mouse(
             &mut ui,
             &solo(&state),
-            click(4, card.area.y + 1 + row as u16),
+            click(4, card.area.y + row as u16),
             now,
         );
         assert_eq!(

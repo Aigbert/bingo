@@ -277,7 +277,8 @@ start '{"responses":[
   {"steps":[{"text":"Wrote it."}]}]}'
 keys 'write the note' Enter
 await 'Do you want to '
-# The dialog is a card: a bordered box, not rows in the transcript.
+if pane | grep -qF 'esc back to it'; then keys Escape; fi
+# The framed preview belongs to the pending step in the transcript.
 await '│'
 press_until 'y' 'Wrote it.'
 [ -f "$WORK/cwd/note.txt" ] || { echo "tui-smoke: the approved Write wrote nothing" >&2; exit 1; }
@@ -302,6 +303,7 @@ start '{"responses":[
 focus O
 keys 'write the note' Enter
 await 'Do you want to '
+if pane | grep -qF 'esc back to it'; then keys Escape; fi
 press_until 'y' 'Wrote it.'
 [ -f "$WORK/cwd/away.txt" ] || { echo "tui-smoke: the approved Write wrote nothing" >&2; exit 1; }
 if pane | grep -qE 'notify|777|Ptmux'; then
@@ -454,6 +456,7 @@ sealed_card() {
     {"steps":[{"text":"Sealed done."}]}]}' 'BINGO_MOTION=off' "--plugin-dir $installed"
   keys 'write sealed input' Enter
   await 'Do you want to '
+  if pane | grep -qF 'esc back to it'; then keys Escape; fi
   case "$fixture" in
     sealed-frame)
       await 'SEALED FRAME'
@@ -465,7 +468,12 @@ sealed_card() {
       ;;
     *) ;; # The built-in card may cover the transcript notice until answered.
   esac
-  press_until "$answer" 'Sealed done.'
+  if [ "$answer" = Escape ]; then
+    keys Escape
+    await 'steps had run'
+  else
+    press_until "$answer" 'Sealed done.'
+  fi
   case "$fixture" in
     sealed-rewrite|sealed-omit|sealed-duplicate)
       await "$fixture (ui.render)"
@@ -485,5 +493,41 @@ done
 sealed_card sealed-frame 80 24 Escape
 sealed_card sealed-frame 200 50 y
 sealed_card sealed-frame 200 50 Escape
+
+
+step 'M169: changing a command checks the replacement again'
+start '{"responses":[
+  {"steps":[{"toolCall":{"name":"Bash","input":{"command":"echo before"}}}]},
+  {"steps":[{"text":"Changed done."}]}]}' 'BINGO_MOTION=off'
+keys 'run the command' Enter
+await 'Do you want to run this command?'
+if pane | grep -qF 'esc back to it'; then keys Escape; fi
+# Enter the editor only after its guard has lifted.
+press_until '4' 'enter send'
+keys C-u
+keys 'echo after' Enter
+await '$ echo after'
+if pane | grep -qF 'esc back to it'; then keys Escape; fi
+press_until 'y' 'Changed done.'
+await 'you changed it first'
+pane
+finish
+
+step 'M169: the built-in question handles a number'
+start '{"responses":[
+  {"steps":[{"toolCall":{"name":"AskUserQuestion","input":{"questions":[{"question":"Which route?","header":"Route","options":[{"label":"Alpha"},{"label":"Beta"}]}]}}}]},
+  {"steps":[{"text":"Question done."}]}]}' 'BINGO_MOTION=off'
+keys 'pick a route' Enter
+await 'Which route?'
+if pane | grep -qF 'esc back to it'; then keys Escape; fi
+await 'something else'
+keys x
+await 'esc back to it'
+pane
+keys Escape
+press_until '2' 'Question done.'
+await 'you: Route: Beta'
+pane
+finish
 
 echo 'tui-smoke ok'

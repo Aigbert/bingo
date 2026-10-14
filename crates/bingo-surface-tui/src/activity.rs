@@ -116,9 +116,18 @@ fn band(
         width,
         pulls,
     };
-    let mut out = working(tree.viewed(), ui, verb, now, &mut site);
+    let mut out = if let Some(line) = crate::ask::drawing::activity(tree, ui) {
+        vec![line]
+    } else {
+        working(tree.viewed(), ui, verb, now, &mut site)
+    };
     if out.is_empty() {
         out.extend(waiting(tree, now));
+    }
+    if let Some((_, open)) = tree.open_interaction()
+        && let Some(keys) = crate::ask::drawing::keys(open, ui)
+    {
+        out.push(Line::from(Span::styled(format!("   {keys}"), theme::dim())));
     }
     let running = !out.is_empty();
     if !ui.activity_hidden {

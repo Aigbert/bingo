@@ -107,6 +107,9 @@ impl Site<'_> {
         let mask = views::marked_with(answer, self.width, &marks, &own);
         let areas = views::sealed::whole(&mask, &expected.borrow(), self.width, self.room)?;
         let lines = views::marked_with(answer, self.width, &views::Marks::default(), &own);
+        if lines.len() > self.room {
+            return None;
+        }
         let options = engine_options
             .borrow()
             .iter()

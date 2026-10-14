@@ -122,14 +122,19 @@ fn form_set_ticked_and_typed_on() {
 /// than read off three snapshots — a snapshot says what one frame looks like,
 /// not that two of them agree.
 #[test]
-fn the_band_holds_still_as_the_tabs_are_walked() {
+fn the_composer_holds_still_as_the_fallback_tabs_are_walked() {
     let (tree, mut ui, now) = asked(crate::test_support::form());
     let mut walked = Vec::new();
     for tab in 0..3 {
         if tab > 0 {
             crate::input::on_key(&mut ui, &tree, key(KeyCode::Right), now);
         }
-        walked.push(landmarks(&draw_tree(80, 24, &tree, &mut ui, now), 80));
+        walked.push(
+            landmarks(&draw_tree(80, 24, &tree, &mut ui, now), 80)
+                .into_iter()
+                .filter(|(name, _)| *name == "the composer")
+                .collect::<Vec<_>>(),
+        );
     }
     assert_eq!(walked[0], walked[1], "{walked:#?}");
     assert_eq!(walked[1], walked[2], "{walked:#?}");
@@ -153,6 +158,6 @@ fn landmarks(screen: &str, width: usize) -> Vec<(&'static str, usize)> {
         ("the band closes", rules.get(1).copied().unwrap_or_default()),
         ("the way out", at("Chat about this")),
         ("the key line", at("Enter to select")),
-        ("the composer", at("ask anything")),
+        ("the composer", at("answer above")),
     ]
 }

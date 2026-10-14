@@ -8,10 +8,18 @@ pub(super) struct Pending {
 }
 
 pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
-    let crate::focus::Focus::Pane(focus) = &run.ui.focus else {
+    let focus = if let Some((_, open)) = run
+        .session
+        .tree
+        .open_interaction()
+        .filter(|_| !run.ui.dialog.aside)
+    {
+        open.id.to_string()
+    } else if let crate::focus::Focus::Pane(focus) = &run.ui.focus {
+        focus.clone()
+    } else {
         return;
     };
-    let focus = focus.clone();
     let Some(handle) = run.session.writer() else {
         return run.not_yet();
     };
@@ -36,6 +44,20 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
     let Some(pending) = run.site_keys.remove(intent) else {
         return;
     };
+    if let Some((_, open)) = run.session.tree.open_interaction()
+        && open.id.as_str() == pending.focus
+        && !run.ui.dialog.aside
+        && matches!(outcome, IntentOutcome::Applied { result } if result["handled"] == false)
+    {
+        let effects = input::interaction_unhandled(
+            &mut run.ui,
+            &run.session.tree,
+            pending.key,
+            run.detection.now(),
+        );
+        run.apply(effects);
+        return;
+    }
     if matches!(outcome, IntentOutcome::Applied { result } if result["handled"] == false)
         && pending.session == run.session.tree.viewed().summary.id
         && matches!(&run.ui.focus, crate::focus::Focus::Pane(key) if key == &pending.focus)

@@ -333,15 +333,16 @@ pub fn item_block(
     if matches!(&item.body, ItemBody::User { origin, .. } if origin.is_context()) {
         return Block::default();
     }
+    if crate::ask::receipts::source(item).is_some_and(|id| rows.state.transcript.get(id).is_some())
+    {
+        return Block::default();
+    }
     // How much of this block is on the screen — what `ctrl+o` and a click both
     // write, over the start its kind has. One question, asked once, here.
     let fold = fold::fold_of(rows.folds, item);
-    pictured::under_the_words(
-        item,
-        item_lines(item, place, agents, rows, cue, fold),
-        fold,
-        rows,
-    )
+    let mut block = item_lines(item, place, agents, rows, cue, fold);
+    crate::ask::receipts::append(item, &mut block.lines, rows);
+    pictured::under_the_words(item, block, fold, rows)
 }
 
 fn default_item_lines(
@@ -865,14 +866,11 @@ fn receipt(
     previous: Option<&Item>,
     rows: &Rows<'_>,
 ) -> Vec<Line<'static>> {
-    if decision == DecisionKind::Allow && feedback.is_none() {
-        return Vec::new();
-    }
     let verdict = match decision {
         DecisionKind::AllowChanged => "you changed it first",
-        DecisionKind::Allow => "allowed",
-        DecisionKind::AllowSession => "allowed for this session",
-        DecisionKind::Deny => "denied",
+        DecisionKind::Allow => "you: yes",
+        DecisionKind::AllowSession => "you: yes for this session",
+        DecisionKind::Deny => "you: no",
     };
     let said = match previous.is_some_and(|item| calls(item, tool)) {
         true => verdict.to_string(),
@@ -930,7 +928,11 @@ pub(crate) fn component_closing(
                 .as_ref()
                 .map(|turn| crate::worked::words(turn, now.wall, &jiff::tz::TimeZone::system()).1)
                 .unwrap_or_default();
-            vec![Line::from(Span::styled(
+            let mut lines: Vec<Line<'static>> = crate::ask::receipts::folded(state)
+                .into_iter()
+                .map(|text| Line::from(Span::styled(text, theme::dim())))
+                .collect();
+            lines.push(Line::from(Span::styled(
                 format!(
                     "{} {} {}{when}",
                     theme::mark(),
@@ -938,7 +940,8 @@ pub(crate) fn component_closing(
                     crate::worked::duration(std::time::Duration::from_millis(props.duration_ms))
                 ),
                 theme::dim(),
-            ))]
+            )));
+            lines
         }
         _ => Vec::new(),
     }
@@ -957,7 +960,7 @@ fn rule(text: &str, width: usize) -> Line<'static> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn rough_edges_a_plain_allow_has_no_receipt_row() {
+    fn every_permission_answer_leaves_a_receipt() {
         assert!(
             drawn(vec![receipt_item(
                 "itm_1",
@@ -965,7 +968,8 @@ mod tests {
                 DecisionKind::Allow,
                 None
             )])
-            .is_empty()
+            .join("\n")
+            .contains("you: yes")
         );
         assert!(
             drawn(vec![receipt_item(
@@ -975,7 +979,7 @@ mod tests {
                 None
             )])
             .join("\n")
-            .contains("allowed for this session")
+            .contains("you: yes for this session")
         );
         assert!(
             drawn(vec![receipt_item(
@@ -985,7 +989,7 @@ mod tests {
                 Some("keep it")
             )])
             .join("\n")
-            .contains("denied — keep it")
+            .contains("you: no — keep it")
         );
     }
 
@@ -2094,7 +2098,7 @@ mod tests {
             ]),
             vec![
                 "⏺ Edit(src/lib.rs)".to_string(),
-                "  ⎿  denied — use cargo clean".to_string(),
+                "  ⎿  you: no — use cargo clean".to_string(),
             ],
             "no blank line, and the tool is named once"
         );
@@ -2109,7 +2113,7 @@ mod tests {
                 DecisionKind::AllowSession,
                 None
             )]),
-            vec!["  ⎿  Edit allowed for this session".to_string()],
+            vec!["  ⎿  Edit you: yes for this session".to_string()],
         );
     }
 

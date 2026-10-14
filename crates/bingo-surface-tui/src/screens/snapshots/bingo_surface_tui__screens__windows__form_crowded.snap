@@ -1,15 +1,11 @@
 ---
 source: crates/bingo-surface-tui/src/screens/windows.rs
-assertion_line: 15
 expression: screen.clone()
 ---
-"────────────────────────────────────────────────────────────────────────────────"
+"   ◆ asks you · needs you                                                       "
 "←  ☐ Auth method  ☐ Library  ☐ Targets  ✔ Submit  →                             "
+"Which authentication method?                                                    "
 "  …                                                                             "
-"  11. option 11                                                                 "
-"  12. option 12                                                                 "
-"  13. option 13                                                                 "
-"  14. option 14                                                                 "
 "  15. option 15                                                                 "
 "  16. option 16                                                                 "
 "  17. option 17                                                                 "
@@ -23,7 +19,10 @@ expression: screen.clone()
 "  25. Type something.                                                           "
 "────────────────────────────────────────────────────────────────────────────────"
 "  26. Chat about this                                                           "
+"                                                                                "
+" ▍ waiting for you                                                              "
+"   tab next · ←→ choose · space toggle · enter send · esc decline               "
 "╭──────────────────────────────────────────────────────────────────────────────╮"
-"│ > ask anything · / for commands · ! for shell                                │"
+"│ > answer above · typing here leaves it for later                             │"
 "╰──────────────────────────────────────────────────────────────────────────────╯"
 "? for shortcuts                                                      fake/fake-1"

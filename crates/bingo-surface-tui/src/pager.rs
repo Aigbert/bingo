@@ -102,6 +102,23 @@ pub fn lines(state: &SessionState, item: &Item, width: usize) -> Vec<Line<'stati
     let body = match &item.body {
         ItemBody::Assistant { text } => markdown::render(text, width),
         ItemBody::Reasoning { .. } => reasoning(state, item, width),
+        ItemBody::ToolCall { .. }
+            if state
+                .interactions
+                .iter()
+                .any(|open| open.item.as_ref() == Some(&item.id)) =>
+        {
+            state
+                .interactions
+                .iter()
+                .find(|open| open.item.as_ref() == Some(&item.id))
+                .and_then(|open| match &open.kind {
+                    bingo_sdk::InteractionKind::Permission { preview, .. } => preview.as_ref(),
+                    _ => None,
+                })
+                .map(|preview| crate::preview::lines(preview, true).0)
+                .unwrap_or_default()
+        }
         ItemBody::ToolCall {
             output: Some(output),
             ..
@@ -237,19 +254,19 @@ fn window_of(ui: &Ui, tree: &Tree) -> Window {
     }
 }
 
+pub fn source<'a>(tree: &'a Tree, id: &ItemId) -> Option<(&'a SessionState, &'a Item)> {
+    tree.sessions()
+        .find_map(|state| state.item(id).map(|item| (state, item)))
+}
+
 /// What the open pager is showing, as the sheet lays it out.
 fn content_of(ui: &Ui, tree: &Tree) -> Vec<Line<'static>> {
     let Open::Pager(open) = ui.focus.open() else {
         return Vec::new();
     };
     let width = width_of(ui);
-    let state = tree.viewed();
-    state
-        .transcript
-        .items()
-        .iter()
-        .find(|item| item.id == open.item)
-        .map(|item| lines(state, item, width))
+    source(tree, &open.item)
+        .map(|(state, item)| lines(state, item, width))
         .unwrap_or_default()
 }
 

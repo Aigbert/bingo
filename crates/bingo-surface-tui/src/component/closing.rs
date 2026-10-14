@@ -14,7 +14,7 @@ pub fn props(state: &SessionState) -> Vec<Props> {
         }));
     }
     if let Some(turn) = &state.last_turn
-        && worked::ran(turn) >= worked::SAY_AFTER
+        && (worked::ran(turn) >= worked::SAY_AFTER || crate::ask::receipts::folded(state).is_some())
     {
         out.push(Props::TurnDuration(TurnDurationProps {
             word: worked::verb(&turn.status).0.into(),

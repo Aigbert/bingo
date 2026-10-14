@@ -125,12 +125,12 @@ impl Tree {
         self.sessions().any(SessionState::attention)
     }
 
-    /// The interaction the dialog answers: the root's first, then the
-    /// children's in id order, so one prompt is on screen at a time. The
-    /// handle routes the answer back to whichever of them asked.
+    /// One ask at a time, ordered by arrival across the tree.
+    /// The handle routes the answer back to the session that opened it.
     pub fn open_interaction(&self) -> Option<(&SessionState, &Interaction)> {
         self.sessions()
-            .find_map(|state| state.interactions.first().map(|open| (state, open)))
+            .flat_map(|state| state.interactions.iter().map(move |open| (state, open)))
+            .min_by_key(|(_, open)| (open.opened_at, open.id.clone()))
     }
 
     /// The children the viewed session spawned, by the tool call that did it;

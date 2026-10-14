@@ -580,7 +580,11 @@ impl Run {
 
     fn refocus(&mut self) {
         let open = self.session.tree.open_interaction().map(|(_, open)| open);
+        let changed = self.ui.dialog.current() != open.map(|open| &open.id);
         self.ui.dialog.focus_on(open);
+        if changed && let Some(open) = open {
+            self.ui.dialog.aside = crate::ask::aside::recent(open.opened_at, self.ui.last_typed);
+        }
     }
 
     /// Only this client's intents have a line to restore on refusal.

@@ -34,7 +34,7 @@ pub enum Owner {
 pub fn owner(ui: &crate::ui::Ui, tree: &crate::tree::Tree) -> Owner {
     resolve(
         &ui.focus,
-        tree.open_interaction().is_some(),
+        tree.open_interaction().is_some() && !ui.dialog.aside,
         !ui.suggestions(&tree.viewed().summary.cwd, &crate::mentions::targets(tree))
             .is_empty(),
     )

@@ -16,6 +16,7 @@ pub use canvas::Canvas;
 
 #[derive(Debug, Default)]
 pub struct Layout {
+    pub inline: Option<(usize, usize, usize)>,
     pub card_actions: Vec<crate::views::targets::Target>,
     pub band_actions: Vec<crate::views::targets::Target>,
     pub seating: crate::pane::seat::Seating,
@@ -83,12 +84,21 @@ impl Layout {
     /// row carries one. The one mapping from the screen back into the
     /// transcript: a click, a drag and a mark are all answered by it.
     pub fn line_at(&self, row: usize) -> Option<usize> {
-        Some(self.top + row.checked_sub(self.padding())?)
+        let line = self.top + row.checked_sub(self.padding())?;
+        match self.inline {
+            Some((at, _, count)) if line >= at && line < at + count => None,
+            Some((at, removed, count)) if line >= at + count => Some(line - count + removed),
+            _ => Some(line),
+        }
     }
 
     /// The row of the transcript region a line was drawn at, when it is on the
     /// screen — [`Layout::line_at`] the other way round.
     pub fn row_of(&self, line: usize) -> Option<u16> {
+        let line = match self.inline {
+            Some((at, removed, count)) if line >= at + removed => line + count - removed,
+            _ => line,
+        };
         let row = u16::try_from(line.checked_sub(self.top)? + self.padding()).ok()?;
         (row < self.regions.transcript.height).then_some(row)
     }

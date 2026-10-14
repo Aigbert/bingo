@@ -32,6 +32,7 @@ use crate::welcome;
 /// terminal item's revision never moves again, so its block is rendered once.
 #[derive(Clone, Debug, PartialEq)]
 struct Revision {
+    receipts: Vec<ItemId>,
     component: (u64, u64),
     render_config: serde_json::Value,
     status: ItemStatus,
@@ -80,6 +81,9 @@ fn revision(
 ) -> Revision {
     let request = crate::component::items::id(item);
     Revision {
+        receipts: crate::ask::receipts::linked(rows.state, &item.id)
+            .map(|receipt| receipt.id.clone())
+            .collect(),
         component: (
             rows.pulled.map_or(0, |memo| memo.version(&request)),
             rows.state

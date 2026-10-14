@@ -212,7 +212,11 @@ fn a_form_keeps_its_tabs_and_the_answer_the_cursor_is_on() {
     let (tree, mut ui, now) = crowded_form(12, 11);
     let screen = shot("form_end", &tree, &mut ui, now);
     assert!(marked(&screen).contains("option 12"), "{screen}");
-    assert_eq!(cuts(&screen), 0, "nothing had to be cut: {screen}");
+    assert_eq!(
+        cuts(&screen),
+        1,
+        "the inline list marks the hidden rows: {screen}"
+    );
     assert!(
         !screen.contains("Enter to select"),
         "the keys gave way first: {screen}"

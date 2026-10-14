@@ -44,10 +44,11 @@
 //! §6). Every other `/name` and every `!line` is submitted verbatim: the
 //! session actor parses commands, not the client.
 
+mod actions;
 /// The rows between the transcript and the input box: the verb row, the task
 /// list and the queue (design §3).
-mod actions;
 mod activity;
+mod ask;
 mod blocks;
 mod clipboard;
 mod clock;

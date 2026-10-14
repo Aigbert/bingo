@@ -667,7 +667,7 @@ fn without_colour() {
     );
     crate::theme::with(no_colour(), || {
         let painted = painted(80, 24, &card, &mut ui, now);
-        for row in ["Do you want to", "1. Yes", "+line 1", "Edit"] {
+        for row in ["Do you want to", "1  Yes", "+line 1", "Edit"] {
             assert!(
                 painted.coloured(row).is_empty(),
                 "NO_COLOR spends none on {row:?}"

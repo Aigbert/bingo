@@ -207,7 +207,8 @@ fn layers(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) 
     );
     match ui.focus.drawn(now) {
         Some(reveal) => layer(tree, ui, frame, above, reveal, width, now),
-        None => card(tree, ui, frame, regions, now),
+        None if !crate::ask::drawing::inline(tree, ui) => card(tree, ui, frame, regions, now),
+        None => {}
     }
 }
 
@@ -254,21 +255,15 @@ fn paged(
     open: &crate::pager::Pager,
     reveal: layers::Reveal,
 ) {
-    let Some(item) = tree
-        .viewed()
-        .transcript
-        .items()
-        .iter()
-        .find(|item| item.id == open.item)
-    else {
+    let Some((state, item)) = pager::source(tree, &open.item) else {
         return;
     };
-    let content = pager::lines(tree.viewed(), item, above.width as usize);
+    let content = pager::lines(state, item, above.width as usize);
     let window = pager::Window {
         height: content.len(),
         rows: usize::from(above.height).saturating_sub(pager::HEAD),
     };
-    let lines = pager::sheet(&pager::title(item, tree.viewed()), &content, open, window);
+    let lines = pager::sheet(&pager::title(item, state), &content, open, window);
     sheet(frame, above, lines, reveal);
     marked(frame, above, open, window, reveal);
 }
@@ -361,7 +356,7 @@ fn card(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
     );
 }
 
-fn wrapped_card_rows(
+pub(crate) fn wrapped_card_rows(
     rows: Vec<(Line<'static>, Option<usize>)>,
     width: usize,
 ) -> Vec<(Line<'static>, Option<usize>)> {
@@ -379,7 +374,7 @@ fn wrapped_card_rows(
 /// it cut the rest. What sits above them is [`layers::card`]'s to give away —
 /// it keeps the title and the newest rows, which is what a permission wants:
 /// the preview gives way, never the answers.
-fn fitted_answers(
+pub(crate) fn fitted_answers(
     rows: Vec<(Line<'static>, Option<usize>)>,
     focus: usize,
     room: usize,
@@ -495,10 +490,26 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     {
         frame.pulls.push(key);
     }
+    let inline = crate::ask::drawing::splice(tree, ui, frame, area, now);
+    if let Some((_, removed, drawing)) = &inline {
+        frame.height = frame.height - removed + drawing.rows.len();
+    }
     frame.top = ui.scroll.top(frame.height, rows, now.instant);
+    if let Some((at, _, drawing)) = &inline {
+        frame.top = (at + drawing.rows.len()).saturating_sub(rows);
+    }
     component_requests(state, ui, frame, area);
     crate::component::closing::requests(state, ui, frame, area.width, area.height, now);
-    let mut shown = frame.blocks.window(frame.top, rows);
+    let mut shown = if let Some((at, removed, drawing)) = &inline {
+        let mut all = frame.blocks.window(0, frame.blocks.height());
+        all.splice(
+            *at..*at + removed,
+            drawing.rows.iter().map(|(line, _)| line.clone()),
+        );
+        all.into_iter().skip(frame.top).take(rows).collect()
+    } else {
+        frame.blocks.window(frame.top, rows)
+    };
     mark_row(ui, frame, &mut shown);
     // A short transcript hangs from the composer, not from the top of the screen.
     let padding = frame.padding();
@@ -506,6 +517,13 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     // Where the pictures among those lines landed, for a click on one (M56).
     frame.cells = graphics::placed::cells(&shown, area);
     frame.render_widget(Paragraph::new(shown), area);
+    if let Some((at, _, drawing)) = inline {
+        crate::ask::drawing::place(frame, drawing, at, area);
+    }
+    mark_transcript(ui, frame, area, padding, now);
+}
+
+fn mark_transcript(ui: &Ui, frame: &mut Layout, area: Rect, padding: usize, now: Now) {
     // A mark is measured from the row line `top` was drawn at, which is where
     // the lines start rather than where the region does.
     let lined = lined(area, padding);
@@ -527,6 +545,19 @@ fn component_requests(state: &SessionState, ui: &Ui, frame: &mut Layout, area: R
         };
         if to <= frame.top || from >= frame.top + usize::from(area.height) {
             continue;
+        }
+        for receipt in crate::ask::receipts::linked(state, &item.id) {
+            if let Some(props) = crate::component::items::props(receipt, false)
+                && let Some(key) = crate::component::key(
+                    state,
+                    &crate::component::items::id(receipt),
+                    &props,
+                    area.width,
+                    area.height,
+                )
+            {
+                frame.pulls.push(key);
+            }
         }
         let expanded = crate::fold::fold_of(&ui.folds, item) == crate::fold::Fold::Open;
         for props in crate::component::items::all(item, expanded) {
@@ -783,7 +814,11 @@ fn render_draft(
     let prompt = prompt::prompt(state);
     // Scroll only as far as the caret needs: it must stay in the box.
     let start = layout.cursor.0.saturating_sub(COMPOSER_ROWS - 1);
-    let placeholder = placeholder(state);
+    let placeholder = if !ui.dialog.aside && ui.dialog.current().is_some() {
+        "answer above · typing here leaves it for later".to_string()
+    } else {
+        placeholder(state)
+    };
     let lines = prompt::box_lines(
         &layout,
         &prompt,
@@ -1125,15 +1160,11 @@ mod tests {
         ui.dialog.focus_on(state.interactions.first());
         let screen = render(&state, &mut ui, now);
         let rows: Vec<&str> = screen.lines().collect();
-        let asked = rows
-            .iter()
-            .position(|row| row.contains("Edit(src/lib.rs)"))
-            .expect("the row that asked");
-        let card = rows
-            .iter()
-            .position(|row| row.contains('╭'))
-            .expect("the card's top edge");
-        assert_eq!(card, asked + 1, "the box opens under it:\n{screen}");
+        assert!(rows.iter().any(|row| row.contains("needs you")), "{screen}");
+        assert!(
+            !rows.iter().any(|row| row.contains("Edit(src/lib.rs)")),
+            "the waiting step is replaced by its sealed ask: {screen}"
+        );
         assert!(
             rows.last().is_some_and(|row| row.contains("fake-1")),
             "and the frame under it did not move:\n{screen}"
@@ -1142,36 +1173,22 @@ mod tests {
     }
 
     #[test]
-    fn everything_behind_a_card_is_dim() {
+    fn an_inline_ask_does_not_dim_the_conversation() {
         let state = folded(vec![
             item_frame(1, user("itm_1", "edit it")),
-            frame(2, opened(permission(Some("Edit(src/)"), None))),
+            frame(2, opened(permission(None, None))),
         ]);
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
         let screen = drawn(80, 24, &solo(&state), &mut ui, now);
-        let card: Vec<usize> = screen
-            .buffer()
-            .content()
-            .chunks(80)
-            .enumerate()
-            .filter(|(_, row)| row.iter().any(|cell| cell.symbol() == "\u{256d}"))
-            .map(|(y, _)| y)
-            .collect();
-        let top = *card.first().expect("a card on the screen");
-        for (y, row) in screen.buffer().content().chunks(80).enumerate() {
-            if y >= top {
-                continue;
-            }
-            for cell in row {
-                assert!(
-                    cell.style()
-                        .add_modifier
-                        .contains(ratatui::style::Modifier::DIM),
-                    "row {y} is behind the card and not dim"
-                );
-            }
-        }
+        assert!(screen.buffer().content().iter().any(|cell| {
+            cell.symbol() == "e"
+                && !cell
+                    .style()
+                    .add_modifier
+                    .contains(ratatui::style::Modifier::DIM)
+        }));
+        assert!(render(&state, &mut ui, now).contains("needs you"));
     }
 
     #[test]

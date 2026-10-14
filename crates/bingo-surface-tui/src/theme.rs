@@ -1021,6 +1021,8 @@ mod tests {
                 "dim",
                 &[
                     "activity.rs",
+                    "ask/drawing.rs",
+                    "ask/receipts.rs",
                     "composer.rs",
                     "crew.rs",
                     "dialog.rs",
@@ -1078,6 +1080,8 @@ mod tests {
                 "presence",
                 &[
                     "activity.rs",
+                    "ask/drawing.rs",
+                    "dialog.rs",
                     "form.rs",
                     "search.rs",
                     "select.rs",

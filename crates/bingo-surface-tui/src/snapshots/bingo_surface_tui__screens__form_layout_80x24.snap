@@ -1,12 +1,8 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 41
 expression: "draw_tree(80, 24, tree, ui, now)"
 ---
-"                                                                                "
-"                                                                                "
-"                                                                                "
-"────────────────────────────────────────────────────────────────────────────────"
+"   ◆ asks you · needs you                                                       "
 "←  ☐ Layout  ☐ Library  ☐ Targets  ✔ Submit  →                                  "
 "Where should the sidebar sit?                                                   "
 "╭────────────────────────╮                                                      "
@@ -23,7 +19,10 @@ expression: "draw_tree(80, 24, tree, ui, now)"
 "  5. Chat about this                                                            "
 "Enter to select · ↑/↓ to navigate · Tab to switch questions · Esc to cancel     "
 "                                                                                "
+"                                                                                "
+" ▍ waiting for you                                                              "
+"   tab next · ←→ choose · space toggle · enter send · esc decline               "
 "╭──────────────────────────────────────────────────────────────────────────────╮"
-"│ > ask anything · / for commands · ! for shell                                │"
+"│ > answer above · typing here leaves it for later                             │"
 "╰──────────────────────────────────────────────────────────────────────────────╯"
 "? for shortcuts                                                      fake/fake-1"
