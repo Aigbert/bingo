@@ -57,6 +57,8 @@ impl ApiKey {
                 .store
                 .as_ref()
                 .map(|store| Arc::new(store.owned_by(owner).at_origin(address, file))),
+            // A detached key has no origin metadata and cannot follow a readdress.
+            configured: self.store.as_ref().and(self.configured.clone()),
             ..self.clone()
         }
     }

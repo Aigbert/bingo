@@ -426,6 +426,33 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn readdress_cannot_redirect_an_embedded_key() {
+        let provider = AnthropicProvider::with_endpoint(
+            bingo_http::client(bingo_http::Bounds::STREAMED).unwrap(),
+            Some("embedded-dummy-key".into()),
+            "http://localhost:1234",
+        );
+        let spec = |url: &str| bingo_sdk::InstanceSpec {
+            base_url: Some(url.into()),
+            images: None,
+        };
+        assert!(matches!(
+            provider
+                .readdress(&spec("http://localhost:1234/path"))
+                .unwrap()
+                .auth(),
+            AuthStatus::Ready { .. }
+        ));
+        assert!(matches!(
+            provider
+                .readdress(&spec("http://localhost:5678"))
+                .unwrap()
+                .auth(),
+            AuthStatus::Missing { .. }
+        ));
+    }
+
+    #[test]
     fn readdress_keeps_keys_only_for_the_same_origin() {
         let directory = tempfile::tempdir().unwrap();
         let configured = providers(

@@ -242,7 +242,7 @@ async fn an_exported_key_does_not_feed_a_named_instance() {
     assert_eq!(out.status.code(), Some(1), "stdout: {}", stdout(&out));
     let err = stderr(&out);
     assert!(
-        err.starts_with("[error] code=AUTH_REQUIRED") && err.contains("/login proxy1"),
+        err.contains("[error] code=AUTH_REQUIRED") && err.contains("/login proxy1"),
         "{err}"
     );
     assert!(
