@@ -65,10 +65,11 @@ M149 (ember), M150 (crew). ADR-0078 §5 grants remain unchanged.
       bingo-sdk render::`, `cargo test -p bingo-surface-tui pane::`.
 - [x] Five TestBackend snapshots: side 200×50, above 100×30, collapsed
       60×15, corner rect 120×40, permission above floating pane.
-- [x] `cargo test -p bingo --test mods_ui`: seated place/dimensions cross
-      RPC and a 200→100-column resize asks Counter at above/100 columns.
+- [ ] `cargo test -p bingo --test mods_ui`: seated place/dimensions cross
+      RPC and resize pass individually; the added coexistence regression fails.
 - [ ] Own isolated tmux drive: Counter/Corner at 200×50, 100×30, 60×15;
-      collapsed click, title cycle and key cycle. Capture results recorded.
+      collapsed click, title cycle and key cycle pass; false render notices
+      leave the combined acceptance drive unverified. Capture results recorded.
 - [ ] `scripts/tui-smoke.sh`, all sequential protocol gates, Windows checks
       for each touched crate; only known third-party C-header deferrals.
 
@@ -94,6 +95,20 @@ taking the screen; covering composer/status/permission; `open.isPlaced`
 - 2026-10-14, delegate: keep `ctrl+p` absent and M148’s test unchanged; use dim for the focused label, add only `pane/draw.rs` to the dim allowlist, keep presence/tokens fixed, and correct/review the 80×24 help snapshots.
 - `alt+p` means “place”; `keys.rs` has no binding and composer `alt()` handles only b/f/Enter, so this chord is free and applies only to a focused pane.
 
+- **Stopped 2026-10-14, protocol §6: render ownership.** The isolated
+  drive completed every placement step on retry (the first harness click
+  landed on blank transcript space and Esc closed Counter). Both drives
+  emitted `corner (ui.render): /children/2: handler belongs to another command`.
+  A fake-provider coexistence test now reproduces that false notice.
+- `bingo-core/src/chain/render.rs` validates every link’s returned tree
+  against that link’s id, including a pass-through of another mod’s valid
+  handlers. The necessary repair is outside Files and in M141’s area;
+  no core behavior was changed and no further gates were run.
+- Options: authorize a scoped core fix that preserves validated inherited
+  handlers while rejecting forged/modified foreign handlers, coordinated
+  with M141; or resume after M141 supplies the equivalent fix. Do not hide
+  the notice or remove the coexistence assertion. ADR-0081 §7 stays proposed.
+
 ## Verified (2026-10-14)
 
 | Command | Result |
@@ -112,10 +127,17 @@ taking the screen; covering composer/status/permission; `open.isPlaced`
 | `cargo fmt --all -- --check` | exit 0. |
 | `cargo check --workspace --all-targets --locked` | Finished dev profile in 26.46s; exit 0. |
 | `cargo clippy --workspace --all-targets --locked -- -D warnings` | Finished dev profile in 26.78s; exit 0. |
-| `cargo test --workspace --locked` | FAILED: TUI 1110 passed, 6 failed, 2 ignored; exit 101. |
-| `scripts/check_discipline.sh` | Not run: protocol §6 stop. |
-| `scripts/budget.sh` | Not run: protocol §6 stop. |
-| `cargo deny check` | Not run: protocol §6 stop. |
-| `cargo check -p bingo-sdk -p bingo-core -p bingo-surface-tui -p bingo-mods -p bingo --all-targets --target x86_64-pc-windows-msvc --locked` | Not run: protocol §6 stop. |
-| `scripts/tui-smoke.sh` | Not run: protocol §6 stop. |
-| `tmux -L <isolated-socket> capture-pane -p -t m151` | Not run: protocol §6 stop. |
+| `cargo test --workspace --locked` (before delegate corrections) | FAILED: TUI 1110 passed, 6 failed, 2 ignored; exit 101. |
+| `scripts/check_discipline.sh` | Pending after render-ownership stop. |
+| `scripts/budget.sh` | Pending after render-ownership stop. |
+| `cargo deny check` | Pending after render-ownership stop. |
+| `cargo check -p bingo-sdk -p bingo-core -p bingo-surface-tui -p bingo-mods -p bingo --all-targets --target x86_64-pc-windows-msvc --locked` | Pending after render-ownership stop. |
+| `scripts/tui-smoke.sh` | Pending after render-ownership stop. |
+| `tmux -L <isolated-socket> capture-pane -p -t m151` (Counter, isolated retry) | 200×50: `Seat: side 64x43`; 100×30: `Seat: above 100x9`; 60×15: `Counter ▸`. |
+| `tmux -L <isolated-socket> capture-pane -p -t m151` (click/key) | Click collapsed: `overlay ▾`; click title: `Seat: above 200x9`; alt+p: `Seat: side 64x43`. |
+| `tmux -L <isolated-socket> capture-pane -p -t m151` (both, isolated retry) | 200×50: Counter/Corner; 100×30: above/Corner; 60×15: Counter collapsed; repeated false foreign-handler notices. |
+| `cargo test -p bingo-surface-tui collapse_click_and_title_and_key_cycle_fit_without_changing_session_data --locked` (before key correction) | FAILED: 0 passed, 1 failed; ctrl+p moved the pane. |
+| `INSTA_UPDATE=always cargo test -p bingo-surface-tui --lib --locked` | ok: 1116 passed, 0 failed, 2 ignored; unchanged M148 test and 80×24 footer test pass. |
+| `git diff -- crates/bingo-surface-tui/src/snapshots/` (delegate correction) | Reviewed sheet_slide, sheet_close, help_80x30, help_100x30 and help_panel; binding rows only, footer retained. |
+| `cargo build -p bingo --locked` | Finished dev profile in 20.73s; exit 0. |
+| `cargo test -p bingo --test mods_ui --locked unrelated_pane_mods_pass_through_each_others_handlers_without_notices -- --exact` | FAILED: 0 passed, 1 failed; valid inherited handler rejected: `corner (ui.render): /children/2: handler belongs to another command`. |
