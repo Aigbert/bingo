@@ -84,7 +84,8 @@ fn atom_key<'a>(argument: &'a Argument<'a>, plugin: &str) -> Option<&'a str> {
     if let Some(key) = key(argument, "state") {
         return Some(key);
     }
-    let Argument::ObjectExpression(object) = argument else {
+    let Expression::ObjectExpression(object) = argument.as_expression()?.get_inner_expression()
+    else {
         return None;
     };
     if object.properties.len() != 2 {

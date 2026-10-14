@@ -285,7 +285,7 @@ fn module_constant_matchers_are_static_but_computed_matchers_are_not() {
 #[test]
 fn object_atom_keys_use_the_same_declared_key_and_owner() {
     let result = checked(
-        "import {atom} from 'bingo'; const value = atom({plugin:'fixture',key:'count'}, 0);",
+        "import {atom} from 'bingo'; const value = atom({plugin:'fixture',key:'count'} as const, 0);",
         "",
     );
     assert!(result.keys.contains("state:count"), "{:?}", result.findings);
