@@ -733,6 +733,21 @@
         {
           "type": "object",
           "properties": {
+            "result": true,
+            "kind": {
+              "type": "string",
+              "const": "acknowledged"
+            }
+          },
+          "required": [
+            "kind",
+            "result"
+          ],
+          "description": "Forward an existing command result without recording or executing it again."
+        },
+        {
+          "type": "object",
+          "properties": {
             "action": {
               "$ref": "#/$defs/Action"
             },
@@ -7498,6 +7513,12 @@
     "CommandRun": {
       "type": "object",
       "properties": {
+        "surface": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "command": {
           "type": "string"
         },

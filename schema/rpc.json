@@ -5829,7 +5829,29 @@
     },
     "StatusProps": {
       "type": "object",
-      "description": "Status is pulled from the asking session; selection belongs to its owner."
+      "properties": {
+        "summary": {
+          "$ref": "#/$defs/SessionSummary"
+        },
+        "config": {
+          "$ref": "#/$defs/ConfigView"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContextUsage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "summary",
+        "config"
+      ],
+      "description": "A status drawing needs facts from the caller's fold, never its transcript."
     },
     "SubmitParams": {
       "type": "object",

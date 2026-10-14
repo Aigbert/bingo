@@ -1561,6 +1561,21 @@
         {
           "type": "object",
           "properties": {
+            "result": true,
+            "kind": {
+              "type": "string",
+              "const": "acknowledged"
+            }
+          },
+          "required": [
+            "kind",
+            "result"
+          ],
+          "description": "Forward an existing command result without recording or executing it again."
+        },
+        {
+          "type": "object",
+          "properties": {
             "action": {
               "$ref": "#/$defs/Action"
             },
@@ -1728,6 +1743,12 @@
     "CommandRun": {
       "type": "object",
       "properties": {
+        "surface": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "command": {
           "type": "string"
         },
@@ -9627,7 +9648,29 @@
     },
     "StatusProps": {
       "type": "object",
-      "description": "Status is pulled from the asking session; selection belongs to its owner."
+      "properties": {
+        "summary": {
+          "$ref": "#/$defs/SessionSummary"
+        },
+        "config": {
+          "$ref": "#/$defs/ConfigView"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContextUsage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "summary",
+        "config"
+      ],
+      "description": "A status drawing needs facts from the caller's fold, never its transcript."
     },
     "StopResult": {
       "oneOf": [

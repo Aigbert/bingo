@@ -9076,6 +9076,12 @@
         "title": "CommandRun",
         "type": "object",
         "properties": {
+          "surface": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "command": {
             "type": "string"
           },
@@ -9110,6 +9116,21 @@
         "$defs": {
           "CommandOutcome": {
             "oneOf": [
+              {
+                "description": "Forward an existing command result without recording or executing it again.",
+                "type": "object",
+                "properties": {
+                  "result": true,
+                  "kind": {
+                    "type": "string",
+                    "const": "acknowledged"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "result"
+                ]
+              },
               {
                 "description": "A client interprets only actions it supports; the host does not dispatch them.",
                 "type": "object",
