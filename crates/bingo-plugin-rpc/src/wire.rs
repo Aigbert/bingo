@@ -1014,6 +1014,7 @@ mod tests {
 
     fn usage() -> ContextUsage {
         ContextUsage {
+            parts: None,
             used: 100,
             window: 1_000,
             trigger: 800,

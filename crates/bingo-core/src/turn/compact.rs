@@ -37,11 +37,18 @@ pub(super) async fn run(turn: &mut Turn<'_>, instructions: Option<String>) -> Tu
 /// Contributors stay lazy: measuring must not reissue context or refresh
 /// a cached baseline before the next ordinary request needs it.
 fn measure_compacted(turn: &mut Turn<'_>, request: &ModelRequest) {
-    let context = turn.ruler.measure(estimate_tokens(
+    let mut context = turn.ruler.measure(estimate_tokens(
         &request.system,
         &ContextView::model_view(&turn.transcript),
         &request.tools,
     ));
+    if !turn.ruler.holds() {
+        context.parts = Some(bingo_sdk::tokens::composition(
+            &request.system,
+            &ContextView::model_view(&turn.transcript),
+            &request.tools,
+        ));
+    }
     emit_and_fold(
         &mut turn.transcript,
         turn.host,

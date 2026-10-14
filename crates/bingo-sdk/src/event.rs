@@ -332,6 +332,9 @@ pub enum InterruptReason {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextUsage {
+    /// Approximate local request composition, independent of server anchoring.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parts: Option<[ContextPart; 4]>,
     /// Tokens the next request would carry, anchored on the server's last count.
     pub used: u64,
     /// The input side of the model's window: what is left once the output
@@ -341,6 +344,32 @@ pub struct ContextUsage {
     /// where the kernel draws no line because the endpoint holds the context
     /// and cuts it itself (ADR-0055 §2).
     pub trigger: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextPart {
+    pub name: ContextKind,
+    pub tokens: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ContextKind {
+    System,
+    Tools,
+    Chat,
+    Pictures,
+}
+impl std::fmt::Display for ContextKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::System => "system",
+            Self::Tools => "tools",
+            Self::Chat => "chat",
+            Self::Pictures => "pictures",
+        })
+    }
 }
 
 impl ContextUsage {
@@ -972,6 +1001,7 @@ mod tests {
                         ..Default::default()
                     },
                     context: ContextUsage {
+                        parts: None,
                         used: 14,
                         window: 200_000,
                         trigger: 180_000,
@@ -1597,5 +1627,25 @@ mod tests {
             serde_json::to_value(option("yes", Some(AnswerRole::Allowing))).expect("an option"),
             serde_json::json!({ "id": "yes", "label": "yes", "role": "allowing" })
         );
+    }
+}
+
+#[cfg(test)]
+mod context_parts_contract {
+    use super::*;
+    #[test]
+    fn parts_are_additive_and_round_trip_the_fixture() {
+        let old = serde_json::json!({"used":42,"window":100,"trigger":90});
+        let usage: ContextUsage = serde_json::from_value(old.clone()).unwrap();
+        assert!(usage.parts.is_none());
+        assert_eq!(serde_json::to_value(usage).unwrap(), old);
+        let wire: serde_json::Value =
+            serde_json::from_str(include_str!("../fixtures/context-parts.json")).unwrap();
+        let usage: ContextUsage = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(
+            usage.parts.unwrap().iter().map(|p| p.tokens).sum::<u64>(),
+            usage.used
+        );
+        assert_eq!(serde_json::to_value(usage).unwrap(), wire);
     }
 }

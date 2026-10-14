@@ -87,7 +87,7 @@
     "props": {
       "word": "Kindling",
       "message": null,
-      "suffix": "…",
+      "suffix": "\u2026",
       "mode": "requesting"
     }
   },
@@ -352,5 +352,9 @@
       "previewed": false,
       "refresh": false
     }
+  },
+  {
+    "component": "Status",
+    "props": {}
   }
 ]

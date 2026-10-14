@@ -116,7 +116,7 @@ enum Step {
 /// assembled around before anything is sent.
 enum Assembled {
     Request {
-        request: ModelRequest,
+        request: Box<ModelRequest>,
         usage: ContextUsage,
     },
     Compacted,
@@ -368,7 +368,31 @@ impl Turn<'_> {
 
     fn measure(&mut self, system: &[SystemBlock], messages: &[Message]) -> ContextUsage {
         let estimate = estimate_tokens(system, messages, &self.tool_specs());
-        self.ruler.measure(estimate)
+        let mut usage = self.ruler.measure(estimate);
+        if !self.ruler.holds() {
+            usage.parts = Some(bingo_sdk::tokens::composition(
+                system,
+                messages,
+                &self.tool_specs(),
+            ));
+        }
+        usage
+    }
+
+    fn measure_request(&mut self, request: &ModelRequest) -> ContextUsage {
+        let mut usage = self.ruler.measure(estimate_tokens(
+            &request.system,
+            &request.messages,
+            &request.tools,
+        ));
+        if !self.ruler.holds() {
+            usage.parts = Some(bingo_sdk::tokens::composition(
+                &request.system,
+                &request.messages,
+                &request.tools,
+            ));
+        }
+        usage
     }
 
     /// Only overflow recovery projects away stale results; normal requests
@@ -430,7 +454,7 @@ impl Turn<'_> {
             });
         }
         let (request, usage) = match self.assemble().await {
-            Some(Assembled::Request { request, usage }) => (request, usage),
+            Some(Assembled::Request { request, usage }) => (*request, usage),
             Some(Assembled::Compacted) => return Step::Assembling,
             None => return self.interrupted(),
         };
@@ -482,11 +506,7 @@ impl Turn<'_> {
             self.record(notice);
         }
         let request = result.ok()?;
-        let usage = self.ruler.measure(estimate_tokens(
-            &request.system,
-            &request.messages,
-            &request.tools,
-        ));
+        let usage = self.measure_request(&request);
         self.recount(&request).await?;
         let usage = self.ruler.anchored(usage);
         self.warn_once(&usage);
@@ -497,11 +517,7 @@ impl Turn<'_> {
         &mut self,
         mut request: ModelRequest,
     ) -> Result<ModelRequest, KernelError> {
-        let preliminary = self.ruler.measure(estimate_tokens(
-            &request.system,
-            &request.messages,
-            &request.tools,
-        ));
+        let preliminary = self.measure_request(&request);
         let original = ContextView::model_view(&self.transcript);
         let extra = self
             .contribute(
@@ -531,7 +547,10 @@ impl Turn<'_> {
         {
             return Some(Assembled::Compacted);
         }
-        Some(Assembled::Request { request, usage })
+        Some(Assembled::Request {
+            request: Box::new(request),
+            usage,
+        })
     }
 
     /// A threshold compaction, unless the breaker says the last three bought

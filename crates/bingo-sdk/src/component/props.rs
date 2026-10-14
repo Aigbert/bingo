@@ -130,3 +130,7 @@ props!(ToastProps {
     alert: bool
 });
 props!(WelcomeProps { session: crate::SessionSummary, effort: Option<crate::Effort>, modes: Vec<String>, update: Option<String>, resume: Option<crate::SessionSummary> });
+
+/// Status is pulled from the asking session; selection belongs to its owner.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct StatusProps {}

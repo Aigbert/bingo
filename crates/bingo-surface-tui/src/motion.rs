@@ -677,6 +677,7 @@ fn context(share: u64) -> Tree {
             turn: bingo_sdk::TurnId::from_raw("trn_1"),
             usage: Default::default(),
             context: bingo_sdk::ContextUsage {
+                parts: None,
                 used: share * 1_000,
                 window: 200_000,
                 trigger: 100_000,

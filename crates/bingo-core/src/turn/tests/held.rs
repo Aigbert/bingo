@@ -51,6 +51,7 @@ async fn a_reading_is_the_rounds_context_whatever_the_bill_said() {
     assert_eq!(
         context_of(&host),
         [ContextUsage {
+            parts: None,
             used: 412_000,
             window: 1_000_000,
             trigger: 1_000_000,

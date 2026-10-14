@@ -252,6 +252,7 @@ mod tests {
         let cx = CompactContext {
             items,
             usage: ContextUsage {
+                parts: None,
                 used: 90_000,
                 window: WINDOW,
                 trigger: 90_000,

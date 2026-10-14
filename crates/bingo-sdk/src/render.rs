@@ -14,6 +14,7 @@ pub enum Component {
     Plugins,
     Palette,
     Sessions,
+    Status,
     Question,
     UserMessage,
     AssistantMessage,
@@ -76,7 +77,7 @@ impl Component {
 
     pub const fn surfaces(self) -> &'static [SurfaceName] {
         match self {
-            Self::Browse | Self::Palette | Self::Plugins | Self::Sessions => {
+            Self::Browse | Self::Palette | Self::Plugins | Self::Sessions | Self::Status => {
                 &[SurfaceName::Terminal, SurfaceName::Desktop]
             }
             Self::AssistantMessage | Self::CommandOutput | Self::InfoNotice | Self::ShellRun => &[
@@ -118,11 +119,12 @@ impl Component {
         }
     }
 
-    pub const ALL: [Self; 34] = [
+    pub const ALL: [Self; 35] = [
         Self::Browse,
         Self::Plugins,
         Self::Palette,
         Self::Sessions,
+        Self::Status,
         Self::Question,
         Self::UserMessage,
         Self::AssistantMessage,
@@ -203,6 +205,7 @@ mod tests {
                         | Component::Palette
                         | Component::Plugins
                         | Component::Sessions
+                        | Component::Status
                 )
             );
             assert_eq!(

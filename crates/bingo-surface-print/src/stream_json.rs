@@ -534,6 +534,7 @@ mod tests {
                 turn: TurnId::from_raw("trn_1"),
                 usage: counted(),
                 context: ContextUsage {
+                    parts: None,
                     used: 100,
                     window: 1000,
                     trigger: 800,

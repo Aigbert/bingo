@@ -62,6 +62,7 @@ impl Turn<'_> {
         self.account(
             &finished,
             ContextUsage {
+                parts: None,
                 used: 0,
                 window: self.model.capabilities.context_window,
                 trigger: self.model.capabilities.context_window,

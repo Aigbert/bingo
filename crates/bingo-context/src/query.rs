@@ -47,6 +47,7 @@ impl Asked {
             turn: TurnId::from_raw("trn_test"),
             items: Vec::new(),
             usage: ContextUsage {
+                parts: None,
                 used: 0,
                 window: 100_000,
                 trigger: 90_000,

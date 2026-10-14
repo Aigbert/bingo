@@ -104,6 +104,7 @@ impl Anchor {
 /// One measurement of the request about to be sent.
 pub fn usage(anchor: Option<&Anchor>, estimate: u64, lines: &Thresholds) -> ContextUsage {
     ContextUsage {
+        parts: None,
         used: anchor.map_or(estimate, |a| a.used(estimate)),
         window: lines.effective,
         trigger: lines.trigger,

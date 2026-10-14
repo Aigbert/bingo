@@ -67,6 +67,7 @@ impl Ruler {
     /// truth about a session nothing has said anything about yet.
     fn holding(&self) -> Option<ContextUsage> {
         Some(ContextUsage {
+            parts: None,
             used: self.held?,
             window: self.lines.effective,
             trigger: self.lines.trigger,

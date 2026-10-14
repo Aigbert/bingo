@@ -1405,6 +1405,7 @@ mod tests {
                 turn: TurnId::from_raw("trn_1"),
                 usage: Default::default(),
                 context: ContextUsage {
+                    parts: None,
                     used,
                     window: 200_000,
                     trigger: 180_000,

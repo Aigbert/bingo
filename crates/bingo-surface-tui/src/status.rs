@@ -516,6 +516,7 @@ mod tests {
                 turn: TurnId::from_raw("trn_1"),
                 usage: Default::default(),
                 context: ContextUsage {
+                    parts: None,
                     used,
                     window: 200_000,
                     trigger: 100_000,
@@ -671,6 +672,7 @@ mod tests {
                     turn: TurnId::from_raw("trn_1"),
                     usage: Default::default(),
                     context: ContextUsage {
+                        parts: None,
                         used: 400_000,
                         window: 1_000_000,
                         trigger: 1_000_000,
@@ -796,6 +798,7 @@ mod tests {
                     turn: TurnId::from_raw("trn_9"),
                     usage: Default::default(),
                     context: ContextUsage {
+                        parts: None,
                         used: 150_000,
                         window: 200_000,
                         trigger: 180_000,

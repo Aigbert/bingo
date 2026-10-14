@@ -130,7 +130,7 @@ fn site(component: Component) -> bingo_sdk::SessionState {
         | Component::AbovePrompt
         | Component::SessionStatus
         | Component::Welcome => state(),
-        Component::Toast | Component::Pane => placed_site(component),
+        Component::Toast | Component::Pane | Component::Status => placed_site(component),
         Component::Reasoning
         | Component::Compaction
         | Component::Rewind
@@ -195,6 +195,7 @@ screen_test!(mode_backend, SessionMode);
 screen_test!(hint_backend, PromptHint);
 screen_test!(band_backend, AbovePrompt);
 screen_test!(pane_backend, Pane);
+screen_test!(status_backend, Status);
 
 #[tokio::test]
 async fn counting_host_receives_no_unmatched_render_requests() {
@@ -434,8 +435,8 @@ screen_test!(welcome_backend, Welcome);
 #[test]
 fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
     for component in Component::ALL {
-        // A pulled pane waits for its first answer; it has no built-in body.
-        if component == Component::Pane {
+        // Pulled sites wait for their first answer; they have no surface body.
+        if matches!(component, Component::Pane | Component::Status) {
             continue;
         }
         let mut state = site(component);
@@ -521,7 +522,7 @@ fn placed_site(component: Component) -> bingo_sdk::SessionState {
             );
             state
         }
-        Component::Pane => {
+        Component::Pane | Component::Status => {
             let mut state = state();
             let slot = Slot::Pane {
                 id: "one".into(),

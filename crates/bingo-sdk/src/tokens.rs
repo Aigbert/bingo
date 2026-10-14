@@ -81,6 +81,42 @@ pub fn estimate(system: &[SystemBlock], messages: &[Message], tools: &[ToolSpec]
     n
 }
 
+/// Four disjoint estimates of a request, including pictures nested in results.
+pub fn composition(
+    system: &[SystemBlock],
+    messages: &[Message],
+    tools: &[ToolSpec],
+) -> [crate::event::ContextPart; 4] {
+    let pictures = messages
+        .iter()
+        .map(|m| picture_tokens(&m.parts))
+        .fold(0, u64::saturating_add);
+    let chat = messages
+        .iter()
+        .map(|m| parts(&m.parts))
+        .fold(0, u64::saturating_add)
+        .saturating_sub(pictures);
+    use crate::ContextKind::*;
+    [
+        (System, blocks(system)),
+        (Tools, estimate(&[], &[], tools)),
+        (Chat, chat),
+        (Pictures, pictures),
+    ]
+    .map(|(name, tokens)| crate::event::ContextPart { name, tokens })
+}
+
+fn picture_tokens(content: &[ContentPart]) -> u64 {
+    content
+        .iter()
+        .map(|part| match part {
+            ContentPart::Image(_) => parts(std::slice::from_ref(part)),
+            ContentPart::ToolResult { parts, .. } => picture_tokens(parts),
+            _ => 0,
+        })
+        .fold(0, u64::saturating_add)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -170,6 +206,40 @@ mod extreme_pixels {
                 &[]
             ),
             u64::MAX
+        );
+    }
+}
+
+#[cfg(test)]
+mod composition_tests {
+    use super::*;
+    #[test]
+    fn composition_partitions_nested_images_and_rounds_each_text_once() {
+        let system = [SystemBlock {
+            text: "five!".into(),
+            cache: false,
+        }];
+        let picture = ContentPart::Image(crate::Image::from_bytes("image/png", b"x").unwrap());
+        let messages = [Message::user(vec![
+            ContentPart::text("hello"),
+            ContentPart::ToolResult {
+                tool_use_id: "c".into(),
+                parts: vec![picture, ContentPart::text("字")],
+                is_error: false,
+            },
+        ])];
+        let parts = composition(&system, &messages, &[]);
+        assert_eq!(
+            parts.iter().map(|p| p.tokens).sum::<u64>(),
+            estimate(&system, &messages, &[])
+        );
+        assert_eq!(
+            parts
+                .iter()
+                .map(|p| (p.name.to_string(), p.tokens))
+                .collect::<Vec<_>>(),
+            [("system", 2), ("tools", 0), ("chat", 3), ("pictures", 1600)]
+                .map(|(name, count)| (name.to_string(), count))
         );
     }
 }

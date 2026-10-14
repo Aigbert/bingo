@@ -107,6 +107,7 @@ mod tests {
     fn rough_edges_status_groups_digits() {
         assert_eq!(
             context(Some(ContextUsage {
+                parts: None,
                 used: 13_812,
                 window: 191_808,
                 trigger: 172_627
@@ -142,6 +143,7 @@ mod tests {
     fn the_context_row_reads_as_a_fraction() {
         assert_eq!(context(None), "not measured yet");
         let usage = ContextUsage {
+            parts: None,
             used: 42_000,
             window: 100_000,
             trigger: 80_000,

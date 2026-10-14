@@ -152,7 +152,8 @@ async fn a_plugin_s_compaction_strategy_answers_a_compaction() {
             CompactContext {
                 items: &[],
                 usage: bingo_sdk::ContextUsage {
-                    used: 900,
+                    parts: None,
+        used: 900,
                     window: 1_000,
                     trigger: 800,
                 },

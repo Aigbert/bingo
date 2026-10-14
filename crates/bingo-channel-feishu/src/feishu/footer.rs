@@ -153,6 +153,7 @@ mod tests {
                 turn: TurnId::from_raw(fixtures::TURN),
                 usage: Usage::default(),
                 context: ContextUsage {
+                    parts: None,
                     used: 150_000,
                     window: 200_000,
                     trigger: 180_000,
@@ -218,6 +219,7 @@ mod tests {
         state.apply(&fixtures::turn_started(3));
         state.config.kernel = json!({ "thinking": null });
         state.context = Some(ContextUsage {
+            parts: None,
             used: 1,
             window: 0,
             trigger: 0,

@@ -551,6 +551,7 @@ fn a_notice_and_a_context_warning() {
                 turn: TurnId::from_raw("trn_1"),
                 usage: Default::default(),
                 context: ContextUsage {
+                    parts: None,
                     used: 185_000,
                     window: 200_000,
                     trigger: 180_000,
