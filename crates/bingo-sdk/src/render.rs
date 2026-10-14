@@ -7,7 +7,7 @@ use serde_json::Value;
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
 pub enum Component {
-    AskUserQuestion,
+    Question,
     UserMessage,
     AssistantMessage,
     ToolUse,

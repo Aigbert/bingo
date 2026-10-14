@@ -264,7 +264,7 @@ mod tests {
 
     // The person's M140 amendment is restricted to these roots and new referenced types.
     fn amend_elements(baseline: &mut Value, current: &Value) {
-        for name in ["View", "Slot"] {
+        for name in ["View", "Slot", "Component"] {
             baseline["$defs"][name] = current["$defs"][name].clone();
         }
         if let Some(method) = current["methods"].get("host/ui/invalidate") {

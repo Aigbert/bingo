@@ -28,7 +28,7 @@ export type Payload = null;
 export type UiSelect = UiSelectInput.Payload;
 export namespace UiRenderInput {
 // Generated from JSON Schema. Do not edit.
-export type Component = ("AskUserQuestion" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane");
+export type Component = ("Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane");
 export type SurfaceName = ("terminal" | "desktop" | "text");
 export type Viewport = { "columns": number; "rows": number; [key: string]: unknown; };
 export type Payload = { "component": Component; "props": unknown; "requestId": string; "surface": SurfaceName; "viewport": Viewport; [key: string]: unknown; };
@@ -38,7 +38,7 @@ export namespace UiRenderResult {
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
 export type ActionItem = { "action": Action; "key"?: (string | null); "label": string; [key: string]: unknown; };
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
-export type Component = ("AskUserQuestion" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane");
+export type Component = ("Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane");
 export type Direction = ("row" | "column");
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
 export type SelectOption = { "label": string; "value": string; [key: string]: unknown; };
@@ -107,7 +107,7 @@ export namespace ToolCallResult {
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
 export type ActionItem = { "action": Action; "key"?: (string | null); "label": string; [key: string]: unknown; };
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
-export type Component = ("AskUserQuestion" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane");
+export type Component = ("Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane");
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
 export type Direction = ("row" | "column");
 export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
@@ -196,7 +196,7 @@ export type Action = { "args"?: unknown; "name": string; [key: string]: unknown;
 export type ActionItem = { "action": Action; "key"?: (string | null); "label": string; [key: string]: unknown; };
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
 export type CompactReason = ({ "kind": "threshold"; [key: string]: unknown; } | { "kind": "overflow"; "message": string; [key: string]: unknown; } | { "instructions"?: (string | null); "kind": "manual"; [key: string]: unknown; });
-export type Component = ("AskUserQuestion" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane");
+export type Component = ("Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane");
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
 export type ContextUsage = { "trigger": number; "used": number; "window": number; [key: string]: unknown; };
 export type DecisionKind = ("allow" | "allowSession" | "deny");
@@ -340,7 +340,7 @@ export namespace CommandRunResult {
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
 export type ActionItem = { "action": Action; "key"?: (string | null); "label": string; [key: string]: unknown; };
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
-export type Component = ("AskUserQuestion" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane");
+export type Component = ("Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane");
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
 export type DecisionKind = ("allow" | "allowSession" | "deny");
 export type Direction = ("row" | "column");

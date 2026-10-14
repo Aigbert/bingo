@@ -7074,7 +7074,7 @@
     "Component": {
       "type": "string",
       "enum": [
-        "AskUserQuestion",
+        "Question",
         "UserMessage",
         "AssistantMessage",
         "ToolUse",
