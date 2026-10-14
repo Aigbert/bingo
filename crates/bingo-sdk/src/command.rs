@@ -290,7 +290,6 @@ pub fn recorded_line(line: &str) -> &str {
 }
 
 /// Session-scoped metadata over the existing global command catalogue.
-#[async_trait]
 pub trait CommandCatalog: Send + Sync {
     fn catalog(&self, catalog: crate::Catalog, view: &SessionView<'_>) -> crate::Catalog;
 }

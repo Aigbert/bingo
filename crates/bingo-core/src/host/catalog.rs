@@ -639,13 +639,14 @@ impl command::CommandCatalog for Scoped {
         let Some(host) = self.0.upgrade() else {
             return catalog;
         };
+        let commands = host
+            .registry
+            .commands
+            .iter()
+            .map(|command| (command.spec().name, command))
+            .collect::<std::collections::HashMap<_, _>>();
         for entry in &mut catalog.entries {
-            if let Some(command) = host
-                .registry
-                .commands
-                .iter()
-                .find(|command| command.spec().name == entry.id)
-            {
+            if let Some(command) = commands.get(&entry.id) {
                 entry.meta["now"] = json!(command.now(view));
             }
         }
@@ -734,6 +735,85 @@ mod current_values {
                 assert_eq!(value.as_deref(), Some("2 signed out"));
             }
         }
+        host.shutdown().await;
+    }
+}
+
+#[cfg(test)]
+mod linear_values {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    struct Counting {
+        name: String,
+        calls: Arc<AtomicUsize>,
+    }
+    #[async_trait::async_trait]
+    impl Command for Counting {
+        fn spec(&self) -> CommandSpec {
+            self.calls.fetch_add(1, Ordering::Relaxed);
+            CommandSpec::ui(&self.name)
+        }
+        async fn run(&self, _: &str, _: &CommandContext) -> Result<CommandOutcome, KernelError> {
+            Ok(CommandOutcome::Handled { handled: true })
+        }
+    }
+    struct Fixture(Arc<AtomicUsize>);
+    impl Plugin for Fixture {
+        fn manifest(&self) -> &'static PluginManifest {
+            static MANIFEST: PluginManifest = PluginManifest {
+                id: "counting",
+                version: "1",
+                uses: &[],
+                requires: &[],
+                provides: &[],
+                config: None,
+            };
+            &MANIFEST
+        }
+        fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+            for name in ["one", "two", "three"] {
+                registrar.add(Contribution::Command(Arc::new(Counting {
+                    name: name.into(),
+                    calls: self.0.clone(),
+                })));
+            }
+            Ok(())
+        }
+    }
+    #[tokio::test]
+    async fn a_scoped_catalogue_reads_each_command_spec_once() {
+        let home = tempfile::tempdir().unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let host = crate::Host::build(
+            vec![Box::new(Fixture(calls.clone()))],
+            crate::HostConfig::new(Env::rooted(home.path())),
+        )
+        .await
+        .unwrap();
+        let reader = HostHandle(host.clone())
+            .service(&command::COMMAND_CATALOG)
+            .unwrap();
+        let summary = serde_json::from_value(json!({"id":"s","cwd":"/unused","createdAt":"2026-10-15T00:00:00Z","updatedAt":"2026-10-15T00:00:00Z"})).unwrap();
+        let state = SessionState::new(summary);
+        let entries = ["one:ui", "two:ui", "three:ui"]
+            .map(|id| CatalogEntry {
+                id: id.into(),
+                label: id.into(),
+                meta: json!({}),
+            })
+            .to_vec();
+        calls.store(0, Ordering::Relaxed);
+        reader.catalog(
+            Catalog {
+                kind: CatalogKind::Commands,
+                entries,
+            },
+            &command::SessionView {
+                state: &state,
+                providers: &[],
+            },
+        );
+        assert_eq!(calls.load(Ordering::Relaxed), 3);
         host.shutdown().await;
     }
 }
