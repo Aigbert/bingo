@@ -208,6 +208,20 @@
         {
           "type": "object",
           "properties": {
+            "input": true,
+            "kind": {
+              "type": "string",
+              "const": "allowChanged"
+            }
+          },
+          "required": [
+            "kind",
+            "input"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
             "kind": {
               "type": "string",
               "const": "allowOnce"
@@ -716,6 +730,23 @@
     },
     "CommandOutcome": {
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "$ref": "#/$defs/Answer"
+            },
+            "kind": {
+              "type": "string",
+              "const": "answer"
+            }
+          },
+          "required": [
+            "kind",
+            "answer"
+          ],
+          "description": "A site key chose an answer; the surface decides whether to send it."
+        },
         {
           "type": "object",
           "properties": {
@@ -1532,6 +1563,7 @@
       "type": "string",
       "enum": [
         "allowChanged",
+        "allowChangedSession",
         "allow",
         "allowSession",
         "deny"

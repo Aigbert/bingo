@@ -7406,6 +7406,7 @@
             "type": "string",
             "enum": [
               "allowChanged",
+              "allowChangedSession",
               "allow",
               "allowSession",
               "deny"
@@ -8978,6 +8979,23 @@
           "CommandOutcome": {
             "oneOf": [
               {
+                "description": "A site key chose an answer; the surface decides whether to send it.",
+                "type": "object",
+                "properties": {
+                  "answer": {
+                    "$ref": "#/$defs/Answer"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "answer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "answer"
+                ]
+              },
+              {
                 "type": "object",
                 "properties": {
                   "handled": {
@@ -9059,6 +9077,156 @@
                 "required": [
                   "kind",
                   "body"
+                ]
+              }
+            ]
+          },
+          "Answer": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "input": true,
+                  "kind": {
+                    "type": "string",
+                    "const": "allowChanged"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "input"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "allowOnce"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "allowSession"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "scope"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "feedback": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "deny"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "description": "The options ticked and, beside them, the words a person typed of their\nown (M59): a question may be answered both ways at once, and dropping\neither half loses what they said. An old frame carries no `other` and\nreads as the ticks alone. Words with nothing ticked are\n[`Answer::Text`], which is what a question answered in words alone has\nalways been.",
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "other": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "choice"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "ids"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "text"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "confirm"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "cancel"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "description": "A form's answers, one per question in the order they were asked; a\nquestion nobody answered is [`Answer::Cancel`] in its place (M53).",
+                "type": "object",
+                "properties": {
+                  "answers": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/Answer"
+                    }
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "form"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "answers"
                 ]
               }
             ]
@@ -10689,6 +10857,7 @@
             "type": "string",
             "enum": [
               "allowChanged",
+              "allowChangedSession",
               "allow",
               "allowSession",
               "deny"

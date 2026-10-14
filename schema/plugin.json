@@ -1474,6 +1474,23 @@
         {
           "type": "object",
           "properties": {
+            "answer": {
+              "$ref": "#/$defs/Answer"
+            },
+            "kind": {
+              "type": "string",
+              "const": "answer"
+            }
+          },
+          "required": [
+            "kind",
+            "answer"
+          ],
+          "description": "A site key chose an answer; the surface decides whether to send it."
+        },
+        {
+          "type": "object",
+          "properties": {
             "handled": {
               "type": "boolean"
             },
@@ -2436,6 +2453,7 @@
       "type": "string",
       "enum": [
         "allowChanged",
+        "allowChangedSession",
         "allow",
         "allowSession",
         "deny"
@@ -4294,6 +4312,9 @@
           "properties": {
             "tool": {
               "type": "string"
+            },
+            "input": {
+              "description": "The call after hooks and interceptors, before this decision."
             },
             "summary": {
               "type": "string"
@@ -7957,6 +7978,26 @@
             "kind": {
               "type": "string",
               "const": "client"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "surface"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "surface": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "plugin"
             }
           },
           "required": [
