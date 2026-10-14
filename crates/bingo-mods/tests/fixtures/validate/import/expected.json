@@ -1,0 +1,10 @@
+[
+  {
+    "file": "register.tsx",
+    "line": 1,
+    "column": 1,
+    "rule": "import",
+    "severity": "error",
+    "text": "import \"outside\" must be relative inside the mod root or bingo"
+  }
+]

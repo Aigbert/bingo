@@ -150,6 +150,7 @@ impl Manager {
             "PLUGIN_RELOADED",
             format!("the {} plugin reloaded", module.found.name),
         ));
+        self.write_types(host).await;
         self.mark_reloaded(&root)
     }
     fn mark_reloaded(&self, root: &Path) -> Result<(), KernelError> {

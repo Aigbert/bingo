@@ -1,0 +1,10 @@
+[
+  {
+    "file": "register.tsx",
+    "line": 1,
+    "column": 44,
+    "rule": "env-name",
+    "severity": "error",
+    "text": "env name must be a string literal"
+  }
+]

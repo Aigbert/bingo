@@ -73,7 +73,7 @@ impl Manager {
             .unwrap_or_else(|error| error.into_inner())
             .push(tokio::spawn(notice::drain(
                 self.notices.clone(),
-                host,
+                host.clone(),
                 self.stop.clone(),
             )));
         let found = discovery::with_explicit(
@@ -105,7 +105,56 @@ impl Manager {
         for module in self.modules() {
             self.publish_callbacks(module);
         }
+        self.write_types(&host).await;
         self.watch();
+    }
+    pub(crate) async fn write_types(&self, host: &HostHandle) {
+        let result = async {
+            let events = host
+                .catalog(CatalogKind::Events)
+                .await
+                .map_err(|e| e.to_string())?;
+            let tools = host
+                .catalog(CatalogKind::Tools)
+                .await
+                .map_err(|e| e.to_string())?;
+            for module in self.modules() {
+                if let Err(reason) = crate::types::write(&module.found.root, &events, &tools) {
+                    self.notices.push(Notice::warn(
+                        "MOD_TYPES",
+                        format!("{}: {reason}", module.found.name),
+                    ));
+                }
+            }
+            Ok::<_, String>(())
+        }
+        .await;
+        if let Err(reason) = result {
+            self.notices.push(Notice::warn("MOD_TYPES", reason));
+        }
+    }
+    pub(crate) async fn testing_call(
+        &self,
+        name: &str,
+        method: &str,
+        params: Value,
+    ) -> Result<Value, String> {
+        let module = self
+            .modules()
+            .into_iter()
+            .find(|module| module.found.name == name)
+            .ok_or("module is not loaded")?;
+        if !module.admission.allowed() {
+            return Err("module is not admitted".into());
+        }
+        bingo_plugin_host::ops::call(
+            self.host.get().ok_or("host is not ready")?,
+            name,
+            &module.store,
+            method,
+            params,
+        )
+        .await
     }
     pub(crate) fn env(&self) -> &Env {
         &self.env

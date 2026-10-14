@@ -77,3 +77,5 @@ Verified 2026-10-14 (M137, ADR-0078): module host operations use registered noun
 Verified 2026-10-14 (M138, ADR-0078 §6): host noun faces own versioned session/global state, owner-bound writes, the plugin quota and per-hook read logs; both runtimes use the same doors.
 
 Verified 2026-10-14 (M139, ADR-0078): world faces carry unsafe method metadata; process service/call uses the same grant admission and owner-bound dispatch as modules.
+
+Verified 2026-10-14 (M142, ADR-0078 §8): live face schemas feed author types through the existing catalogue door; in-process tests retain ordinary wire dispatch and grants.

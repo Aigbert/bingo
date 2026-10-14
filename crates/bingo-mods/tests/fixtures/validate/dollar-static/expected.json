@@ -1,0 +1,10 @@
+[
+  {
+    "file": "register.tsx",
+    "line": 1,
+    "column": 44,
+    "rule": "dollar-static",
+    "severity": "error",
+    "text": "$ members must be static"
+  }
+]

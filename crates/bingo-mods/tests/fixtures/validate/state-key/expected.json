@@ -1,0 +1,10 @@
+[
+  {
+    "file": "register.tsx",
+    "line": 1,
+    "column": 44,
+    "rule": "state-key",
+    "severity": "error",
+    "text": "state key must be a string literal"
+  }
+]

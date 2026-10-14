@@ -248,6 +248,8 @@ mod tests {
             std::fs::write(&path, rendered()).expect("the schema is writable");
             let mut baseline = frozen();
             amend_elements(&mut baseline, &document());
+            // M142: the authorized pre-release events catalogue kind.
+            baseline["$defs"]["CatalogKind"] = document()["$defs"]["CatalogKind"].clone();
             std::fs::write(
                 path.with_file_name("plugin-2.json"),
                 format!("{}\n", serde_json::to_string_pretty(&baseline).unwrap()),

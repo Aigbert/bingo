@@ -114,3 +114,5 @@ Verified 2026-10-14 (M137, ADR-0078): module links own their active-time budget;
 Verified 2026-10-14 (M138, ADR-0078 §4): completion and configuration cross their kernel chains once; reverse RPC and actor work carry the calling hook so only that hook is omitted.
 
 Verified 2026-10-14 (M139, ADR-0078): world methods cross one noun chain; model SpawnAgent uses agent.spawn. Shared unsafe admission retains process tighten and user/explicit module rewrite defaults.
+
+Verified 2026-10-14 (M142, ADR-0078 §8): author tests run the real chains with the fake provider and ordinary permission rules; mod grants and hook budgets remain enforced.

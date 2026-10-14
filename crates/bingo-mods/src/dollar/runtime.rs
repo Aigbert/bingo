@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 use std::{path::PathBuf, sync::Arc};
 
 pub struct Runtime {
+    testing: Option<Arc<crate::testing::Environment>>,
     timers: super::clock::Timers,
     every_floor: std::time::Duration,
     pub(super) registered: super::register::Registrations,
@@ -42,7 +43,17 @@ impl Runtime {
         env: &Env,
         every_floor: std::time::Duration,
     ) -> Result<Arc<Self>, KernelError> {
+        Self::install_testing(host, root, env, every_floor, None)
+    }
+    pub(crate) fn install_testing(
+        host: &HostHandle,
+        root: PathBuf,
+        env: &Env,
+        every_floor: std::time::Duration,
+        testing: Option<Arc<crate::testing::Environment>>,
+    ) -> Result<Arc<Self>, KernelError> {
         let runtime = Arc::new(Self {
+            testing,
             timers: Default::default(),
             every_floor,
             registered: Default::default(),
@@ -151,7 +162,10 @@ impl Runtime {
         }
         match method {
             "store.keys" | "store.delete" => store(caller, method, params).await,
-            "clock.now" => Ok(json!(jiff::Timestamp::now().to_string())),
+            "clock.now" => Ok(json!(match &self.testing {
+                Some(testing) => testing.now()?,
+                None => jiff::Timestamp::now().to_string(),
+            })),
             "clock.sleep" => {
                 tokio::time::sleep(std::time::Duration::from_millis(
                     parse::<Millis>(params)?.ms,
@@ -201,9 +215,19 @@ impl Runtime {
         match (noun, method) {
             ("fs", method) => self.files.call(caller, method, params).await,
             ("http", "fetch") => Ok(json!(self.http.fetch(parse(params)?).await?)),
-            ("env", "get") => Ok(json!(self.env.get(parse(params)?)?)),
+            ("env", "get") => {
+                let input: super::world::EnvGet = parse(params)?;
+                Ok(json!(match &self.testing {
+                    Some(testing) => testing.env(&input.name),
+                    None => self.env.get(input)?,
+                }))
+            }
             ("env", "set") => {
-                self.env.set(&caller.plugin, parse(params)?)?;
+                let input: super::world::EnvSet = parse(params)?;
+                if let Some(testing) = &self.testing {
+                    testing.set_env(input.name.clone(), input.value.clone());
+                }
+                self.env.set(&caller.plugin, input)?;
                 Ok(Value::Null)
             }
             ("process", "spawn" | "run") => {

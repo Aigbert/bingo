@@ -97,29 +97,22 @@ fn typescript_acceptance_runs_outside_the_workspace() {
     std::fs::write(plugin.join("plugin.json"), manifest.to_string()).unwrap();
     let validated = success(&run(root.path(), "validate", &plugin));
     assert!(validated.contains("protocol 2") && validated.contains("tool.check"));
-    let tested = success(&run(root.path(), "test", &plugin));
-    assert!(tested.starts_with("PASS ") && tested.contains("acceptance.json"));
-    println!("external TypeScript acceptance ran (validate, state, reload, slot, denial)");
-    assert!(!plugin.join("must-not-run").exists());
+    println!("external TypeScript process validation ran");
 }
 
 #[test]
-fn wrong_expectation_names_the_step_and_exits_one() {
-    if !node_available() {
-        return;
-    }
+fn wrong_expectation_names_the_test_and_exits_one() {
     let root = tempfile::tempdir().unwrap();
     let plugin = fixture(root.path(), "ts-status");
-    std::fs::write(plugin.join("scenarios/acceptance.json"), r#"{"model":{"responses":[]},"steps":[{"expect":{"slot":{"slot":"calls","contains":"wrong"}}}]}"#).unwrap();
+    std::fs::write(plugin.join("hooks/register.test.ts"), "import { test, expect } from 'bingo/testing'; test('wrong expectation', () => expect(1).toBe(2));").unwrap();
     let output = run(root.path(), "test", &plugin);
     assert_eq!(output.status.code(), Some(1));
-    assert!(output.stdout.is_empty());
-    let error = String::from_utf8(output.stderr).unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(
-        error.contains("step 1")
-            && error.contains("expectation not met")
-            && error.contains("slots:"),
-        "{error}"
+        stdout.contains("wrong expectation")
+            && stdout.contains("register.test.ts:")
+            && stdout.contains("FAIL"),
+        "{stdout}"
     );
 }
 
@@ -155,27 +148,18 @@ fn missing_entry_is_a_clean_validation_failure() {
 }
 
 #[test]
-fn scenario_refuses_a_plugin_that_did_not_start() {
+fn tests_refuse_a_process_only_manifest() {
     let root = tempfile::tempdir().unwrap();
     let plugin = root.path().join("broken");
-    std::fs::create_dir_all(plugin.join("scenarios")).unwrap();
+    std::fs::create_dir(&plugin).unwrap();
     std::fs::write(
         plugin.join("plugin.json"),
-        serde_json::json!({
-            "name":"broken", "version":"1", "entry":{"command":plugin.join("missing-program")}
-        })
-        .to_string(),
-    )
-    .unwrap();
-    std::fs::write(
-        plugin.join("scenarios/start.json"),
-        r#"{"model":{"responses":[]},"steps":[]}"#,
+        r#"{"name":"broken","version":"1","entry":{"command":"must-not-run"}}"#,
     )
     .unwrap();
     let output = run(root.path(), "test", &plugin);
     assert_eq!(output.status.code(), Some(1));
-    assert!(output.stdout.is_empty());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("missing-program"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("module manifest"));
 }
 
 #[test]
@@ -190,7 +174,7 @@ fn module_acceptance_runs_outside_the_workspace() {
     manifest["uses"] = serde_json::json!(["store", "ui"]);
     std::fs::write(plugin.join("plugin.json"), manifest.to_string()).unwrap();
     let tested = success(&run(root.path(), "test", &plugin));
-    assert!(tested.starts_with("PASS ") && tested.contains("acceptance.json"));
+    assert!(tested.starts_with("PASS ") && tested.contains("register.test.ts"));
     assert!(!plugin.join("must-not-run").exists());
 }
 
@@ -453,4 +437,159 @@ fn the_models_spawn_agent_call_crosses_the_agent_noun_chain() {
         .map(|line| serde_json::from_str(line).expect("NDJSON frames"))
         .collect();
     assert!(frames.iter().any(|frame| matches!(&frame.event,bingo_sdk::Event::ItemCompleted {item} if matches!(&item.body,bingo_sdk::ItemBody::ToolCall {output:Some(output),..} if output.parts.iter().any(|part|part.as_text()==Some("agent noun intercepted"))))));
+}
+
+#[test]
+fn module_tests_report_ndjson_and_use_the_real_host() {
+    let home = tempfile::tempdir().unwrap();
+    let plugin = home.path().join("kit");
+    std::fs::create_dir(&plugin).unwrap();
+    std::fs::write(
+        plugin.join("plugin.json"),
+        r#"{"name":"kit","version":"1","module":"main.ts","uses":["session"]}"#,
+    )
+    .unwrap();
+    std::fs::write(plugin.join("main.ts"), "export const register = on => {};").unwrap();
+    std::fs::write(plugin.join("main.test.ts"), "import {test,expect} from 'bingo/testing'; test('real host', async $ => expect(await $.session.id()).not.toBe(undefined)); test('wrong', () => expect(1).toBe(2));").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+        .args(["plugins", "test"])
+        .arg(&plugin)
+        .arg("--json")
+        .envs(home::home_env(home.path()))
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let lines: Vec<serde_json::Value> = String::from_utf8(output.stdout)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(
+        lines.len(),
+        2,
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(lines[0]["outcome"]["status"], "pass");
+    assert_eq!(lines[1]["outcome"]["status"], "fail");
+    assert!(
+        lines[1]["outcome"]["at"]
+            .as_str()
+            .unwrap()
+            .contains("main.test.ts:")
+    );
+}
+
+#[test]
+fn mounts_use_terminal_drawing_actions_and_invalidation() {
+    let home = tempfile::tempdir().unwrap();
+    let plugin = home.path().join("counter");
+    copy(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mods/counter"),
+        &plugin,
+    );
+    std::fs::write(
+        plugin.join("counter.test.ts"),
+        r#"import {test,expect} from 'bingo/testing';
+      test('counter', async $ => {
+        await $.command.run({name:'counter',args:{}});
+        const pane = await $.ui.mount({pane:'counter'});
+        expect(await pane.drawn()).toContain('Count: 0');
+        await pane.press('i');
+        expect(await pane.drawn()).toContain('Count: 1');
+        await pane.advance(40);
+        await pane.input('name','Ada');
+        expect(JSON.stringify(await pane.tree())).toContain('Ada');
+        expect(await pane.find('name')).toMatchObject({kind:'Input',key:'name'});
+        await pane.resize(60,12);
+        expect(await pane.drawn()).toContain('Count: 1');
+      });"#,
+    )
+    .unwrap();
+    let tested = success(&run(home.path(), "test", &plugin));
+    assert!(tested.starts_with("PASS"), "{tested}");
+}
+#[test]
+fn clock_and_environment_mocks_keep_grants_and_hook_budgets() {
+    let home = tempfile::tempdir().unwrap();
+    let plugin = home.path().join("clock");
+    std::fs::create_dir(&plugin).unwrap();
+    std::fs::write(
+        plugin.join("plugin.json"),
+        r#"{"name":"clock","version":"1","module":"main.ts","uses":["clock","env"]}"#,
+    )
+    .unwrap();
+    std::fs::write(plugin.join("main.ts"), "export const register = on => {};").unwrap();
+    std::fs::write(plugin.join("clock.test.ts"),r#"import {test,expect,mock} from 'bingo/testing';
+      test('clock and env', async $ => {
+        await mock.clock.set('2026-01-01T00:00:00Z');
+        await mock.clock.advance(86400000);
+        expect(await $.clock.now()).toBe('2026-01-02T00:00:00Z');
+        await mock.env({BINGO_TEST:'isolated'});
+        expect(await $.env.get({name:'BINGO_TEST'})).toBe('isolated');
+        expect(await $.env.get({name:'PATH'})).toBe(null);
+        await expect($.http.fetch({url:'https://must-not-contact.invalid'})).rejects.toThrow('grant');
+      });"#).unwrap();
+    assert!(success(&run(home.path(), "test", &plugin)).starts_with("PASS"));
+}
+
+#[test]
+fn a_second_module_load_keeps_generated_types_untouched() {
+    let home = tempfile::tempdir().unwrap();
+    let plugin = fixture(home.path(), "ts-status");
+    success(&run(home.path(), "test", &plugin));
+    let paths = [
+        "bingo/index.d.ts",
+        "bingo/events.ts",
+        "bingo/testing.d.ts",
+        "bingo-tools/index.d.ts",
+    ];
+    let metadata = || {
+        paths.map(|path| {
+            std::fs::metadata(plugin.join(".bingo/types").join(path))
+                .unwrap()
+                .modified()
+                .unwrap()
+        })
+    };
+    let first = metadata();
+    success(&run(home.path(), "test", &plugin));
+    assert_eq!(metadata(), first);
+    println!("type mtimes unchanged: {first:?}");
+    let events = std::fs::read_to_string(plugin.join(".bingo/types/bingo/events.ts")).unwrap();
+    assert!(
+        events.contains("ToolCall") && events.contains("ClockNow") && events.contains("UiRender")
+    );
+}
+
+#[test]
+fn component_examples_run_with_the_author_kit() {
+    for name in ["tool-call", "band", "pane"] {
+        let home = tempfile::tempdir().unwrap();
+        let plugin = fixture(home.path(), name);
+        assert!(
+            success(&run(home.path(), "test", &plugin)).contains("PASS"),
+            "{name}"
+        );
+    }
+}
+#[test]
+fn sdk_helpers_run_without_a_mod_manifest() {
+    let home = tempfile::tempdir().unwrap();
+    let library = home.path().join("sdk");
+    copy(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../sdk/typescript"),
+        &library,
+    );
+    let output = success(&run(home.path(), "test", &library));
+    assert_eq!(
+        output
+            .lines()
+            .filter(|line| line.starts_with("PASS "))
+            .count(),
+        3,
+        "{output}"
+    );
+    assert!(output.contains("SKIP src/on.test.ts"), "{output}");
+    assert!(!library.join("plugin.json").exists());
 }

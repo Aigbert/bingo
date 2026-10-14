@@ -1,1 +1,1 @@
-export interface PluginState { hidden: boolean }
+export interface PluginState { 'band': { hidden: boolean } }

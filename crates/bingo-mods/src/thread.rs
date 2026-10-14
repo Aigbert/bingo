@@ -1,6 +1,6 @@
 //! One current-thread executor owns one mod's runtime and all of its jobs.
 use crate::{
-    engine::{Fault, Limits, Operation, RegisteredHook, Request},
+    engine::{Entry, Fault, Limits, Operation, RegisteredHook, Request},
     load::Root,
     meter::Meter,
 };
@@ -17,7 +17,7 @@ type Active = Arc<Mutex<Option<Arc<Meter>>>>;
 
 pub(crate) fn run(
     root: std::path::PathBuf,
-    module: String,
+    module: Entry,
     config: Value,
     limits: Limits,
     stop: CancellationToken,
@@ -37,7 +37,7 @@ pub(crate) fn run(
 
 async fn serve(
     root: std::path::PathBuf,
-    module: String,
+    module: Entry,
     config: Value,
     limits: Limits,
     stop: CancellationToken,
@@ -76,13 +76,18 @@ async fn serve(
 
 async fn initialize(
     root: std::path::PathBuf,
-    module: &str,
+    module: &Entry,
     config: &Value,
     limits: &Limits,
     stop: &CancellationToken,
     active: &Active,
 ) -> Result<(AsyncRuntime, AsyncContext, Vec<RegisteredHook>), Fault> {
     let root = Root::new(&root, limits.memory_bytes as u64).map_err(Fault::load)?;
+    let root = if module.testing {
+        root.for_testing()
+    } else {
+        root
+    };
     let runtime = AsyncRuntime::new().map_err(Fault::load)?;
     runtime.set_memory_limit(limits.memory_bytes).await;
     runtime.set_max_stack_size(limits.stack_bytes).await;
@@ -105,12 +110,7 @@ async fn initialize(
     let context = crate::sandbox::context(&runtime)
         .await
         .map_err(Fault::load)?;
-    let bootstrap = format!(
-        "import {{ Hooks, dollar, Callbacks, Handlers, patternMatches, matches, frozen, renderMatcher }} from 'bingo';\nimport {{ register }} from {};\nconst hooks = new Hooks();\nconst callbacks = new Callbacks();\nconst handlers = new Handlers();\nawait register(hooks.on, {});\n{}",
-        json!(format!("./{module}")),
-        config,
-        include_str!("thread.js")
-    );
+    let bootstrap = bootstrap(module, config);
     let loaded = context.async_with(async |ctx| {
         let (module, promise) = Module::declare(ctx.clone(), "__runtime__.js", bootstrap)
             .and_then(Module::eval)
@@ -246,4 +246,27 @@ fn fault(ctx: &rquickjs::Ctx<'_>, error: rquickjs::Error, meter: &Meter) -> Faul
         "throw"
     };
     Fault { kind, message }
+}
+
+fn bootstrap(entry: &Entry, config: &Value) -> String {
+    let import = if entry.testing {
+        format!(
+            "import * as testing from 'bingo/testing';\nimport {};",
+            json!(format!("./{}", entry.path))
+        )
+    } else {
+        format!(
+            "const testing = null;\nimport {{ register }} from {};",
+            json!(format!("./{}", entry.path))
+        )
+    };
+    let register = if entry.testing {
+        String::new()
+    } else {
+        format!("await register(hooks.on, {config});")
+    };
+    format!(
+        "import {{ Hooks, dollar, Callbacks, Handlers, patternMatches, matches, frozen, renderMatcher }} from 'bingo';\n{import}\nconst hooks = new Hooks();\nconst callbacks = new Callbacks();\nconst handlers = new Handlers();\n{register}\n{}",
+        include_str!("thread.js")
+    )
 }

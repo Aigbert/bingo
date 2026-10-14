@@ -1,8 +1,6 @@
 //! Plugin switches and the isolated author kit.
-mod expect;
-mod scenario;
-mod schema;
 mod switch;
+mod test;
 mod validate;
 
 use bingo_sdk::KernelError;
@@ -11,7 +9,7 @@ pub use switch::{Action, run};
 pub async fn author(action: &Action) -> Option<Result<i32, KernelError>> {
     let result = match action {
         Action::Validate { dir } => validate::run(dir).await,
-        Action::Test { dir } => scenario::run(dir).await,
+        Action::Test { dir, json } => test::run(dir, *json).await,
         _ => return None,
     };
     Some(match result {

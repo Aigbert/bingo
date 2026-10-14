@@ -1,0 +1,10 @@
+[
+  {
+    "file": "register.tsx",
+    "line": 1,
+    "column": 44,
+    "rule": "uses",
+    "severity": "error",
+    "text": "unsafe call process.run requires uses: process"
+  }
+]

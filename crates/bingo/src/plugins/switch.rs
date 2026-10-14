@@ -26,8 +26,12 @@ use clap::Subcommand;
 pub enum Action {
     /// Parse a plugin and report its protocol-2 contributions.
     Validate { dir: std::path::PathBuf },
-    /// Run isolated fake-model scenarios against a plugin.
-    Test { dir: std::path::PathBuf },
+    /// Run TypeScript tests against an isolated host and fake model.
+    Test {
+        dir: std::path::PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
     /// Every plugin the next start will consider, and whether it will run.
     List,
     /// Turn one on in the user settings layer.

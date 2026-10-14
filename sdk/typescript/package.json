@@ -2,6 +2,11 @@
   "name": "bingo",
   "private": true,
   "type": "module",
-  "exports": "./src/index.ts",
-  "scripts": { "test": "node --test src/*.test.ts" }
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./test/testing.ts"
+  },
+  "scripts": {
+    "test": "node --test src/*.test.ts"
+  }
 }

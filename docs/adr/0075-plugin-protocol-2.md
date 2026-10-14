@@ -134,6 +134,8 @@ Verified 2026-10-14 (M138, ADR-0078): process callbacks reload before dispatch a
 
 Verified 2026-10-14 (M139, ADR-0078): QuickJS and Node world fixtures agree through service/call; both transports bind caller identity and share unsafe grants and notices.
 
+2026-10-14, person's delegate: pre-release, M142: add the events catalogue kind and its generated shapes; protocol 2 is unreleased (latest tag v0.6.5), and its freeze still starts with its first release. Verified: in-process module tests replace scenarios, and generated files agree.
+
 2026-10-14, person's delegate: pre-release, M141: add component props and optional render matcher metadata to the protocol-2 schemas; regenerate with `BINGO_UPDATE_SCHEMA=1`, retaining all existing shapes.
 
 2026-10-14, person’s delegate: pre-release, M151: amend pane place/size and render viewport placement, normalizing legacy rows; regenerate the scoped protocol-2 baseline (latest released tag v0.6.5).
