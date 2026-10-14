@@ -1192,6 +1192,7 @@
         "Plugins",
         "Palette",
         "Sessions",
+        "Status",
         "Question",
         "UserMessage",
         "AssistantMessage",
@@ -2473,6 +2474,18 @@
     "ContextUsage": {
       "type": "object",
       "properties": {
+        "parts": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ContextPart"
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "Approximate local request composition, independent of server anchoring."
+        },
         "used": {
           "type": "integer",
           "format": "uint64",
@@ -2498,6 +2511,32 @@
         "trigger"
       ],
       "description": "The one ruler for context: used tokens, the model window, and the point at\nwhich compaction triggers."
+    },
+    "ContextPart": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/ContextKind"
+        },
+        "tokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "name",
+        "tokens"
+      ]
+    },
+    "ContextKind": {
+      "type": "string",
+      "enum": [
+        "system",
+        "tools",
+        "chat",
+        "pictures"
+      ]
     },
     "Send": {
       "type": "object",

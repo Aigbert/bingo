@@ -2182,6 +2182,7 @@
         "Plugins",
         "Palette",
         "Sessions",
+        "Status",
         "Question",
         "UserMessage",
         "AssistantMessage",
@@ -2375,6 +2376,32 @@
         }
       }
     },
+    "ContextKind": {
+      "type": "string",
+      "enum": [
+        "system",
+        "tools",
+        "chat",
+        "pictures"
+      ]
+    },
+    "ContextPart": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/ContextKind"
+        },
+        "tokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "name",
+        "tokens"
+      ]
+    },
     "ContextPiece": {
       "oneOf": [
         {
@@ -2420,6 +2447,18 @@
     "ContextUsage": {
       "type": "object",
       "properties": {
+        "parts": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ContextPart"
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "Approximate local request composition, independent of server anchoring."
+        },
         "used": {
           "type": "integer",
           "format": "uint64",
@@ -7213,6 +7252,22 @@
           "properties": {
             "component": {
               "type": "string",
+              "const": "Status"
+            },
+            "props": {
+              "$ref": "#/$defs/StatusProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
               "const": "Question"
             },
             "props": {
@@ -9569,6 +9624,10 @@
         "version",
         "value"
       ]
+    },
+    "StatusProps": {
+      "type": "object",
+      "description": "Status is pulled from the asking session; selection belongs to its owner."
     },
     "StopResult": {
       "oneOf": [

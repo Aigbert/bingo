@@ -183,6 +183,7 @@
               "Plugins",
               "Palette",
               "Sessions",
+              "Status",
               "Question",
               "UserMessage",
               "AssistantMessage",
@@ -1316,6 +1317,7 @@
               "Plugins",
               "Palette",
               "Sessions",
+              "Status",
               "Question",
               "UserMessage",
               "AssistantMessage",
@@ -3435,6 +3437,7 @@
               "Plugins",
               "Palette",
               "Sessions",
+              "Status",
               "Question",
               "UserMessage",
               "AssistantMessage",
@@ -7407,6 +7410,7 @@
               "Plugins",
               "Palette",
               "Sessions",
+              "Status",
               "Question",
               "UserMessage",
               "AssistantMessage",
@@ -7465,6 +7469,18 @@
             "description": "The one ruler for context: used tokens, the model window, and the point at\nwhich compaction triggers.",
             "type": "object",
             "properties": {
+              "parts": {
+                "description": "Approximate local request composition, independent of server anchoring.",
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "$ref": "#/$defs/ContextPart"
+                },
+                "minItems": 4,
+                "maxItems": 4
+              },
               "used": {
                 "description": "Tokens the next request would carry, anchored on the server's last count.",
                 "type": "integer",
@@ -7488,6 +7504,32 @@
               "used",
               "window",
               "trigger"
+            ]
+          },
+          "ContextPart": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/ContextKind"
+              },
+              "tokens": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "name",
+              "tokens"
+            ]
+          },
+          "ContextKind": {
+            "type": "string",
+            "enum": [
+              "system",
+              "tools",
+              "chat",
+              "pictures"
             ]
           },
           "ModelRequest": {
@@ -10330,6 +10372,7 @@
               "Plugins",
               "Palette",
               "Sessions",
+              "Status",
               "Question",
               "UserMessage",
               "AssistantMessage",
@@ -11583,6 +11626,18 @@
             "description": "The one ruler for context: used tokens, the model window, and the point at\nwhich compaction triggers.",
             "type": "object",
             "properties": {
+              "parts": {
+                "description": "Approximate local request composition, independent of server anchoring.",
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "$ref": "#/$defs/ContextPart"
+                },
+                "minItems": 4,
+                "maxItems": 4
+              },
               "used": {
                 "description": "Tokens the next request would carry, anchored on the server's last count.",
                 "type": "integer",
@@ -11606,6 +11661,32 @@
               "used",
               "window",
               "trigger"
+            ]
+          },
+          "ContextPart": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/ContextKind"
+              },
+              "tokens": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "name",
+              "tokens"
+            ]
+          },
+          "ContextKind": {
+            "type": "string",
+            "enum": [
+              "system",
+              "tools",
+              "chat",
+              "pictures"
             ]
           }
         }

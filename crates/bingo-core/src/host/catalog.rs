@@ -717,6 +717,7 @@ mod current_values {
         state.summary.model = Some("large".into());
         state.config.kernel["thinking"] = json!("xHigh");
         state.context = Some(ContextUsage {
+            parts: None,
             used: 123,
             window: 1000,
             trigger: 900,
