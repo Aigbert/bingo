@@ -83,6 +83,9 @@ fn existing_examples_and_registered_callback_parameters_validate_cleanly() {
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for relative in [
         "examples/plugins/ts-status",
+        "examples/plugins/tool-call",
+        "examples/plugins/band",
+        "examples/plugins/pane",
         "crates/bingo/tests/fixtures/mods/counter",
     ] {
         let root = workspace.join(relative);

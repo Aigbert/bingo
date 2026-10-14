@@ -561,3 +561,35 @@ fn a_second_module_load_keeps_generated_types_untouched() {
         events.contains("ToolCall") && events.contains("ClockNow") && events.contains("UiRender")
     );
 }
+
+#[test]
+fn component_examples_run_with_the_author_kit() {
+    for name in ["tool-call", "band", "pane"] {
+        let home = tempfile::tempdir().unwrap();
+        let plugin = fixture(home.path(), name);
+        assert!(
+            success(&run(home.path(), "test", &plugin)).contains("PASS"),
+            "{name}"
+        );
+    }
+}
+#[test]
+fn sdk_helpers_run_without_a_mod_manifest() {
+    let home = tempfile::tempdir().unwrap();
+    let library = home.path().join("sdk");
+    copy(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../sdk/typescript"),
+        &library,
+    );
+    let output = success(&run(home.path(), "test", &library));
+    assert_eq!(
+        output
+            .lines()
+            .filter(|line| line.starts_with("PASS "))
+            .count(),
+        3,
+        "{output}"
+    );
+    assert!(output.contains("SKIP src/on.test.ts"), "{output}");
+    assert!(!library.join("plugin.json").exists());
+}
