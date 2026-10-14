@@ -38,7 +38,9 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let draft = ui.composer.layout(inner_width(state, area.width as usize));
     let strip = strip(state, ui, &frame.measurements, area.width);
     let mut activity = activity::lines(tree, ui, area.width as usize, now);
-    activity.extend(crate::component::band(state, ui, frame));
+    let band_offset = activity.len();
+    let band = crate::component::band::draw(state, ui, frame);
+    activity.extend(band.lines.iter().cloned());
     let toasts = ui.placed.toasts.lines(state, now, usize::from(area.width));
     let toast_rows = (toasts.len() as u16).min(area.height / 3);
     let pane_rows = crate::pane::height(ui, state, area.height);
@@ -80,6 +82,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     frame.regions = regions;
     render_transcript(tree, ui, frame, regions.transcript, now);
     render_activity(ui, frame, regions.activity, activity);
+    crate::component::band::place(&band, frame, regions.activity, band_offset);
     render_strip(frame, regions.strip, strip);
     render_composer(tree.viewed(), ui, frame, regions.composer, now, draft);
     render_status(tree, ui, frame, regions.status, now);

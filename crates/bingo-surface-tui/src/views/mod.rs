@@ -27,6 +27,7 @@ mod select;
 /// A GFM table in an answer is the same table a plugin publishes, so
 /// [`crate::markdown`] hands its rows straight to this renderer (M11e).
 pub mod table;
+pub mod targets;
 mod text;
 mod tree;
 
@@ -48,6 +49,7 @@ pub const MISSING: &str = "–";
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Marks {
     pub pending: Option<Action>,
+    pub targets: Option<std::rc::Rc<std::cell::RefCell<Vec<bingo_sdk::ActionItem>>>>,
     /// Where an unbounded bar's sheen is in its turn: 0 at the head, which is
     /// where a frame that says nothing about it leaves it (§6's rest).
     pub beat: f32,
@@ -58,6 +60,7 @@ impl Marks {
     pub fn at(now: Now) -> Self {
         Self {
             pending: None,
+            targets: None,
             beat: progress::walk(now),
         }
     }
@@ -103,7 +106,7 @@ fn marked_with(
     marks: &Marks,
     engine: &Engine<'_>,
 ) -> Vec<Line<'static>> {
-    match view {
+    let lines = match view {
         View::Text { children, style } => text::styled(children, style, width),
         View::Markdown { text, dim_color } => {
             let mut lines = markdown::lines(text, width);
@@ -152,7 +155,8 @@ fn marked_with(
         // for exactly this (ADR-0038 §1). Learning a kind richly is a
         // surface's own affair, and no kind is learned here yet.
         View::Custom { fold, .. } => text::lines(fold),
-    }
+    };
+    targets::mask(view, lines, marks)
 }
 
 /// Whether a column of values reads as numbers, which is what right-aligning

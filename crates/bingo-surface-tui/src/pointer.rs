@@ -79,6 +79,10 @@ fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect>
     if crate::pane::click(ui, Position::new(mouse.column, mouse.row)) {
         return Vec::new();
     }
+    if let Some(effects) = crate::component::band::press(ui, Position::new(mouse.column, mouse.row))
+    {
+        return effects;
+    }
     if ui
         .shown
         .crew

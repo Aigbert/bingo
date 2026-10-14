@@ -130,3 +130,5 @@ height without scroll jumps. Only visible rows ask, through the bounded queue.
 - `scripts/tui-smoke.sh`: PENDING; no live/credential run.
 - `git diff --name-only ba70fdf6 -- crates/bingo/tests/catalogue.rs`: mechanical LinkMatcher constructor only (render: None); no new exhaustive variant arms.
 - `git diff --name-only ba70fdf6 -- crates/bingo-surface-tui/src/{pointer,input}.rs`: authorized additive band routes; pane routing unchanged.
+- `cargo test -p bingo-surface-tui component:: --locked`: PASS, 5 tests including band click, hotkey ownership and clipped/hidden action cells.
+- `git diff --name-only -- crates/bingo-surface-tui/src/layout.rs`: additive drawn band Action marks supporting authorized input routes; no seating change.

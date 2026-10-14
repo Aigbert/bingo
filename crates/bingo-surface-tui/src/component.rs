@@ -1,6 +1,7 @@
 //! Engine nodes return to the asking site's own typed drawing.
 use bingo_sdk::{View, component::Props};
 use ratatui::text::Line;
+pub mod band;
 pub mod items;
 
 pub fn draw(
@@ -103,49 +104,11 @@ pub fn key(
         .then(|| crate::pulled::Key::new(state, &request, width, rows))
 }
 
-pub fn band(
-    state: &bingo_sdk::SessionState,
-    ui: &crate::ui::Ui,
-    frame: &mut crate::layout::Layout,
-) -> Vec<Line<'static>> {
-    use bingo_sdk::component::{AbovePromptProps, SiteScroll, SiteView};
-    if ui.activity_hidden {
-        return Vec::new();
-    }
-    let area = frame.area();
-    let max_rows = area.height / 2;
-    let props = Props::AbovePrompt(AbovePromptProps {
-        has_survey: false,
-        is_working: state.busy(),
-        max_rows,
-        body_columns: area.width,
-        scroll: SiteScroll {
-            offset: 0,
-            body_rows: usize::from(max_rows),
-        },
-        view: SiteView { agent_id: None },
-    });
-    let Some(key) = key(state, "AbovePrompt", &props, area.width, max_rows) else {
-        return Vec::new();
-    };
-    let mut lines = draw(
-        &props,
-        ui.placed.pulled.get(&key),
-        usize::from(area.width),
-        |_, _| Vec::new(),
-    );
-    frame.pulls.push(key);
-    lines.truncate(usize::from(max_rows));
-    lines
-}
-
 #[cfg(test)]
 mod band_tests {
     use super::*;
     use crate::test_support::{draw_tree, drawn, scene, solo, state};
-    use crossterm::event::{
-        KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
-    };
+    use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
     use serde_json::json;
 
     #[test]
@@ -184,7 +147,7 @@ mod band_tests {
                     .map(|column| (column as u16, row as u16))
             })
             .expect("the TestBackend draws the mod's band button");
-        let mut effects = crate::pointer::on_mouse(
+        let effects = crate::pointer::on_mouse(
             &mut ui,
             &tree,
             MouseEvent {
@@ -195,12 +158,6 @@ mod band_tests {
             },
             now,
         );
-        effects.extend(crate::input::on_key(
-            &mut ui,
-            &tree,
-            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
-            now,
-        ));
         assert!(effects.iter().any(|effect| matches!(effect, crate::effect::Effect::Submit(bingo_sdk::Input::Action { action: fired, .. }) if fired == &action)),
             "the drawn band button must dispatch its handler; effects: {effects:?}");
     }
