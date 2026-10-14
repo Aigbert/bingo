@@ -93,10 +93,7 @@ static STORE: PluginManifest = PluginManifest {
 };
 
 /// A host on a shared store, as a second process would be.
-async fn host_on(
-    store: Arc<crate::journal::MemoryStore>,
-    provider: Arc<ScriptedProvider>,
-) -> Arc<Host> {
+async fn host_on(store: Arc<dyn SessionStore>, provider: Arc<ScriptedProvider>) -> Arc<Host> {
     let plugins = vec![
         TestPlugin::boxed(&PROVIDER, vec![Contribution::Provider(provider)]),
         TestPlugin::boxed(&STORE, vec![Contribution::Store(store)]),

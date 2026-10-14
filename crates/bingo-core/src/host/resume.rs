@@ -13,6 +13,11 @@ impl Host {
     /// A session that is not live but is in the store: the newest candidate
     /// nobody holds is taken, replayed and run on this host's plugins.
     pub(super) async fn reopen(&self, selector: SessionSelector) -> Result<Mailbox, KernelError> {
+        let _turn = self.reopening.lock().await;
+        // Whoever held the turn may have opened what this selector means.
+        if let Some(mailbox) = self.resolve(&selector) {
+            return Ok(mailbox);
+        }
         let not_found = || KernelError::new(ErrorCode::SessionNotFound, "no such session");
         let store = self.registry.store.clone().ok_or_else(not_found)?;
         let mut last = not_found();

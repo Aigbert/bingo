@@ -111,6 +111,9 @@ pub struct Host {
     registry: Registry,
     plugins: Vec<Box<dyn Plugin>>,
     sessions: Mutex<BTreeMap<SessionId, Live>>,
+    /// One reopening at a time: two openers of one stored session in this
+    /// process would otherwise find it locked by each other.
+    reopening: tokio::sync::Mutex<()>,
     gateway: broadcast::Sender<GatewayEvent>,
     /// Windows the servers have corrected since this host started (ADR-0004).
     learned: Arc<Learned>,
@@ -185,6 +188,7 @@ impl Host {
                 registry,
                 plugins,
                 sessions: Mutex::new(BTreeMap::new()),
+                reopening: tokio::sync::Mutex::new(()),
                 gateway,
                 learned,
                 served,
@@ -664,15 +668,14 @@ impl Host {
                 .find(|l| l.spec.key.as_deref() == Some(key.as_str()))
                 .map(|l| l.mailbox.clone()),
             // A person's own session, never one of its children: a role or a
-            // room under it is newer, and is not what `--continue` means.
-            SessionSelector::Latest { cwd } => {
-                let here: Vec<&Live> = sessions.values().filter(|l| &l.spec.cwd == cwd).collect();
-                here.iter()
-                    .filter(|l| l.spec.parent.is_none())
-                    .chain(here.iter())
-                    .max_by_key(|l| (l.spec.parent.is_none(), l.created_at))
-                    .map(|l| l.mailbox.clone())
-            }
+            // room under it is newer, and is not what `--continue` means. A
+            // child a plugin woke at start is live before its root is, so
+            // with no live root the store answers, roots first.
+            SessionSelector::Latest { cwd } => sessions
+                .values()
+                .filter(|l| &l.spec.cwd == cwd && l.spec.parent.is_none())
+                .max_by_key(|l| l.created_at)
+                .map(|l| l.mailbox.clone()),
         }
     }
 }
