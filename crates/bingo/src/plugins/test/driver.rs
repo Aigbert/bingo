@@ -1,3 +1,4 @@
+mod mock;
 use super::*;
 use bingo_core::{Host, HostConfig};
 use bingo_mods::{ModsPlugin, mount::Mount, testing::Environment};
@@ -92,90 +93,6 @@ impl Driver {
         tokio::time::advance(std::time::Duration::from_millis(ms)).await;
         self.drain();
     }
-    async fn mock(&mut self, method: &str, params: Value) -> Result<Value, String> {
-        match method {
-            "session.submit" => {
-                let intent = IntentId::mint();
-                self.session.handle.submit(
-                    intent.clone(),
-                    Input::text(
-                        params.as_str().ok_or("submit requires text")?,
-                        Origin::surface("plugin-kit"),
-                    ),
-                );
-                self.wait(intent, true).await?;
-                Ok(Value::Null)
-            }
-            "session.snapshot" => serde_json::to_value(&self.session.snapshot).map_err(error),
-            "session" => {
-                self.host.shutdown().await;
-                let (host, modules, session) = build(
-                    &self.root,
-                    self.home.path(),
-                    self.environment.clone(),
-                    params,
-                )
-                .await?;
-                self.host = host;
-                self.modules = modules;
-                self.session = session;
-                self.mounts.clear();
-                Ok(self.site_value())
-            }
-            "clock.set" => {
-                self.pause();
-                self.environment
-                    .set(params.as_str().ok_or("clock.set requires a timestamp")?)?;
-                Ok(Value::Null)
-            }
-            "clock.advance" => {
-                self.advance(
-                    params
-                        .as_u64()
-                        .ok_or("clock.advance requires milliseconds")?,
-                )
-                .await;
-                Ok(Value::Null)
-            }
-            "env" => {
-                self.environment
-                    .seed_env(serde_json::from_value(params).map_err(error)?);
-                Ok(Value::Null)
-            }
-            "store.seed" => {
-                for (key, value) in params.as_object().ok_or("store.seed requires an object")? {
-                    self.modules
-                        .testing_call(
-                            &self.name,
-                            "host/state/set",
-                            json!({"scope":"global","key":key,"value":value}),
-                        )
-                        .await?;
-                }
-                Ok(Value::Null)
-            }
-            "store.read" => {
-                self.modules
-                    .testing_call(
-                        &self.name,
-                        "host/state/get",
-                        json!({"scope":"global","key":params}),
-                    )
-                    .await
-            }
-            "reload" => {
-                self.modules.reload(&self.root).await.map_err(error)?;
-                for mount in self.mounts.values_mut() {
-                    let request = mount.request.request_id.clone();
-                    mount.invalidate(std::slice::from_ref(&request));
-                }
-                Ok(Value::Null)
-            }
-            "mount" => self.mount(params),
-            _ if method.starts_with("mount.") => self.mounted(&method[6..], params).await,
-            _ => Err(format!("unknown testing operation {method}")),
-        }
-    }
 }
 #[async_trait::async_trait]
 impl bingo_mods::testing::Driver for Driver {
@@ -234,22 +151,7 @@ async fn build(
     let config = HostConfig::new(Env::rooted(home))
         .with_layer("test", json!({"provider":"fake","model":"fake-1"}));
     let host = Host::build(plugins, config).await.map_err(error)?;
-    let name = bingo_plugin_rpc::validate::read(root).map_err(error)?.name;
-    let catalogue = host.catalog(CatalogKind::Plugins).await.map_err(error)?;
-    if !catalogue
-        .entries
-        .iter()
-        .any(|entry| entry.id == name && entry.meta["enabled"] == true)
-    {
-        let reason = catalogue
-            .entries
-            .iter()
-            .find(|entry| entry.id == name)
-            .map(|entry| entry.meta["reason"].to_string())
-            .unwrap_or_else(|| "module was not discovered".into());
-        host.shutdown().await;
-        return Err(format!("{name}: {reason}"));
-    }
+    admitted(&host, root).await?;
     let session = host
         .open(
             SessionSelector::Create {
@@ -267,6 +169,25 @@ async fn build(
         .await
         .map_err(error)?;
     Ok((host, modules, session))
+}
+async fn admitted(host: &Arc<Host>, root: &Path) -> Result<(), String> {
+    let name = bingo_plugin_rpc::validate::read(root).map_err(error)?.name;
+    let catalogue = host.catalog(CatalogKind::Plugins).await.map_err(error)?;
+    if !catalogue
+        .entries
+        .iter()
+        .any(|entry| entry.id == name && entry.meta["enabled"] == true)
+    {
+        let reason = catalogue
+            .entries
+            .iter()
+            .find(|entry| entry.id == name)
+            .map(|entry| entry.meta["reason"].to_string())
+            .unwrap_or_else(|| "module was not discovered".into());
+        host.shutdown().await;
+        return Err(format!("{name}: {reason}"));
+    }
+    Ok(())
 }
 pub(super) fn error(why: impl std::fmt::Display) -> String {
     why.to_string()
