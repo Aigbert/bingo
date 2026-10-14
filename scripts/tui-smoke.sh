@@ -139,7 +139,7 @@ finish() {
   keys C-u
   # While a turn runs the status line says `esc to interrupt`, and a ctrl+c
   # then interrupts the turn instead of asking to leave: wait for it to end.
-  await '? for shortcuts'
+  await "${1:-? for shortcuts}"
   keys C-c
   await 'press ctrl+c again to exit'
   keys C-c
@@ -435,7 +435,7 @@ await 'Bash ·'
 await 'Read ·'
 keys Escape
 vanish 'Tool ledger'
-finish
+finish 'Example calls: 2'
 step 'M141: band hidden; Edit denied; Bash rewritten; two pane rows; Escape closed'
 
 echo 'tui-smoke ok'
