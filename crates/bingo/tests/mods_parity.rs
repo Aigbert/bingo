@@ -13,7 +13,6 @@ fn workspace() -> std::path::PathBuf {
 #[cfg(unix)]
 #[test]
 fn port_layout_changes_only_the_package_specifier() {
-    use std::os::unix::fs::PermissionsExt;
     let temp = tempfile::tempdir().unwrap();
     let source = temp.path().join("originals");
     std::fs::create_dir(&source).unwrap();
@@ -25,13 +24,7 @@ fn port_layout_changes_only_the_package_specifier() {
     for file in ["band-state.d.ts", "pane-state.d.ts"] {
         std::fs::write(source.join(file), state).unwrap();
     }
-    let binary = temp.path().join("probe");
-    std::fs::write(
-        &binary,
-        "#!/bin/sh\nprintf '%s\\n' \"$1 $2\" >> \"$HOME/invocations\"\n",
-    )
-    .unwrap();
-    std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let binary = probe(temp.path());
     let ports = temp.path().join("ports");
     let output = Command::new("bash")
         .arg(workspace().join("scripts/port_examples.sh"))
@@ -75,6 +68,19 @@ fn port_layout_changes_only_the_package_specifier() {
             .count(),
         3
     );
+}
+
+#[cfg(unix)]
+fn probe(root: &Path) -> std::path::PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let binary = root.join("probe");
+    std::fs::write(
+        &binary,
+        "#!/bin/sh\nprintf '%s\\n' \"$1 $2\" >> \"$HOME/invocations\"\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
+    binary
 }
 
 fn copy_example(source: &Path, destination: &Path) {
