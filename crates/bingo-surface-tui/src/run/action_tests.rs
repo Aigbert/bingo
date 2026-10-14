@@ -45,8 +45,8 @@ fn finish_newest(run: &mut Run, session: &TestSession) -> (String, Vec<String>) 
     (saved, trace)
 }
 
-#[test]
-fn pane_edits_persist_in_key_order_even_if_newer_actions_finish_first() {
+#[tokio::test]
+async fn pane_edits_persist_in_key_order_even_if_newer_actions_finish_first() {
     let now = still(scene().1);
     let session = Arc::new(TestSession::default());
     let mut run = tests::idle_in(counter(""), session.clone(), now.instant);
@@ -67,8 +67,8 @@ fn pane_edits_persist_in_key_order_even_if_newer_actions_finish_first() {
     assert!(screen.last().contains("Name: Ada"), "{}", screen.last());
 }
 
-#[test]
-fn closing_a_pane_follows_its_last_edit() {
+#[tokio::test]
+async fn closing_a_pane_follows_its_last_edit() {
     let now = still(scene().1);
     let session = Arc::new(TestSession::default());
     let mut run = tests::idle_in(counter(""), session.clone(), now.instant);
