@@ -21,9 +21,9 @@ type CompletionScript = Script<(SessionId, Option<TurnId>, Completion), Vec<Mode
 
 #[derive(Default)]
 pub(super) struct Scripts {
+    pub presentation: PresentationScripts,
     pub approve: Option<Script<(Approval,), String>>,
     pub complete: Option<CompletionScript>,
-    pub render: Option<Script<(SessionId, crate::render::RenderRequest), View>>,
     pub sessions: Option<Script<(SessionFilter,), Vec<SessionSummary>>>,
     pub open: Option<Script<(SessionSelector, ClientIdentity, OpenOptions), Attachment>>,
     pub close: Option<Script<(SessionId, CloseReason), ()>>,
@@ -32,11 +32,16 @@ pub(super) struct Scripts {
     pub extend: Option<Script<(SessionId, String, String, Value), ()>>,
     pub signal: Option<Script<(SessionId, String, String, Value), ()>>,
     pub invoke: Option<Script<(SessionId, ToolCall), ToolOutcome>>,
-    pub ask: Option<QuestionScript>,
     pub rewind: Option<Script<(SessionId, TurnId), u32>>,
     pub withdraw: Option<Script<(SessionId, IntentId, ClientIdentity), Input>>,
     pub reconfigure: Option<Script<(SessionId, SessionChange), ()>>,
     pub catalog: Option<Script<(CatalogKind,), Catalog>>,
+}
+
+#[derive(Default)]
+pub(super) struct PresentationScripts {
+    pub render: Option<Script<(SessionId, crate::render::RenderRequest), View>>,
+    pub ask: Option<QuestionScript>,
     pub notice: Option<Script<(Level, String, String), ()>>,
 }
 
@@ -54,9 +59,10 @@ impl TestHost {
         F: Fn(SessionId, crate::render::RenderRequest) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<View, KernelError>> + Send + 'static,
     {
-        locked(&self.inner.scripts).render = Some(Arc::new(move |(session, request)| {
-            Box::pin(script(session, request))
-        }));
+        locked(&self.inner.scripts).presentation.render =
+            Some(Arc::new(move |(session, request)| {
+                Box::pin(script(session, request))
+            }));
     }
 
     pub fn on_approve<F, Fut>(&self, script: F)
@@ -174,9 +180,10 @@ impl TestHost {
         F: Fn(SessionId, InteractionKind, Vec<AnswerSpec>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Answer, KernelError>> + Send + 'static,
     {
-        locked(&self.inner.scripts).ask = Some(Arc::new(move |(session, kind, answers)| {
-            Box::pin(script(session, kind, answers))
-        }));
+        locked(&self.inner.scripts).presentation.ask =
+            Some(Arc::new(move |(session, kind, answers)| {
+                Box::pin(script(session, kind, answers))
+            }));
     }
 
     /// Override `rewind`; the call is recorded before this script runs.
@@ -227,9 +234,10 @@ impl TestHost {
         F: Fn(Level, String, String) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<(), KernelError>> + Send + 'static,
     {
-        locked(&self.inner.scripts).notice = Some(Arc::new(move |(level, code, text)| {
-            Box::pin(script(level, code, text))
-        }));
+        locked(&self.inner.scripts).presentation.notice =
+            Some(Arc::new(move |(level, code, text)| {
+                Box::pin(script(level, code, text))
+            }));
     }
 
     /// Override `gateway_events`; the call is recorded before this script runs.

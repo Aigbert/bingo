@@ -9,6 +9,8 @@ mod auth;
 mod catalog;
 mod choose;
 mod completion;
+mod config;
+pub use config::HostConfig;
 mod interception;
 mod live;
 pub(crate) mod model_switch;
@@ -43,52 +45,11 @@ use crate::gate::DefaultPolicy;
 use crate::models::{Learned, ServedModels};
 use crate::prompt::{self, PromptInput};
 use crate::session::{self, Mailbox};
-use crate::settings::{self, Claim, Layer, Merged, SettingsError};
-use crate::turn::{
-    CompactorSet, ContributorSet, HookSet, ModelChoice, ToolSet, TurnBudget, TurnConfig,
-};
+use crate::settings::{self, Claim, Merged, SettingsError};
+use crate::turn::{CompactorSet, ContributorSet, HookSet, ModelChoice, ToolSet, TurnConfig};
 
 /// Gateway events buffered per subscriber before the oldest is dropped.
 const GATEWAY_CAPACITY: usize = 64;
-
-#[derive(Clone, Debug)]
-pub struct HostConfig {
-    /// Settings layers, lowest priority first; the command line is the last.
-    pub layers: Vec<Layer>,
-    /// A system block appended after the kernel's own (hosts, tests).
-    pub extra_system: Option<String>,
-    pub budget: TurnBudget,
-    pub env: Env,
-    /// How deep a chain of sub-sessions may go; 1 = one level below a root.
-    pub max_child_depth: u32,
-    /// Live children one session may have; `None` places no bound.
-    pub max_children: Option<usize>,
-}
-
-impl HostConfig {
-    pub fn new(env: Env) -> Self {
-        Self {
-            layers: Vec::new(),
-            extra_system: None,
-            budget: TurnBudget::default(),
-            env,
-            max_child_depth: 1,
-            max_children: None,
-        }
-    }
-
-    /// Add the highest-priority layer so far; a non-object is ignored.
-    pub fn with_layer(mut self, source: &str, value: Value) -> Self {
-        if let Value::Object(map) = value {
-            self.layers.push(Layer::new(
-                crate::settings::LayerOrigin::Explicit,
-                source,
-                map,
-            ));
-        }
-        self
-    }
-}
 
 #[derive(Debug, thiserror::Error)]
 pub enum HostError {

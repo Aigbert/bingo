@@ -28,7 +28,7 @@ impl HostApi for TestHost {
             session: session.clone(),
             request: request.clone(),
         });
-        let script = locked(&self.inner.scripts).render.clone();
+        let script = locked(&self.inner.scripts).presentation.render.clone();
         if let Some(script) = script {
             return script((session.clone(), request)).await;
         }
@@ -215,7 +215,7 @@ impl HostApi for TestHost {
             kind: kind.clone(),
             answers: answers.clone(),
         });
-        let script = locked(&self.inner.scripts).ask.clone();
+        let script = locked(&self.inner.scripts).presentation.ask.clone();
         if let Some(script) = script {
             return script((session.clone(), kind, answers)).await;
         }
@@ -283,7 +283,7 @@ impl HostApi for TestHost {
             code: code.to_string(),
             text: text.to_string(),
         });
-        let script = locked(&self.inner.scripts).notice.clone();
+        let script = locked(&self.inner.scripts).presentation.notice.clone();
         if let Some(script) = script {
             return script((level, code.to_string(), text.to_string())).await;
         }
