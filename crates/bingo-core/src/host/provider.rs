@@ -63,6 +63,7 @@ pub(crate) async fn set_provider(
     name: &str,
     url: &str,
 ) -> Result<(Arc<dyn Provider>, bool, Refreshed), KernelError> {
+    instances::validate_name(name)?;
     let (provider, needs_key) = {
         let _edit = host.registry.provider_state.instances.edit.lock().await;
         let old = instance_provider(host, name).await?;

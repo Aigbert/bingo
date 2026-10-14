@@ -347,3 +347,14 @@ async fn a_late_provider_takes_precedence_over_a_boot_instance() {
     source.set(vec![ScriptedProvider::new(vec![])]);
     assert!(!host.provider(Some("scripted")).await.unwrap().instance());
 }
+
+#[tokio::test]
+async fn setting_an_invalid_name_never_echoes_url_credentials() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = build(dir.path(), 1).await.unwrap();
+    let error = provider::set_provider(&host, "http://user:SECRET@host", "http://new")
+        .await
+        .err()
+        .unwrap();
+    assert!(!error.message.contains("SECRET"));
+}
