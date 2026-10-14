@@ -50,7 +50,7 @@ After M138 and M140; landed dependencies are recorded below.
 
 - `crates/bingo-sdk/src/{component.rs (new),component/,render.rs,lib.rs,intercept.rs,catalogue/matcher.rs}`
 - `crates/bingo-core/src/{chain/render.rs,session.rs,session/catalogue.rs}` (config publication)
-- `crates/bingo-mods/src/` `$.ui.log`, the embedded helpers; `sdk/typescript/src/{state.ts (new),index.ts}`
+- `crates/bingo-mods/src/` `$.ui.log`, the embedded helpers; `sdk/typescript/src/{state.ts (new),state.test.ts (new),index.ts,ui.ts}`
 - `crates/bingo-surface-tui/src/{component.rs (new),views/mod.rs,transcript.rs,transcript/{said,output}.rs,
   activity.rs,worked.rs,status.rs,form.rs,dialog.rs,blocks.rs,pane.rs,pulled.rs,view.rs,run/pulling.rs,lib.rs}`
 - `crates/bingo-{surface-rpc,plugin-rpc}/src/schema.rs`; `schema/{rpc,events,plugin,plugin-2}.json`; generated TypeScript
@@ -91,7 +91,7 @@ height without scroll jumps. Only visible rows ask, through the bounded queue.
 
 - Landed prerequisites: M137 `c1d95e8c`, M138 `5581b978`, M139 `686ad289`,
   M140 `ba70fdf6`; the TUI baseline includes M147 `6e3b1b03`, M148
-  `fddb62f3`, M149 `b2bee6f4`, M150 `a2f77d96`. No new dependency.
+  `fddb62f3`, M149 `b2bee6f4`, M150 `a2f77d96`. M141 adds the existing workspace `tracing` dependency to mods for `$.ui.log`; no new external package.
 - `Component::Question` is the landed name; Permission is excluded.
 - Sdk `catalogue::prefilter` is conservative; both runtimes share `on.ts`.
   M141 adds per-hook render metadata without duplicating dispatch links.
