@@ -9,7 +9,7 @@ use std::sync::Arc;
 pub(crate) struct Fixture {
     _home: tempfile::TempDir,
     link: Arc<dyn Interceptor>,
-    handler: Arc<dyn Command>,
+    pub(crate) handler: Arc<dyn Command>,
 }
 impl Fixture {
     pub(crate) fn new() -> Self {

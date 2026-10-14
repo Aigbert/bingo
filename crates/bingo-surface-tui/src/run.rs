@@ -681,8 +681,8 @@ impl Run {
                 {
                     self.site_keys.clear();
                     self.site_queue.clear();
-                    if crate::palette::active(&self.ui) {
-                        crate::palette::close(&mut self.ui, self.detection.now());
+                    if chord.as_deref() == Some("ctrl+c") && palette::ctrl_c(self, key) {
+                        return;
                     }
                 }
                 if site_keys::blocked(self) {
@@ -899,6 +899,9 @@ impl Run {
     fn reply(&mut self, reply: Reply, events: &mut Option<FrameStream>) {
         match reply {
             Reply::Rendered(key, view) => {
+                if palette::retired(self, &key, &view) {
+                    return;
+                }
                 self.ui.placed.pulled.answer(key, *view);
                 site_keys::drain(self);
             }
@@ -2833,3 +2836,6 @@ mod action_tests;
 
 #[cfg(test)]
 mod palette_tests;
+
+#[cfg(test)]
+mod palette_close_tests;
