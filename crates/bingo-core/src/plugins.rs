@@ -147,6 +147,23 @@ pub(crate) enum Switched {
 }
 
 pub(crate) async fn switch_in(
+    host: &std::sync::Arc<crate::host::Host>,
+    session: &bingo_sdk::SessionId,
+    name: &str,
+    enabled: bool,
+) -> Result<Switched, bingo_sdk::KernelError> {
+    let (host, session, name) = (host.clone(), session.clone(), name.to_owned());
+    let asked = bingo_sdk::render::asked();
+    tokio::spawn(async move {
+        bingo_sdk::render::under_input(asked, switch_owned(&host, &session, &name, enabled)).await
+    })
+    .await
+    .map_err(|error| {
+        bingo_sdk::KernelError::new(bingo_sdk::ErrorCode::Internal, error.to_string())
+    })?
+}
+
+async fn switch_owned(
     host: &crate::host::Host,
     session: &bingo_sdk::SessionId,
     name: &str,

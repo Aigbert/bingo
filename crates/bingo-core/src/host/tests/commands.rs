@@ -792,3 +792,85 @@ async fn switching_another_plugin_keeps_required_surfaces_on() {
     );
     host.shutdown().await;
 }
+
+#[derive(Default)]
+struct SlowSwitch {
+    block: std::sync::atomic::AtomicBool,
+    entered: tokio::sync::Notify,
+    release: tokio::sync::Notify,
+    applied: tokio::sync::Notify,
+}
+#[async_trait]
+impl PluginSource for SlowSwitch {
+    fn id(&self) -> &str {
+        "slow"
+    }
+    async fn plugins(&self) -> Vec<PluginStatus> {
+        if self.block.load(std::sync::atomic::Ordering::SeqCst) {
+            self.entered.notify_one();
+            self.release.notified().await;
+        }
+        vec![PluginStatus {
+            id: "outside".into(),
+            version: "0".into(),
+            state: PluginState::On,
+            from: "slow".into(),
+            execution: None,
+        }]
+    }
+    async fn switch_kind(&self, _: &str) -> bingo_sdk::plugin::PluginSwitch {
+        bingo_sdk::plugin::PluginSwitch::Now
+    }
+    async fn switch(
+        &self,
+        _: &str,
+        _: bool,
+    ) -> Result<bingo_sdk::plugin::PluginSwitch, KernelError> {
+        self.applied.notify_one();
+        Ok(bingo_sdk::plugin::PluginSwitch::Now)
+    }
+}
+#[tokio::test]
+async fn cancelling_source_lookup_does_not_lose_a_persisted_switch() {
+    let home = tempfile::tempdir().unwrap();
+    let source = Arc::new(SlowSwitch::default());
+    let host = Host::build(
+        vec![TestPlugin::boxed(
+            &PROVIDER,
+            vec![Contribution::Plugins(source.clone())],
+        )],
+        HostConfig::new(env_in(home.path())),
+    )
+    .await
+    .unwrap();
+    source
+        .block
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let caller = {
+        let host = host.clone();
+        tokio::spawn(async move {
+            crate::plugins::switch_in(&host, &SessionId::mint(), "outside", false)
+                .await
+                .map(|_| ())
+        })
+    };
+    source.entered.notified().await;
+    assert_eq!(
+        user_settings(home.path())["enabledPlugins"]["outside"],
+        false
+    );
+    caller.abort();
+    let _ = caller.await;
+    source
+        .block
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    source.release.notify_one();
+    tokio::time::pause();
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_secs(1), source.applied.notified())
+            .await
+            .is_ok(),
+        "persisted apply was cancelled"
+    );
+    host.shutdown().await;
+}

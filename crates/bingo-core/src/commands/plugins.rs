@@ -151,7 +151,7 @@ fn row(status: &PluginStatus) -> Vec<String> {
 
 /// Write one switch into the user layer, or say why this is not one to write.
 async fn switched(
-    host: &Host,
+    host: &std::sync::Arc<Host>,
     session: &SessionId,
     listed: &[PluginStatus],
     name: &str,
