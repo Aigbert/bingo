@@ -19,3 +19,5 @@ mod module;
 mod handlers;
 
 mod ui;
+
+mod log;

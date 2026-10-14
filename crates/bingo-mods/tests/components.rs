@@ -20,8 +20,14 @@ export function register(on) {
 }
 "#;
     let fixture = Fixture::new(source, &["state", "ui"], json!({})).await;
-    assert_eq!(fixture.call("fixture", "echo", json!({})).await, json!({"count":1,"doubled":2,"member":true}));
+    assert_eq!(
+        fixture.call("fixture", "echo", json!({})).await,
+        json!({"count":1,"doubled":2,"member":true})
+    );
     fixture.plugin.reload(&fixture.root).await.unwrap();
-    assert_eq!(fixture.call("fixture", "echo", json!({})).await, json!({"count":2,"doubled":4,"member":true}));
+    assert_eq!(
+        fixture.call("fixture", "echo", json!({})).await,
+        json!({"count":2,"doubled":4,"member":true})
+    );
     fixture.host.shutdown().await;
 }

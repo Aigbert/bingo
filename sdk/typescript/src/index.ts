@@ -7,3 +7,6 @@ export type * from './wire.ts';
 
 export type * from './events.ts';
 export type { CommandRun, ConfigSet, ToolCall } from './events.ts';
+
+export { atom, derive, read, update, memberOf } from './state.ts';
+export type { Atom, Derived } from './state.ts';

@@ -93,6 +93,7 @@ impl WireService for Ui {
             .method::<render::Invalidate, ()>("invalidate", false)
             .method::<Resolve, Value>("resolve", false)
             .method::<Notice, ()>("notice", false)
+            .method::<Notice, ()>("log", false)
             .method::<Ask, Answer>("ask", false);
         for method in &mut face.methods {
             method.entry.pinned = &["/plugin"];
@@ -133,6 +134,11 @@ impl WireService for Ui {
                             .then_some(placed.slot))
                         .collect::<Vec<_>>()
                 ))
+            }
+            "log" => {
+                let input: Notice = parse(params)?;
+                crate::log::write(&caller.plugin, &input.text);
+                Ok(Value::Null)
             }
             "notice" => {
                 let input: Notice = parse(params)?;

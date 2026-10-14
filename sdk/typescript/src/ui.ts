@@ -77,6 +77,7 @@ export function ui(rpc: Rpc, site: HookSite) {
       const table = await call<{kind:string;props:string[]}[]>('resolve', {surface:event.surface});
       return Object.fromEntries(table.map(element => [element.kind, element.kind])) as Record<string,string>;
     },
+    log: (text: string) => call<null>('log', {text}),
     notice: (text: string, options: {level?:Level} = {}) => call<null>('notice', {text,...options}),
     ask: (kind: InteractionKind, answers: AnswerSpec[]) => call<Answer>('ask', {session:site.session,kind,answers}),
   };
