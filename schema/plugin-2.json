@@ -7104,7 +7104,9 @@
         "SessionMode",
         "PromptHint",
         "AbovePrompt",
-        "Pane"
+        "Pane",
+        "Permission",
+        "SignIn"
       ]
     },
     "Invalidate": {

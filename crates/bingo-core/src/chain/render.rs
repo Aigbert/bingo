@@ -15,6 +15,7 @@ impl Point for Render {
             && before.request_id == after.request_id
             && before.surface == after.surface
             && before.viewport == after.viewport
+            && (!before.component.sealed() || before.props == after.props)
     }
     fn dispatch<'a>(
         link: &'a dyn Interceptor,
@@ -23,7 +24,6 @@ impl Point for Render {
         next: Next<'a, RenderRequest, View>,
     ) -> BoxFuture<'a, Result<View, KernelError>> {
         Box::pin(async move {
-            let component = input.component;
             // A hook may pass on another mod's answer; its handlers stay valid.
             let inherited = Arc::new(Mutex::new(None));
             let answered = inherited.clone();
@@ -42,7 +42,14 @@ impl Point for Render {
                 .await?;
             let view = serde_json::from_value(value).map_err(invalid)?;
             let inherited = inherited.lock().ok().and_then(|view| view.clone());
-            view::answer_ok(component, link.id(), inherited.as_ref(), &view).map_err(invalid)?;
+            view::answer_ok(
+                input.component,
+                &input.props,
+                link.id(),
+                inherited.as_ref(),
+                &view,
+            )
+            .map_err(invalid)?;
             Ok(view)
         })
     }
@@ -90,14 +97,25 @@ pub(crate) async fn dispatch(
             interceptor: Arc::new(Owner(link.clone())),
         })
         .collect();
-    run::<Render>(
+    let checked = Report::default();
+    let fallback = request.component.sealed().then(|| request.engine());
+    let result = run::<Render>(
         &owned,
         Next::new(|request: RenderRequest| Box::pin(async move { Ok(request.engine()) })),
         cx,
         request,
-        report,
+        checked.clone(),
     )
-    .await
+    .await;
+    let notices = checked.take();
+    let failed = !notices.is_empty();
+    for notice in notices {
+        report.push(notice);
+    }
+    if failed && let Some(engine) = fallback {
+        return Ok(engine);
+    }
+    result
 }
 
 /// The config is a projection of the currently admitted links, never a registry.
@@ -142,7 +160,7 @@ mod tests {
             tier: Tier::Rewrite,
         };
         let exposed = matched(&[link]);
-        assert_eq!(exposed.0.len(), 15);
+        assert_eq!(exposed.0.len(), bingo_sdk::render::Component::ALL.len());
         assert!(matched(&[]).0.is_empty());
     }
     struct Answer(bool);
@@ -285,3 +303,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod sealed_tests;

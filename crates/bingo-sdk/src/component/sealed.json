@@ -1,0 +1,6 @@
+[
+  {"component":"Permission","props":{"interactionId":"ask_1","tool":"Write","input":{"content":"hello","file_path":"note.txt"},"answers":["allowOnce","allowSession","deny"]}},
+  {"component":"SignIn","props":{"interactionId":"ask_2","provider":"example","flow":{"kind":"browser","url":"https://example.test/login"}}},
+  {"component":"SignIn","props":{"interactionId":"ask_3","provider":"example","flow":{"kind":"device","url":"https://example.test/device","code":"ABCD"}}},
+  {"component":"SignIn","props":{"interactionId":"ask_4","provider":"example","flow":{"kind":"paste"}}}
+]

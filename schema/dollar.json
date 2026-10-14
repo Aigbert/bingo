@@ -1192,7 +1192,9 @@
         "SessionMode",
         "PromptHint",
         "AbovePrompt",
-        "Pane"
+        "Pane",
+        "Permission",
+        "SignIn"
       ]
     },
     "Session": {

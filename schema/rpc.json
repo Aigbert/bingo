@@ -575,7 +575,9 @@
         "SessionMode",
         "PromptHint",
         "AbovePrompt",
-        "Pane"
+        "Pane",
+        "Permission",
+        "SignIn"
       ]
     },
     "ConfigView": {
@@ -3386,6 +3388,30 @@
       ],
       "description": "Where a child hangs in the tree: its parent, and the tool call that\nspawned it when one did (ADR-0011 §3)."
     },
+    "PermissionProps": {
+      "type": "object",
+      "properties": {
+        "interactionId": {
+          "$ref": "#/$defs/InteractionId"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "input": true,
+        "answers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AnswerSpec"
+          }
+        }
+      },
+      "required": [
+        "interactionId",
+        "tool",
+        "input",
+        "answers"
+      ]
+    },
     "PinnedPartParams": {
       "type": "object",
       "properties": {
@@ -3730,6 +3756,38 @@
             },
             "props": {
               "$ref": "#/$defs/PaneProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Permission"
+            },
+            "props": {
+              "$ref": "#/$defs/PermissionProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "SignIn"
+            },
+            "props": {
+              "$ref": "#/$defs/SignInProps"
             }
           },
           "required": [
@@ -4497,6 +4555,25 @@
         "cwd",
         "createdAt",
         "updatedAt"
+      ]
+    },
+    "SignInProps": {
+      "type": "object",
+      "properties": {
+        "interactionId": {
+          "$ref": "#/$defs/InteractionId"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "flow": {
+          "$ref": "#/$defs/LoginFlow"
+        }
+      },
+      "required": [
+        "interactionId",
+        "provider",
+        "flow"
       ]
     },
     "SignalParams": {

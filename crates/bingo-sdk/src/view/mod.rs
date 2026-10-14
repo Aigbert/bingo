@@ -17,7 +17,7 @@ mod read;
 pub mod table;
 mod validate;
 mod walk;
-pub use validate::{answer_ok, published_ok};
+pub use validate::{answer_ok, published_ok, sealed_ok};
 mod style;
 pub use style::*;
 #[cfg(test)]
