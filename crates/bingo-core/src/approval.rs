@@ -1,5 +1,6 @@
 //! The user layer is the sole authority for repository code.
 mod digest;
+mod entry;
 use crate::settings;
 use bingo_sdk::{Approval, ApprovalReader, Env, ErrorCode, KernelError, PluginState};
 pub use digest::{digest_dir, digest_entry};
@@ -75,6 +76,7 @@ impl Authority {
             let dir = plugin_dir(request)?;
             let digest = digest_dir(&dir).map_err(failed)?;
             digest::contained(&dir).map_err(failed)?;
+            entry::contained(&dir).map_err(|error| failed(format!("{}: {error}", request.what)))?;
             return Ok(digest);
         }
         let key = (root_key(&request.root)?, request.what.clone());
@@ -127,6 +129,42 @@ impl ApprovalReader for Authority {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn approval_and_spawn_verdict_refuse_entry_paths_outside_the_digest() {
+        let home = tempfile::tempdir().unwrap();
+        let repo = tempfile::tempdir().unwrap();
+        let dir = repo.path().join(".bingo/plugins/p");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(repo.path().join("outside.js"), "original").unwrap();
+        std::fs::write(dir.join("inside.js"), "inside").unwrap();
+        let authority = Authority::new(Env::rooted(home.path()), Approved::new(), BTreeMap::new());
+        let request = Approval {
+            root: repo.path().into(),
+            what: "plugin:p".into(),
+        };
+        for (command, args) in [
+            ("${PLUGIN_ROOT}/../../../outside.js", vec![]),
+            ("node", vec!["${PLUGIN_ROOT}/../../../outside.js"]),
+            ("node", vec!["../../../outside.js"]),
+            ("node", vec!["..\\..\\..\\outside.js"]),
+        ] {
+            let manifest = serde_json::json!({"entry": {"command":command, "args":args}});
+            std::fs::write(dir.join("plugin.json"), manifest.to_string()).unwrap();
+            let error = authority
+                .approve(&request)
+                .expect_err("outside bytes cannot be approved");
+            assert!(error.message.contains("plugin:p"), "{error}");
+            assert!(authority.state(&request).is_err(), "spawn must refuse too");
+        }
+        std::fs::write(
+            dir.join("plugin.json"),
+            r#"{"entry":{"command":"node","args":["${PLUGIN_ROOT}/inside.js"]}}"#,
+        )
+        .unwrap();
+        authority.approve(&request).unwrap();
+        assert_eq!(authority.state(&request).unwrap(), PluginState::On);
+    }
+
     #[test]
     fn a_yes_names_root_item_and_bytes() {
         let approved = BTreeMap::from([(

@@ -73,3 +73,11 @@ at approval even though the digest itself hashes link text. `pluginDirs` uses
 the generic personal-only accumulation rule so a repository cannot classify its
 own code as explicitly supplied. Waiting catalogue rows have command-prefixed
 IDs (`plugins:name`, `mcp:name`), distinct from a running user namesake.
+
+Review decisions (2026-10-15): approval and each spawn verdict refuse a process
+entry whose command or argument names a path outside the canonical plugin root
+(after `${PLUGIN_ROOT}` substitution). Unresolvable paths fail closed and name
+the entry. Bare PATH programs remain allowed. Digesting a runtime's own module
+lookup outside the root (PATH programs, global `node_modules`) is a non-goal.
+RPC approval is person input: an RPC client is a person's surface by definition.
+The reverse plugin bridge has no approval verb, at any trust tier.
