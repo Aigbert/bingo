@@ -88,6 +88,12 @@ async fn shape_contract_and_duplicate_registration() {
     let dir = tempfile::tempdir().unwrap();
     assert!(build(dir.path(), 2).await.is_err());
     let host = build(dir.path(), 1).await.unwrap();
+    assert_eq!(
+        host.registry.switch_kind(PROVIDER.id),
+        Some(bingo_sdk::plugin::PluginSwitch::NextStart {
+            why: "providers".into()
+        })
+    );
     let (held, _, result) = provider::add_provider(&host, "work", "local", "http://up")
         .await
         .unwrap();

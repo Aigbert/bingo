@@ -97,9 +97,10 @@ fn contribution_kind(contribution: &Contribution) -> ContributionKind {
             }
         }
         Contribution::Tool(_) | Contribution::Tools(_) => ContributionKind::Tools,
-        Contribution::Provider(_) | Contribution::Providers(_) | Contribution::Agent(_) => {
-            ContributionKind::Providers
-        }
+        Contribution::Provider(_)
+        | Contribution::Providers(_)
+        | Contribution::ProviderShape(_)
+        | Contribution::Agent(_) => ContributionKind::Providers,
         Contribution::Store(_) => ContributionKind::Store,
         Contribution::Surface(_) => ContributionKind::Surface,
         Contribution::Service { .. } => ContributionKind::Service,
@@ -171,7 +172,14 @@ impl Registry {
                     .plugins
                     .push(PluginStatus::disabled(manifest, reason));
                 if switched_off.contains(manifest.id) && needed(manifest).is_none() {
-                    registry.register_off(plugin.as_ref(), slices, env, switched_off, layers, &reserved);
+                    registry.register_off(
+                        plugin.as_ref(),
+                        slices,
+                        env,
+                        switched_off,
+                        layers,
+                        &reserved,
+                    );
                 }
                 continue;
             }
