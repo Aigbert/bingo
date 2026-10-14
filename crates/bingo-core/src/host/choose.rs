@@ -43,7 +43,7 @@ impl Host {
     ) -> Result<String, KernelError> {
         if let Some(model) = wanted
             .map(str::to_string)
-            .or_else(|| self.settings.kernel.model.clone())
+            .or_else(|| configured_model(self))
         {
             return Ok(model);
         }
@@ -115,11 +115,7 @@ impl Host {
         agent: Arc<dyn Agent>,
         spec: &SessionSpec,
     ) -> Result<ModelChoice, KernelError> {
-        let id = match spec
-            .model
-            .clone()
-            .or_else(|| self.settings.kernel.model.clone())
-        {
+        let id = match spec.model.clone().or_else(|| configured_model(self)) {
             Some(id) => id,
             None => agent
                 .models()
@@ -210,4 +206,17 @@ fn default_provider(providers: &[Arc<dyn Provider>]) -> Result<Arc<dyn Provider>
         .find(|p| auth::signed_in(p.as_ref()))
         .cloned()
         .ok_or_else(|| auth::nobody_signed_in(providers))
+}
+
+fn configured_model(host: &Host) -> Option<String> {
+    if host
+        .registry
+        .provider_state
+        .default_cleared
+        .load(std::sync::atomic::Ordering::Relaxed)
+    {
+        None
+    } else {
+        host.settings.kernel.model.clone()
+    }
 }

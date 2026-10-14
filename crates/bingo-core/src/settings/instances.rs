@@ -112,6 +112,9 @@ fn clear_choices(document: &mut Map<String, Value>, name: &str) -> Vec<String> {
     let mut cleared = Vec::new();
     if document.get("provider").and_then(Value::as_str) == Some(name) {
         document.remove("provider");
+        if document.remove("model").is_some() {
+            cleared.push("default model".into());
+        }
         cleared.push("default provider".into());
     }
     if let Some(pins) = document.get_mut("pinned").and_then(Value::as_array_mut) {
@@ -162,9 +165,9 @@ mod tests {
         let path = dir.path().join("settings.toml");
         std::fs::write(
             &path,
-            r#"# keep
-model = "m"
+            r#"model = "m"
 provider = "work"
+# keep
 pinned = ["work/m", "other/m", "worker/m"]
 [local.instances.work]
 baseUrl = "http://up"
@@ -174,6 +177,7 @@ baseUrl = "http://up"
         change(&path, "local", "work", None).unwrap();
         let doc = read(&path).unwrap();
         assert!(doc.get("provider").is_none());
+        assert!(doc.get("model").is_none());
         assert_eq!(doc["pinned"], json!(["other/m", "worker/m"]));
         assert!(std::fs::read_to_string(path).unwrap().contains("# keep"));
     }

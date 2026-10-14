@@ -191,11 +191,13 @@ async fn add_readdress_and_remove_without_restarting_or_rebinding_sessions() {
     let choices =
         bingo_core::settings::read_document(&server.cwd().join(".bingo/settings.toml")).unwrap();
     assert!(!choices.contains_key("provider"));
+    assert!(!choices.contains_key("model"));
     assert_eq!(choices["pinned"], json!([]));
-    kernel
+    let mut after = kernel
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
+    answer(&mut after, "unused").await;
     auth_required(&mut newer, "work was removed").await;
     assert!(
         !kernel

@@ -1,6 +1,6 @@
 use super::*;
 
-struct Shape;
+pub(super) struct Shape;
 impl ProviderShape for Shape {
     fn id(&self) -> &str {
         "local"
@@ -233,7 +233,10 @@ async fn readding_a_name_does_not_restore_its_cleared_default() {
     let env = Env::rooted(dir.path());
     crate::settings::remember(
         &crate::settings::user_path(&env),
-        &[("provider", json!("work"))],
+        &[
+            ("provider", json!("work")),
+            ("model", json!("removed-model")),
+        ],
     )
     .unwrap();
     let host = Host::build(
@@ -241,7 +244,8 @@ async fn readding_a_name_does_not_restore_its_cleared_default() {
             &PROVIDER,
             vec![Contribution::ProviderShape(Arc::new(Shape))],
         )],
-        HostConfig::new(env).with_layer("user", json!({"provider":"work"})),
+        HostConfig::new(env)
+            .with_layer("user", json!({"provider":"work", "model":"removed-model"})),
     )
     .await
     .unwrap();
@@ -253,8 +257,20 @@ async fn readding_a_name_does_not_restore_its_cleared_default() {
         .unwrap();
     provider::remove_provider(&host, "work").await.unwrap();
     assert_eq!(host.provider(None).await.unwrap().id(), "other");
+    assert_eq!(
+        host.model(host.provider(None).await.unwrap().as_ref(), None)
+            .await
+            .unwrap(),
+        "m"
+    );
     provider::add_provider(&host, "work", "local", "http://up")
         .await
         .unwrap();
     assert_eq!(host.provider(None).await.unwrap().id(), "other");
+    assert_eq!(
+        host.model(host.provider(None).await.unwrap().as_ref(), None)
+            .await
+            .unwrap(),
+        "m"
+    );
 }
