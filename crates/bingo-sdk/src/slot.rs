@@ -5,6 +5,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+mod size;
+mod wire;
+pub use size::{Anchor, Length, PaneSize, Place, Rect, Span, above};
+
 use crate::{ActionItem, ItemId, SessionState, Tone, View};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -34,7 +38,7 @@ impl Shown {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(remote = "Self", tag = "kind", rename_all = "camelCase")]
 pub enum Slot {
     Status {
         text: String,
@@ -63,7 +67,10 @@ pub enum Slot {
         #[serde(rename = "holdToasts")]
         hold_toasts: bool,
         asked: bool,
-        rows: u16,
+        #[serde(default = "above")]
+        place: Vec<Place>,
+        #[serde(default)]
+        size: PaneSize,
         view: Shown,
     },
     Toast {
@@ -94,8 +101,11 @@ impl Slot {
         match self {
             Self::Activity { view, .. }
             | Self::Rail { view, .. }
-            | Self::Panel { view, .. }
-            | Self::Pane { view, .. } => view.published_ok(),
+            | Self::Panel { view, .. } => view.published_ok(),
+            Self::Pane { place, size, view, .. } => {
+                place.iter().copied().all(Place::published_ok)
+                    && size.published_ok() && view.published_ok()
+            }
             Self::Row { body, .. } => body
                 .as_ref()
                 .is_none_or(|view| crate::view::published_ok(view).is_ok()),
@@ -291,7 +301,7 @@ mod pull_contract {
     fn pulled_panes_and_toasts_round_trip() {
         for wire in [
             json!({"kind":"pane","id":"counter","title":"Count","focus":true,"closeOnEscape":true,
-                "holdToasts":true,"asked":true,"rows":8,"view":{"request":{"component":"Pane",
+                "holdToasts":true,"asked":true,"place":["above"],"size":PaneSize::default(),"view":{"request":{"component":"Pane",
                 "requestId":"counter","surface":"terminal","props":{},"viewport":{"columns":80,"rows":8}}}}),
             json!({"kind":"toast","text":"Saved","until":"2026-10-14T12:00:00Z","alert":false}),
         ] {

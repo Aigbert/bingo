@@ -62,6 +62,7 @@ async fn a_pulled_counter_invalidates_and_renders_after_a_press() {
         surface: SurfaceName::Terminal,
         props: serde_json::json!({}),
         viewport: Viewport {
+                place: None,
             columns: 80,
             rows: 8,
         },
@@ -141,6 +142,7 @@ async fn edit_and_close(
                 surface: SurfaceName::Terminal,
                 props: serde_json::json!({}),
                 viewport: Viewport {
+                place: None,
                     columns: 80,
                     rows: 8,
                 },

@@ -164,6 +164,7 @@ async fn open(caller: &Caller, input: Open) -> Result<Value, ServiceError> {
         surface: SurfaceName::Terminal,
         props: input.props,
         viewport: Viewport {
+                place: None,
             columns: 0,
             rows: input.rows,
         },
@@ -175,7 +176,8 @@ async fn open(caller: &Caller, input: Open) -> Result<Value, ServiceError> {
         close_on_escape: input.close_on_escape,
         hold_toasts: input.hold_toasts,
         asked: render::asked(),
-        rows: input.rows,
+        place: bingo_sdk::slot::above(),
+        size: bingo_sdk::slot::PaneSize::from_rows(input.rows),
         view: Shown::Pull { request },
     };
     place(

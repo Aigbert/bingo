@@ -183,6 +183,16 @@
           "Viewport": {
             "type": "object",
             "properties": {
+              "place": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Place"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "columns": {
                 "type": "integer",
                 "format": "uint16",
@@ -199,6 +209,77 @@
             "required": [
               "columns",
               "rows"
+            ]
+          },
+          "Place": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "above",
+                  "side",
+                  "overlay"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "rect": {
+                    "$ref": "#/$defs/Rect"
+                  }
+                },
+                "required": [
+                  "rect"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "Rect": {
+            "type": "object",
+            "properties": {
+              "anchor": {
+                "$ref": "#/$defs/Anchor"
+              },
+              "x": {
+                "$ref": "#/$defs/Length"
+              },
+              "y": {
+                "$ref": "#/$defs/Length"
+              },
+              "width": {
+                "$ref": "#/$defs/Length"
+              },
+              "height": {
+                "$ref": "#/$defs/Length"
+              }
+            },
+            "required": [
+              "width",
+              "height"
+            ]
+          },
+          "Anchor": {
+            "type": "string",
+            "enum": [
+              "topLeft",
+              "topRight",
+              "bottomLeft",
+              "bottomRight",
+              "center"
+            ]
+          },
+          "Length": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              {
+                "type": "string"
+              }
             ]
           }
         }
