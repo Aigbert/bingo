@@ -331,3 +331,52 @@ The ACP deadline test also passed in the final full run. Budget reported
 17 GB of debug output; the final worktree action after committing and auditing
 is `cargo clean`. No live/credential tests, external dependencies or allowlist
 changes; no push, merge or PR.
+
+## Verified — 2026-10-15 (M165 rebase)
+
+Rebased onto `dev` at `dbdc5952` with `git rebase dev`; all 33 existing
+commits remain separate and in order. Conflict resolutions retain
+`settings.kernel.switched_off()`, both new Registry arguments, provider-name
+reservation, Registrar configuration sources and notices, disabled-resident
+ordering, and M172's registration/start failure handling.
+
+Three integration adjustments followed in separate core commits:
+
+- M165's new `ProviderShape` contribution is next-start (`providers`). The
+  initial check failed with E0004; the provider-shape contract test now also
+  asserts that classification and passes.
+- Disabled declared providers are classified before registration: registration
+  can migrate credentials. M165's existing black-box regression
+  `a_reserved_instance_cannot_adopt_a_disabled_familys_legacy_key` initially
+  failed (286 CLI tests passed, 1 failed), because the disabled family bound
+  the mock legacy record. It passes with the provider left unregistered.
+  Reserved names and origin-bound credentials retain M165's behavior.
+- The combined Registry had 17 fields and failed discipline's 16-field cap.
+  The registered provider list now belongs to the existing ProviderState with
+  its shapes and replacements; discipline passes without an allowlist change.
+
+Final commands ran sequentially on the completed code. Both test invocations
+removed every `OPENAI_*` and `ANTHROPIC_*` environment variable and set
+`RUST_TEST_THREADS=4`. All credentials in the tests were fixtures.
+
+```text
+cargo check --workspace --all-targets --locked
+  Finished dev profile in 13.46s; exit 0
+cargo test --locked -p bingo-core -p bingo-mods -p bingo-plugin-host -p bingo-surface-tui -p bingo
+  2410 passed; 0 failed; 3 ignored (47 summaries); exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings
+  Finished dev profile in 15.92s; exit 0
+cargo fmt --all -- --check
+  exit 0; no output
+bash scripts/check_discipline.sh
+  discipline ok; advisory warnings only; exit 0
+cargo test --locked -p bingo-sdk -p bingo-plugin-rpc -p bingo-surface-rpc --lib
+  327 passed; 0 failed; schema and TypeScript generator assertions pass; exit 0
+```
+
+- [x] Preserve M165 and M172 behavior and the unsquashed history.
+- [x] Requested rebase gates pass; no schema/TypeScript drift to regenerate.
+
+No live/credential tests, external dependencies, allowlist edits, push, merge
+or PR. After committing this record and auditing the clean tree, the final
+worktree command is `cargo clean`.
