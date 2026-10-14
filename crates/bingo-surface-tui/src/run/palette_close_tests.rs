@@ -105,3 +105,66 @@ async fn a_palette_render_finishing_after_ctrl_c_is_retired() {
     );
     answer(&mut run, &session, &fixture, 0).await;
 }
+
+#[tokio::test]
+async fn palette_retirement_targets_each_drawing_even_with_a_redraw_pending() {
+    let now = still(scene().1);
+    let mut state = state();
+    state.config.kernel["render"] = serde_json::json!({"Palette":[{}]});
+    let session = Arc::new(TestSession::default());
+    let mut run = tests::idle_in(state, session.clone(), now.instant);
+    crate::palette::open(&mut run.ui, PaletteOpen::Keys, now);
+    draw_tree(80, 24, &run.session.tree, &mut run.ui, now);
+    let mut pending = run
+        .ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == bingo_sdk::render::Component::Palette)
+        .unwrap()
+        .clone();
+    let drawing = |handler| {
+        serde_json::from_value(serde_json::json!({
+            "kind":"Box", "children":[],
+            "onKey":{"name":"palette:ui","args":{"handler":handler,"event":"key"}}
+        }))
+        .unwrap()
+    };
+    run.ui.placed.pulled.request(&pending);
+    run.ui.placed.pulled.answer(pending.clone(), drawing("old"));
+    pending.request.props["query"] = "changed".into();
+    run.ui.placed.pulled.request(&pending);
+    run.terminal_event(Term::Key(ctrl('c')));
+    assert_eq!(
+        session.submitted().len(),
+        1,
+        "retire the displayed drawing immediately"
+    );
+    assert!(run.ui.actions.deadline().is_none());
+    run.reply(
+        Reply::Rendered(
+            run.ui.placed.pulled.epoch(),
+            pending,
+            Box::new(drawing("late")),
+        ),
+        &mut None,
+    );
+    run.ack(
+        &session.submissions()[0].0,
+        &IntentOutcome::Applied {
+            result: serde_json::json!({}),
+        },
+    );
+    let handlers: Vec<_> = session
+        .submitted()
+        .into_iter()
+        .map(|input| {
+            let Input::Action { action } = input else {
+                panic!("retirement")
+            };
+            assert_eq!(action.args["value"]["key"], "ctrl+c");
+            action.args["handler"].clone()
+        })
+        .collect();
+    assert_eq!(handlers, ["old", "late"]);
+}

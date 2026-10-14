@@ -250,7 +250,7 @@ pub struct Placed {
 #[derive(Debug)]
 pub struct Ui {
     pub placed: Placed,
-    controls: controls::Controls,
+    pub(crate) controls: controls::Controls,
     pub scroll: Scroll,
     pub notices: Vec<Notice>,
     /// A command's `View`, shown until the next key.

@@ -39,7 +39,7 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
             open(run, session, intent, action);
         }
     } else if let Some(handle) = handle {
-        run.ui.actions.push(session, handle, intent, action);
+        run.enqueue_action(session, handle, intent, action);
     }
 }
 

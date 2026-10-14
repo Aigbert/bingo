@@ -406,6 +406,7 @@ impl Run {
             .next_frame
             .into_iter()
             .chain(self.behind.then_some(self.painted + TICK))
+            .chain(self.ui.actions.deadline())
             .min()
     }
 
@@ -588,6 +589,7 @@ impl Run {
     fn ack(&mut self, intent: &IntentId, outcome: &IntentOutcome) {
         site_keys::answered(self, intent, outcome);
         self.ui.actions.acknowledge(intent);
+        self.release_actions();
         site_keys::drain(self);
         let Some(about) = self.mine.remove(intent) else {
             return;
@@ -903,6 +905,7 @@ impl Run {
                     return;
                 }
                 self.ui.placed.pulled.answer_at(epoch, key, *view);
+                self.release_actions();
                 site_keys::drain(self);
             }
             Reply::Attached(attachment) => self.attach(*attachment, events),
@@ -2839,3 +2842,6 @@ mod palette_tests;
 
 #[cfg(test)]
 mod palette_close_tests;
+
+#[cfg(test)]
+mod rebinding_tests;

@@ -240,7 +240,7 @@ pub async fn handler(
     };
     let notice = match result {
         Ok(value) if value["stale"].as_bool() == Some(true) => {
-            Some("This control belongs to an earlier drawing; try the current one.".to_string())
+            Some(bingo_sdk::view::STALE_CONTROL.to_string())
         }
         Ok(value) if value.get("handled").and_then(Value::as_bool).is_some() => {
             return Ok(CommandOutcome::Handled {

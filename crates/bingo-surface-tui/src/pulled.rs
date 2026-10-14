@@ -141,6 +141,31 @@ impl Memo {
                 .map(|(_, view)| view)
         })
     }
+    pub fn drawings(&self, session: &SessionId) -> impl Iterator<Item = (&Key, &View)> {
+        self.entries
+            .iter()
+            .filter(move |entry| &entry.key.session == session)
+            .filter_map(|entry| entry.answer.as_ref().map(|(key, view)| (key, view)))
+    }
+    /// The drawing a site shows now and whether a newer one is owed; `None`
+    /// when the memo holds nothing for the site.
+    pub fn current(
+        &self,
+        component: bingo_sdk::render::Component,
+        request: &str,
+        state: &SessionState,
+    ) -> Option<(Option<&View>, bool)> {
+        let entry = self.entries.iter().find(|entry| {
+            entry.key.session == state.summary.id
+                && entry.key.request.component == component
+                && entry.key.request.request_id == request
+        })?;
+        let generation = state.invalidated.get(request).copied().unwrap_or_default();
+        let waiting = entry.answer.as_ref().is_none_or(|(answered, _)| {
+            !answered.same(&entry.key) || answered.generation != generation
+        });
+        Some((entry.answer.as_ref().map(|(_, view)| view), waiting))
+    }
     pub fn version(&self, id: &str) -> u64 {
         self.entries
             .iter()

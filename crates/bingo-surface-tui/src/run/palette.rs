@@ -111,6 +111,8 @@ fn close_action(view: &View) -> Option<bingo_sdk::Action> {
 fn send_close(run: &mut Run, session: SessionId, action: bingo_sdk::Action) {
     if let Some(handle) = run.session.handles.get(&session).cloned() {
         let intent = run.mint(None);
-        run.ui.actions.push(session, handle, intent, action);
+        // Retirement belongs to this drawing, even after its site has closed.
+        run.ui.actions.push(session, handle, intent, action, None);
+        run.release_actions();
     }
 }

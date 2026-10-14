@@ -40,6 +40,7 @@ impl Run {
             self.mine.remove(&intent);
             self.site_keys.remove(&intent);
         }
+        self.release_actions();
     }
 
     pub(super) fn submit(&mut self, input: Input) {
@@ -55,13 +56,51 @@ impl Run {
             } => self.submit_text(handle, text, images, origin, delivery),
             Input::Action { action } => {
                 let intent = self.mint(None);
-                self.ui.actions.push(
+                self.enqueue_action(
                     self.session.tree.viewed().summary.id.clone(),
                     handle,
                     intent,
                     action,
                 );
             }
+        }
+    }
+
+    pub(super) fn enqueue_action(
+        &mut self,
+        session: bingo_sdk::SessionId,
+        handle: SessionHandle,
+        intent: bingo_sdk::IntentId,
+        action: bingo_sdk::Action,
+    ) {
+        let binding = self.session.tree.state(&session).and_then(|state| {
+            crate::actions::Binding::capture(state, &self.ui.placed.pulled, &action)
+        });
+        self.ui
+            .actions
+            .push(session, handle, intent, action, binding);
+        self.release_actions();
+    }
+
+    /// Queued gestures leave by the run's own clock, the one its wake obeys.
+    pub(super) fn release_actions(&mut self) {
+        self.release_actions_at(self.detection.now().instant);
+    }
+
+    pub(super) fn release_actions_at(&mut self, now: std::time::Instant) {
+        let controls = &mut self.ui.controls;
+        let dropped = controls.actions.release(now, |session, binding| {
+            binding.resolve(
+                session,
+                &self.session.tree,
+                &self.ui.placed.pulled,
+                &self.ui.shown.pulls,
+            )
+        });
+        for (intent, notice) in dropped {
+            self.mine.remove(&intent);
+            self.site_keys.remove(&intent);
+            self.ui.notify(Level::Warn, notice, now);
         }
     }
 

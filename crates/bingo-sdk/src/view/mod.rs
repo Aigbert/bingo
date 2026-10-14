@@ -25,6 +25,10 @@ mod contract;
 #[cfg(test)]
 mod tests;
 
+/// What a person is told when a gesture names a control its drawing no longer
+/// has: the host, a surface and a channel all say it in these words.
+pub const STALE_CONTROL: &str = "This control belongs to an earlier drawing; try the current one.";
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase", remote = "Self")]
 pub enum View {

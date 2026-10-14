@@ -90,6 +90,7 @@ pub(super) fn paint(
         .map_err(stdio)?;
     pulling::request(run, &layout.pulls);
     run.ui.shown = layout;
+    run.release_actions_at(now.instant);
     site_keys::drain(run);
     run.grumble(began.elapsed());
     showing::hand(run, screen)?;

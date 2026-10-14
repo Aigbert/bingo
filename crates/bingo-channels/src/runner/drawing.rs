@@ -143,10 +143,7 @@ impl Runner {
             .drawing(id)
             .is_some_and(|(drawing, _)| drawing.session == session && drawing.permits(&action));
         if !allowed {
-            if let Err(error) = self
-                .post("This control belongs to an earlier drawing; try the current one.")
-                .await
-            {
+            if let Err(error) = self.post(bingo_sdk::view::STALE_CONTROL).await {
                 tracing::warn!(%error, "the stale control notice could not be sent");
             }
             return;
@@ -296,7 +293,7 @@ mod tests {
             .await;
         assert!(
             matches!(adapter.records().last(), Some(Record::Send { text, .. })
-            if text == "This control belongs to an earlier drawing; try the current one.")
+            if text == bingo_sdk::view::STALE_CONTROL)
         );
         let before = renders(&host);
         runner.redraw(&[first.request.request_id]).await;

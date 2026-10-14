@@ -170,8 +170,10 @@ fn removing_a_session_releases_the_next_action_to_its_original_mailbox() {
                 name: "counter:ui".into(),
                 args: json!({"value":session}),
             },
+            None,
         );
     }
+    actions.release(Instant::now(), |_, _| unreachable!());
     assert_eq!(first.submitted().len(), 1);
     assert!(second.submitted().is_empty());
     assert_eq!(
@@ -179,6 +181,7 @@ fn removing_a_session_releases_the_next_action_to_its_original_mailbox() {
         [IntentId::from_raw("first")]
     );
     actions.acknowledge(&IntentId::from_raw("first"));
+    actions.release(Instant::now(), |_, _| unreachable!());
     assert_eq!(first.submitted().len(), 1);
     assert!(
         matches!(&second.submitted()[..], [Input::Action { action }] if action.args["value"] == "second")
