@@ -49,7 +49,7 @@ its step and in the turn's folded line.
 - `crates/bingo-permissions/src/{lib.rs,decide.rs,caution.rs}`; SDK policy, state and component props;
   core session interactions, receipt recording and `host/plugin.rs` provenance adapter.
 - `crates/bingo-surface-tui/src/{component/sealed.rs,activity.rs,
-  input{.rs,/interaction.rs},view.rs,transcript.rs,blocks.rs,run/{site_keys,interactions}.rs}`, new `ask/`; fallback drawings in
+  input{.rs,/interaction.rs},effect.rs,view.rs,transcript.rs,blocks.rs,run/{site_keys,interactions}.rs}`, new `ask/`; fallback drawings in
   `dialog.rs`, `component/question.rs`.
 - New `crates/bingo-mod-ask/`; `bingo-channel-adapter/src/question.rs` does not offer `AllowChanged` (the
   chat keeps its buttons).
@@ -62,7 +62,7 @@ its step and in the turn's folded line.
 - [x] `TestBackend`: arrow and number answers, No with a reason, change then run, danger starts on No, esc
   stops the turn, typed `x` sets aside and `ctrl+g` returns.
 - [x] An outside mod cannot replace the permission list (sealed test); it can wrap `Question` with `next`.
-- [x] All nine review findings have failing-before/passing-after regression coverage.
+- [x] All nine round-1 and four round-2 findings have failing-before/passing-after regressions.
 - [x] tmux drive against the fake provider in a temp HOME, captured; tui-smoke and all native gates as
   M167.
 - [ ] Complete Windows compilation of every touched crate: blocked by missing Windows C headers in
@@ -82,6 +82,9 @@ write's whole file in place.
 
 ## Decisions
 
+- Round 2: interaction keys bypass the pane-action FIFO, retaining per-site order, and use the asking
+  session's handle. Late opens cannot send keys for resolved asks. Escape always interrupts that owner,
+  answers only if supported, and drops its queued actions.
 - Options read the accepted specs in `Interaction`, the kernel's authoritative answer list.
 - A denied replacement offers only Change and No. Every replacement repeats hooks and policy checks;
   approval never overrides a deny rule.
@@ -90,7 +93,7 @@ write's whole file in place.
 - Review: plugin handles carry kernel-stamped provenance, independent of claimed identity or activation.
   Permission answers from plugins are refused; accepted answers record their source (ADR-0086).
   The host owns one stable adapter with a weak backlink: plugin weak handles survive startup without
-  forming a cycle. This preserves the boundary without adding a `HostApi` door.
+  forming a cycle. M171 approval forwards to the host, retaining its person-input check.
 - The mod returns its chosen answer in the supervised command acknowledgement; the surface resolves it
   through the person's handle. Minted question props avoid opening a session snapshot per key.
   An event hook releases mod state on resolution/cancellation, without waiting for another key.
@@ -116,27 +119,27 @@ write's whole file in place.
 
 ## Verified — 2026-10-15
 
-Review verification; local/fake fixtures only. Each finding was reproduced by a failing regression before its fix.
-Gates ran sequentially. Final command-output summaries:
+Round 2: local/fake fixtures only; all commands below used `RUST_TEST_THREADS=4`, with gates sequential.
+The four requested regressions failed before their fixes; late/failed owner opens also have coverage.
 
 ```text
 cargo fmt --all -- --check -> exit 0
 cargo check --workspace --all-targets --locked -> Finished dev profile; exit 0
 cargo clippy --workspace --all-targets --locked -- -D warnings -> Finished dev profile; exit 0
-cargo test --workspace --locked -> 5569 passed; 0 failed; 5 ignored (168 suites)
+cargo test --workspace --locked -> 5614 passed; 0 failed; 5 ignored (168 suites)
 bash scripts/check_discipline.sh -> discipline ok (advisories remain)
 bash scripts/budget.sh -> dependencies 413/413; core check 1s; relink 0 crates; budget ok
 cargo deny check -> advisories ok, bans ok, licenses ok, sources ok
 bash scripts/tui-smoke.sh -> tui-smoke ok
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked -> 191 passed
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc -p bingo-surface-rpc -p bingo-store-jsonl -p bingo-mods --lib --locked -> 264 passed; 1 ignored
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked -> 192 passed
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc -p bingo-surface-rpc -p bingo-store-jsonl -p bingo-mods --lib --locked -> 267 passed; 1 ignored
 cd sdk/typescript && npm test -> 31 pass; 0 fail
 ```
 
-World-parity initially exposed the temporary plugin adapter's lifetime; the retained adapter and regression fix it.
-The first smoke run timed out on one-shot `x`; the existing guard-aware `press_until` fixes the driver, and the full
-rerun passes. No wall-clock unit-test flake was observed. Budget warns at 12 GB; no external dependency was added.
-Discipline retains an advisory for the production provenance adapter; its purpose is recorded above, without an allowlist.
+The first workspace run exposed missing M171 `approve` forwarding (`UNSUPPORTED`) in the plugin adapter.
+Forwarding preserves the host's person-input check; the new guard regression and original CLI test pass.
+No timing flake was observed. Regeneration left schema/TS unchanged. Budget warns at 16 GB; no new dependency.
+The production provenance adapter retains its explained discipline advisory; no allowlist changed.
 
 For each touched crate: `cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc`:
 
