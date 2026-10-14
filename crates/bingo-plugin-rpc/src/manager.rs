@@ -251,10 +251,17 @@ impl Manager {
 
     /// Explicit reload has no clock and shares the watcher's bridge operation.
     pub async fn reload(&self, root: &Path) -> Result<(), bingo_sdk::KernelError> {
-        let manifest = crate::validate::read(root)?;
+        let root = root.canonicalize().map_err(|error| {
+            bingo_sdk::KernelError::new(bingo_sdk::ErrorCode::InvalidInput, error.to_string())
+        })?;
+        let manifest = crate::validate::read(&root)?;
         let bridge = self
-            .bridges()
-            .find(|bridge| bridge.name() == manifest.name)
+            .discovered()
+            .iter()
+            .find(|installed| {
+                installed.registration.root.canonicalize().ok().as_ref() == Some(&root)
+            })
+            .and_then(|installed| installed.bridge.as_ref())
             .ok_or_else(|| {
                 bingo_sdk::KernelError::new(
                     bingo_sdk::ErrorCode::InvalidInput,
@@ -431,6 +438,32 @@ impl Manager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn reload_never_installs_a_waiting_namesake_in_the_personal_bridge() {
+        let home = tempfile::tempdir().unwrap();
+        let repo = tempfile::tempdir().unwrap();
+        installed(home.path(), "same");
+        installed(repo.path(), "same");
+        let project = repo.path().join(".bingo/plugins/same");
+        let path = project.join("plugin.json");
+        let mut value: Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        value["version"] = serde_json::json!("unapproved");
+        std::fs::write(path, value.to_string()).unwrap();
+        let manager = Manager::new(Env::rooted(home.path()), BTreeMap::new(), BTreeSet::new());
+        manager
+            .start(repo.path(), bingo_sdk::testing::NoHost::handle())
+            .await;
+        assert!(manager.reload(&project).await.is_err());
+        let personal = manager
+            .discovered()
+            .iter()
+            .find(|entry| entry.registration.origin == bingo_sdk::PluginOrigin::User)
+            .unwrap();
+        assert_eq!(personal.registration.status(ID).version, "0.4.2");
+        manager.shutdown().await;
+    }
 
     #[tokio::test]
     async fn a_manager_that_has_discovered_nothing_answers_nothing() {
