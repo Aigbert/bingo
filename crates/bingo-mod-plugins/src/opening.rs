@@ -27,7 +27,7 @@ impl Interceptor for Opening {
         let fallback = serde_json::from_value::<CommandOutcome>(plain)
             .ok()
             .and_then(|outcome| match outcome {
-                CommandOutcome::View { view } => Some(view.fold()),
+                CommandOutcome::View { view } => Some(view.fold_markdown()),
                 _ => None,
             });
         serde_json::to_value(CommandOutcome::Surface {

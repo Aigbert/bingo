@@ -11,7 +11,7 @@ expression: output
 "   ✗ postgres             stdio · failed                                        "
 "   ○ figma                http · off                                            "
 "────────────────────────────────────────────────────────────────────────────────"
-" github    MCP · stdio                                                          "
+" github                                                              MCP · stdio"
 " 26 tools for the model                                                         "
 "                                                                                "
 " state    ● connected                                                           "

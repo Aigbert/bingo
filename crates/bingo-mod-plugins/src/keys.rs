@@ -82,18 +82,16 @@ impl Handler {
                 Ok(json!({}))
             }
             Verb::Fold => {
-                cursor.expanded = !cursor.expanded;
-                if cursor.expanded {
-                    cursor.selected = props
-                        .plugins
-                        .iter()
-                        .find(|p| groups::builtin(p))
-                        .map(|p| format!("p:{}", p.id))
-                        .unwrap_or_default();
-                }
+                fold(cursor, props);
                 Ok(json!({}))
             }
-            _ => Ok(operation(verb)),
+            _ => {
+                if matches!(&verb, Verb::Line(line) if line.starts_with("/mcp login ") || line.starts_with("/mcp tools "))
+                {
+                    state.remove(&identity);
+                }
+                Ok(operation(verb))
+            }
         }
     }
 }
@@ -118,5 +116,17 @@ fn navigate(cursor: &mut crate::Cursor, groups: &[groups::Group], key: &str) {
     };
     if let Some(row) = rows.get(at) {
         cursor.selected = row.key.clone();
+    }
+}
+
+fn fold(cursor: &mut crate::Cursor, props: &PluginsProps) {
+    cursor.expanded = !cursor.expanded;
+    if cursor.expanded {
+        cursor.selected = props
+            .plugins
+            .iter()
+            .find(|p| groups::builtin(p))
+            .map(|p| format!("p:{}", p.id))
+            .unwrap_or_default();
     }
 }

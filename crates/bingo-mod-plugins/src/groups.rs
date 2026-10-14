@@ -98,10 +98,14 @@ fn plugin_row(index: usize, p: &CatalogEntry, plugins: &[CatalogEntry]) -> Row {
                     String::new()
                 }
             }),
-        PluginState::On => p.meta["tier"].as_str().unwrap_or("tighten").into(),
+        PluginState::On => p.meta["tier"].as_str().unwrap_or("on").into(),
     };
     Row {
-        key: format!("p:{}", p.id),
+        key: if p.meta["origin"] == "project" {
+            format!("p:plugins:{}", name(p))
+        } else {
+            format!("p:{}", p.id)
+        },
         label: name(p).into(),
         glyph,
         tag,

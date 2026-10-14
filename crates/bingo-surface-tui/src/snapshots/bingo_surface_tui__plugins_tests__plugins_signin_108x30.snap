@@ -11,7 +11,7 @@ expression: output
 "                                                                                                            "
 "                                                                                                            "
 " MCP servers   7 plugins · 4 MCP servers · one list                      ● on   ○ off   ✗ failed   ◌ waiting"
-"   MCP servers  their tools always ask                  │ linear    MCP · http                              "
+"   MCP servers  their tools always ask                  │ linear                                  MCP · http"
 "   ● github               stdio · 26 tools              │ its tools appear once you sign in                 "
 " ❯ ○ linear               http · sign in                │                                                   "
 "   ✗ postgres             stdio · failed                │ state    ○ needs sign-in                          "

@@ -156,6 +156,18 @@ fn handlers_retire_the_opening_and_return_only_command_lines() {
         json!({"close":true})
     );
     assert!(state.lock().unwrap().is_empty());
+    state.lock().unwrap().insert(
+        (props.session.clone(), "b".into()),
+        Cursor {
+            selected: "m:github".into(),
+            ..Default::default()
+        },
+    );
+    assert_eq!(
+        handler.press("b", "enter", &props, &servers).unwrap(),
+        json!({"run":"/mcp tools github"})
+    );
+    assert!(state.lock().unwrap().is_empty());
 }
 
 #[test]
@@ -173,4 +185,20 @@ fn removing_the_selected_row_drops_its_unconfirmed_trust_choice() {
     let rows = groups::groups(component::PluginsOpen::Plugins, &plugins, &servers, false);
     groups::selected(&rows, &mut cursor);
     assert!(cursor.trust.is_none());
+}
+
+#[test]
+fn approval_keeps_the_project_rows_identity() {
+    let (mut plugins, servers) = fixture();
+    plugins[3].id = "demo-lint".into();
+    plugins[3].meta["state"] = json!({"kind":"on"});
+    let mut cursor = Cursor {
+        selected: "p:plugins:demo-lint".into(),
+        ..Default::default()
+    };
+    let rows = groups::groups(component::PluginsOpen::Plugins, &plugins, &servers, false);
+    assert_eq!(
+        groups::selected(&rows, &mut cursor).unwrap().label,
+        "demo-lint"
+    );
 }

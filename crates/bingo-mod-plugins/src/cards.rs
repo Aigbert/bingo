@@ -4,11 +4,20 @@ use bingo_services::mcp::{Auth, ServerRow, Status};
 pub struct Fact {
     pub text: String,
     pub error: bool,
+    pub aside: Option<String>,
 }
 fn line(text: impl Into<String>) -> Fact {
     Fact {
         text: text.into(),
         error: false,
+        aside: None,
+    }
+}
+fn title(name: &str, aside: &str) -> Fact {
+    Fact {
+        text: format!(" {name}"),
+        error: false,
+        aside: Some(aside.into()),
     }
 }
 fn fact(key: &str, value: impl std::fmt::Display) -> Fact {
@@ -19,11 +28,7 @@ pub fn plugin_card(
     all: &[CatalogEntry],
     trust: Option<&crate::trust::Choice>,
 ) -> Vec<Fact> {
-    let mut rows = vec![
-        line(format!(" {}", crate::groups::name(p))),
-        fact("kind", kind(p)),
-        line(""),
-    ];
+    let mut rows = vec![title(crate::groups::name(p), kind(p)), line(""), line("")];
     rows.push(fact("state", plugin_state(&crate::groups::state(p))));
     rows.push(fact(
         "version",
@@ -48,8 +53,10 @@ fn kind(p: &CatalogEntry) -> &str {
         "compiled in"
     } else if p.meta["runtime"] == "process" {
         "process"
-    } else {
+    } else if p.meta["runtime"] == "module" {
         "js mod"
+    } else {
+        "plugin"
     }
 }
 fn origin(p: &CatalogEntry) -> String {
@@ -59,8 +66,13 @@ fn origin(p: &CatalogEntry) -> String {
         format!(".bingo/plugins/{}", crate::groups::name(p))
     } else if p.meta["origin"] == "explicit" {
         "explicit plugin directory".into()
-    } else {
+    } else if p.meta["origin"] == "user" {
         format!("~/.bingo/plugins/{}", crate::groups::name(p))
+    } else {
+        p.meta["from"]
+            .as_str()
+            .unwrap_or("configured plugin")
+            .into()
     }
 }
 fn plugin_state(state: &PluginState) -> String {
@@ -127,7 +139,9 @@ fn granted(p: &CatalogEntry) -> String {
     if crate::groups::builtin(p) {
         return "full · compiled in".into();
     }
-    let tier = p.meta["tier"].as_str().unwrap_or("tighten");
+    let Some(tier) = p.meta["tier"].as_str() else {
+        return "none yet".into();
+    };
     let words = crate::trust::TIERS
         .iter()
         .find(|(name, _)| *name == tier)
@@ -141,6 +155,7 @@ fn plugin_footer(p: &CatalogEntry) -> Vec<Fact> {
         rows.push(Fact {
             text: why,
             error: true,
+            aside: None,
         });
     }
     if let Some(why) = p.meta["needed"].as_str() {
@@ -175,6 +190,7 @@ fn trust_card(p: &CatalogEntry, choice: &crate::trust::Choice) -> Vec<Fact> {
                 crate::groups::name(p)
             ),
             error: true,
+            aside: None,
         }
     } else {
         line(" kept in ~/.bingo/settings.toml, never the repo")
@@ -182,7 +198,7 @@ fn trust_card(p: &CatalogEntry, choice: &crate::trust::Choice) -> Vec<Fact> {
     rows
 }
 pub fn server_card(s: &ServerRow) -> Vec<Fact> {
-    let mut rows = vec![line(format!(" {}    MCP · {}", s.name, s.transport.name()))];
+    let mut rows = vec![title(&s.name, &format!("MCP · {}", s.transport.name()))];
     rows.push(line(match s.status {
         Status::Connected { tools } => format!(" {tools} tools for the model"),
         Status::NeedsAuth { .. } => " its tools appear once you sign in".into(),
@@ -232,6 +248,7 @@ pub fn server_card(s: &ServerRow) -> Vec<Fact> {
         rows.push(Fact {
             text: why.clone(),
             error: true,
+            aside: None,
         });
     }
     rows

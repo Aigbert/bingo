@@ -303,6 +303,10 @@ async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
             key(&host, &mut attachment, "enter").await["run"],
             format!("/mcp {verb} local")
         );
+        if matches!(verb, "tools" | "login") {
+            key(&host, &mut attachment, "down").await;
+            key(&host, &mut attachment, "down").await;
+        }
     }
     row.lock().unwrap().status = Status::SigningIn;
     let refused = key(&host, &mut attachment, "r").await;

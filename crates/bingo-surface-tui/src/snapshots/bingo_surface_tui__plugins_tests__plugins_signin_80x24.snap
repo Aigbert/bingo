@@ -11,7 +11,7 @@ expression: output
 "   ✗ postgres             stdio · failed                                        "
 "   ○ figma                http · off                                            "
 "────────────────────────────────────────────────────────────────────────────────"
-" linear    MCP · http                                                           "
+" linear                                                               MCP · http"
 " its tools appear once you sign in                                              "
 "                                                                                "
 " state    ○ needs sign-in                                                       "

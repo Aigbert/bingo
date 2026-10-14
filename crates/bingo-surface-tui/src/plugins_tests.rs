@@ -157,3 +157,18 @@ fn an_engine_fallback_does_not_block_escape_and_the_draft_returns() {
     assert!(!crate::plugins::active(&ui));
     assert_eq!(ui.composer.text(), "kept draft");
 }
+
+#[test]
+fn a_long_load_error_wraps_without_losing_its_end() {
+    let (mut props, servers) = fixture();
+    props.plugins[1].meta["state"]["why"] =
+        json!(format!("{} END-OF-ERROR", "load failed: ".repeat(8)));
+    for (width, height) in [(108, 30), (80, 24)] {
+        let mut cursor = Cursor {
+            selected: "p:weather".into(),
+            ..Default::default()
+        };
+        let output = painted(&props, &servers, &mut cursor, width, height);
+        assert!(output.contains("END-OF-ERROR"), "{output}");
+    }
+}

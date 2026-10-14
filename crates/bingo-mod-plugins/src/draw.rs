@@ -155,7 +155,10 @@ fn hints(
         );
     }
     match kind {
-        Some(Kind::Builtins) => " ↑↓ pick · ⏎ show / fold · esc close".into(),
+        Some(Kind::Builtins) => format!(
+            " ↑↓ pick · ⏎ {} · esc close",
+            if cursor.expanded { "fold" } else { "show them" }
+        ),
         Some(Kind::Plugin(i))
             if matches!(
                 groups::state(&props.plugins[*i]),
@@ -275,18 +278,7 @@ fn body(
         room
     };
     let list = list(groups, &cursor.selected, list_height);
-    let card = column(
-        card.into_iter()
-            .map(|fact| {
-                text(
-                    fact.text,
-                    if fact.error { Some("red") } else { None },
-                    false,
-                )
-            })
-            .collect(),
-        None,
-    );
+    let card = column(card.into_iter().map(fact_view).collect(), None);
     if width < 100 {
         column(
             vec![list, text("─".repeat(usize::from(width)), None, true), card],
@@ -323,4 +315,29 @@ fn header(props: &PluginsProps, servers: usize) -> String {
             .count(),
         servers
     )
+}
+
+fn fact_view(fact: crate::cards::Fact) -> View {
+    let Some(aside) = fact.aside else {
+        let mut view = text(
+            fact.text,
+            if fact.error { Some("red") } else { None },
+            false,
+        );
+        if let View::Text { style, .. } = &mut view {
+            style.wrap = Some("wrap".into());
+        }
+        return view;
+    };
+    View::Box {
+        children: vec![
+            text(fact.text, Some("yellow"), false),
+            text(aside, None, true),
+        ],
+        layout: Box::new(view::BoxStyle {
+            flex_direction: Some(view::Direction::Row),
+            justify_content: Some(view::Justify::SpaceBetween),
+            ..Default::default()
+        }),
+    }
 }
