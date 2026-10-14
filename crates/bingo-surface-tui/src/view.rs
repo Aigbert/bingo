@@ -37,7 +37,8 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let state = tree.viewed();
     let draft = ui.composer.layout(inner_width(state, area.width as usize));
     let strip = strip(state, ui, &frame.measurements, area.width);
-    let activity = activity::lines(tree, ui, area.width as usize, now);
+    let mut activity = activity::lines(tree, ui, area.width as usize, now);
+    activity.extend(crate::component::band(state, ui, frame));
     let toasts = ui.placed.toasts.lines(state, now, usize::from(area.width));
     let toast_rows = (toasts.len() as u16).min(area.height / 3);
     let pane_rows = crate::pane::height(ui, state, area.height);
@@ -479,12 +480,14 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
             now,
         )
         .in_tree(tree)
+        .components(&ui.placed.pulled)
         .saying(ui.welcome.update.as_deref())
         .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
         .opening(ui.focus.intro().map(|intro| intro.seconds(now)))
         .measuring(ui.measure),
     );
     frame.top = ui.scroll.top(frame.height, rows, now.instant);
+    component_requests(state, ui, frame, area);
     let mut shown = frame.blocks.window(frame.top, rows);
     mark_row(ui, frame, &mut shown);
     // A short transcript hangs from the composer, not from the top of the screen.
@@ -504,6 +507,29 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     }
     if ui.crossfading(now) {
         layers::hush(frame, area);
+    }
+}
+
+fn component_requests(state: &SessionState, ui: &Ui, frame: &mut Layout, area: Rect) {
+    for item in state.transcript.items() {
+        let Some((from, to)) = frame.blocks.span(&item.id) else {
+            continue;
+        };
+        if to <= frame.top || from >= frame.top + usize::from(area.height) {
+            continue;
+        }
+        let expanded = crate::fold::fold_of(&ui.folds, item) == crate::fold::Fold::Open;
+        if let Some(props) = crate::component::items::props(item, expanded)
+            && let Some(key) = crate::component::key(
+                state,
+                &crate::component::items::id(item),
+                &props,
+                area.width,
+                area.height,
+            )
+        {
+            frame.pulls.push(key);
+        }
     }
 }
 

@@ -82,6 +82,7 @@ const EXPAND: &str = "ctrl+o to expand";
 
 /// What every row of one transcript needs to know about where it is.
 pub struct Rows<'a> {
+    pub pulled: Option<&'a crate::pulled::Memo>,
     pub state: &'a SessionState,
     pub names: Vec<markdown::mentions::Name>,
     pub width: usize,
@@ -129,6 +130,7 @@ impl<'a> Rows<'a> {
         now: Now,
     ) -> Self {
         Self {
+            pulled: None,
             state,
             names: Vec::new(),
             width,
@@ -143,6 +145,11 @@ impl<'a> Rows<'a> {
             opening: None,
             entrance: crate::welcome::Entrance::default(),
         }
+    }
+
+    pub fn components(mut self, memo: &'a crate::pulled::Memo) -> Self {
+        self.pulled = Some(memo);
+        self
     }
 
     /// What the welcome box has to add: the release this build could become.
@@ -348,7 +355,29 @@ fn item_lines(
     cue: Cue,
     fold: Fold,
 ) -> Block {
-    let block = default_item_lines(item, place, agents, rows, cue, fold);
+    let mut block = default_item_lines(item, place, agents, rows, cue, fold);
+    if let Some(props) = crate::component::items::props(item, fold == Fold::Open)
+        && let Some(key) = crate::component::key(
+            rows.state,
+            &crate::component::items::id(item),
+            &props,
+            rows.width as u16,
+            0,
+        )
+        && let Some(answer) = rows.pulled.and_then(|memo| memo.get(&key))
+    {
+        block.lines = crate::component::draw(&props, Some(answer), rows.width, |changed, _| {
+            if changed == &props {
+                return block.lines.clone();
+            }
+            let changed_item = crate::component::items::changed(item, changed);
+            let fold = match changed {
+                bingo_sdk::component::Props::UserMessage(props) if props.is_expanded => Fold::Open,
+                _ => fold,
+            };
+            default_item_lines(&changed_item, place, agents, rows, cue, fold).lines
+        });
+    }
     match rows.placed_on(&item.id).next_back() {
         Some(slot) => slots::placed_row(item, slot, rows, cue, block),
         None => block,
