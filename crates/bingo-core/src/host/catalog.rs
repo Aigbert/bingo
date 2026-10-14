@@ -512,3 +512,47 @@ mod tests {
         assert_eq!(sonnet.meta["images"], json!(facts.images));
     }
 }
+
+#[cfg(test)]
+mod event_contract {
+    use super::*;
+    struct Face;
+    #[async_trait::async_trait]
+    impl WireService for Face {
+        fn face(&self) -> Option<bingo_sdk::Face> {
+            let mut face = bingo_sdk::Face::new("kit");
+            face.methods.push(service::Method {
+                entry: catalogue::Entry::face(
+                    "kit.echo".into(),
+                    schemars::schema_for!(String),
+                    schemars::schema_for!(String),
+                ),
+                unsafe_call: false,
+            });
+            Some(face)
+        }
+        async fn call(&self, _: &str, _: Value) -> Result<Value, ServiceError> {
+            Err(ServiceError("catalogue must not execute a method".into()))
+        }
+    }
+    #[tokio::test]
+    async fn event_catalogue_includes_kernel_and_late_service_schemas() {
+        let home = tempfile::tempdir().unwrap();
+        let host = crate::Host::build(vec![], crate::HostConfig::new(Env::rooted(home.path())))
+            .await
+            .unwrap();
+        host.open_service("kit", Arc::new(Face)).unwrap();
+        let kind = serde_json::from_value(json!("events")).expect("event catalogue wire kind");
+        let result = host.catalog(kind).await.unwrap();
+        assert!(result.entries.iter().any(|entry| entry.id == "ui.render"
+            && entry.meta["input"]["properties"]["component"].is_object()));
+        let echo = result
+            .entries
+            .iter()
+            .find(|entry| entry.id == "kit.echo")
+            .unwrap();
+        assert_eq!(echo.meta["input"]["type"], "string");
+        assert_eq!(echo.meta["result"]["type"], "string");
+        host.shutdown().await;
+    }
+}
