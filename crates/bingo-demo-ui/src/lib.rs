@@ -79,6 +79,7 @@ static MANIFEST: PluginManifest = PluginManifest {
     ],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[],
         keys: &[(SETTING, Merge::Replace)],
         schema,
     }),

@@ -471,6 +471,7 @@ name = "bingo-core"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-digest",
  "bingo-sdk",
  "futures",
  "insta",

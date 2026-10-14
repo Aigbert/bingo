@@ -172,7 +172,7 @@ async fn plugins_load_in_order_and_unmet_requirements_disable_not_crash() {
     assert_eq!(
         statuses
             .iter()
-            .map(|p| (p.id.as_str(), p.enabled))
+            .map(|p| (p.id.as_str(), p.state.is_on()))
             .collect::<Vec<_>>(),
         vec![
             ("test.provider", true),
@@ -181,11 +181,11 @@ async fn plugins_load_in_order_and_unmet_requirements_disable_not_crash() {
         ]
     );
     assert_eq!(
-        statuses[2].reason.as_deref(),
+        statuses[2].state.reason(),
         Some("unmet requirements: service:missing")
     );
     let plugins = host.catalog(CatalogKind::Plugins).await.unwrap();
-    assert_eq!(plugins.entries[2].meta["enabled"], json!(false));
+    assert_eq!(plugins.entries[2].meta["state"]["kind"], json!("off"));
     assert_eq!(
         host.catalog(CatalogKind::Tools).await.unwrap().entries[0].id,
         "Echo"
@@ -580,6 +580,7 @@ async fn a_plugin_receives_only_the_settings_it_claimed() {
         provides: &[],
         requires: &[],
         config: Some(ConfigClaim {
+            approve: &[],
             keys: &[
                 ("greeting.text", Merge::Replace),
                 ("greeting.tags", Merge::Accumulate),

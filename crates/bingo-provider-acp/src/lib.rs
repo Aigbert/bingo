@@ -72,6 +72,7 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     provides: &["service:bingo.acp.pages"],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[],
         keys: &[("acp", Merge::ByName)],
         schema,
     }),

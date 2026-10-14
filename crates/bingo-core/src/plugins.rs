@@ -120,6 +120,25 @@ fn written(path: &Path) -> Result<Map<String, Value>, SettingsError> {
     }
 }
 
+/// Waiting catalogue IDs include the owning command, so clients need no feature cases.
+pub fn waiting_line(entry: &bingo_sdk::CatalogEntry) -> Option<String> {
+    let state: bingo_sdk::PluginState =
+        serde_json::from_value(entry.meta.get("state")?.clone()).ok()?;
+    let (_, name) = entry.id.split_once(':')?;
+    Some(format!("{name}: {}", waiting_reason(&entry.id, &state)?))
+}
+
+pub fn waiting_reason(id: &str, state: &bingo_sdk::PluginState) -> Option<String> {
+    if !matches!(state, bingo_sdk::PluginState::Waiting { .. }) {
+        return None;
+    }
+    let (command, name) = id.split_once(':')?;
+    Some(format!(
+        "{}; /{command} approve {name} (bingo {command} approve {name})",
+        state.reason().unwrap_or_default()
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -41,7 +41,8 @@ for n in plugins:
         elif d in plugins:
             bad.append(f"{n} -> {d} (plugin -> plugin; use a service trait via the sdk)")
 for d in deps("bingo-core") & ws:
-    if d != "bingo-sdk":
+    # ADR-0087 permits the pure digest library for approval fingerprints.
+    if d not in {"bingo-sdk", "bingo-digest"}:
         bad.append(f"bingo-core -> {d} (the kernel never imports a plugin)")
 for n in ws:
     if n != "bingo-surface-tui":

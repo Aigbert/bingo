@@ -304,7 +304,9 @@ impl Registry {
     }
 
     pub(super) fn enabled(&self, plugin: &str) -> bool {
-        self.plugins.iter().any(|p| p.id == plugin && p.enabled)
+        self.plugins
+            .iter()
+            .any(|p| p.id == plugin && p.state.is_on())
     }
 }
 
@@ -620,7 +622,7 @@ mod tests {
     fn a_requirement_met_later_in_the_order_still_stands() {
         let registry = loaded(vec![Box::new(Paper(&NEEDS)), Box::new(Paper(&GIVES))]);
         assert!(
-            registry.plugins.iter().all(|status| status.enabled),
+            registry.plugins.iter().all(|status| status.state.is_on()),
             "{:?}",
             registry.plugins
         );
@@ -630,26 +632,30 @@ mod tests {
     fn a_loss_cascades_to_whoever_required_the_lost_capability() {
         let registry = loaded(vec![Box::new(Paper(&LEANS)), Box::new(Paper(&CHAIN))]);
         let chain = &registry.plugins[1];
-        assert!(!chain.enabled, "{:?}", registry.plugins);
+        assert!(!chain.state.is_on(), "{:?}", registry.plugins);
         assert!(
             chain
-                .reason
-                .as_deref()
+                .state
+                .reason()
                 .unwrap_or_default()
                 .contains("service:missing"),
             "{:?}",
-            chain.reason
+            chain.state.reason()
         );
         let leans = &registry.plugins[0];
-        assert!(!leans.enabled, "the loss cascades: {:?}", registry.plugins);
+        assert!(
+            !leans.state.is_on(),
+            "the loss cascades: {:?}",
+            registry.plugins
+        );
         assert!(
             leans
-                .reason
-                .as_deref()
+                .state
+                .reason()
                 .unwrap_or_default()
                 .contains("service:y"),
             "{:?}",
-            leans.reason
+            leans.state.reason()
         );
     }
 
@@ -660,8 +666,8 @@ mod tests {
     fn a_plugin_switched_off_is_disabled_with_its_reason_and_registers_nothing() {
         let registry = switched(vec![Box::new(Contributor(&GIVES))], &["test.gives"]);
         let gives = status(&registry, "test.gives");
-        assert!(!gives.enabled, "{:?}", registry.plugins);
-        assert_eq!(gives.reason.as_deref(), Some(SWITCHED_OFF));
+        assert!(!gives.state.is_on(), "{:?}", registry.plugins);
+        assert_eq!(gives.state.reason(), Some(SWITCHED_OFF));
         assert_eq!(gives.from, BUILT_IN);
         assert!(
             registry.sources.tools.is_empty(),
@@ -681,15 +687,15 @@ mod tests {
             &["test.gives"],
         );
         let needs = status(&registry, "test.needs");
-        assert!(!needs.enabled, "{:?}", registry.plugins);
+        assert!(!needs.state.is_on(), "{:?}", registry.plugins);
         assert!(
             needs
-                .reason
-                .as_deref()
+                .state
+                .reason()
                 .unwrap_or_default()
                 .contains("service:x"),
             "{:?}",
-            needs.reason
+            needs.state.reason()
         );
     }
 
@@ -700,7 +706,7 @@ mod tests {
     fn a_store_ignores_its_switch_and_the_notice_names_it() {
         let registry = switched(vec![Box::new(Contributor(&STORE))], &["test.store"]);
         assert!(
-            status(&registry, "test.store").enabled,
+            status(&registry, "test.store").state.is_on(),
             "{:?}",
             registry.plugins
         );

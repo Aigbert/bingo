@@ -21,7 +21,7 @@ pub(super) async fn model_granted(host: &super::Host, plugin: &str) -> bool {
     match status.and_then(|status| {
         status
             .execution
-            .map(|execution| (status.enabled, execution.grant))
+            .map(|execution| (status.state.is_on(), execution.grant))
     }) {
         Some((enabled, grant)) => {
             enabled && grant.tier != Tier::Tighten && grant.uses.contains("model")
@@ -243,8 +243,7 @@ async fn plugins(registry: &Registry) -> Vec<CatalogEntry> {
 /// One plugin as a client reads it: whether it runs, why not, and which
 /// listing it came from — the row `/plugins` draws, in a catalogue's shape.
 pub(super) fn plugin_entry(status: &PluginStatus) -> CatalogEntry {
-    let mut meta =
-        json!({ "enabled": status.enabled, "reason": status.reason, "from": status.from });
+    let mut meta = json!({ "state": status.state, "from": status.from });
     if let (Some(execution), Some(meta)) = (&status.execution, meta.as_object_mut())
         && let Ok(Value::Object(fields)) = serde_json::to_value(execution)
     {
@@ -521,8 +520,9 @@ mod tests {
             vec![PluginStatus {
                 id: "wordcount".into(),
                 version: "0.2.0".into(),
-                enabled: false,
-                reason: Some("switched off in the settings".into()),
+                state: bingo_sdk::PluginState::Off {
+                    why: "switched off in the settings".into(),
+                },
                 execution: None,
                 from: "bridge".into(),
             }]
@@ -533,8 +533,7 @@ mod tests {
         PluginStatus {
             id: id.into(),
             version: "1.0.0".into(),
-            enabled: true,
-            reason: None,
+            state: bingo_sdk::PluginState::On,
             execution: None,
             from: BUILT_IN.into(),
         }
@@ -562,13 +561,12 @@ mod tests {
         assert_eq!(web.label, "bingo.tools.web 1.0.0");
         assert_eq!(
             web.meta,
-            json!({ "enabled": true, "reason": null, "from": BUILT_IN })
+            json!({ "state": {"kind":"on"}, "from": BUILT_IN })
         );
         assert_eq!(
             entry(&entries, "wordcount").meta,
             json!({
-                "enabled": false,
-                "reason": "switched off in the settings",
+                "state": {"kind":"off", "why":"switched off in the settings"},
                 "from": "bridge",
             }),
             "a plugin only a source has seen says where it came from"

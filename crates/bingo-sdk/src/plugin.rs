@@ -46,6 +46,7 @@ pub struct PluginManifest {
 pub struct ConfigClaim {
     pub keys: &'static [(&'static str, Merge)],
     pub schema: fn() -> schemars::Schema,
+    pub approve: &'static [&'static str],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,6 +55,8 @@ pub enum Merge {
     Replace,
     /// Lists concatenate across layers (permission rules, disabled servers).
     Accumulate,
+    /// Accumulate only personal or explicitly supplied layers, never repository layers.
+    PersonalAccumulate,
     /// Objects merge per key (named providers, MCP servers).
     ByName,
 }
@@ -125,6 +128,42 @@ pub struct PluginRegistration {
     pub execution: PluginExecution,
 }
 
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum PluginState {
+    On,
+    Off { why: String },
+    Failed { why: String },
+    Waiting { changed: bool },
+    Pending,
+}
+
+impl PluginState {
+    pub fn is_on(&self) -> bool {
+        matches!(self, Self::On)
+    }
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::On => "on",
+            Self::Off { .. } => "off",
+            Self::Failed { .. } => "failed",
+            Self::Waiting { .. } => "waiting",
+            Self::Pending => "pending",
+        }
+    }
+    pub fn reason(&self) -> Option<&str> {
+        match self {
+            Self::On => None,
+            Self::Off { why } | Self::Failed { why } => Some(why),
+            Self::Waiting { changed: true } => Some("changed since your yes"),
+            Self::Waiting { changed: false } => Some("waits for your yes"),
+            Self::Pending => Some("registration pending"),
+        }
+    }
+}
+
 /// What one plugin is, for a listing: what it is called, whether it will run,
 /// and why not. It covers a plugin the kernel registered and one only a
 /// [`PluginSource`] has ever seen, so the two draw as one table (ADR-0057 §5).
@@ -132,9 +171,7 @@ pub struct PluginRegistration {
 pub struct PluginStatus {
     pub id: String,
     pub version: String,
-    pub enabled: bool,
-    /// Why it is not standing; `None` for one that is.
-    pub reason: Option<String>,
+    pub state: PluginState,
     /// [`BUILT_IN`], or the id of the source that listed it.
     pub from: String,
     pub execution: Option<PluginExecution>,
@@ -146,8 +183,7 @@ impl PluginStatus {
         Self {
             id: manifest.id.to_string(),
             version: manifest.version.to_string(),
-            enabled: true,
-            reason: None,
+            state: PluginState::On,
             from: BUILT_IN.to_string(),
             execution: None,
         }
@@ -156,8 +192,7 @@ impl PluginStatus {
     /// One this build ships that will not run, and why.
     pub fn disabled(manifest: &PluginManifest, reason: impl Into<String>) -> Self {
         Self {
-            reason: Some(reason.into()),
-            enabled: false,
+            state: PluginState::Off { why: reason.into() },
             ..Self::loaded(manifest)
         }
     }
@@ -511,15 +546,19 @@ mod tests {
     fn a_built_in_status_names_the_build_and_carries_its_reason() {
         let loaded = PluginStatus::loaded(&MANIFEST);
         assert_eq!(
-            (loaded.id.as_str(), loaded.version.as_str(), loaded.enabled),
+            (
+                loaded.id.as_str(),
+                loaded.version.as_str(),
+                loaded.state.is_on()
+            ),
             ("test.plugin", "0.2.0", true)
         );
         assert_eq!(loaded.from, BUILT_IN);
-        assert_eq!(loaded.reason, None);
+        assert_eq!(loaded.state.reason(), None);
 
         let disabled = PluginStatus::disabled(&MANIFEST, SWITCHED_OFF);
-        assert!(!disabled.enabled);
-        assert_eq!(disabled.reason.as_deref(), Some(SWITCHED_OFF));
+        assert!(!disabled.state.is_on());
+        assert_eq!(disabled.state.reason(), Some(SWITCHED_OFF));
         assert_eq!(disabled.from, BUILT_IN);
     }
 }

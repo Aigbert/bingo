@@ -39,6 +39,7 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     // One block, so one key: what it says. Whether it is said at all is the
     // plugin switch's, not a second `enabled` here (ADR-0059 §1).
     config: Some(ConfigClaim {
+        approve: &[],
         keys: &[(SETTING, Merge::Replace)],
         schema,
     }),

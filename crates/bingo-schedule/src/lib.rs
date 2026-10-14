@@ -77,6 +77,7 @@ static MANIFEST: PluginManifest = PluginManifest {
     // data directory, and what is in it is written by the tools. The one
     // setting is whether the model may wake itself at all (ADR-0019 §8).
     config: Some(ConfigClaim {
+        approve: &[],
         keys: &[(SETTING, Merge::Replace)],
         schema,
     }),

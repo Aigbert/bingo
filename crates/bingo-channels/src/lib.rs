@@ -77,6 +77,7 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     ],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[],
         // Two layers each naming an adapter both apply: a project may add a
         // chat without unsaying the user's.
         keys: &[(SETTING, Merge::ByName)],

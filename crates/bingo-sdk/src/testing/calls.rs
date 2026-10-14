@@ -5,6 +5,9 @@ use std::sync::Arc;
 /// Every HostApi verb, with the arguments supplied by its caller.
 #[derive(Clone)]
 pub enum HostCall {
+    Approve {
+        request: Approval,
+    },
     Render {
         session: SessionId,
         request: crate::render::RenderRequest,
@@ -93,6 +96,7 @@ pub enum HostCall {
 impl std::fmt::Debug for HostCall {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Approve { request } => f.debug_tuple("Approve").field(request).finish(),
             Self::Render { session, request } => {
                 fields(f, "Render", &[("session", session), ("request", request)])
             }
@@ -140,25 +144,13 @@ impl std::fmt::Debug for HostCall {
                 plugin,
                 kind,
                 payload,
-            } => f
-                .debug_struct("Extend")
-                .field("session", session)
-                .field("plugin", plugin)
-                .field("kind", kind)
-                .field("payload", payload)
-                .finish(),
+            } => extension(f, "Extend", session, plugin, kind, payload),
             Self::Signal {
                 session,
                 plugin,
                 kind,
                 payload,
-            } => f
-                .debug_struct("Signal")
-                .field("session", session)
-                .field("plugin", plugin)
-                .field("kind", kind)
-                .field("payload", payload)
-                .finish(),
+            } => extension(f, "Signal", session, plugin, kind, payload),
             Self::Invoke { session, call } => f
                 .debug_struct("Invoke")
                 .field("session", session)
@@ -223,4 +215,24 @@ fn fields(
         value.field(key, field);
     }
     value.finish()
+}
+
+fn extension(
+    f: &mut std::fmt::Formatter<'_>,
+    verb: &str,
+    session: &SessionId,
+    plugin: &str,
+    kind: &str,
+    payload: &Value,
+) -> std::fmt::Result {
+    fields(
+        f,
+        verb,
+        &[
+            ("session", session),
+            ("plugin", &plugin),
+            ("kind", &kind),
+            ("payload", payload),
+        ],
+    )
 }

@@ -263,6 +263,7 @@ static MANIFEST: PluginManifest = PluginManifest {
     provides: &["provider:anthropic"],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[],
         // One endpoint at a time: a project that names its own key and base
         // url replaces the user's pair whole rather than half-overriding it —
         // its instances with it (ADR-0017).

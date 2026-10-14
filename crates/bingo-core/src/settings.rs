@@ -7,6 +7,7 @@
 //! `settings.toml` stands, the `settings.json` an older bingo wrote is read
 //! as it always was, and [`migrate_all`] moves it across once.
 
+mod approval;
 mod edit;
 mod format;
 mod merge;
@@ -37,6 +38,7 @@ pub const KERNEL_KEYS: &[&str] = &[
     "pluginTrust",
     "keys",
     "pinned",
+    "approved",
 ];
 
 /// The one key under `pictures`: the spelling every other kernel key uses, and
@@ -47,22 +49,48 @@ const CACHE_DAYS: [&str; 2] = ["cacheDays", "cache_days"];
 /// One settings source, lowest priority first when listed.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Layer {
-    user: bool,
+    origin: LayerOrigin,
     /// Where it came from, for messages: a path or `cli`.
     pub source: String,
     pub value: Map<String, Value>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+enum LayerOrigin {
+    User,
+    Repository(PathBuf),
+    Explicit,
+}
+
 impl Layer {
+    fn is_user(&self) -> bool {
+        matches!(self.origin, LayerOrigin::User)
+    }
+    fn repository(&self) -> Option<&Path> {
+        match &self.origin {
+            LayerOrigin::Repository(root) => Some(root),
+            _ => None,
+        }
+    }
+
+    pub fn project(mut self, root: &Path) -> Result<Self, SettingsError> {
+        self.origin =
+            LayerOrigin::Repository(root.canonicalize().map_err(|source| SettingsError::Read {
+                path: root.into(),
+                source,
+            })?);
+        Ok(self)
+    }
+
     /// Mark a layer supplied by the person, never a repository or CLI overlay.
     pub fn user(mut self) -> Self {
-        self.user = true;
+        self.origin = LayerOrigin::User;
         self
     }
 
     pub fn new(source: impl Into<String>, value: Map<String, Value>) -> Self {
         Self {
-            user: false,
+            origin: LayerOrigin::Explicit,
             source: source.into(),
             value,
         }
@@ -74,6 +102,7 @@ impl Layer {
 pub struct Claim {
     pub plugin: String,
     pub keys: Vec<(String, Merge)>,
+    pub approve: Vec<String>,
 }
 
 impl Claim {
@@ -81,6 +110,7 @@ impl Claim {
         let claim = manifest.config?;
         Some(Self {
             plugin: manifest.id.to_string(),
+            approve: claim.approve.iter().map(|key| (*key).to_string()).collect(),
             keys: claim
                 .keys
                 .iter()
@@ -115,6 +145,7 @@ pub struct KernelSettings {
     pub keys: BTreeMap<String, String>,
     /// Ordered model ids offered by every model chooser.
     pub pinned: Vec<String>,
+    pub approved: crate::approval::Approved,
 }
 
 impl KernelSettings {
@@ -138,6 +169,7 @@ pub struct UnknownKey {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Merged {
+    pub repository_entries: BTreeMap<(String, String), String>,
     pub notices: Vec<(String, String)>,
     pub kernel: KernelSettings,
     /// Each plugin's slice: an object holding only the roots it claimed.
@@ -374,8 +406,15 @@ fn migrated(path: &Path) -> Result<(), SettingsError> {
 pub fn load(env: &Env, cwd: &Path, extra: Option<&Path>) -> Result<Vec<Layer>, SettingsError> {
     let mut layers = Vec::new();
     for (index, path) in layer_paths(env, cwd).into_iter().enumerate() {
+        if index > 0 && path == user_path(env) {
+            continue;
+        }
         if let Some(layer) = standing_layer(&path)? {
-            layers.push(if index == 0 { layer.user() } else { layer });
+            layers.push(if index == 0 {
+                layer.user()
+            } else {
+                layer.project(cwd)?
+            });
         }
     }
     if let Some(path) = extra

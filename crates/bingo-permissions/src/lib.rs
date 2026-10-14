@@ -49,6 +49,7 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     ],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[],
         keys: &[
             ("permissions.defaultMode", Merge::Replace),
             ("permissions.allow", Merge::Accumulate),

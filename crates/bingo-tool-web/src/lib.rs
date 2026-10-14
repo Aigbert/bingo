@@ -56,6 +56,7 @@ static MANIFEST: PluginManifest = PluginManifest {
     provides: &["tool:WebFetch", "tool:WebSearch", "tool:ShowPage"],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[],
         keys: &[("web", Merge::Replace)],
         schema,
     }),

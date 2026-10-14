@@ -149,7 +149,7 @@ async fn registration_links(host: &Host) -> Vec<crate::chain::Link> {
     for source in &host.registry.sources.interceptors {
         for external in source.interceptors().await {
             let status = statuses.iter().find(|status| status.id == external.plugin);
-            if status.is_some_and(|status| !status.enabled) {
+            if status.is_some_and(|status| !status.state.is_on()) {
                 continue;
             }
             let tier = status
@@ -178,7 +178,7 @@ async fn protect_grants(host: &Host, catalog: &mut Catalog) {
     let statuses = crate::plugins::listing(&host.registry).await;
     for entry in &mut catalog.entries {
         let Some(status) = statuses.iter().find(|status| status.id == entry.id) else {
-            entry.meta = serde_json::json!({"enabled":false, "reason":"unknown plugin"});
+            entry.meta = serde_json::json!({"state":{"kind":"failed", "why":"unknown plugin"}});
             continue;
         };
         entry.meta = super::catalog::plugin_entry(status).meta;

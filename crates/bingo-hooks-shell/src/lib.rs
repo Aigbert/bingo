@@ -76,6 +76,7 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     provides: &["hook:shell", "service:bingo.hooks.shell.pages"],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[],
         keys: config::CLAIMED,
         schema: config::schema,
     }),

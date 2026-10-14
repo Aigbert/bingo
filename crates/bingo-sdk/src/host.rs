@@ -427,6 +427,13 @@ pub struct Completion {
 
 #[async_trait]
 pub trait HostApi: Send + Sync {
+    async fn approve(&self, _request: crate::Approval) -> Result<String, KernelError> {
+        Err(KernelError::new(
+            ErrorCode::Unsupported,
+            "this host cannot approve repository code",
+        ))
+    }
+
     async fn render(
         &self,
         _session: &SessionId,

@@ -499,6 +499,7 @@ static MANIFEST: PluginManifest = PluginManifest {
     provides: &["provider:openai", "provider:codex"],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[],
         // One endpoint at a time: a project that names its own key and base
         // url replaces the user's trio rather than half-overriding it — its
         // instances with it (ADR-0017).

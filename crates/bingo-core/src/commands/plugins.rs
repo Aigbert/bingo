@@ -35,10 +35,15 @@ impl Command for PluginsCommand {
             aliases: vec!["modules".into()],
             ..super::spec(
                 "plugins",
-                "list, reload, enable or disable plugins",
+                "list, approve, reload, enable or disable plugins",
                 ArgSpec::Words {
                     alone: vec!["reload".into()],
-                    values: vec![ENABLE.into(), DISABLE.into(), "reload".into()],
+                    values: vec![
+                        ENABLE.into(),
+                        DISABLE.into(),
+                        "reload".into(),
+                        "approve".into(),
+                    ],
                     then: Some(Box::new(ArgSpec::Catalog {
                         source: PLUGINS.into(),
                     })),
@@ -62,6 +67,9 @@ impl Command for PluginsCommand {
                 message: Some(report.message()),
             });
         }
+        if let Some(name) = args.trim().strip_prefix("approve ") {
+            return approve(&host, cx, name.trim()).await;
+        }
         let listed = listing(host.registry()).await;
         match parse(args)? {
             None => Ok(CommandOutcome::View {
@@ -70,6 +78,29 @@ impl Command for PluginsCommand {
             Some((name, enabled)) => switched(&host, &cx.session, &listed, name, enabled).await,
         }
     }
+}
+
+async fn approve(
+    host: &Host,
+    cx: &CommandContext,
+    name: &str,
+) -> Result<CommandOutcome, KernelError> {
+    let digest = host
+        .approve(Approval {
+            root: cx.cwd.clone(),
+            what: format!("plugin:{name}"),
+        })
+        .await?;
+    let mut report = PluginReload::default();
+    for source in &host.registry().sources.plugins {
+        report.append(source.reload().await?);
+    }
+    Ok(CommandOutcome::Applied {
+        message: Some(format!(
+            "approved {name} ({digest}); modules reload now, process plugins start next time. {}",
+            report.message()
+        )),
+    })
 }
 
 /// The line as a switch to write, or `None` for the listing.
@@ -82,7 +113,7 @@ fn parse(args: &str) -> Result<Option<(&str, bool)>, KernelError> {
         ENABLE => true,
         DISABLE => false,
         other => {
-            let usage = format!("usage: /plugins [reload|{ENABLE}|{DISABLE} <name>]");
+            let usage = format!("usage: /plugins [reload|approve|{ENABLE}|{DISABLE} <name>]");
             return Err(invalid(format!("unknown argument `{other}`; {usage}")));
         }
     };
@@ -112,8 +143,9 @@ fn row(status: &PluginStatus) -> Vec<String> {
     vec![
         status.id.clone(),
         status.version.clone(),
-        state(status.enabled).to_string(),
-        status.reason.clone().unwrap_or_default(),
+        status.state.label().to_string(),
+        crate::plugins::waiting_reason(&status.id, &status.state)
+            .unwrap_or_else(|| status.state.reason().unwrap_or_default().to_string()),
         status.from.clone(),
     ]
 }
@@ -160,8 +192,13 @@ mod tests {
         PluginStatus {
             id: id.into(),
             version: "1.2.3".into(),
-            enabled,
-            reason: reason.map(str::to_string),
+            state: if enabled {
+                bingo_sdk::PluginState::On
+            } else {
+                bingo_sdk::PluginState::Off {
+                    why: reason.unwrap_or_default().into(),
+                }
+            },
             execution: None,
             from: BUILT_IN.into(),
         }
@@ -182,7 +219,7 @@ mod tests {
         else {
             panic!("a verb is one of the words");
         };
-        assert_eq!(values, [ENABLE, DISABLE, "reload"]);
+        assert_eq!(values, [ENABLE, DISABLE, "reload", "approve"]);
         assert_eq!(alone, ["reload"]);
         assert_eq!(
             then.as_deref(),

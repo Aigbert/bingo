@@ -12,6 +12,7 @@ description = "bingo kernel: session actor, journal and hub, turn state machine,
 workspace = true
 
 [dependencies]
+bingo-digest.workspace = true
 bingo-sdk.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true

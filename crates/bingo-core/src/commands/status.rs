@@ -19,9 +19,19 @@ impl Command for StatusCommand {
     }
 
     async fn run(&self, _args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
-        let state = super::host(&self.host)?.session_state(&cx.session).await?;
+        let host = super::host(&self.host)?;
+        let state = host.session_state(&cx.session).await?;
+        let mut rows = rows(&state);
+        let catalog = host.catalog(CatalogKind::Plugins).await?;
+        rows.extend(
+            catalog
+                .entries
+                .iter()
+                .filter_map(crate::plugins::waiting_line)
+                .map(|line| ("repository".into(), line)),
+        );
         Ok(CommandOutcome::View {
-            view: View::KeyValue { rows: rows(&state) },
+            view: View::KeyValue { rows },
         })
     }
 }

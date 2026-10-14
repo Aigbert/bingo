@@ -3,6 +3,7 @@
 //! collects every contribution into one registry, and serves `HostApi` over
 //! a map of session actors. It knows no plugin by name.
 
+mod approval;
 mod ask;
 mod auth;
 mod catalog;
@@ -108,6 +109,7 @@ pub enum HostError {
 pub struct Host {
     config: HostConfig,
     settings: Merged,
+    approvals: Arc<crate::approval::Authority>,
     registry: Registry,
     plugins: Vec<Box<dyn Plugin>>,
     sessions: Mutex<BTreeMap<SessionId, Live>>,
@@ -158,6 +160,11 @@ impl Host {
             .filter_map(|p| Claim::from_manifest(p.manifest()))
             .collect();
         let mut settings = settings::merge(&config.layers, &claims)?;
+        let approvals = Arc::new(crate::approval::Authority::new(
+            config.env.clone(),
+            std::mem::take(&mut settings.kernel.approved),
+            std::mem::take(&mut settings.repository_entries),
+        ));
         let switched_off = settings.kernel.switched_off();
         let mut registry = Registry::load(&plugins, &settings.plugins, &config.env, &switched_off)?;
         for link in &mut registry.links {
@@ -185,6 +192,7 @@ impl Host {
             Host {
                 config,
                 settings,
+                approvals,
                 registry,
                 plugins,
                 sessions: Mutex::new(BTreeMap::new()),
@@ -682,6 +690,10 @@ impl Host {
 
 #[async_trait]
 impl HostApi for Host {
+    async fn approve(&self, request: Approval) -> Result<String, KernelError> {
+        approval::approve(self, request)
+    }
+
     async fn complete(
         &self,
         session: &SessionId,
@@ -968,6 +980,10 @@ impl HostApi for Host {
     }
 
     fn service_any(&self, key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
+        if key == APPROVALS.name() {
+            let authority: Arc<dyn ApprovalReader> = self.approvals.clone();
+            return Some(Arc::new(authority));
+        }
         self.registry.services.value(key)
     }
 

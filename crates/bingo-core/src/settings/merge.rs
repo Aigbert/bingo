@@ -13,7 +13,8 @@ use super::{Claim, KERNEL_KEYS, KernelSettings, Layer, Merged, SettingsError, Un
 type Sourced<'a> = (&'a str, &'a Value);
 
 pub fn merge(layers: &[Layer], claims: &[Claim]) -> Result<Merged, SettingsError> {
-    let normalized = canonical_pictures(layers);
+    let (layers, personal_notices) = super::approval::personal(layers, claims);
+    let normalized = canonical_pictures(&layers);
     let layers = normalized.as_slice();
     let owners = owners(claims)?;
     let modes = modes(claims);
@@ -24,10 +25,12 @@ pub fn merge(layers: &[Layer], claims: &[Claim]) -> Result<Merged, SettingsError
         .collect();
     let merged = fold_objects("", &objects, &modes)?;
     let kernel = kernel_settings(&merged, layers)?;
-    let plugins = slices(&merged, claims);
-    let notices = layers
+    let mut plugins = slices(&merged, claims);
+    let repository_entries = super::approval::entries(layers, claims, &merged)?;
+    super::approval::waiting(&mut plugins, claims, &repository_entries, &kernel.approved);
+    let mut notices: Vec<_> = layers
         .iter()
-        .filter(|layer| !layer.user && layer.value.contains_key("pluginTrust"))
+        .filter(|layer| !layer.is_user() && layer.value.contains_key("pluginTrust"))
         .map(|layer| {
             (
                 "PLUGIN_TRUST_IGNORED".into(),
@@ -38,7 +41,10 @@ pub fn merge(layers: &[Layer], claims: &[Claim]) -> Result<Merged, SettingsError
             )
         })
         .collect();
+    notices.extend(super::approval::ignored(layers));
+    notices.extend(personal_notices);
     Ok(Merged {
+        repository_entries,
         notices,
         kernel,
         plugins,
@@ -168,7 +174,7 @@ fn fold_value(
     }
     match modes.get(path).copied().unwrap_or(Merge::Replace) {
         Merge::Replace => Ok(Some((*last).clone())),
-        Merge::Accumulate => accumulate(path, live).map(Some),
+        Merge::Accumulate | Merge::PersonalAccumulate => accumulate(path, live).map(Some),
         Merge::ByName => by_name(path, live).map(Some),
     }
 }
@@ -266,7 +272,8 @@ fn kernel_settings(
         thinking: typed(merged, layers, "thinking")?,
         max_tokens: typed(merged, layers, "maxTokens")?,
         models: typed(merged, layers, "models")?.unwrap_or_default(),
-        plugin_trust: user_grants(layers)?,
+        plugin_trust: user_value(layers, "pluginTrust")?,
+        approved: user_value(layers, "approved")?,
         enabled_plugins: typed(merged, layers, crate::plugins::KEY)?.unwrap_or_default(),
         keys: typed(merged, layers, "keys")?.unwrap_or_default(),
         pinned: typed(merged, layers, "pinned")?.unwrap_or_default(),
@@ -281,16 +288,21 @@ fn cache_days(merged: &Map<String, Value>, layers: &[Layer]) -> Result<Option<u6
     super::said(&Layer::new(source, Map::new()), pictures)
 }
 
-fn user_grants(
+fn user_value<T: serde::de::DeserializeOwned + Default>(
     layers: &[Layer],
-) -> Result<BTreeMap<String, bingo_sdk::PluginTrust>, SettingsError> {
-    let user: Vec<Layer> = layers.iter().filter(|layer| layer.user).cloned().collect();
+    key: &str,
+) -> Result<T, SettingsError> {
+    let user: Vec<Layer> = layers
+        .iter()
+        .filter(|layer| layer.is_user())
+        .cloned()
+        .collect();
     let objects: Vec<_> = user
         .iter()
         .map(|layer| (layer.source.as_str(), &layer.value))
         .collect();
     let merged = fold_objects("", &objects, &HashMap::new())?;
-    Ok(typed(&merged, &user, "pluginTrust")?.unwrap_or_default())
+    Ok(typed(&merged, &user, key)?.unwrap_or_default())
 }
 
 fn slices(merged: &Map<String, Value>, claims: &[Claim]) -> BTreeMap<String, Value> {
@@ -375,6 +387,7 @@ mod tests {
 
     fn permissions_claim() -> Claim {
         Claim {
+            approve: vec![],
             plugin: "bingo.permissions".into(),
             keys: vec![
                 ("permissions.defaultMode".into(), Merge::Replace),
@@ -386,6 +399,7 @@ mod tests {
 
     fn anthropic_claim() -> Claim {
         Claim {
+            approve: vec![],
             plugin: "bingo.provider.anthropic".into(),
             keys: vec![("anthropic".into(), Merge::Replace)],
         }
@@ -514,6 +528,7 @@ mod tests {
         assert!(merged.unknown.is_empty(), "{:?}", merged.unknown);
 
         let claim = Claim {
+            approve: vec![],
             plugin: "p".into(),
             keys: vec![("enabledPlugins".into(), Merge::Replace)],
         };
@@ -613,6 +628,7 @@ mod tests {
     #[test]
     fn by_name_replaces_entries_in_place() {
         let claim = Claim {
+            approve: vec![],
             plugin: "p".into(),
             keys: vec![("servers".into(), Merge::ByName)],
         };
@@ -664,6 +680,7 @@ mod tests {
     #[test]
     fn a_key_claimed_twice_or_a_kernel_key_claimed_is_a_conflict() {
         let other = Claim {
+            approve: vec![],
             plugin: "other".into(),
             keys: vec![("permissions.extra".into(), Merge::Replace)],
         };
@@ -671,6 +688,7 @@ mod tests {
         assert!(matches!(err, SettingsError::Conflict { ref key, .. } if key == "permissions"));
 
         let kernel = Claim {
+            approve: vec![],
             plugin: "p".into(),
             keys: vec![("model".into(), Merge::Replace)],
         };

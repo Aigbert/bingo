@@ -8,6 +8,17 @@ use std::sync::Arc;
 
 #[async_trait]
 impl HostApi for TestHost {
+    async fn approve(&self, request: Approval) -> Result<String, KernelError> {
+        self.record(HostCall::Approve {
+            request: request.clone(),
+        });
+        let script = locked(&self.inner.scripts).approve.clone();
+        if let Some(script) = script {
+            return script((request,)).await;
+        }
+        NoHost.approve(request).await
+    }
+
     async fn render(
         &self,
         session: &SessionId,

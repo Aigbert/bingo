@@ -21,6 +21,7 @@ type CompletionScript = Script<(SessionId, Option<TurnId>, Completion), Vec<Mode
 
 #[derive(Default)]
 pub(super) struct Scripts {
+    pub approve: Option<Script<(Approval,), String>>,
     pub complete: Option<CompletionScript>,
     pub render: Option<Script<(SessionId, crate::render::RenderRequest), View>>,
     pub sessions: Option<Script<(SessionFilter,), Vec<SessionSummary>>>,
@@ -56,6 +57,15 @@ impl TestHost {
         locked(&self.inner.scripts).render = Some(Arc::new(move |(session, request)| {
             Box::pin(script(session, request))
         }));
+    }
+
+    pub fn on_approve<F, Fut>(&self, script: F)
+    where
+        F: Fn(Approval) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<String, KernelError>> + Send + 'static,
+    {
+        locked(&self.inner.scripts).approve =
+            Some(Arc::new(move |(request,)| Box::pin(script(request))));
     }
 
     /// Override `complete`; the call is recorded before this script runs.

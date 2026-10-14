@@ -56,8 +56,8 @@ pub use page::{Page, Pages};
 pub use plugin::{
     BUILT_IN, CommandSource, CompactorSource, ConfigClaim, ContextSource, Contribution, HookSource,
     Merge, Plugin, PluginDecision, PluginError, PluginExecution, PluginGrant, PluginManifest,
-    PluginOrigin, PluginRegistration, PluginReload, PluginRuntime, PluginSource, PluginStatus,
-    ProviderSource, Registrar, SWITCHED_OFF, ToolSource,
+    PluginOrigin, PluginRegistration, PluginReload, PluginRuntime, PluginSource, PluginState,
+    PluginStatus, ProviderSource, Registrar, SWITCHED_OFF, ToolSource,
 };
 pub use policy::{Decision, PermissionPolicy, PolicyInput, Reason, Stance, Verdict};
 pub use provider::{AuthStatus, LoginMethod, ModelInfo, Provider};
@@ -83,3 +83,6 @@ pub mod catalogue;
 pub mod invocation;
 
 pub mod render;
+
+mod approval;
+pub use approval::{APPROVALS, Approval, ApprovalReader, Waiting};

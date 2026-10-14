@@ -66,6 +66,7 @@ static MANIFEST: PluginManifest = PluginManifest {
     // whether this project keeps playbooks at all (ADR-0014, amended
     // 2026-09-07).
     config: Some(ConfigClaim {
+        approve: &[],
         keys: &[(SETTING, Merge::Replace)],
         schema,
     }),
