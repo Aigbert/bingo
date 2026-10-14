@@ -321,7 +321,7 @@ fn repository_processes_wait_for_a_byte_bound_personal_approval() {
     std::fs::create_dir_all(&dir).unwrap();
     let marker = repo.path().join("ran");
     let manifest = serde_json::json!({"name":"repo-code", "version":"1", "entry":{
-        "command":"/bin/sh", "args":["-c", "printf ran > \"$1\"", "sh", marker]}});
+        "command":"sh", "args":["-c", "printf ran > \"$MARKER\""], "env":{"MARKER":marker}}});
     std::fs::write(dir.join("plugin.json"), manifest.to_string()).unwrap();
     let root = bingo_core::approval::root_key(repo.path()).unwrap();
     let digest = bingo_core::approval::digest_dir(&dir).unwrap();
@@ -420,4 +420,79 @@ fn repository_stdio_servers_cannot_dial_through_enable_or_reconnect() {
     assert_eq!(approved.status.code(), Some(0), "{}", stderr(&approved));
     assert!(!marker.exists());
     assert!(settings_json(home.path())["approved"].is_object());
+}
+
+#[cfg(unix)]
+#[test]
+fn escaped_plugin_entry_is_refused_even_with_a_matching_saved_digest() {
+    let home = tempfile::tempdir().unwrap();
+    let repo = tempfile::tempdir().unwrap();
+    let dir = repo.path().join(".bingo/plugins/escape");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(repo.path().join("outside.sh"), "touch ran").unwrap();
+    std::fs::write(
+        dir.join("plugin.json"),
+        serde_json::json!({
+            "name":"escape", "version":"1", "entry":{
+                "command":"sh", "args":["${PLUGIN_ROOT}/../../../outside.sh"]
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let root = bingo_core::approval::root_key(repo.path()).unwrap();
+    let digest = bingo_core::approval::digest_dir(&dir).unwrap();
+    std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
+    std::fs::write(
+        home.path().join(".bingo/settings.json"),
+        serde_json::json!({
+            "approved":{root:{"plugin:escape":digest}}
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let approved = run(bingo()
+        .envs(home_env(home.path()))
+        .arg("--cwd")
+        .arg(repo.path())
+        .args(["plugins", "approve", "escape"]));
+    assert!(!approved.status.success());
+    assert!(stderr(&approved).contains("plugin:escape"));
+    let output = repository_print(home.path(), repo.path(), "/plugins");
+    assert_eq!(output.status.code(), Some(0));
+    assert!(!dir.join("ran").exists());
+    assert!(
+        format!("{}{}", stdout(&output), stderr(&output)).contains("escapes the plugin root"),
+        "stdout={} stderr={}",
+        stdout(&output),
+        stderr(&output)
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn repository_acp_adapter_waits_before_model_catalogue_probe() {
+    let home = tempfile::tempdir().unwrap();
+    let repo = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(repo.path().join(".bingo")).unwrap();
+    let marker = repo.path().join("acp-ran");
+    std::fs::write(
+        repo.path().join(".bingo/settings.json"),
+        serde_json::json!({
+            "acp":{"adapters":{"repository":{
+                "command":"sh", "args":["-c", "printf ran > \"$MARKER\""], "env":{"MARKER":marker}
+            }}}
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let listed = repository_print(home.path(), repo.path(), "/model");
+    assert_eq!(listed.status.code(), Some(0), "{}", stderr(&listed));
+    assert!(!marker.exists());
+    assert!(stderr(&listed).contains("/acp approve repository"));
+    let approved = repository_print(home.path(), repo.path(), "/acp approve repository");
+    assert_eq!(approved.status.code(), Some(0), "{}", stderr(&approved));
+    assert!(!marker.exists());
+    let root = bingo_core::approval::root_key(repo.path()).unwrap();
+    assert!(settings_json(home.path())["approved"][root]["acp.adapters:repository"].is_string());
 }

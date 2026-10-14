@@ -68,6 +68,12 @@ pub fn approved(
             };
             if index != 0 {
                 plugin.state = project_state(&plugin, authority);
+                if let bingo_sdk::PluginState::Failed { why } = &plugin.state {
+                    notices.push(Notice::warn(
+                        "PLUGIN_REFUSED",
+                        format!("{}: {why}", plugin.name),
+                    ));
+                }
                 if !plugin.state.is_on() {
                     waiting.push(plugin);
                     continue;
@@ -170,6 +176,42 @@ mod tests {
         let root = dir.join(name);
         std::fs::create_dir_all(&root).expect("a plugin directory");
         std::fs::write(root.join(MANIFEST_FILE), body).expect("a manifest");
+    }
+
+    #[test]
+    fn a_refused_entry_is_named_in_a_notice_and_shadows_nothing() {
+        struct Refused;
+        impl bingo_sdk::ApprovalReader for Refused {
+            fn state(
+                &self,
+                _: &bingo_sdk::Approval,
+            ) -> Result<bingo_sdk::PluginState, bingo_sdk::KernelError> {
+                Err(bingo_sdk::KernelError::new(
+                    bingo_sdk::ErrorCode::InvalidInput,
+                    "entry path escapes",
+                ))
+            }
+        }
+        let home = tempfile::tempdir().unwrap();
+        let repo = tempfile::tempdir().unwrap();
+        for dir in [&home, &repo] {
+            plugin(dir.path(), "p", &manifest("p"));
+        }
+        let notices = Notices::default();
+        let found = approved(
+            &[home.path().into(), repo.path().into()],
+            &[],
+            &notices,
+            Some(&Refused),
+        );
+        assert_eq!(found[0].root, home.path().join("p"));
+        assert!(matches!(
+            found[1].state,
+            bingo_sdk::PluginState::Failed { .. }
+        ));
+        let said = notices.drain();
+        assert_eq!(said.len(), 1);
+        assert!(said[0].text.contains("p: entry path escapes"));
     }
 
     #[test]

@@ -405,6 +405,13 @@ fn migrate_settings(cwd: &std::path::Path) -> Result<(), KernelError> {
 /// registered, a setting nobody claimed. On stderr, as every diagnostic is.
 async fn report_notices(host: &Host) {
     if let Ok(catalog) = host.handle().catalog(bingo_sdk::CatalogKind::Plugins).await {
+        for refused in catalog
+            .entries
+            .iter()
+            .filter_map(bingo_core::plugins::refused_line)
+        {
+            eprintln!("{}", notice_report("PLUGIN_REFUSED", &refused, false));
+        }
         let waiting: Vec<_> = catalog
             .entries
             .iter()

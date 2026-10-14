@@ -121,6 +121,15 @@ fn written(path: &Path) -> Result<Map<String, Value>, SettingsError> {
 }
 
 /// Waiting catalogue IDs include the owning command, so clients need no feature cases.
+pub fn refused_line(entry: &bingo_sdk::CatalogEntry) -> Option<String> {
+    let name = entry.id.strip_prefix("plugins:")?;
+    let state = serde_json::from_value(entry.meta.get("state")?.clone()).ok()?;
+    match state {
+        bingo_sdk::PluginState::Failed { why } => Some(format!("{name}: {why}")),
+        _ => None,
+    }
+}
+
 pub fn waiting_line(entry: &bingo_sdk::CatalogEntry) -> Option<String> {
     let state: bingo_sdk::PluginState =
         serde_json::from_value(entry.meta.get("state")?.clone()).ok()?;

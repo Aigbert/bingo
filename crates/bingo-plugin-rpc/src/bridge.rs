@@ -263,6 +263,12 @@ impl Bridge {
             .unwrap_or(Ok(bingo_sdk::PluginState::Waiting { changed: false }))
             .unwrap_or_else(|error| bingo_sdk::PluginState::Failed { why: error.message });
         if !state.is_on() {
+            if let bingo_sdk::PluginState::Failed { why } = &state {
+                self.notices.push(Notice::warn(
+                    "PLUGIN_REFUSED",
+                    format!("{}: {why}", self.name),
+                ));
+            }
             registration.admission.stop(state);
             return false;
         }
