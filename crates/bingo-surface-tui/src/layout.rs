@@ -148,6 +148,11 @@ pub fn paint(layout: &Layout, frame: &mut ratatui::Frame, render: &crate::render
 }
 
 fn paint_cells(layout: &Layout, frame: &mut ratatui::Frame) {
+    // Terminal::draw has resized both buffers. A layout built before that
+    // resize must not replace their area; leave a blank frame until rebuilt.
+    if frame.area() != layout.canvas.area() {
+        return;
+    }
     frame.buffer_mut().clone_from(&layout.canvas.buffer);
     if let Some(cursor) = layout.canvas.cursor {
         frame.set_cursor_position(cursor);

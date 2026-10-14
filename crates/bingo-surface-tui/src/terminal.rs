@@ -23,7 +23,7 @@ use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
     supports_keyboard_enhancement,
 };
-use ratatui::backend::CrosstermBackend;
+use ratatui::backend::{Backend, CrosstermBackend};
 use ratatui::{Terminal, TerminalOptions, Viewport};
 
 use crate::graphics::Transport;
@@ -32,6 +32,8 @@ use crate::layout::{self, Layout};
 use crate::render::{Detection, Render};
 
 mod probe;
+#[cfg(test)]
+mod resizing;
 
 /// Push the window title onto the terminal's stack, and pop it back at exit,
 /// so the shell's own title survives the session.
@@ -154,16 +156,13 @@ impl Screen for Tui {
     }
     fn draw(&mut self, layout: &Layout, render: &Render) -> io::Result<()> {
         if !self.synchronized {
-            self.terminal
-                .draw(|frame| layout::paint(layout, frame, render))?;
+            paint(&mut self.terminal, layout, render)?;
             return Ok(());
         }
         // The closing half is written whatever the frame did: a terminal left
         // holding an update that never ends shows nothing at all.
         out_of_band(BEGIN_FRAME)?;
-        let drawn = self
-            .terminal
-            .draw(|frame| layout::paint(layout, frame, render));
+        let drawn = paint(&mut self.terminal, layout, render);
         let ended = out_of_band(END_FRAME);
         drawn?;
         ended
@@ -203,6 +202,15 @@ impl Screen for Tui {
             .map(|size| (size.width, size.height))
             .unwrap_or((0, 0))
     }
+}
+
+fn paint<B: Backend>(
+    terminal: &mut Terminal<B>,
+    layout: &Layout,
+    render: &Render,
+) -> Result<(), B::Error> {
+    terminal.draw(|frame| layout::paint(layout, frame, render))?;
+    Ok(())
 }
 
 // ---- what a window nobody is looking at says (design §6) ----------------
