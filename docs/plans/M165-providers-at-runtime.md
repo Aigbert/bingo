@@ -4,8 +4,7 @@ ADR-0085 §§5–7.
 
 ## Goal
 
-Add, re-address, check and remove named providers without restarting. Sessions
-keep their resolved endpoint; credentials never enter errors or recorded input.
+Add, re-address, check and remove named providers without restarting. Sessions keep their resolved endpoint; credentials never enter errors or recorded input.
 
 ## Bricks
 
@@ -20,79 +19,47 @@ keep their resolved endpoint; credentials never enter errors or recorded input.
 
 ## Decisions
 
-- Constructors share primitives rather than retain boot settings in shapes: otherwise
-  removed configured keys could revive on add. The public spec contains no credentials.
-- Review changes add's probe-before-login order: no refresh before a new key is pasted.
-  Existing credential entries block add and name `/provider remove <name>` as recovery.
-- Round 2 moves the nonempty `[A-Za-z0-9_-]+` rule to SDK, shared by core and boot claims.
-  Invalid names are skipped before construction, with notices that cannot echo secrets.
-- Round 3 binds stored keys to canonical scheme/host/port, and OAuth to issuer plus
-  resource origins. Paste, wizard, login and refresh stamp metadata; every request checks
-  it, including cached tokens. Mismatches keep providers built but signed out and name
-  the resolved origin and override file. No repository baseUrl approval is needed.
-- Legacy named entries gain missing metadata only from exactly one user-layer family
-  declaration, using that layer's addresses before merging. Project/local never adopt.
-  Default legacy entries use user-layer addresses or the shipped defaults; never overrides.
-  Existing metadata is retained; reserved names cannot adopt another family's legacy key.
-  Explicit legacy API-key and Codex regressions remain.
-- Reserved names include registered providers/shapes and all shipped families, switched
-  on or off, supplied by binary config. Boot collisions skip instances with notices;
-  late providers take precedence. Notices name the instance, winning plugin/family and
-  declaration file to rename/delete. The kernel contains no vendor name list.
-- Scheme/host/port changes clear stored and user-layer keys and request Login Paste;
-  same-origin paths retain them. No keep-key option. Any non-user layer holding apiKey
-  blocks an origin change and names its file, including keys shadowed by higher layers.
-- Validate user ownership, delete the credential, persist the address, then retire the
-  old endpoint. Failed writes leave it unretired but can require signing in again.
-  Old sessions and OAuth retries cannot read the new origin's key.
-- Source refresh identity uses provider ID; runtime overlays additionally require their
-  installed Arc, rejecting stale results while accepting plugin-rpc's fresh adapters.
-- Removal clears the saved provider/model default and matching pins in one write, and
-  names the cleared fields. Live pins clear under their writer lock. Re-adding a name
-  cannot revive the boot default. Orphan removal also checks the owner family's declarations
-  in every layer, including disabled families, and compares ownership again at deletion.
-- Removal stops live sessions at their next request with AuthRequired naming removal,
-  including configured keys and same-origin clones. The guide states this limitation.
+- Constructors share primitives rather than retain boot settings in shapes: otherwise removed configured keys could revive on add. The public spec contains no credentials.
+- Review changes add's probe-before-login order: no refresh before a new key is pasted. Existing credential entries block add and name `/provider remove <name>` as recovery.
+- Round 2 moves the nonempty `[A-Za-z0-9_-]+` rule to SDK, shared by core and boot claims. Invalid names are skipped before construction, with notices that cannot echo secrets.
+- Round 3 binds stored keys to canonical scheme/host/port, and OAuth to issuer plus resource origins. Paste, wizard, login and refresh stamp metadata; every request checks it, including cached tokens. Mismatches keep providers built but signed out and name the resolved origin and override file. No repository baseUrl approval is needed.
+- Legacy named entries gain missing metadata only from exactly one user-layer family declaration, using that layer's addresses before merging. Project/local never adopt. Default legacy entries use user-layer addresses or the shipped defaults; never overrides. Existing metadata is retained; reserved names cannot adopt another family's legacy key. Explicit legacy API-key and Codex regressions remain.
+- Reserved names include registered providers/shapes and all shipped families, switched on or off, supplied by binary config. Boot collisions skip instances with notices; late providers take precedence. Notices name the instance, winning plugin/family and declaration file to rename/delete. The kernel contains no vendor name list.
+- Scheme/host/port changes clear stored and user-layer keys and request Login Paste; same-origin paths retain them. No keep-key option. Any non-user layer holding apiKey blocks an origin change and names its file, including keys shadowed by higher layers.
+- Validate user ownership, delete the credential, persist the address, then retire the old endpoint. Failed writes leave it unretired but can require signing in again. Old sessions and OAuth retries cannot read the new origin's key.
+- Source refresh identity uses provider ID; runtime overlays additionally require their installed Arc, rejecting stale results while accepting plugin-rpc's fresh adapters.
+- Removal clears the saved provider/model default and matching pins in one write, and names the cleared fields. Live pins clear under their writer lock. Re-adding a name cannot revive the boot default. Orphan removal also checks the owner family's declarations in every layer, including disabled families, and compares ownership again at deletion.
+- Removal stops live sessions at their next request with AuthRequired naming removal, including configured keys and same-origin clones. The guide states this limitation.
 - Codex session selection retains ADR-0012's fallback; live probes still report failure.
-- Registration receives provenance only for its claimed settings, plus user-instance
-  counts for unambiguous adoption. Unreadable auth.json produces one notice and supplies
-  no keys; invalid names and foreign owners name the skipped declaration file.
-- Login answers are private. Journal, queue previews and TUI history redact every
-  `/provider` argument before validation. Reach exposes categories; addresses strip secrets.
-- ProviderState groups registry facts; mutation/command locks serialize edits. Project-only
-  instances must be edited there. CredentialStore's shared lock prevents lost writes.
-- Follow-ups: replacing `default_cleared` with mutable settings affects selection and
-  approval consumers (>40 lines). SDK argument secrecy also needs declaration access
-  in history/queue readers plus constructors/wire fixtures (>40 lines). Defer both
-  optional cleanups; retain tested redaction and cleared-default behavior.
-- Guides use the owning crate's Page (ADR-0054), never docs/guide/. No dependencies or
-  allowlist changes. HTTP tests use local fakes/wiremock with provider environment unset.
+- Registration receives provenance only for its claimed settings, plus user-instance counts for unambiguous adoption. Unreadable auth.json produces one notice and supplies no keys; invalid names and foreign owners name the skipped declaration file.
+- Login answers are private. Journal, queue previews and TUI history redact every `/provider` argument before validation. Reach exposes categories; addresses strip secrets.
+- ProviderState groups registry facts; mutation/command locks serialize edits. Project-only instances must be edited there. CredentialStore's shared lock prevents lost writes.
+- Follow-ups: replacing `default_cleared` with mutable settings affects selection and approval consumers (>40 lines). SDK argument secrecy also needs declaration access in history/queue readers plus constructors/wire fixtures (>40 lines). Defer both optional cleanups; retain tested redaction and cleared-default behavior.
+- Guides use the owning crate's Page (ADR-0054), never docs/guide/. No dependencies or allowlist changes. HTTP tests use local fakes/wiremock with provider environment unset.
 
 ## Files
 
-- SDK provider/plugin/command contracts; core host, commands, settings/instances,
-  session input recording and turn/endpoint; provider-openai and provider-anthropic.
-- Auth library key/source/store/lifetime; bin provider writer and RPC/CLI tests.
+- SDK provider/plugin/command contracts; core host, commands, settings/instances, session input recording and turn/endpoint; provider-openai and provider-anthropic.
+- Auth library key/source/store/lifetime; bin provider writer and RPC/CLI tests; plugin-rpc provider attribution and its fixture.
 - TUI guide/history; existing AuthStatus consumers; schema/ and sdk/typescript/.
 
 ## Exit criteria
 
 - [x] Shape contract, shipped reserved names and safe boot instances.
 - [x] Wiremock RPC add → paste → catalogue → same-session model answer; no pre-paste HTTP.
-- [x] Strict names; no implicit foreign-credential adoption/deletion; orphan recovery.
-- [x] Origin change requires a new paste; same-origin paths retain credentials.
-- [x] Fresh plugin Arcs publish lists/reach; stale runtime probes are discarded.
+- [x] Strict names; user-only legacy adoption; no foreign-key adoption/deletion; safe orphan recovery.
+- [x] Stored origins checked at boot/request/refresh; origin changes require a new paste.
+- [x] Fresh plugin Arcs publish lists/reach; stale probes are discarded; collisions name plugin/file.
 - [x] Codex fallback survives failed catalogue while live probes report failure.
 - [x] Remove clears provider/model default and pins; live sessions get named AuthRequired.
 - [x] Failed reach, invalid URL and key arguments never disclose secrets in recordings.
-- [x] Native gates and isolated TUI smoke pass after review.
-- [x] Windows SDK, core, agents and RPC checks pass.
+- [x] Native gates pass; earlier isolated TUI smoke is recorded below.
+- [x] Earlier Windows SDK, core, agents and RPC checks passed (below).
 - [ ] Windows auth, both providers, TUI and bin: missing C headers/toolchain (below).
 
 ## Non-goals
 
-Picker UI (M166); removing built-ins; editing images in chat; shape inference;
-OAuth for new issuers; retaining credentials across origins.
+Picker UI (M166); removing built-ins; editing images in chat; shape inference; OAuth for new issuers; retaining credentials across origins.
 
 ## Risks
 
@@ -159,3 +126,25 @@ CLI: 266 passed; runtime-provider RPC: 4 passed, including a turn after removal.
 Initial clippy needless-borrow and two test-fixture mistakes were corrected; no wall-clock flake.
 TUI smoke was not rerun (guide-only surface change); prior counter bug record stands.
 Final `cargo clean` follows this commit to remove the 16 GB build-directory soft warning.
+
+## Verified — 2026-10-15 (review round 3)
+
+Regressions failed before fixes: project overrides (named/default keys and OAuth issuer), legacy adoption, foreign-owner notices, disabled-family orphan removal, unreadable auth.json, bad-name provenance and plugin attribution.
+Additional regressions cover OAuth resource overrides, cached-token checks, reserved-name migration and URL-safe notices.
+Sequential native gates with provider key/URL environment unset and `RUST_TEST_THREADS=4`:
+
+```text
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-mods -p bingo-store-jsonl --locked => 603 passed, 3 ignored; schema/TS unchanged
+cargo fmt --all -- --check => exit 0
+cargo check --workspace --all-targets --locked => exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings => exit 0
+cargo test --workspace --locked => 5619 passed, 5 ignored, 167 groups
+bash scripts/check_discipline.sh => discipline ok (advisory warnings)
+bash scripts/budget.sh => dependencies 412; warm core 0s; isolation 0; target 18 GB; budget ok
+cargo deny --offline check => advisories ok, bans ok, licenses ok, sources ok
+```
+
+CLI: 279 passed; runtime-provider RPC: 5 passed. No wall-clock flake; HTTP fixtures were local.
+Direct-construction fixtures now carry bindings; explicit legacy API-key and Codex boot tests remain.
+Native-only review: TUI smoke and Windows checks were not rerun; earlier records and C-toolchain deferrals stand.
+Final `cargo clean` follows this verification commit to remove the build-directory soft warning.
