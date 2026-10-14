@@ -218,20 +218,22 @@ pub(super) async fn reap(manager: &Manager) {
 }
 pub(super) async fn cleanup(manager: &Manager, name: &str) {
     // Name-scoped state may still belong to a turn using a retired generation.
-    if manager
-        .switches
-        .retired
-        .lock()
-        .await
-        .iter()
-        .any(|module| module.found.name == name)
-    {
+    if retired(manager, name).await {
         return;
     }
     manager.clear_signals(name).await;
     if let Some(dollar) = manager.dollar.get() {
         dollar.reload(name).await;
     }
+}
+pub(super) async fn retired(manager: &Manager, name: &str) -> bool {
+    manager
+        .switches
+        .retired
+        .lock()
+        .await
+        .iter()
+        .any(|module| module.found.name == name)
 }
 fn next(why: &str) -> PluginSwitch {
     PluginSwitch::NextStart { why: why.into() }

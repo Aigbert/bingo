@@ -142,7 +142,11 @@ impl Manager {
     ) -> Result<(), KernelError> {
         if let Some(old) = old {
             old.close().await;
-            switching::cleanup(self, &old.found.name).await;
+            if !switching::retired(self, &old.found.name).await
+                && let Some(dollar) = self.dollar.get()
+            {
+                dollar.reload(&old.found.name).await;
+            }
         }
         let config = self
             .settings
