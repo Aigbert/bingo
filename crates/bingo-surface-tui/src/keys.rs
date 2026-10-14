@@ -120,6 +120,11 @@ pub const BINDINGS: &[Binding] = &[
         description: "expand preview",
     },
     Binding {
+        keys: "ctrl+p",
+        group: "move",
+        description: "cycle focused pane place",
+    },
+    Binding {
         keys: "ctrl+o",
         group: "move",
         description: "expand result · again for all",

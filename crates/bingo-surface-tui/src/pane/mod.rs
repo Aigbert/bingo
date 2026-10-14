@@ -1,26 +1,27 @@
+//! Pane declarations and the surface state belonging to their controls.
+mod draw;
+mod mouse;
+mod moved;
 pub mod seat;
-// Pane placement and the editor belonging to the focused element.
-use crate::{
-    clock::Now, composer::Composer, effect::Effect, focus::Focus, layout::Layout, theme, ui::Ui,
-    views,
-};
+use crate::{composer::Composer, effect::Effect, focus::Focus, theme, ui::Ui};
 use bingo_sdk::{
     Action, Input, SessionState, View,
     slot::{Shown, Slot},
     view::{InputProps, SelectProps},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{
-    layout::Rect,
-    text::{Line, Span},
-    widgets::Paragraph,
-};
+pub use draw::{draw, status};
+pub use mouse::mouse;
+use ratatui::layout::Rect;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Default)]
 pub struct State {
     opened: BTreeSet<String>,
-    seen: BTreeSet<String>,
+    order: Vec<String>,
+    moved: BTreeMap<String, bingo_sdk::slot::Place>,
+    scroll: BTreeMap<String, usize>,
+    selection: Option<(String, crate::select::Run)>,
     selected: BTreeMap<String, usize>,
     editors: BTreeMap<(String, usize), Composer>,
 }
@@ -64,7 +65,7 @@ pub fn placed(state: &SessionState) -> Vec<Pane> {
                     hold: hold_toasts,
                     asked,
                     place,
-                size,
+                    size,
                     view,
                 })
             } else {
@@ -81,18 +82,26 @@ impl State {
         let panes = placed(state);
         let keys: BTreeSet<_> = panes.iter().map(|pane| pane.key.clone()).collect();
         self.opened.retain(|key| keys.contains(key));
-        self.seen.retain(|key| keys.contains(key));
+        self.order.retain(|key| keys.contains(key));
+        self.scroll.retain(|key, _| keys.contains(key));
+        if self
+            .selection
+            .as_ref()
+            .is_some_and(|(key, _)| !keys.contains(key))
+        {
+            self.selection = None;
+        }
         self.selected.retain(|key, _| keys.contains(key));
         self.editors.retain(|(key, _), _| keys.contains(key));
         if matches!(focus,Focus::Pane(key) if !keys.contains(key)) {
             *focus = Focus::Composer;
         }
         for pane in panes {
-            if self.seen.insert(pane.key.clone())
-                && pane.asked
-                && pane.focus
-                && matches!(focus, Focus::Composer)
-            {
+            if self.order.contains(&pane.key) {
+                continue;
+            }
+            self.order.push(pane.key.clone());
+            if pane.asked && pane.focus && matches!(focus, Focus::Composer) {
                 *focus = Focus::Pane(pane.key);
             }
         }
@@ -103,78 +112,22 @@ impl State {
             .any(|pane| pane.hold && self.visible(pane))
     }
 }
-pub fn height(ui: &Ui, state: &SessionState, screen: u16) -> u16 {
-    placed(state)
-        .iter()
-        .filter(|pane| ui.placed.panes.visible(pane))
-        .map(|pane| pane.size.rows.ideal.cells(screen).max(2))
-        .fold(0, u16::saturating_add)
-        .min(screen / 3)
-}
-pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, now: Now) {
-    let panes: Vec<_> = placed(state)
+pub fn wanted(ui: &Ui, state: &SessionState) -> Vec<Pane> {
+    let mut panes: Vec<_> = placed(state)
         .into_iter()
         .filter(|pane| ui.placed.panes.visible(pane))
         .collect();
-    let mut y = area.y;
-    let count = panes.len().max(1) as u16;
-    for pane in panes {
-        let height = pane
-            .size.rows.ideal.cells(area.height)
-            .max(2)
-            .min(area.height / count)
-            .min(area.bottom().saturating_sub(y));
-        let rect = Rect::new(area.x, y, area.width, height);
-        y += height;
-        if height == 0 {
-            continue;
-        }
-        frame.panes.push((pane.key.clone(), rect));
-        let selected = matches!(&ui.focus,Focus::Pane(key) if key==&pane.key);
-        let title = if selected {
-            format!("{} · Tab: next · Esc: close", pane.title)
-        } else {
-            pane.title.clone()
-        };
-        let mut lines = vec![Line::from(Span::styled(title, theme::bold()))];
-        if let Shown::Pull { request } = &pane.view {
-            frame.pulls.push(crate::pulled::Key::new(
-                state,
-                request,
-                rect.width,
-                rect.height.saturating_sub(1),
-            ));
-        }
-        match ui.placed.pulled.view(&pane.view, state, rect.width) {
-            Some(view) => {
-                let mut view = view.clone();
-                let index = ui
-                    .placed
-                    .panes
-                    .selected
-                    .get(&pane.key)
-                    .copied()
-                    .unwrap_or_default();
-                edited(
-                    &mut view,
-                    index,
-                    ui.placed.panes.editors.get(&(pane.key.clone(), index)),
-                    selected,
-                    &mut 0,
-                );
-                lines.extend(views::marked(
-                    &view,
-                    usize::from(rect.width),
-                    &views::Marks {
-                        pending: ui.pending_ui.as_ref().map(|(_, action)| action.clone()),
-                        ..views::Marks::at(now)
-                    },
-                ));
-            }
-            None => lines.push(Line::from(theme::ellipsis())),
-        }
-        frame.render_widget(Paragraph::new(lines), rect);
-    }
+    panes.sort_by_key(|pane| {
+        ui.placed
+            .panes
+            .order
+            .iter()
+            .position(|key| key == &pane.key)
+    });
+    panes
+}
+pub fn seating(ui: &Ui, state: &SessionState, area: Rect) -> seat::Seating {
+    seat::seat(area, &wanted(ui, state), &ui.placed.panes.moved)
 }
 pub fn waiting(ui: &Ui, state: &SessionState) -> Vec<Pane> {
     placed(state)
@@ -182,20 +135,18 @@ pub fn waiting(ui: &Ui, state: &SessionState) -> Vec<Pane> {
         .filter(|pane| !ui.placed.panes.visible(pane))
         .collect()
 }
-pub fn click(ui: &mut Ui, at: ratatui::layout::Position) -> bool {
-    let key = ui
-        .shown
-        .waiting
-        .iter()
-        .chain(&ui.shown.panes)
-        .find(|(_, area)| area.contains(at))
-        .map(|(key, _)| key.clone());
-    if let Some(key) = key {
-        ui.placed.panes.opened.insert(key.clone());
-        ui.focus = Focus::Pane(key);
-        true
-    } else {
-        false
+fn view<'a>(
+    ui: &'a Ui,
+    state: &SessionState,
+    pane: &'a Pane,
+    seated: &seat::Seated,
+) -> Option<&'a View> {
+    match &pane.view {
+        Shown::View(view) => Some(view),
+        Shown::Pull { request } => ui
+            .placed
+            .pulled
+            .answer_for(&crate::pulled::Key::seated(state, request, seated)),
     }
 }
 #[derive(Clone)]
@@ -306,6 +257,7 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
         return Vec::new();
     };
     if key.code == KeyCode::Esc {
+        ui.placed.panes.selection = None;
         ui.focus = Focus::Composer;
         if pane.close {
             return submit(
@@ -318,13 +270,20 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
         }
         return Vec::new();
     }
-    let width = ui
+    if key.code == KeyCode::Char('p') && key.modifiers == KeyModifiers::CONTROL {
+        moved::cycle(ui, state, &focused);
+        return Vec::new();
+    }
+    let Some(seated) = ui
         .shown
+        .seating
         .panes
         .iter()
-        .find(|(id, _)| id == &focused)
-        .map_or(0, |(_, area)| area.width);
-    let Some(view) = ui.placed.pulled.view(&pane.view, state, width) else {
+        .find(|seat| seat.key == focused)
+    else {
+        return Vec::new();
+    };
+    let Some(view) = view(ui, state, &pane, seated) else {
         return Vec::new();
     };
     let mut items = Vec::new();
@@ -435,121 +394,7 @@ fn submit(mut action: Action, value: Option<String>) -> Vec<Effect> {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::test_support::*;
-    use bingo_sdk::{
-        View,
-        slot::{Shown, Slot},
-    };
-    fn pane(asked: bool) -> Slot {
-        Slot::Pane {
-            id: "counter".into(),
-            title: "Counter pane".into(),
-            focus: true,
-            close_on_escape: true,
-            hold_toasts: false,
-            asked,
-            place: bingo_sdk::slot::above(),
-            size: bingo_sdk::slot::PaneSize::from_rows(20),
-            view: Shown::View(View::text("Count: 0")),
-        }
-    }
-    fn with(slot: Slot) -> bingo_sdk::SessionState {
-        let mut state = state();
-        state.signals.entry("counter".into()).or_default().insert(
-            "pane".into(),
-            bingo_sdk::slot::with(serde_json::json!({}), [slot]),
-        );
-        state
-    }
-    #[test]
-    fn asked_panes_are_inline_at_both_widths_and_unasked_panes_wait_for_a_click() {
-        for width in [80, 200] {
-            let (mut ui, now) = scene();
-            let tree = solo(&with(pane(true)));
-            let screen = draw_tree(width, 24, &tree, &mut ui, now);
-            assert_eq!(ui.shown.panes[0].1.height, 8);
-            assert_eq!(ui.shown.panes[0].1.bottom(), ui.shown.regions.composer.y);
-            assert!(
-                screen.contains("Counter pane") && screen.contains("Count: 0"),
-                "{screen}"
-            );
-        }
-        let (mut ui, now) = scene();
-        let tree = solo(&with(pane(false)));
-        let screen = draw_tree(200, 24, &tree, &mut ui, now);
-        assert!(screen.contains("Counter pane (waiting)"), "{screen}");
-        assert!(!screen.contains("Count: 0"));
-        crate::pointer::on_mouse(
-            &mut ui,
-            &tree,
-            crossterm::event::MouseEvent {
-                kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
-                column: 0,
-                row: 23,
-                modifiers: crossterm::event::KeyModifiers::NONE,
-            },
-            now,
-        );
-        assert!(draw_tree(200, 24, &tree, &mut ui, now).contains("Count: 0"));
-    }
-    #[test]
-    fn pane_keys_use_handlers_and_an_independent_composer() {
-        use bingo_sdk::{
-            Action,
-            view::{ButtonProps, InputProps},
-        };
-        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-        let action = |event: &str| Action {
-            name: "counter:ui".into(),
-            args: serde_json::json!({"handler":"token","event":event}),
-        };
-        let mut slot = pane(true);
-        if let Slot::Pane { view, .. } = &mut slot {
-            *view = View::column(vec![
-                View::Button {
-                    children: vec![],
-                    button: ButtonProps {
-                        hotkey: Some('i'),
-                        on_press: Some(action("press")),
-                        ..Default::default()
-                    }
-                    .into(),
-                },
-                View::Input {
-                    input: InputProps {
-                        value: Some("A".into()),
-                        on_input: Some(action("input")),
-                        ..Default::default()
-                    }
-                    .into(),
-                },
-            ])
-            .into();
-        }
-        let state = with(slot);
-        let tree = solo(&state);
-        let (mut ui, now) = scene();
-        ui.sync_panes(&state);
-        draw_tree(80, 24, &tree, &mut ui, now);
-        let key = |code| KeyEvent::new(code, KeyModifiers::NONE);
-        let fired = crate::input::on_key(&mut ui, &tree, key(KeyCode::Char('i')), now);
-        assert!(
-            matches!(&fired[..],[crate::effect::Effect::Submit(bingo_sdk::Input::Action{action})] if action.args["event"]=="press")
-        );
-        crate::input::on_key(&mut ui, &tree, key(KeyCode::Tab), now);
-        let typed = crate::input::on_key(&mut ui, &tree, key(KeyCode::Char('b')), now);
-        assert!(
-            matches!(&typed[..],[crate::effect::Effect::Submit(bingo_sdk::Input::Action{action})] if action.args["value"]=="Ab")
-        );
-        assert!(ui.composer.is_empty());
-        assert!(draw_tree(80, 24, &tree, &mut ui, now).contains("Ab"));
-        let closed = crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(
-            matches!(&closed[..],[crate::effect::Effect::Submit(bingo_sdk::Input::Action{action})] if action.args["event"]=="close")
-        );
-    }
-}
+mod tests;
 
 #[cfg(test)]
 mod integration_tests;
