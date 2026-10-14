@@ -67,3 +67,5 @@ first record; 0036 §2 answered it before it was named).
 - [0081 — The screen is the person's](0081-the-screen-is-the-persons.md)
 - [0082 — Every place on screen is a site](0082-every-place-on-screen-is-a-site.md)
 - [0083 — The chat is a surface](0083-the-chat-is-a-surface.md)
+- [0084 — The places you act are sites](0084-the-places-you-act-are-sites.md) — proposed
+- [0085 — Choosing a model without leaving the chat](0085-choosing-a-model-without-leaving-the-chat.md)
