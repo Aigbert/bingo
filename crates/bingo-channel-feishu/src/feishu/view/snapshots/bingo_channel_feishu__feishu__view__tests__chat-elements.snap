@@ -1,0 +1,432 @@
+---
+source: crates/bingo-channel-feishu/src/feishu/view/tests.rs
+assertion_line: 52
+expression: "views.into_iter().map(render).collect::<Vec<_>>()"
+---
+[
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "markdown",
+          "content": "A"
+        },
+        {
+          "tag": "markdown",
+          "content": "B"
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "column_set",
+          "flex_mode": "flow",
+          "columns": [
+            {
+              "tag": "column",
+              "width": "weighted",
+              "weight": 1,
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "A"
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "weighted",
+              "weight": 1,
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "B"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "markdown",
+          "content": "<font color='blue'>~~*Hello **world***~~</font>"
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "markdown",
+          "content": "```rust\nlet x = 1;\n```"
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "markdown",
+          "content": "[Read](https://example.com/a%28b%29)"
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "img",
+          "img_key": "img-key",
+          "alt": {
+            "tag": "plain_text",
+            "content": "Picture"
+          }
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "button",
+          "text": {
+            "tag": "plain_text",
+            "content": "Press"
+          },
+          "type": "default",
+          "behaviors": [
+            {
+              "type": "callback",
+              "value": {
+                "bingo": {
+                  "chat": "chat",
+                  "thread": null,
+                  "group": false,
+                  "session": "session",
+                  "requestId": "answer",
+                  "action": {
+                    "name": "fixture:ui",
+                    "args": {
+                      "handler": "minted",
+                      "event": "ui.press",
+                      "value": null
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "select_static",
+          "placeholder": {
+            "tag": "plain_text",
+            "content": "Pick"
+          },
+          "options": [
+            {
+              "text": {
+                "tag": "plain_text",
+                "content": "Alpha"
+              },
+              "value": "a"
+            }
+          ],
+          "initial_option": "a",
+          "behaviors": [
+            {
+              "type": "callback",
+              "value": {
+                "bingo": {
+                  "chat": "chat",
+                  "thread": null,
+                  "group": false,
+                  "session": "session",
+                  "requestId": "answer",
+                  "action": {
+                    "name": "fixture:ui",
+                    "args": {
+                      "handler": "minted",
+                      "event": "ui.press",
+                      "value": null
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "form",
+          "name": "name",
+          "elements": [
+            {
+              "tag": "input",
+              "name": "value",
+              "placeholder": {
+                "tag": "plain_text",
+                "content": "Type"
+              },
+              "default_value": "Alice",
+              "label": {
+                "tag": "plain_text",
+                "content": "Name"
+              }
+            },
+            {
+              "tag": "button",
+              "name": "submit",
+              "action_type": "form_submit",
+              "type": "primary",
+              "text": {
+                "tag": "plain_text",
+                "content": "Submit"
+              },
+              "behaviors": [
+                {
+                  "type": "callback",
+                  "value": {
+                    "bingo": {
+                      "chat": "chat",
+                      "thread": null,
+                      "group": false,
+                      "session": "session",
+                      "requestId": "answer",
+                      "action": {
+                        "name": "fixture:ui",
+                        "args": {
+                          "handler": "minted",
+                          "event": "ui.press",
+                          "value": null
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "markdown",
+          "content": "Changed"
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "markdown",
+          "content": "Circle"
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "markdown",
+          "content": "x"
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "markdown",
+          "content": "\\*\\*fold\\*\\*"
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "markdown",
+          "content": "A\nB"
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  },
+  {
+    "schema": "2.0",
+    "config": {
+      "streaming_mode": false,
+      "update_multi": true
+    },
+    "body": {
+      "elements": [
+        {
+          "tag": "markdown",
+          "content": "Later"
+        },
+        {
+          "tag": "markdown",
+          "content": "---\nmodel · out 10"
+        }
+      ]
+    }
+  }
+]

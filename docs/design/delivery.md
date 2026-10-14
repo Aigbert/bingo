@@ -274,3 +274,5 @@ Also watched: Windows drift (cfg(unix) creep in plugins; Windows CI job promoted
 - `/Users/yexrob/Episodes/Projects/bingo-inc/bingo/src/api/contract.rs` — stream vocabulary, accumulator finish rules and error classification for M0/M1.
 - `/Users/yexrob/Episodes/Projects/bingo-inc/bingo/src/tool/bash.rs` — interactive rejection table, periodic detection, foreground/background process handling for M1.
 - `/Users/yexrob/Episodes/Projects/bingo-inc/bingo/notes/cc-gap-analysis.md` — the open P0/P1 list every milestone above maps to.
+
+2026-10-14 — M162 (ADR-0083): chat sites finish and redraw Feishu cards with checked controls; an adapter menu capability publishes per-app commands. Offline fixtures verify the wire; the person’s live check remains pending.

@@ -123,6 +123,22 @@ fn click(event: &Value) -> Option<Incoming> {
         (None, Some(true)) => Conversation::group(chat),
         (None, _) => Conversation::direct(chat),
     };
+    if ours.get("action").is_some() {
+        if event["context"]["open_chat_id"].as_str()? != chat {
+            return None;
+        }
+        return Some(Incoming::Action {
+            conversation,
+            principal: event["operator"]["open_id"].as_str()?.into(),
+            session: serde_json::from_value(ours["session"].clone()).ok()?,
+            request_id: ours["requestId"].as_str()?.into(),
+            action: serde_json::from_value(ours["action"].clone()).ok()?,
+            value: event["action"]
+                .get("option")
+                .cloned()
+                .or_else(|| event["action"]["form_value"].get("value").cloned()),
+        });
+    }
     Some(Incoming::Click {
         question: InteractionId::from_raw(ours["interaction"].as_str()?),
         choice: ours["choice"].as_str()?.to_string(),
@@ -146,6 +162,16 @@ pub fn button_value(to: &Conversation, question: &Question, choice: &str) -> Val
             "group": to.group,
         }
     })
+}
+
+pub fn action_value(
+    to: &Conversation,
+    session: &bingo_sdk::SessionId,
+    request_id: &str,
+    action: &bingo_sdk::Action,
+) -> Value {
+    json!({OURS: {"chat":to.chat,"thread":to.thread,"group":to.group,
+        "session":session,"requestId":request_id,"action":action}})
 }
 
 /// Events already handled. The peer delivers at least once, so an id that has
@@ -452,5 +478,55 @@ mod tests {
             "the oldest id fell out, which is the price of a bounded ring"
         );
         assert_eq!(seen.order.len(), 2);
+    }
+}
+
+#[cfg(test)]
+mod action_tests {
+    use super::*;
+    #[test]
+    fn controls_carry_the_exact_action_and_separate_user_values() {
+        let action = bingo_sdk::Action {
+            name: "mod:ui".into(),
+            args: json!({"handler":"generation:1","event":"ui.select","value":null}),
+        };
+        let value = action_value(
+            &Conversation::group("chat").in_thread("thread"),
+            &bingo_sdk::SessionId::from_raw("s"),
+            "answer",
+            &action,
+        );
+        for extra in [
+            json!({"option":"chosen"}),
+            json!({"form_value":{"value":"typed"}}),
+            json!({}),
+        ] {
+            let mut event = json!({"operator":{"open_id":"person"},"context":{"open_chat_id":"chat"},"action":extra});
+            event["action"]["value"] = value.clone();
+            let Some(Incoming::Action {
+                action: received,
+                value: input,
+                conversation,
+                session,
+                request_id,
+                ..
+            }) = click(&event)
+            else {
+                panic!("action")
+            };
+            assert_eq!(received, action);
+            assert_eq!(session.as_str(), "s");
+            assert_eq!(request_id, "answer");
+            assert_eq!(conversation.path(), "chat/thread");
+            assert_eq!(
+                input,
+                event["action"]
+                    .get("option")
+                    .cloned()
+                    .or_else(|| event["action"]["form_value"].get("value").cloned())
+            );
+            event["context"]["open_chat_id"] = json!("foreign");
+            assert!(click(&event).is_none());
+        }
     }
 }

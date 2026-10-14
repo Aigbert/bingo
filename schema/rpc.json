@@ -5219,7 +5219,8 @@
       "enum": [
         "terminal",
         "desktop",
-        "text"
+        "text",
+        "chat"
       ]
     },
     "TextChild": {

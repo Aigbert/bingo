@@ -8968,7 +8968,8 @@
       "enum": [
         "terminal",
         "desktop",
-        "text"
+        "text",
+        "chat"
       ]
     },
     "SystemBlock": {

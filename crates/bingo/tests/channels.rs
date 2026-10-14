@@ -99,9 +99,23 @@ struct Chat {
 
 impl Chat {
     async fn open(script: &str, settings: Value) -> Chat {
+        Self::with_mod(script, settings, None).await
+    }
+
+    async fn with_mod(script: &str, settings: Value, fixture: Option<&str>) -> Chat {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let peer = listener.local_addr().unwrap().to_string();
         let home = tempfile::tempdir().unwrap();
+        if let Some(fixture) = fixture {
+            let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/mods")
+                .join(fixture);
+            let installed = home.path().join(".bingo/plugins").join(fixture);
+            std::fs::create_dir_all(&installed).unwrap();
+            for file in ["plugin.json", "main.ts"] {
+                std::fs::copy(source.join(file), installed.join(file)).unwrap();
+            }
+        }
         let script_path = home.path().join("script.json");
         std::fs::write(&script_path, script).unwrap();
         let settings_path = home.path().join("channels.json");
@@ -739,4 +753,88 @@ async fn loopback_without_the_switch_is_refused_before_listening() {
         stderr.contains("no such channel adapter: loopback"),
         "{stderr}"
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_chat_site_delivers_its_tree_and_only_its_minted_button_runs() {
+    let mut chat = Chat::with_mod(
+        &answering("Engine answer"),
+        json!({"channels":{"loopback":{"menu":true}}}),
+        Some("chat"),
+    )
+    .await;
+    tokio::time::timeout(LIMIT, async {
+        loop {
+            chat.peer.chats("chat", "/chat-ready").await;
+            let seen = chat.peer.until(|op| is(op, "finish")).await;
+            if seen.last().unwrap()["text"] == "Chat ready" {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the fixture command registers");
+    chat.peer.chats("chat", "hello").await;
+    let seen = chat.peer.until(|op| is(op, "draw")).await;
+    let first = seen.last().unwrap();
+    let drawing = &first["drawing"];
+    assert_eq!(drawing["request"]["surface"], "chat");
+    assert_eq!(
+        drawing["request"]["viewport"],
+        json!({"columns":0,"rows":0})
+    );
+    assert_eq!(
+        drawing["view"]["children"][0]["children"][0],
+        "Chat count: 0"
+    );
+    let mut press = json!({"kind":"action","chat":"chat","session":drawing["session"],
+        "requestId":drawing["request"]["requestId"],"action":drawing["view"]["children"][1]["onPress"]});
+    let original = press["action"].clone();
+    press["action"]["name"] = json!("forged:ui");
+    chat.peer.say(press.clone()).await;
+    chat.peer
+        .until(|op| {
+            op["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("earlier drawing"))
+        })
+        .await;
+    press["action"] = original;
+    chat.peer.say(press.clone()).await;
+    let changed = chat
+        .peer
+        .until(|op| {
+            is(op, "draw") && op["drawing"]["view"]["children"][0]["children"][0] == "Chat count: 1"
+        })
+        .await;
+    assert_eq!(
+        changed.last().unwrap()["id"],
+        first["id"],
+        "invalidation edits the delivered card"
+    );
+    press["action"] = changed.last().unwrap()["drawing"]["view"]["children"][1]["onPress"].clone();
+    let module = chat.home.path().join(".bingo/plugins/chat/main.ts");
+    let source = std::fs::read_to_string(&module).unwrap();
+    std::fs::write(&module, format!("{source}\n// A new generation.\n")).unwrap();
+    chat.peer.chats("chat", "/plugins reload").await;
+    chat.peer.until(|op| is(op, "finish")).await;
+    chat.peer.say(press.clone()).await;
+    chat.peer
+        .until(|op| {
+            op["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("earlier drawing"))
+        })
+        .await;
+    chat.peer.chats("chat", "/new").await;
+    chat.peer.until(|op| op["text"] == "新会话已开启。").await;
+    chat.peer.say(press).await;
+    chat.peer
+        .until(|op| {
+            op["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("earlier drawing"))
+        })
+        .await;
 }
