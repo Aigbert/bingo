@@ -121,9 +121,8 @@ impl OpenAiProvider {
     ) -> Self {
         let id = id.into();
         let issuer = codex_issuer(endpoint.issuer);
-        let base_url = endpoint
-            .base_url
-            .unwrap_or_else(|| CODEX_BASE_URL.to_string());
+        let base_url =
+            bingo_auth_oauth::address::resolve(endpoint.base_url.as_deref(), CODEX_BASE_URL, None);
         let store = Arc::new(
             store
                 .owned_by("codex")
@@ -359,11 +358,9 @@ impl Provider for OpenAiProvider {
         }
         if provider.credential_origin() != self.credential_origin() {
             provider.credential = match &self.credential {
-                Credential::Key(key) => Credential::Key(key.without_configured().at_origin(
-                    "openai",
-                    &provider.base_url,
-                    "user settings",
-                )),
+                Credential::Key(key) => {
+                    Credential::Key(key.at_origin("openai", &provider.base_url, "user settings"))
+                }
                 Credential::Tokens(source) => {
                     Credential::Tokens(Arc::new(source.at_resource(&provider.base_url)))
                 }
@@ -508,7 +505,7 @@ fn refused(error: &ProviderError) -> bool {
 fn codex_issuer(base: Option<String>) -> Issuer {
     Issuer {
         client_id: CODEX_CLIENT_ID.into(),
-        base: base.unwrap_or_else(|| CODEX_ISSUER.to_string()),
+        base: bingo_auth_oauth::address::resolve(base.as_deref(), CODEX_ISSUER, None),
         authorize_path: "/oauth/authorize".into(),
         token_path: "/oauth/token".into(),
         revoke_path: Some("/oauth/revoke".into()),

@@ -83,6 +83,7 @@ impl ProviderShape for Shape {
             endpoint,
             &self.env.user_settings(),
             &store,
+            None,
         )))
     }
 }

@@ -38,6 +38,7 @@ pub(crate) fn for_plugin(
         sources.layers.push(ConfigLayer {
             source: layer.source.clone(),
             user: layer.is_user(),
+            repository: layer.repository().is_some(),
             values,
         });
     }

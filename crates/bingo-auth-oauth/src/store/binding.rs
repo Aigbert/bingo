@@ -38,6 +38,14 @@ impl Binding {
 }
 
 impl CredentialStore {
+    pub fn check_configured(&self, name: &str, address: &str) -> Result<(), AuthError> {
+        self.validate_address()?;
+        if let Ok(Some(binding)) = &self.binding {
+            binding.check(name, crate::lifetime::origin(address).as_deref())?;
+        }
+        Ok(())
+    }
+
     pub fn validate_address(&self) -> Result<(), AuthError> {
         for binding in [&self.binding, &self.resource] {
             if let Err(message) = binding {

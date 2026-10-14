@@ -20,6 +20,7 @@
 //!
 //! Nothing here logs a credential.
 
+pub mod address;
 pub mod boot;
 pub mod callback;
 pub mod challenge;

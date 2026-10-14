@@ -9,6 +9,7 @@ pub struct Endpoint<'a> {
     pub name: &'a str,
     pub field: &'a str,
     pub default: &'a str,
+    pub environment: Option<&'a str>,
     pub resource: Option<&'a str>,
 }
 
@@ -62,11 +63,17 @@ impl Endpoint<'_> {
         };
         let fallback = registrar.env().user_settings().display().to_string();
         let file = file.unwrap_or(&fallback);
-        let address = value
-            .and_then(|v| v.get(self.field))
-            .and_then(Value::as_str)
-            .unwrap_or(self.default);
-        let mut scoped = store.at_origin(address, file);
+        let environment = self
+            .environment
+            .and_then(|variable| std::env::var(variable).ok());
+        let address = crate::address::resolve(
+            value
+                .and_then(|v| v.get(self.field))
+                .and_then(Value::as_str),
+            self.default,
+            environment.as_deref(),
+        );
+        let mut scoped = store.at_origin(&address, file);
         if let Some(default) = self.resource {
             path.pop();
             path.push("baseUrl");
@@ -76,11 +83,12 @@ impl Endpoint<'_> {
                 registrar.sources().source(&path)
             }
             .unwrap_or(&fallback);
-            let address = value
-                .and_then(|v| v.get("baseUrl"))
-                .and_then(Value::as_str)
-                .unwrap_or(default);
-            scoped = scoped.at_resource(address, file);
+            let address = crate::address::resolve(
+                value.and_then(|v| v.get("baseUrl")).and_then(Value::as_str),
+                default,
+                None,
+            );
+            scoped = scoped.at_resource(&address, file);
         }
         scoped
     }

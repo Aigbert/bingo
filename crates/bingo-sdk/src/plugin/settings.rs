@@ -7,6 +7,8 @@ use serde_json::{Map, Value};
 pub struct ConfigLayer {
     pub source: String,
     pub user: bool,
+    /// Repository-controlled settings, including the local override.
+    pub repository: bool,
     pub values: Map<String, Value>,
 }
 

@@ -9,7 +9,8 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use bingo_auth_oauth::CredentialStore;
+use bingo_auth_oauth::{CredentialStore, address};
+use bingo_sdk::plugin::ConfigSources;
 use bingo_sdk::{PluginError, Provider, Registrar};
 
 use crate::settings::{AnthropicEndpoint, Settings};
@@ -31,20 +32,41 @@ pub fn providers(
     let file = env.user_settings();
     let mut named = BTreeSet::new();
     let default_store = bound(registrar, &store, "anthropic", "anthropic");
-    let mut providers: Vec<Arc<dyn Provider>> = vec![Arc::new(default_anthropic(
-        http.clone(),
-        settings.anthropic.endpoint.clone(),
-        &file,
-        &default_store,
-    ))];
+    let mut providers: Vec<Arc<dyn Provider>> = vec![registered(
+        default_anthropic(
+            http.clone(),
+            settings.anthropic.endpoint.clone(),
+            &file,
+            &default_store,
+            Some(registrar.sources()),
+        ),
+        registrar,
+    )];
     for (name, endpoint) in settings.anthropic.instances {
         let store = bound(registrar, &store, "anthropic", &name);
         if !allowed(&mut named, &name, "anthropic", &store, registrar) {
             continue;
         }
-        providers.push(Arc::new(keyed(http.clone(), name, endpoint, &file, &store)));
+        providers.push(registered(
+            keyed(
+                http.clone(),
+                name,
+                endpoint,
+                &file,
+                &store,
+                Some(registrar.sources()),
+            ),
+            registrar,
+        ));
     }
     Ok(providers)
+}
+
+fn registered(provider: AnthropicProvider, registrar: &mut Registrar) -> Arc<dyn Provider> {
+    if let Some(message) = provider.key.address_notice() {
+        registrar.notice("provider.address", message);
+    }
+    Arc::new(provider)
 }
 
 /// Where the default `anthropic` key may be written. `with_endpoint` builds
@@ -63,25 +85,22 @@ fn default_anthropic(
     endpoint: AnthropicEndpoint,
     file: &Path,
     store: &Arc<CredentialStore>,
+    sources: Option<&ConfigSources>,
 ) -> AnthropicProvider {
     let places = default_places(Some(file.to_path_buf()));
-    let base_url = first([std::env::var(BASE_URL_ENV).ok(), endpoint.base_url.clone()])
-        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
+    let base_url = address::resolve(
+        endpoint.base_url.as_deref(),
+        DEFAULT_BASE_URL,
+        std::env::var(BASE_URL_ENV).ok().as_deref(),
+    );
     let key = ApiKey::new(
         PROVIDER_ID,
         places.clone(),
         store.clone(),
-        configured(&places, endpoint.api_key),
+        configured(&places, endpoint.api_key, sources, &base_url),
     )
     .at_origin("anthropic", &base_url, &file.display().to_string());
-    AnthropicProvider::keyed(
-        http,
-        PROVIDER_ID,
-        key,
-        first([std::env::var(BASE_URL_ENV).ok(), endpoint.base_url])
-            .unwrap_or_else(|| DEFAULT_BASE_URL.to_string()),
-        endpoint.images,
-    )
+    AnthropicProvider::keyed(http, PROVIDER_ID, key, base_url, endpoint.images)
 }
 
 /// One more Anthropic-shaped endpoint under its own name. Its key is its own:
@@ -92,6 +111,7 @@ pub(crate) fn keyed(
     endpoint: AnthropicEndpoint,
     file: &Path,
     store: &Arc<CredentialStore>,
+    sources: Option<&ConfigSources>,
 ) -> AnthropicProvider {
     let places = Places {
         // No variable: one exported key must not feed every proxy.
@@ -99,38 +119,55 @@ pub(crate) fn keyed(
         setting: format!("anthropic.instances.{name}.apiKey"),
         file: Some(file.to_path_buf()),
     };
-    let base_url = blank(endpoint.base_url.clone()).unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
+    let base_url = address::resolve(endpoint.base_url.as_deref(), DEFAULT_BASE_URL, None);
     let key = ApiKey::new(
         name.clone(),
         places.clone(),
         Arc::new(store.owned_by("anthropic")),
-        configured(&places, endpoint.api_key),
+        configured(&places, endpoint.api_key, sources, &base_url),
     )
     .at_origin("anthropic", &base_url, &file.display().to_string());
-    AnthropicProvider::keyed(
-        http,
-        name,
-        key,
-        blank(endpoint.base_url).unwrap_or_else(|| DEFAULT_BASE_URL.to_string()),
-        endpoint.images,
-    )
+    AnthropicProvider::keyed(http, name, key, base_url, endpoint.images)
 }
 
 /// The key one endpoint holds before any paste, and the place that held it.
 /// The variable wins over the setting, so one shell can point a run at
 /// another key without editing a file.
-fn configured(places: &Places, from_settings: Option<String>) -> Option<Configured> {
+fn configured(
+    places: &Places,
+    from_settings: Option<String>,
+    sources: Option<&ConfigSources>,
+    resolved: &str,
+) -> Option<Configured> {
+    let environment = places
+        .variable
+        .and_then(|_| std::env::var(BASE_URL_ENV).ok());
+    let permitted = |from_environment| {
+        address::configured(
+            sources,
+            &places.setting,
+            if sources.is_some() {
+                DEFAULT_BASE_URL
+            } else {
+                resolved
+            },
+            environment.as_deref(),
+            from_environment,
+        )
+    };
     if let Some(variable) = places.variable
         && let Some(key) = blank(std::env::var(variable).ok())
     {
         return Some(Configured {
             key,
             place: variable.to_string(),
+            address: Some(permitted(true)),
         });
     }
     blank(from_settings).map(|key| Configured {
         key,
         place: places.setting.clone(),
+        address: Some(permitted(false)),
     })
 }
 
@@ -145,6 +182,7 @@ fn bound(
         name,
         field: "baseUrl",
         default: DEFAULT_BASE_URL,
+        environment: (family == "anthropic" && name == family).then_some(BASE_URL_ENV),
         resource: None,
     };
     Arc::new(endpoint.store(registrar, store))
@@ -215,6 +253,7 @@ fn claim(named: &mut BTreeSet<String>, name: &str) -> Result<(), PluginError> {
 /// The first value set to something other than blanks. A blank counts as
 /// unset wherever it is written, so an exported empty variable does not
 /// shadow a configured one.
+#[cfg(test)]
 fn first<const N: usize>(values: [Option<String>; N]) -> Option<String> {
     values.into_iter().find_map(blank)
 }
@@ -246,6 +285,7 @@ mod tests {
                 endpoint,
                 &file,
                 &store(&directory),
+                None,
             )
         };
         assert_eq!(
@@ -315,9 +355,15 @@ mod tests {
             setting: "anthropic.instances.proxy1.apiKey".into(),
             file: None,
         };
-        let held = configured(&places, Some("sk-ant-instance".into())).expect("the setting");
+        let held = configured(
+            &places,
+            Some("sk-ant-instance".into()),
+            None,
+            DEFAULT_BASE_URL,
+        )
+        .expect("the setting");
         assert_eq!(held.key, "sk-ant-instance");
         assert_eq!(held.place, "anthropic.instances.proxy1.apiKey");
-        assert!(configured(&places, Some("   ".into())).is_none());
+        assert!(configured(&places, Some("   ".into()), None, DEFAULT_BASE_URL).is_none());
     }
 }

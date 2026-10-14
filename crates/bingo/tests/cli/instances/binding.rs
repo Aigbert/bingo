@@ -251,3 +251,5 @@ fn a_reserved_instance_cannot_adopt_a_disabled_familys_legacy_key() {
     assert!(stderr(&out).contains("Skipped"), "{}", stderr(&out));
     assert_eq!(stored(home.path()), legacy);
 }
+
+mod configured;

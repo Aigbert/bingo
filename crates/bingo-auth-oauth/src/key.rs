@@ -34,6 +34,8 @@ pub struct Places {
 pub struct Configured {
     pub key: String,
     pub place: String,
+    /// The address resolved using only the key's own or more trusted settings.
+    pub address: Option<String>,
 }
 
 /// One endpoint's key: the store a paste writes to, and what was configured
@@ -49,14 +51,6 @@ pub struct ApiKey {
 }
 
 impl ApiKey {
-    /// A changed origin must not inherit a configured key.
-    pub fn without_configured(&self) -> Self {
-        Self {
-            configured: None,
-            ..self.clone()
-        }
-    }
-
     pub fn at_origin(&self, owner: &str, address: &str, file: &str) -> Self {
         Self {
             store: self.store.as_ref().map(|store| {
@@ -68,6 +62,16 @@ impl ApiKey {
             }),
             ..self.clone()
         }
+    }
+
+    pub fn address_notice(&self) -> Option<String> {
+        let configured = self.configured.as_ref()?;
+        let address = configured.address.as_deref()?;
+        self.store
+            .as_ref()?
+            .check_configured(&self.provider, address)
+            .err()
+            .map(|error| error.to_string())
     }
 
     pub fn new(
@@ -94,6 +98,7 @@ impl ApiKey {
             configured: key.map(|key| Configured {
                 key,
                 place: "the endpoint it was built with".into(),
+                address: None,
             }),
         }
     }
@@ -193,11 +198,11 @@ impl ApiKey {
     fn resolve(&self) -> Result<(String, bingo_sdk::KeySource), String> {
         match self.stored() {
             Ok(Some(key)) => Ok((key, bingo_sdk::KeySource::Store)),
-            Ok(None) => self.configured_key().ok_or_else(|| self.hint()),
+            Ok(None) => self.configured_key()?.ok_or_else(|| self.hint()),
             // An unreadable store is not a key; a configured one still is,
             // and when there is none the store's error is what to fix.
             Err(AuthError::Binding(message)) => Err(message),
-            Err(error) => self.configured_key().ok_or_else(|| error.to_string()),
+            Err(error) => self.configured_key()?.ok_or_else(|| error.to_string()),
         }
     }
 
@@ -213,8 +218,16 @@ impl ApiKey {
         }
     }
 
-    fn configured_key(&self) -> Option<(String, bingo_sdk::KeySource)> {
-        self.configured.as_ref().map(|held| {
+    fn configured_key(&self) -> Result<Option<(String, bingo_sdk::KeySource)>, String> {
+        let Some(held) = &self.configured else {
+            return Ok(None);
+        };
+        if let (Some(store), Some(address)) = (&self.store, &held.address) {
+            store
+                .check_configured(&self.provider, address)
+                .map_err(|error| error.to_string())?;
+        }
+        Ok(Some({
             let from = if self
                 .places
                 .variable
@@ -225,7 +238,7 @@ impl ApiKey {
                 bingo_sdk::KeySource::Setting
             };
             (held.key.clone(), from)
-        })
+        }))
     }
 
     fn store(&self) -> Result<&Arc<CredentialStore>, ProviderError> {
@@ -270,6 +283,33 @@ fn spelling(method: LoginMethod) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn configured_origin_is_checked_at_boot_and_after_readdress() {
+        let directory = tempfile::tempdir().unwrap();
+        let key = ApiKey::new(
+            "work",
+            places(None),
+            store(&directory),
+            Some(Configured {
+                key: "dummy".into(),
+                place: "settings".into(),
+                address: Some("https://trusted".into()),
+            }),
+        )
+        .at_origin("family", "https://trusted/path", "user.toml");
+        assert_eq!(key.bearer().unwrap(), "dummy");
+        assert_eq!(
+            key.at_origin("family", "https://trusted/other", "user.toml")
+                .bearer()
+                .unwrap(),
+            "dummy"
+        );
+        let redirected = key.at_origin("family", "https://foreign", "project.toml");
+        assert!(matches!(redirected.status(), AuthStatus::Missing { .. }));
+        assert!(redirected.bearer().is_err());
+        assert!(redirected.address_notice().is_some());
+    }
 
     #[test]
     fn unreadable_store_allows_a_configured_key_but_wrong_origin_does_not() {
@@ -323,6 +363,7 @@ mod tests {
         Some(Configured {
             key: key.into(),
             place: place.into(),
+            address: None,
         })
     }
 

@@ -186,11 +186,9 @@ impl Provider for AnthropicProvider {
             provider.base_url = url.trim_end_matches('/').into();
         }
         if provider.credential_origin() != self.credential_origin() {
-            provider.key = self.key.without_configured().at_origin(
-                "anthropic",
-                &provider.base_url,
-                "user settings",
-            );
+            provider.key = self
+                .key
+                .at_origin("anthropic", &provider.base_url, "user settings");
             provider.lifetime = Default::default();
         }
         if let Some(images) = spec.images {
