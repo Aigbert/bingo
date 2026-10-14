@@ -115,8 +115,10 @@ impl Memo {
             .unwrap_or_default()
     }
     pub fn retain(&mut self, drawn: &[Key]) {
-        self.entries
-            .retain(|(key, answer, _)| answer.is_some() || drawn.iter().any(|one| one.same(key)));
+        self.entries.retain(|(key, answer, _)| {
+            (answer.is_some() && key.request.component != bingo_sdk::render::Component::Pane)
+                || drawn.iter().any(|one| one.same(key))
+        });
     }
 }
 #[cfg(test)]

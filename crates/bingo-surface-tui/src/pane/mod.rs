@@ -279,7 +279,6 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
     };
     if key.code == KeyCode::Esc {
         ui.placed.panes.selection = None;
-        ui.focus = Focus::Composer;
         if pane.close {
             return submit(
                 Action {
@@ -289,6 +288,7 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
                 None,
             );
         }
+        ui.focus = Focus::Composer;
         return Vec::new();
     }
     if key.code == KeyCode::Char('p') && key.modifiers == KeyModifiers::ALT {

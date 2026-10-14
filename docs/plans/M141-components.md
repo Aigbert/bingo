@@ -19,7 +19,7 @@ After M138 and M140; landed dependencies are recorded below.
    and `Matched::asks` share the catalogue matcher; regex/functions widen
    to their component alone. Table tests for nested/scalar/opaque matchers.
 3. **Engine substitution.** Pure TUI `component::draw(component, props,
-   answer, own)` draws `own(props)` until answered. `views::render_with`
+   answer, own)` draws `own(props)` until answered. `views::marked_with`
    resolves nested Engine nodes with parsed rewritten props; invalid props
    fall back to the originals with one notice. Stub-own table tests.
 4. **Draw sites.** Messages, tool use/result/group/progress, command output,
@@ -88,7 +88,7 @@ height without scroll jumps. Only visible rows ask, through the bounded queue.
 
 2026-10-14 delegate decision: M141 owns additive band Action hit-testing in `pointer.rs` and unclaimed hotkeys in `input.rs`; composer keeps focus (no new Focus variant), and M151 owns pane placement and hit-testing.
 
-Stopped 2026-10-14, protocol §6: full PTY smoke and an isolated Counter-only rerun both leave `Count: 1` visible after Escape; focus returns to the composer. No fix attempted and no third run; the two attempts did not move the failure. Options: authorize investigation of the pane close Action versus concurrent typed render requests, or reproduce on dev to establish whether the merge baseline already has the failure. ADR-0079 §4 remains proposed until smoke and the final example drive pass.
+2026-10-14 cause/fix: releasing pane focus on Escape changed `isFocused`, blanking its pending pull before slot removal and allowing an unfocused reopen; retain focus until removal, and evict undrawn Pane answers so reopening restores render subscriptions (off-screen transcript answers remain cached).
 
 ## Re-verified (2026-10-14, ba70fdf6)
 
@@ -100,7 +100,7 @@ Stopped 2026-10-14, protocol §6: full PTY smoke and an isolated Counter-only re
   M141 adds per-hook render metadata without duplicating dispatch links.
 - Config comes from `session.rs`; catalogue completion is the reload boundary.
   M140 provides `answer_ok`, Shown/Pull and the bounded core render queue.
-  Its memo evicts off-screen answers; M141 retains them and revises blocks.
+  Its memo evicts off-screen answers; M141 retains transcript answers and revises blocks.
 - Tool headings/results share `transcript::called`; no ToolGroup drawing
   exists. PromptHint is `status::middle`; closing rows use `worked`.
 - Examples use `Edit.file_path`/`Bash.command`. User/explicit mods are rewrite,
