@@ -15,6 +15,9 @@ impl Key {
     pub fn new(state: &SessionState, request: &RenderRequest, columns: u16, rows: u16) -> Self {
         let mut request = request.clone();
         request.surface = SurfaceName::Terminal;
+        if request.component == bingo_sdk::render::Component::Status {
+            request.props = serde_json::json!(bingo_sdk::component::StatusProps::from(state));
+        }
         request.viewport.columns = columns;
         request.viewport.rows = rows;
         Self {
@@ -284,6 +287,37 @@ mod pane_tests {
 mod lifecycle_tests {
     use super::*;
     use bingo_sdk::render::{Component, RenderRequest, SurfaceName, Viewport};
+
+    #[test]
+    fn status_props_exclude_a_large_transcript() {
+        use crate::test_support::{folded, frame, user};
+        let secret = "large private transcript".repeat(100_000);
+        let state = folded(vec![frame(
+            1,
+            bingo_sdk::Event::ItemCompleted {
+                item: user("large", &secret),
+            },
+        )]);
+        let request = RenderRequest {
+            component: Component::Status,
+            request_id: "status".into(),
+            surface: SurfaceName::Terminal,
+            props: serde_json::json!({}),
+            viewport: Viewport {
+                place: None,
+                columns: 80,
+                rows: 12,
+            },
+        };
+        let key = Key::new(&state, &request, 80, 12);
+        assert_eq!(
+            key.request.props["summary"]["id"],
+            state.summary.id.as_str()
+        );
+        let encoded = key.request.props.to_string();
+        assert!(encoded.len() < 16_384);
+        assert!(!encoded.contains("large private transcript"));
+    }
 
     #[test]
     fn an_undrawn_pane_reasks_on_reopen_but_scrolled_messages_keep_answers() {

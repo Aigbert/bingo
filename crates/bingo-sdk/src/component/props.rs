@@ -131,6 +131,19 @@ props!(ToastProps {
 });
 props!(WelcomeProps { session: crate::SessionSummary, effort: Option<crate::Effort>, modes: Vec<String>, update: Option<String>, resume: Option<crate::SessionSummary> });
 
-/// Status is pulled from the asking session; selection belongs to its owner.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct StatusProps {}
+/// A status drawing needs facts from the caller's fold, never its transcript.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct StatusProps {
+    pub summary: crate::SessionSummary,
+    pub config: crate::ConfigView,
+    pub context: Option<crate::ContextUsage>,
+}
+impl From<&crate::SessionState> for StatusProps {
+    fn from(state: &crate::SessionState) -> Self {
+        Self {
+            summary: state.summary.clone(),
+            config: state.config.clone(),
+            context: state.context,
+        }
+    }
+}

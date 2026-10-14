@@ -42,7 +42,7 @@ impl Command for Handler {
         let Some(label) = self.0.lock().map_err(error)?.get(&cx.session).cloned() else {
             return Ok(CommandOutcome::Handled { handled: false });
         };
-        let rows = crate::draw::read(&cx.host, &cx.session).await?;
+        let rows: Vec<Row> = serde_json::from_value(args["rows"].clone()).map_err(error)?;
         if key == "enter" {
             return enter(&rows, &label, cx, &self.0).await;
         }

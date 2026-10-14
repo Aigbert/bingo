@@ -30,7 +30,8 @@ impl Interceptor for Drawing {
         _: Next<'_, Value, Value>,
     ) -> Result<Value, KernelError> {
         let request: render::RenderRequest = serde_json::from_value(input).map_err(error)?;
-        let rows = read(&cx.host, &cx.session).await?;
+        let facts = serde_json::from_value(request.props).map_err(error)?;
+        let rows = read(&cx.host, &facts).await?;
         let selected = self
             .selections
             .lock()
@@ -48,8 +49,10 @@ impl Interceptor for Drawing {
         serde_json::to_value(tree).map_err(error)
     }
 }
-pub(crate) async fn read(host: &HostHandle, session: &SessionId) -> Result<Vec<Row>, KernelError> {
-    let state = crate::snapshot(host, session).await?.snapshot;
+pub(crate) async fn read(
+    host: &HostHandle,
+    state: &component::StatusProps,
+) -> Result<Vec<Row>, KernelError> {
     let plugins = host.catalog(CatalogKind::Plugins).await?;
     let models = host.catalog(CatalogKind::Models).await?;
     let id = format!(
@@ -66,7 +69,7 @@ pub(crate) async fn read(host: &HostHandle, session: &SessionId) -> Result<Vec<R
         Some(service) => service.rows().await,
         None => vec![],
     };
-    Ok(crate::rows::rows(&state, &plugins.entries, &servers, price))
+    Ok(crate::rows::rows(state, &plugins.entries, &servers, price))
 }
 pub fn tree(rows: &[Row], selected: &str, columns: u16, height: u16, uptime: u64) -> View {
     let selected = crate::keys::selected(rows, selected);
@@ -92,7 +95,7 @@ pub fn tree(rows: &[Row], selected: &str, columns: u16, height: u16, uptime: u64
         layout: Box::new(BoxStyle {
             on_key: Some(Action {
                 name: format!("{ID}:ui"),
-                args: json!({"handler":REQUEST,"event":"press"}),
+                args: json!({"handler":REQUEST,"event":"press","rows":rows}),
             }),
             ..Default::default()
         }),

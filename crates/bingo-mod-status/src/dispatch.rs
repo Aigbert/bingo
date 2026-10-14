@@ -83,7 +83,12 @@ mod tests {
                 message: Some("forgot rule".into())
             }
         );
-        assert_eq!(result(IntentOutcome::Queued { position: 1 }), Some(Ok(CommandOutcome::Applied { message: Some("queued (position 1)".into()) })));
+        assert_eq!(
+            result(IntentOutcome::Queued { position: 1 }),
+            Some(Ok(CommandOutcome::Applied {
+                message: Some("queued (position 1)".into())
+            }))
+        );
         let error = KernelError::new(ErrorCode::InvalidInput, "refused");
         assert_eq!(
             result(IntentOutcome::Rejected {

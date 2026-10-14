@@ -1,5 +1,5 @@
 use crate::spent::{Price, spent};
-use bingo_sdk::{CatalogEntry, SessionState};
+use bingo_sdk::{CatalogEntry, component::StatusProps};
 use bingo_services::mcp::{ServerRow, Status};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -14,10 +14,12 @@ pub struct Span {
     pub text: String,
     pub tone: Tone,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Row {
     pub label: String,
+    #[serde(skip)]
     pub value: Vec<Span>,
+    #[serde(skip)]
     pub detail: Option<String>,
     pub command: Option<String>,
 }
@@ -33,7 +35,7 @@ fn row(label: &str, text: String, command: Option<&str>) -> Row {
     }
 }
 pub fn rows(
-    state: &SessionState,
+    state: &StatusProps,
     plugins: &[CatalogEntry],
     servers: &[ServerRow],
     price: Option<Price>,
@@ -74,7 +76,7 @@ pub fn rows(
     rows.push(server_row(servers));
     rows
 }
-fn rules(state: &SessionState) -> Vec<&str> {
+fn rules(state: &StatusProps) -> Vec<&str> {
     state
         .config
         .plugins
@@ -85,7 +87,7 @@ fn rules(state: &SessionState) -> Vec<&str> {
         .filter_map(|v| v.as_str())
         .collect()
 }
-fn permission(state: &SessionState) -> Row {
+fn permission(state: &StatusProps) -> Row {
     let mode = state
         .config
         .plugins
@@ -98,7 +100,7 @@ fn permission(state: &SessionState) -> Row {
         Some("permission"),
     )
 }
-fn spent_row(state: &SessionState, price: Option<Price>) -> Row {
+fn spent_row(state: &StatusProps, price: Option<Price>) -> Row {
     let spent = spent(state.summary.usage, price);
     let cost = spent
         .usd
@@ -117,7 +119,7 @@ fn spent_row(state: &SessionState, price: Option<Price>) -> Row {
     result.value[0].tone = Tone::Dim;
     result
 }
-fn context(state: &SessionState) -> Row {
+fn context(state: &StatusProps) -> Row {
     let Some(c) = &state.context else {
         return row("context", "not measured yet".into(), Some("compact"));
     };

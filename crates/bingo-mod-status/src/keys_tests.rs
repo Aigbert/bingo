@@ -76,7 +76,7 @@ async fn enter_submits_each_rows_command_after_removing_the_card() {
     };
     let selections = Selections::default();
     let handler = keys::Handler(selections.clone());
-    for row in rows::rows(&state, &[], &[], None)
+    for row in rows::rows(&(&state).into(), &[], &[], None)
         .into_iter()
         .filter(|r| r.command.is_some())
     {
@@ -86,7 +86,7 @@ async fn enter_submits_each_rows_command_after_removing_the_card() {
             .insert(cx.session.clone(), row.label);
         let outcome = handler
             .run(
-                &json!({"handler":"status","event":"press","value":{"key":"enter"}}).to_string(),
+                &json!({"handler":"status","event":"press","value":{"key":"enter"},"rows":rows::rows(&(&state).into(), &[], &[], None)}).to_string(),
                 &cx,
             )
             .await

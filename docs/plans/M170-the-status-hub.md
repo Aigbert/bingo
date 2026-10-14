@@ -55,7 +55,7 @@ the kernel's `/status` key-value view stays as the plain fallback.
   keys.rs,dispatch.rs}`; listed in `crates/bingo/src/main.rs`.
 - Shared changes: sdk tokens/render/component contracts; MCP services/rows;
   permissions/session; TUI pane drawing/viewport/mouse/tests; bin composition;
-  run/pulling and action tests (retain callbacks while the FIFO drains);
+  run/pulling and action tests (draw even while actions are queued);
   mechanical ContextUsage literal updates; existing generators and fixtures.
 - Reads `catalog(Plugins)` and `bingo_services::mcp::find` (no plugin
   import).
@@ -83,9 +83,10 @@ the kernel's `/status` key-value view stays as the plain fallback.
   original site key result. Otherwise the TUI ignores the view on an intent it did not submit.
   The instant handler holds no actor queue, so it can await that result while preserving the
   existing surface FIFO.
-- Pane/status pulls wait for the existing action FIFO to drain: replacing a
-  drawing earlier can revoke callbacks still referenced by queued edits. Question
-  and form pulls stay live; no queue or ordering state is added.
+- Pane/status pulls stay live while commands are queued. Queued dispatch returns immediately;
+  stale callback binding is M174's responsibility, not a global redraw guard.
+- StatusProps carry summary/config/context from the asking surface's existing fold. Render
+  and arrow handlers never open a session or subscribe; key arguments carry only row targets.
 - MCP `Servers::servers` returns connection configuration, not live status.
   Add a default `status` service method and a typed projection of the manager's
   lines in bingo-services/bingo-mcp; no credentials enter the status projection.

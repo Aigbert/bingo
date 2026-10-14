@@ -105,7 +105,10 @@ async fn snapshot(host: &HostHandle, session: &SessionId) -> Result<Attachment, 
             name: ID.into(),
             surface: "terminal".into(),
         },
-        OpenOptions::default(),
+        OpenOptions {
+            max_snapshot_bytes: Some(64 * 1024),
+            ..Default::default()
+        },
     )
     .await
 }

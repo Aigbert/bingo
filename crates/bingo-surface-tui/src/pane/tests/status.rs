@@ -81,7 +81,7 @@ fn status_scenarios_match_at_both_terminal_sizes() {
                 output: Some(15.0),
                 cache_read: Some(0.3),
             });
-            let rows = rows::rows(&state, &plugins, &servers, price);
+            let rows = rows::rows(&(&state).into(), &plugins, &servers, price);
             let selected = match which {
                 "long" => "context",
                 "failed" | "waiting" => "plugins",
@@ -105,7 +105,7 @@ fn status_scenarios_match_at_both_terminal_sizes() {
 #[test]
 fn status_keys_preserve_escape_and_live_config_preserves_the_row() {
     let (mut state, plugins) = scenario("overview");
-    let rows = rows::rows(&state, &plugins, &[], None);
+    let rows = rows::rows(&(&state).into(), &plugins, &[], None);
     put(&mut state, draw::tree(&rows, "permission", 80, 11, 0), 24);
     let (mut ui, now) = scene();
     ui.focus = crate::focus::Focus::Pane(format!("{}/bingo.mod.status/status", state.summary.id));
@@ -127,7 +127,7 @@ fn status_keys_preserve_escape_and_live_config_preserves_the_row() {
         json!({"mode":"plan","rules":[]}),
     );
     state.apply(&frame(1, Event::ConfigChanged { config }));
-    let rows = rows::rows(&state, &plugins, &[], None);
+    let rows = rows::rows(&(&state).into(), &plugins, &[], None);
     put(&mut state, draw::tree(&rows, "permission", 80, 11, 0), 24);
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(screen.contains("❯ permission plan"), "{screen}");

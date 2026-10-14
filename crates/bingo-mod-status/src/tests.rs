@@ -29,7 +29,7 @@ fn rows_match_the_prototype_scenarios() {
             meta: json!({"state":{"kind":kind}}),
         }];
         let rows = rows::rows(
-            &state,
+            &(&state).into(),
             &plugins,
             &[serde_json::from_value(json!({
                 "name": "remote",
@@ -72,7 +72,7 @@ fn rows_match_the_prototype_scenarios() {
 }
 #[test]
 fn drawing_is_a_valid_status_answer_with_an_owned_root_handler() {
-    let rows = rows::rows(&state(), &[], &[], None);
+    let rows = rows::rows(&(&state()).into(), &[], &[], None);
     for (width, height) in [(108, 15), (80, 12)] {
         let tree = draw::tree(&rows, "context", width, height, 2520);
         assert!(view::answer_ok(render::Component::Status, &json!({}), ID, None, &tree).is_ok());
@@ -112,11 +112,60 @@ fn a_server_row_reads_the_state_the_plugins_panel_reads() {
          "origin": "this project · /work", "status": {"kind": "waiting", "changed": false}}
     ]))
     .unwrap();
-    let rows = rows::rows(&state(), &[], &servers, None);
+    let rows = rows::rows(&(&state()).into(), &[], &servers, None);
     let mcp = rows.iter().find(|r| r.label == "mcp").unwrap();
     assert_eq!(mcp.value[0].text, "1 connected · 8 tools");
     let waiting = servers[1].status.said();
     assert_eq!(waiting, "waiting for your yes");
     assert_eq!(mcp.value[1].text, format!(" · local {waiting}"));
     assert_eq!(mcp.value[1].tone, rows::Tone::Warn);
+}
+
+#[tokio::test]
+async fn rendering_uses_supplied_facts_without_opening_a_session() {
+    let state = state();
+    let host = testing::TestHost::default();
+    host.on_catalog(|kind| async move {
+        Ok(Catalog {
+            kind,
+            entries: vec![],
+        })
+    });
+    let cx = HookContext {
+        session: state.summary.id.clone(),
+        turn: None,
+        item: None,
+        cwd: "/unused".into(),
+        provider: None,
+        model: None,
+        host: host.handle(),
+    };
+    let drawing = draw::Drawing {
+        selections: Default::default(),
+        started: Instant::now(),
+    };
+    let input = json!({"component":"Status","requestId":"status","surface":"terminal",
+        "props":{"summary":state.summary,"config":state.config,"context":state.context},
+        "viewport":{"columns":80,"rows":12}});
+    let answer = drawing
+        .chain(
+            catalogue::UI_RENDER,
+            &cx,
+            input,
+            Next::new(|_| Box::pin(async { Ok(json!(View::text("fallback"))) })),
+        )
+        .await
+        .unwrap();
+    assert!(
+        serde_json::from_value::<View>(answer)
+            .unwrap()
+            .fold()
+            .contains("session")
+    );
+    assert!(
+        !host
+            .calls()
+            .iter()
+            .any(|call| matches!(call, testing::HostCall::Open { .. }))
+    );
 }

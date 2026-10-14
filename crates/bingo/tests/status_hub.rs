@@ -6,12 +6,12 @@ use serde_json::json;
 mod support;
 use support::{LIMIT, Server, ack_for, create, ready, who};
 
-fn request() -> RenderRequest {
+fn request(state: &SessionState) -> RenderRequest {
     RenderRequest {
         component: Component::Status,
         request_id: "status".into(),
         surface: SurfaceName::Terminal,
-        props: json!({}),
+        props: json!(component::StatusProps::from(state)),
         viewport: Viewport {
             place: None,
             columns: 108,
@@ -54,19 +54,31 @@ async fn status_opens_updates_dispatches_and_closes_over_rpc() {
         IntentOutcome::Applied { .. }
     ));
     let id = attachment.session.clone();
-    let tree = host.render(&id, request()).await.unwrap();
+    let tree = host
+        .render(&id, request(&attachment.snapshot))
+        .await
+        .unwrap();
     assert!(tree.fold().contains("❯ session"), "{tree:?}");
     key(&mut attachment, &tree, "down").await;
-    let tree = host.render(&id, request()).await.unwrap();
+    let tree = host
+        .render(&id, request(&attachment.snapshot))
+        .await
+        .unwrap();
     assert!(tree.fold().contains("❯ model"));
     command(&mut attachment, "/rename Updated").await;
-    let tree = host.render(&id, request()).await.unwrap();
+    let tree = host
+        .render(&id, request(&attachment.snapshot))
+        .await
+        .unwrap();
     assert!(tree.fold().contains("Updated"));
     assert!(tree.fold().contains("❯ model"));
     let outcome = key(&mut attachment, &tree, "enter").await;
     assert!(serde_json::to_value(outcome).unwrap()["result"]["view"].is_object());
     command(&mut attachment, "/status").await;
-    let tree = host.render(&id, request()).await.unwrap();
+    let tree = host
+        .render(&id, request(&attachment.snapshot))
+        .await
+        .unwrap();
     let outcome = key(&mut attachment, &tree, "enter").await;
     assert!(
         serde_json::to_value(outcome)
@@ -166,7 +178,10 @@ async fn an_outside_mod_can_wrap_or_replace_the_status_tree() {
             )
             .await
             .unwrap();
-        let tree = host.render(&attachment.session, request()).await.unwrap();
+        let tree = host
+            .render(&attachment.session, request(&attachment.snapshot))
+            .await
+            .unwrap();
         assert!(tree.fold().starts_with(expected), "{tree:?}");
         host.shutdown().await;
     }
