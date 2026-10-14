@@ -212,3 +212,31 @@ async fn reloading_an_off_module_preserves_the_retired_generations_process() {
         );
     }
 }
+
+#[tokio::test]
+async fn retirement_closes_the_engine_and_reaps_its_process() {
+    let (_root, manager, old) = fixture().await;
+    let runtime = runtime(&manager);
+    let (id, session) = process(&runtime, &old);
+    let stopped = old.engine.as_ref().unwrap().stopped();
+    let mut output = Box::pin(runtime.processes_for_test().read("fixture", &session, &id));
+    assert!(futures::poll!(&mut output).is_pending());
+    manager.switch("fixture", false).await.unwrap();
+    assert!(!stopped.is_cancelled());
+    drop(old);
+    reap(&manager).await;
+    assert!(stopped.is_cancelled(), "retired engine was not closed");
+    let output = tokio::time::timeout(std::time::Duration::from_secs(10), output)
+        .await
+        .expect("retired process kept its output pipes open")
+        .unwrap();
+    assert!(output.stdout.is_empty());
+    assert!(manager.switches.retired.lock().await.is_empty());
+    assert!(
+        runtime
+            .processes_for_test()
+            .write("fixture", &session, &id, Some("late".into()))
+            .await
+            .is_err()
+    );
+}
