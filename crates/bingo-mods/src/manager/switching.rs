@@ -69,17 +69,7 @@ pub(super) async fn switch_module(
     deferred: tokio::sync::oneshot::Sender<()>,
 ) -> Result<PluginSwitch, KernelError> {
     if enabled {
-        let bare = name.strip_prefix("plugins:").unwrap_or(name);
-        if tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            wait_retired(manager, bare),
-        )
-        .await
-        .is_err()
-        {
-            let _ = deferred.send(());
-            wait_retired(manager, bare).await;
-        }
+        defer_retirement(manager, name, deferred).await;
     }
     let _guard = manager.reloading.lock().await;
     let bare = name.strip_prefix("plugins:").unwrap_or(name);
@@ -104,8 +94,6 @@ pub(super) async fn switch_module(
                 == name
         })
         .ok_or_else(|| reload::failed("module unavailable"))?;
-    let name = old.found.name.clone();
-    let name = name.as_str();
     let kind = classify(manager, &old);
     if kind != PluginSwitch::Now {
         return Ok(kind);
@@ -113,7 +101,7 @@ pub(super) async fn switch_module(
     let found = switch_found(manager, &old);
     let config = manager
         .settings
-        .get(name)
+        .get(&old.found.name)
         .cloned()
         .unwrap_or_else(|| serde_json::json!({}));
     let module = Module::load(
@@ -132,6 +120,23 @@ pub(super) async fn switch_module(
     }
     activate_switch(manager, old, module).await?;
     Ok(PluginSwitch::Now)
+}
+async fn defer_retirement(
+    manager: &Manager,
+    name: &str,
+    deferred: tokio::sync::oneshot::Sender<()>,
+) {
+    let bare = name.strip_prefix("plugins:").unwrap_or(name);
+    if tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        wait_retired(manager, bare),
+    )
+    .await
+    .is_err()
+    {
+        let _ = deferred.send(());
+        wait_retired(manager, bare).await;
+    }
 }
 async fn activate_switch(
     manager: &Manager,
