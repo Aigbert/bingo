@@ -2,7 +2,10 @@ use super::*;
 
 impl Run {
     pub(super) fn refocus(&mut self) {
-        let now = self.detection.now().wall;
+        self.refocus_at(self.detection.now().wall);
+    }
+
+    pub(super) fn refocus_at(&mut self, now: jiff::Timestamp) {
         let open_ids: std::collections::HashSet<_> = self
             .session
             .tree

@@ -325,14 +325,14 @@ async fn resize_then_down_then_enter_uses_one_cursor() {
 
 #[tokio::test]
 async fn aside_uses_surface_reception_instead_of_the_kernel_clock() {
-    let now = scene().1;
+    let now = later(scene().1, 3_600_000);
     let mut run = tests::idle_in(
         folded(vec![frame(1, opened(question(false, true)))]),
         Arc::new(TestSession::default()),
         now.instant,
     );
-    run.ui.last_typed = Some(run.detection.now().wall);
-    run.refocus();
+    run.ui.last_typed = Some(now.wall);
+    run.refocus_at(now.wall);
     assert!(
         run.ui.dialog.aside,
         "the fixture's remote opened_at is long before the local keystroke"
