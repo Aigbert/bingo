@@ -42,6 +42,9 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
         return Vec::new();
     }
     ui.prepare(&tree.viewed().summary.cwd);
+    if key == KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL) && ui.composer.is_empty() {
+        return vec![Effect::Exit];
+    }
     if crate::palette::active(ui) {
         return crate::palette::key(ui, tree, key, now);
     }
@@ -93,6 +96,11 @@ fn composer_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effec
     }
     if let Some(line) = keys::commands::line(ui, tree.viewed(), key) {
         return command_line(ui, tree, now, line);
+    }
+    if key == KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL)
+        && let Some(effects) = crate::palette::command(ui, "/resume", now)
+    {
+        return effects;
     }
     if let Some(effects) = layered(ui, tree, key, now) {
         return effects;
@@ -677,8 +685,7 @@ fn plain(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         KeyCode::Enter => return enter(ui, tree, now),
         KeyCode::BackTab => return cycle_mode(ui, tree.viewed(), now),
         KeyCode::Up => return walk_back(ui, tree),
-        // The list's other door: `↓` on an empty box opens the same list
-        // `ctrl+g` does, with the cursor on the session already in view.
+        // Down returns through the draft/history walk. Ctrl+r opens sessions.
         KeyCode::Down => walk_forward(ui),
         KeyCode::PageUp => scroll(ui, ui.page() as isize, now),
         KeyCode::PageDown => scroll(ui, -(ui.page() as isize), now),
@@ -769,6 +776,9 @@ fn enter(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 /// `delivery` is the whole of the difference between the two keys that send:
 /// `⏎` steers a running turn at its next barrier, `tab` waits for it to end.
 pub(crate) fn command_line(ui: &mut Ui, tree: &Tree, now: Now, line: String) -> Vec<Effect> {
+    if let Some(effects) = crate::palette::command(ui, &line, now) {
+        return effects;
+    }
     let composer = std::mem::take(&mut ui.composer);
     ui.composer.set(&line);
     let effects = submit(ui, tree, now, Delivery::default());
@@ -784,6 +794,9 @@ fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect>
     ui.history.remember(&text);
     ui.edited();
     ui.scroll.end();
+    if let Some(effects) = crate::palette::command(ui, &text, now) {
+        return effects;
+    }
     match commands::local(&text) {
         Some(Local::Clear) => vec![Effect::Open(SessionSelector::Create {
             spec: SessionSpec {

@@ -231,10 +231,11 @@ fn layer(
         Open::Palette(_) => {
             let lines = crate::palette::draw(
                 ui,
-                tree.viewed(),
+                tree,
                 frame,
                 above.width,
                 (frame.canvas.area().height / 2).min(above.height),
+                _now,
             );
             over(frame, above, lines);
         }

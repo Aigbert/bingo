@@ -333,6 +333,9 @@ async fn attach(
         sluggish: false,
         exit: None,
     };
+    run.ui.catalogs.current = host
+        .service(&bingo_sdk::command::COMMAND_CATALOG)
+        .map(crate::palette::Current);
     run.ui.measure = surface.settings.measure();
     run.fetch_catalogs();
     run.ask_for_updates(surface.settings.update.check);
@@ -610,11 +613,11 @@ impl Run {
         if let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone()) {
             palette::surface_action(self, action);
         }
-        if result.get("handled").is_none() {
-            self.fetch_catalogs();
-        }
+        // Catalogue changes arrive on GatewayEvent::CatalogChanged; acknowledgements
+        // do not identify changed facts and ordinary messages must not trigger I/O.
         if result.get("surface").is_none()
-            && let Some(message) = result.get("message").and_then(Value::as_str) {
+            && let Some(message) = result.get("message").and_then(Value::as_str)
+        {
             self.ui
                 .notify(Level::Info, message.to_string(), Instant::now());
         }
@@ -827,15 +830,19 @@ impl Run {
     /// The catalogues are read at start and again whenever the host says one
     /// of them was rebuilt: the dropdown follows, it does not poll.
     fn fetch_catalogs(&mut self) {
+        self.fetch_commands();
+        for (source, kind) in CATALOGUES {
+            self.fetch_catalogue(source, *kind);
+        }
+    }
+
+    fn fetch_commands(&mut self) {
         let host = self.host.clone();
         self.spawn(async move {
             host.catalog(CatalogKind::Commands)
                 .await
                 .map(|c| Reply::Commands(commands::specs_from(&c)))
         });
-        for (source, kind) in CATALOGUES {
-            self.fetch_catalogue(source, *kind);
-        }
     }
 
     /// One catalogue's ids, on the loop's own host-call lane.
@@ -852,7 +859,7 @@ impl Run {
     /// serves (ADR-0026 §4) — is read again, and only that one.
     fn catalog_changed(&mut self, kind: CatalogKind) {
         if kind == CatalogKind::Commands {
-            self.fetch_catalogs();
+            self.fetch_commands();
             return;
         }
         let Some((source, _)) = CATALOGUES.iter().find(|(_, listed)| *listed == kind) else {
@@ -2619,6 +2626,201 @@ mod tests {
                 "and another probe's reply is not an answer to this question"
             );
         });
+    }
+
+    #[tokio::test]
+    async fn a_line_typed_in_a_childs_view_is_submitted_on_the_childs_handle() {
+        let mut harness = Harness::new();
+        let (host, root, child) = TestHost::tree(vec![
+            child_frame(1, announced("reviewer")),
+            child_frame(2, started("trn_9")),
+        ]);
+        let script = vec![
+            ctrl('r'),
+            key(KeyCode::Down),
+            key(KeyCode::Enter),
+            typed('h'),
+            typed('i'),
+            key(KeyCode::Enter),
+            ctrl('d'),
+        ];
+        let ended = drive(
+            &host,
+            options(None, harness.home.path()),
+            &mut harness.recorder,
+            keys(script),
+        )
+        .await
+        .expect("the loop ran");
+        assert_eq!(ended.exit, Exit { code: 0 });
+        assert_eq!(
+            child.submitted(),
+            vec![Input::text("hi", bingo_sdk::Origin::surface("tui"))]
+        );
+        assert!(root.submitted().is_empty(), "the root was not written to");
+    }
+
+    #[tokio::test]
+    async fn a_child_closed_by_a_shutdown_keeps_what_it_said_for_its_reopening() {
+        let mut harness = Harness::new();
+        let (host, _, _) = TestHost::tree(vec![
+            child_frame(1, announced("reviewer")),
+            child_frame(
+                2,
+                Event::ItemCompleted {
+                    item: assistant("itm_2", "reviewed it", ItemStatus::Completed),
+                },
+            ),
+            child_frame(
+                3,
+                Event::SessionClosed {
+                    reason: CloseReason::Shutdown,
+                },
+            ),
+            child_frame(4, announced("reviewer")),
+        ]);
+        let script = vec![
+            ctrl('r'),
+            key(KeyCode::Down),
+            key(KeyCode::Enter),
+            ctrl('d'),
+        ];
+        let ended = drive(
+            &host,
+            options(None, harness.home.path()),
+            &mut harness.recorder,
+            keys(script),
+        )
+        .await
+        .expect("the loop ran");
+        assert_eq!(ended.exit, Exit { code: 0 });
+        let screen = harness.recorder.last();
+        assert!(
+            screen.contains("reviewed it"),
+            "the child's transcript survived its close: {screen}"
+        );
+    }
+
+    #[tokio::test]
+    async fn opening_the_palette_reads_the_store_and_the_card_fills() {
+        let mut harness = Harness::new();
+        let (host, _) = TestHost::with_stored(vec![], vec![stored_summary("ses_7", "scout")]);
+        let ended = drive(
+            &host,
+            options(None, harness.home.path()),
+            &mut harness.recorder,
+            keys(vec![ctrl('r'), ctrl('d')]),
+        )
+        .await
+        .expect("the loop ran");
+        assert_eq!(ended.exit, Exit { code: 0 });
+        let screen = harness.recorder.last();
+        assert!(screen.contains("scout"), "{screen}");
+    }
+
+    fn placeholders(screen: &str) -> usize {
+        screen.matches(crate::graphics::kitty::PLACEHOLDER).count()
+    }
+
+    #[tokio::test]
+    async fn the_palette_opened_over_a_picture_writes_no_graphics() {
+        let read = tool(
+            "itm_1",
+            "Read",
+            serde_json::json!({ "file_path": "shot.png" }),
+            Some(bingo_sdk::ToolOutput {
+                parts: vec![bingo_sdk::ContentPart::Image(bingo_pictures::testing::png(
+                    100, 200,
+                ))],
+                display: None,
+                is_error: false,
+            }),
+            ItemStatus::Completed,
+        );
+        let (mut run, mut waiting) =
+            replying(folded(vec![frame(1, Event::ItemCompleted { item: read })]));
+        // A store with rows in it, so the list that comes down is a list.
+        let stored: Vec<SessionSummary> = (0..4)
+            .map(|at| stored_summary(&format!("ses_{at}"), &format!("scout {at}")))
+            .collect();
+        run.host = TestHost::with_stored(vec![], stored).0;
+        let mut recorder = Recorder::default();
+        // Still, so the list is whole on the frame it opens on rather than a
+        // quarter of the way down it.
+        let now = crate::test_support::still(crate::test_support::scene().1);
+        let drawing = crate::graphics::drawing();
+        crate::graphics::with(drawing, || {
+            run.detection = crate::render::Render {
+                motion: now.motion,
+                ..crate::render::current()
+            }
+            .into();
+            run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
+        });
+        settle(&mut run, &mut waiting).await;
+        crate::graphics::with(drawing, || {
+            run.detection = crate::render::Render {
+                motion: now.motion,
+                ..crate::render::current()
+            }
+            .into();
+            run.paint(&mut recorder, Wake::Frame, now)
+                .expect("the picture");
+        });
+        assert_eq!(recorder.places.len(), 1, "the terminal has the picture");
+        let cells = placeholders(recorder.last());
+        assert!(cells > 0, "and its cells are drawn:\n{}", recorder.last());
+
+        // ctrl+r: the list comes down over the transcript, and what the store
+        // holds fills it.
+        run.terminal_event(Term::Key(ctrl('r')));
+        settle(&mut run, &mut waiting).await;
+        crate::graphics::with(drawing, || {
+            run.detection = crate::render::Render {
+                motion: now.motion,
+                ..crate::render::current()
+            }
+            .into();
+            run.paint(&mut recorder, Wake::Frame, now)
+                .expect("the list");
+        });
+        assert!(run.ui.focus.showing(), "the palette is open");
+        assert!(
+            placeholders(recorder.last()) < cells,
+            "and it covers cells the picture had:\n{}",
+            recorder.last()
+        );
+        assert_eq!(
+            recorder.places.len(),
+            1,
+            "nothing went out for it: {:?}",
+            places(&recorder)
+        );
+
+        // esc: the list goes, and the cells under it are written back.
+        run.terminal_event(Term::Key(key(KeyCode::Esc)));
+        crate::graphics::with(drawing, || {
+            run.detection = crate::render::Render {
+                motion: now.motion,
+                ..crate::render::current()
+            }
+            .into();
+            run.paint(&mut recorder, Wake::Frame, now)
+                .expect("back again");
+        });
+        assert!(!run.ui.focus.showing());
+        assert_eq!(
+            placeholders(recorder.last()),
+            cells,
+            "every cell is back:\n{}",
+            recorder.last()
+        );
+        assert_eq!(
+            recorder.places.len(),
+            1,
+            "and still nothing went out: {:?}",
+            places(&recorder)
+        );
     }
 }
 

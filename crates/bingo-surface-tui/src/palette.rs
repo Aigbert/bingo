@@ -13,12 +13,22 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::text::Line;
 use serde_json::json;
 
+#[derive(Clone)]
+pub struct Current(pub std::sync::Arc<dyn command::CommandCatalog>);
+impl std::fmt::Debug for Current {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("CommandCatalog")
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Opened {
     pub first: PaletteOpen,
     pub id: String,
     pub draft: String,
     pub sessions: Vec<SessionSummary>,
+    pub children: Vec<SessionSummary>,
+    pub fallback_at: Option<usize>,
 }
 pub fn open(ui: &mut Ui, first: PaletteOpen, now: Now) -> Vec<Effect> {
     let draft = ui.composer.take();
@@ -33,6 +43,8 @@ pub fn open(ui: &mut Ui, first: PaletteOpen, now: Now) -> Vec<Effect> {
             id: IntentId::mint().to_string(),
             draft,
             sessions: Vec::new(),
+            children: Vec::new(),
+            fallback_at: None,
         }),
         now.instant,
     );
@@ -58,20 +70,10 @@ pub fn request(ui: &Ui) -> Option<&str> {
         None
     }
 }
-fn props(ui: &Ui, state: &SessionState, open: &Opened) -> PaletteProps {
-    let commands = ui
-        .catalogs
-        .commands
-        .iter()
-        .cloned()
-        .chain(crate::commands::local_specs())
-        .map(|spec| CatalogEntry {
-            id: spec.name.clone(),
-            label: spec.hint.clone(),
-            meta: serde_json::to_value(spec).unwrap_or_default(),
-        })
-        .collect();
+fn props(ui: &Ui, tree: &Tree, open: &Opened, now: Now) -> PaletteProps {
+    let state = tree.viewed();
     let catalogs = ui.catalogs.values();
+    let commands = command_entries(ui, state, &catalogs);
     PaletteProps {
         key_hints: crate::keys::BINDINGS
             .iter()
@@ -86,11 +88,14 @@ fn props(ui: &Ui, state: &SessionState, open: &Opened) -> PaletteProps {
         open: open.first,
         commands,
         bindings: crate::keys::commands::bindings(ui, state).commands,
-        sessions: open.sessions.clone(),
-        summary: state.summary.clone(),
-        config: state.config.clone(),
-        context: state.context,
-        signals: state.signals.clone(),
+        sessions: open
+            .sessions
+            .iter()
+            .filter(|s| !tree.is_root(&s.id))
+            .map(sessions::stored)
+            .collect(),
+        conversation: sessions::conversation(tree, &open.children, now),
+        session: tree.view().clone(),
         action: Action {
             name: "surface:palette".into(),
             args: json!({"handler":open.id}),
@@ -98,36 +103,66 @@ fn props(ui: &Ui, state: &SessionState, open: &Opened) -> PaletteProps {
         catalogs,
     }
 }
-pub fn draw(
+fn command_entries(
     ui: &Ui,
     state: &SessionState,
+    catalogs: &std::collections::BTreeMap<String, Vec<CatalogEntry>>,
+) -> Vec<CatalogEntry> {
+    let mut commands = ui
+        .catalogs
+        .commands
+        .iter()
+        .cloned()
+        .chain(crate::commands::local_specs())
+        .map(|spec| CatalogEntry {
+            id: spec.name.clone(),
+            label: spec.hint.clone(),
+            meta: serde_json::to_value(spec).unwrap_or_default(),
+        })
+        .collect();
+    if let Some(reader) = &ui.catalogs.current {
+        let providers = catalogs
+            .get("providers")
+            .into_iter()
+            .flatten()
+            .filter_map(|entry| serde_json::from_value(entry.meta["auth"].clone()).ok())
+            .collect::<Vec<_>>();
+        commands = reader
+            .0
+            .catalog(
+                Catalog {
+                    kind: CatalogKind::Commands,
+                    entries: commands,
+                },
+                &command::SessionView {
+                    state,
+                    providers: &providers,
+                },
+            )
+            .entries;
+    }
+    commands
+}
+pub fn draw(
+    ui: &Ui,
+    tree: &Tree,
     frame: &mut crate::layout::Layout,
     width: u16,
     rows: u16,
+    now: Now,
 ) -> Vec<Line<'static>> {
     let Open::Palette(open) = ui.focus.open() else {
         return Vec::new();
     };
-    let props = Props::Palette(Box::new(props(ui, state, open)));
-    let key = crate::component::key(state, &open.id, &props, width, rows);
+    let props = Props::Palette(Box::new(props(ui, tree, open, now)));
+    let key = crate::component::key(tree.viewed(), &open.id, &props, width, rows);
     let answer = key.as_ref().and_then(|key| ui.placed.pulled.get(key));
     if let Some(key) = key {
         frame.pulls.push(key);
     }
-    crate::component::draw(&props, answer, usize::from(width), fallback)
-}
-fn fallback(props: &Props, _: usize) -> Vec<Line<'static>> {
-    let Props::Palette(props) = props else {
-        return Vec::new();
-    };
-    let query = props.query.strip_prefix('/').unwrap_or(&props.query);
-    props
-        .commands
-        .iter()
-        .filter(|entry| entry.meta["hidden"] != true && entry.id.starts_with(query))
-        .take(10)
-        .map(|entry| Line::from(format!("   /{}", entry.id)))
-        .collect()
+    crate::component::draw(&props, answer, usize::from(width), |props, width| {
+        fallback::draw(props, open.fallback_at, width, rows)
+    })
 }
 fn handler(ui: &Ui) -> Option<Action> {
     let id = request(ui)?;
@@ -144,7 +179,7 @@ fn handler(ui: &Ui) -> Option<Action> {
     };
     layout.on_key.clone()
 }
-pub fn waiting(ui: &Ui, state: &SessionState) -> bool {
+pub fn waiting(ui: &Ui, tree: &Tree, now: Now) -> bool {
     if !active(ui) {
         return false;
     }
@@ -152,8 +187,17 @@ pub fn waiting(ui: &Ui, state: &SessionState) -> bool {
         return false;
     };
     let area = ui.shown.canvas.area();
-    let props = Props::Palette(Box::new(props(ui, state, open)));
-    if crate::component::key(state, &open.id, &props, area.width, area.height / 2).is_none() {
+    let above = ui.shown.regions.above();
+    let props = Props::Palette(Box::new(props(ui, tree, open, now)));
+    if crate::component::key(
+        tree.viewed(),
+        &open.id,
+        &props,
+        above.width,
+        (area.height / 2).min(above.height),
+    )
+    .is_none()
+    {
         return false;
     }
     let Some(key) = ui
@@ -177,18 +221,9 @@ pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         }
         return Vec::new();
     }
-    match key.code {
-        KeyCode::Esc => {
-            close(ui, now);
-            Vec::new()
-        }
-        KeyCode::Enter => {
-            ui.focus.close(now.instant);
-            crate::input::palette_submit(ui, tree, now)
-        }
-        _ => crate::input::palette_edit(ui, tree, key, now),
-    }
+    fallback::key(ui, tree, key, now)
 }
+
 pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect> {
     if action.name != "surface:palette" || action.args["handler"].as_str() != request(ui) {
         return Vec::new();
@@ -212,6 +247,10 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect
         close(ui, now);
         return crate::input::command_line(ui, tree, now, line.into());
     }
+    if let Some(id) = value["view"].as_str() {
+        close(ui, now);
+        return vec![Effect::View(SessionId::from_raw(id))];
+    }
     if let Some(id) = value["resume"].as_str() {
         close(ui, now);
         return vec![Effect::Open(SessionSelector::ById {
@@ -221,5 +260,23 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect
     Vec::new()
 }
 
+mod fallback;
+pub(crate) mod sessions;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
+
+/// The client keeps its native doors when the built-in command is absent.
+pub fn command(ui: &mut Ui, line: &str, now: Now) -> Option<Vec<Effect>> {
+    let (name, args) = crate::commands::split(line)?;
+    if ui.catalogs.commands.iter().any(|spec| spec.name == name) {
+        return None;
+    }
+    match name {
+        "help" => Some(open(ui, PaletteOpen::Keys, now)),
+        "resume" if args.is_empty() => Some(open(ui, PaletteOpen::Sessions, now)),
+        "resume" => Some(vec![Effect::Open(SessionSelector::ById {
+            id: SessionId::from_raw(args),
+        })]),
+        _ => None,
+    }
+}

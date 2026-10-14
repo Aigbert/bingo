@@ -6,10 +6,10 @@
 //!
 //! Every state here is the reducer's — one `SessionState` per session, folded
 //! by `frame.session`. What is the surface's own is which of them is on
-//! screen. Names, tallies, the `↳` rows and the switcher are derived from
+//! screen. Names, tallies, the `↳` rows and the palette are derived from
 //! these states at render time, so nothing about a child is stored twice.
 //!
-//! The tree holds live descendants only. The switcher lists more than that:
+//! The tree holds live descendants only. The palette lists more than that:
 //! [`roster`] merges these states with a listing the host answered with, so
 //! what an earlier process spawned is visible and can be chosen — a row, not
 //! a state, and the live one always wins.
@@ -17,7 +17,6 @@
 use std::collections::BTreeMap;
 
 use bingo_collab::lifecycle::Lifecycle;
-#[cfg(test)]
 use bingo_sdk::Driver;
 use bingo_sdk::{
     Interaction, ItemBody, ItemId, SessionId, SessionState, SessionSummary, TreeState,
@@ -27,12 +26,11 @@ use bingo_sdk::{
 /// state is the whole of the row, so nothing about it is stored twice.
 pub type Agents<'a> = BTreeMap<ItemId, &'a SessionState>;
 
-/// One row of the switcher, derived from a session in the tree or from what
+/// One row of the conversation roster, derived from a session in the tree or from what
 /// the store answered with.
 #[derive(Debug)]
 pub struct Row<'a> {
     pub session: &'a SessionId,
-    #[cfg(test)]
     pub name: String,
     /// Absent for a session nothing answers.
     pub status: Option<Lifecycle>,
@@ -154,12 +152,11 @@ impl Tree {
         self.agents().get(item).map(|child| &child.summary.id)
     }
 
-    /// The switcher's rows, in the order it lists them.
+    /// The live conversation rows, root first.
     pub fn rows(&self) -> Vec<Row<'_>> {
         self.sessions()
             .map(|state| Row {
                 session: &state.summary.id,
-                #[cfg(test)]
                 name: name(state),
                 status: Lifecycle::of_state(state),
                 attention: asking(state),
@@ -222,10 +219,9 @@ pub(crate) fn covered<'a>(tree: &'a Tree, scope: Scope<'_>) -> Vec<&'a SessionId
         .collect()
 }
 
-/// The switcher's rows: what this attachment carries, then the root's stored
+/// The conversation roster: what this attachment carries, then the root's stored
 /// descendants that are not among them. Live wins — a session that is both
 /// live and stored is one row, and it is the live one.
-#[cfg(test)]
 pub fn roster<'a>(tree: &'a Tree, stored: &'a [SessionSummary]) -> Vec<Row<'a>> {
     let mut rows = tree.rows();
     let live: Vec<SessionId> = rows.iter().map(|row| row.session.clone()).collect();
@@ -240,8 +236,10 @@ pub fn roster<'a>(tree: &'a Tree, stored: &'a [SessionSummary]) -> Vec<Row<'a>> 
 }
 
 /// The listed sessions whose parent chain reaches `root`.
-#[cfg(test)]
-fn descendants<'a>(root: &SessionId, listed: &'a [SessionSummary]) -> Vec<&'a SessionSummary> {
+pub(crate) fn descendants<'a>(
+    root: &SessionId,
+    listed: &'a [SessionSummary],
+) -> Vec<&'a SessionSummary> {
     let all: Vec<&'a SessionSummary> = listed.iter().collect();
     all.iter()
         .copied()
@@ -270,7 +268,6 @@ fn reaches(root: &SessionId, summary: &SessionSummary, listed: &[&SessionSummary
 /// not here. What it was doing is the journal's business, not a row's — and a
 /// room answers nothing whether it is here or not, so it reports no status
 /// either way and the list puts it where every other room goes.
-#[cfg(test)]
 fn stored_row(summary: &SessionSummary) -> Row<'_> {
     Row {
         session: &summary.id,

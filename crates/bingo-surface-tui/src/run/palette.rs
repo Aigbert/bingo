@@ -6,7 +6,7 @@ pub(super) fn list_stored(run: &mut Run) {
         return;
     };
     let host = run.host.clone();
-    let cwd = Some(run.session.tree.viewed().summary.cwd.clone().into());
+    let cwd = Some(run.session.tree.root().summary.cwd.clone().into());
     run.spawn(async move {
         host.sessions(SessionFilter {
             cwd,
@@ -25,7 +25,13 @@ pub(super) fn fill_palette(run: &mut Run, request: &str, mut sessions: Vec<Sessi
     }
     if let Some(Open::Palette(open)) = run.ui.focus.open_mut() {
         sessions.sort_by_key(|s| std::cmp::Reverse(s.updated_at));
-        open.sessions = sessions;
+        open.children = crate::tree::descendants(run.session.tree.root_id(), &sessions)
+            .into_iter()
+            .filter(|s| run.session.tree.state(&s.id).is_none())
+            .take(crate::palette::sessions::RECENT)
+            .cloned()
+            .collect();
+        open.sessions = crate::palette::sessions::recent_roots(sessions);
     }
 }
 

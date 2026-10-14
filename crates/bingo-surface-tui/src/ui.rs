@@ -128,6 +128,7 @@ pub struct Card {
 /// at start — the dropdown ranks them, it does not watch them.
 #[derive(Clone, Debug, Default)]
 pub struct Catalogs {
+    pub current: Option<crate::palette::Current>,
     pub plugins: Vec<bingo_sdk::CatalogEntry>,
     pub commands: Vec<CommandSpec>,
     pub values: std::collections::BTreeMap<String, Vec<bingo_sdk::CatalogEntry>>,

@@ -159,3 +159,100 @@ async fn an_unmatched_palette_replacement_never_queues_the_keyboard() {
     assert!(!crate::palette::active(&run.ui));
     assert!(run.site_queue.is_empty());
 }
+
+#[test]
+fn the_resume_picker_offers_twenty_newest_roots_and_never_a_child_or_a_room() {
+    let now = still(scene().1);
+    let mut run = tests::idle(now.instant);
+    crate::palette::open(&mut run.ui, PaletteOpen::Sessions, now);
+    let request = crate::palette::request(&run.ui).unwrap().to_owned();
+    let mut sessions = vec![child_summary("reviewer"), log_summary("#design")];
+    sessions.extend((0..25).map(|at| SessionSummary {
+        id: SessionId::from_raw(format!("ses_root{at}")),
+        updated_at: now.wall + std::time::Duration::from_secs(at),
+        ..summary()
+    }));
+    palette::fill_palette(&mut run, &request, sessions);
+    let Open::Palette(open) = run.ui.focus.open() else {
+        panic!("palette")
+    };
+    assert_eq!(open.sessions.len(), 20);
+    assert!(open.sessions.iter().all(|session| session.parent.is_none()));
+    assert_eq!(open.sessions[0].id.as_str(), "ses_root24");
+    assert_eq!(open.sessions[19].id.as_str(), "ses_root5");
+}
+
+#[tokio::test]
+async fn stored_sessions_use_the_roots_workspace_when_a_child_is_in_view() {
+    let now = still(scene().1);
+    let mut run = tests::idle(now.instant);
+    let mut child = child_summary("reviewer");
+    child.cwd = "/another/workspace".into();
+    run.session
+        .tree
+        .fold
+        .apply(&child_frame(1, Event::SessionUpdated { summary: child }));
+    run.session.tree.show(&child_id());
+    let host = bingo_sdk::testing::TestHost::default();
+    let cwd = run.session.tree.root().summary.cwd.clone();
+    let observed = Arc::new(std::sync::Mutex::new(None));
+    let capture = observed.clone();
+    host.on_sessions(move |filter| {
+        *capture.lock().unwrap() = filter.cwd;
+        async { Ok(vec![]) }
+    });
+    run.host = host.handle();
+    let (sender, mut replies) = tokio::sync::mpsc::channel(1);
+    run.replies = sender;
+    crate::palette::open(&mut run.ui, PaletteOpen::Sessions, now);
+    palette::list_stored(&mut run);
+    assert!(matches!(replies.recv().await, Some(Reply::Stored(_, _))));
+    assert_eq!(
+        *observed.lock().unwrap(),
+        Some(std::path::PathBuf::from(cwd))
+    );
+}
+
+#[test]
+fn the_palette_receives_drawing_facts_without_a_copy_of_session_state() {
+    let now = still(scene().1);
+    let mut state = state();
+    state.config.kernel["render"] = json!({"Palette":[{}]});
+    let mut run = tests::idle_in(state, Arc::new(TestSession::default()), now.instant);
+    crate::palette::open(&mut run.ui, PaletteOpen::Sessions, now);
+    draw_tree(80, 24, &run.session.tree, &mut run.ui, now);
+    let props = &run
+        .ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == bingo_sdk::render::Component::Palette)
+        .unwrap()
+        .request
+        .props;
+    for field in ["summary", "config", "signals", "context"] {
+        assert!(
+            props.get(field).is_none(),
+            "{field} should not duplicate the fold"
+        );
+    }
+    assert_eq!(
+        props["conversation"][0]["id"],
+        run.session.tree.root_id().as_str()
+    );
+}
+
+#[tokio::test]
+async fn acknowledgements_do_not_refetch_catalogues_and_changes_fetch_only_their_kind() {
+    let now = still(scene().1);
+    let mut run = tests::idle(now.instant);
+    let senders = run.replies.strong_count();
+    run.applied(&json!({"message":"renamed"}));
+    assert_eq!(run.replies.strong_count(), senders);
+    run.catalog_changed(CatalogKind::Commands);
+    assert_eq!(
+        run.replies.strong_count(),
+        senders + 1,
+        "only the changed catalogue is read"
+    );
+}

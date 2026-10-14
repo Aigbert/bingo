@@ -312,8 +312,8 @@ fn strip_scopes_overflows_finishes_and_clicks() {
         "opening the list requests stored sessions"
     );
     assert!(
-        !ui.focus.captures(),
-        "the mod command opens its site on acknowledgement"
+        ui.focus.captures(),
+        "the crew strip opens this conversation immediately"
     );
     tree.fold.apply(&child_frame(
         20,

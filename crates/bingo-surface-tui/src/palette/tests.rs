@@ -6,13 +6,13 @@ use crossterm::event::KeyModifiers;
 use serde_json::Value;
 use std::sync::Arc;
 
-struct Fixture {
+pub(crate) struct Fixture {
     _home: tempfile::TempDir,
     link: Arc<dyn Interceptor>,
     handler: Arc<dyn Command>,
 }
 impl Fixture {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let home = tempfile::tempdir().unwrap();
         let mut registrar = Registrar::new(
             "palette",
@@ -56,7 +56,21 @@ impl Fixture {
         width: u16,
         height: u16,
     ) -> String {
-        draw_sized(width, height, state, ui, now);
+        self.paint_tree(ui, &solo(state), now, width, height).await
+    }
+    pub(crate) async fn paint_tree(
+        &self,
+        ui: &mut Ui,
+        tree: &Tree,
+        now: Now,
+        width: u16,
+        height: u16,
+    ) -> String {
+        let state = tree.viewed();
+        ui.catalogs
+            .current
+            .get_or_insert_with(|| Current(Arc::new(Values)));
+        draw_tree(width, height, tree, ui, now);
         let key = ui
             .shown
             .pulls
@@ -104,7 +118,7 @@ impl Fixture {
         );
         ui.placed.pulled.request(&key);
         ui.placed.pulled.answer(key, view);
-        draw_sized(width, height, state, ui, now)
+        draw_tree(width, height, tree, ui, now)
     }
     async fn press(
         &self,
@@ -113,8 +127,17 @@ impl Fixture {
         key: KeyEvent,
         now: Now,
     ) -> Vec<Effect> {
-        let tree = solo(state);
-        let effects = crate::input::on_key(ui, &tree, key, now);
+        self.press_tree(ui, &solo(state), key, now).await
+    }
+    pub(crate) async fn press_tree(
+        &self,
+        ui: &mut Ui,
+        tree: &Tree,
+        key: KeyEvent,
+        now: Now,
+    ) -> Vec<Effect> {
+        let state = tree.viewed();
+        let effects = crate::input::on_key(ui, tree, key, now);
         let Some(Effect::SiteKey { action, .. }) = effects.first() else {
             return effects;
         };
@@ -130,9 +153,9 @@ impl Fixture {
             .await
             .unwrap()
         {
-            CommandOutcome::Surface { action, .. } => result(ui, &tree, &action, now),
+            CommandOutcome::Surface { action, .. } => result(ui, tree, &action, now),
             CommandOutcome::Handled { handled: false } => {
-                crate::input::palette_edit(ui, &tree, key, now)
+                crate::input::palette_edit(ui, tree, key, now)
             }
             _ => vec![],
         }
@@ -253,6 +276,10 @@ async fn search_arguments_escape_and_resume_use_the_same_site() {
 fn help_resume_and_shift_tab_keep_their_own_routes() {
     let (state, mut ui, now) = setup();
     let tree = solo(&state);
+    ui.catalogs.commands.push(CommandSpec {
+        name: "help".into(),
+        ..crate::commands::local_specs()[0].clone()
+    });
     for (key, line) in [(typed('?'), "/help"), (ctrl('r'), "/resume")] {
         let effects = crate::input::on_key(&mut ui, &tree, key, now);
         assert!(matches!(&effects[0],Effect::Submit(Input::Text{text,..}) if text==line));
@@ -285,9 +312,9 @@ async fn stale_query_and_engine_answers_cannot_trap_the_keyboard() {
     open(&mut ui, PaletteOpen::Commands, now);
     fixture.paint(&mut ui, &state, now, 80, 24).await;
     ui.composer.set("/rename ");
-    assert!(waiting(&ui, &state));
+    assert!(waiting(&ui, &solo(&state), now));
     fixture.paint(&mut ui, &state, now, 80, 24).await;
-    assert!(!waiting(&ui, &state));
+    assert!(!waiting(&ui, &solo(&state), now));
     let key = ui
         .shown
         .pulls
@@ -296,15 +323,17 @@ async fn stale_query_and_engine_answers_cannot_trap_the_keyboard() {
         .unwrap()
         .clone();
     ui.placed.pulled.answer(key.clone(), key.request.engine());
-    assert!(!waiting(&ui, &state));
+    assert!(!waiting(&ui, &solo(&state), now));
 }
 
 struct Values;
 impl command::CommandCatalog for Values {
     fn catalog(&self, mut catalog: Catalog, view: &command::SessionView<'_>) -> Catalog {
-        assert!(slot::placed(view.state).iter().any(
+        if catalog.entries.iter().any(|entry| entry.id == "permission") {
+            assert!(slot::placed(view.state).iter().any(
             |placed| matches!(&placed.slot, slot::Slot::Mode {current, ..} if current=="default")
         ));
+        }
         for entry in &mut catalog.entries {
             entry.meta["now"] = json!(match entry.id.as_str() {
                 "model" => "fake/small",
@@ -355,5 +384,66 @@ async fn choosing_the_mode_key_replays_shift_tab_after_closing() {
     assert!(!active(&ui));
     assert!(
         matches!(&effects[0], Effect::Submit(Input::Action {action}) if action.name == "permission")
+    );
+}
+
+#[test]
+fn ctrl_p_is_unbound_and_absent_from_the_palette_keys() {
+    let (state, mut ui, now) = setup();
+    assert!(crate::input::on_key(&mut ui, &solo(&state), ctrl('p'), now).is_empty());
+    assert!(!active(&ui));
+    open(&mut ui, PaletteOpen::Keys, now);
+    draw_sized(80, 24, &state, &mut ui, now);
+    let props = &ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == render::Component::Palette)
+        .unwrap()
+        .request
+        .props;
+    assert!(props["keyHints"].get("ctrl+p").is_none());
+    assert!(props["bindings"].get("ctrl+p").is_none());
+    let escape = crate::keys::BINDINGS
+        .iter()
+        .find(|binding| binding.keys == "esc")
+        .unwrap();
+    assert_eq!(
+        escape.description,
+        crate::keys::ESCAPES
+            .iter()
+            .map(|(_, word)| *word)
+            .collect::<Vec<_>>()
+            .join(" → ")
+    );
+}
+
+#[test]
+fn disabled_palette_keeps_help_and_resume_in_the_client() {
+    let (mut state, mut ui, now) = setup();
+    state.config.kernel =
+        json!({"enabledPlugins":{bingo_mod_palette::Palette.manifest().id:false}});
+    ui.catalogs.commands.clear();
+    let tree = solo(&state);
+    for opener in [typed('?'), ctrl('r')] {
+        assert_eq!(
+            crate::input::on_key(&mut ui, &tree, opener, now),
+            vec![Effect::ListStored]
+        );
+        assert!(active(&ui));
+        close(&mut ui, now);
+    }
+    assert_eq!(
+        crate::input::command_line(&mut ui, &tree, now, "/resume".into()),
+        vec![Effect::ListStored]
+    );
+    sessions(&mut ui, &state);
+    let effects = super::key(&mut ui, &tree, key(KeyCode::Down), now);
+    assert!(effects.is_empty());
+    assert_eq!(
+        super::key(&mut ui, &tree, key(KeyCode::Enter), now),
+        vec![Effect::Open(SessionSelector::ById {
+            id: SessionId::from_raw("ses_other")
+        })]
     );
 }

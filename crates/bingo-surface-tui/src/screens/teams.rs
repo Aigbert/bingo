@@ -195,3 +195,159 @@ fn what_the_message_tools_answer() {
 }
 
 // ---- the one list of sessions (M36) -------------------------------------
+
+fn a_team() -> crate::tree::Tree {
+    let mut frames = busy_child("reviewer");
+    frames.extend([
+        agent_frame(3, 20, agent_announced(3, "watcher")),
+        agent_frame(4, 21, agent_announced(4, "scout")),
+        agent_frame(4, 22, started("trn_4")),
+        agent_frame(
+            4,
+            23,
+            crate::test_support::completed("trn_4", bingo_sdk::TurnStatus::Completed),
+        ),
+        log_frame(30, log_announced("#design")),
+        log_frame(
+            31,
+            extended(
+                "bingo.rooms",
+                "members",
+                roster_payload(
+                    &["reviewer", "watcher"],
+                    &[("reviewer", 0), ("watcher", 600)],
+                ),
+            ),
+        ),
+        frame(
+            32,
+            signalled(
+                "bingo.rooms",
+                "owed",
+                owed_payload(&[("#design", "reviewer", 22)]),
+            ),
+        ),
+        item(33, user("itm_0", "what is in this workspace?")),
+    ]);
+    frames.extend((1..=4u64).map(|n| {
+        posted(
+            31 + n,
+            &format!("itm_p{n}"),
+            "watcher",
+            &format!("post {n}"),
+        )
+    }));
+    // Four posts stand in the room; this seat stopped reading at the first.
+    frames.push(log_frame(36, room_cursor("reviewer", "itm_p1")));
+    folded_tree(frames)
+}
+
+fn palette_team() -> crate::tree::Tree {
+    let mut tree = a_team();
+    let config = || bingo_sdk::ConfigView {
+        kernel: json!({"render":{"Palette":[{}]}}),
+        ..Default::default()
+    };
+    for frame in [
+        frame(100, Event::ConfigChanged { config: config() }),
+        child_frame(100, Event::ConfigChanged { config: config() }),
+        log_frame(100, Event::ConfigChanged { config: config() }),
+    ] {
+        tree.fold.apply(&frame);
+    }
+    tree
+}
+
+#[tokio::test]
+async fn the_palette_roster_preserves_status_unread_and_owed_columns() {
+    let tree = palette_team();
+    let fixture = crate::palette::tests::Fixture::new();
+    let (mut ui, now) = scene();
+    let now = still(now);
+    crate::palette::open(&mut ui, bingo_sdk::component::PaletteOpen::Sessions, now);
+    let wide = fixture.paint_tree(&mut ui, &tree, now, 160, 40).await;
+    for text in [
+        "this conversation",
+        "reviewer",
+        "working · in #design · 3 unread · live",
+        "watcher",
+        "listening · 600s",
+        "owes an answer · 22m",
+        "#design",
+        "2 seats",
+        "1 owed",
+        "this one",
+    ] {
+        assert!(wide.contains(text), "missing {text}: {wide}");
+    }
+    insta::assert_snapshot!("palette_roster", wide);
+    let painted = crate::painted::painted(160, 40, &tree, &mut ui, now);
+    assert!(
+        painted.coloured("this conversation").is_empty(),
+        "group labels remain dim"
+    );
+    assert!(
+        !painted.coloured("owes an answer · 22m").is_empty(),
+        "debts retain attention colour"
+    );
+}
+
+#[tokio::test]
+async fn the_palette_roster_starts_on_the_viewed_room_and_returns_to_the_root() {
+    let mut tree = palette_team();
+    tree.show(&log_id());
+    let fixture = crate::palette::tests::Fixture::new();
+    let (mut ui, now) = scene();
+    let now = still(now);
+    crate::palette::open(&mut ui, bingo_sdk::component::PaletteOpen::Sessions, now);
+    let screen = fixture.paint_tree(&mut ui, &tree, now, 80, 24).await;
+    assert!(screen.contains("❯ #design"), "{screen}");
+    insta::assert_snapshot!("palette_roster_in_the_room", screen);
+    for _ in 0..4 {
+        fixture
+            .press_tree(&mut ui, &tree, key(crossterm::event::KeyCode::Up), now)
+            .await;
+        fixture.paint_tree(&mut ui, &tree, now, 80, 24).await;
+    }
+    let effects = fixture
+        .press_tree(&mut ui, &tree, key(crossterm::event::KeyCode::Enter), now)
+        .await;
+    assert_eq!(
+        effects,
+        vec![crate::effect::Effect::View(tree.root_id().clone())]
+    );
+}
+
+#[tokio::test]
+async fn the_palette_roster_has_identical_keyboard_and_crew_doors() {
+    use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    let tree = palette_team();
+    let fixture = crate::palette::tests::Fixture::new();
+    let (mut keyboard, now) = scene();
+    let (mut pointer, _) = scene();
+    let now = still(now);
+    crate::input::on_key(&mut keyboard, &tree, ctrl('r'), now);
+    draw_tree(120, 40, &tree, &mut pointer, now);
+    let area = pointer.shown.crew.unwrap();
+    crate::pointer::on_mouse(
+        &mut pointer,
+        &tree,
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: area.x,
+            row: area.y,
+            modifiers: KeyModifiers::NONE,
+        },
+        now,
+    );
+    for (width, height) in [(80, 24), (120, 40)] {
+        assert_eq!(
+            fixture
+                .paint_tree(&mut keyboard, &tree, now, width, height)
+                .await,
+            fixture
+                .paint_tree(&mut pointer, &tree, now, width, height)
+                .await
+        );
+    }
+}

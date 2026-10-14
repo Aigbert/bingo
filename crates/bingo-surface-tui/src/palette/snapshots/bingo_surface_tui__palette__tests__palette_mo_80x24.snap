@@ -13,7 +13,7 @@ expression: screen
 "   commands                                                                     "
 " ❯ /model          choose model                                     fake/small  "
 "   /permission     choose permission                                   default  "
-"   sessions                                                                     "
+"   stored sessions                                                              "
 "   model migration                          2023-11-14T22:13:20Z · 12 messages  "
 "   keys                                                                         "
 "   shift+tab      turn · cycle permission mode                         default  "

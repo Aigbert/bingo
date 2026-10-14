@@ -1,0 +1,28 @@
+---
+source: crates/bingo-surface-tui/src/screens/teams.rs
+expression: screen
+---
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"● watcher: post 1                                                               "
+"  members: reviewer, watcher                                                    "
+"                                                                                "
+"   this conversation                                                            "
+"   ◆ project  idle · what is in this workspace?                                 "
+"   ◗~ reviewer  working · in #design · 3 unread · live · owes an answer · 22m   "
+"   ● watcher  idle · in #design · listening · 600s                              "
+"   ✦ scout  idle · completed                                                    "
+" ❯ #design  2 seats · 1 owed                                          this one  "
+"   type to search commands, sessions and keys together                          "
+"╭──────────────────────────────────────────────────────────────────────────────╮"
+"│ #design > post to the room                                                   │"
+"╰──────────────────────────────────────────────────────────────────────────────╯"
+"? for shortcuts                                                       in #design"

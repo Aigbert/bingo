@@ -151,6 +151,15 @@ impl TestHost {
         (Arc::new(host).scripted().handle(), session, child)
     }
 
+    pub fn with_stored(
+        frames: Vec<bingo_sdk::Frame>,
+        stored: Vec<SessionSummary>,
+    ) -> (HostHandle, Arc<TestSession>) {
+        let session = scripted(frames, std::time::Duration::ZERO);
+        let host = Self::over(Arc::clone(&session), stored, Vec::new());
+        (Arc::new(host).scripted().handle(), session)
+    }
+
     fn over(
         session: Arc<TestSession>,
         stored: Vec<SessionSummary>,

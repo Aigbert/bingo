@@ -200,10 +200,17 @@ pub(super) fn notices(run: &mut Run) {
 }
 
 fn focus(run: &Run) -> Option<String> {
-    target(run).map(|(_, focus, _)| focus)
+    // An unhandled printable key sets the ask aside; finish its already queued
+    // burst in the composer instead of dropping the remaining letters.
+    target(run).map(|(_, focus, _)| focus).or_else(|| {
+        run.session
+            .tree
+            .open_interaction()
+            .map(|(_, open)| open.id.to_string())
+    })
 }
 fn palette_waiting(run: &Run) -> bool {
-    crate::palette::waiting(&run.ui, run.session.tree.viewed())
+    crate::palette::waiting(&run.ui, &run.session.tree, run.detection.now())
 }
 pub(super) fn blocked(run: &Run) -> bool {
     if palette_waiting(run) {
