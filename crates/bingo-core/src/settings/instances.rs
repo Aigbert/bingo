@@ -50,8 +50,15 @@ pub fn change(
 }
 
 pub fn ensure_user(path: &Path, key: &str, name: &str) -> Result<(), KernelError> {
-    if read(path)?.get(key).and_then(|v| v.get("instances")).and_then(|v| v.get(name)).is_none() {
-        return Err(invalid("only instances in user settings can be changed or removed"));
+    if read(path)?
+        .get(key)
+        .and_then(|v| v.get("instances"))
+        .and_then(|v| v.get(name))
+        .is_none()
+    {
+        return Err(invalid(
+            "only instances in user settings can be changed or removed",
+        ));
     }
     Ok(())
 }

@@ -49,11 +49,17 @@ async fn add(session: &mut Attachment, endpoint: &MockServer) {
         session,
         &format!("/provider add work openai {}", endpoint.uri()),
         endpoint,
+        None,
     )
     .await;
 }
 
-async fn login_command(session: &mut Attachment, text: &str, endpoint: &MockServer) {
+async fn login_command(
+    session: &mut Attachment,
+    text: &str,
+    endpoint: &MockServer,
+    auth: Option<&std::path::Path>,
+) {
     let intent = IntentId::mint();
     session
         .handle
@@ -80,6 +86,14 @@ async fn login_command(session: &mut Attachment, text: &str, endpoint: &MockServ
         endpoint.received_requests().await.unwrap().is_empty(),
         "no probe before paste"
     );
+    if let Some(path) = auth {
+        let stored: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        assert!(
+            stored.get("work").is_none(),
+            "origin change must delete the old key before paste"
+        );
+    }
     session.handle.answer(
         IntentId::mint(),
         dialog.id,
@@ -153,6 +167,7 @@ async fn add_readdress_and_remove_without_restarting_or_rebinding_sessions() {
         &mut session,
         &format!("/provider set work url {}", second.uri()),
         &second,
+        Some(&server.cwd().join(".bingo/data/auth.json")),
     )
     .await;
     auth_required(&mut session, "changed origin").await;
@@ -167,7 +182,20 @@ async fn add_readdress_and_remove_without_restarting_or_rebinding_sessions() {
         command(&mut newer, "/provider remove openai").await,
         IntentOutcome::Applied { .. }
     ));
-    applied(&mut newer, "/provider remove work").await;
+    applied(&mut newer, "/model work/local-model --keep").await;
+    applied(&mut newer, "/model pin work/local-model").await;
+    let removed = command(&mut newer, "/provider remove work").await;
+    let notice = serde_json::to_string(&removed).unwrap();
+    assert!(notice.contains("default provider"), "{notice}");
+    assert!(notice.contains("model pins"), "{notice}");
+    let choices =
+        bingo_core::settings::read_document(&server.cwd().join(".bingo/settings.toml")).unwrap();
+    assert!(!choices.contains_key("provider"));
+    assert_eq!(choices["pinned"], json!([]));
+    kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
     auth_required(&mut newer, "work was removed").await;
     assert!(
         !kernel
@@ -243,6 +271,7 @@ async fn failed_reach_is_redacted_and_readdressing_repairs_it() {
         &mut session,
         &format!("/provider set work url {}", good.uri()),
         &good,
+        Some(&server.cwd().join(".bingo/data/auth.json")),
     )
     .await;
     assert_eq!(meta(&kernel).await["reach"]["kind"], "ok");

@@ -210,3 +210,19 @@ async fn a_source_that_rebuilds_arcs_can_publish_models_and_reach() {
     }
     assert!(models_changed);
 }
+
+#[tokio::test]
+async fn removal_clears_live_pins_before_another_pin_write() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = build(dir.path(), 1).await.unwrap();
+    provider::add_provider(&host, "work", "local", "http://up")
+        .await
+        .unwrap();
+    pins::pin_model(&host, "work/m", true).unwrap();
+    pins::pin_model(&host, "other/m", true).unwrap();
+    provider::remove_provider(&host, "work").await.unwrap();
+    assert_eq!(pins::pinned_models(&host), ["other/m"]);
+    pins::pin_model(&host, "third/m", true).unwrap();
+    let document = crate::settings::read_document(&crate::settings::user_path(host.env())).unwrap();
+    assert_eq!(document["pinned"], json!(["other/m", "third/m"]));
+}

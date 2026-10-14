@@ -116,12 +116,7 @@ pub(crate) async fn remove_provider(host: &Host, name: &str) -> Result<String, K
             .ok_or_else(|| invalid("provider has no registered shape"))?,
     )?;
     // Persist first: a file that refuses a write must not silently change live choices.
-    let cleared = instances::change(
-        &settings::user_path(host.env()),
-        shape.settings_key(),
-        name,
-        None,
-    )?;
+    let cleared = remove_settings(host, shape.settings_key(), name)?;
     install_provider(host, name, None);
     provider.retire(&format!(
         "Provider {name} was removed; choose another provider."
@@ -137,6 +132,14 @@ pub(crate) async fn remove_provider(host: &Host, name: &str) -> Result<String, K
             cleared.join(" and ")
         )
     })
+}
+
+fn remove_settings(host: &Host, key: &str, name: &str) -> Result<Vec<String>, KernelError> {
+    let mut pinned = host.pinned.lock().unwrap_or_else(|p| p.into_inner());
+    let cleared = instances::change(&settings::user_path(host.env()), key, name, None)?;
+    let prefix = format!("{name}/");
+    pinned.retain(|id| !id.starts_with(&prefix));
+    Ok(cleared)
 }
 
 async fn instance_provider(host: &Host, name: &str) -> Result<Arc<dyn Provider>, KernelError> {
