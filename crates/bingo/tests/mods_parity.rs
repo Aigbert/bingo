@@ -38,8 +38,8 @@ fn port_layout_changes_only_the_package_specifier() {
         String::from_utf8_lossy(&output.stderr)
     );
     for (name, file) in [
-        ("band", "band.tsx"),
-        ("pane", "pane.tsx"),
+        ("turn-band", "band.tsx"),
+        ("tool-calls", "pane.tsx"),
         ("tool-call", "tool-call.ts"),
     ] {
         assert_eq!(std::fs::read_to_string(source.join(file)).unwrap(), module);
@@ -50,7 +50,7 @@ fn port_layout_changes_only_the_package_specifier() {
         assert!(ports.join(name).join("register.test.ts").is_file());
     }
     assert_eq!(
-        std::fs::read_to_string(ports.join("band/types/index.d.ts")).unwrap(),
+        std::fs::read_to_string(ports.join("turn-band/types/index.d.ts")).unwrap(),
         state.replace("'claude-code'", "'bingo'")
     );
     let invocations = std::fs::read_to_string(ports.join(".home/invocations")).unwrap();

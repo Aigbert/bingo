@@ -37,7 +37,7 @@ def port(source, target):
 
 
 def layout(root, source, out, name, identity, extension, uses):
-    directory = out / name
+    directory = out / identity
     file = f'{name}.{extension}'
     port(source / file, directory / 'hooks' / file)
     contract = source / f'{name}-state.d.ts'
@@ -64,7 +64,7 @@ def main():
     binary = Path(os.environ.get('BINGO_BIN', root / 'target/debug/bingo')).resolve()
     isolated = out / '.home'
     (isolated / '.bingo').mkdir(parents=True)
-    (isolated / '.bingo/settings.json').write_text('{"update":{"check":false}}\n')
+    (isolated / '.bingo/settings.toml').write_text('[update]\ncheck = false\n')
     env = dict(os.environ, HOME=str(isolated), USERPROFILE=str(isolated))
     env.pop('BINGO_FAKE_SCRIPT', None)
     examples = (
