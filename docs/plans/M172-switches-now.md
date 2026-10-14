@@ -84,7 +84,9 @@ and says why. The listing tells the wish from what runs.
   Box the scoped host operation: the composed three-mod smoke exposed stack
   overflow when the new grant wrapper carried that large future inline.
   Enable waits up to five seconds before replying that it will finish after
-  the running turn; an owned operation completes it after retirement.
+  the running turn; an owned operation wakes on retirement. After thirty seconds
+  it stops waiting and reports next-start. This bounds retained workers without
+  interrupting a running turn.
   Tokio paused time tests the deadline without pinning a wall clock.
   Dynamic `tool` authority is conservatively next-start even before registration;
   otherwise an unloaded module could add tools while being enabled.

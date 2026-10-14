@@ -32,6 +32,8 @@ If the old generation still serves a turn after five seconds, enable replies
 that it is queued after the running turn. Other switches remain available;
 a later disable supersedes that queued enable. The listing and command
 completions refresh when it finishes, including after the command is cancelled.
+If the turn still holds it after thirty seconds, enabling applies at the next
+start and a notice explains why.
 Retirement releases only that generation's processes, signals and callbacks.
 `$.state` and `$.store` survive; session-start hooks run again.
 A module holding declared or trust-granted

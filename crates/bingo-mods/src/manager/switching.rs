@@ -7,6 +7,7 @@ pub(super) struct State {
     pub off: RwLock<BTreeSet<String>>,
     pub retired: tokio::sync::Mutex<Vec<Arc<Module>>>,
     pub requests: Mutex<BTreeMap<String, Arc<Request>>>,
+    pub changed: tokio::sync::Notify,
 }
 pub(super) struct Request {
     pub enabled: bool,
@@ -19,6 +20,7 @@ pub(super) fn begin(manager: &Manager, name: &str, enabled: bool) -> Arc<Request
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .insert(name.into(), request.clone());
+    manager.switches.changed.notify_waiters();
     request
 }
 fn current(manager: &Manager, name: &str, request: &Arc<Request>) -> bool {
@@ -116,7 +118,11 @@ pub(super) async fn switch_module(
         tokio::select! {
             biased;
             _ = manager.stop.cancelled() => return Err(reload::failed("module manager stopped")),
-            _ = defer_retirement(manager, name, request, deferred) => {}
+            ready = defer_retirement(manager, name, request, deferred) => if !ready {
+                let why = "running turn still holds the previous generation";
+                manager.notices.push(Notice::warn("PLUGIN_SWITCH", format!("{name}: on at next start ({why})")));
+                return Ok(next(why));
+            }
         }
     }
     let _guard = manager.reloading.lock().await;
@@ -171,7 +177,7 @@ async fn defer_retirement(
     name: &str,
     request: &Arc<Request>,
     deferred: tokio::sync::oneshot::Sender<()>,
-) {
+) -> bool {
     let bare = name.strip_prefix("plugins:").unwrap_or(name);
     if tokio::time::timeout(
         std::time::Duration::from_secs(5),
@@ -181,8 +187,14 @@ async fn defer_retirement(
     .is_err()
     {
         let _ = deferred.send(());
-        wait_retired(manager, name, bare, request).await;
+        return tokio::time::timeout(
+            std::time::Duration::from_secs(25),
+            wait_retired(manager, name, bare, request),
+        )
+        .await
+        .is_ok();
     }
+    true
 }
 async fn activate_switch(
     manager: &Manager,
@@ -221,6 +233,9 @@ fn switch_found(manager: &Manager, old: &Module) -> discovery::Found {
 }
 async fn wait_retired(manager: &Manager, id: &str, name: &str, request: &Arc<Request>) {
     loop {
+        let changed = manager.switches.changed.notified();
+        tokio::pin!(changed);
+        changed.as_mut().enable();
         if !current(manager, id, request) {
             return;
         }
@@ -234,7 +249,7 @@ async fn wait_retired(manager: &Manager, id: &str, name: &str, request: &Arc<Req
         {
             return;
         }
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        changed.await;
     }
 }
 pub(super) async fn reap(manager: &Manager) {
@@ -258,6 +273,7 @@ pub(super) async fn reap(manager: &Manager) {
             .await
             .retain(|entry| !Arc::ptr_eq(entry, &module));
         cleanup(manager, &module).await;
+        manager.switches.changed.notify_waiters();
     }
 }
 pub(super) async fn cleanup(manager: &Manager, module: &Module) {

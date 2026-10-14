@@ -481,3 +481,41 @@ async fn failed_publication_keeps_the_committed_switch_on_reload() {
     assert!(manager.modules()[0].engine.is_none());
     manager.stop().await;
 }
+
+#[tokio::test]
+async fn retirement_wakes_waiters_without_a_polling_tick() {
+    let (_root, manager, old) = fixture().await;
+    runtime(&manager);
+    manager.switch("fixture", false).await.unwrap();
+    let request = begin(&manager, "fixture", true);
+    tokio::time::pause();
+    let mut waiting = Box::pin(wait_retired(&manager, "fixture", "fixture", &request));
+    assert!(futures::poll!(&mut waiting).is_pending());
+    drop(old);
+    reap(&manager).await;
+    assert!(
+        futures::poll!(&mut waiting).is_ready(),
+        "reap did not wake the switch"
+    );
+    manager.stop().await;
+}
+
+#[tokio::test]
+async fn held_retirement_expires_to_next_start() {
+    let (_root, manager, old) = fixture().await;
+    runtime(&manager);
+    manager.switch("fixture", false).await.unwrap();
+    tokio::time::pause();
+    assert_eq!(
+        manager.switch("fixture", true).await.unwrap(),
+        PluginSwitch::AfterTurn
+    );
+    let finished =
+        tokio::time::timeout(std::time::Duration::from_secs(31), finish_workers(&manager)).await;
+    assert!(finished.is_ok(), "retirement worker never expires");
+    assert!(manager.modules()[0].engine.is_none());
+    assert!(manager.switches.off.read().unwrap().contains("fixture"));
+    assert!(manager.switches.requests.lock().unwrap().is_empty());
+    drop(old);
+    manager.stop().await;
+}
