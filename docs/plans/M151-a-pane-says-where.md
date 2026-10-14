@@ -36,8 +36,8 @@ M149 (ember), M150 (crew). ADR-0078 §5 grants remain unchanged.
    Resize/move asks again; collapsed panes are never asked (ADR-0079 §5).
 5. **Status.** The right edge shows `<title> ▸` for collapsed panes; clicking
    tries overlay. Unasked panes retain `1 pane waiting` and open on click.
-6. **Moves.** Focused title `place ▾` and `ctrl+p` cycle fitting above,
-   side, overlay, then declared rects. M148 freed this key; `?` lists it.
+6. **Moves.** Focused title `place ▾` and `alt+p` cycle fitting above,
+   side, overlay, then declared rects; `?` lists the key.
    Moves are keyed by pane identity in the TUI process, never the session.
 7. **Runtime.** `$.ui.open({ id, title, place, size })` in QuickJS/Node.
    Regenerate schema and TypeScript with `BINGO_UPDATE_SCHEMA=1`; scoped
@@ -51,6 +51,7 @@ M149 (ember), M150 (crew). ADR-0078 §5 grants remain unchanged.
 - `crates/bingo-sdk/src/{slot,render}.rs`, `slot/` helpers/tests and fixtures.
 - `crates/bingo-surface-tui/src/pane/` (formerly `pane.rs`),
   `{view,layout,pointer,pulled,status,keys}.rs`, affected tests/snapshots.
+- `theme.rs`: only the dim file allowlist in `every_token_is_spent_where_the_design_says` (delegate-authorized).
 - `crates/bingo-mods/src/`, `sdk/typescript/src/ui.ts`.
 - `crates/bingo/tests/mods_ui.rs`, `tests/fixtures/mods/{counter,corner}/`.
 - Generated `schema/{rpc,plugin,plugin-2,events}.json`, TypeScript wire/events.
@@ -90,22 +91,8 @@ taking the screen; covering composer/status/permission; `open.isPlaced`
 - Mechanical constructors outside Files: core `host/render_queue.rs`
   (`Viewport.place: None`) and TUI `toast.rs` (pane defaults).
 
-- **Stopped 2026-10-14, protocol §6.** The workspace test gate has six
-  deterministic TUI failures. `theme::tests::every_token_is_spent_where_the_design_says`
-  pins exact source-file lists; `pane/draw.rs` now spends `dim` and `presence`.
-  Its repair changes `theme.rs` assertions outside Files, not a constructor
-  or exhaustive-match arm covered by the delegate’s standing exceptions.
-- **Option A (recommended):** authorize only adding `pane/draw.rs` to the
-  `dim` and `presence` allowlists in that test; keep token values and roles.
-  Then fix the in-scope help regressions and resume sequential gates.
-- **Option B:** redesign the rendering split to keep these token uses in
-  their existing allowed modules; re-verify that scope before resuming.
-- Other failures: M148’s test still requires `ctrl+p` absent from help;
-  the extra binding clips the 80×24 footer; `sheet_slide`, `sheet_close`
-  and `help_80x30` snapshots need the corrected help layout. No flaky PTY
-  or wall-clock failure occurred. No tmux session was started. ADR-0081 §7
-  remains proposed; M151 is not verified. The ACP token cases passed in
-  the workspace run; their required isolated runs remain pending.
+- 2026-10-14, delegate: keep `ctrl+p` absent and M148’s test unchanged; use dim for the focused label, add only `pane/draw.rs` to the dim allowlist, keep presence/tokens fixed, and correct/review the 80×24 help snapshots.
+- `alt+p` means “place”; `keys.rs` has no binding and composer `alt()` handles only b/f/Enter, so this chord is free and applies only to a focused pane.
 
 ## Verified (2026-10-14)
 
