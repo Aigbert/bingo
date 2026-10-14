@@ -217,7 +217,18 @@ impl PluginSource for Manager {
         switching::module_kind(self, name)
     }
     async fn switch(&self, name: &str, enabled: bool) -> Result<plugin::PluginSwitch, KernelError> {
-        switching::switch_module(self, name, enabled).await
+        let manager = self
+            .this
+            .get()
+            .and_then(Weak::upgrade)
+            .ok_or_else(|| reload::failed("module manager unavailable"))?;
+        let name = name.to_owned();
+        let asked = render::asked();
+        tokio::spawn(async move {
+            render::under_input(asked, switching::switch_module(&manager, &name, enabled)).await
+        })
+        .await
+        .map_err(reload::failed)?
     }
     async fn approval(&self, name: &str) -> Option<Approval> {
         let modules = self.modules();

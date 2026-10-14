@@ -168,19 +168,29 @@ async fn wait_retired(manager: &Manager, name: &str) {
     }
 }
 pub(super) async fn reap(manager: &Manager) {
-    let mut retired = manager.switches.retired.lock().await;
-    let mut i = 0;
-    while i < retired.len() {
-        if Arc::strong_count(&retired[i]) != 1 {
-            i += 1;
-            continue;
-        }
-        let module = retired.remove(i);
+    let _guard = manager.reloading.lock().await;
+    let ready: Vec<_> = manager
+        .switches
+        .retired
+        .lock()
+        .await
+        .iter()
+        .filter(|module| Arc::strong_count(module) == 1)
+        .cloned()
+        .collect();
+    for module in ready {
         module.close().await;
         manager.clear_signals(&module.found.name).await;
         if let Some(dollar) = manager.dollar.get() {
             dollar.reload(&module.found.name).await;
         }
+        // Keep closing generations visible to enable until cleanup finishes.
+        manager
+            .switches
+            .retired
+            .lock()
+            .await
+            .retain(|entry| !Arc::ptr_eq(entry, &module));
     }
 }
 fn next(why: &str) -> PluginSwitch {

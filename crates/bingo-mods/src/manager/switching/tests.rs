@@ -44,3 +44,70 @@ async fn trust_granted_tool_authority_pins_even_before_lazy_registration() {
     assert_eq!(module_kind(&manager, "fixture"), next("tools"));
     module.close().await;
 }
+
+#[tokio::test]
+async fn cancelling_the_switch_waiter_does_not_lose_the_retiring_generation() {
+    let (_root, manager, old) = fixture().await;
+    let host = bingo_sdk::testing::TestHost::default();
+    manager.host.set(host.handle()).unwrap();
+    manager.this.set(Arc::downgrade(&manager)).unwrap();
+    let retired = manager.switches.retired.lock().await;
+    let caller = {
+        let manager = manager.clone();
+        tokio::spawn(async move { manager.switch("fixture", false).await })
+    };
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        while manager.modules()[0].engine.is_some() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    caller.abort();
+    let _ = caller.await;
+    drop(retired);
+    let _completed = manager.reloading.lock().await;
+    assert!(
+        manager
+            .switches
+            .retired
+            .lock()
+            .await
+            .iter()
+            .any(|entry| Arc::ptr_eq(entry, &old))
+    );
+    old.close().await;
+}
+
+#[tokio::test]
+async fn retirement_does_not_hold_the_list_while_awaiting_host_cleanup() {
+    let (_root, manager, module) = fixture().await;
+    manager.modules.write().unwrap().clear();
+    manager.switches.retired.lock().await.push(module);
+    let host = bingo_sdk::testing::TestHost::default();
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    host.on_sessions({
+        let entered = entered.clone();
+        let release = release.clone();
+        move |_| {
+            let entered = entered.clone();
+            let release = release.clone();
+            async move {
+                entered.notify_one();
+                release.notified().await;
+                Ok(vec![])
+            }
+        }
+    });
+    manager.host.set(host.handle()).unwrap();
+    let cleanup = {
+        let manager = manager.clone();
+        tokio::spawn(async move { reap(&manager).await })
+    };
+    entered.notified().await;
+    let available = manager.switches.retired.try_lock().is_ok();
+    release.notify_one();
+    cleanup.await.unwrap();
+    assert!(available, "retired list locked across host I/O");
+}
