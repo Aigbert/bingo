@@ -23,7 +23,7 @@ pub(crate) async fn run(
                 command
                     .run(&input.args, cx)
                     .await
-                    .map(catalogue::CommandReply::Outcome)
+                    .map(|outcome| catalogue::CommandReply::Outcome(Box::new(outcome)))
             })
         }),
         report,
