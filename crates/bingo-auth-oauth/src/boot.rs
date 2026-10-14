@@ -54,18 +54,11 @@ impl Endpoint<'_> {
         value: Option<&Value>,
         user: bool,
     ) -> CredentialStore {
-        let mut path = self.path();
-        path.push(self.field);
-        let file = if user {
-            None
-        } else {
-            registrar.sources().source(&path)
-        };
-        let fallback = registrar.env().user_settings().display().to_string();
-        let file = file.unwrap_or(&fallback);
         let environment = self
             .environment
-            .and_then(|variable| std::env::var(variable).ok());
+            .and_then(|variable| std::env::var(variable).ok())
+            .filter(|value| !value.trim().is_empty());
+        let (file, repository) = self.source(registrar, self.field, user, environment.is_some());
         let address = crate::address::resolve(
             value
                 .and_then(|v| v.get(self.field))
@@ -73,24 +66,42 @@ impl Endpoint<'_> {
             self.default,
             environment.as_deref(),
         );
-        let mut scoped = store.at_origin(&address, file);
+        let mut scoped = store
+            .at_origin(&address, &file)
+            .with_repository_origin(repository);
         if let Some(default) = self.resource {
-            path.pop();
-            path.push("baseUrl");
-            let file = if user {
-                None
-            } else {
-                registrar.sources().source(&path)
-            }
-            .unwrap_or(&fallback);
+            let (file, repository) = self.source(registrar, "baseUrl", user, false);
             let address = crate::address::resolve(
                 value.and_then(|v| v.get("baseUrl")).and_then(Value::as_str),
                 default,
                 None,
             );
-            scoped = scoped.at_resource(&address, file);
+            scoped = scoped
+                .at_resource(&address, &file)
+                .with_repository_resource(repository);
         }
         scoped
+    }
+
+    fn source(
+        &self,
+        registrar: &Registrar,
+        field: &str,
+        user: bool,
+        environment: bool,
+    ) -> (String, bool) {
+        if environment && let Some(variable) = self.environment {
+            return (variable.into(), false);
+        }
+        let mut path = self.path();
+        path.push(field);
+        if !user && let Some(layer) = registrar.sources().layer(&path) {
+            return (
+                layer.source.clone(),
+                layer.origin == bingo_sdk::plugin::ConfigOrigin::Repository,
+            );
+        }
+        (registrar.env().user_settings().display().to_string(), false)
     }
 
     fn migrate(&self, registrar: &mut Registrar, store: &CredentialStore) {

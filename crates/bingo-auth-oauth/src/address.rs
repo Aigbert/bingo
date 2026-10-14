@@ -1,5 +1,5 @@
 //! Resolve addresses and the origins a configured key is allowed to reach.
-use bingo_sdk::plugin::ConfigSources;
+use bingo_sdk::plugin::{ConfigOrigin, ConfigSources};
 use serde_json::Value;
 
 pub fn resolve(setting: Option<&str>, default: &str, environment: Option<&str>) -> String {
@@ -40,7 +40,9 @@ pub fn configured(
         .iter()
         .enumerate()
         .rev()
-        .filter(|(index, layer)| !layer.repository || key_layer.is_some_and(|key| *index <= key))
+        .filter(|(index, layer)| {
+            layer.origin != ConfigOrigin::Repository || key_layer.is_some_and(|key| *index <= key)
+        })
         .find_map(|(_, layer)| value(&layer.values, &path).and_then(Value::as_str));
     resolve(address, default, environment)
 }
@@ -57,8 +59,11 @@ mod tests {
     fn layer(source: &str, repository: bool, values: Value) -> bingo_sdk::plugin::ConfigLayer {
         bingo_sdk::plugin::ConfigLayer {
             source: source.into(),
-            repository,
-            user: !repository,
+            origin: if repository {
+                ConfigOrigin::Repository
+            } else {
+                ConfigOrigin::User
+            },
             values: values.as_object().unwrap().clone(),
         }
     }

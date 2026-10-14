@@ -34,6 +34,9 @@ Add, re-address, check and remove named providers without restarting. Sessions k
 - Registration receives provenance only for its claimed settings, plus user-instance counts for unambiguous adoption. Unreadable auth.json produces one notice and supplies no keys; invalid names and foreign owners name the skipped declaration file.
 - Login answers are private. Journal, queue previews and TUI history redact every `/provider` argument before validation. Reach exposes categories; addresses strip secrets.
 - ProviderState groups registry facts; mutation/command locks serialize edits. Project-only instances must be edited there. CredentialStore's shared lock prevents lost writes.
+- Round 4 binds configured keys too: environment keys use the default or their BASE_URL variable; settings keys use addresses from their own or more trusted layers. One request-time guard also applies after readdressing. SDK provenance is an origin enum, so user/repository/explicit cannot contradict each other.
+- Boot, migration and provider construction share address resolution, including environment URLs and blank-as-unset. Invalid origins retain a refusal, never a binding or credential write. Canonical tests cover case, userinfo, IPv6 and trailing dots (distinct, failing closed).
+- Repository-controlled sign-in first asks for destination confirmation showing canonical origin and source file, before paste, browser or device flows. Cancellation writes nothing and sends no HTTP. Same-origin rebinding retains provenance; a changed origin gets its new source. Reserved-name notices use the declaring manifest even when disabled; composition-only reservations name the binary.
 - Follow-ups: replacing `default_cleared` with mutable settings affects selection and approval consumers (>40 lines). SDK argument secrecy also needs declaration access in history/queue readers plus constructors/wire fixtures (>40 lines). Defer both optional cleanups; retain tested redaction and cleared-default behavior.
 - Guides use the owning crate's Page (ADR-0054), never docs/guide/. No dependencies or allowlist changes. HTTP tests use local fakes/wiremock with provider environment unset.
 
@@ -48,7 +51,7 @@ Add, re-address, check and remove named providers without restarting. Sessions k
 - [x] Shape contract, shipped reserved names and safe boot instances.
 - [x] Wiremock RPC add → paste → catalogue → same-session model answer; no pre-paste HTTP.
 - [x] Strict names; user-only legacy adoption; no foreign-key adoption/deletion; safe orphan recovery.
-- [x] Stored origins checked at boot/request/refresh; origin changes require a new paste.
+- [x] Stored and configured origins checked at boot/request/refresh; origin changes require a new paste and repository sign-ins show the destination.
 - [x] Fresh plugin Arcs publish lists/reach; stale probes are discarded; collisions name plugin/file.
 - [x] Codex fallback survives failed catalogue while live probes report failure.
 - [x] Remove clears provider/model default and pins; live sessions get named AuthRequired.

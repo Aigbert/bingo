@@ -139,6 +139,9 @@ impl TokenSource {
         method: LoginMethod,
         open_browser: bool,
     ) -> Result<Tokens, AuthError> {
+        self.store
+            .confirm_sign_in(&self.provider, prompter.as_ref())
+            .await?;
         match method {
             LoginMethod::Browser => self.login_browser(prompter, open_browser).await,
             LoginMethod::Device => self.login_device(prompter).await,

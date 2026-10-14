@@ -1,7 +1,7 @@
 //! Claimed values retain their provenance across the plugin boundary.
 use super::Layer;
 use bingo_sdk::PluginManifest;
-use bingo_sdk::plugin::{ConfigLayer, ConfigSources};
+use bingo_sdk::plugin::{ConfigLayer, ConfigOrigin, ConfigSources};
 
 pub(crate) fn for_plugin(
     layers: &[Layer],
@@ -37,8 +37,13 @@ pub(crate) fn for_plugin(
             .collect();
         sources.layers.push(ConfigLayer {
             source: layer.source.clone(),
-            user: layer.is_user(),
-            repository: layer.repository().is_some(),
+            origin: if layer.is_user() {
+                ConfigOrigin::User
+            } else if layer.repository().is_some() {
+                ConfigOrigin::Repository
+            } else {
+                ConfigOrigin::Explicit
+            },
             values,
         });
     }

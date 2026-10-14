@@ -6,6 +6,7 @@
 //! ours, and neither reads the other's file.
 
 mod binding;
+mod signin;
 use binding::Binding;
 pub use binding::Metadata;
 

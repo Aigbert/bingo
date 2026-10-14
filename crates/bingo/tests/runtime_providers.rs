@@ -471,3 +471,6 @@ async fn remove_orphan_preserves_a_disabled_familys_declared_key() {
         );
     }
 }
+
+#[path = "runtime_providers/provider_signin.rs"]
+mod provider_signin;

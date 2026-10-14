@@ -367,10 +367,18 @@ pub(crate) mod tests {
     fn providers(directory: &tempfile::TempDir, settings: Value) -> Vec<Arc<dyn Provider>> {
         let mut registrar = Registrar::new(
             "bingo.provider.anthropic",
-            settings,
+            settings.clone(),
             bingo_sdk::Env::rooted(directory.path()),
             Default::default(),
-        );
+        )
+        .with_sources(bingo_sdk::plugin::ConfigSources {
+            layers: vec![bingo_sdk::plugin::ConfigLayer {
+                source: "explicit fixture settings".into(),
+                origin: bingo_sdk::plugin::ConfigOrigin::Explicit,
+                values: settings.as_object().unwrap().clone(),
+            }],
+            ..Default::default()
+        });
         AnthropicPlugin.register(&mut registrar).expect("register");
         registrar
             .into_contributions()

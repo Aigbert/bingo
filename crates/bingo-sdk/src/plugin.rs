@@ -4,7 +4,7 @@
 mod reload;
 mod settings;
 pub use reload::PluginReload;
-pub use settings::{ConfigLayer, ConfigSources};
+pub use settings::{ConfigLayer, ConfigOrigin, ConfigSources};
 
 use std::any::Any;
 use std::collections::BTreeSet;

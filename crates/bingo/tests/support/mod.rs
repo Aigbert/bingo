@@ -45,6 +45,16 @@ impl Server {
     /// A server whose home is handed to it rather than made: what a second
     /// run continuing the first works in.
     pub fn spawn_at(home: tempfile::TempDir, script: &str, extra: &[&str]) -> Server {
+        let cwd = home.path().to_path_buf();
+        Self::spawn_in(home, script, extra, &cwd)
+    }
+
+    pub fn spawn_in(
+        home: tempfile::TempDir,
+        script: &str,
+        extra: &[&str],
+        cwd: &std::path::Path,
+    ) -> Server {
         let path = home.path().join("script.json");
         std::fs::File::create(&path)
             .unwrap()
@@ -53,7 +63,7 @@ impl Server {
         let mut command = Command::new(env!("CARGO_BIN_EXE_bingo"));
         command
             .args(["serve", "--stdio", "--cwd"])
-            .arg(home.path())
+            .arg(cwd)
             .args(extra)
             .env("BINGO_FAKE_SCRIPT", &path)
             .envs(home::home_env(home.path()))

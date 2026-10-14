@@ -183,6 +183,11 @@ also bind their issuer. If a settings override changes an origin, the instance
 stays listed but signed out. The notice names the address and override file:
 sign in again for that address, or remove the override there. Old credentials
 migrate only from an unambiguous instance declaration in the user settings.
+Environment keys follow only the default address or their `*_BASE_URL` variable.
+Settings keys follow addresses from their own or more trusted settings layers.
+A repository override cannot redirect either key to another origin. Before you
+sign in under an override, confirm the destination origin and file shown in the
+prompt. Blank addresses mean unset; malformed addresses cannot store a key.
 
 Boot skips invalid or colliding names and names the declaration file to edit.
 A credential owned by another family stays with that family; rename or delete

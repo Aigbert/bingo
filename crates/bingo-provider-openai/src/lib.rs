@@ -681,10 +681,18 @@ pub(crate) mod tests {
     fn registered(directory: &tempfile::TempDir, settings: Value) -> Vec<Contribution> {
         let mut registrar = Registrar::new(
             "bingo.provider.openai",
-            settings,
+            settings.clone(),
             bingo_sdk::Env::rooted(directory.path()),
             Default::default(),
-        );
+        )
+        .with_sources(bingo_sdk::plugin::ConfigSources {
+            layers: vec![bingo_sdk::plugin::ConfigLayer {
+                source: "explicit fixture settings".into(),
+                origin: bingo_sdk::plugin::ConfigOrigin::Explicit,
+                values: settings.as_object().unwrap().clone(),
+            }],
+            ..Default::default()
+        });
         OpenAiPlugin.register(&mut registrar).expect("register");
         registrar.into_contributions()
     }

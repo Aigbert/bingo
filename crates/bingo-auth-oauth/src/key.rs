@@ -53,13 +53,10 @@ pub struct ApiKey {
 impl ApiKey {
     pub fn at_origin(&self, owner: &str, address: &str, file: &str) -> Self {
         Self {
-            store: self.store.as_ref().map(|store| {
-                Arc::new(
-                    store
-                        .owned_by(owner)
-                        .at_origin(address, store.origin_file().unwrap_or(file)),
-                )
-            }),
+            store: self
+                .store
+                .as_ref()
+                .map(|store| Arc::new(store.owned_by(owner).at_origin(address, file))),
             ..self.clone()
         }
     }
@@ -143,7 +140,8 @@ impl ApiKey {
     async fn paste(&self, prompter: Arc<dyn Prompter>) -> Result<String, ProviderError> {
         let store = self.store()?;
         store
-            .validate_address()
+            .confirm_sign_in(&self.provider, prompter.as_ref())
+            .await
             .map_err(|error| ProviderError::Auth {
                 message: error.to_string(),
             })?;
@@ -184,13 +182,19 @@ impl ApiKey {
             .map_err(|error| ProviderError::Config {
                 message: error.to_string(),
             })?;
-        Ok(match &self.configured {
-            Some(configured) => format!(
-                "Signed out of {}; {} still applies.",
-                self.provider, configured.place
-            ),
-            None => format!("Signed out of {}.", self.provider),
-        })
+        Ok(
+            match self
+                .configured
+                .as_ref()
+                .filter(|_| self.address_notice().is_none())
+            {
+                Some(configured) => format!(
+                    "Signed out of {}; {} still applies.",
+                    self.provider, configured.place
+                ),
+                None => format!("Signed out of {}.", self.provider),
+            },
+        )
     }
 
     /// `auth.json`, then what was configured; the error is what a person does
@@ -309,6 +313,7 @@ mod tests {
         assert!(matches!(redirected.status(), AuthStatus::Missing { .. }));
         assert!(redirected.bearer().is_err());
         assert!(redirected.address_notice().is_some());
+        assert_eq!(redirected.forget().unwrap(), "Signed out of work.");
     }
 
     #[test]
@@ -603,3 +608,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod signin_tests;

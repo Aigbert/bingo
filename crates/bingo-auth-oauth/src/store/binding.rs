@@ -11,8 +11,9 @@ pub struct Metadata {
 
 #[derive(Clone, Debug)]
 pub(super) struct Binding {
-    origin: String,
-    file: String,
+    pub(super) origin: String,
+    pub(super) file: String,
+    pub(super) repository: bool,
 }
 
 impl Binding {
@@ -23,6 +24,7 @@ impl Binding {
         Ok(Self {
             origin,
             file: file.into(),
+            repository: false,
         })
     }
 
@@ -37,7 +39,36 @@ impl Binding {
     }
 }
 
+fn rebound(
+    previous: &Result<Option<Binding>, String>,
+    address: &str,
+    file: &str,
+) -> Result<Option<Binding>, String> {
+    let mut binding = Binding::new(address, file)?;
+    if let Ok(Some(previous)) = previous
+        && previous.origin == binding.origin
+    {
+        binding.repository = previous.repository;
+        binding.file = previous.file.clone();
+    }
+    Ok(Some(binding))
+}
+
 impl CredentialStore {
+    pub fn with_repository_origin(mut self, repository: bool) -> Self {
+        if let Ok(Some(binding)) = &mut self.binding {
+            binding.repository = repository;
+        }
+        self
+    }
+
+    pub fn with_repository_resource(mut self, repository: bool) -> Self {
+        if let Ok(Some(binding)) = &mut self.resource {
+            binding.repository = repository;
+        }
+        self
+    }
+
     pub fn check_configured(&self, name: &str, address: &str) -> Result<(), AuthError> {
         self.validate_address()?;
         if let Ok(Some(binding)) = &self.binding {
@@ -73,7 +104,7 @@ impl CredentialStore {
 
     pub fn at_origin(&self, address: &str, file: &str) -> Self {
         Self {
-            binding: Binding::new(address, file).map(Some),
+            binding: rebound(&self.binding, address, file),
             ..self.clone()
         }
     }
@@ -81,7 +112,7 @@ impl CredentialStore {
     /// OAuth also sends access tokens to a resource server, separate from its issuer.
     pub fn at_resource(&self, address: &str, file: &str) -> Self {
         Self {
-            resource: Binding::new(address, file).map(Some),
+            resource: rebound(&self.resource, address, file),
             ..self.clone()
         }
     }
