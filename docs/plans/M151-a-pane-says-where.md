@@ -10,6 +10,11 @@ it to the status line when none does, and tells the mod what it got
 through the render `viewport`. M140 seats every asked pane `above`; this
 milestone adds the rest. No new dependency. After M140 and M148.
 
+Re-verified at `ba70fdf6` on 2026-10-14. Landed dependencies: M137
+(runtime), M138 (host nouns), M139 (world nouns), M140 (pulled views),
+M147 (rough edges), M148 (layout removal), M149 (ember), M150 (crew).
+The working tree is clean on `m151-a-pane-says-where`.
+
 ## Bricks, in build order
 
 1. **Contract first** (sdk `slot.rs`, `render.rs`). `Place = Above |
@@ -17,7 +22,8 @@ milestone adds the rest. No new dependency. After M140 and M148.
    `Anchor = TopLeft | TopRight | BottomLeft | BottomRight | Center`
    (default `TopLeft`); `Length = Cells(u16) | Percent(u8)`, JSON `12`
    or `"40%"`; `Span { min, ideal, max }`; `PaneSize { rows, columns }`.
-   `Slot::Pane` gains `place: Vec<Place>` and `size`. Golden fixtures:
+   `Slot::Pane` gains `place: Vec<Place>` and `size`; legacy `rows`
+   is normalized on read, never retained beside `size`. Golden fixtures:
    `["side", "above"]`, `[{ "rect": { "anchor": "bottomRight", "width":
    "40%", "height": "30%" } }]`, and a pane without either, which reads
    as `["above"]` at M140's size. `Viewport` gains `place`.
@@ -56,8 +62,8 @@ milestone adds the rest. No new dependency. After M140 and M148.
    pane not asked keeps M140's `1 pane waiting`.
 6. **The person's move.** A focused pane's title row ends in `place ▾`;
    a click cycles the places that fit, in `above`, `side`, `overlay`
-   order, then the declared rect. The same on a key, chosen at the start
-   against `keys.rs` and listed in the `?` sheet. Moves are kept by pane
+   order, then the declared rect. The same on `ctrl+p` (free after M148), only while a pane is
+   focused, listed in the `?` sheet. Moves are kept by pane
    id in the TUI's process (`pane/moved.rs`), never in the session.
 7. **The mod's side.** `$.ui.open({ id, title, place, size })` in the
    mod runtime and `sdk/typescript/src/ui.ts`; plugin-rpc's
@@ -71,19 +77,21 @@ milestone adds the rest. No new dependency. After M140 and M148.
 
 ## Files
 
-- `crates/bingo-sdk/src/{slot,render}.rs` and their fixtures;
-  `schema/{rpc,plugin-2}.json` (regenerated, additive)
+- `crates/bingo-sdk/src/{slot,render}.rs`, `slot/` sizing and wire
+  helpers/tests and fixtures; `schema/{rpc,plugin,plugin-2}.json` and
+  `sdk/typescript/src/wire.ts` (regenerated pre-release)
 - `crates/bingo-surface-tui/src/pane/{mod,seat,moved}.rs` (`pane.rs`
-  becomes the module), `{layout,pointer,pulled,status,keys}.rs`
+  becomes the module), `{view,layout,pointer,pulled,status,keys}.rs`,
+  pane tests and affected TUI snapshots
 - `crates/bingo-mods/src/` (`$.ui.open`), `sdk/typescript/src/ui.ts`
 - `crates/bingo/tests/{mods_ui.rs,fixtures/mods/{counter,corner}/}`
-- `docs/adr/{0079,0081}-*.md`, `docs/design/{tui,mods-parity-2026-10}.md`,
-  the panes guide page
+- `docs/adr/{0075,0079,0081}-*.md`, `docs/design/{tui,mods-parity-2026-10}.md`,
+  `crates/bingo-mods/guide.md` and the TUI guide
 
 ## Exit criteria
 
 - [ ] Brick 1's and brick 2's tests failed first (output pasted) and pass:
-      `cargo test -p bingo-sdk slot:: render::`, `cargo test -p
+      `cargo test -p bingo-sdk slot::` and `cargo test -p bingo-sdk render::`, `cargo test -p
       bingo-surface-tui pane::`.
 - [ ] `TestBackend` snapshots: `side` at 200×50, `above` at 100×30,
       collapsed at 60×15, the `corner` rect at 120×40 over the
@@ -93,7 +101,7 @@ milestone adds the rest. No new dependency. After M140 and M148.
       columns asks `counter` again with `place: "above"`.
 - [ ] A tmux drive (own session only) with `counter` and `corner`: open
       at 200×50, resize to 100×30 and 60×15, click `<title> ▸`, click
-      `place ▾`; each step's `capture-pane` pasted.
+      `place ▾`; each step's `capture-pane` result recorded (no capture files committed).
 - [ ] `scripts/tui-smoke.sh` passes; all gates of the upgrade protocol;
       the Windows check of `bingo-surface-tui`, `bingo-sdk`, `bingo-mods`.
 
@@ -113,6 +121,11 @@ milestone adds the rest. No new dependency. After M140 and M148.
   Brick 3's tests drive both before the drawing lands.
 - **Redraw cost.** A pane asked again on every resize step; the memo and
   M140's four-in-flight cap hold it, and the drive says if it lags.
-- Re-verify at start: M140's `Slot::Pane`, `Viewport` and `pane.rs`;
-  M124's layout targets after M148; `pointer.rs` after M92 and M148;
-  which key is free.
+- M140 panes are composed in `view.rs`; `Layout` owns hit targets and
+  `pulled::Memo` currently ignores height. M148 left `ctrl+p` free.
+- M141 shares sdk `render.rs` and TUI `status.rs`: edits stay additive;
+  generated files reconcile at merge. M142 owns the mod kit.
+- Protocol 2 is unreleased (latest tag v0.6.5); the delegate authorizes
+  scoped schema amendments with a dated ADR-0075 line. Mechanical type
+  construction changes outside Files are listed with verification; no
+  kernel/sdk tool names or discipline 4c changes. No live/credential tests.
