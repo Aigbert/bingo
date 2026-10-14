@@ -24,7 +24,7 @@ impl Manager {
                 tokio::select! {
                     biased;
                     _ = stop.cancelled() => break,
-                    _ = clock.tick() => if let Some(manager) = weak.upgrade() { manager.reap().await; manager.poll().await; manager.reload_if_idle().await; } else { break; },
+                    _ = clock.tick() => if let Some(manager) = weak.upgrade() { switching::reap(&manager).await; manager.poll().await; manager.reload_if_idle().await; } else { break; },
                 }
             }
         }));

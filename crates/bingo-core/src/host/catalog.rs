@@ -548,7 +548,10 @@ mod tests {
     async fn the_plugins_catalogue_lists_the_sources_after_the_registry() {
         let registry = Registry {
             plugins: vec![registered("bingo.tools.web")],
-            wishes: std::sync::RwLock::new(["wordcount".into()].into()),
+            switches: crate::host::registry::Switches {
+                wishes: std::sync::RwLock::new(["wordcount".into()].into()),
+                ..Default::default()
+            },
             sources: Sources {
                 plugins: vec![Arc::new(Found)],
                 ..Default::default()

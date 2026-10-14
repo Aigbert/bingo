@@ -64,10 +64,17 @@ pub async fn listing(registry: &Registry) -> Vec<PluginStatus> {
     for source in &registry.sources.plugins {
         listed.extend(source.plugins().await);
     }
-    let wishes = registry.wishes.read().unwrap_or_else(|e| e.into_inner());
+    let wishes = registry
+        .switches
+        .wishes
+        .read()
+        .unwrap_or_else(|e| e.into_inner());
     for status in &mut listed {
-        let now = if registry.kinds.get(&status.id) == Some(&bingo_sdk::plugin::PluginSwitch::Now) {
+        let now = if registry.switches.kinds.get(&status.id)
+            == Some(&bingo_sdk::plugin::PluginSwitch::Now)
+        {
             !registry
+                .switches
                 .running
                 .read()
                 .unwrap_or_else(|e| e.into_inner())
@@ -128,7 +135,7 @@ pub(crate) async fn switch_in(
     name: &str,
     enabled: bool,
 ) -> Result<(bool, bingo_sdk::plugin::PluginSwitch), bingo_sdk::KernelError> {
-    let _guard = host.registry().switching.lock().await;
+    let _guard = host.registry().switches.switching.lock().await;
     let target = name;
     let name = name.strip_prefix("plugins:").unwrap_or(name);
     let path = settings::user_path(host.env());
@@ -154,6 +161,7 @@ pub(crate) async fn switch_in(
     {
         let mut wishes = host
             .registry()
+            .switches
             .wishes
             .write()
             .unwrap_or_else(|e| e.into_inner());
@@ -174,9 +182,13 @@ async fn apply(
     enabled: bool,
 ) -> Result<bingo_sdk::plugin::PluginSwitch, bingo_sdk::KernelError> {
     use bingo_sdk::plugin::PluginSwitch;
-    if let Some(kind) = registry.kinds.get(name) {
+    if let Some(kind) = registry.switches.kinds.get(name) {
         if kind == &PluginSwitch::Now {
-            let mut off = registry.running.write().unwrap_or_else(|e| e.into_inner());
+            let mut off = registry
+                .switches
+                .running
+                .write()
+                .unwrap_or_else(|e| e.into_inner());
             if enabled {
                 off.remove(name);
             } else {

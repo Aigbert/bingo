@@ -40,6 +40,16 @@ pub struct Sources {
 }
 
 #[derive(Default)]
+pub struct Switches {
+    /// Resident owners excluded from future dispatch snapshots.
+    pub running: Arc<RwLock<BTreeSet<String>>>,
+    pub switching: tokio::sync::Mutex<()>,
+    /// The resolved enabledPlugins wish, represented by its disabled names.
+    pub wishes: RwLock<BTreeSet<String>>,
+    pub kinds: BTreeMap<String, plugin::PluginSwitch>,
+}
+
+#[derive(Default)]
 pub struct Registry {
     pub tools: Vec<Arc<dyn Tool>>,
     pub providers: Vec<Arc<dyn Provider>>,
@@ -50,12 +60,7 @@ pub struct Registry {
     pub links: Vec<crate::chain::Link>,
     pub contributors: Vec<Arc<dyn ContextContributor>>,
     pub commands: Vec<super::registry_commands::OwnedCommand>,
-    /// Resident owners excluded from future dispatch snapshots.
-    pub running: Arc<RwLock<BTreeSet<String>>>,
-    pub switching: tokio::sync::Mutex<()>,
-    /// The resolved enabledPlugins wish, represented by its disabled names.
-    pub wishes: RwLock<BTreeSet<String>>,
-    pub kinds: BTreeMap<String, plugin::PluginSwitch>,
+    pub switches: Switches,
     pub surfaces: Vec<Arc<dyn Surface>>,
     pub store: Option<Arc<dyn SessionStore>>,
     pub compactor: Option<Arc<dyn Compactor>>,
@@ -150,7 +155,10 @@ impl Registry {
             .collect();
         let mut registry = Registry {
             notices: ignored_switches(plugins, switched_off),
-            wishes: RwLock::new(switched_off.clone()),
+            switches: Switches {
+                wishes: RwLock::new(switched_off.clone()),
+                ..Switches::default()
+            },
             ..Registry::default()
         };
         for (plugin, reason) in plugins.iter().zip(standing(plugins, switched_off)) {
@@ -159,6 +167,7 @@ impl Registry {
                 if reason == SWITCHED_OFF {
                     registry.register(plugin.as_ref(), slices, env, switched_off, layers, &reserved)?;
                     registry
+                        .switches
                         .running
                         .write()
                         .unwrap_or_else(|e| e.into_inner())
@@ -182,6 +191,7 @@ impl Registry {
         }
         for plugin in plugins.iter().filter(|p| needed(p.manifest()).is_some()) {
             registry
+                .switches
                 .wishes
                 .get_mut()
                 .unwrap_or_else(|e| e.into_inner())
@@ -211,7 +221,7 @@ impl Registry {
             ));
         if let Err(source) = plugin.register(&mut registrar) {
             if switched_off.contains(manifest.id) {
-                self.kinds.insert(
+                self.switches.kinds.insert(
                     manifest.id.into(),
                     plugin::PluginSwitch::NextStart {
                         why: "registration unavailable".into(),
@@ -242,7 +252,7 @@ impl Registry {
         let retain = kind == plugin::PluginSwitch::Now
             || !switched_off.contains(manifest.id)
             || needed(manifest).is_some();
-        self.kinds.insert(manifest.id.into(), kind);
+        self.switches.kinds.insert(manifest.id.into(), kind);
         if !retain {
             return Ok(());
         }
@@ -525,14 +535,14 @@ impl Registry {
         let mut sources: Vec<Arc<dyn CommandSource>> =
             vec![Arc::new(super::registry_commands::Commands {
                 table: self.commands.clone(),
-                running: self.running.clone(),
+                running: self.switches.running.clone(),
             })];
         sources.extend(self.sources.commands.clone());
         sources
     }
 
     pub(super) fn enabled(&self, plugin: &str) -> bool {
-        if self.kinds.get(plugin) == Some(&plugin::PluginSwitch::Now) {
+        if self.switches.kinds.get(plugin) == Some(&plugin::PluginSwitch::Now) {
             return true;
         }
         self.plugins

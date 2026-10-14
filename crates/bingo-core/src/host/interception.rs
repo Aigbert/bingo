@@ -3,7 +3,7 @@ use super::*;
 
 pub(super) fn hook_set(host: &Host) -> HookSet {
     HookSet {
-        running: host.registry.running.clone(),
+        running: host.registry.switches.running.clone(),
         links: host.registry.links.clone(),
         interceptors: host
             .registry
@@ -147,6 +147,7 @@ pub(super) async fn register_pending(host: &Host) {
 async fn registration_links(host: &Host) -> Vec<crate::chain::Link> {
     let off = host
         .registry
+        .switches
         .running
         .read()
         .unwrap_or_else(|e| e.into_inner())

@@ -155,7 +155,8 @@ impl Manager {
             .cloned()
             .unwrap_or_else(|| serde_json::json!({}));
         let off = self
-            .switched_off
+            .switches
+            .off
             .read()
             .unwrap_or_else(|e| e.into_inner())
             .contains(&found.name);

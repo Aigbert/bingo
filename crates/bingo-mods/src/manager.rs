@@ -22,8 +22,7 @@ pub(crate) struct Manager {
     env: Env,
     directories: directories::Directories,
     settings: BTreeMap<String, Value>,
-    switched_off: RwLock<BTreeSet<String>>,
-    retired: tokio::sync::Mutex<Vec<Arc<Module>>>,
+    switches: switching::State,
     limits: Limits,
     modules: RwLock<Vec<Arc<Module>>>,
     host: OnceLock<HostHandle>,
@@ -49,8 +48,10 @@ impl Manager {
             env,
             directories: directories::Directories::new(directories),
             settings,
-            switched_off: RwLock::new(switched_off),
-            retired: tokio::sync::Mutex::default(),
+            switches: switching::State {
+                off: RwLock::new(switched_off),
+                ..switching::State::default()
+            },
             limits,
             modules: RwLock::new(Vec::new()),
             host: OnceLock::new(),
@@ -94,7 +95,8 @@ impl Manager {
                 .cloned()
                 .unwrap_or_else(|| serde_json::json!({}));
             let off = self
-                .switched_off
+                .switches
+                .off
                 .read()
                 .unwrap_or_else(|e| e.into_inner())
                 .contains(&found.name);
@@ -200,7 +202,7 @@ impl Manager {
         for module in self.modules() {
             module.close().await;
         }
-        let retired = std::mem::take(&mut *self.retired.lock().await);
+        let retired = std::mem::take(&mut *self.switches.retired.lock().await);
         for module in retired {
             module.close().await;
         }
@@ -212,10 +214,10 @@ impl Manager {
 #[async_trait]
 impl PluginSource for Manager {
     async fn switch_kind(&self, name: &str) -> plugin::PluginSwitch {
-        self.module_kind(name)
+        switching::module_kind(self, name)
     }
     async fn switch(&self, name: &str, enabled: bool) -> Result<plugin::PluginSwitch, KernelError> {
-        self.switch_module(name, enabled).await
+        switching::switch_module(self, name, enabled).await
     }
     async fn approval(&self, name: &str) -> Option<Approval> {
         let modules = self.modules();
