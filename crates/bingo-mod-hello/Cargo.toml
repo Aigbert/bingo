@@ -15,4 +15,3 @@ workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
 serde_json.workspace = true
-

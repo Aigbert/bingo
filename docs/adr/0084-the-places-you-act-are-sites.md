@@ -17,7 +17,9 @@ record adds component names and props to the sdk.
 
 ## Decision
 
-1. **Seven interaction sites**, each a `Component` with sdk props:
+1. **Seven interaction sites**, each a `Component` with sdk props. Their
+   feature owner is a `bingo-mod-<noun>` (ADR-0086); M167 supplies the shared
+   bindings and root-handler seam, and each screen moves with its redesign:
    - `Composer { text, cursor, mode, queued, attachments }`;
    - `KeyBar { actions: [{ action, keys }] }`: what the keys do now;
    - `Palette { query, open: commands | keys | sessions, groups }`;

@@ -1,6 +1,6 @@
 # ADR-0086 — Built-in features are mods
 
-Status: proposed · 2026-10-14 · Plans: M167 (the seam), then each redesigned screen's milestone (first M166) · Amends: ADR-0082 §1, ADR-0084 §3 §5
+Status: accepted · 2026-10-15 · Plans: M167 (the seam), then each redesigned screen's milestone (first M166) · Amends: ADR-0082 §1, ADR-0084 §3 §5
 
 ## Context
 
@@ -14,8 +14,10 @@ every part is a built-in mod that an outside mod can replace, from what
 it does to how it is drawn. In-process interceptors sit outermost today
 (tier Full, `host/registry.rs`), the wrong end for a default.
 
-The ratchet: no `HostApi` method is added. Two additive sdk fields
-(a link's placement, a command's default keys) and one settings key.
+The ratchet: no `HostApi` method is added. Additive sdk contracts
+(a link's placement, a command's default keys, a root key handler and its
+handled acknowledgement) and one settings key. M167 keeps handlers on the
+existing supervised action mailbox; ready render answers need no channel hop.
 
 ## Decision
 
@@ -67,6 +69,8 @@ The ratchet: no `HostApi` method is added. Two additive sdk fields
 - An outside mod test wraps each built-in with `next` and asserts it
   receives the built-in's tree (M167).
 - Switching every built-in off still leaves a usable terminal.
+- M167 adds the test-only `bingo-mod-hello` member: the normal-tree budget
+  counts workspace members, so 411 → 412; no external dependency is added.
 - `check_discipline.sh` treats `bingo-mod-*` as plugins: no surface,
   no ratatui, no other plugin.
 
