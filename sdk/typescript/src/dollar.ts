@@ -48,13 +48,18 @@ export function dollar(rpc: Rpc, site: HookSite, identity: DollarData['plugin'] 
   hostApi.clock.sleep = (ms: number) => sleep({ms});
   const deleteKey = hostApi.store.delete;
   hostApi.store.delete = (key: string) => deleteKey({scope:'global',key});
-  for (const noun of ['tool', 'command']) {
-    const register = hostApi[noun].register;
-    hostApi[noun].register = (spec: { name: string }, handler: Callback) => {
-      if (!callbacks) throw new Error('callback runtime is unavailable');
-      return register({ spec, callback: callbacks.put(noun, handler, spec.name) });
-    };
-  }
+  const registerTool = hostApi.tool.register;
+  hostApi.tool.register = (spec: ToolSpec, handler: Callback) => {
+    if (!callbacks) throw new Error('callback runtime is unavailable');
+    return registerTool({spec, callback:callbacks.put('tool', handler, spec.name)});
+  };
+  const registerCommand = hostApi.command.register;
+  hostApi.command.register = (description: CommandRegistration, handler: Callback = () => ({kind:'applied'})) => {
+    if (!callbacks) throw new Error('callback runtime is unavailable');
+    const {description: hint, ...options} = description;
+    const spec: CommandSpec = {aliases:[],hint:hint ?? '',args:{kind:'none'},instant:false,family:'plugin',...options};
+    return registerCommand({spec, callback:callbacks.put('command', handler, spec.name)});
+  };
   const spawn = hostApi.process.spawn;
   hostApi.process.spawn = async (input: any) => {
     const id = await spawn(input);
@@ -97,6 +102,7 @@ export type ProcessHandle = {
   write(body: string | null): Promise<null>;
   kill(): Promise<null>;
 };
+export type CommandRegistration = Pick<CommandSpec, 'name'> & Partial<Omit<CommandSpec, 'name'>> & {description?: string};
 export type Dollar = Replace<HostNouns, {
   process: Replace<HostNouns['process'], {spawn(input: AtSite<DollarInputs['process.spawn']>): Promise<ProcessHandle>}>;
   readonly plugin: Readonly<DollarData['plugin']>;
@@ -104,7 +110,7 @@ export type Dollar = Replace<HostNouns, {
   store: State & {keys(): Promise<string[]>; delete(key: string): Promise<boolean>};
   model: Replace<HostNouns['model'], {complete(request: ModelRequest): Promise<Completed>}>;
   tool: Replace<HostNouns['tool'], {register(spec: ToolSpec, handler: Callback): Promise<string>}>;
-  command: Replace<HostNouns['command'], {register(spec: CommandSpec, handler: Callback): Promise<string>}>;
+  command: Replace<HostNouns['command'], {register(spec: CommandRegistration, handler?: Callback): Promise<string>}>;
   clock: {
     now(): Promise<string>;
     sleep(ms: number): Promise<null>;
