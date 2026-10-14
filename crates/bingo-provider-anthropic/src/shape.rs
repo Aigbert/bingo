@@ -31,9 +31,15 @@ impl ProviderShape for Shape {
             .map(|entry| entry.is_some())
             .map_err(|_| PluginError::Config("could not read credential store".into()))
     }
-    fn forget_credential(&self, name: &str) -> Result<(), PluginError> {
+    fn credential_owner(&self, name: &str) -> Result<Option<String>, PluginError> {
         CredentialStore::new(self.env.data_dir.clone())
-            .remove(name)
+            .metadata(name)
+            .map(|entry| entry.and_then(|entry| entry.owner))
+            .map_err(|_| PluginError::Config("could not read credential store".into()))
+    }
+    fn forget_credential(&self, name: &str, owner: Option<&str>) -> Result<(), PluginError> {
+        CredentialStore::new(self.env.data_dir.clone())
+            .remove_if_owner(name, owner)
             .map_err(|_| PluginError::Config("could not remove stored credential".into()))
     }
     fn takes_key(&self) -> bool {

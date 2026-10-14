@@ -58,6 +58,19 @@ impl CredentialStore {
         }
     }
 
+    pub fn remove_if_owner(&self, name: &str, owner: Option<&str>) -> Result<(), AuthError> {
+        let _guard = self.locked();
+        let mut entries = self.load()?;
+        if let Some(stored) = entries.get(name) {
+            if stored.owner.as_deref() != owner {
+                return Err(AuthError::Store("credential ownership changed".into()));
+            }
+            entries.remove(name);
+            self.save(&entries)?;
+        }
+        Ok(())
+    }
+
     pub fn metadata(&self, name: &str) -> Result<Option<Metadata>, AuthError> {
         let _guard = self.locked();
         Ok(self.load()?.remove(name).map(|stored| Metadata {

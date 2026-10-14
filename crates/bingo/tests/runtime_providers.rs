@@ -427,3 +427,47 @@ async fn boot_skips_foreign_credentials_and_reserves_disabled_families() {
     );
     no_secret(&server.sessions_dir());
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn remove_orphan_preserves_a_disabled_familys_declared_key() {
+    for file in ["settings.json", "settings.local.json"] {
+        let home = tempfile::tempdir().unwrap();
+        let config = home.path().join(".bingo");
+        std::fs::create_dir_all(config.join("data")).unwrap();
+        let mut user = json!({"enabledPlugins":{"bingo.provider.anthropic":false}});
+        let declaration = json!({"instances":{"work":{}}});
+        if file == "settings.json" {
+            user["anthropic"] = declaration;
+        } else {
+            std::fs::write(
+                config.join(file),
+                json!({"anthropic":declaration}).to_string(),
+            )
+            .unwrap();
+        }
+        std::fs::write(config.join("settings.json"), user.to_string()).unwrap();
+        let auth = config.join("data/auth.json");
+        let original = json!({"work":{"type":"api","key":KEY,"owner":"anthropic","origin":"https://api.anthropic.com:443"}}).to_string();
+        std::fs::write(&auth, &original).unwrap();
+        let mut server = Server::spawn_at(home, IDLE, &[]);
+        let kernel = ready(&mut server).await;
+        let mut session = kernel
+            .open(create(server.cwd()), who(), OpenOptions::default())
+            .await
+            .unwrap();
+        let outcome = command(&mut session, "/provider remove work").await;
+        assert!(
+            !matches!(outcome, IntentOutcome::Applied { .. }),
+            "{outcome:?}"
+        );
+        assert_eq!(std::fs::read_to_string(auth).unwrap(), original);
+        kernel.shutdown().await.unwrap();
+        assert!(
+            tokio::time::timeout(LIMIT, server.child.wait())
+                .await
+                .unwrap()
+                .unwrap()
+                .success()
+        );
+    }
+}

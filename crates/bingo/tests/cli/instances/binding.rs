@@ -182,3 +182,39 @@ fn ambiguous_user_declarations_cannot_adopt_legacy_entries() {
     assert!(!out.status.success());
     assert!(stored(home.path())["work"].get("owner").is_none());
 }
+#[tokio::test]
+async fn foreign_owner_notice_names_both_families_and_the_override() {
+    let server = endpoint_for("owned-test-key").await;
+    let home = tempfile::tempdir().unwrap();
+    user_settings(
+        home.path(),
+        json!({"anthropic":{"instances":{"work":{"baseUrl":server.uri()}}}}),
+    );
+    let root = project(
+        home.path(),
+        json!({"openai":{"instances":{"work":{"baseUrl":server.uri()}}}}),
+    );
+    write_auth(
+        home.path(),
+        json!({"work":{
+            "type":"api", "key":"owned-test-key", "owner":"anthropic", "origin":server.uri()
+        }}),
+    );
+    let h = home.path().to_path_buf();
+    let r = root.clone();
+    let out = tokio::task::spawn_blocking(move || run(&mut at(&h, &r, "openai")))
+        .await
+        .unwrap();
+    let notice = stderr(&out);
+    assert!(
+        notice.contains("anthropic") && notice.contains("openai"),
+        "{notice}"
+    );
+    assert!(
+        notice.contains(&root.join(".bingo/settings.json").display().to_string()),
+        "{notice}"
+    );
+    assert!(notice.contains("rename or delete"), "{notice}");
+    assert!(!notice.contains("/provider remove work"), "{notice}");
+    assert_eq!(stored(home.path())["work"]["owner"], "anthropic");
+}

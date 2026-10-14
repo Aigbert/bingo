@@ -68,8 +68,16 @@ pub trait ProviderShape: Send + Sync {
     fn credential_exists(&self, _name: &str) -> Result<bool, crate::PluginError> {
         Ok(false)
     }
-    /// Delete an orphan after the host has ruled out an active provider.
-    fn forget_credential(&self, _name: &str) -> Result<(), crate::PluginError> {
+    /// Non-secret owner used to protect declarations in inactive families.
+    fn credential_owner(&self, _name: &str) -> Result<Option<String>, crate::PluginError> {
+        Ok(None)
+    }
+    /// Delete only if ownership still matches the declaration check.
+    fn forget_credential(
+        &self,
+        _name: &str,
+        _owner: Option<&str>,
+    ) -> Result<(), crate::PluginError> {
         Err(crate::PluginError::Config(
             "credential removal is not supported".into(),
         ))

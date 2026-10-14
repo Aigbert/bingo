@@ -65,7 +65,7 @@ pub enum LayerOrigin {
 }
 
 impl Layer {
-    fn is_user(&self) -> bool {
+    pub(crate) fn is_user(&self) -> bool {
         matches!(self.origin, LayerOrigin::User)
     }
     fn repository(&self) -> Option<&Path> {

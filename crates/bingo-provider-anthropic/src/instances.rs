@@ -179,14 +179,12 @@ fn allowed(
         );
         return true;
     }
-    if store
-        .metadata(name)
-        .ok()
-        .flatten()
-        .is_some_and(|entry| entry.owner.as_deref() != Some(owner))
+    if let Some(entry) = store.metadata(name).ok().flatten()
+        && entry.owner.as_deref() != Some(owner)
     {
+        let held = entry.owner.as_deref().unwrap_or("an unknown family");
         registrar.notice("provider.instance", format!(
-            "Skipped instance `{name}`: its stored credential has a different or unknown owner; remove it with `/provider remove {name}` and sign in again."
+            "Skipped instance `{name}` in family `{owner}`: its credential belongs to `{held}`; rename or delete the `{owner}` declaration in {file}."
         ));
         return false;
     }

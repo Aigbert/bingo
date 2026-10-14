@@ -1,4 +1,6 @@
 //! Runtime instance changes through registered constructors and one settings writer.
+mod orphan;
+
 use super::{Host, Refreshed, refresh};
 use crate::settings::{self, instances};
 use bingo_sdk::*;
@@ -115,7 +117,7 @@ pub(crate) async fn remove_provider(host: &Host, name: &str) -> Result<String, K
     instances::validate_name(name)?;
     let _edit = host.registry.provider_state.instances.edit.lock().await;
     if !host.providers().await.iter().any(|p| p.id() == name) {
-        return remove_orphan(host, name);
+        return orphan::remove(host, name);
     }
     let provider = instance_provider(host, name).await?;
     let shape = provider_shape(
@@ -141,27 +143,6 @@ pub(crate) async fn remove_provider(host: &Host, name: &str) -> Result<String, K
             cleared.join(" and ")
         )
     })
-}
-
-fn remove_orphan(host: &Host, name: &str) -> Result<String, KernelError> {
-    if host.config.reserved_providers.contains(name)
-        || host.registry.endpoint_name_taken(name)
-        || host.registry.provider_state.shapes.contains_key(name)
-    {
-        return Err(invalid("a registered provider credential is not an orphan"));
-    }
-    for shape in host.registry.provider_state.shapes.values() {
-        if shape
-            .credential_exists(name)
-            .map_err(|_| invalid("could not read credential store"))?
-        {
-            shape
-                .forget_credential(name)
-                .map_err(|_| invalid("could not remove stored credential"))?;
-            return Ok(format!("Removed orphaned credential {name}."));
-        }
-    }
-    Err(invalid("no instance or orphaned credential has that name"))
 }
 
 fn remove_settings(host: &Host, key: &str, name: &str) -> Result<Vec<String>, KernelError> {
