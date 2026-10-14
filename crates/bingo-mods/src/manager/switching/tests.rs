@@ -286,3 +286,27 @@ async fn failed_enable_does_not_change_reload_state() {
     );
     manager.stop().await;
 }
+
+#[tokio::test]
+async fn queued_enable_cannot_reopen_engines_after_stop() {
+    let (_root, manager, old) = fixture().await;
+    runtime(&manager);
+    manager.switch("fixture", false).await.unwrap();
+    tokio::time::pause();
+    assert_eq!(
+        manager.switch("fixture", true).await.unwrap(),
+        PluginSwitch::AfterTurn
+    );
+    manager.stop().await;
+    drop(old);
+    assert!(
+        manager.switch("fixture", true).await.is_err(),
+        "stopped manager accepted enable"
+    );
+    assert!(manager.modules().iter().all(|module| {
+        module
+            .engine
+            .as_ref()
+            .is_none_or(|engine| engine.stopped().is_cancelled())
+    }));
+}

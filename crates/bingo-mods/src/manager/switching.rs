@@ -43,6 +43,13 @@ pub(super) fn finish(manager: &Manager, name: &str, request: &Arc<Request>) {
         requests.remove(name);
     }
 }
+pub(super) fn running(manager: &Manager) -> Result<(), KernelError> {
+    if manager.stop.is_cancelled() {
+        Err(reload::failed("module manager stopped"))
+    } else {
+        Ok(())
+    }
+}
 pub(super) fn module_kind(manager: &Manager, name: &str) -> PluginSwitch {
     manager
         .modules()
@@ -106,9 +113,14 @@ pub(super) async fn switch_module(
 ) -> Result<PluginSwitch, KernelError> {
     let enabled = request.enabled;
     if enabled {
-        defer_retirement(manager, name, request, deferred).await;
+        tokio::select! {
+            biased;
+            _ = manager.stop.cancelled() => return Err(reload::failed("module manager stopped")),
+            _ = defer_retirement(manager, name, request, deferred) => {}
+        }
     }
     let _guard = manager.reloading.lock().await;
+    running(manager)?;
     if !current(manager, name, request) {
         return Ok(PluginSwitch::Now);
     }

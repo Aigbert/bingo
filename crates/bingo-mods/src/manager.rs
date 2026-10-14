@@ -199,6 +199,7 @@ impl Manager {
         for task in tasks {
             let _ = task.await;
         }
+        let _guard = self.reloading.lock().await;
         for module in self.modules() {
             module.close().await;
         }
@@ -217,6 +218,7 @@ impl PluginSource for Manager {
         switching::module_kind(self, name)
     }
     async fn switch(&self, name: &str, enabled: bool) -> Result<plugin::PluginSwitch, KernelError> {
+        switching::running(self)?;
         let kind = switching::module_kind(self, name);
         if kind != plugin::PluginSwitch::Now {
             return Ok(kind);
@@ -230,7 +232,8 @@ impl PluginSource for Manager {
         let name = name.to_owned();
         let asked = render::asked();
         let (deferred, waiting) = tokio::sync::oneshot::channel();
-        let mut work = tokio::spawn(async move {
+        let (answer, mut result) = tokio::sync::oneshot::channel();
+        let work = tokio::spawn(async move {
             let result = render::under_input(
                 asked,
                 switching::switch_module(&manager, &name, &request, deferred),
@@ -242,13 +245,17 @@ impl PluginSource for Manager {
                     .notices
                     .push(Notice::warn("PLUGIN_SWITCH", &error.message));
             }
-            result
+            let _ = answer.send(result);
         });
+        self.tasks
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(work);
         tokio::select! {
-            result = &mut work => result.map_err(reload::failed)?,
+            result = &mut result => result.map_err(reload::failed)?,
             deferred = waiting => match deferred {
                 Ok(()) => Ok(plugin::PluginSwitch::AfterTurn),
-                Err(_) => work.await.map_err(reload::failed)?,
+                Err(_) => result.await.map_err(reload::failed)?,
             },
         }
     }
