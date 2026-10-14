@@ -773,6 +773,12 @@ async fn the_remote_catalog_answers_on_a_multi_threaded_runtime() {
     .expect("the catalogue is read");
     assert_eq!(asked.entries.len(), 1);
 
+    let models = kernel
+        .catalog(CatalogKind::Models)
+        .await
+        .expect("model facts");
+    assert_eq!(models.entries[0].meta, host::model_meta());
+
     kernel.shutdown().await.expect("shutdown is answered");
     assert_eq!(
         served.await.expect("the server task did not panic"),

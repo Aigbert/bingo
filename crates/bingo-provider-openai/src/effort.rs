@@ -64,6 +64,13 @@ pub fn effort_for(model: &str, effort: Effort) -> &'static str {
         .unwrap_or_else(|| shallowest(accepted))
 }
 
+pub fn efforts(model: &str) -> Vec<Effort> {
+    Effort::ALL
+        .into_iter()
+        .filter(|effort| effort_for(model, *effort) == effort.name())
+        .collect()
+}
+
 fn accepted_by(model: &str) -> &'static [&'static str] {
     FAMILIES
         .iter()
@@ -103,6 +110,36 @@ fn requested(effort: Effort) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn offered_efforts_have_distinct_wire_values() {
+        let levels = efforts("gpt-5.4");
+        assert_eq!(
+            levels,
+            [Effort::Low, Effort::Medium, Effort::High, Effort::XHigh]
+        );
+        let values: std::collections::BTreeSet<_> = levels
+            .iter()
+            .map(|effort| effort_for("gpt-5.4", *effort))
+            .collect();
+        assert_eq!(levels.len(), values.len());
+    }
+
+    #[test]
+    fn every_family_offers_only_distinct_unfolded_levels() {
+        for model in FAMILIES.iter().map(|(model, _)| *model).chain(["unknown"]) {
+            let levels = efforts(model);
+            let wires: std::collections::BTreeSet<_> = levels
+                .iter()
+                .map(|effort| effort_for(model, *effort))
+                .collect();
+            assert_eq!(levels.len(), wires.len(), "{model}");
+            assert!(
+                levels
+                    .iter()
+                    .all(|effort| effort_for(model, *effort) == effort.name())
+            );
+        }
+    }
 
     const LEVELS: [Effort; 6] = [
         Effort::Minimal,

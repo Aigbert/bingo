@@ -347,6 +347,10 @@ impl Provider for OpenAiProvider {
     /// Responses caches prefixes on its own and cannot count tokens ahead of
     /// a request; what each model can do is the kernel catalogue's to say
     /// (ADR-0004).
+    fn efforts(&self, model: &str) -> Vec<bingo_sdk::Effort> {
+        effort::efforts(model)
+    }
+
     fn endpoint(&self, _model: &str) -> EndpointCapabilities {
         EndpointCapabilities {
             images: self.images,

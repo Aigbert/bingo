@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 
 use crate::host::Prompter;
-use crate::model::{EndpointCapabilities, ModelRequest, ModelStream, ProviderError};
+use crate::model::{Effort, EndpointCapabilities, ModelRequest, ModelStream, ProviderError};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -73,6 +73,12 @@ pub trait Provider: Send + Sync {
     /// What this endpoint does with a request for `model`. Fails closed: a
     /// provider that does not know says `false`.
     fn endpoint(&self, model: &str) -> EndpointCapabilities;
+
+    /// Distinct effort levels this adapter can encode for a model. The
+    /// catalogue applies model-owned reasoning metadata before offering them.
+    fn efforts(&self, _model: &str) -> Vec<Effort> {
+        Effort::ALL.to_vec()
+    }
 
     /// Stream one response. Non-streaming completion is this, drained.
     async fn stream(

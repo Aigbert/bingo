@@ -175,6 +175,10 @@ impl Provider for AnthropicProvider {
     /// Every Claude endpoint counts tokens and caches prefixes, and forwards
     /// images unless a proxy says it strips them; what each model can do is
     /// the kernel catalogue's to say (ADR-0004).
+    fn efforts(&self, _model: &str) -> Vec<bingo_sdk::Effort> {
+        request::efforts()
+    }
+
     fn endpoint(&self, _model: &str) -> EndpointCapabilities {
         EndpointCapabilities {
             images: self.images,

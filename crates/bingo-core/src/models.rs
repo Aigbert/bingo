@@ -5,6 +5,7 @@
 //! exist at all is nobody's here but the endpoint's: `served` keeps what each
 //! provider answered when it was asked.
 
+mod alias;
 pub mod catalog;
 pub mod declared;
 pub mod learned;
@@ -12,6 +13,7 @@ pub mod resolve;
 pub mod served;
 pub mod vision;
 
+pub use alias::alias_of;
 pub use catalog::{ModelCatalog, ModelFacts};
 pub use declared::Declared;
 pub use learned::{Learned, window_from_overflow};

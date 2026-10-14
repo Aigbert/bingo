@@ -14,7 +14,7 @@ settings key.
 
 1. **Snapshot fields.** `scripts/models_dev.sh` also keeps
    `cost.{input,output,cache_read}` and `modalities.output`; regenerate
-   `crates/bingo-core/models.dev.json`. `ModelFacts` gains
+   `crates/bingo-core/models.dev.json` with `--preserve-capabilities`. `ModelFacts` gains
    `price: Option<Price>` (`input`, `output`, `cache_read`, per million
    tokens) and `chat: bool` (output holds `text`, id not an embedding by
    the snapshot's family). Parse test on a three-model fixture.
@@ -23,7 +23,7 @@ settings key.
    is in `listed`. Table test, including a dated id with no undated twin
    (not an alias).
 3. **Provider efforts.** `Provider::efforts(&self, model) -> Vec<Effort>`
-   in `bingo-sdk`, default from `reasoning`. Anthropic and OpenAI answer
+   in `bingo-sdk`, default all levels, catalogue-gated by `reasoning`. Providers answer
    from their own request mapping (`request.rs`); a level folded into
    another is not listed. Unit test per provider, plus one asserting
    every listed level maps to a distinct wire value.
@@ -52,15 +52,51 @@ settings key.
 8. **Docs.** ADR-0003 §5 and ADR-0004 §3 get a dated amendment line
    pointing at ADR-0085; `docs/guide/` model page updated.
 
+## Decisions
+
+- The SDK cannot read kernel-owned reasoning metadata. `Provider::efforts`
+  defaults to all levels; the catalogue applies the reasoning gate and omits
+  efforts for unknown facts. This preserves ADR-0004's ownership boundary.
+- Anthropic currently maps five distinct values, including `xhigh`, rather
+  than the ADR's four. List the existing five; do not alter request encoding
+  or cache behavior to fit a stale count.
+- Invocation-specific `Command::is_instant` defaults to the static spec.
+  Model choice resolves its target against the supplied session state before
+  admission; the actor rechecks queued commands when dispatching them.
+- `--keep` persists only the command's own keys (model/provider or thinking),
+  as the exit criteria require; it never overwrites an unrelated choice.
+
+- Pin order is represented by stable catalogue ordering (pins first). Unknown
+  snapshot ids omit unavailable facts, but an explicitly pinned offered id
+  still reports its known pin state. Stale pins can always be removed.
+- Admission uses the larger of measured usage and the shared transcript
+  estimate so a new unfinished input cannot hide behind an old measurement.
+  Compactor counts cover only the replaced prefix, so manual compaction
+  measures the retained transcript with the already assembled system/tools
+  and publishes usage through the existing event before switching. It must
+  not rerun contributors: snapshot refresh and cached baselines stay lazy.
+- A compaction that cannot get below the target trigger refuses the switch;
+  a same-model choice never compacts solely because of this command.
+- The workspace gate exposed an existing CLI helper that assumed the first
+  multiplexed frame was the root. Select the print prompt's session instead;
+  a resumed child's reminder may arrive first. Keep this test fix separate.
+- `docs/guide/` did not exist; add `docs/guide/models.md` as the model page.
+
+- Full upstream regeneration also changed existing request capabilities and
+  dropped ids. Use `models_dev.sh --preserve-capabilities` to enrich this
+  snapshot while retaining every old limit, reasoning flag and input modality.
+  Missing output modalities on retained legacy ids stay chat candidates.
+
 ## Files
 
 - `scripts/models_dev.sh`, `crates/bingo-core/models.dev.json`,
   `crates/bingo-core/src/models/{catalog.rs,mod.rs}`, new
   `models/alias.rs`.
-- `crates/bingo-sdk/src/provider.rs`; `crates/bingo-provider-anthropic/
+- `crates/bingo-sdk/src/{provider,command}.rs`; `crates/bingo-provider-anthropic/
   src/request.rs`, `crates/bingo-provider-openai/src/` request mapping.
-- `crates/bingo-core/src/host/catalog.rs`, `settings.rs`,
-  `settings/merge.rs`, `commands/{mod.rs,model.rs,think.rs}`.
+- `crates/bingo-core/src/host/{catalog,model_switch,pins}.rs`, `settings.rs`,
+  `settings/merge.rs`, `commands/{mod,model,think,pin}.rs`,
+  `session/inputs.rs`, `turn.rs`, `turn/compact.rs`, and their tests.
 - `schema/`, `sdk/typescript/`, RPC fixtures.
 
 ## Exit criteria

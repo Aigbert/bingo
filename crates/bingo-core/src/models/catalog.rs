@@ -4,19 +4,33 @@
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Pruned by `scripts/models_dev.sh`; the fields below are all it keeps.
 const SNAPSHOT: &str = include_str!("../../models.dev.json");
 
 /// What the catalogue knows about one model.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ModelFacts {
     pub context_window: u64,
     pub max_output: u64,
     pub reasoning: bool,
     /// Accepts image input.
     pub images: bool,
+    pub price: Option<Price>,
+    pub chat: bool,
+}
+
+/// Published prices per million tokens; missing prices remain unknown.
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Price {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<f64>,
+    #[serde(default, alias = "cache_read", skip_serializing_if = "Option::is_none")]
+    pub cache_read: Option<f64>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -35,6 +49,8 @@ struct ProviderEntry {
 struct Entry {
     limit: Limit,
     #[serde(default)]
+    cost: Option<Price>,
+    #[serde(default)]
     reasoning: bool,
     #[serde(default)]
     modalities: Modalities,
@@ -50,15 +66,27 @@ struct Limit {
 struct Modalities {
     #[serde(default)]
     input: Vec<String>,
+    #[serde(default)]
+    output: Option<Vec<String>>,
 }
 
 impl Entry {
-    fn facts(&self) -> ModelFacts {
+    fn facts(&self, id: &str) -> ModelFacts {
         ModelFacts {
             context_window: self.limit.context,
             max_output: self.limit.output,
             reasoning: self.reasoning,
             images: self.modalities.input.iter().any(|m| m == "image"),
+            price: self.cost,
+            chat: self
+                .modalities
+                .output
+                .as_ref()
+                .is_none_or(|output| output.iter().any(|m| m == "text"))
+                && !id
+                    .to_ascii_lowercase()
+                    .split(['-', '_', '/'])
+                    .any(|part| matches!(part, "embed" | "embedding")),
         }
     }
 }
@@ -118,7 +146,7 @@ impl ModelCatalog {
 }
 
 fn exact(models: &BTreeMap<String, Entry>, model: &str) -> Option<ModelFacts> {
-    models.get(model).map(Entry::facts)
+    models.get(model).map(|entry| entry.facts(model))
 }
 
 /// The longest catalogue id that is a prefix of `model` at a separator, so
@@ -128,7 +156,7 @@ fn by_prefix(models: &BTreeMap<String, Entry>, model: &str) -> Option<ModelFacts
         .iter()
         .filter(|(id, _)| is_family_prefix(id, model))
         .max_by_key(|(id, _)| id.len())
-        .map(|(_, entry)| entry.facts())
+        .map(|(id, entry)| entry.facts(id))
 }
 
 fn is_family_prefix(id: &str, model: &str) -> bool {
@@ -141,6 +169,38 @@ fn is_family_prefix(id: &str, model: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prices_chat_and_missing_fields_parse_from_the_snapshot_shape() {
+        let catalog = ModelCatalog::parse(r#"{"vendor":{"models":{
+            "embedded-chat":{"limit":{"context":100,"output":10},"cost":{"input":1.5,"output":6,"cache_read":0.15},"modalities":{"input":["image"],"output":["text"]}},
+            "text-embedding-3":{"limit":{"context":100,"output":0},"modalities":{"output":["text"]}},
+            "audio":{"limit":{"context":100,"output":10},"modalities":{"output":["audio"]}}
+        }}}"#).unwrap();
+        let chat = catalog.lookup("vendor", "embedded-chat").unwrap();
+        assert!(chat.chat && chat.images);
+        assert_eq!(
+            serde_json::to_value(chat.price).unwrap(),
+            serde_json::json!({"input":1.5,"output":6.0,"cacheRead":0.15})
+        );
+        for id in ["text-embedding-3", "audio"] {
+            let facts = catalog.lookup("vendor", id).unwrap();
+            assert!(!facts.chat);
+            assert!(facts.price.is_none());
+        }
+        for (provider, entry) in &ModelCatalog::embedded().providers {
+            for id in entry.models.keys().filter(|id| id.contains("embed")) {
+                assert!(!ModelCatalog::embedded().lookup(provider, id).unwrap().chat);
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_output_is_unknown_instead_of_hiding_a_chat_model() {
+        let facts = fixture().lookup("openai", "gpt-5").unwrap();
+        assert!(facts.chat);
+        assert!(facts.price.is_none());
+    }
 
     fn fixture() -> ModelCatalog {
         ModelCatalog::parse(

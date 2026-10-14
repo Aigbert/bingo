@@ -62,7 +62,7 @@ pub(super) async fn entries(
                     entries.push(CatalogEntry {
                         id: format!("{}/{}", agent.id(), offer.id),
                         label: offer.id,
-                        meta: json!({"provider": agent.id(), "source": offer.source.as_str()}),
+                        meta: json!({"provider": agent.id(), "source": offer.source.as_str(), "chat": true}),
                     });
                 }
             }
@@ -112,20 +112,35 @@ fn models(
             // models of its own — it serves its wire shape's.
             let shelf: Vec<&str> = catalogue.models_of(p.family()).collect();
             let endpoint = served.get(p.id());
-            served::merge(endpoint.as_ref(), &shelf, configured)
-                .into_iter()
-                .map(|offer| entry(p.as_ref(), offer))
+            let offers = served::merge(endpoint.as_ref(), &shelf, configured);
+            offers
+                .iter()
+                .map(|offer| entry(p.as_ref(), offer, &offers))
                 .collect::<Vec<_>>()
         })
         .collect()
 }
 
-fn entry(provider: &dyn Provider, offer: Offer) -> CatalogEntry {
+fn entry(provider: &dyn Provider, offer: &Offer, listed: &[Offer]) -> CatalogEntry {
     let facts = ModelCatalog::embedded().facts_for(provider.family(), provider.id(), &offer.id);
+    let mut meta = model_meta(provider.id(), offer.source, facts);
+    if let Some(facts) = facts {
+        meta["efforts"] = json!(if facts.reasoning {
+            provider.efforts(&offer.id)
+        } else {
+            vec![]
+        });
+        meta["pinned"] = json!(false);
+        if let Some(alias) =
+            crate::models::alias_of(&offer.id, listed.iter().map(|offer| offer.id.as_str()))
+        {
+            meta["aliasOf"] = json!(alias);
+        }
+    }
     CatalogEntry {
         id: format!("{}/{}", provider.id(), offer.id),
-        meta: model_meta(provider.id(), offer.source, facts),
-        label: offer.id,
+        meta,
+        label: offer.id.clone(),
     }
 }
 
@@ -138,7 +153,11 @@ fn model_meta(provider: &str, source: Source, facts: Option<ModelFacts>) -> Valu
     let mut meta = Map::new();
     meta.insert("provider".into(), json!(provider));
     meta.insert("source".into(), json!(source.as_str()));
+    meta.insert("chat".into(), json!(facts.is_none_or(|facts| facts.chat)));
     if let Some(facts) = facts {
+        if let Some(price) = facts.price {
+            meta.insert("price".into(), json!(price));
+        }
         meta.insert("context".into(), json!(facts.context_window));
         meta.insert("output".into(), json!(facts.max_output));
         meta.insert("reasoning".into(), json!(facts.reasoning));
@@ -315,9 +334,13 @@ mod tests {
         assert_eq!(
             keys(&sonnet),
             [
+                "chat",
                 "context",
+                "efforts",
                 "images",
                 "output",
+                "pinned",
+                "price",
                 "provider",
                 "reasoning",
                 "source"
@@ -338,11 +361,40 @@ mod tests {
     fn a_model_the_catalogue_does_not_know_carries_the_provider_alone() {
         let entries = listed(Some("house-private-1"));
         let private = entry(&entries, "house/house-private-1");
-        assert_eq!(keys(&private), ["provider", "source"]);
+        assert_eq!(keys(&private), ["chat", "provider", "source"]);
         assert_eq!(
             private.meta,
-            json!({ "provider": "house", "source": "configured" })
+            json!({ "provider": "house", "source": "configured", "chat": true })
         );
+    }
+
+    #[test]
+    fn a_dated_offer_names_only_a_twin_in_the_same_provider_list() {
+        let served = ServedModels::default();
+        served.record(
+            "house",
+            vec![
+                ModelInfo {
+                    id: "claude-sonnet-4-5".into(),
+                    display: None,
+                },
+                ModelInfo {
+                    id: "claude-sonnet-4-5-20250929".into(),
+                    display: None,
+                },
+            ],
+            jiff::Timestamp::UNIX_EPOCH,
+        );
+        let entries = listed_with(None, &served);
+        assert_eq!(
+            entry(&entries, "house/claude-sonnet-4-5-20250929").meta["aliasOf"],
+            "claude-sonnet-4-5"
+        );
+        let model = entry(&entries, "house/claude-sonnet-4-5");
+        assert!(model.meta.get("aliasOf").is_none());
+        assert!(model.meta["price"]["input"].is_number());
+        assert_eq!(model.meta["efforts"], json!(Effort::ALL));
+        assert_eq!(model.meta["chat"], true);
     }
 
     /// Once the endpoint has answered, its ids are the list — the snapshot's

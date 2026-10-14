@@ -17,6 +17,8 @@ const UNKNOWN: ModelFacts = ModelFacts {
     max_output: 8_192,
     reasoning: false,
     images: true,
+    price: None,
+    chat: true,
 };
 
 /// `declared > learned clamp > catalogue > unknown`, field by field; the
@@ -79,6 +81,8 @@ mod tests {
             max_output: 64_000,
             reasoning: true,
             images: true,
+            price: None,
+            chat: true,
         }
     }
 
@@ -185,6 +189,8 @@ mod tests {
                         max_output,
                         reasoning,
                         images,
+                        price: None,
+                        chat: true,
                     }
                 }),
         )

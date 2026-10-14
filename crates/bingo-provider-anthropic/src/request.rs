@@ -157,6 +157,13 @@ fn add_thinking(body: &mut Map<String, Value>, effort: Effort) {
 /// Anthropic's effort levels are `low|medium|high|xhigh|max` (old
 /// `contract.rs:143-181`). `minimal` has no Anthropic level, so it takes the
 /// shallowest one that exists rather than a name the API would 400 on.
+pub fn efforts() -> Vec<Effort> {
+    Effort::ALL
+        .into_iter()
+        .filter(|effort| effort_name(*effort) == effort.name())
+        .collect()
+}
+
 fn effort_name(effort: Effort) -> &'static str {
     match effort {
         Effort::Minimal | Effort::Low => "low",
@@ -280,6 +287,23 @@ fn tool(spec: &ToolSpec) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn offered_efforts_have_distinct_wire_values() {
+        let levels = efforts();
+        assert_eq!(
+            levels,
+            [
+                Effort::Low,
+                Effort::Medium,
+                Effort::High,
+                Effort::XHigh,
+                Effort::Max
+            ]
+        );
+        let values: std::collections::BTreeSet<_> =
+            levels.iter().map(|effort| effort_name(*effort)).collect();
+        assert_eq!(levels.len(), values.len());
+    }
 
     fn caps(caching: bool) -> EndpointCapabilities {
         EndpointCapabilities {

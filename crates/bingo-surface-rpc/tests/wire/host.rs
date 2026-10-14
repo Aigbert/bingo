@@ -471,7 +471,11 @@ impl HostApi for TestHost {
             entries: vec![CatalogEntry {
                 id: "fake".into(),
                 label: "the fake provider".into(),
-                meta: Value::Null,
+                meta: if kind == CatalogKind::Models {
+                    model_meta()
+                } else {
+                    Value::Null
+                },
             }],
         })
     }
@@ -512,4 +516,10 @@ fn session_open_fixture_keeps_its_wire_bytes() {
     assert_eq!(wire, expected);
     let restored: SessionState = serde_json::from_str(&wire).unwrap();
     assert_eq!(serde_json::to_string(&restored).unwrap(), expected);
+}
+
+pub fn model_meta() -> Value {
+    serde_json::json!({"provider":"fake","source":"catalogue","context":200000,"output":8192,
+        "reasoning":true,"images":true,"price":{"input":1.5,"output":6.0,"cacheRead":0.15},
+        "chat":true,"aliasOf":"model","efforts":["low","medium","high"],"pinned":true})
 }
