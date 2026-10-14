@@ -86,7 +86,10 @@ async fn run(node: bool) -> Value {
             break payload;
         }
     };
-    assert_eq!(answer["plugin"], json!({"name":"fixture","root":root}));
+    assert_eq!(
+        answer["plugin"],
+        json!({"name":"fixture","root":root,"version":"1"})
+    );
     answer["plugin"]["root"] = json!("<fixture>");
     host.shutdown().await;
     answer
@@ -103,7 +106,7 @@ async fn the_host_nouns_fixture_agrees_under_quickjs_and_node() {
         native,
         json!({"session":true,"prompt":{"queue":[],"last":null},"tools":true,"commands":true,
         "config":null,"model":"no model","state":{"version":1,"value":1},"store":{"version":1,"value":2},
-        "clock":"number","plugin":{"name":"fixture","root":"<fixture>"},"frozen":true,"abort":null})
+        "clock":"number","plugin":{"name":"fixture","root":"<fixture>","version":"1"},"frozen":true,"abort":null})
     );
 }
 
