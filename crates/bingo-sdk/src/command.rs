@@ -146,7 +146,9 @@ impl std::fmt::Debug for CommandContext {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum CommandOutcome {
     /// Forward an existing command result without recording or executing it again.
-    Acknowledged { result: serde_json::Value },
+    Acknowledged {
+        result: serde_json::Value,
+    },
     /// A client interprets only actions it supports; the host does not dispatch them.
     Surface {
         action: crate::Action,

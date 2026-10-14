@@ -5,7 +5,10 @@ use std::sync::Arc;
 /// Every HostApi verb, with the arguments supplied by its caller.
 #[derive(Clone)]
 pub enum HostCall {
-    Invalidate { session: SessionId, requests: Vec<String> },
+    Invalidate {
+        session: SessionId,
+        requests: Vec<String>,
+    },
     Approve {
         request: Approval,
     },
@@ -116,7 +119,11 @@ pub enum HostCall {
 impl std::fmt::Debug for HostCall {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Invalidate { session, requests } => fields(f, "Invalidate", &[("session", session), ("requests", requests)]),
+            Self::Invalidate { session, requests } => fields(
+                f,
+                "Invalidate",
+                &[("session", session), ("requests", requests)],
+            ),
             Self::Approve { request } => f.debug_tuple("Approve").field(request).finish(),
             Self::Render { session, request } => {
                 fields(f, "Render", &[("session", session), ("request", request)])

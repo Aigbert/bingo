@@ -35,7 +35,7 @@ fn scenario(which: &str) -> (SessionState, Vec<CatalogEntry>) {
     let plugins = vec![CatalogEntry {
         id: "review".into(),
         label: "review".into(),
-        meta: json!({"state":{"kind": match which {"failed" => "failed", "waiting" => "waiting", _ => "on"}}}),
+        meta: json!({"state": match which {"failed" => PluginState::Failed { why: "failed".into() }, "waiting" => PluginState::Waiting { changed: false }, _ => PluginState::On}}),
     }];
     (state, plugins)
 }
@@ -80,6 +80,7 @@ fn status_scenarios_match_at_both_terminal_sizes() {
                 input: Some(3.0),
                 output: Some(15.0),
                 cache_read: Some(0.3),
+                cache_write: None,
             });
             let rows = rows::rows(&(&state).into(), &plugins, &servers, price);
             let selected = match which {

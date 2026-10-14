@@ -66,11 +66,15 @@ mod tests {
     fn acknowledgements_forward_views_messages_and_refusals() {
         assert_eq!(
             applied(json!({"view":View::text("next screen")})).unwrap(),
-            CommandOutcome::Acknowledged { result: json!({"view":View::text("next screen")}) }
+            CommandOutcome::Acknowledged {
+                result: json!({"view":View::text("next screen")})
+            }
         );
         assert_eq!(
             applied(json!({"message":"forgot rule"})).unwrap(),
-            CommandOutcome::Acknowledged { result: json!({"message":"forgot rule"}) }
+            CommandOutcome::Acknowledged {
+                result: json!({"message":"forgot rule"})
+            }
         );
         assert_eq!(
             result(IntentOutcome::Queued { position: 1 }),
@@ -94,7 +98,13 @@ mod forwarding_tests {
     use serde_json::json;
     #[test]
     fn acknowledgements_preserve_every_result_without_recording_twice() {
-        for result in [json!({"view":View::text("screen")}), json!({"message":"done"}), json!({"surface":{"name":"Composer","args":{"text":"/rename "}},"message":"fallback"}), json!({"item":"existing-item"}), json!({"answer":{"kind":"cancel"},"handled":true})] {
+        for result in [
+            json!({"view":View::text("screen")}),
+            json!({"message":"done"}),
+            json!({"surface":{"name":"Composer","args":{"text":"/rename "}},"message":"fallback"}),
+            json!({"item":"existing-item"}),
+            json!({"answer":{"kind":"cancel"},"handled":true}),
+        ] {
             let forwarded = serde_json::to_value(applied(result.clone()).unwrap()).unwrap();
             assert_eq!(forwarded, json!({"kind":"acknowledged","result":result}));
         }

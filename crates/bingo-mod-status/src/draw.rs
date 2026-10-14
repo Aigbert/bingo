@@ -34,7 +34,9 @@ impl Interceptor for Drawing {
         let rows = read(&cx.host, &facts).await?;
         let selected = {
             let mut selections = self.selections.lock().map_err(error)?;
-            let selection = selections.entry(cx.session.clone()).or_insert_with(|| "session".into());
+            let selection = selections
+                .entry(cx.session.clone())
+                .or_insert_with(|| "session".into());
             selection.seen = Instant::now();
             selection.label.clone()
         };

@@ -29,11 +29,12 @@ the kernel's `/status` key-value view stays as the plain fallback.
 3. **Forget a rule.** `/permission forget <rule>` in `bingo-permissions`
    (a free rule argument; selectable session rules in the card); answers the rule it
    dropped. Test over a session with two rules.
-4. **Rows, pure.** `rows(&SessionState, plugins, servers) -> Vec<Row>`
+4. **Rows, pure.** `rows(&StatusProps, plugins, servers) -> Vec<Row>`
    in the mod: label, value spans, tone (`ok`, `warn`, `bad`, `dim`),
    and the command line `⏎` runs (`None` for spent). Plugins and
    servers are summarised to one row each: counts, then each problem
-   by name. Table test per prototype scenario.
+   by name. Deserialize SDK PluginState and match the services MCP State enum; malformed
+   plugin states report unavailable. Table test per prototype scenario.
 5. **Drawing.** `Status` site as a `View` tree: a title line with the
    hint (`live; ⏎ on a row goes there`) and version · uptime, one `❯`
    row, the context bar with its parts on a dim second line, the rules
@@ -102,8 +103,8 @@ the kernel's `/status` key-value view stays as the plain fallback.
 - Parts sum to the local estimate, not the anchored server count. Scaling estimates
   to a server count would invent accuracy; the drawing labels them `about`.
 - Cost is an estimate at the current model's catalogue rates, explicitly labelled;
-  a session may have changed models. Cache writes have no catalogue rate, so cost
-  is unknown when they occur, as it is for missing input/output/cache-read rates.
+  a session may have changed models. Preserve M164 catalogue cache-write rates (the old
+  parser/pruner discarded them); only used components without rates make cost unknown.
 - A Vec removed Copy and required edits in M172-owned mods. The four fixed categories instead
   use an optional array and Copy ContextKind names. JSON remains an additive array; absent
   means unknown. Consumers need only literal updates. Shared token estimation owns the split.

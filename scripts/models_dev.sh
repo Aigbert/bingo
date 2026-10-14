@@ -30,7 +30,7 @@ source_json "$@" \
           models: (.models | with_entries(.value |= {
             limit: {context: .limit.context, output: .limit.output},
             reasoning: .reasoning,
-            cost: (.cost | if . == null then null else {input, output, cache_read} end),
+            cost: (.cost | if . == null then null else {input, output, cache_read, cache_write} end),
             modalities: {input: .modalities.input, output: .modalities.output}
           }))
         })' > "$fresh"

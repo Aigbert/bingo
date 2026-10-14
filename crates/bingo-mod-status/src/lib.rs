@@ -23,10 +23,17 @@ struct Selection {
     seen: Instant,
 }
 impl From<String> for Selection {
-    fn from(label: String) -> Self { Self { label, seen: Instant::now() } }
+    fn from(label: String) -> Self {
+        Self {
+            label,
+            seen: Instant::now(),
+        }
+    }
 }
 impl From<&str> for Selection {
-    fn from(label: &str) -> Self { label.to_string().into() }
+    fn from(label: &str) -> Self {
+        label.to_string().into()
+    }
 }
 
 pub struct Status {

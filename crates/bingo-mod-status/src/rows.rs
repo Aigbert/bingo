@@ -177,24 +177,28 @@ fn problem(row: &mut Row, names: &[&str], suffix: &str, tone: Tone) {
     });
 }
 fn plugin_row(plugins: &[CatalogEntry]) -> Row {
-    let named = |wanted: &str| {
-        plugins
-            .iter()
-            .filter(|p| p.meta["state"]["kind"] == wanted)
-            .map(|p| p.id.as_str())
-            .collect::<Vec<_>>()
-    };
-    let mut result = row(
-        "plugins",
-        format!("{} on · {} off", named("on").len(), named("off").len()),
-        Some("plugins"),
-    );
-    for (state, label, tone) in [
-        ("failed", "failed", Tone::Bad),
-        ("waiting", "from this repo waits for you", Tone::Warn),
-        ("pending", "pending", Tone::Warn),
+    use bingo_sdk::PluginState;
+    let (mut on, mut off) = (0, 0);
+    let (mut failed, mut waiting, mut pending, mut unknown) = (vec![], vec![], vec![], vec![]);
+    for plugin in plugins {
+        let name = plugin.id.as_str();
+        match serde_json::from_value::<PluginState>(plugin.meta["state"].clone()) {
+            Ok(PluginState::On) => on += 1,
+            Ok(PluginState::Off { .. }) => off += 1,
+            Ok(PluginState::Failed { .. }) => failed.push(name),
+            Ok(PluginState::Waiting { .. }) => waiting.push(name),
+            Ok(PluginState::Registering | PluginState::Pending { .. }) => pending.push(name),
+            Err(_) => unknown.push(name),
+        }
+    }
+    let mut result = row("plugins", format!("{on} on · {off} off"), Some("plugins"));
+    for (names, label, tone) in [
+        (failed, "failed", Tone::Bad),
+        (waiting, "from this repo waits for you", Tone::Warn),
+        (pending, "pending", Tone::Warn),
+        (unknown, "state unavailable", Tone::Warn),
     ] {
-        problem(&mut result, &named(state), label, tone);
+        problem(&mut result, &names, label, tone);
     }
     result
 }

@@ -18,15 +18,25 @@ fn rows_match_the_prototype_scenarios() {
         json!({"mode":"acceptEdits","rules":["Edit(src/**)","Bash(cargo:*)"]}),
     );
     for (kind, word, tone) in [
-        ("on", "1 on", rows::Tone::Ok),
-        ("failed", "failed", rows::Tone::Bad),
-        ("waiting", "waits for you", rows::Tone::Warn),
-        ("pending", "pending", rows::Tone::Warn),
+        (PluginState::On, "1 on", rows::Tone::Ok),
+        (
+            PluginState::Failed {
+                why: "failed".into(),
+            },
+            "failed",
+            rows::Tone::Bad,
+        ),
+        (
+            PluginState::Waiting { changed: false },
+            "waits for you",
+            rows::Tone::Warn,
+        ),
+        (PluginState::Registering, "pending", rows::Tone::Warn),
     ] {
         let plugins = vec![CatalogEntry {
             id: "fixture".into(),
             label: "fixture".into(),
-            meta: json!({"state":{"kind":kind}}),
+            meta: json!({"state":kind}),
         }];
         let rows = rows::rows(
             &(&state).into(),
@@ -98,7 +108,10 @@ async fn config_frames_invalidate_an_open_card_without_changing_selection() {
         host: host.handle(),
     };
     let frame: Frame = serde_json::from_value(json!({"session":state.summary.id, "seq":1,"ts":"2026-10-15T00:00:00Z","event":{"type":"configChanged","config":state.config}})).unwrap();
-    let status = Status { selections: selections.clone(), ..Default::default() };
+    let status = Status {
+        selections: selections.clone(),
+        ..Default::default()
+    };
     let mut registrar = Registrar::new(ID, json!({}), Env::rooted("/unused"), Default::default());
     status.register(&mut registrar).unwrap();
     for contribution in registrar.into_contributions() {
@@ -109,7 +122,10 @@ async fn config_frames_invalidate_an_open_card_without_changing_selection() {
     assert!(host.calls().iter().any(|call| matches!(call,
         testing::HostCall::Invalidate { session, requests } if session == &state.summary.id && requests == &[REQUEST.to_string()]
     )));
-    assert_eq!(selections.lock().unwrap()[&state.summary.id].label, "plugins");
+    assert_eq!(
+        selections.lock().unwrap()[&state.summary.id].label,
+        "plugins"
+    );
 }
 #[test]
 fn a_server_row_reads_the_state_the_plugins_panel_reads() {
@@ -175,5 +191,22 @@ async fn rendering_uses_supplied_facts_without_opening_a_session() {
             .calls()
             .iter()
             .any(|call| matches!(call, testing::HostCall::Open { .. }))
+    );
+}
+
+#[test]
+fn malformed_plugin_states_are_reported_as_unavailable() {
+    let entry = CatalogEntry {
+        id: "invalid".into(),
+        label: "invalid".into(),
+        meta: json!({"state":{"kind":"failed"}}),
+    };
+    let rows = rows::rows(&(&state()).into(), &[entry], &[], None);
+    let plugins = rows.iter().find(|row| row.label == "plugins").unwrap();
+    assert!(
+        plugins
+            .value
+            .iter()
+            .any(|span| span.text.contains("state unavailable"))
     );
 }

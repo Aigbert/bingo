@@ -1644,6 +1644,10 @@ mod context_parts_contract {
         let usage: ContextUsage = serde_json::from_value(wire.clone()).unwrap();
         assert_eq!(
             usage.parts.unwrap().iter().map(|p| p.tokens).sum::<u64>(),
+            1605
+        );
+        assert_ne!(
+            usage.parts.unwrap().iter().map(|p| p.tokens).sum::<u64>(),
             usage.used
         );
         assert_eq!(serde_json::to_value(usage).unwrap(), wire);

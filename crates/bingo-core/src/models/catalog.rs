@@ -31,6 +31,12 @@ pub struct Price {
     pub output: Option<f64>,
     #[serde(default, alias = "cache_read", skip_serializing_if = "Option::is_none")]
     pub cache_read: Option<f64>,
+    #[serde(
+        default,
+        alias = "cache_write",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub cache_write: Option<f64>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -296,5 +302,15 @@ mod tests {
         assert!(ids.len() > 3, "{ids:?}");
         assert!(ids.windows(2).all(|w| w[0] < w[1]));
         assert_eq!(ModelCatalog::embedded().models_of("nobody").count(), 0);
+    }
+}
+
+#[cfg(test)]
+mod cache_write_contract {
+    use super::*;
+    #[test]
+    fn catalogue_retains_the_optional_cache_write_price() {
+        let price: Price = serde_json::from_value(serde_json::json!({"cache_write":1.25})).unwrap();
+        assert_eq!(serde_json::to_value(price).unwrap()["cacheWrite"], 1.25);
     }
 }

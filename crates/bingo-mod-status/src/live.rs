@@ -55,11 +55,18 @@ pub fn start(host: HostHandle, selections: Selections, stop: CancellationToken) 
 }
 
 async fn tick(host: &HostHandle, selections: &Selections, now: std::time::Instant) {
-    let sessions = selections.lock().map(|mut selections| {
-        selections.retain(|_, selection| now.saturating_duration_since(selection.seen) < std::time::Duration::from_secs(5));
-        selections.keys().cloned().collect::<Vec<_>>()
-    }).unwrap_or_default();
-    for session in sessions { let _ = host.invalidate(&session, vec![REQUEST.into()]).await; }
+    let sessions = selections
+        .lock()
+        .map(|mut selections| {
+            selections.retain(|_, selection| {
+                now.saturating_duration_since(selection.seen) < std::time::Duration::from_secs(5)
+            });
+            selections.keys().cloned().collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    for session in sessions {
+        let _ = host.invalidate(&session, vec![REQUEST.into()]).await;
+    }
 }
 
 #[cfg(test)]
@@ -75,7 +82,9 @@ mod tests {
         selection.seen = now;
         selections.lock().unwrap().insert(id.clone(), selection);
         tick(&host.handle(), &selections, now).await;
-        assert!(matches!(host.calls().as_slice(), [testing::HostCall::Invalidate { session, .. }] if session == &id));
+        assert!(
+            matches!(host.calls().as_slice(), [testing::HostCall::Invalidate { session, .. }] if session == &id)
+        );
         assert_eq!(selections.lock().unwrap()[&id].label, "plugins");
     }
     #[tokio::test]
@@ -87,7 +96,12 @@ mod tests {
         selection.seen = now;
         let id = SessionId::from_raw("unviewed");
         selections.lock().unwrap().insert(id.clone(), selection);
-        tick(&host.handle(), &selections, now + std::time::Duration::from_secs(10)).await;
+        tick(
+            &host.handle(),
+            &selections,
+            now + std::time::Duration::from_secs(10),
+        )
+        .await;
         assert!(host.calls().is_empty());
         assert!(!selections.lock().unwrap().contains_key(&id));
     }
