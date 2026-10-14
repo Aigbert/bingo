@@ -30,3 +30,5 @@ Amended 2026-10-13 · M128: the copied codec and pending map now live in
 ## Supersedes
 
 —
+
+Amended 2026-10-15 by ADR-0087 (M171): repository plugins wait for a user-layer digest approval before admission. A waiting repository namesake leaves the personal plugin active; only an approved candidate takes its name. Every process connection rechecks the approval.

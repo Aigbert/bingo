@@ -70,5 +70,5 @@ first record; 0036 §2 answered it before it was named).
 - [0084 — The places you act are sites](0084-the-places-you-act-are-sites.md) — proposed
 - [0085 — Choosing a model without leaving the chat](0085-choosing-a-model-without-leaving-the-chat.md)
 - [0086 — Built-in features are mods](0086-built-in-features-are-mods.md) — proposed
-- [0087 — What a repository brings waits for a yes](0087-what-a-repository-brings-waits-for-a-yes.md) — proposed
+- [0087 — What a repository brings waits for a yes](0087-what-a-repository-brings-waits-for-a-yes.md)
 - [0088 — A plugin without tools switches now](0088-a-plugin-without-tools-switches-now.md) — proposed

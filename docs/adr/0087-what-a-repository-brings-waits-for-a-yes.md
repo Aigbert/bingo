@@ -1,6 +1,6 @@
 # ADR-0087 — What a repository brings waits for a yes
 
-Status: proposed · 2026-10-14 · Plan: M171 · Amends: ADR-0015 §1, ADR-0057 §6
+Status: accepted · 2026-10-15 · Plan: M171 · Amends: ADR-0015 §1, ADR-0057 §6
 
 ## Context
 
@@ -16,8 +16,9 @@ waiting with `waits for your yes` until the person picks a tier.
 
 The ratchet: only the kernel knows which layer an entry came from.
 Refusing the door would make `bingo-mcp` read settings files itself, a
-second representation of the layering. One `HostApi` verb, one field on
-a settings claim, one kernel settings key.
+second representation of the layering. One `HostApi` write verb, a read-only
+SDK approval service, one field on a settings claim, one kernel settings key. Discovery and reload read the same
+authority; refusing the read seam would make runtimes parse settings again.
 
 ## Decision
 
@@ -59,9 +60,16 @@ a settings claim, one kernel settings key.
 - `bingo-mcp` gains `Status::Waiting`; `/mcp` lists it with `approve`.
 - Approvals never travel with a repository and never apply to another
   checkout path; a moved checkout asks again.
-- A plugin directory over the digest cap (8 MiB or 2 000 files) cannot
+- A plugin directory over the digest cap (8 MiB or 2 000 entries) cannot
   be approved by digest and says so; vendoring belongs outside it.
 - The digest is `bingo-digest` (the library tier's own SHA-256), a new
   workspace edge from `bingo-core`; no external dependency.
 
 Refs: ADR-0003, ADR-0015, ADR-0057, ADR-0074, ADR-0088.
+
+Implementation decisions (2026-10-15): directory fingerprints are always read;
+mtime and size cannot prove unchanged bytes. Escaping/looping links are refused
+at approval even though the digest itself hashes link text. `pluginDirs` uses
+the generic personal-only accumulation rule so a repository cannot classify its
+own code as explicitly supplied. Waiting catalogue rows have command-prefixed
+IDs (`plugins:name`, `mcp:name`), distinct from a running user namesake.

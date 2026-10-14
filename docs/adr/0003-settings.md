@@ -37,3 +37,5 @@ Amended 2026-10-14 by ADR-0069 §5–6 (M126): §2 resolves picture cache days i
 *2026-10-15, M164: ADR-0085 §§1–4 amend choice persistence and model
 facts. `/model` and `/think` are session-only unless `--keep` is given;
 the snapshot also retains prices and output modalities.*
+
+Amended 2026-10-15 by ADR-0087 (M171): `approved` joins the kernel keys as a user-only nested object, keyed by canonical repository root and item. Other layers produce `APPROVED_IGNORED`. Claims can mark runnable entry keys; their slices carry kernel-derived waiting metadata. `PersonalAccumulate` ignores repository contributions, preventing `pluginDirs` from promoting repository code into explicit inputs.

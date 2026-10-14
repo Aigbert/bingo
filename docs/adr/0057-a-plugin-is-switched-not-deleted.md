@@ -37,3 +37,5 @@ require this explicit move. Admission and switches still apply on every load;
 state and store survive replacement. The SDK plugin-source reload method keeps
 the kernel independent of runtimes. Built-in switches still take effect at
 next start, and process-plugin reload behavior is unchanged.
+
+Amended 2026-10-15 by ADR-0087 (M171): `PluginStatus.state` is the sole status representation, with `On`, `Off { why }`, `Failed { why }`, `Waiting { changed }`, and `Pending`. Enabling a repository plugin does not approve it; waiting catalogue rows use distinct command-prefixed IDs.
