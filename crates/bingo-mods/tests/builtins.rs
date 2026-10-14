@@ -9,13 +9,14 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
     let mut plugins: Vec<Box<dyn Plugin>> = vec![
         Box::new(bingo_mod_hello::Hello),
         Box::new(bingo_mod_ask::Ask),
+        Box::new(bingo_mod_palette::Palette),
     ];
     if let Some(source) = source {
         let root = home.join("outside");
         std::fs::create_dir(&root).unwrap();
         std::fs::write(
             root.join("plugin.json"),
-            json!({"name":"outside","version":"1","module":"main.ts","uses":["ui"]}).to_string(),
+            json!({"name":"outside","version":"1","module":"main.ts","uses":["ui","command","session"]}).to_string(),
         )
         .unwrap();
         std::fs::write(root.join("main.ts"), source).unwrap();
@@ -27,7 +28,7 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
     }
     let config = HostConfig::new(Env::rooted(home)).with_layer(
         "test",
-        json!({"enabledPlugins":{"hello":!disabled,"ask":!disabled}}),
+        json!({"enabledPlugins":{"hello":!disabled,"ask":!disabled,"palette":!disabled}}),
     );
     let host = Host::build(plugins, config).await.unwrap();
     let attachment = host
@@ -235,6 +236,92 @@ async fn the_ask_handler_returns_an_answer_for_the_surface_to_send() {
             ids: vec!["b".into()],
             other: None
         }
+    );
+    host.shutdown().await;
+}
+
+async fn palette_request(host: &Host, attachment: &Attachment) -> render::RenderRequest {
+    let catalog = host.catalog(CatalogKind::Commands).await.unwrap();
+    let specs = catalog
+        .entries
+        .iter()
+        .filter_map(|entry| serde_json::from_value(entry.meta.clone()).ok())
+        .collect::<Vec<_>>();
+    let props = component::PaletteProps {
+        query: "".into(),
+        open: component::PaletteOpen::Keys,
+        commands: catalog.entries,
+        bindings: keys::bindings(&specs, &Default::default(), &[]).commands,
+        key_hints: Default::default(),
+        sessions: vec![],
+        summary: attachment.snapshot.summary.clone(),
+        config: attachment.snapshot.config.clone(),
+        context: None,
+        signals: attachment.snapshot.signals.clone(),
+        action: Action {
+            name: "surface:palette".into(),
+            args: json!({"handler":"palette"}),
+        },
+        catalogs: Default::default(),
+    };
+    render::RenderRequest {
+        component: render::Component::Palette,
+        request_id: "palette".into(),
+        surface: render::SurfaceName::Terminal,
+        props: serde_json::to_value(props).unwrap(),
+        viewport: render::Viewport {
+            columns: 80,
+            rows: 12,
+            place: None,
+        },
+    }
+}
+#[tokio::test]
+async fn a_js_command_and_its_keys_appear_inside_a_wrapped_palette() {
+    let home = tempfile::tempdir().unwrap();
+    let source = r#"export function register(on) {
+        on('session.start', async ($) => {
+            await $.command.register({name:'sample',hint:'sample command',keys:['alt+z'],args:{kind:'none'},family:'fixture'}, async ($) => ({kind:'applied',message:'sample ran'}));
+            await $.session.append({key:'palette-ready',value:true});
+        });
+        on('ui.render',{component:'Palette'},async ($,e,next)=>{const tree=await next(e);return {...tree,children:[h('Text',{},'Outside frame'),...tree.children]};});
+    }"#;
+    let (host, mut attachment) = start(home.path(), Some(source), false).await;
+    tokio::time::timeout(std::time::Duration::from_secs(15), async {
+        while let Some(frame) = attachment.events.next().await {
+            if matches!(frame.event,Event::Extension{kind,..} if kind=="palette-ready") {
+                return;
+            }
+        }
+        panic!("registration ended");
+    })
+    .await
+    .unwrap();
+    let request = palette_request(&host, &attachment).await;
+    let tree = host.render(&attachment.session, request).await.unwrap();
+    assert!(tree.fold().contains("Outside frame"));
+    assert!(tree.fold().contains("alt+z"));
+    assert!(tree.fold().contains("sample command"), "{}", tree.fold());
+    assert!(matches!(tree,View::Box{layout,..} if layout.on_key.is_some()));
+    host.shutdown().await;
+}
+#[tokio::test]
+async fn disabled_palette_has_no_commands_or_render_override() {
+    let home = tempfile::tempdir().unwrap();
+    let (host, attachment) = start(home.path(), None, true).await;
+    let request = palette_request(&host, &attachment).await;
+    assert!(
+        !request.props["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["id"] == "help" || entry["id"] == "resume")
+    );
+    assert_eq!(
+        host.render(&attachment.session, request.clone())
+            .await
+            .unwrap(),
+        request.engine()
     );
     host.shutdown().await;
 }

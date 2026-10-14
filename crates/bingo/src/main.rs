@@ -700,6 +700,7 @@ fn plugins(
         Box::new(AcpPlugin::default()),
         Box::new(PermissionsPlugin),
         Box::new(bingo_mod_ask::Ask),
+        Box::new(bingo_mod_palette::Palette),
         Box::new(ShellHooksPlugin),
         Box::new(JsonlStorePlugin::default()),
         Box::new(ContextPlugin),

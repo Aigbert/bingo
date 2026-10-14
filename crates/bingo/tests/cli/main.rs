@@ -793,6 +793,7 @@ mod login;
 mod mcp;
 mod mentions;
 mod models;
+mod palette;
 mod peers;
 mod persona;
 mod plugins;
