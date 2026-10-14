@@ -31,6 +31,9 @@ fn bingo() -> Command {
     cmd.envs(home_env(isolated_home()))
         .env_remove("ANTHROPIC_API_KEY")
         .env_remove("OPENAI_API_KEY")
+        // Endpoint overrides can redirect a fixture key away from its local server.
+        .env_remove("ANTHROPIC_BASE_URL")
+        .env_remove("OPENAI_BASE_URL")
         .env_remove("BINGO_FAKE_SCRIPT")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -829,4 +832,17 @@ fn mcp_config_must_exist_and_carry_servers() {
         "{}",
         stderr(&empty)
     );
+}
+
+#[test]
+fn provider_endpoints_are_not_inherited_by_cli_fixtures() {
+    let command = bingo();
+    for name in ["OPENAI_BASE_URL", "ANTHROPIC_BASE_URL"] {
+        assert!(
+            command
+                .get_envs()
+                .any(|(key, value)| key == name && value.is_none()),
+            "fixture must remove {name} before a test sets its local endpoint"
+        );
+    }
 }
