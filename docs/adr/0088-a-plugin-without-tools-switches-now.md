@@ -26,7 +26,7 @@ added; the ratchet question does not arise.
    interceptors at points that do not shape a request switches now;
    one that contributes a tool, provider, store, surface, service,
    context contributor, or an interceptor at a request-shaping point
-   (`prompt.compose`) switches at the next start. A process plugin is
+   (`prompt.compose`, `tool.describe`, `turn.step`) switches at the next start. A process plugin is
    always next start.
 2. **Every contribution remembers its plugin.** `Link` and the command
    table carry the plugin id; the registry keeps the running switch set
