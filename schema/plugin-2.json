@@ -719,6 +719,22 @@
         {
           "type": "object",
           "properties": {
+            "handled": {
+              "type": "boolean"
+            },
+            "kind": {
+              "type": "string",
+              "const": "handled"
+            }
+          },
+          "required": [
+            "kind",
+            "handled"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
             "message": {
               "type": [
                 "string",
@@ -6457,6 +6473,16 @@
               "items": {
                 "$ref": "#/$defs/View"
               }
+            },
+            "onKey": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Action"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "key": {
               "type": [

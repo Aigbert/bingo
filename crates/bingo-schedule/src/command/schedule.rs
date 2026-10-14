@@ -25,6 +25,7 @@ impl ScheduleCommand {
 impl Command for ScheduleCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: "schedule".into(),
             aliases: vec!["schedules".into()],

@@ -139,6 +139,7 @@ impl PromoteCommand {
 impl Command for PromoteCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: ACTION.into(),
             aliases: Vec::new(),

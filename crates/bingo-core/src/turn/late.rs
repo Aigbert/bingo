@@ -133,13 +133,14 @@ impl HookSet {
                     .map_or(Tier::Tighten, |grant| grant.tier);
                 let tier = source.tier(&external.plugin).await.unwrap_or(fallback);
                 links.push(crate::chain::Link {
+                    placement: bingo_sdk::plugin::Placement::Outer,
                     external: Some(external.plugin),
                     interceptor: external.link,
                     tier,
                 });
             }
         }
-        links
+        crate::chain::ordered(links)
     }
 
     pub fn fixed(hooks: Vec<Arc<dyn Hook>>) -> Self {

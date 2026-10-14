@@ -316,6 +316,7 @@ fn invalid(what: String) -> KernelError {
 impl Command for McpCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: "mcp".into(),
             aliases: Vec::new(),

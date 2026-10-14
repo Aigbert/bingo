@@ -1243,6 +1243,7 @@ mod tests {
         let state = state();
         let (mut ui, now) = scene();
         ui.catalogs.commands = vec![bingo_sdk::CommandSpec {
+            keys: vec![],
             hidden: false,
             name: "model".into(),
             aliases: vec![],
@@ -1264,6 +1265,7 @@ mod tests {
         let state = state();
         let (mut ui, now) = scene();
         ui.catalogs.commands = vec![bingo_sdk::CommandSpec {
+            keys: vec![],
             hidden: false,
             name: "plugins".into(),
             aliases: vec!["modules".into()],

@@ -50,6 +50,7 @@ fn host(weak: &Weak<Host>) -> Result<Arc<Host>, KernelError> {
 
 fn spec(name: &str, hint: &str, args: ArgSpec, instant: bool) -> CommandSpec {
     CommandSpec {
+        keys: vec![],
         hidden: false,
         name: name.into(),
         aliases: Vec::new(),

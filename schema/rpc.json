@@ -5904,6 +5904,16 @@
                 "$ref": "#/$defs/View"
               }
             },
+            "onKey": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Action"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "key": {
               "type": [
                 "string",

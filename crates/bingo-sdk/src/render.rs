@@ -265,3 +265,9 @@ impl From<RenderRequest> for PullRequest {
         }
     }
 }
+
+/// A control may return the key to the asking surface.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct HandlerResult {
+    pub handled: bool,
+}

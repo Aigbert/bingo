@@ -125,6 +125,7 @@ impl Plugin for FixturePlugin {
         registrar.tool(Arc::new(Echo));
         registrar.add(Contribution::Compactor(Arc::new(Compact)));
         registrar.add(Contribution::Interceptor {
+            placement: bingo_sdk::plugin::Placement::Outer,
             external: None,
             link: self.0.clone(),
         });

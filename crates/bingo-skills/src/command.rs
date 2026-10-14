@@ -69,6 +69,7 @@ impl SkillCommand {
 impl Command for SkillCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: self.skill.name.clone(),
             aliases: Vec::new(),

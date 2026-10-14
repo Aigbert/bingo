@@ -70,6 +70,7 @@ impl Compactor for Hung {
 impl Command for Hung {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: "hang".into(),
             aliases: vec![],

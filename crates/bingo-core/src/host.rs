@@ -527,6 +527,7 @@ impl Host {
             .map(|choice| self.system_blocks(spec, choice))
             .unwrap_or_default();
         TurnConfig {
+            keys: self.settings.kernel.keys.clone(),
             spec: Arc::new(spec.clone()),
             session: crate::spec::stated(spec, choice.as_ref(), summary.clone()),
             cwd: spec.cwd.clone(),

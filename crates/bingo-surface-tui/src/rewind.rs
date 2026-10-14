@@ -161,6 +161,7 @@ mod tests {
 
     fn spec(name: &str) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: name.into(),
             aliases: Vec::new(),

@@ -489,6 +489,16 @@
                 "$ref": "#/$defs/View"
               }
             },
+            "onKey": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Action"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "key": {
               "type": [
                 "string",
@@ -1086,6 +1096,21 @@
         "label"
       ]
     },
+    "Action": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "args": {
+          "default": null
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command."
+    },
     "Direction": {
       "type": "string",
       "enum": [
@@ -1144,21 +1169,6 @@
         "action"
       ],
       "description": "A button: the surface fires `Input::Action` with `action` (ADR-0008 §1)."
-    },
-    "Action": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "args": {
-          "default": null
-        }
-      },
-      "required": [
-        "name"
-      ],
-      "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command."
     },
     "SelectOption": {
       "type": "object",
@@ -3249,6 +3259,12 @@
     "CommandSpec": {
       "type": "object",
       "properties": {
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "hidden": {
           "type": "boolean"
         },

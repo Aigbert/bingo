@@ -81,6 +81,7 @@ impl RewindCommand {
 impl Command for RewindCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: NAME.into(),
             aliases: Vec::new(),

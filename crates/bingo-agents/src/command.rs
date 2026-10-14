@@ -21,6 +21,7 @@ pub struct AgentsCommand;
 impl Command for AgentsCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: "agents".into(),
             aliases: Vec::new(),

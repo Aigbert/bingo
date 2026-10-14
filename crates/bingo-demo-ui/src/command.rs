@@ -51,6 +51,7 @@ pub const RESET_COMMAND: BoardCommand = BoardCommand {
 impl Command for BoardCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: self.name.into(),
             aliases: Vec::new(),

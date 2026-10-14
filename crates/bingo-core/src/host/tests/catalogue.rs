@@ -39,6 +39,7 @@ async fn lifecycle_facts_are_ordered_and_completion_text_follows_the_answer() {
             vec![
                 Contribution::Provider(provider),
                 Contribution::Interceptor {
+                    placement: bingo_sdk::plugin::Placement::Outer,
                     external: None,
                     link: Arc::new(Watch(seen.clone())),
                 },
@@ -134,6 +135,7 @@ async fn a_denied_setting_changes_neither_the_session_nor_the_file() {
             vec![
                 Contribution::Provider(ScriptedProvider::new(vec![])),
                 Contribution::Interceptor {
+                    placement: bingo_sdk::plugin::Placement::Outer,
                     external: None,
                     link: Arc::new(DenySetting),
                 },
@@ -194,6 +196,7 @@ async fn a_passive_observer_cannot_hold_a_command_acknowledgement() {
             vec![
                 Contribution::Provider(ScriptedProvider::new(vec![])),
                 Contribution::Interceptor {
+                    placement: bingo_sdk::plugin::Placement::Outer,
                     external: None,
                     link: Arc::new(PausedObserver {
                         entered: entered.clone(),

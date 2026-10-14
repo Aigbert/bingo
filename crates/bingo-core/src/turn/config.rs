@@ -90,6 +90,7 @@ impl Breaker {
 /// Everything a turn reads. Built by the host per session; what arrives after
 /// I/O is a set here and resolved when the turn starts ([`super::late`]).
 pub struct TurnConfig {
+    pub keys: std::collections::BTreeMap<String, String>,
     pub spec: Arc<SessionSpec>,
     pub session: SessionSummary,
     pub cwd: PathBuf,

@@ -25,6 +25,8 @@ pub struct TextStyle {
 #[serde(rename_all = "camelCase")]
 pub struct BoxStyle {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_key: Option<Action>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub flex_direction: Option<Direction>,

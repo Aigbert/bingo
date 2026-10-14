@@ -17,6 +17,10 @@ impl HostApi for TestHost {
             session: session.clone(),
             request: request.clone(),
         });
+        let script = locked(&self.inner.scripts).render.clone();
+        if let Some(script) = script {
+            return script((session.clone(), request)).await;
+        }
         NoHost.render(session, request).await
     }
     async fn complete(

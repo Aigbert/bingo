@@ -265,8 +265,26 @@ pub trait PluginSource: Send + Sync {
     async fn registered(&self, _name: &str, _grant: Result<PluginGrant, String>) {}
 }
 
-/// What a plugin hands the host. One enum so the in-process path and a future
-/// out-of-process bridge share one representation.
+/// A default sits after every ordinary link and before the engine.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum Placement {
+    #[default]
+    Outer,
+    Builtin,
+}
+
+/// What a plugin hands the host.
 pub enum Contribution {
     Tool(Arc<dyn Tool>),
     /// Tools resolved late, from a source that does its I/O elsewhere.
@@ -278,6 +296,7 @@ pub enum Contribution {
     Policy(Arc<dyn PermissionPolicy>),
     Hook(Arc<dyn Hook>),
     Interceptor {
+        placement: Placement,
         external: Option<String>,
         link: Arc<dyn crate::Interceptor>,
     },
@@ -332,7 +351,7 @@ impl fmt::Debug for Contribution {
             Contribution::Provider(p) => write!(f, "Provider({})", p.id()),
             Contribution::Providers(s) => write!(f, "Providers({})", s.id()),
             Contribution::Policy(p) => write!(f, "Policy({})", p.id()),
-            Contribution::Interceptor { external, link } => {
+            Contribution::Interceptor { external, link, .. } => {
                 write!(f, "Interceptor({external:?}, {})", link.id())
             }
             Contribution::Interceptors(source) => write!(f, "Interceptors({})", source.id()),
@@ -501,5 +520,19 @@ mod tests {
         assert!(!disabled.enabled);
         assert_eq!(disabled.reason.as_deref(), Some(SWITCHED_OFF));
         assert_eq!(disabled.from, BUILT_IN);
+    }
+}
+
+#[cfg(test)]
+mod placement_contract {
+    use super::Placement;
+    #[test]
+    fn placement_defaults_outer_and_uses_camel_case() {
+        assert_eq!(Placement::default(), Placement::Outer);
+        assert_eq!(serde_json::to_value(Placement::Builtin).unwrap(), "builtin");
+        assert_eq!(
+            serde_json::from_str::<Placement>("\"outer\"").unwrap(),
+            Placement::Outer
+        );
     }
 }

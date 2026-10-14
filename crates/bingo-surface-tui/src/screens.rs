@@ -586,6 +586,7 @@ fn the_command_dropdown() {
     let state = folded(answered());
     let (mut ui, now) = scene();
     ui.catalogs.commands = vec![bingo_sdk::CommandSpec {
+        keys: vec![],
         hidden: false,
         name: "model".into(),
         aliases: vec![],

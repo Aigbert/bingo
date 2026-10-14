@@ -29,6 +29,7 @@ impl MemoryCommand {
 impl Command for MemoryCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: "memory".into(),
             aliases: Vec::new(),

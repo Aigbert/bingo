@@ -113,6 +113,7 @@ fn summary() -> SessionSummary {
 
 fn config(provider: Arc<ScriptedProvider>, tools: Vec<Arc<dyn Tool>>) -> TurnConfig {
     TurnConfig {
+        keys: Default::default(),
         spec: Arc::new(crate::spec::spec_of(&SessionState::new(summary()))),
         session: summary(),
         cwd: "/tmp".into(),

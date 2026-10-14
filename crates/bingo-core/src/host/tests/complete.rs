@@ -14,6 +14,7 @@ async fn fixture(link: bool) -> (Arc<Host>, Attachment, Arc<ScriptedProvider>) {
     let mut contributions = Vec::new();
     if link {
         contributions.push(Contribution::Interceptor {
+            placement: bingo_sdk::plugin::Placement::Outer,
             external: None,
             link: Arc::new(SideCall),
         });
@@ -162,6 +163,7 @@ impl Interceptor for CountComplete {
 async fn a_completion_crosses_its_kernel_chain_once() {
     let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let (host, attachment, provider) = build(vec![Contribution::Interceptor {
+        placement: bingo_sdk::plugin::Placement::Outer,
         external: None,
         link: Arc::new(CountComplete(count.clone())),
     }])

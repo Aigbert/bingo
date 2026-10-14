@@ -35,6 +35,7 @@ pub const KERNEL_KEYS: &[&str] = &[
     "pictures",
     crate::plugins::KEY,
     "pluginTrust",
+    "keys",
 ];
 
 /// The one key under `pictures`: the spelling every other kernel key uses, and
@@ -110,6 +111,7 @@ pub struct KernelSettings {
     /// Which plugins run, by name: a manifest id for one this build ships, a
     /// directory name for one a bridge found. Absent is on (ADR-0057 §1).
     pub enabled_plugins: BTreeMap<String, bool>,
+    pub keys: BTreeMap<String, String>,
 }
 
 impl KernelSettings {

@@ -19,6 +19,8 @@ use crate::view::View;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandSpec {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keys: Vec<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hidden: bool,
     pub name: String,
@@ -36,6 +38,7 @@ pub struct CommandSpec {
 impl CommandSpec {
     pub fn ui(plugin: &str) -> Self {
         Self {
+            keys: vec![],
             name: format!("{plugin}:ui"),
             aliases: vec![],
             hint: String::new(),
@@ -96,6 +99,9 @@ impl std::fmt::Debug for CommandContext {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum CommandOutcome {
+    Handled {
+        handled: bool,
+    },
     Applied {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         message: Option<String>,
@@ -213,5 +219,29 @@ mod hidden_contract {
         hidden["hidden"] = serde_json::json!(true);
         let spec: CommandSpec = serde_json::from_value(hidden).unwrap();
         assert_eq!(serde_json::to_value(spec).unwrap()["hidden"], true);
+    }
+}
+
+#[cfg(test)]
+mod key_contract {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn default_keys_are_additive_and_handled_is_an_explicit_result() {
+        let old = json!({"name":"hello","hint":"Hello","args":{"kind":"none"},"family":"fixture"});
+        let mut spec: CommandSpec = serde_json::from_value(old).unwrap();
+        assert!(spec.keys.is_empty());
+        assert!(serde_json::to_value(&spec).unwrap().get("keys").is_none());
+        spec.keys.push("ctrl+x".into());
+        assert_eq!(
+            serde_json::from_value::<CommandSpec>(serde_json::to_value(&spec).unwrap()).unwrap(),
+            spec
+        );
+        let wire = json!({"kind":"handled","handled":false});
+        assert_eq!(
+            serde_json::to_value(serde_json::from_value::<CommandOutcome>(wire.clone()).unwrap())
+                .unwrap(),
+            wire
+        );
     }
 }

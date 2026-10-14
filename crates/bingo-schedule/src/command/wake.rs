@@ -72,6 +72,7 @@ fn applied(message: String) -> CommandOutcome {
 impl Command for WakeCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: "wake".into(),
             aliases: Vec::new(),

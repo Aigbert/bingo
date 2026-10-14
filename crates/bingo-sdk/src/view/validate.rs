@@ -56,6 +56,9 @@ fn check(view: &View, answer: Option<(Component, &str, &[&Action])>) -> Result<(
         return Err("view exceeds 4096 nodes".into());
     }
     for (path, node) in nodes {
+        if matches!(node, View::Box { layout, .. } if layout.on_key.is_some()) && !path.is_empty() {
+            return Err(format!("{path}: onKey is only valid at the root"));
+        }
         if let View::Engine { component, .. } = node
             && answer.is_none_or(|(asked, _, _)| asked != *component)
         {
@@ -187,5 +190,20 @@ mod sealed_tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod key_contract {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn one_owned_key_handler_at_the_root_round_trips() {
+        let wire = json!({"kind":"Box","children":[],"onKey":{"name":"owner:ui","args":{"handler":"keys","event":"press"}}});
+        let view: View = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&view).unwrap(), wire);
+        assert!(answer_ok(Component::Pane, &json!({}), "owner", None, &view).is_ok());
+        assert!(answer_ok(Component::Pane, &json!({}), "other", None, &view).is_err());
+        assert!(published_ok(&View::column(vec![view])).is_err());
     }
 }

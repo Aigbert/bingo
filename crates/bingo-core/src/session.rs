@@ -440,10 +440,12 @@ impl Actor {
         if !described.is_null() {
             plugins.insert(policy.id().to_string(), described);
         }
-        let config = ConfigView {
-            kernel: json!({ "thinking": self.config.model.as_ref().and_then(|m| m.reasoning) }),
-            plugins,
-        };
+        let mut kernel =
+            json!({ "thinking": self.config.model.as_ref().and_then(|m| m.reasoning) });
+        if !self.config.keys.is_empty() {
+            kernel["keys"] = json!(self.config.keys);
+        }
+        let config = ConfigView { kernel, plugins };
         if config != self.state.config {
             if self.config.hooks.has_links() {
                 catalogue::rewrite(self, Event::ConfigChanged { config });

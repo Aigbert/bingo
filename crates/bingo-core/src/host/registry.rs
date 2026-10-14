@@ -162,13 +162,18 @@ impl Registry {
                 Ok(())
             }
             Contribution::Policy(policy) => self.set_policy(policy),
-            Contribution::Interceptor { external, link } => {
+            Contribution::Interceptor {
+                external,
+                link,
+                placement,
+            } => {
                 let tier = if external.is_some() {
                     Tier::Tighten
                 } else {
                     Tier::Full
                 };
                 self.links.push(crate::chain::Link {
+                    placement,
                     external,
                     interceptor: link,
                     tier,

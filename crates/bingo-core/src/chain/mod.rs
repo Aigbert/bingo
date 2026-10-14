@@ -4,11 +4,14 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Link {
+    pub placement: bingo_sdk::plugin::Placement,
     pub external: Option<String>,
     pub interceptor: Arc<dyn Interceptor>,
     pub tier: Tier,
 }
 
+mod ordering;
+pub use ordering::ordered;
 mod tier;
 pub use tier::{Act, admits, tightens};
 

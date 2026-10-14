@@ -33,6 +33,7 @@ impl Interceptor for AnswerPoints {
 }
 fn full(interceptor: Arc<dyn Interceptor>) -> crate::chain::Link {
     crate::chain::Link {
+        placement: bingo_sdk::plugin::Placement::Outer,
         interceptor,
         external: None,
         tier: Tier::Full,
@@ -118,6 +119,7 @@ async fn a_tighten_link_at_turn_step_observes_only() {
     let provider = ScriptedProvider::new(vec![Script::Events(text("from provider"))]);
     let mut cfg = config(provider.clone(), vec![]);
     cfg.hooks.links.push(crate::chain::Link {
+        placement: bingo_sdk::plugin::Placement::Outer,
         interceptor: Arc::new(AnswerPoints),
         external: Some("untrusted".into()),
         tier: Tier::Tighten,

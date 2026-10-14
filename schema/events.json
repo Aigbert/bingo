@@ -24,8 +24,29 @@
       },
       "result": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "null",
-        "type": "null"
+        "title": "Nullable_HandlerResult",
+        "anyOf": [
+          {
+            "$ref": "#/$defs/HandlerResult"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "$defs": {
+          "HandlerResult": {
+            "description": "A control may return the key to the asking surface.",
+            "type": "object",
+            "properties": {
+              "handled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "handled"
+            ]
+          }
+        }
       },
       "matcher": [
         "handler",
@@ -584,6 +605,16 @@
                 "items": {
                   "$ref": "#"
                 }
+              },
+              "onKey": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Action"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "key": {
                 "type": [
@@ -1182,6 +1213,21 @@
               "label"
             ]
           },
+          "Action": {
+            "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "args": {
+                "default": null
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
           "Direction": {
             "type": "string",
             "enum": [
@@ -1239,21 +1285,6 @@
             "required": [
               "label",
               "action"
-            ]
-          },
-          "Action": {
-            "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "args": {
-                "default": null
-              }
-            },
-            "required": [
-              "name"
             ]
           },
           "SelectOption": {
@@ -2664,6 +2695,16 @@
                       "$ref": "#/$defs/View"
                     }
                   },
+                  "onKey": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "key": {
                     "type": [
                       "string",
@@ -3261,6 +3302,21 @@
               "label"
             ]
           },
+          "Action": {
+            "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "args": {
+                "default": null
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
           "Direction": {
             "type": "string",
             "enum": [
@@ -3318,21 +3374,6 @@
             "required": [
               "label",
               "action"
-            ]
-          },
-          "Action": {
-            "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "args": {
-                "default": null
-              }
-            },
-            "required": [
-              "name"
             ]
           },
           "SelectOption": {
@@ -6598,6 +6639,16 @@
                       "$ref": "#/$defs/View"
                     }
                   },
+                  "onKey": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "key": {
                     "type": [
                       "string",
@@ -7195,6 +7246,21 @@
               "label"
             ]
           },
+          "Action": {
+            "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "args": {
+                "default": null
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
           "Direction": {
             "type": "string",
             "enum": [
@@ -7252,21 +7318,6 @@
             "required": [
               "label",
               "action"
-            ]
-          },
-          "Action": {
-            "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "args": {
-                "default": null
-              }
-            },
-            "required": [
-              "name"
             ]
           },
           "SelectOption": {
@@ -8908,6 +8959,22 @@
               {
                 "type": "object",
                 "properties": {
+                  "handled": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "handled"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "handled"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
                   "message": {
                     "type": [
                       "string",
@@ -9257,6 +9324,16 @@
                     "items": {
                       "$ref": "#/$defs/View"
                     }
+                  },
+                  "onKey": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "key": {
                     "type": [
@@ -9855,6 +9932,21 @@
               "label"
             ]
           },
+          "Action": {
+            "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "args": {
+                "default": null
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
           "Direction": {
             "type": "string",
             "enum": [
@@ -9912,21 +10004,6 @@
             "required": [
               "label",
               "action"
-            ]
-          },
-          "Action": {
-            "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "args": {
-                "default": null
-              }
-            },
-            "required": [
-              "name"
             ]
           },
           "SelectOption": {
@@ -10592,6 +10669,12 @@
         "title": "CommandSpec",
         "type": "object",
         "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "hidden": {
             "type": "boolean"
           },
@@ -10731,6 +10814,12 @@
           "CommandSpec": {
             "type": "object",
             "properties": {
+              "keys": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "hidden": {
                 "type": "boolean"
               },

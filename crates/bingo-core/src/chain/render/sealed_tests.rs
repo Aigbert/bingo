@@ -43,6 +43,7 @@ async fn rewriting_through_next_returns_engine_alone_and_names_the_mod() {
     for rewrite in [false, true] {
         let report = Report::default();
         let links = [Link {
+            placement: bingo_sdk::plugin::Placement::Outer,
             external: Some("sealed-frame".into()),
             interceptor: Arc::new(Wrap(rewrite)),
             tier: Tier::Rewrite,

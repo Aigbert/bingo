@@ -331,6 +331,7 @@ async fn a_full_link_answers_a_call_without_running_the_tool() {
         vec![Arc::new(EchoTool { read_only: true })],
         |cfg| {
             cfg.hooks.links.push(crate::chain::Link {
+                placement: bingo_sdk::plugin::Placement::Outer,
                 external: None,
                 interceptor: Arc::new(Answering),
                 tier: Tier::Full,
@@ -406,6 +407,7 @@ async fn a_bridged_after_tool_block_completes_at_the_round_boundary() {
         move |cfg| {
             cfg.hooks = crate::turn::HookSet::fixed(vec![Arc::new(BlockAfter)]);
             cfg.hooks.links.push(crate::chain::Link {
+                placement: bingo_sdk::plugin::Placement::Outer,
                 interceptor: link.clone(),
                 external: None,
                 tier: Tier::Full,
@@ -499,6 +501,7 @@ async fn a_call_still_running_when_its_turn_completes_is_not_called_an_interrupt
     let link = Arc::new(HeldStep(release.clone()));
     let mailbox = start_with(streaming(), vec![Arc::new(Hanging)], move |cfg| {
         cfg.hooks.links.push(crate::chain::Link {
+            placement: bingo_sdk::plugin::Placement::Outer,
             interceptor: link.clone(),
             external: None,
             tier: Tier::Full,

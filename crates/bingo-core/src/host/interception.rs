@@ -151,13 +151,14 @@ async fn registration_links(host: &Host) -> Vec<crate::chain::Link> {
                 })
                 .unwrap_or(Tier::Tighten);
             links.push(crate::chain::Link {
+                placement: bingo_sdk::plugin::Placement::Outer,
                 external: Some(external.plugin),
                 interceptor: external.link,
                 tier,
             });
         }
     }
-    links
+    crate::chain::ordered(links)
 }
 
 async fn protect_grants(host: &Host, catalog: &mut Catalog) {

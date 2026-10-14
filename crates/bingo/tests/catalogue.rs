@@ -72,6 +72,7 @@ impl bingo_sdk::Plugin for Watching {
     }
     fn register(&self, registrar: &mut bingo_sdk::Registrar) -> Result<(), bingo_sdk::PluginError> {
         registrar.add(bingo_sdk::Contribution::Interceptor {
+            placement: bingo_sdk::plugin::Placement::Outer,
             external: None,
             link: std::sync::Arc::new(FaceWatch(self.0.clone())),
         });

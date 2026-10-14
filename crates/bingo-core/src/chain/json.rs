@@ -163,6 +163,7 @@ mod tests {
     #[tokio::test]
     async fn completion_wraps_the_text_from_beneath() {
         let links = [Link {
+            placement: bingo_sdk::plugin::Placement::Outer,
             external: None,
             interceptor: Arc::new(Answer),
             tier: Tier::Rewrite,
@@ -227,6 +228,7 @@ mod contracts {
     }
     fn link(key: &'static str, value: Value, tier: Tier) -> Vec<Link> {
         vec![Link {
+            placement: bingo_sdk::plugin::Placement::Outer,
             interceptor: Arc::new(Rewrite(key, value)),
             external: None,
             tier,

@@ -10,6 +10,7 @@ pub const ELEMENTS: &[Element] = &[
     Element {
         kind: "Box",
         props: &[
+            "onKey",
             "key",
             "flexDirection",
             "flexGrow",

@@ -156,6 +156,9 @@ fn fold_value(
     let Some((_, last)) = live.last() else {
         return Ok(None);
     };
+    if path == "keys" {
+        return Ok(Some((*last).clone()));
+    }
     if live.iter().all(|(_, v)| v.is_object()) {
         let objects: Vec<(&str, &Map<String, Value>)> = live
             .iter()
@@ -265,6 +268,7 @@ fn kernel_settings(
         models: typed(merged, layers, "models")?.unwrap_or_default(),
         plugin_trust: user_grants(layers)?,
         enabled_plugins: typed(merged, layers, crate::plugins::KEY)?.unwrap_or_default(),
+        keys: typed(merged, layers, "keys")?.unwrap_or_default(),
     })
 }
 
@@ -669,5 +673,29 @@ mod tests {
             matches!(&err, SettingsError::Type { key, layer, .. } if key == "maxTokens" && layer == "project"),
             "{err}"
         );
+    }
+}
+
+#[cfg(test)]
+mod key_tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn keys_replace_as_a_whole_and_reject_non_strings() {
+        let layer = |value| Layer::new("keys", serde_json::from_value(value).unwrap());
+        let result = merge(
+            &[
+                layer(json!({"keys":{"ctrl+x":"/one"}})),
+                layer(json!({"keys":{"alt+x":"/two"}})),
+            ],
+            &[],
+        )
+        .unwrap();
+        assert_eq!(
+            result.kernel.keys,
+            BTreeMap::from([("alt+x".into(), "/two".into())])
+        );
+        assert!(result.unknown.is_empty());
+        assert!(merge(&[layer(json!({"keys":{"ctrl+x":false}}))], &[]).is_err());
     }
 }

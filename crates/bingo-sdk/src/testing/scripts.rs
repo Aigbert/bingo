@@ -22,6 +22,7 @@ type CompletionScript = Script<(SessionId, Option<TurnId>, Completion), Vec<Mode
 #[derive(Default)]
 pub(super) struct Scripts {
     pub complete: Option<CompletionScript>,
+    pub render: Option<Script<(SessionId, crate::render::RenderRequest), View>>,
     pub sessions: Option<Script<(SessionFilter,), Vec<SessionSummary>>>,
     pub open: Option<Script<(SessionSelector, ClientIdentity, OpenOptions), Attachment>>,
     pub close: Option<Script<(SessionId, CloseReason), ()>>,
@@ -47,6 +48,16 @@ pub(super) struct ImmediateScripts {
 }
 
 impl TestHost {
+    pub fn on_render<F, Fut>(&self, script: F)
+    where
+        F: Fn(SessionId, crate::render::RenderRequest) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<View, KernelError>> + Send + 'static,
+    {
+        locked(&self.inner.scripts).render = Some(Arc::new(move |(session, request)| {
+            Box::pin(script(session, request))
+        }));
+    }
+
     /// Override `complete`; the call is recorded before this script runs.
     pub fn on_complete<F, Fut>(&self, script: F)
     where

@@ -395,6 +395,7 @@ pub fn config(
     tool_host: Arc<dyn ToolHost>,
 ) -> crate::turn::TurnConfig {
     crate::turn::TurnConfig {
+        keys: Default::default(),
         spec: Arc::new(crate::spec::spec_of(&SessionState::new(summary("ses_1")))),
         session: summary("ses_1"),
         cwd: "/tmp".into(),
@@ -523,6 +524,7 @@ impl ScriptedCommand {
 impl Command for ScriptedCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            keys: vec![],
             hidden: false,
             name: self.name.into(),
             aliases: Vec::new(),

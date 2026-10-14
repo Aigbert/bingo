@@ -104,6 +104,9 @@ impl Actor {
             self.cancel_command_interactions().await?;
         }
         match outcome {
+            Ok(CommandOutcome::Handled { handled }) => {
+                self.applied(intent, json!({"handled": handled})).await?;
+            }
             Ok(CommandOutcome::Applied { message }) => {
                 let result = match message {
                     Some(message) => json!({ "message": message }),

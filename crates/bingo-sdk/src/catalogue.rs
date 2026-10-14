@@ -123,7 +123,7 @@ const WATCH: Acts = Acts {
 };
 
 catalogue! {
-    UI_PRESS: "ui.press", Chain, crate::render::HandlerEvent => (), &["handler", "event"], &["/handler", "/event"], WRAP;
+    UI_PRESS: "ui.press", Chain, crate::render::HandlerEvent => Option<crate::render::HandlerResult>, &["handler", "event"], &["/handler", "/event"], WRAP;
     UI_INPUT: "ui.input", Chain, crate::render::HandlerEvent => (), &["handler", "event"], &["/handler", "/event"], WRAP;
     UI_SELECT: "ui.select", Chain, crate::render::HandlerEvent => (), &["handler", "event"], &["/handler", "/event"], WRAP;
     UI_RENDER: "ui.render", Chain, crate::render::RenderRequest => crate::View, &["component", "requestId", "surface"], &["/component", "/requestId", "/surface", "/viewport"], WRAP;

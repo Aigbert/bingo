@@ -35,6 +35,7 @@ pub fn nodes(root: &View) -> Vec<(String, &View)> {
 
 pub fn handlers(view: &View) -> Vec<&Action> {
     match view {
+        View::Box { layout, .. } => layout.on_key.iter().collect(),
         View::Button { button, .. } => button.on_press.iter().collect(),
         View::Input { input } => input
             .on_input
