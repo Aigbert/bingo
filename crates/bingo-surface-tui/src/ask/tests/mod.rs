@@ -252,3 +252,25 @@ fn ctrl_g_leaves_the_change_editor_and_the_hint_names_it() {
     assert!(ui.dialog.words.is_none());
     assert!(ui.dialog.changing.is_none());
 }
+
+#[test]
+fn escape_ends_the_turn_from_aside_and_from_the_change_editor() {
+    for editing in [false, true] {
+        let (tree, mut ui, now) = scene_for(permission(None, None), true);
+        if editing {
+            crate::input::on_key(&mut ui, &tree, typed('3'), now);
+            assert!(ui.dialog.changing.is_some());
+        } else {
+            crate::input::on_key(&mut ui, &tree, typed('x'), now);
+            assert!(ui.dialog.aside);
+        }
+        let effects = crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
+        assert!(matches!(
+            effects.as_slice(),
+            [crate::effect::Effect::StopInteraction {
+                answer: Answer::Deny { .. },
+                ..
+            }]
+        ));
+    }
+}
