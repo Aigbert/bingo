@@ -314,3 +314,17 @@ mod cache_write_contract {
         assert_eq!(serde_json::to_value(price).unwrap()["cacheWrite"], 1.25);
     }
 }
+
+#[cfg(test)]
+mod embedded_prices {
+    use super::*;
+    #[test]
+    fn anthropic_snapshot_includes_cache_write_pricing() {
+        let price = ModelCatalog::embedded()
+            .lookup("anthropic", "claude-sonnet-4-5")
+            .unwrap()
+            .price
+            .unwrap();
+        assert!(price.cache_write.is_some_and(|price| price > 0.0));
+    }
+}
