@@ -61,7 +61,10 @@ static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.mods",
     version: env!("CARGO_PKG_VERSION"),
     uses: &[],
-    provides: &["service:bingo.plugin-host.callbacks"],
+    provides: &[
+        "service:bingo.plugin-host.callbacks",
+        "service:bingo.mods.pages",
+    ],
     requires: &[],
     config: Some(ConfigClaim {
         keys: &[("mods", Merge::ByName)],
@@ -74,6 +77,7 @@ impl Plugin for ModsPlugin {
         &MANIFEST
     }
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+        registrar.add(crate::guide::contribution(registrar));
         let manager = Arc::new(Manager::new(
             registrar.env().clone(),
             self.directories.clone(),

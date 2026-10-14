@@ -126,6 +126,28 @@ fn a_plugin_s_page_is_a_skill_the_model_can_read_by_name() {
 }
 
 #[test]
+fn the_mods_page_loads_through_the_skill_tool() {
+    let home = tempfile::tempdir().unwrap();
+    let script = script(
+        r#"{"responses":[
+            {"steps":[{"toolCall":{"name":"Skill","input":{"name":"guide-mods"}}}]},
+            {"steps":[{"text":"read"}]}
+        ]}"#,
+    );
+    let out = run(bingo()
+        .env("BINGO_FAKE_SCRIPT", script.path())
+        .args(["--print", "--output-format", "json", "--cwd"])
+        .arg(home.path())
+        .arg("what are mods?")
+        .envs(home_env(home.path())));
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
+    assert_eq!(
+        tool_result(&out, "Skill"),
+        include_str!("../../../bingo-mods/src/guide.md")
+    );
+}
+
+#[test]
 fn the_prompt_lists_the_pages_the_loaded_plugins_wrote() {
     let home = tempfile::tempdir().unwrap();
     // The fake provider answers only a request that carries this text, and the
@@ -163,6 +185,7 @@ fn the_prompt_lists_a_page_for_every_plugin_that_owns_a_noun() {
         "guide-hooks",
         "guide-mcp",
         "guide-memory",
+        "guide-mods",
         "guide-permissions",
         "guide-persona",
         "guide-rewind",
