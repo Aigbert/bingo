@@ -94,7 +94,7 @@ async fn shape_contract_and_duplicate_registration() {
             .is_err()
     );
     assert!(
-        provider::add_provider(&host, "fake", "local", "http://up")
+        provider::add_provider(&host, "local", "local", "http://up")
             .await
             .is_err()
     );
@@ -146,6 +146,17 @@ async fn a_removed_or_replaced_provider_cannot_publish_a_late_probe() {
 }
 
 #[tokio::test]
+async fn unregistered_family_names_are_not_reserved_by_the_kernel() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = build(dir.path(), 1).await.unwrap();
+    assert!(
+        provider::add_provider(&host, "fake", "local", "http://up")
+            .await
+            .is_ok()
+    );
+}
+
+#[tokio::test]
 async fn adding_cannot_adopt_an_existing_credential() {
     let dir = tempfile::tempdir().unwrap();
     let host = build(dir.path(), 1).await.unwrap();
@@ -157,3 +168,4 @@ async fn adding_cannot_adopt_an_existing_credential() {
     assert!(host.providers().await.is_empty());
     assert!(!crate::settings::user_path(host.env()).exists());
 }
+

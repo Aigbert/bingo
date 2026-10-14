@@ -22,7 +22,8 @@ pub(crate) async fn add_provider(
     };
     let provider = {
         let _edit = host.registry.provider_state.instances.edit.lock().await;
-        if host.providers().await.iter().any(|p| p.id() == name)
+        if host.registry.provider_state.shapes.contains_key(name)
+            || host.providers().await.iter().any(|p| p.id() == name)
             || host.registry.endpoint_name_taken(name)
         {
             return Err(invalid("that provider name is already registered"));

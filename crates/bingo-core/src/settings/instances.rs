@@ -13,9 +13,6 @@ pub fn validate_name(name: &str) -> Result<(), KernelError> {
             "a provider name uses only ASCII letters, digits, `_` and `-`",
         ));
     }
-    if ["openai", "anthropic", "codex", "fake"].contains(&name) {
-        return Err(invalid("that name belongs to a built-in provider"));
-    }
     Ok(())
 }
 
