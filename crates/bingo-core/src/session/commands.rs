@@ -279,7 +279,7 @@ impl Commands {
             cancel: cancel.clone(),
             session: self.session.clone(),
             cwd: self.lookup.cwd.clone(),
-            host: HostHandle(host),
+            host: crate::host::plugin::handle(HostHandle(host)),
         };
         let Run {
             intent,

@@ -108,7 +108,11 @@ write's whole file in place.
   actor on resolution.
 - Keep the surface's old question/form machinery only as the disabled-mod fallback required by ADR-0086;
   the active builtin draws and drives the new list and field layout. No new host door is needed: handlers
-  use the existing session port and the supervised action acknowledgement.
+  return a chosen answer in the supervised action acknowledgement; the surface resolves it.
+- Review: plugin handles carry unforgeable provenance; Permission answers from plugins are refused
+  even with a terminal identity. ADR-0086 now states this boundary. Mod key requests contain the
+  minted question props, so no per-key session snapshot is needed. An event hook releases state at
+  resolution/cancellation. Tests enable the existing SDK testing feature; no new dependency.
 
 - The existing Question site represents both forms and questions. A single, untitled form uses the choice
   list while still returning `Answer::Form`; AskUserQuestion uses that wire shape even when it asks one

@@ -85,6 +85,7 @@ impl Actor {
         id: &InteractionId,
         answer: &Answer,
         activation: Activation,
+        plugin: bool,
     ) -> Option<(ErrorCode, String)> {
         let Some(pending) = self.pending.get(id) else {
             return Some((
@@ -92,6 +93,9 @@ impl Actor {
                 "no such open interaction".into(),
             ));
         };
+        if plugin && matches!(pending.interaction.kind, InteractionKind::Permission { .. }) {
+            return Some((ErrorCode::PermissionDenied, "plugins cannot answer permission interactions".into()));
+        }
         if !pending.interaction.answers.contains(&answer.spec()) {
             return Some((
                 ErrorCode::InvalidInput,
@@ -118,8 +122,9 @@ impl Actor {
             answer,
             activation,
             who,
+            plugin,
         } = answered;
-        if let Some((code, message)) = self.refuse(&id, &answer, activation) {
+        if let Some((code, message)) = self.refuse(&id, &answer, activation, plugin) {
             return self.reject(intent, code, message).await;
         }
         let Some(pending) = self.pending.remove(&id) else {
@@ -131,10 +136,7 @@ impl Actor {
             Event::InteractionResolved {
                 id,
                 answer,
-                by: ResolvedBy::Client {
-                    name: who.name,
-                    surface: who.surface,
-                },
+                by: if plugin { ResolvedBy::Plugin { name: who.name, surface: who.surface } } else { ResolvedBy::Client { name: who.name, surface: who.surface } },
             },
             Some(intent.clone()),
         )

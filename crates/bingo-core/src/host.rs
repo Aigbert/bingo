@@ -15,6 +15,7 @@ mod interception;
 mod live;
 pub(crate) mod model_switch;
 pub(crate) mod pins;
+pub(crate) mod plugin;
 use live::Live;
 mod refresh;
 mod registry;
@@ -195,7 +196,7 @@ impl Host {
                 continue;
             }
             plugin
-                .start(self.handle())
+                .start(plugin::handle(self.handle()))
                 .await
                 .map_err(|source| HostError::Start {
                     plugin: manifest.id.to_string(),
@@ -533,7 +534,7 @@ impl Host {
             },
             budget: self.config.budget,
             env: Arc::new(self.config.env.clone()),
-            host: self.handle(),
+            host: plugin::handle(self.handle()),
             tool_host: Arc::new(SessionToolHost {
                 mailbox: mailbox.clone(),
             }),

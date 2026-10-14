@@ -46,6 +46,16 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
     };
     if let Some((_, open)) = run.session.tree.open_interaction()
         && open.id.as_str() == pending.focus
+        && matches!(open.kind, bingo_sdk::InteractionKind::Question(_) | bingo_sdk::InteractionKind::Form { .. })
+        && let IntentOutcome::Applied { result } = outcome
+        && let Ok(answer) = serde_json::from_value::<bingo_sdk::Answer>(result["answer"].clone())
+        && open.answers.contains(&answer.spec())
+    {
+        run.answer(open.id.clone(), answer, bingo_sdk::Activation::Keyboard);
+        return;
+    }
+    if let Some((_, open)) = run.session.tree.open_interaction()
+        && open.id.as_str() == pending.focus
         && !run.ui.dialog.aside
         && matches!(outcome, IntentOutcome::Applied { result } if result["handled"] == false)
     {

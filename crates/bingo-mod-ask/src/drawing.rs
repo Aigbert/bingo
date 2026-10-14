@@ -35,9 +35,9 @@ impl Interceptor for Drawing {
             .0
             .lock()
             .map_err(error)?
-            .get(&(cx.session.clone(), id.to_string()))
-            .cloned()
-            .unwrap_or_default();
+            .entry((cx.session.clone(), id.to_string()))
+            .or_default()
+            .clone();
         serde_json::to_value(tree(&props, &state, &request.request_id, &cx.session)).map_err(error)
     }
 }
@@ -71,7 +71,7 @@ pub fn tree(
         layout: Box::new(view::BoxStyle {
             on_key: Some(Action {
                 name: "ask:ui".into(),
-                args: json!({"handler":props.interaction_id,"event":"press","request":request,"session":session}),
+                args: json!({"handler":props.interaction_id,"event":"press","request":request,"session":session,"props":props}),
             }),
             ..Default::default()
         }),

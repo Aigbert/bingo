@@ -295,3 +295,41 @@ async fn a_session_this_host_does_not_run_is_never_answered_for() {
         .expect_err("no such session");
     assert_eq!(error.code, ErrorCode::SessionNotFound);
 }
+
+struct BorrowedHost(Arc<std::sync::Mutex<Option<HostHandle>>>);
+#[async_trait]
+impl Plugin for BorrowedHost {
+    fn manifest(&self) -> &'static PluginManifest { &STANCE }
+    fn register(&self, _: &mut Registrar) -> Result<(), PluginError> { Ok(()) }
+    async fn start(&self, host: HostHandle) -> Result<(), PluginError> {
+        *self.0.lock().unwrap() = Some(host);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn a_plugins_host_handle_cannot_approve_a_permission() {
+    let borrowed = Arc::new(std::sync::Mutex::new(None));
+    let plugins: Vec<Box<dyn Plugin>> = vec![
+        TestPlugin::boxed(&PROVIDER, vec![Contribution::Provider(ScriptedProvider::new(vec![]))]),
+        Box::new(BorrowedHost(borrowed.clone())),
+    ];
+    let host = Host::build(plugins, HostConfig::new(env()).with_layer("cli", json!({"model":"m"}))).await.unwrap();
+    let mut person = attach(&host).await;
+    let session = person.session.clone();
+    let asking = host.clone();
+    let pending = tokio::spawn(async move { asking.ask(&session,
+        serde_json::from_value(json!({"kind":"permission","tool":"Echo","summary":"may I?"})).unwrap(),
+        vec![AnswerSpec::AllowOnce, AnswerSpec::Deny]).await });
+    let id = opened(&mut person).await;
+    let plugin = borrowed.lock().unwrap().clone().unwrap();
+    let forged = plugin.open(SessionSelector::ById { id: person.session.clone() },
+        ClientIdentity { name: "ask".into(), surface: "terminal".into() }, OpenOptions { children: true, ..Default::default() }).await.unwrap();
+    let intent = IntentId::mint();
+    forged.handle.answer(intent.clone(), id.clone(), Answer::AllowOnce, Activation::Programmatic);
+    let events = frames_to_the_mark(&host, &mut person).await;
+    assert!(events.iter().any(|e| matches!(e, Event::IntentAck { intent: i, outcome: IntentOutcome::Rejected { error } } if i == &intent && error.code == ErrorCode::PermissionDenied)), "{events:?}");
+    person.handle.answer(IntentId::mint(), id, Answer::Deny { feedback: None }, Activation::Programmatic);
+    assert!(matches!(pending.await.unwrap().unwrap(), Answer::Deny { .. }));
+    host.shutdown().await;
+}

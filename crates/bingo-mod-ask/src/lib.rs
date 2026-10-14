@@ -2,6 +2,7 @@
 pub mod drawing;
 mod guide;
 mod handlers;
+mod cleanup;
 pub mod state;
 use bingo_sdk::*;
 use std::{
@@ -29,6 +30,7 @@ impl Plugin for Ask {
         registrar.add(Contribution::Command(Arc::new(handlers::Handler(
             states.clone(),
         ))));
+        registrar.add(Contribution::Hook(Arc::new(cleanup::Cleanup(states.clone()))));
         registrar.add(Contribution::Interceptor {
             placement: plugin::Placement::Builtin,
             external: None,
@@ -36,5 +38,16 @@ impl Plugin for Ask {
         });
         registrar.add(guide::contribution(registrar));
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn interaction_resolution_has_a_cleanup_observer() {
+        let mut registrar = Registrar::new("ask", serde_json::json!({}), Env::rooted("/unused"), Default::default());
+        Ask.register(&mut registrar).unwrap();
+        assert!(registrar.into_contributions().iter().any(|c| matches!(c, Contribution::Hook(h) if h.matcher().points.contains(&HookPoint::Event))));
     }
 }

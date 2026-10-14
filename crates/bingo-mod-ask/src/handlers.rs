@@ -15,73 +15,30 @@ impl Command for Handler {
         if args["event"] != "press" || key == "esc" || key == "ctrl+c" {
             return Ok(handled(false));
         }
-        let attachment = cx
-            .host
-            .open(
-                SessionSelector::ById {
-                    id: session.clone(),
-                },
-                ClientIdentity {
-                    name: "ask".into(),
-                    surface: "terminal".into(),
-                },
-                OpenOptions::default(),
-            )
-            .await?;
-        let Some(open) = attachment
-            .snapshot
-            .interactions
-            .iter()
-            .find(|open| open.id.as_str() == id)
-        else {
-            return Ok(handled(false));
-        };
-        let (used, answer) = answer(&self.0, &session, &attachment.snapshot, open, key)?;
-        if let Some(answer) = answer {
-            attachment.handle.answer(
-                IntentId::mint(),
-                open.id.clone(),
-                answer,
-                Activation::Keyboard,
-            );
-        }
+        let props: component::QuestionProps = serde_json::from_value(args["props"].clone()).map_err(error)?;
+        let (used, answer) = answer(&self.0, &session, id, &props, key)?;
         cx.host
             .invalidate(
                 &session,
                 vec![args["request"].as_str().unwrap_or_default().into()],
             )
             .await?;
-        Ok(handled(used))
+        Ok(answer.map_or_else(|| handled(used), |answer| CommandOutcome::Answer { answer }))
     }
 }
 fn answer(
     states: &States,
     session: &SessionId,
-    snapshot: &SessionState,
-    open: &Interaction,
+    id: &str,
+    props: &component::QuestionProps,
     key: &str,
 ) -> Result<(bool, Option<Answer>), KernelError> {
-    let (questions, form, field_layout) = match &open.kind {
-        InteractionKind::Question(question) => (std::slice::from_ref(question), false, false),
-        InteractionKind::Form { questions, title } => (
-            questions.as_slice(),
-            true,
-            crate::state::fields(questions.len(), title.is_some()),
-        ),
-        _ => return Ok((false, None)),
-    };
+    let questions = &props.questions;
+    let form = props.form;
+    let field_layout = form && crate::state::fields(questions.len(), props.metadata_source.is_some());
     let mut states = states.lock().map_err(error)?;
-    states.retain(|(owner, id), _| {
-        owner != session
-            || snapshot
-                .interactions
-                .iter()
-                .any(|open| open.id.as_str() == id)
-    });
-    let (used, answer) = states
-        .entry((session.clone(), open.id.to_string()))
-        .or_default()
-        .key(questions, field_layout, key);
+    let Some(state) = states.get_mut(&(session.clone(), id.into())) else { return Ok((false, None)); };
+    let (used, answer) = state.key(questions, field_layout, key);
     let answer = answer.map(|answer| {
         if form && !field_layout {
             Answer::Form {
@@ -99,4 +56,27 @@ fn handled(handled: bool) -> CommandOutcome {
 }
 fn error(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::InvalidInput, error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn a_key_returns_the_answer_without_opening_a_session() {
+        let states = States::default();
+        let session = SessionId::from_raw("s");
+        states.lock().unwrap().insert((session.clone(), "q".into()), Default::default());
+        let args = json!({"handler":"q","session":"s","event":"press","request":"q", "value":{"key":"2"},
+            "props":{"questions":[{"question":"Route?", "options":[{"id":"a","label":"Alpha"},{"id":"b","label":"Beta"}],"multi":false,"freeText":false}]}});
+        let handler = Handler(states);
+        let args = args.to_string();
+        let cx = CommandContext {
+            session, cwd: "/unused".into(), host: bingo_sdk::testing::NoHost::handle(), cancel: Default::default()
+        };
+        let mut future = std::pin::pin!(handler.run(&args, &cx));
+        let std::task::Poll::Ready(result) = std::future::Future::poll(future.as_mut(), &mut std::task::Context::from_waker(std::task::Waker::noop())) else { panic!("unexpected host request") };
+        let result = serde_json::to_value(result.unwrap()).unwrap();
+        assert_eq!(result["answer"], json!({"kind":"choice","ids":["b"]}));
+    }
 }

@@ -344,6 +344,7 @@ pub enum Activation {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ResolvedBy {
     Client { name: String, surface: String },
+    Plugin { name: String, surface: String },
     Kernel,
     Policy,
 }

@@ -57,7 +57,11 @@ existing supervised action mailbox; ready render answers need no channel hop.
 7. **What stays with the surface:** the composer's editing core
    (buffer, cursor, IME, history, paste), focus and layout, `/exit`,
    `/clear`, and the sealed sites: the permission ask, sign-in, and the
-   KeyBar while one of them is open (ADR-0082 §6, ADR-0084 §4).
+   KeyBar while one of them is open (ADR-0082 §6, ADR-0084 §4). A mod may interpret
+   a question's keys and return a chosen answer in its command acknowledgement; the surface
+   resolves it through the person's handle. Plugin handles carry kernel-stamped provenance,
+   independent of their claimed client name or activation. The kernel refuses every permission
+   answer from a plugin and records the source of accepted answers.
 
 ## Consequences
 

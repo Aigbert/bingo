@@ -175,7 +175,7 @@ async fn an_outside_mod_wraps_the_question_builtin_with_next() {
 }
 
 #[tokio::test]
-async fn the_ask_handler_answers_the_live_question_through_the_existing_port() {
+async fn the_ask_handler_returns_an_answer_for_the_surface_to_send() {
     let home = tempfile::tempdir().unwrap();
     let (host, mut attachment) = start(home.path(), None, false).await;
     let asking = {
@@ -211,7 +211,10 @@ async fn the_ask_handler_answers_the_live_question_through_the_existing_port() {
     let mut action = layout.on_key.clone().unwrap();
     action.args["value"] = json!({"key":"2"});
     let outcome = command(&mut attachment, Input::Action { action }).await;
-    assert!(matches!(outcome, IntentOutcome::Applied { result } if result["handled"] == true));
+    let IntentOutcome::Applied { result } = outcome else { panic!("applied") };
+    assert_eq!(result["handled"], true);
+    assert!(!asking.is_finished(), "the mod cannot resolve the interaction");
+    attachment.handle.answer(IntentId::mint(), open.id.clone(), serde_json::from_value(result["answer"].clone()).unwrap(), Activation::Keyboard);
     assert_eq!(
         tokio::time::timeout(std::time::Duration::from_secs(10), asking)
             .await

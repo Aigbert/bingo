@@ -194,6 +194,7 @@ pub(crate) struct Answered {
     pub answer: Answer,
     pub activation: Activation,
     pub who: ClientIdentity,
+    pub plugin: bool,
 }
 
 /// The actor's address. Cheap to clone; every write is synchronous and
@@ -314,6 +315,7 @@ impl Mailbox {
             answer,
             activation,
             who,
+            plugin: crate::host::plugin::answering(),
         }));
     }
 
