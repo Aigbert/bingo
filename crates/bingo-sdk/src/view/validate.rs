@@ -1,29 +1,44 @@
 use super::*;
 use crate::render::Component;
 
-pub fn answer_ok(component: Component, plugin: &str, view: &View) -> Result<(), String> {
-    check(view, Some((component, plugin)))
+/// `inherited` is what the rest of the chain answered: a hook that passes it
+/// on keeps the handlers it was given unchanged and adds only its own.
+pub fn answer_ok(
+    component: Component,
+    plugin: &str,
+    inherited: Option<&View>,
+    view: &View,
+) -> Result<(), String> {
+    let given = inherited.map(handlers).unwrap_or_default();
+    check(view, Some((component, plugin, &given)))
 }
 pub fn published_ok(view: &View) -> Result<(), String> {
     check(view, None)
 }
 
-fn check(view: &View, answer: Option<(Component, &str)>) -> Result<(), String> {
+fn handlers(view: &View) -> Vec<&Action> {
+    super::walk::nodes(view)
+        .into_iter()
+        .flat_map(|(_, node)| super::walk::handlers(node))
+        .collect()
+}
+
+fn check(view: &View, answer: Option<(Component, &str, &[&Action])>) -> Result<(), String> {
     let nodes = super::walk::nodes(view);
     if nodes.len() > 4096 {
         return Err("view exceeds 4096 nodes".into());
     }
     for (path, node) in nodes {
         if let View::Engine { component, .. } = node
-            && answer.is_none_or(|(asked, _)| asked != *component)
+            && answer.is_none_or(|(asked, _, _)| asked != *component)
         {
             return Err(format!(
                 "{path}: Engine is only valid for the requested component"
             ));
         }
-        if let Some((_, plugin)) = answer {
+        if let Some((_, plugin, given)) = answer {
             for action in super::walk::handlers(node) {
-                if action.name != format!("{plugin}:ui") {
+                if action.name != format!("{plugin}:ui") && !given.contains(&action) {
                     return Err(format!("{path}: handler belongs to another command"));
                 }
             }
@@ -46,17 +61,23 @@ mod tests {
             component: Component::Pane,
             props: json!({}),
         };
-        assert!(answer_ok(Component::Pane, "counter", &engine).is_ok());
-        assert!(answer_ok(Component::AbovePrompt, "counter", &engine).is_err());
+        assert!(answer_ok(Component::Pane, "counter", None, &engine).is_ok());
+        assert!(answer_ok(Component::AbovePrompt, "counter", None, &engine).is_err());
         assert!(published_ok(&View::column(vec![engine])).is_err());
         let button: View = serde_json::from_value(json!({"kind":"Button","onPress":{
             "name":"foreign:ui","args":{"handler":"1:1","event":"press"}}}))
         .unwrap();
-        assert!(answer_ok(Component::Pane, "counter", &button).is_err());
+        assert!(answer_ok(Component::Pane, "counter", None, &button).is_err());
+        assert!(answer_ok(Component::Pane, "counter", Some(&button), &button).is_ok());
+        let forged: View = serde_json::from_value(json!({"kind":"Button","onPress":{
+            "name":"foreign:ui","args":{"handler":"1:2","event":"press"}}}))
+        .unwrap();
+        assert!(answer_ok(Component::Pane, "counter", Some(&button), &forged).is_err());
         assert!(
             answer_ok(
                 Component::Pane,
                 "counter",
+                None,
                 &View::column(vec![View::text("x"); 4096])
             )
             .is_err()
@@ -65,6 +86,6 @@ mod tests {
             children: vec![TextChild::Node(Box::new(View::column(vec![])))],
             style: Default::default(),
         };
-        assert!(answer_ok(Component::Pane, "counter", &bad_text).is_err());
+        assert!(answer_ok(Component::Pane, "counter", None, &bad_text).is_err());
     }
 }

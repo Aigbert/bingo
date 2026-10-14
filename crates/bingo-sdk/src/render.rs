@@ -3,6 +3,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+mod matched;
+pub use matched::{Matched, matched};
+
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
@@ -32,6 +35,8 @@ pub enum SurfaceName {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Viewport {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<crate::slot::Place>,
     pub columns: u16,
     pub rows: u16,
 }
@@ -43,6 +48,25 @@ pub struct RenderRequest {
     pub surface: SurfaceName,
     pub props: Value,
     pub viewport: Viewport,
+}
+impl Component {
+    pub const ALL: [Self; 15] = [
+        Self::Question,
+        Self::UserMessage,
+        Self::AssistantMessage,
+        Self::ToolUse,
+        Self::ToolResult,
+        Self::ToolGroup,
+        Self::ToolProgress,
+        Self::CommandOutput,
+        Self::Spinner,
+        Self::TurnDuration,
+        Self::InfoNotice,
+        Self::SessionMode,
+        Self::PromptHint,
+        Self::AbovePrompt,
+        Self::Pane,
+    ];
 }
 impl RenderRequest {
     pub fn engine(&self) -> crate::View {
@@ -69,6 +93,13 @@ pub struct HandlerEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pane_viewport_keeps_its_seated_place() {
+        let wire = serde_json::json!({"columns":64,"rows":24,"place":"side"});
+        let viewport: Viewport = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(serde_json::to_value(viewport).unwrap(), wire);
+    }
+
     #[test]
     fn question_is_named_for_its_drawing() {
         let wire = serde_json::json!("Question");

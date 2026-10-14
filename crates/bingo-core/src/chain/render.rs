@@ -24,17 +24,25 @@ impl Point for Render {
     ) -> BoxFuture<'a, Result<View, KernelError>> {
         Box::pin(async move {
             let component = input.component;
+            // A hook may pass on another mod's answer; its handlers stay valid.
+            let inherited = Arc::new(Mutex::new(None));
+            let answered = inherited.clone();
             let continued = Next::at(next.tier(), move |value| {
                 Box::pin(async move {
                     let request = serde_json::from_value(value).map_err(invalid)?;
-                    serde_json::to_value(next.run(request).await?).map_err(invalid)
+                    let view = next.run(request).await?;
+                    if let Ok(mut answered) = answered.lock() {
+                        *answered = Some(view.clone());
+                    }
+                    serde_json::to_value(view).map_err(invalid)
                 })
             });
             let value = link
                 .chain(Self::POINT, cx, Self::payload(&input), continued)
                 .await?;
             let view = serde_json::from_value(value).map_err(invalid)?;
-            view::answer_ok(component, link.id(), &view).map_err(invalid)?;
+            let inherited = inherited.lock().ok().and_then(|view| view.clone());
+            view::answer_ok(component, link.id(), inherited.as_ref(), &view).map_err(invalid)?;
             Ok(view)
         })
     }
@@ -92,10 +100,51 @@ pub(crate) async fn dispatch(
     .await
 }
 
+/// The config is a projection of the currently admitted links, never a registry.
+pub(crate) fn matched(links: &[Link]) -> bingo_sdk::render::Matched {
+    let mut matched = bingo_sdk::render::Matched::default();
+    for link in links {
+        let matcher = link.interceptor.matcher();
+        if !matcher.patterns.is_empty()
+            && !matcher
+                .patterns
+                .iter()
+                .any(|pattern| pattern.matches("ui.render"))
+        {
+            continue;
+        }
+        let partials = matcher.render.unwrap_or_else(|| vec![matcher.prefilter]);
+        for component in bingo_sdk::render::Component::ALL {
+            let event = serde_json::json!({"component":component});
+            for partial in &partials {
+                if partial.is_null() || catalogue::prefilter(partial, &event) {
+                    matched
+                        .0
+                        .entry(component)
+                        .or_default()
+                        .push(partial.clone());
+                }
+            }
+        }
+    }
+    matched
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::{Value, json};
+    #[test]
+    fn only_ui_render_links_publish_components() {
+        let link = Link {
+            external: None,
+            interceptor: Arc::new(Answer(false)),
+            tier: Tier::Rewrite,
+        };
+        let exposed = matched(&[link]);
+        assert_eq!(exposed.0.len(), 15);
+        assert!(matched(&[]).0.is_empty());
+    }
     struct Answer(bool);
     #[async_trait::async_trait]
     impl Interceptor for Answer {
@@ -156,6 +205,83 @@ mod tests {
             let notices = report.take();
             assert_eq!(notices.len(), 1);
             assert!(matches!(&notices[0], ItemBody::Notice {text,..} if text.contains("counter")));
+        }
+    }
+    struct Pass;
+    #[async_trait::async_trait]
+    impl Interceptor for Pass {
+        fn id(&self) -> &str {
+            "corner"
+        }
+        fn matcher(&self) -> LinkMatcher {
+            LinkMatcher::at(catalogue::UI_RENDER)
+        }
+        async fn chain(
+            &self,
+            _: &catalogue::Entry,
+            _: &HookContext,
+            input: Value,
+            next: Next<'_, Value, Value>,
+        ) -> Result<Value, KernelError> {
+            next.run(input).await
+        }
+    }
+    struct Press;
+    #[async_trait::async_trait]
+    impl Interceptor for Press {
+        fn id(&self) -> &str {
+            "counter"
+        }
+        fn matcher(&self) -> LinkMatcher {
+            LinkMatcher::at(catalogue::UI_RENDER)
+        }
+        async fn chain(
+            &self,
+            _: &catalogue::Entry,
+            _: &HookContext,
+            _: Value,
+            _: Next<'_, Value, Value>,
+        ) -> Result<Value, KernelError> {
+            Ok(json!({"kind":"Button","onPress":{"name":"counter:ui",
+                "args":{"handler":"1:1","event":"press"}}}))
+        }
+    }
+    #[tokio::test]
+    async fn a_hook_passing_another_mods_answer_keeps_its_handlers() {
+        let request: RenderRequest = serde_json::from_value(json!({"component":"Pane",
+            "requestId":"counter", "surface":"terminal", "props":{},
+            "viewport":{"columns":80,"rows":8}}))
+        .unwrap();
+        let cx = HookContext {
+            session: SessionId::from_raw("s"),
+            turn: None,
+            item: None,
+            cwd: "/".into(),
+            provider: None,
+            model: None,
+            host: testing::NoHost::handle(),
+        };
+        let link = |id: &str, interceptor: Arc<dyn Interceptor>| Link {
+            external: Some(id.into()),
+            interceptor,
+            tier: Tier::Rewrite,
+        };
+        for links in [
+            [
+                link("corner", Arc::new(Pass)),
+                link("counter", Arc::new(Press)),
+            ],
+            [
+                link("counter", Arc::new(Press)),
+                link("corner", Arc::new(Pass)),
+            ],
+        ] {
+            let report = Report::default();
+            let view = dispatch(&links, &cx, request.clone(), report.clone())
+                .await
+                .unwrap();
+            assert!(matches!(view, View::Button { .. }), "{view:?}");
+            assert!(report.take().is_empty());
         }
     }
 }

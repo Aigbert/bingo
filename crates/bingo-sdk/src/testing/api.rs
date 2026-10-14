@@ -8,6 +8,17 @@ use std::sync::Arc;
 
 #[async_trait]
 impl HostApi for TestHost {
+    async fn render(
+        &self,
+        session: &SessionId,
+        request: crate::render::RenderRequest,
+    ) -> Result<View, KernelError> {
+        self.record(HostCall::Render {
+            session: session.clone(),
+            request: request.clone(),
+        });
+        NoHost.render(session, request).await
+    }
     async fn complete(
         &self,
         session: &SessionId,

@@ -112,3 +112,9 @@ strips the glyphs, `BINGO_MOTION=off` stills every animation, `BINGO_THEME` is
 `--no-print-on-exit` leaves the terminal as it was; without it the last
 screenful of the conversation is printed on the way out, under a line saying
 how to reopen the session.
+
+A mod pane sits above or beside the transcript, or floats over it. Click
+`<title> ▸` in status to reopen a collapsed pane as an overlay; click a waiting
+pane to open it. On a focused pane, `alt+p` or its title’s `place ▾` cycles
+places that fit. Your moves last until this TUI exits. The pane has its own
+wheel scrolling and drag-to-copy selection.

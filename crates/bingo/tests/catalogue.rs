@@ -40,6 +40,7 @@ impl bingo_sdk::Interceptor for FaceWatch {
     }
     fn matcher(&self) -> bingo_sdk::LinkMatcher {
         bingo_sdk::LinkMatcher {
+            render: None,
             patterns: vec![bingo_sdk::catalogue::Pattern::parse("mcp.*").unwrap()],
             prefilter: serde_json::Value::Null,
         }

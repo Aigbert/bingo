@@ -108,3 +108,34 @@ EOF. Handles belong to the creating plugin and session; reload, session end
 and shutdown terminate their trees. `process.run` is bounded by the host
 operation deadline. Arguments are argv, with no implicit shell. `env.set`
 changes only the caller's child-process overlay; `env.get` reads the host.
+
+## Pane places
+
+A pane opens from the person's command, key or press. Otherwise it waits in
+status until clicked. `open` resolves `{}`; the next render's `viewport`
+says which `place`, `columns` and content `rows` the pane received.
+
+```ts
+const size = {rows: {min: 8, ideal: 10, max: 20},
+              columns: {min: 48, ideal: 64, max: '80%'}};
+await $.ui.open({id: 'notes', title: 'Notes', place: ['above'], size});
+await $.ui.open({id: 'notes', title: 'Notes', place: ['side', 'above'], size});
+await $.ui.open({id: 'notes', title: 'Notes', place: ['overlay'], size});
+await $.ui.open({id: 'notes', title: 'Notes',
+  place: [{rect: {anchor: 'bottomRight', width: '40%', height: '30%'}}]});
+```
+
+Lengths are cells or percentages of the available transcript area. Rect
+anchors are `topLeft` (default), `topRight`, `bottomLeft`, `bottomRight`,
+and `center`; `x` and `y` default to zero and offset inward from a corner,
+or right/down from the center. Out-of-bounds rects move in before shrinking.
+One above and one side pane can dock while leaving the transcript at least
+60 columns and 8 rows. Up to three floating panes can cover that area; the
+newest draws last. The composer and status remain available.
+
+The first fitting place wins. A pane that cannot fit becomes `<title> ▸`
+in status; click it to try an overlay. Click the focused title's `place ▾`
+or press `alt+p` to cycle fitting places. Moves last for this TUI process.
+A collapsed pane receives no render request. Moving or resizing a seated
+pane asks again when its place, content width or content height changes.
+Old `rows` options still read as the ideal row count; new code uses `size`.

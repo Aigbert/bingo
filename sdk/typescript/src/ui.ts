@@ -55,8 +55,8 @@ export class Handlers {
   }
 }
 
-import type { HookSite, Tone, Level, InteractionKind, AnswerSpec, Answer, Slot, SurfaceName } from './wire.ts';
-export type OpenPane = {id: string; title: string; focus?: boolean; closeOnEscape?: boolean; holdToasts?: boolean; rows?: number; props?: unknown};
+import type { HookSite, Tone, Level, InteractionKind, AnswerSpec, Answer, Slot, SurfaceName, PanePlace, PaneSize } from './wire.ts';
+export type OpenPane = {id: string; title: string; focus?: boolean; closeOnEscape?: boolean; holdToasts?: boolean; rows?: number; place?: PanePlace[]; size?: PaneSize; props?: unknown};
 export function ui(rpc: Rpc, site: HookSite) {
   const call = <T>(method: string, params: unknown): Promise<T> =>
     rpc.request<{result:T}>('service/call', {key:'bingo.plugin.ui', method, params}).then(reply => reply.result);
@@ -77,6 +77,7 @@ export function ui(rpc: Rpc, site: HookSite) {
       const table = await call<{kind:string;props:string[]}[]>('resolve', {surface:event.surface});
       return Object.fromEntries(table.map(element => [element.kind, element.kind])) as Record<string,string>;
     },
+    log: (text: string) => call<null>('log', {text}),
     notice: (text: string, options: {level?:Level} = {}) => call<null>('notice', {text,...options}),
     ask: (kind: InteractionKind, answers: AnswerSpec[]) => call<Answer>('ask', {session:site.session,kind,answers}),
   };

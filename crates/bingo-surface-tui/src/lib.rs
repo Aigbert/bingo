@@ -52,6 +52,7 @@ mod clipboard;
 mod clock;
 mod commands;
 mod complete;
+mod component;
 mod composer;
 mod count;
 mod crew;

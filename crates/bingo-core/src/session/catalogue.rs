@@ -137,6 +137,7 @@ pub(super) async fn finished(actor: &mut Actor, completed: Completed) -> Result<
     for notice in notices {
         actor.record(notice).await?;
     }
+    actor.refresh_config().await?;
     actor.after_turn(turn, items);
     if let Some(reason) = actor.closing.take() {
         return actor.finish_close(reason).await;
@@ -173,7 +174,9 @@ pub(super) fn rewrite(actor: &Actor, event: Event) {
                 kind: input.kind,
                 payload: input.payload,
             }),
-            Event::ConfigChanged { config } => {
+            Event::ConfigChanged { mut config } => {
+                config.kernel["render"] =
+                    serde_json::to_value(crate::chain::render::matched(&links)).unwrap_or_default();
                 crate::chain::config::describe(config, &links, &cx, report.clone())
                     .await
                     .map(|config| Event::ConfigChanged { config })

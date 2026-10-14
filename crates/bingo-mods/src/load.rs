@@ -66,8 +66,13 @@ impl Root {
                 include_str!("../../../sdk/typescript/src/dollar.ts"),
             )
             .map_err(|why| why.to_string())?;
+            let state = crate::strip::strip(
+                Path::new("state.ts"),
+                include_str!("../../../sdk/typescript/src/state.ts"),
+            )
+            .map_err(|why| why.to_string())?;
             return Ok(format!(
-                "export const h = globalThis.h; export const Fragment = globalThis.Fragment;\nexport {{ Handlers }} from './ui.ts';\nexport {{ Callbacks }} from './callbacks.ts';\n{hooks}\n{dollar}"
+                "export const h = globalThis.h; export const Fragment = globalThis.Fragment;\nexport {{ Handlers }} from './ui.ts';\nexport {{ Callbacks }} from './callbacks.ts';\n{hooks}\n{dollar}\n{state}"
             ));
         }
         let path = self.path(name)?;

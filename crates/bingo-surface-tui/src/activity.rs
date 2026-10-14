@@ -68,11 +68,17 @@ pub fn next_change(tree: &Tree, ui: &Ui, now: Now) -> Option<std::time::Instant>
 /// The rows between the transcript and the input box: what the turn is doing
 /// — or, between turns, what it is waiting on — the session's task list, and
 /// whatever the person has queued behind it.
-pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'static>> {
+pub(crate) fn components(
+    tree: &Tree,
+    ui: &Ui,
+    width: usize,
+    now: Now,
+    pulls: &mut Vec<crate::pulled::Key>,
+) -> Vec<Line<'static>> {
     crate::layout::count::band(2);
     let state = tree.viewed();
     let slots = bingo_sdk::slot::placed(state);
-    let mut out = band(tree, ui, &slots, width, now);
+    let mut out = band(tree, ui, &slots, width, now, pulls);
     out.extend(queued(state));
     // A blank row between the transcript and these, as between any two blocks
     // (§3): they are not the tail of what was said, they are what is going on.
@@ -98,14 +104,23 @@ fn band(
     slots: &[bingo_sdk::slot::Placed],
     width: usize,
     now: Now,
+    pulls: &mut Vec<crate::pulled::Key>,
 ) -> Vec<Line<'static>> {
     let verb = slots.iter().find_map(|placed| match &placed.slot {
         bingo_sdk::slot::Slot::Activity { verb, .. } => verb.as_deref(),
         _ => None,
     });
-    let row = working(tree.viewed(), ui, verb, now).or_else(|| waiting(tree, now));
-    let running = row.is_some();
-    let mut out: Vec<_> = row.into_iter().collect();
+    let mut site = crate::component::Site {
+        state: tree.viewed(),
+        memo: &ui.placed.pulled,
+        width,
+        pulls,
+    };
+    let mut out = working(tree.viewed(), ui, verb, now, &mut site);
+    if out.is_empty() {
+        out.extend(waiting(tree, now));
+    }
+    let running = !out.is_empty();
     if !ui.activity_hidden {
         for placed in slots {
             if let bingo_sdk::slot::Slot::Activity { view, .. } = &placed.slot {
@@ -256,14 +271,17 @@ fn working(
     ui: &Ui,
     placed_verb: Option<&str>,
     now: Now,
-) -> Option<Line<'static>> {
-    let turn = state.turn.as_ref()?;
+    site: &mut crate::component::Site<'_>,
+) -> Vec<Line<'static>> {
+    let Some(turn) = state.turn.as_ref() else {
+        return Vec::new();
+    };
     let elapsed = now.past(turn.started_at);
     let stopping = ui.stop_asked.as_ref() == Some(&turn.id);
     // A row that answers a key is never held back by the delay that spares a
     // fast turn its flash.
     if elapsed < ACTIVITY_AFTER && !stopping {
-        return None;
+        return Vec::new();
     }
     let (verb, hint) = match stopping {
         true => (STOPPING, ""),
@@ -272,22 +290,38 @@ fn working(
             "esc to interrupt · ",
         ),
     };
-    let mut spans = vec![Span::styled(
-        format!("{} ", theme::mark()),
-        caret_style(state, stopping, now),
-    )];
-    spans.extend(beamed(format!("{verb}{}", theme::ellipsis()), now));
-    spans.push(Span::styled(
-        format!(" ({hint}{}s{})", elapsed.as_secs(), written(turn)),
-        theme::dim(),
-    ));
-    if let Some(retry) = turn.retrying {
+    let props = bingo_sdk::component::Props::Spinner(bingo_sdk::component::SpinnerProps {
+        word: verb.into(),
+        message: Some(hint.into()),
+        suffix: written(turn),
+        mode: if stopping { "stopping" } else { "working" }.into(),
+    });
+    site.draw("Spinner", &props, |props, _| {
+        let bingo_sdk::component::Props::Spinner(props) = props else {
+            return Vec::new();
+        };
+        let mut spans = vec![Span::styled(
+            format!("{} ", theme::mark()),
+            caret_style(state, stopping, now),
+        )];
+        spans.extend(beamed(format!("{}{}", props.word, theme::ellipsis()), now));
         spans.push(Span::styled(
-            format!(" retrying {}/{}", retry.attempt, retry.max),
-            theme::presence(),
+            format!(
+                " ({}{}s{})",
+                props.message.as_deref().unwrap_or_default(),
+                elapsed.as_secs(),
+                props.suffix
+            ),
+            theme::dim(),
         ));
-    }
-    Some(Line::from(spans))
+        if let Some(retry) = turn.retrying {
+            spans.push(Span::styled(
+                format!(" retrying {}/{}", retry.attempt, retry.max),
+                theme::presence(),
+            ));
+        }
+        vec![Line::from(spans)]
+    })
 }
 
 /// `▍ Waiting for 2 background agents to finish` — what an idle session says
@@ -447,6 +481,11 @@ fn arriving(item: &bingo_sdk::Item) -> bool {
 fn blocking(item: &bingo_sdk::Item) -> bool {
     matches!(item.body, bingo_sdk::ItemBody::ToolCall { .. })
         && item.status == bingo_sdk::ItemStatus::Running
+}
+
+#[cfg(test)]
+pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'static>> {
+    components(tree, ui, width, now, &mut Vec::new())
 }
 
 #[cfg(test)]

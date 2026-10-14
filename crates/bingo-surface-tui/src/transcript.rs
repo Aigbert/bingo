@@ -5,9 +5,7 @@
 
 use std::time::{Duration, Instant};
 
-use bingo_sdk::{
-    CommandSpec, DecisionKind, Item, ItemBody, ItemStatus, SessionState, ToolOutput, TurnStatus,
-};
+use bingo_sdk::{CommandSpec, DecisionKind, Item, ItemBody, ItemStatus, SessionState, ToolOutput};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use serde_json::Value;
@@ -17,11 +15,13 @@ use crate::clock::{self, Anim, Now};
 use crate::fold::{self, Fold, Folds};
 use crate::graphics::{Decoded, Linked, Picture};
 use crate::tree::{self, Agents};
-use crate::{markdown, paths, theme, thoughts, worked, wrap};
+use crate::{markdown, paths, theme, thoughts, wrap};
 
+mod components;
 /// What was said into a session: a person's line, a subsystem's notice, a
 /// room's conversation.
 mod said;
+use components::{component_call, item_lines};
 
 /// Producer replacements for individual transcript rows.
 pub(crate) mod slots;
@@ -81,7 +81,9 @@ const DIFF_ROWS: usize = 12;
 const EXPAND: &str = "ctrl+o to expand";
 
 /// What every row of one transcript needs to know about where it is.
+#[derive(Clone)]
 pub struct Rows<'a> {
+    pub pulled: Option<&'a crate::pulled::Memo>,
     pub state: &'a SessionState,
     pub names: Vec<markdown::mentions::Name>,
     pub width: usize,
@@ -129,6 +131,7 @@ impl<'a> Rows<'a> {
         now: Now,
     ) -> Self {
         Self {
+            pulled: None,
             state,
             names: Vec::new(),
             width,
@@ -143,6 +146,11 @@ impl<'a> Rows<'a> {
             opening: None,
             entrance: crate::welcome::Entrance::default(),
         }
+    }
+
+    pub fn components(mut self, memo: &'a crate::pulled::Memo) -> Self {
+        self.pulled = Some(memo);
+        self
     }
 
     /// What the welcome box has to add: the release this build could become.
@@ -336,25 +344,6 @@ pub fn item_block(
     )
 }
 
-/// The words of one item's block — every row of it but the picture its own
-/// parts carry. An answer's words may name a picture themselves, and that one
-/// is drawn among them ([`pictured::in_the_words`]), so this answers with a
-/// block rather than lines.
-fn item_lines(
-    item: &Item,
-    place: &Place<'_>,
-    agents: &Agents<'_>,
-    rows: &Rows<'_>,
-    cue: Cue,
-    fold: Fold,
-) -> Block {
-    let block = default_item_lines(item, place, agents, rows, cue, fold);
-    match rows.placed_on(&item.id).next_back() {
-        Some(slot) => slots::placed_row(item, slot, rows, cue, block),
-        None => block,
-    }
-}
-
 fn default_item_lines(
     item: &Item,
     place: &Place<'_>,
@@ -476,7 +465,8 @@ fn called(
     };
     match agents.get(&item.id) {
         Some(child) => child_row(child, input, rows),
-        None => tool_call(
+        None => component_call(
+            item,
             Call {
                 status: item.status,
                 name,
@@ -646,6 +636,7 @@ fn cooling(back: usize, age: f32) -> Style {
 }
 
 /// One tool call, as much of it as there is yet.
+#[derive(Clone)]
 struct Call<'a> {
     status: ItemStatus,
     name: &'a str,
@@ -905,45 +896,51 @@ fn calls(item: &Item, tool: &str) -> bool {
 /// 2026-09-08, user-directed — not a row pinned over the composer) and the
 /// next turn takes it away.
 pub fn closing(state: &SessionState, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    if state.busy() {
-        return Vec::new();
-    }
-    let mut out = failure(state, rows);
-    out.extend(worked(state, rows));
-    out
+    crate::component::closing::props(state)
+        .iter()
+        .flat_map(|props| {
+            crate::component::closing::draw(state, rows.pulled, props, rows.width, rows.now)
+        })
+        .collect()
 }
 
-/// A turn that failed says why on a `⏺` of its own.
-fn failure(state: &SessionState, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let Some(TurnStatus::Failed { error }) = state.last_status() else {
-        return Vec::new();
-    };
-    speaks(
-        theme::bad(),
-        vec![Line::from(Span::styled(
-            error.message.clone(),
+pub(crate) fn component_closing(
+    state: &SessionState,
+    props: &bingo_sdk::component::Props,
+    now: Now,
+) -> Vec<Line<'static>> {
+    match props {
+        bingo_sdk::component::Props::InfoNotice(props) => vec![Line::from(Span::styled(
+            format!(
+                "{} {}{}",
+                theme::bullet(),
+                props.text,
+                props
+                    .command
+                    .as_ref()
+                    .map(|c| format!(" /{c}"))
+                    .unwrap_or_default()
+            ),
             theme::bad(),
         ))],
-        rows,
-    )
-}
-
-/// `▍ Worked for 15m 11s · done 13:48`, dim: the verb the verdict earns, how
-/// long the turn ran, and the hour it ended on. A turn that answered at once
-/// says nothing, as it drew no row while it ran.
-fn worked(state: &SessionState, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let Some(turn) = state.last_turn.as_ref() else {
-        return Vec::new();
-    };
-    if worked::ran(turn) < worked::SAY_AFTER {
-        return Vec::new();
+        bingo_sdk::component::Props::TurnDuration(props) => {
+            let when = state
+                .last_turn
+                .as_ref()
+                .map(|turn| crate::worked::words(turn, now.wall, &jiff::tz::TimeZone::system()).1)
+                .unwrap_or_default();
+            vec![Line::from(Span::styled(
+                format!(
+                    "{} {} {}{when}",
+                    theme::mark(),
+                    props.word,
+                    crate::worked::duration(std::time::Duration::from_millis(props.duration_ms))
+                ),
+                theme::dim(),
+            ))]
+        }
+        _ => Vec::new(),
     }
-    let (what, when) = worked::words(turn, rows.now.wall, &jiff::tz::TimeZone::system());
-    vec![Line::from(vec![
-        Span::styled(format!("{} ", theme::mark()), theme::dim()),
-        Span::styled(what, theme::dim()),
-        Span::styled(when, theme::dim()),
-    ])]
 }
 
 /// A full-width divider with its reason in the middle of the left run.
@@ -2122,7 +2119,7 @@ mod tests {
                 2,
                 completed(
                     "trn_1",
-                    TurnStatus::Failed {
+                    bingo_sdk::TurnStatus::Failed {
                         error: bingo_sdk::KernelError::new(
                             bingo_sdk::ErrorCode::ProviderUnavailable,
                             "no route to the provider",

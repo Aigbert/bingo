@@ -26,3 +26,5 @@ pub mod validate;
 pub mod mount;
 
 pub mod types;
+
+mod log;

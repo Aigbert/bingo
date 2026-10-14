@@ -266,7 +266,7 @@ fn bootstrap(entry: &Entry, config: &Value) -> String {
         format!("await register(hooks.on, {config});")
     };
     format!(
-        "import {{ Hooks, dollar, Callbacks, Handlers, patternMatches, matches, frozen }} from 'bingo';\n{import}\nconst hooks = new Hooks();\nconst callbacks = new Callbacks();\nconst handlers = new Handlers();\n{register}\n{}",
+        "import {{ Hooks, dollar, Callbacks, Handlers, patternMatches, matches, frozen, renderMatcher }} from 'bingo';\n{import}\nconst hooks = new Hooks();\nconst callbacks = new Callbacks();\nconst handlers = new Handlers();\n{register}\n{}",
         include_str!("thread.js")
     )
 }

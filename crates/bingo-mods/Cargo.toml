@@ -14,6 +14,8 @@ workspace = true
 [dependencies]
 # M142: render host schemas into author types on load.
 bingo-schema-ts.workspace = true
+# M141: send mod logs through the existing application subscriber.
+tracing.workspace = true
 # M139: reuse the bounded HTTP client, process trees and canonical paths.
 bingo-http.workspace = true
 bingo-process.workspace = true

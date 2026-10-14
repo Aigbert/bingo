@@ -19,6 +19,7 @@ use crate::wire::{METHODS, NOTIFICATIONS, PROTOCOL, Ref, schema_of};
 /// plugin author writes and the last thing the wire mentions.
 static UNNAMED: &[Ref] = &[
     schema_of::<Manifest>,
+    schema_of::<bingo_sdk::component::Props>,
     schema_of::<crate::context::Context>,
     schema_of::<crate::wire::ServiceMethod>,
 ];
