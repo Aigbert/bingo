@@ -592,7 +592,21 @@ async fn plugin_approval_uses_discovery_root_instead_of_session_cwd() {
 #[tokio::test]
 async fn a_tool_switch_explains_pending_and_keeps_the_running_tools() {
     let home = tempfile::tempdir().unwrap();
-    let host = host_in(home.path(), None).await;
+    let host = Host::build(
+        vec![
+            TestPlugin::boxed(
+                &PROVIDER,
+                vec![Contribution::Provider(ScriptedProvider::new(vec![]))],
+            ),
+            TestPlugin::boxed(
+                &TOOLS,
+                vec![Contribution::Tool(Arc::new(EchoTool { read_only: true }))],
+            ),
+        ],
+        HostConfig::new(Env::rooted(home.path())).with_layer("test", json!({"model":"m"})),
+    )
+    .await
+    .unwrap();
     let mut client = Client::open(&host).await;
     let before = host.catalog(CatalogKind::Tools).await.unwrap();
     let (ack, _) = client.ack("/plugins disable test.tools").await;
