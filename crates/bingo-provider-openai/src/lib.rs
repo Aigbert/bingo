@@ -120,6 +120,11 @@ impl OpenAiProvider {
         store: Arc<CredentialStore>,
     ) -> Self {
         let id = id.into();
+        let store = if id == Variant::Codex.provider_id() {
+            store
+        } else {
+            Arc::new(store.owned_by("codex"))
+        };
         let source = TokenSource::new(&id, codex_issuer(endpoint.issuer), store, oauth);
         let base_url = endpoint
             .base_url
@@ -584,7 +589,7 @@ impl Plugin for OpenAiPlugin {
             true,
             registrar.env(),
         )));
-        for provider in instances::providers(http, oauth, settings, registrar.env())? {
+        for provider in instances::providers(http, oauth, settings, registrar)? {
             registrar.provider(provider);
         }
         Ok(())
@@ -697,6 +702,40 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn boot_skips_invalid_names_and_foreign_credentials() {
+        let directory = tempfile::tempdir().unwrap();
+        let env = bingo_sdk::Env::rooted(directory.path());
+        std::fs::create_dir_all(&env.data_dir).unwrap();
+        std::fs::write(
+            env.data_dir.join("auth.json"),
+            r#"{
+            "channels.telegram":{"type":"api","key":"foreign"},
+            "occupied":{"type":"api","key":"foreign","owner":"another-service"},
+            "legacy":{"type":"api","key":"unknown-owner"}
+        }"#,
+        )
+        .unwrap();
+        let listed = providers(
+            &directory,
+            json!({"openai":{"instances":{
+                "channels.telegram":{"baseUrl":"http://localhost:1"},
+                "service:key":{"baseUrl":"http://localhost:1"},
+                "occupied":{"baseUrl":"http://localhost:1"},
+                "legacy":{"baseUrl":"http://localhost:1"},
+                "safe-name_2":{"baseUrl":"http://localhost:1"}
+            }}}),
+        );
+        assert_eq!(
+            listed
+                .iter()
+                .filter(|p| p.instance())
+                .map(|p| p.id())
+                .collect::<Vec<_>>(),
+            ["safe-name_2"]
+        );
+    }
+
+    #[test]
     fn readdress_keeps_keys_only_for_the_same_origin() {
         let directory = tempfile::tempdir().unwrap();
         let configured = providers(
@@ -788,10 +827,8 @@ pub(crate) mod tests {
                 bingo_sdk::Env::rooted(directory.path()),
                 Default::default(),
             );
-            OpenAiPlugin
-                .register(&mut registrar)
-                .expect_err("a refusal")
-                .to_string()
+            OpenAiPlugin.register(&mut registrar).unwrap();
+            format!("{:?}", registrar.take_notices())
         };
         assert!(
             refused(json!({ "openai": { "instances": { "codex": {} } } })).contains("`codex`"),
@@ -814,6 +851,7 @@ pub(crate) mod tests {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let store = CredentialStore::new(directory.path().join(".bingo/data"));
         store
+            .owned_by("openai")
             .write(
                 "proxy2",
                 Entry::Api {

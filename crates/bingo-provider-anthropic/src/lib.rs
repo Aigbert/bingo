@@ -330,7 +330,7 @@ impl Plugin for AnthropicPlugin {
         let http = bingo_http::client(bingo_http::Bounds::STREAMED)
             .map_err(|e| PluginError::Failed(e.to_string()))?;
         registrar.provider_shape(Arc::new(shape::Shape::new(http.clone(), registrar.env())));
-        for provider in instances::providers(http, settings, registrar.env())? {
+        for provider in instances::providers(http, settings, registrar)? {
             registrar.provider(provider);
         }
         Ok(())
@@ -379,6 +379,40 @@ pub(crate) mod tests {
                 other => panic!("expected a provider or shape, got {other:?}"),
             })
             .collect()
+    }
+
+    #[test]
+    fn boot_skips_invalid_names_and_foreign_credentials() {
+        let directory = tempfile::tempdir().unwrap();
+        let env = bingo_sdk::Env::rooted(directory.path());
+        std::fs::create_dir_all(&env.data_dir).unwrap();
+        std::fs::write(
+            env.data_dir.join("auth.json"),
+            r#"{
+            "channels.telegram":{"type":"api","key":"foreign"},
+            "occupied":{"type":"api","key":"foreign","owner":"another-service"},
+            "legacy":{"type":"api","key":"unknown-owner"}
+        }"#,
+        )
+        .unwrap();
+        let listed = providers(
+            &directory,
+            json!({"anthropic":{"instances":{
+                "channels.telegram":{"baseUrl":"http://localhost:1"},
+                "service:key":{"baseUrl":"http://localhost:1"},
+                "occupied":{"baseUrl":"http://localhost:1"},
+                "legacy":{"baseUrl":"http://localhost:1"},
+                "safe-name_2":{"baseUrl":"http://localhost:1"}
+            }}}),
+        );
+        assert_eq!(
+            listed
+                .iter()
+                .filter(|p| p.instance())
+                .map(|p| p.id())
+                .collect::<Vec<_>>(),
+            ["safe-name_2"]
+        );
     }
 
     #[test]
@@ -482,10 +516,8 @@ pub(crate) mod tests {
             bingo_sdk::Env::rooted(directory.path()),
             Default::default(),
         );
-        let refused = AnthropicPlugin
-            .register(&mut registrar)
-            .expect_err("a refusal")
-            .to_string();
+        AnthropicPlugin.register(&mut registrar).unwrap();
+        let refused = format!("{:?}", registrar.take_notices());
         assert!(refused.contains("`openai`"), "{refused}");
     }
 
@@ -522,6 +554,7 @@ pub(crate) mod tests {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let store = bingo_auth_oauth::CredentialStore::new(directory.path().join(".bingo/data"));
         store
+            .owned_by("anthropic")
             .write(
                 "proxy2",
                 bingo_auth_oauth::Entry::Api {

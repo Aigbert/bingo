@@ -421,6 +421,7 @@ pub struct Registrar {
     env: Env,
     switched_off: BTreeSet<String>,
     contributions: Vec<Contribution>,
+    notices: Vec<(String, String)>,
 }
 
 struct OneInterceptor {
@@ -464,6 +465,7 @@ impl Registrar {
             env,
             switched_off,
             contributions: Vec::new(),
+            notices: Vec::new(),
         }
     }
 
@@ -511,6 +513,14 @@ impl Registrar {
 
     pub fn surface(&mut self, surface: Arc<dyn Surface>) {
         self.add(Contribution::Surface(surface));
+    }
+
+    pub fn notice(&mut self, code: impl Into<String>, text: impl Into<String>) {
+        self.notices.push((code.into(), text.into()));
+    }
+
+    pub fn take_notices(&mut self) -> Vec<(String, String)> {
+        std::mem::take(&mut self.notices)
     }
 
     pub fn into_contributions(self) -> Vec<Contribution> {

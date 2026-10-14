@@ -134,6 +134,7 @@ impl Registry {
                 plugin: manifest.id.to_string(),
                 source,
             })?;
+        self.notices.extend(registrar.take_notices());
         for contribution in registrar.into_contributions() {
             declared_service(manifest, &contribution)?;
             self.add(manifest.id, contribution)?;

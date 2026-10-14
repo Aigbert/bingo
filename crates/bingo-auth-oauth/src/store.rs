@@ -68,13 +68,40 @@ pub fn mcp_key(server: &str) -> String {
 #[derive(Debug)]
 pub struct CredentialStore {
     path: PathBuf,
+    owner: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Stored {
+    #[serde(flatten)]
+    entry: Entry,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    owner: Option<String>,
 }
 
 impl CredentialStore {
     pub fn new(data_dir: PathBuf) -> Self {
         Self {
             path: data_dir.join(AUTH_FILE),
+            owner: None,
         }
+    }
+
+    /// A named provider must own an entry before reading or deleting it.
+    pub fn owned_by(&self, owner: &str) -> Self {
+        Self {
+            path: self.path.clone(),
+            owner: Some(owner.into()),
+        }
+    }
+
+    fn check_owner(&self, stored: &Stored) -> Result<(), AuthError> {
+        if self.owner.is_some() && self.owner != stored.owner {
+            return Err(AuthError::Store(
+                "credential belongs to a different or unknown owner".into(),
+            ));
+        }
+        Ok(())
     }
 
     pub fn path(&self) -> &Path {
@@ -83,13 +110,28 @@ impl CredentialStore {
 
     pub fn read(&self, provider: &str) -> Result<Option<Entry>, AuthError> {
         let _guard = self.locked();
-        Ok(self.load()?.remove(provider))
+        self.load()?
+            .remove(provider)
+            .map(|stored| {
+                self.check_owner(&stored)?;
+                Ok(stored.entry)
+            })
+            .transpose()
     }
 
     pub fn write(&self, provider: &str, entry: Entry) -> Result<(), AuthError> {
         let _guard = self.locked();
         let mut entries = self.load()?;
-        entries.insert(provider.to_string(), entry);
+        if let Some(stored) = entries.get(provider) {
+            self.check_owner(stored)?;
+        }
+        entries.insert(
+            provider.to_string(),
+            Stored {
+                entry,
+                owner: self.owner.clone(),
+            },
+        );
         self.save(&entries)
     }
 
@@ -98,7 +140,10 @@ impl CredentialStore {
         let _guard = self.locked();
         let mut entries = self.load()?;
         match entries.remove(provider) {
-            Some(_) => self.save(&entries),
+            Some(stored) => {
+                self.check_owner(&stored)?;
+                self.save(&entries)
+            }
             None => Ok(()),
         }
     }
@@ -113,14 +158,14 @@ impl CredentialStore {
 
     /// A missing file is an empty store; a corrupt one is an error, never
     /// silently emptied — emptying it would delete a credential to hide a bug.
-    fn load(&self) -> Result<BTreeMap<String, Entry>, AuthError> {
+    fn load(&self) -> Result<BTreeMap<String, Stored>, AuthError> {
         let Ok(raw) = std::fs::read_to_string(&self.path) else {
             return Ok(BTreeMap::new());
         };
         serde_json::from_str(&raw).map_err(|e| AuthError::Store(format!("{}: {e}", self.display())))
     }
 
-    fn save(&self, entries: &BTreeMap<String, Entry>) -> Result<(), AuthError> {
+    fn save(&self, entries: &BTreeMap<String, Stored>) -> Result<(), AuthError> {
         let directory = self
             .path
             .parent()
@@ -136,7 +181,7 @@ impl CredentialStore {
     fn write_private(
         &self,
         temporary: &Path,
-        entries: &BTreeMap<String, Entry>,
+        entries: &BTreeMap<String, Stored>,
     ) -> Result<(), AuthError> {
         let mut file = std::fs::File::create(temporary).map_err(|e| self.io("create", e))?;
         #[cfg(unix)]
@@ -177,6 +222,34 @@ mod tests {
             expires: 1_786_000_000,
             account_id: Some("acc_1".into()),
         }
+    }
+
+    #[test]
+    fn named_credentials_keep_their_owner_across_handles() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = store(&directory);
+        let owner = store.owned_by("family-a");
+        owner
+            .write("work", Entry::Api { key: "test".into() })
+            .unwrap();
+        assert!(store.owned_by("family-a").read("work").unwrap().is_some());
+        let foreign = store.owned_by("family-b");
+        assert!(foreign.read("work").is_err());
+        assert!(foreign.remove("work").is_err());
+        assert!(
+            foreign
+                .write(
+                    "work",
+                    Entry::Api {
+                        key: "other".into()
+                    }
+                )
+                .is_err()
+        );
+        assert!(owner.read("work").unwrap().is_some());
+        let raw: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(store.path()).unwrap()).unwrap();
+        assert_eq!(raw["work"]["owner"], "family-a");
     }
 
     #[test]

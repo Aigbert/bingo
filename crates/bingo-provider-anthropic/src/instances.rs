@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use bingo_auth_oauth::CredentialStore;
-use bingo_sdk::{Env, PluginError, Provider};
+use bingo_sdk::{PluginError, Provider, Registrar};
 
 use crate::settings::{AnthropicEndpoint, Settings};
 use crate::{API_KEY_ENV, AnthropicProvider, BASE_URL_ENV, DEFAULT_BASE_URL, PROVIDER_ID};
@@ -26,8 +26,9 @@ const BUILT_IN: [&str; 4] = ["anthropic", "codex", "fake", "openai"];
 pub fn providers(
     http: reqwest::Client,
     settings: Settings,
-    env: &Env,
+    registrar: &mut Registrar,
 ) -> Result<Vec<Arc<dyn Provider>>, PluginError> {
+    let env = registrar.env();
     let store = Arc::new(CredentialStore::new(env.data_dir.clone()));
     let file = env.user_settings();
     let mut named = BTreeSet::new();
@@ -38,7 +39,9 @@ pub fn providers(
         &store,
     ))];
     for (name, endpoint) in settings.anthropic.instances {
-        claim(&mut named, &name)?;
+        if !allowed(&mut named, &name, "anthropic", &store, registrar) {
+            continue;
+        }
         providers.push(Arc::new(keyed(http.clone(), name, endpoint, &file, &store)));
     }
     Ok(providers)
@@ -96,7 +99,7 @@ pub(crate) fn keyed(
     let key = ApiKey::new(
         name.clone(),
         places.clone(),
-        store.clone(),
+        Arc::new(store.owned_by("anthropic")),
         configured(&places, endpoint.api_key),
     );
     AnthropicProvider::keyed(
@@ -126,13 +129,32 @@ fn configured(places: &Places, from_settings: Option<String>) -> Option<Configur
     })
 }
 
+fn allowed(
+    named: &mut BTreeSet<String>,
+    name: &str,
+    owner: &str,
+    store: &CredentialStore,
+    registrar: &mut Registrar,
+) -> bool {
+    if let Err(error) = claim(named, name) {
+        registrar.notice("provider.instance", format!("Skipped instance: {error}"));
+        return false;
+    }
+    if store.owned_by(owner).read(name).is_err() {
+        registrar.notice("provider.instance", format!(
+            "Skipped instance `{name}`: its stored credential has a different or unknown owner; remove it with `/provider remove {name}` and sign in again."
+        ));
+        return false;
+    }
+    true
+}
+
 /// A name may be claimed once, and never one the build already answers to.
 fn claim(named: &mut BTreeSet<String>, name: &str) -> Result<(), PluginError> {
-    if name.is_empty() || name.contains('/') || name.contains(char::is_whitespace) {
-        return Err(PluginError::Config(format!(
-            "provider instance `{name}`: a name is one word without `/`, \
-             because it is what `--provider` and `/model <name>/<model>` say"
-        )));
+    if !bingo_sdk::valid_provider_name(name) {
+        return Err(PluginError::Config(
+            "a provider name uses only ASCII letters, digits, `_` and `-`".into(),
+        ));
     }
     if BUILT_IN.contains(&name) {
         return Err(PluginError::Config(format!(
@@ -222,9 +244,9 @@ mod tests {
     /// split on the characters this refuses.
     #[test]
     fn a_name_that_could_not_be_typed_is_refused() {
-        assert!(refusal(&[""]).contains("one word"));
-        assert!(refusal(&["two words"]).contains("one word"));
-        assert!(refusal(&["one/two"]).contains("one word"));
+        assert!(refusal(&[""]).contains("ASCII"));
+        assert!(refusal(&["two words"]).contains("ASCII"));
+        assert!(refusal(&["one/two"]).contains("ASCII"));
     }
 
     #[test]

@@ -4,11 +4,7 @@ use serde_json::{Map, Value, json};
 use std::path::Path;
 
 pub fn validate_name(name: &str) -> Result<(), KernelError> {
-    if name.is_empty()
-        || !name
-            .bytes()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-'))
-    {
+    if !bingo_sdk::valid_provider_name(name) {
         return Err(invalid(
             "a provider name uses only ASCII letters, digits, `_` and `-`",
         ));

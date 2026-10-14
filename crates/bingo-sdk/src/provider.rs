@@ -10,6 +10,14 @@ use tokio_util::sync::CancellationToken;
 use crate::host::Prompter;
 use crate::model::{Effort, EndpointCapabilities, ModelRequest, ModelStream, ProviderError};
 
+/// The credential namespace shared by persisted and runtime instances.
+pub fn valid_provider_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-'))
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AuthStatus {
@@ -234,5 +242,16 @@ mod runtime_contract {
             serde_json::to_value(spec).unwrap(),
             json!({"baseUrl":"http://localhost:1234", "images":false})
         );
+    }
+}
+
+#[cfg(test)]
+mod name_tests {
+    #[test]
+    fn instance_names_are_one_ascii_namespace() {
+        for name in ["", "channels.telegram", "mcp:key", "é", "a/b", "a b"] {
+            assert!(!super::valid_provider_name(name));
+        }
+        assert!(super::valid_provider_name("Work_2-local"));
     }
 }
