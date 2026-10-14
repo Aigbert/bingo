@@ -187,6 +187,9 @@ fn with_scope(req: &Request<'_>, rules: &Rules, decision: Decision) -> Decision 
 }
 
 fn silencing_rule(req: &Request<'_>, rules: &Rules) -> Option<String> {
+    if req.traits.destructive || crate::caution::subjects(req.call.subjects).is_some() {
+        return None;
+    }
     let candidate = scope::narrowest(req.call, req.cwd, req.home)?;
     let mut widened = rules.clone();
     widened.allow.push(Rule::parse(&candidate)?);
@@ -781,6 +784,24 @@ pub(crate) mod tests {
             Kind::Allow,
             "and the next call of the session"
         );
+    }
+
+    #[test]
+    fn cautioned_commands_offer_no_session_scope() {
+        for command in [
+            "rm -rf build",
+            "git reset --hard",
+            "git push --force",
+            "dd if=a of=b",
+        ] {
+            assert!(
+                matches!(
+                    Probe::bash(command).decide(),
+                    Decision::Ask { scope: None, .. }
+                ),
+                "{command}"
+            );
+        }
     }
 
     #[test]

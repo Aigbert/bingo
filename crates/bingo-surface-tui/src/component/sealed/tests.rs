@@ -23,6 +23,7 @@ fn state_with_card(login: bool) -> SessionState {
                 summary: "sample operation".into(),
                 preview: None,
                 session_scope: Some("sample".into()),
+                caution: None,
             },
             vec![
                 AnswerSpec::AllowOnce,

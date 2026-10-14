@@ -252,6 +252,7 @@ impl Question {
     /// this very chat says as its own buttons come off.
     pub fn decided(&self, answer: &Answer) -> String {
         match answer {
+            Answer::AllowChanged { .. } => "changed input".into(),
             Answer::AllowOnce => "approved".into(),
             Answer::AllowSession { .. } => "approved for this session".into(),
             Answer::Deny { .. } => "denied".into(),
@@ -356,6 +357,7 @@ mod tests {
                     cwd: "/tmp".into(),
                 }),
                 session_scope: scope.map(str::to_owned),
+                caution: None,
             },
             vec![
                 AnswerSpec::AllowOnce,

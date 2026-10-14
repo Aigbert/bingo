@@ -489,6 +489,7 @@ pub fn permission(scope: Option<&str>, preview: Option<Preview>) -> Interaction 
             summary: "Edit src/lib.rs".into(),
             preview,
             session_scope: scope.map(str::to_owned),
+            caution: None,
         },
         answers,
     )
@@ -833,6 +834,7 @@ pub fn receipt_item(
         id,
         ItemStatus::Completed,
         ItemBody::PermissionReceipt {
+            item: None,
             interaction: InteractionId::from_raw("int_1"),
             tool: tool.into(),
             decision,

@@ -491,11 +491,15 @@ pub enum ItemBody {
         text: String,
     },
     QuestionAnswer {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        item: Option<ItemId>,
         interaction: InteractionId,
         question: String,
         answer: String,
     },
     PermissionReceipt {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        item: Option<ItemId>,
         interaction: InteractionId,
         tool: String,
         decision: DecisionKind,
@@ -551,6 +555,7 @@ pub fn shell_note(command: &str, output: &str, exit: Option<i32>) -> String {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum DecisionKind {
+    AllowChanged,
     Allow,
     AllowSession,
     Deny,
@@ -767,6 +772,7 @@ mod tests {
                     unified: "--- a\n+++ b\n".into(),
                 }),
                 session_scope: Some("Edit(src/)".into()),
+                caution: None,
             },
             answers: vec![
                 AnswerSpec::AllowOnce,
@@ -1390,6 +1396,7 @@ mod tests {
             summary: "Read Cargo.toml".into(),
             preview: None,
             session_scope: session_scope.map(str::to_string),
+            caution: None,
         }
     }
 

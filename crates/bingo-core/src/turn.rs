@@ -864,10 +864,13 @@ impl Turn<'_> {
             if let Some(receipt) = gated.receipt {
                 self.record(receipt);
             }
-            if gated.gate == Gate::Allowed
-                && let Some(mut item) = self.transcript.get(item_id).cloned()
+            if let Some(mut item) = self.transcript.get(item_id).cloned()
+                && (gated.gate == Gate::Allowed
+                    || matches!(&item.body, ItemBody::ToolCall { input, .. } if *input != gated.call.input))
             {
-                item.status = ItemStatus::Running;
+                if gated.gate == Gate::Allowed {
+                    item.status = ItemStatus::Running;
+                }
                 if let ItemBody::ToolCall { input, .. } = &mut item.body {
                     *input = gated.call.input.clone();
                 }

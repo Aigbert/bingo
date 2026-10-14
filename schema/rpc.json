@@ -130,6 +130,20 @@
         {
           "type": "object",
           "properties": {
+            "input": true,
+            "kind": {
+              "type": "string",
+              "const": "allowChanged"
+            }
+          },
+          "required": [
+            "kind",
+            "input"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
             "kind": {
               "type": "string",
               "const": "allowOnce"
@@ -306,6 +320,7 @@
     "AnswerSpec": {
       "type": "string",
       "enum": [
+        "allowChanged",
         "allowOnce",
         "allowSession",
         "deny",
@@ -841,6 +856,7 @@
     "DecisionKind": {
       "type": "string",
       "enum": [
+        "allowChanged",
         "allow",
         "allowSession",
         "deny"
@@ -2343,6 +2359,12 @@
               ],
               "description": "The rule `AllowSession` would install, when one would silence the prompt."
             },
+            "caution": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "kind": {
               "type": "string",
               "const": "permission"
@@ -2840,6 +2862,16 @@
         {
           "type": "object",
           "properties": {
+            "item": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ItemId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "interaction": {
               "$ref": "#/$defs/InteractionId"
             },
@@ -2864,6 +2896,16 @@
         {
           "type": "object",
           "properties": {
+            "item": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ItemId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "interaction": {
               "$ref": "#/$defs/InteractionId"
             },
@@ -4327,6 +4369,19 @@
     "QuestionProps": {
       "type": "object",
       "properties": {
+        "interactionId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InteractionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "form": {
+          "type": "boolean"
+        },
         "tool": {
           "type": "string"
         },

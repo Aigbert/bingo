@@ -117,6 +117,7 @@ fn permission(tool: &str, summary: &str) -> Frame {
                 summary: summary.into(),
                 preview: None,
                 session_scope: None,
+                caution: None,
             },
             answers: vec![AnswerSpec::Deny],
         },

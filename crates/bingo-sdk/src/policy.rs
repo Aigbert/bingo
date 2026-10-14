@@ -80,6 +80,16 @@ pub trait PermissionPolicy: Send + Sync {
 
     async fn decide(&self, input: PolicyInput<'_>) -> Decision;
 
+    /// A warning attached to an ask; a warned call never offers a session rule.
+    fn caution(&self, _input: PolicyInput<'_>) -> Option<String> {
+        None
+    }
+
+    /// Whether the ask can accept replacement input, subject to a fresh check.
+    fn allows_replacement(&self, _input: PolicyInput<'_>) -> bool {
+        false
+    }
+
     /// Install the session-scoped rule the user accepted. Never persisted by the kernel.
     async fn on_verdict(&self, _input: PolicyInput<'_>, _verdict: &Verdict) {}
 

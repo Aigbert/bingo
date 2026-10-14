@@ -869,6 +869,7 @@ fn receipt(
         return Vec::new();
     }
     let verdict = match decision {
+        DecisionKind::AllowChanged => "you changed it first",
         DecisionKind::Allow => "allowed",
         DecisionKind::AllowSession => "allowed for this session",
         DecisionKind::Deny => "denied",

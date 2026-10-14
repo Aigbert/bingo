@@ -270,6 +270,7 @@ fn tool_done_with_output() {
         item(
             3,
             item_of(ItemBody::PermissionReceipt {
+                item: None,
                 interaction: bingo_sdk::InteractionId::from_raw("int_1"),
                 tool: "Read".into(),
                 decision: bingo_sdk::DecisionKind::AllowSession,

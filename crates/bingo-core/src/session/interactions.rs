@@ -10,7 +10,9 @@ use tokio::sync::oneshot;
 use super::Actor;
 use super::mailbox::Answered;
 
-/// A keyboard answer inside this window after opening is a stray keystroke.
+mod receipt;
+
+/// A keyboard approval inside this window after opening is a stray keystroke.
 pub const INTERACTION_GUARD_MS: i64 = 400;
 
 pub(super) struct Pending {
@@ -23,6 +25,20 @@ pub(super) struct Pending {
 }
 
 impl Actor {
+    pub(super) fn recorded_denial(&self, body: &ItemBody) -> Option<ItemId> {
+        let ItemBody::PermissionReceipt {
+            item: Some(source),
+            decision: DecisionKind::Deny,
+            ..
+        } = body
+        else {
+            return None;
+        };
+        self.state.transcript.items().iter().find_map(|previous| {
+            matches!(&previous.body, ItemBody::PermissionReceipt { item: Some(id), decision: DecisionKind::Deny, .. } if id == source).then(|| previous.id.clone())
+        })
+    }
+
     pub(super) async fn open_interaction(
         &mut self,
         item: Option<ItemId>,
@@ -83,6 +99,7 @@ impl Actor {
             ));
         }
         if activation == Activation::Keyboard
+            && !matches!(answer, Answer::Deny { .. } | Answer::Cancel)
             && let Some(guard) = pending.interaction.guard_until
             && Timestamp::now() < guard
         {
@@ -108,6 +125,7 @@ impl Actor {
         let Some(pending) = self.pending.remove(&id) else {
             return Ok(());
         };
+        let receipt = receipt::answered(&pending.interaction, &answer);
         let _ = pending.reply.send(Ok(answer.clone()));
         self.publish(
             Event::InteractionResolved {
@@ -121,6 +139,9 @@ impl Actor {
             Some(intent.clone()),
         )
         .await?;
+        if let Some(body) = receipt {
+            self.record(body).await?;
+        }
         self.applied(intent, Value::Null).await?;
         self.publish_summary(self.state.summary.clone()).await?;
         Ok(())

@@ -587,6 +587,7 @@ fn sealed_site(component: Component) -> bingo_sdk::SessionState {
                 summary: "sample operation".into(),
                 preview: None,
                 session_scope: None,
+                caution: None,
             },
             vec![
                 bingo_sdk::AnswerSpec::AllowOnce,

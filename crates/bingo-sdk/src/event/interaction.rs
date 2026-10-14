@@ -53,9 +53,11 @@ impl Interaction {
     /// a list, so it has no rungs.
     pub fn rungs(&self) -> Vec<Rung> {
         match &self.kind {
-            InteractionKind::Permission { session_scope, .. } => {
-                self.permission_rungs(session_scope.as_deref())
-            }
+            InteractionKind::Permission {
+                session_scope,
+                caution,
+                ..
+            } => self.permission_rungs(session_scope.as_deref().filter(|_| caution.is_none())),
             InteractionKind::Question(question) => self.question_rungs(question),
             InteractionKind::Confirm { .. } => self
                 .rung(Answer::Confirm, "Yes")
@@ -130,6 +132,8 @@ pub enum InteractionKind {
         /// The rule `AllowSession` would install, when one would silence the prompt.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         session_scope: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        caution: Option<String>,
     },
     /// One question on its own. It holds [`Question`] flattened, so the frame
     /// it makes is the one it always was.
@@ -261,6 +265,7 @@ pub enum LoginFlow {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum AnswerSpec {
+    AllowChanged,
     AllowOnce,
     AllowSession,
     Deny,
@@ -274,6 +279,9 @@ pub enum AnswerSpec {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Answer {
+    AllowChanged {
+        input: serde_json::Value,
+    },
     AllowOnce,
     AllowSession {
         scope: String,
@@ -308,6 +316,7 @@ pub enum Answer {
 impl Answer {
     pub fn spec(&self) -> AnswerSpec {
         match self {
+            Answer::AllowChanged { .. } => AnswerSpec::AllowChanged,
             Answer::AllowOnce => AnswerSpec::AllowOnce,
             Answer::AllowSession { .. } => AnswerSpec::AllowSession,
             Answer::Deny { .. } => AnswerSpec::Deny,
@@ -346,4 +355,29 @@ pub enum CancelReason {
     SessionClosed,
     Expired,
     Superseded,
+}
+
+#[cfg(test)]
+mod changed_contract {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn changed_input_is_an_additive_answer() {
+        let wire = json!({"kind":"allowChanged","input":{"command":"cargo test"}});
+        let answer: Answer = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(answer.spec(), AnswerSpec::AllowChanged);
+        assert_eq!(serde_json::to_value(answer).unwrap(), wire);
+    }
+
+    #[test]
+    fn old_permissions_have_no_caution() {
+        let wire = json!({"kind":"permission","tool":"Bash","summary":"run"});
+        let kind: InteractionKind = serde_json::from_value(wire.clone()).unwrap();
+        assert!(matches!(
+            kind,
+            InteractionKind::Permission { caution: None, .. }
+        ));
+        assert_eq!(serde_json::to_value(kind).unwrap(), wire);
+    }
 }

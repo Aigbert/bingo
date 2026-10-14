@@ -756,6 +756,7 @@ pub(crate) mod tests {
                 summary: "Read Cargo.toml".into(),
                 preview: None,
                 session_scope: session_scope.map(str::to_owned),
+                caution: None,
             },
             answers: vec![
                 AnswerSpec::AllowOnce,

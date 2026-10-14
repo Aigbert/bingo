@@ -1531,6 +1531,7 @@
     "DecisionKind": {
       "type": "string",
       "enum": [
+        "allowChanged",
         "allow",
         "allowSession",
         "deny"
@@ -3398,6 +3399,16 @@
         {
           "type": "object",
           "properties": {
+            "item": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ItemId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "interaction": {
               "$ref": "#/$defs/InteractionId"
             },
@@ -3422,6 +3433,16 @@
         {
           "type": "object",
           "properties": {
+            "item": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ItemId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "interaction": {
               "$ref": "#/$defs/InteractionId"
             },

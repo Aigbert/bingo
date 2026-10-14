@@ -148,6 +148,7 @@ pub fn permission(scope: Option<&str>) -> Interaction {
             summary: "run `cargo test`".into(),
             preview: None,
             session_scope: scope.map(str::to_owned),
+            caution: None,
         },
         answers: vec![
             AnswerSpec::AllowOnce,

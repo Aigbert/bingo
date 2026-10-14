@@ -8,6 +8,10 @@ macro_rules! props {
     };
 }
 props!(QuestionProps {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    interaction_id: Option<crate::InteractionId>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    form: bool,
     tool: String,
     questions: Vec<crate::Question>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

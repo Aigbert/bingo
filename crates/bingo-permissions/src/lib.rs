@@ -7,6 +7,7 @@
 //! decided. A rule accepted "for the session", and a mode chosen for it, come
 //! back into the same in-memory store and live no longer than the session.
 
+pub mod caution;
 pub mod command;
 pub mod decide;
 pub mod guide;
@@ -194,8 +195,19 @@ fn parse_table(lines: &[String]) -> Result<Vec<Rule>, PluginError> {
 
 #[async_trait]
 impl PermissionPolicy for PermissionsPolicy {
+    fn allows_replacement(&self, input: PolicyInput<'_>) -> bool {
+        // External judgements cannot return replacement input to their executor.
+        input.traits.trusted
+            && ((input.call.name == "Bash" && input.call.input["command"].is_string())
+                || (input.call.name == "Edit" && input.call.input["new_string"].is_string()))
+    }
+
     fn id(&self) -> &str {
         MANIFEST.id
+    }
+
+    fn caution(&self, input: PolicyInput<'_>) -> Option<String> {
+        caution::subjects(input.subjects)
     }
 
     async fn decide(&self, input: PolicyInput<'_>) -> Decision {
@@ -296,6 +308,38 @@ mod tests {
                 cwd: Path::new("/work/project"),
             })
             .await
+    }
+
+    #[test]
+    fn replacement_requires_a_supported_input_and_trusted_executor() {
+        let policy = policy(json!({}));
+        let session = SessionId::from_raw("replacement");
+        for (name, input, trusted, expected) in [
+            ("Bash", json!({"command":"echo hi"}), true, true),
+            ("Edit", json!({"new_string":"new"}), true, true),
+            ("Bash", json!({"command":"echo hi"}), false, false),
+            ("Write", json!({"content":"new"}), true, false),
+            ("Bash", json!({}), true, false),
+        ] {
+            let mut call = call(name);
+            call.input = input;
+            let traits = ToolTraits {
+                trusted,
+                ..Default::default()
+            };
+            assert_eq!(
+                policy.allows_replacement(PolicyInput {
+                    call: &call,
+                    traits: &traits,
+                    subjects: &[],
+                    confirm: None,
+                    session: &session,
+                    cwd: Path::new("/work"),
+                }),
+                expected,
+                "{name}: trusted={trusted}"
+            );
+        }
     }
 
     #[test]

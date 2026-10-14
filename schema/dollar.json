@@ -2194,6 +2194,16 @@
         {
           "type": "object",
           "properties": {
+            "item": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ItemId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "interaction": {
               "$ref": "#/$defs/InteractionId"
             },
@@ -2218,6 +2228,16 @@
         {
           "type": "object",
           "properties": {
+            "item": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ItemId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "interaction": {
               "$ref": "#/$defs/InteractionId"
             },
@@ -2333,6 +2353,7 @@
     "DecisionKind": {
       "type": "string",
       "enum": [
+        "allowChanged",
         "allow",
         "allowSession",
         "deny"
@@ -2588,6 +2609,12 @@
                 "null"
               ],
               "description": "The rule `AllowSession` would install, when one would silence the prompt."
+            },
+            "caution": {
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "kind": {
               "type": "string",
@@ -2888,6 +2915,7 @@
     "AnswerSpec": {
       "type": "string",
       "enum": [
+        "allowChanged",
         "allowOnce",
         "allowSession",
         "deny",
@@ -2900,6 +2928,20 @@
     },
     "Answer": {
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "input": true,
+            "kind": {
+              "type": "string",
+              "const": "allowChanged"
+            }
+          },
+          "required": [
+            "kind",
+            "input"
+          ]
+        },
         {
           "type": "object",
           "properties": {

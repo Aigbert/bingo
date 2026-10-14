@@ -8,9 +8,14 @@ pub fn props(interaction: &Interaction) -> Option<Props> {
         _ => return None,
     };
     Some(Props::Question(QuestionProps {
+        interaction_id: Some(interaction.id.clone()),
+        form: matches!(interaction.kind, InteractionKind::Form { .. }),
         tool: String::new(),
         questions,
-        metadata_source: None,
+        metadata_source: match &interaction.kind {
+            InteractionKind::Form { title, .. } => title.clone(),
+            _ => None,
+        },
     }))
 }
 

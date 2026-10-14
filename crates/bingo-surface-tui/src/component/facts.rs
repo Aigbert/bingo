@@ -123,6 +123,7 @@ fn change_receipt_or_operation(item: &mut Item, props: &Props) {
     match props {
         Props::QuestionAnswer(props) => {
             item.body = ItemBody::QuestionAnswer {
+                item: None,
                 interaction: props.interaction.clone(),
                 question: props.question.clone(),
                 answer: props.answer.clone(),
@@ -130,6 +131,7 @@ fn change_receipt_or_operation(item: &mut Item, props: &Props) {
         }
         Props::PermissionReceipt(props) => {
             item.body = ItemBody::PermissionReceipt {
+                item: None,
                 interaction: props.interaction.clone(),
                 tool: props.tool.clone(),
                 decision: props.decision,

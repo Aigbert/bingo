@@ -6059,6 +6059,16 @@
               {
                 "type": "object",
                 "properties": {
+                  "item": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/ItemId"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "interaction": {
                     "$ref": "#/$defs/InteractionId"
                   },
@@ -6083,6 +6093,16 @@
               {
                 "type": "object",
                 "properties": {
+                  "item": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/ItemId"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "interaction": {
                     "$ref": "#/$defs/InteractionId"
                   },
@@ -7385,6 +7405,7 @@
           "DecisionKind": {
             "type": "string",
             "enum": [
+              "allowChanged",
               "allow",
               "allowSession",
               "deny"
@@ -10327,6 +10348,16 @@
               {
                 "type": "object",
                 "properties": {
+                  "item": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/ItemId"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "interaction": {
                     "$ref": "#/$defs/InteractionId"
                   },
@@ -10351,6 +10382,16 @@
               {
                 "type": "object",
                 "properties": {
+                  "item": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/ItemId"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "interaction": {
                     "$ref": "#/$defs/InteractionId"
                   },
@@ -10636,6 +10677,10 @@
               "error"
             ]
           },
+          "ItemId": {
+            "description": "One unit in the transcript order.",
+            "type": "string"
+          },
           "InteractionId": {
             "description": "A pending question or permission, answered once by id.",
             "type": "string"
@@ -10643,6 +10688,7 @@
           "DecisionKind": {
             "type": "string",
             "enum": [
+              "allowChanged",
               "allow",
               "allowSession",
               "deny"

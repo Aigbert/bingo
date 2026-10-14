@@ -660,7 +660,10 @@ impl Actor {
             &event,
             Event::ItemCompleted { item } if matches!(item.body, ItemBody::PermissionReceipt { .. })
         );
-        self.publish(event, None).await?;
+        let duplicate = matches!(&event, Event::ItemCompleted { item } if self.recorded_denial(&item.body).is_some());
+        if !duplicate {
+            self.publish(event, None).await?;
+        }
         if receipt {
             self.refresh_config().await?;
         }
@@ -845,6 +848,10 @@ impl Actor {
     }
 
     async fn record(&mut self, body: ItemBody) -> Result<ItemId, KernelError> {
+        if let Some(id) = self.recorded_denial(&body) {
+            self.refresh_config().await?;
+            return Ok(id);
+        }
         let turn = self.running.as_ref().map(|r| r.turn.clone());
         let item = self.fresh(turn, None, body);
         let id = item.id.clone();

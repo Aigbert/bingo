@@ -327,6 +327,7 @@ async fn a_session_allow_answers_twice_with_once_and_asks_the_person_once() {
     let asked = until_asked(&mut attachment).await;
     let InteractionKind::Permission {
         session_scope: Some(scope),
+        caution: None,
         ..
     } = asked.kind
     else {
