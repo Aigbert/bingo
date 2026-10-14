@@ -619,6 +619,10 @@ impl Host {
 
     /// The directories this process runs in; what a command that writes a
     /// settings file needs to find one (ADR-0008 §8).
+    pub(crate) fn settings_layers(&self) -> &[settings::Layer] {
+        &self.config.layers
+    }
+
     pub fn env(&self) -> &Env {
         &self.config.env
     }

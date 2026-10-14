@@ -632,3 +632,69 @@ async fn a_tool_switch_explains_pending_and_keeps_the_running_tools() {
     );
     host.shutdown().await;
 }
+
+#[tokio::test]
+async fn project_switch_override_keeps_the_effective_wish_and_names_its_file() {
+    static WORDCOUNT: PluginManifest = PluginManifest {
+        id: "wordcount",
+        version: "0",
+        uses: &[],
+        provides: &[],
+        requires: &[],
+        config: None,
+    };
+    for on in [true, false] {
+        let home = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let path = project.path().join(".bingo/settings.toml");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, format!("[enabledPlugins]\nwordcount = {on}\n")).unwrap();
+        let env = env_in(home.path());
+        let mut config = HostConfig::new(env.clone());
+        config.layers = settings::load(&env, project.path(), None).unwrap();
+        let config = config.with_layer("cli", json!({"model":"m"}));
+        let host = Host::build(
+            vec![
+                TestPlugin::boxed(&WORDCOUNT, vec![]),
+                TestPlugin::boxed(
+                    &PROVIDER,
+                    vec![Contribution::Provider(ScriptedProvider::new(vec![]))],
+                ),
+            ],
+            config,
+        )
+        .await
+        .unwrap();
+        let mut client = Client::open(&host).await;
+        let verb = if on { "disable" } else { "enable" };
+        let (ack, _) = client.ack(&format!("/plugins {verb} wordcount")).await;
+        let text = message(&ack);
+        assert!(text.contains(&path.display().to_string()), "{text}");
+        assert!(
+            text.contains(&format!("keeps it {}", crate::plugins::state(on))),
+            "{text}"
+        );
+        let listed = crate::plugins::listing(host.registry()).await;
+        assert_eq!(
+            listed
+                .iter()
+                .find(|row| row.id == "wordcount")
+                .unwrap()
+                .state
+                .is_on(),
+            on
+        );
+        assert_eq!(
+            user_settings(home.path())["enabledPlugins"]["wordcount"],
+            !on
+        );
+        assert_eq!(
+            settings::merge(&settings::load(&env, project.path(), None).unwrap(), &[])
+                .unwrap()
+                .kernel
+                .enabled_plugins["wordcount"],
+            on
+        );
+        host.shutdown().await;
+    }
+}

@@ -129,12 +129,17 @@ pub fn switch(env: &Env, name: &str, enabled: bool) -> Result<(), SettingsError>
     settings::remember(&path, &[(KEY, Value::Object(switches))])
 }
 
+pub(crate) enum Switched {
+    Applied(bool, bingo_sdk::plugin::PluginSwitch),
+    Overridden(bool, String),
+}
+
 pub(crate) async fn switch_in(
     host: &crate::host::Host,
     session: &bingo_sdk::SessionId,
     name: &str,
     enabled: bool,
-) -> Result<(bool, bingo_sdk::plugin::PluginSwitch), bingo_sdk::KernelError> {
+) -> Result<Switched, bingo_sdk::KernelError> {
     let _guard = host.registry().switches.switching.lock().await;
     let target = name;
     let name = name.strip_prefix("plugins:").unwrap_or(name);
@@ -158,22 +163,57 @@ pub(crate) async fn switch_in(
         )
     })?;
     settings::remember(&path, &[(KEY, value)]).map_err(failed)?;
-    {
-        let mut wishes = host
-            .registry()
-            .switches
-            .wishes
-            .write()
-            .unwrap_or_else(|e| e.into_inner());
-        if enabled {
-            wishes.remove(name);
-        } else {
-            wishes.insert(name.into());
-        }
+    let (merged, source) = effective_wish(host, name).map_err(failed)?;
+    let effective = merged.enabled_plugins.get(name).copied().unwrap_or(true);
+    *host
+        .registry()
+        .switches
+        .wishes
+        .write()
+        .unwrap_or_else(|e| e.into_inner()) = merged.switched_off();
+    if effective != enabled {
+        host.plugins_changed();
+        return Ok(Switched::Overridden(effective, source));
     }
-    let result = apply(host.registry(), target, enabled).await;
+    let result = apply(host.registry(), target, effective).await;
     host.plugins_changed();
-    result.map(|kind| (enabled, kind))
+    result.map(|kind| Switched::Applied(effective, kind))
+}
+
+fn effective_wish(
+    host: &crate::host::Host,
+    name: &str,
+) -> Result<(settings::KernelSettings, String), SettingsError> {
+    let path = settings::user_path(host.env());
+    let mut layers = vec![settings::Layer::new(
+        settings::LayerOrigin::User,
+        path.display().to_string(),
+        settings::read_document(&path)?,
+    )];
+    for layer in host
+        .settings_layers()
+        .iter()
+        .filter(|layer| !layer.is_user())
+    {
+        let mut layer = layer.clone();
+        let path = Path::new(&layer.source);
+        if path.is_file() {
+            layer.value = settings::read_document(path)?;
+        }
+        layers.push(layer);
+    }
+    let source = layers
+        .iter()
+        .rev()
+        .find(|layer| {
+            layer
+                .value
+                .get(KEY)
+                .is_some_and(|value| value.is_null() || value.get(name).is_some())
+        })
+        .map(|layer| layer.source.clone())
+        .unwrap_or_default();
+    Ok((settings::merge(&layers, &[])?.kernel, source))
 }
 
 async fn apply(

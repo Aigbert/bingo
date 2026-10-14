@@ -158,7 +158,17 @@ async fn switched(
     enabled: bool,
 ) -> Result<CommandOutcome, KernelError> {
     refuse(host, listed, name)?;
-    let (enabled, kind) = crate::plugins::switch_in(host, session, name, enabled).await?;
+    let (enabled, kind) = match crate::plugins::switch_in(host, session, name, enabled).await? {
+        crate::plugins::Switched::Applied(enabled, kind) => (enabled, kind),
+        crate::plugins::Switched::Overridden(enabled, source) => {
+            return Ok(CommandOutcome::Applied {
+                message: Some(format!(
+                    "{name}: switch saved; setting in {source} keeps it {}.",
+                    state(enabled)
+                )),
+            });
+        }
+    };
     let target = name;
     let name = name.strip_prefix("plugins:").unwrap_or(name);
     let when = match kind {
