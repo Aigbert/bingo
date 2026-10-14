@@ -203,9 +203,14 @@ async fn a_catalogue_that_will_not_answer_reports_failed_reach() {
         .mount(&server)
         .await;
 
+    let models = signed_in(&server, &directory, "at-1")
+        .models()
+        .await
+        .unwrap();
+    assert!(!models.is_empty());
     assert!(
         signed_in(&server, &directory, "at-1")
-            .models()
+            .probe_models()
             .await
             .is_err()
     );

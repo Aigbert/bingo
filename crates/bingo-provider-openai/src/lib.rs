@@ -411,10 +411,20 @@ impl Provider for OpenAiProvider {
 
     async fn models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
         match self.variant {
-            Variant::Codex => self.codex_catalogue().await,
+            Variant::Codex => Ok(self
+                .codex_catalogue()
+                .await
+                .unwrap_or_else(|_| models::codex_fallback())),
             Variant::Default => Ok(models::parse(
                 &self.json(self.get("/v1/models").await?).await?,
             )),
+        }
+    }
+
+    async fn probe_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        match self.variant {
+            Variant::Codex => self.codex_catalogue().await,
+            Variant::Default => self.models().await,
         }
     }
 

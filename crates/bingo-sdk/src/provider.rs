@@ -166,6 +166,11 @@ pub trait Provider: Send + Sync {
         Ok(Vec::new())
     }
 
+    /// Fetch the live catalogue without substituting an offline model menu.
+    async fn probe_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        self.models().await
+    }
+
     fn auth(&self) -> AuthStatus {
         AuthStatus::NotApplicable
     }

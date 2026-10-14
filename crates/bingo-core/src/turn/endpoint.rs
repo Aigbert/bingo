@@ -21,6 +21,12 @@ impl Endpoint {
             Self::Agent(a) => a.models().await,
         }
     }
+    pub async fn probe_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        match self {
+            Self::Provider(p) => p.probe_models().await,
+            Self::Agent(a) => a.models().await,
+        }
+    }
     pub fn provider(&self) -> Option<Arc<dyn Provider>> {
         match self {
             Self::Provider(p) => Some(p.clone()),

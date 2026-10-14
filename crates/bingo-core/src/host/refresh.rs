@@ -74,7 +74,7 @@ fn usable(providers: &[Arc<dyn Provider>]) -> Vec<Arc<dyn Provider>> {
 async fn ask(host: Weak<Host>, provider: Endpoint) -> Refreshed {
     let started = Instant::now();
     let answer = provider
-        .models()
+        .probe_models()
         .await
         .map_err(|error| format!("model list failed ({:?})", error.code()));
     if let Some(host) = host.upgrade() {
