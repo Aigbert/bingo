@@ -827,6 +827,19 @@ impl Turn<'_> {
         );
     }
 
+    async fn record_receipt(&mut self, body: Option<ItemBody>) -> bool {
+        let Some(body) = body else {
+            return true;
+        };
+        let item = self.fresh(body, ItemStatus::Completed);
+        let Ok(item) = self.host.receipt(item).await else {
+            self.cancel.cancel();
+            return false;
+        };
+        self.transcript.apply(&Event::ItemCompleted { item });
+        true
+    }
+
     async fn gate(&mut self, finished: &Finished) -> Vec<PendingCall> {
         let mut calls = Vec::with_capacity(finished.tool_calls.len());
         // Asked once for the round: the gate does the per-tool matching, and
@@ -861,13 +874,8 @@ impl Turn<'_> {
             for notice in gated.notices {
                 self.record(notice);
             }
-            if let Some(receipt) = gated.receipt {
-                let item = self.fresh(receipt, ItemStatus::Completed);
-                let Ok(item) = self.host.receipt(item).await else {
-                    self.cancel.cancel();
-                    return Vec::new();
-                };
-                self.transcript.apply(&Event::ItemCompleted { item });
+            if !self.record_receipt(gated.receipt).await {
+                return Vec::new();
             }
             if let Some(mut item) = self.transcript.get(item_id).cloned()
                 && (gated.gate == Gate::Allowed
