@@ -11,101 +11,61 @@ the hook gave it. The permission prompt is never a component. `$.ui.log`
 finishes the pulled half of `$.ui`, and `'bingo'` gains its state
 helpers (ADR-0078 §8). The proof is three examples of bingo's own,
 `tool-call`, `band` and `pane`, which do what Claude Code's authoring
-examples of those names do and draw in the TUI. After M138 and M140.
+examples of those names do and draw in the TUI. After M138 and M140; see the re-verification below.
 
 ## Bricks, in build order
 
-1. **Contract: component props, tests first.** Sdk `component.rs` (one
-   noun: what a component draws). Each of the fifteen has an sdk type
-   with Claude Code's prop names (its `claude-code.d.ts`, 9777–10340):
-   `ToolUse { tool, input, isRunning, isErrored, isInterrupted, output }`,
-   `AbovePrompt { hasSurvey, isWorking, maxRows, bodyColumns, … }`,
-   `Pane { title, isFocused, bodyColumns }`, and so on. Each is a pure
-   projection of what `SessionState` already holds, built at draw time,
-   never stored. A field bingo has no source for takes its resting value
-   (`hasSurvey: false`), so a port type-checks unchanged. Golden JSON per
-   component, generated into `schema/rpc.json` and, through
-   `bingo-schema-ts` (M133), the TypeScript types. They fail first.
-2. **Matched components, published.** Core reads the matchers of the
-   links at `ui.render` (M131's `LinkMatcher`, a partial of `e`) and
-   publishes `{ component: [partial…] }` under `ConfigView.kernel.render`,
-   again when a plugin loads, reloads or leaves. The sdk gains
-   `render::matched(&ConfigView) -> Matched` and the pure
-   `Matched::asks(component, &request)`, which uses the same partial
-   matcher the runtime applies to `e` (moved to the sdk if M137 left it
-   in `bingo-mods`: one matcher, two callers). A matcher holding a
-   RegExp or a function publishes as its component alone, so a surface
-   asks more, never less. Table tests.
-3. **`Engine` substitution, pure.** TUI `component.rs`: `draw(component,
-   props, answer: Option<&View>, own) -> Vec<Line>`. No answer draws
-   `own(props)`. An answer renders through `views::render_with(view,
-   width, engine)`, where each `Engine { component, props }` draws `own`
-   of those props parsed back into the component's type; props that do
-   not parse draw `own` of the original, with one notice. Table tests
-   over a stub `own`.
-4. **Each component asks, only when matched.** The module that draws it
-   today calls `component::draw` when `matched.asks(…)`, and otherwise
-   draws exactly as before: `transcript.rs` and `transcript/{said,
-   output}.rs` (messages, tool rows and results, command output,
-   `InfoNotice`), `activity.rs` (`Spinner`, `ToolProgress`,
-   `AbovePrompt`), `worked.rs` (`TurnDuration`), `status.rs`
-   (`SessionMode`, `PromptHint`), `form.rs` (`AskUserQuestion`), M140's
-   `pane.rs` (`Pane`). Today's drawings read only those props, so a
-   rewritten prop is what the person sees. `requestId` is the item's id
-   (`tool_use_id` for a tool row), or the component's name for one that
-   occurs once. Only rows on screen ask; M140's memo answers a row
-   scrolled back to; `blocks.rs` keys its kept block on the answer's
-   generation. M136's `turn.complete` text, an `Item::Notice` after
-   `TurnCompleted`, draws under the answer through `InfoNotice`, and
-   `TurnDuration` keeps its own row: a `TestBackend` test with hooks on
-   both pins two rows, two requests, in that order.
-5. **The permission prompt is not a component.** `Component` has no
-   variant for it (M140), and `AskUserQuestion`'s projection answers
-   `None` for the permission kind, so `dialog.rs` has no props to send.
-   A test loads a hook matching `{ component: 'AskUserQuestion' }` with
-   no partial, raises a permission interaction, and counts zero
-   `ui/render` requests.
-6. **`$.ui.log`**, an op event: `tracing` at target `mod::<plugin>`, into
-   the log file bingo already keeps.
-7. **The state helpers in `'bingo'`.** `sdk/typescript/src/state.ts`:
-   `atom(key, initial)`, `derive(fn)` (memoised per render), `read($,
-   atom)`, `update($, atom, fn)` (retries an `ifVersion` conflict three
-   times, then throws), `memberOf(atom, id)` — pure TypeScript over
-   `$.state` (M138). The in-process `bingo` module embeds the same file
-   (`include_str!`), so both transports run one source. They land here
-   because the examples use them; M142's kit tests them.
-8. **The examples, bingo's own.** `examples/plugins/{tool-call,band,
-   pane}/`, each a `plugin.json` naming its `module`, the source,
-   `types/index.d.ts` (its `PluginState`) and a README, written fresh for
-   bingo: nothing is copied from Claude Code's examples, which carry no
-   licence. They import `'bingo'`, use the helpers, match on `component`
-   and `requestId` and read `e.props.hasSurvey` as Claude Code's names
-   are on the wire, and name bingo's own tools and inputs. `tool-call`
-   denies an edit to a protected path and rewrites a shell command,
-   counting in `$.ui.status`; `band` answers `AbovePrompt` with a
-   `Button` that hides it; `pane` opens a pane from a command and answers
-   its `requestId` with one row per tool call. M146 consumes them; M142
-   adds their `*.test.ts`.
-9. **The acceptance run.** `crates/bingo/tests/mods_components.rs`
-   drives each example over `bingo serve --stdio` with the fake provider
-   (`band` shows and hides; `pane` gains a row per call and keeps it
-   across a reload; `tool-call` denies, rewrites, counts);
-   `scripts/tui-smoke.sh` gains one `--plugin-dir` case per example.
+1. **Contracts first.** Sdk `component.rs`: fifteen typed props using the
+   reference's `RenderPropsOf` names, golden JSON per component, generated
+   RPC/TypeScript schemas. Missing source fields take resting values.
+   Props are projections, never stored alongside session items.
+2. **Matched components.** Publish `{ component: [partial…] }` under
+   `ConfigView.kernel.render` at load/reload/removal. Sdk `render::matched`
+   and `Matched::asks` share the catalogue matcher; regex/functions widen
+   to their component alone. Table tests for nested/scalar/opaque matchers.
+3. **Engine substitution.** Pure TUI `component::draw(component, props,
+   answer, own)` draws `own(props)` until answered. `views::render_with`
+   resolves nested Engine nodes with parsed rewritten props; invalid props
+   fall back to the originals with one notice. Stub-own table tests.
+4. **Draw sites.** Messages, tool use/result/group/progress, command output,
+   notices, spinner, duration, mode, prompt hint, AbovePrompt, Pane and
+   Question ask only when matched and visible. Request ids are item ids,
+   tool-use ids, or singleton component names. Rewritten props feed own
+   drawing; memo generations revise block caches and survive scrolling.
+   TestBackend coverage per component; unmatched sites make zero requests.
+   A turn-completion notice and duration remain two rows/two requests in order.
+5. **Permission exclusion.** Question projection refuses Permission;
+   even an unrestricted Question hook causes zero render requests for it.
+6. **`$.ui.log`.** One op event writing to bingo's existing tracing log,
+   attributed to `mod::<plugin>`.
+7. **State helpers.** Shared `state.ts`: `atom`, per-render memoized `derive`,
+   `read`, `update` (three ifVersion conflict retries, then throw), `memberOf`.
+   QuickJS embeds the same source; M142's kit consumes it.
+8. **Original examples.** `examples/plugins/{tool-call,band,pane}/` each has
+   plugin.json, module source, types/index.d.ts (PluginState) and README.
+   Tool-call denies a protected edit, rewrites a shell command and counts in
+   status; band answers AbovePrompt with a hide Button; pane opens from a
+   command and shows one row per call. Use helpers and component/requestId
+   matchers, read `hasSurvey`; copy no unlicensed example source.
+9. **Acceptance.** `mods_components.rs` drives all three over stdio RPC with
+   fake provider: denial/rewrite/count, band show/hide, pane rows/reload.
+   Add all three to tui-smoke; isolated tmux pane open/two calls/escape drive.
 
 ## Files
 
-- `crates/bingo-sdk/src/{component.rs (new),render.rs}`; the matcher's home (brick 2)
-- `crates/bingo-core/src/chain/render.rs` (the matched components), its config-view writer
+- `crates/bingo-sdk/src/{component.rs (new),component/,render.rs,lib.rs,intercept.rs,catalogue/matcher.rs}`
+- `crates/bingo-core/src/{chain/render.rs,session.rs,session/catalogue.rs}` (config publication)
 - `crates/bingo-mods/src/` `$.ui.log`, the embedded helpers; `sdk/typescript/src/{state.ts (new),index.ts}`
 - `crates/bingo-surface-tui/src/{component.rs (new),views/mod.rs,transcript.rs,transcript/{said,output}.rs,
-  activity.rs,worked.rs,status.rs,form.rs,dialog.rs,blocks.rs}`
-- `schema/{rpc,events}.json`; the generated TypeScript types
+  activity.rs,worked.rs,status.rs,form.rs,dialog.rs,blocks.rs,pane.rs,pulled.rs,view.rs,run/pulling.rs,lib.rs}`
+- `crates/bingo-surface-rpc/src/schema.rs`; `schema/{rpc,events,plugin,plugin-2}.json`; generated TypeScript
+- `sdk/typescript/src/{on.ts,plugin.ts}` (shared matcher metadata); `docs/adr/0075-plugin-protocol-2.md`
 - `examples/plugins/{tool-call,band,pane}/` (new)
 - `crates/bingo/tests/mods_components.rs` (new); `scripts/tui-smoke.sh`
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-sdk component:: render::matched` passes: each
+- [ ] `cargo test -p bingo-sdk component::` and `cargo test -p bingo-sdk render::matched` pass: each
       component's golden JSON, and `asks` over scalar, nested and
       RegExp-only matchers.
 - [ ] `cargo test -p bingo-surface-tui component::` passes: `draw` with
@@ -142,8 +102,30 @@ examples of those names do and draw in the TUI. After M138 and M140.
   first ask happens before the row is first painted.
 - **Cost under `ToolUse`.** Every visible row asks; the four-in-flight
   bound and the memo keep scrolling cheap, as the drive measures.
-- Re-verify at start: M140 as landed (`render.rs`, `pulled.rs` and its
-  memo key, `answer_ok`, `Shown`); whether M131's `LinkMatcher` holds a
-  partial of `e`; where M137 put the matcher; which TUI module draws
-  `ToolGroup` and `PromptHint`; bingo's tool names and input fields;
-  the `InteractionKind` variants; the prop list in 2.1.296's types.
+
+## Re-verified (2026-10-14, ba70fdf6)
+
+- Landed prerequisites: M137 `c1d95e8c`, M138 `5581b978`, M139 `686ad289`,
+  M140 `ba70fdf6`; the TUI baseline includes M147 `6e3b1b03`, M148
+  `fddb62f3`, M149 `b2bee6f4`, M150 `a2f77d96`. No new dependency.
+- `render::Component` has fifteen variants including `Question` (ADR-0079's
+  dated amendment); `InteractionKind::Permission` must never project one.
+- `LinkMatcher` already has `prefilter`; sdk `catalogue::prefilter` is
+  conservative, while both runtimes share TypeScript `on.ts::matches`.
+  Mod metadata currently exports patterns only; publish serializable hook
+  partials, widening unsupported predicates rather than dropping matches.
+- `session.rs::refresh_config` writes config; catalogue completion handles
+  the reload boundary. M140's `answer_ok`, `Shown::Pull`, `pulled::Memo` and
+  core render queue are present. Memo currently drops off-screen requests;
+  M141 must retain component answers for scrolling and revise block caches.
+- `transcript::called` combines the tool heading/result; no ToolGroup
+  drawing exists yet. `status::middle` owns PromptHint; `worked` supplies
+  transcript closing rows. Ember/crew and removed rail/sheet remain intact.
+- Examples use `Edit.file_path` and `Bash.command`. User/explicit mods are
+  rewrite, project mods tighten; only user-layer trust grants full (§5).
+- M142 owns kit/mount/type emission and example `*.test.ts`; M151 owns
+  pane placement/viewport geometry. Shared render/status edits stay scoped.
+- Protocol 2 is unreleased (latest tag v0.6.5): scoped schema amendments
+  are authorized with one dated ADR-0075 line and generated with
+  `BINGO_UPDATE_SCHEMA=1`. Mechanical exhaustive arms outside Files are
+  listed in Verified. Discipline 4c stays unchanged; sdk/core name no tool.
