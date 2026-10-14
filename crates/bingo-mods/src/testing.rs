@@ -37,3 +37,30 @@ mod tests {
         }
     }
 }
+
+#[async_trait::async_trait]
+pub trait Driver: Send {
+    async fn call(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, String>;
+}
+pub struct Runner;
+impl Runner {
+    pub async fn load(
+        _: &std::path::Path,
+        _: &str,
+        _: crate::engine::Limits,
+    ) -> Result<Self, String> {
+        Err("test runtime is not installed".into())
+    }
+    pub async fn run(
+        &self,
+        _: &mut dyn Driver,
+        _: serde_json::Value,
+    ) -> Result<Vec<Report>, String> {
+        Ok(Vec::new())
+    }
+    pub async fn close(&self) {}
+}
