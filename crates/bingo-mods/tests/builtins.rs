@@ -316,9 +316,20 @@ async fn a_js_command_and_its_keys_appear_inside_a_wrapped_palette() {
             .as_array()
             .is_some_and(|commands| commands.iter().any(|command| command["name"] == "sample"))
     }));
-    let request = palette_request(&host, &attachment).await;
+    let mut request = palette_request(&host, &attachment).await;
+    let mut schema = json!({"leaf":"choice metadata"});
+    for _ in 0..6 {
+        schema = json!({"properties":{"nested":schema}});
+    }
+    request.props["catalogs"]["plugins"] = json!([{"id":"demo", "label":"demo", "meta":schema}]);
     let tree = host.render(&attachment.session, request).await.unwrap();
     assert!(tree.fold().contains("Outside frame"));
+    let payload = serde_json::to_value(&tree).unwrap();
+    assert_eq!(
+        payload["onKey"]["args"]["props"]["catalogs"]["plugins"][0]["id"],
+        "demo"
+    );
+    assert!(payload["onKey"]["args"]["props"]["catalogs"]["plugins"][0]["meta"].is_null());
     assert!(tree.fold().contains("alt+z"));
     assert!(tree.fold().contains("sample command"), "{}", tree.fold());
     assert!(matches!(tree,View::Box{layout,..} if layout.on_key.is_some()));

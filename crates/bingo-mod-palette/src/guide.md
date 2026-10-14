@@ -8,8 +8,9 @@ Enter runs the selected command or opens the selected session. Merely typing
 never runs anything. Live rows show status, unread posts and owed answers;
 stored rows show their message counts.
 
-Commands with arguments open their values in the same list. The current value
-starts selected. Free text arguments show the command Enter will run. Escape
+Commands selected from partial names open their argument values in the same list.
+Enter runs an exactly typed command or alias, including its default without arguments.
+Tab fills the name and opens argument choices. The current value starts selected. Free text arguments show the command Enter will run. Escape
 goes back one argument level, then closes the list. Shift+Tab keeps cycling the
 permission mode without opening a list. Ctrl+G returns to a pending ask. An ask
 arriving under the palette waits aside until the palette closes. Informational

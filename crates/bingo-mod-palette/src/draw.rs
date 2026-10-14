@@ -172,7 +172,7 @@ pub fn tree(
         layout: Box::new(view::BoxStyle {
             on_key: Some(Action {
                 name: "palette:ui".into(),
-                args: json!({"handler":request,"event":"press","props":props}),
+                args: json!({"handler":request,"event":"press","props":key_props(props)}),
             }),
             ..Default::default()
         }),
@@ -270,4 +270,14 @@ fn marked(text: &str, marks: &[usize], dim: bool) -> View {
             ..Default::default()
         },
     }
+}
+
+fn key_props(props: &PaletteProps) -> PaletteProps {
+    let mut props = props.clone();
+    for entries in props.catalogs.values_mut() {
+        for entry in entries {
+            entry.meta = Value::Null;
+        }
+    }
+    props
 }

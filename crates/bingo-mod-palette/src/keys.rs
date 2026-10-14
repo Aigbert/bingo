@@ -139,7 +139,13 @@ fn activate(target: Target, props: &PaletteProps) -> Value {
                 .iter()
                 .find(|entry| entry.id == name)
                 .and_then(|entry| serde_json::from_value::<CommandSpec>(entry.meta.clone()).ok());
-            if spec.is_some_and(|spec| !matches!(spec.args, ArgSpec::None)) {
+            let exact = props.query.trim().strip_prefix('/').is_some_and(|query| {
+                query == name
+                    || spec
+                        .as_ref()
+                        .is_some_and(|spec| spec.aliases.iter().any(|alias| alias == query))
+            });
+            if !exact && spec.is_some_and(|spec| !matches!(spec.args, ArgSpec::None)) {
                 json!({"edit":format!("/{name} ")})
             } else {
                 json!({"run":format!("/{name}")})
@@ -213,6 +219,27 @@ mod review_tests {
     use std::sync::{Arc, Mutex};
     fn props() -> PaletteProps {
         serde_json::from_value(json!({"query":"", "open":"keys", "commands":[], "keyHints":{}, "bindings":{}, "session":"s", "conversation":[], "sessions":[], "action":{"name":"client", "args":{}}, "catalogs":{}})).unwrap()
+    }
+    #[test]
+    fn exact_commands_and_aliases_run_while_partial_names_complete() {
+        let mut props = props();
+        props.commands = vec![CatalogEntry {
+            id: "plugins".into(),
+            label: "plugins".into(),
+            meta: json!({"name":"plugins","hint":"plugins","args":{"kind":"words","values":["enable"],"alone":[]},"instant":true,"family":"session","aliases":["modules"]}),
+        }];
+        for query in ["/plugins", "/modules"] {
+            props.query = query.into();
+            assert_eq!(
+                activate(Target::Command("plugins".into()), &props),
+                json!({"run":"/plugins"})
+            );
+        }
+        props.query = "/plug".into();
+        assert_eq!(
+            activate(Target::Command("plugins".into()), &props),
+            json!({"edit":"/plugins "})
+        );
     }
     #[test]
     fn informational_and_interrupt_keys_are_not_actionable() {
