@@ -56,6 +56,7 @@ impl Command for PermissionCommand {
             aliases: vec!["permissions".into()],
             hint: "show or change the permission mode".into(),
             args: ArgSpec::Words {
+                alone: vec![],
                 values: Mode::ALL.map(|mode| mode.as_str().to_string()).to_vec(),
                 then: None,
             },
@@ -290,7 +291,7 @@ mod tests {
         assert_eq!(spec.aliases, ["permissions"]);
         assert!(spec.instant, "reading a mode never waits for a turn");
         assert_eq!(spec.family, "session");
-        let ArgSpec::Words { values, then } = spec.args else {
+        let ArgSpec::Words { values, then, .. } = spec.args else {
             panic!("a mode is one of the words");
         };
         assert_eq!(then, None, "a mode is the whole of the argument");

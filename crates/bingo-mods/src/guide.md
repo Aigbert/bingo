@@ -1,8 +1,10 @@
 # Mods
 
-A mod's `plugin.json` names a JavaScript or TypeScript `module`, run in sandboxed
-QuickJS. It can change dispatch, add tools or commands, and draw the interface. A skill supplies instructions (`guide-skills`), a shell hook runs a configured
-command (`guide-hooks`), and an MCP server supplies tools (`guide-mcp`). An external-process plugin runs its own executable and speaks the
+A mod's `plugin.json` names a JavaScript or TypeScript `module`, run in
+sandboxed QuickJS. It can change dispatch, add tools or commands, and draw the
+interface. A skill supplies instructions (`guide-skills`), a shell hook runs a
+configured command (`guide-hooks`), and an MCP server supplies tools
+(`guide-mcp`). An external-process plugin runs its own executable and speaks the
 plugin protocol; it is the other code-authoring path, described below.
 
 ## Files and loading
@@ -12,7 +14,6 @@ The user directory is `~/.bingo/plugins/<name>/`, the project layer is
 directly (repeatable). Later layers win by directory name: user, project, then
 explicit directories in argument order. The user directory follows bingo's
 config directory. There is no separate `mods/` discovery directory.
-
 A minimal `plugin.json`, in a directory named `counter`:
 
 ```json
@@ -190,7 +191,6 @@ An external-process plugin uses `entry: {command, args, env}` instead of
 for its baseline. `schema/rpc.json` describes the separate `bingo serve --stdio`
 session-client API, not the plugin handshake. Process plugins default to
 `tighten`; extra rewrite/full authority comes from user-layer `pluginTrust`.
-
 Start from the repository's `examples/plugins/` and read the adjacent tests:
 - `examples/plugins/tool-call` — deny edits, rewrite shell input, count calls and wrap `ToolUse`.
 - `examples/plugins/band` — `AbovePrompt`, a button and state across reload.

@@ -118,3 +118,27 @@ not moved to Trash. Raw verification logs are `/tmp/m157-gate-*.log` and
 `/tmp/m157-drive.log`. The watcher harness also proves that a new same-name
 project mod cannot displace a watched user mod before explicit reload, and that
 state/store, refusal and independent healthy modules survive replacement.
+
+## Review follow-up verified — 2026-10-14
+
+`ArgSpec::Words.alone` owns words that end their argument; TUI completion reads
+that contract without command-specific grammar. Empty lists stay off the wire;
+old frames still decode. Generated schemas/types and ADR-0008 §6a agree.
+The guide's wording is unchanged, its opening paragraph is within 80 columns,
+and the page remains 199 lines. Added one follow-up commit without rebasing.
+
+Sequential verification (logs: `/tmp/m157-review-*.log`):
+
+```text
+cargo fmt --all -- --check: exit 0
+cargo check --workspace --all-targets --locked: exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings: exit 0
+cargo test -p bingo-sdk -p bingo-core -p bingo-mcp -p bingo-mods \
+  -p bingo-permissions -p bingo-schedule -p bingo-surface-tui \
+  -p bingo-plugin-rpc --locked: 2,459 passed, 0 failed, 3 ignored
+cargo test --workspace --locked: 5,414 passed, 0 failed, 5 ignored
+scripts/check_discipline.sh: discipline ok (existing advisory warnings)
+scripts/budget.sh: budget ok
+  dependencies: 411 (max 411); warm core check: 0s (max 20s)
+  relink isolation: 0; target/debug: 10 GB (soft max 5, warning)
+```

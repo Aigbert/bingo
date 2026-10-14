@@ -214,15 +214,16 @@ fn after(
 ) -> Vec<Suggestion> {
     let ArgSpec::Words {
         values,
+        alone,
         then: Some(then),
     } = args
     else {
         return Vec::new();
     };
-    if partial.contains(char::is_whitespace) || !values.iter().any(|value| value == word) {
-        return Vec::new();
-    }
-    if matches!(name, "plugins" | "modules") && word == "reload" {
+    if partial.contains(char::is_whitespace)
+        || !values.iter().any(|value| value == word)
+        || alone.iter().any(|value| value == word)
+    {
         return Vec::new();
     }
     offered(&format!("/{name} {word}"), partial, then, catalogues)
@@ -395,6 +396,7 @@ mod tests {
         let specs = vec![spec(
             "think",
             ArgSpec::Words {
+                alone: vec![],
                 values: ["low", "high", "off"].map(str::to_string).to_vec(),
                 then: None,
             },
@@ -414,6 +416,7 @@ mod tests {
         let specs = vec![spec(
             "mcp",
             ArgSpec::Words {
+                alone: vec![],
                 values: vec!["login".into(), "logout".into()],
                 then: None,
             },
@@ -430,12 +433,43 @@ mod tests {
         vec![spec(
             "plugins",
             ArgSpec::Words {
+                alone: vec!["reload".into()],
                 values: vec!["enable".into(), "disable".into(), "reload".into()],
                 then: Some(Box::new(ArgSpec::Catalog {
                     source: "plugins".into(),
                 })),
             },
         )]
+    }
+
+    #[test]
+    fn a_word_declared_alone_offers_no_following_argument() {
+        assert_eq!(
+            suggestions("/plugins rel", &plugins(), &installed())[0].value,
+            "/plugins reload"
+        );
+        assert!(suggestions("/plugins reload ", &plugins(), &installed()).is_empty());
+        assert_eq!(
+            suggestions("/plugins enable ", &plugins(), &installed())
+                .iter()
+                .map(|row| row.value.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "/plugins enable bingo.tools.web",
+                "/plugins enable bingo.tasks",
+                "/plugins enable wordcount"
+            ]
+        );
+        let mut specs = plugins();
+        specs[0].name = "extensions".into();
+        specs[0].aliases = vec!["ext".into()];
+        for name in ["extensions", "ext"] {
+            assert!(suggestions(&format!("/{name} reload "), &specs, &installed()).is_empty());
+            assert_eq!(
+                suggestions(&format!("/{name} enable "), &specs, &installed()).len(),
+                3
+            );
+        }
     }
 
     fn installed() -> Catalogues {
@@ -499,8 +533,10 @@ mod tests {
         let specs = vec![spec(
             "mcp",
             ArgSpec::Words {
+                alone: vec![],
                 values: vec!["reconnect".into()],
                 then: Some(Box::new(ArgSpec::Words {
+                    alone: vec![],
                     values: vec!["files".into(), "remote".into()],
                     then: None,
                 })),
@@ -531,6 +567,7 @@ mod tests {
         let mut spec = spec(
             "permission",
             ArgSpec::Words {
+                alone: vec![],
                 values: vec!["plan".into()],
                 then: None,
             },
@@ -576,29 +613,5 @@ mod tests {
         let specs = specs_from(&catalog);
         assert_eq!(specs.len(), 1);
         assert_eq!(specs[0].name, "model");
-    }
-}
-
-#[cfg(test)]
-mod reload_tests {
-    #[test]
-    fn reload_has_no_plugin_name_completion() {
-        let specs = [bingo_sdk::CommandSpec {
-            name: "plugins".into(),
-            args: bingo_sdk::ArgSpec::Words {
-                values: vec!["reload".into()],
-                then: Some(Box::new(bingo_sdk::ArgSpec::Catalog {
-                    source: "plugins".into(),
-                })),
-            },
-            ..bingo_sdk::CommandSpec::ui("test")
-        }];
-        let catalogues =
-            std::collections::BTreeMap::from([("plugins".into(), vec!["fixture".into()])]);
-        assert_eq!(
-            super::suggestions("/plugins rel", &specs, &catalogues)[0].value,
-            "/plugins reload"
-        );
-        assert!(super::suggestions("/plugins reload ", &specs, &catalogues).is_empty());
     }
 }

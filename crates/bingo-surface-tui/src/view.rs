@@ -1244,6 +1244,7 @@ mod tests {
             aliases: vec!["modules".into()],
             hint: "[enable|disable <name>]".into(),
             args: bingo_sdk::ArgSpec::Words {
+                alone: vec![],
                 values: vec!["enable".into(), "disable".into()],
                 then: Some(Box::new(bingo_sdk::ArgSpec::Catalog {
                     source: "plugins".into(),

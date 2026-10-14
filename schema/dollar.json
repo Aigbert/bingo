@@ -3320,6 +3320,13 @@
         {
           "type": "object",
           "properties": {
+            "alone": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Words among `values` that end the argument; `then` does not apply."
+            },
             "values": {
               "type": "array",
               "items": {
