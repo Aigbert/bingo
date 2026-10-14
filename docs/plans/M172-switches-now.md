@@ -40,6 +40,10 @@ and says why. The listing tells the wish from what runs.
   commands/plugins.rs}`; `crates/bingo-sdk/src/{catalogue.rs,plugin.rs}`;
   `schema/`, `sdk/typescript/`.
 - `crates/bingo-mods/src/{manager.rs,load.rs}`.
+- Round 2 ownership adds SDK generation scope and live signal metadata,
+  core mailbox propagation, plugin-host callback ownership, and mechanical
+  signal-reader/fixture updates in consuming crates. Name-based cleanup
+  cannot meet the overlapping-generation invariant.
 
 ## Exit criteria
 
@@ -96,8 +100,8 @@ and says why. The listing tells the wish from what runs.
 
 - Review decisions: cancellation drops only the switch waiter; the owned switch
   finishes publication. Retirement releases its list lock before asynchronous
-  cleanup. Reload skips name-scoped cleanup while a retired generation still
-  owns the name; the last retirement cleans it under the reload lock. Missing
+  cleanup. Round 2 replaces the insufficient name-based cleanup exception
+  with generation ownership on processes, signals and callbacks. Missing
   turn snapshots use live hooks, so safety hooks cannot silently disappear.
 
 ## Non-goals
@@ -216,3 +220,114 @@ The review touched those three crates. Windows mods remains deferred by
 aws-lc-sys C headers (`windows.h`/`stdlib.h` unavailable); no Rust diagnostic.
 The original Windows criterion stays unticked. Budget's 14 GB debug-output
 warning is addressed by the final `cargo clean` in this worktree.
+
+## Round 2 decisions
+
+- `off` is committed reload state, not a queued wish. Queued operations own
+  their request; pending rows derive from that request and the current module.
+  Classification or pre-activation failure never changes reload state.
+- The name-based cleanup exception was insufficient. Each module now owns a
+  unique generation identity. Processes and callback executors carry that
+  identity; signals retain it with their payload. Cleanup matches both plugin
+  and generation, including conditional removal if a newer signal replaced it.
+  Live snapshots wrap every signal payload with optional ownership to avoid
+  confusing arbitrary payload fields with ownership. The SDK carries generic
+  generation scope/metadata; no feature noun is added.
+- Reuse the boot layer parser and validate a proposed merge before persistence.
+  Startup and switches share the filter for plugins required by the host.
+- Owned core applies survive command cancellation. Module workers are tracked,
+  checked against stop under the reload lock, and joined during shutdown.
+  Completion calls the host catalogue-change callback even after a deferred reply.
+- Register residents in declared order; an active owner evicts a conflicting
+  off resident. Deterministic tests join switch workers and drive the watcher
+  with paused Tokio time; removing either guard must fail its regression.
+
+## Verified — 2026-10-15 (review round 2)
+
+Each numbered regression failed before its fix, then passed. Item 9 was
+checked by removing the supersession guard and periodic reaper separately;
+both mutations failed, and both production calls were restored.
+
+- [x] 1: Next-start enable and unavailable-module errors leave committed
+  reload state unchanged (2 failed → passed).
+- [x] 2: Retiring an old generation preserves the new generation's writable
+  process; old handles/callbacks cannot resolve into the new owner. Signal
+  ownership survives folding and attachment snapshots (failed → passed).
+- [x] 3: Commented project/explicit layers use boot's parser. An invalid
+  proposed merge refuses before changing the user file or runtime (failed → passed).
+- [x] 4: Startup and live switching share the required-plugin filter;
+  switching another plugin leaves a required surface On (failed → passed).
+- [x] 5: Queued switches are tracked and joined; stop prevents engines from
+  reopening, including work waiting for the reload lock (failed → passed).
+- [x] 6: Deferred workers notify plugin and command catalogues on completion;
+  the core callback emits the gateway catalogue change (failed → passed).
+- [x] 7: Cancelling during source lookup preserves the entire owned apply
+  after persistence (failed → passed).
+- [x] 8: Boot-off residents register in declared order and retain their hook
+  and command order; off-conflict/start-failure escape tests pass (failed → passed).
+- [x] 9: Supersession assertions join the worker; paused time drives the
+  periodic watcher. Removing either production check fails its test (2 failed → passed).
+
+Generation ownership required a typed live-signal snapshot contract. The
+existing schema/type generators ran with `BINGO_UPDATE_SCHEMA=1 cargo test --locked`:
+```text
+-p bingo-sdk: 194 passed; 0 failed
+-p bingo-plugin-rpc -p bingo-surface-rpc --lib: 150 passed; 0 failed
+-p bingo-mods --lib schema_and_types_are_generated_from_the_same_rows: 1 passed
+-p bingo-store-jsonl --lib journal: 35 passed; 0 failed
+```
+
+The first full suite caught a callback-selection regression:
+`tool_policy_rewrite_count_and_pane_rows_survive_reload` rejected `/ledger`
+with `pane: callback runtime is unavailable`. Registered names must resolve
+the executor after their reload check; pinning the name beforehand selected
+an obsolete generation. Executors and their resource cleanup remain owned
+by generation. The comments fixture also covers both discovered project
+settings and explicit `--settings`, including invalid-layer refusal.
+
+The example parity gate then caught two signal handoff details. Its band
+fixture now reads slots from the typed signal payload. Ordinary reload also
+atomically transfers retained signals from the replaced generation to the
+admitted replacement through the session actor. This preserves a pane while
+letting the new owner close it; mismatched owners cannot transfer or clear it.
+Switch retirement does not transfer ownership to a different generation.
+
+A final callback regression reproduced unscoped dispatch into a retired
+module (`retired callback accepted new dispatch`). Ordinary lookup now derives
+the current generation from the manager's loaded set, while captured scope
+can still select the retiring executor: 1 failed → 13 lifecycle tests passed.
+Signal handling moved into `session/signals.rs` after discipline found the
+actor at 1007 non-test lines and dispatch at 121 lines.
+
+One unchanged ACP wall-clock test failed once in the full run:
+`deadline_keeps_an_agent_that_answers_cancel` timed out at deadlines.rs:67
+(`Elapsed(())`, suite 20.38s). The isolated rerun passed in 0.06s:
+`RUST_TEST_THREADS=4 cargo test --locked -p bingo-provider-acp --test deadlines deadline_keeps_an_agent_that_answers_cancel` → 1 passed, 0 failed.
+Recorded as the contention flake allowed by the review instructions; no ACP
+provider source was changed.
+
+Final gates ran one at a time on the completed code:
+```text
+cargo fmt --all -- --check: exit 0; no output
+cargo check --workspace --all-targets --locked: Finished dev profile; exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev profile; exit 0
+RUST_TEST_THREADS=4 cargo test --workspace --locked: 5653 passed; 0 failed; 5 ignored (168 summaries)
+bash scripts/check_discipline.sh: discipline ok (advisory warnings)
+bash scripts/budget.sh: 413/413 dependencies; warm core 0s; isolation 0; budget ok
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok
+bash scripts/tui-smoke.sh: tui-smoke ok (own socket, -f /dev/null, temporary HOME)
+npm --prefix sdk/typescript test: tests 31; pass 31; fail 0
+cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc --locked: exit 0
+cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked: exit 0
+cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc --locked: exit 101
+```
+
+- [x] Round 2 native gates, isolated smoke and SDK/core Windows checks.
+- [ ] Mods Windows check: the known C-toolchain deferral remains. aws-lc-sys
+  lacks `stdlib.h`/`windows.h`; host clang rejects rquickjs-sys's MSVC
+  `/std:c11` and `/experimental:c11atomics` flags. No Rust diagnostic.
+
+The ACP deadline test also passed in the final full run. Budget reported
+17 GB of debug output; the final worktree action after committing and auditing
+is `cargo clean`. No live/credential tests, external dependencies or allowlist
+changes; no push, merge or PR.
