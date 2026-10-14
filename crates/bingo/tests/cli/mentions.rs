@@ -93,12 +93,20 @@ fn cards(out: &Output) -> Vec<Value> {
         .collect()
 }
 
-fn root_of(out: &Output) -> SessionId {
+/// The session the person's prompt landed in. A woken child's reminder is a
+/// user item too, so the prompt's own text names the root.
+fn root_of(out: &Output, prompt: &str) -> SessionId {
     frames_of(out)
         .into_iter()
-        .find_map(|frame| match frame.event {
-            Event::ItemCompleted { item }
-                if matches!(&item.body, ItemBody::User { origin, .. } if origin.surface == "print" && origin.principal.is_none()) => Some(frame.session),
+        .find_map(|frame| match &frame.event {
+            Event::ItemCompleted { item } => match &item.body {
+                ItemBody::User { parts, .. }
+                    if parts.iter().filter_map(ContentPart::as_text).eq([prompt]) =>
+                {
+                    Some(frame.session)
+                }
+                _ => None,
+            },
             _ => None,
         })
         .expect("the person's submitted input")
@@ -194,7 +202,7 @@ fn a_question_left_unanswered_is_chased_when_the_next_process_opens_the_room() {
         "ask them",
     );
     assert_eq!(asked.status.code(), Some(0), "stderr: {}", stderr(&asked));
-    let root = root_of(&asked);
+    let root = root_of(&asked, "ask them");
     assert!(
         nudges(home.path(), &root, "scout").is_empty(),
         "nothing is chased inside the first five minutes"
@@ -208,7 +216,11 @@ fn a_question_left_unanswered_is_chased_when_the_next_process_opens_the_room() {
         "carry on",
     );
     assert_eq!(again.status.code(), Some(0), "stderr: {}", stderr(&again));
-    assert_eq!(root_of(&again), root, "--continue is the same session");
+    assert_eq!(
+        root_of(&again, "carry on"),
+        root,
+        "--continue is the same session"
+    );
 
     let nudged = nudges(home.path(), &root, "scout");
     assert_eq!(
@@ -253,7 +265,7 @@ fn the_card_stands_while_a_question_does_and_goes_when_it_is_answered() {
         "ask them",
     );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
-    let root = root_of(&out);
+    let root = root_of(&out, "ask them");
 
     let cards = cards(&out);
     let owing = cards
