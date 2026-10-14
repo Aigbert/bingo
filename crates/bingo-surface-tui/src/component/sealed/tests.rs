@@ -88,7 +88,7 @@ fn framed_cards_keep_host_facts_and_keys_at_both_sizes() {
             let effects =
                 crate::input::on_key(&mut ui, &tree, KeyEvent::new(code, KeyModifiers::NONE), now);
             assert!(
-                matches!(&effects[0], Effect::Answer { answer, .. } | Effect::StopInteraction { answer, .. } if *answer == if login { Answer::Cancel } else { Answer::AllowOnce })
+                matches!(&effects[0], Effect::Answer { answer, .. } | Effect::StopInteraction { answer: Some(answer), .. } if *answer == if login { Answer::Cancel } else { Answer::AllowOnce })
             );
         }
     }

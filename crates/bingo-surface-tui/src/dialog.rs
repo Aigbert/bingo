@@ -222,7 +222,7 @@ fn words_answer(interaction: &Interaction, text: String) -> Answer {
 }
 
 /// Leaving a permission prompt is the refusal; leaving anything else cancels.
-fn cancel(interaction: &Interaction) -> Option<Answer> {
+pub(crate) fn cancel(interaction: &Interaction) -> Option<Answer> {
     if interaction.answers.contains(&AnswerSpec::Deny) {
         return Some(Answer::Deny { feedback: None });
     }

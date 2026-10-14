@@ -22,7 +22,7 @@ pub enum Effect {
     StopInteraction {
         session: SessionId,
         interaction: InteractionId,
-        answer: Answer,
+        answer: Option<Answer>,
     },
     Answer {
         interaction: InteractionId,

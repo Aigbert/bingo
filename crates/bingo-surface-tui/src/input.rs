@@ -45,7 +45,7 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     }
     ui.prepare(&tree.viewed().summary.cwd);
     if key.code == KeyCode::Esc && tree.open_interaction().is_some() {
-        return cancel(ui, tree, now);
+        return cancel(ui, tree);
     }
     if key == KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL) && ui.dialog.aside {
         ui.dialog.aside = false;
@@ -418,7 +418,7 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     ui.esc_armed &= rung.is_none();
     match rung {
         Some(keys::Escape::Sheet) => ui.focus.close(now.instant),
-        Some(keys::Escape::Card) => return cancel(ui, tree, now),
+        Some(keys::Escape::Card) => return cancel(ui, tree),
         Some(keys::Escape::Dropdown) => ui.menu.dismissed = true,
         Some(keys::Escape::Interrupt) => return ask_to_stop(ui, tree.viewed()),
         // The stack was empty, so this `esc` is one of `esc esc`.
@@ -1371,7 +1371,7 @@ mod tests {
             vec![Effect::StopInteraction {
                 session: state.summary.id.clone(),
                 interaction: state.interactions[0].id.clone(),
-                answer: Answer::Deny { feedback: None },
+                answer: Some(Answer::Deny { feedback: None }),
             }]
         );
         ui.focus = crate::focus::Focus::Composer;
@@ -1491,7 +1491,7 @@ mod tests {
             vec![Effect::StopInteraction {
                 session: state.summary.id.clone(),
                 interaction: state.interactions[0].id.clone(),
-                answer: Answer::Cancel,
+                answer: Some(Answer::Cancel),
             }]
         );
     }
@@ -1617,7 +1617,7 @@ mod tests {
             vec![Effect::StopInteraction {
                 session: state.summary.id.clone(),
                 interaction: state.interactions[0].id.clone(),
-                answer: Answer::Cancel,
+                answer: Some(Answer::Cancel),
             }]
         );
     }

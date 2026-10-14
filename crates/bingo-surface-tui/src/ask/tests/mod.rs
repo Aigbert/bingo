@@ -174,7 +174,7 @@ fn caution_starts_on_no_and_escape_denies_and_stops() {
     assert!(matches!(
         effects.as_slice(),
         [crate::effect::Effect::StopInteraction {
-            answer: Answer::Deny { .. },
+            answer: Some(Answer::Deny { .. }),
             ..
         }]
     ));
@@ -268,7 +268,7 @@ fn escape_ends_the_turn_from_aside_and_from_the_change_editor() {
         assert!(matches!(
             effects.as_slice(),
             [crate::effect::Effect::StopInteraction {
-                answer: Answer::Deny { .. },
+                answer: Some(Answer::Deny { .. }),
                 ..
             }]
         ));

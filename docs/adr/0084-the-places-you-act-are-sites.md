@@ -42,7 +42,8 @@ record adds component names and props to the sdk.
    the keys that answer a permission ask, a question or a sign-in are
    the host's drawing.
 5. **Escape ends the asking turn.** In every ask state, including a draft set aside and the change
-   editor, Escape denies or cancels and interrupts the session that owns the interaction. Ctrl+G
+   editor, Escape interrupts the session that owns the interaction, sending Deny or Cancel only
+   when the ask accepts it. An ask with neither answer still stops. Ctrl+G
    returns from the composer to the ask or leaves the change editor without answering.
 6. **`surfaces()`**: `Composer`, `KeyBar`, `Palette`, `ModelPicker`,
    `Browse`: terminal and desktop. `Ledger`, `TurnFold`: terminal,

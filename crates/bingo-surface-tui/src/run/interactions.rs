@@ -31,13 +31,18 @@ pub(super) fn stop_interaction(
     run: &mut Run,
     session: SessionId,
     interaction: bingo_sdk::InteractionId,
-    answer: bingo_sdk::Answer,
+    answer: Option<bingo_sdk::Answer>,
 ) {
-    let deny = run.mint(None);
-    let stop = run.mint(None);
+    let answer = answer.map(|answer| (run.mint(None), answer));
+    let interrupt = run.mint(None);
+    let stop = move |handle: &SessionHandle| {
+        if let Some((intent, answer)) = answer {
+            handle.answer(intent, interaction, answer, bingo_sdk::Activation::Keyboard);
+        }
+        handle.interrupt(interrupt, InterruptScope::Head);
+    };
     if let Some(handle) = run.session.handles.get(&session) {
-        handle.answer(deny, interaction, answer, bingo_sdk::Activation::Keyboard);
-        handle.interrupt(stop, InterruptScope::Head);
+        stop(handle);
         return;
     }
     let host = run.host.clone();
@@ -51,10 +56,7 @@ pub(super) fn stop_interaction(
                 OpenOptions::default(),
             )
             .await?;
-        attachment
-            .handle
-            .answer(deny, interaction, answer, bingo_sdk::Activation::Keyboard);
-        attachment.handle.interrupt(stop, InterruptScope::Head);
+        stop(&attachment.handle);
         Ok(Reply::Handle(session, attachment.handle))
     });
 }

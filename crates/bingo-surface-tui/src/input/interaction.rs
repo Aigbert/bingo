@@ -69,32 +69,18 @@ pub(crate) fn interaction_unhandled(
 
 /// Leaving the card that is asking: the kernel's own cancel or denial, which
 /// the dialog knows and this does not.
-pub(crate) fn cancel(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+pub(crate) fn cancel(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
     let Some((owner, interaction)) = tree.open_interaction() else {
         return Vec::new();
     };
     ui.dialog.words = None;
     ui.dialog.changing = None;
     ui.dialog.aside = false;
-    let effects = ui.dialog.on_key(
-        interaction,
-        KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
-        now,
-    );
+    ui.dialog.answered = true;
     ui.stop_asked = owner.turn.as_ref().map(|turn| turn.id.clone());
-    effects
-        .into_iter()
-        .map(|effect| match effect {
-            Effect::Answer {
-                interaction,
-                answer,
-                ..
-            } => Effect::StopInteraction {
-                session: owner.summary.id.clone(),
-                interaction,
-                answer,
-            },
-            other => other,
-        })
-        .collect()
+    vec![Effect::StopInteraction {
+        session: owner.summary.id.clone(),
+        interaction: interaction.id.clone(),
+        answer: crate::dialog::cancel(interaction),
+    }]
 }

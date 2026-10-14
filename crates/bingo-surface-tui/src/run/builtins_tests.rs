@@ -415,3 +415,58 @@ fn answer_key(run: &mut Run, submission: &(IntentId, Input), open: &bingo_sdk::I
         },
     );
 }
+
+#[tokio::test(start_paused = true)]
+async fn escape_interrupts_even_without_an_offered_cancellation_answer() {
+    for cached in [false, true] {
+        let (host, root, child) = crate::doubles::TestHost::tree(Vec::new());
+        let now = still(scene().1);
+        let mut run = tests::idle_in(state(), root.clone(), now.instant);
+        run.host = host;
+        let (replies, mut waiting) = mpsc::channel(4);
+        run.replies = replies;
+        let mut open = question(false, false);
+        open.session = child_id();
+        open.answers = vec![bingo_sdk::AnswerSpec::Choice];
+        open.guard_until = Some(now.wall + jiff::SignedDuration::from_secs(60));
+        run.session.tree = folded_tree(vec![
+            child_frame(1, announced("child")),
+            child_frame(2, started("child-turn")),
+            child_frame(3, opened(open)),
+        ]);
+        if cached {
+            run.session
+                .handles
+                .insert(child_id(), SessionHandle(child.clone()));
+        }
+        interactions::refocus(&mut run);
+        let effects = input::on_key(
+            &mut run.ui,
+            &run.session.tree,
+            key(crossterm::event::KeyCode::Esc),
+            now,
+        );
+        assert!(
+            !effects.is_empty(),
+            "Escape must interrupt without an answer to send"
+        );
+        run.apply(effects);
+        if !cached {
+            let reply = tokio::time::timeout(Duration::from_secs(1), waiting.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            run.reply(reply, &mut None);
+        }
+        assert_eq!(child.interrupts(), 1, "cached: {cached}");
+        assert!(
+            child.answers().is_empty(),
+            "do not invent an unsupported answer"
+        );
+        assert_eq!(root.interrupts(), 0);
+        assert_eq!(
+            run.ui.stop_asked,
+            Some(bingo_sdk::TurnId::from_raw("child-turn"))
+        );
+    }
+}
