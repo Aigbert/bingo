@@ -57,12 +57,12 @@ pub(super) fn check(semantic: &Semantic<'_>, source: &mut Source<'_>) {
                 if chain(&member.object, semantic).is_some() =>
             {
                 let parent = semantic.nodes().parent_kind(node.id());
-                if !matches!(
+                let is_chain = matches!(
                     parent,
-                    AstKind::StaticMemberExpression(_)
-                        | AstKind::ComputedMemberExpression(_)
-                        | AstKind::CallExpression(_)
-                ) {
+                    AstKind::StaticMemberExpression(_) | AstKind::ComputedMemberExpression(_)
+                );
+                let is_called = matches!(parent, AstKind::CallExpression(call) if call.callee.span() == member.span());
+                if !is_chain && !is_called {
                     source.finding(
                         member.span().start,
                         Rule::DollarStatic,

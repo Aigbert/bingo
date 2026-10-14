@@ -76,10 +76,7 @@ fn scan(file: &Path, source: &mut Source<'_>) -> Vec<PathBuf> {
     let parsed = Parser::new(&allocator, source.text, kind).parse();
     if let Some(error) = parsed.diagnostics.first() {
         source.finding(
-            error
-                .labels
-                .first()
-                .map_or(0, |label| label.offset() as u32),
+            error.labels.first().map_or(0, |label| label.offset()),
             Rule::Import,
             Severity::Error,
             error.to_string(),
