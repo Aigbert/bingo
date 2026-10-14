@@ -54,6 +54,7 @@ mod owed;
 mod placement;
 mod post;
 mod reader;
+mod recovery;
 mod room;
 mod roster;
 mod seat;
@@ -91,7 +92,10 @@ pub const SURFACE: &str = "room";
 static MANIFEST: PluginManifest = PluginManifest {
     id: PLUGIN,
     version: env!("CARGO_PKG_VERSION"),
-    uses: &[bingo_services::team::KEY.name()],
+    uses: &[
+        bingo_services::team::KEY.name(),
+        bingo_sdk::store::reader::KEY.name(),
+    ],
     provides: &[
         "command:room",
         "hook:rooms",
@@ -124,6 +128,7 @@ pub(crate) fn identity() -> ClientIdentity {
 pub struct RoomsPlugin {
     writer: Arc<RoomWriter>,
     hook: Arc<RoomsHook>,
+    recovery: recovery::Recovery,
 }
 
 #[async_trait]
@@ -156,13 +161,12 @@ impl Plugin for RoomsPlugin {
     }
     async fn start(&self, host: bingo_sdk::HostHandle) -> Result<(), PluginError> {
         self.writer.start(host.clone());
-        self.hook
-            .start(&host)
-            .await
-            .map_err(|error| PluginError::Failed(error.message))
+        self.recovery.start(self.hook.clone(), host);
+        Ok(())
     }
 
     async fn stop(&self) -> Result<(), PluginError> {
+        self.recovery.stop().await;
         self.hook.stop();
         Ok(())
     }

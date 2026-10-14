@@ -12,21 +12,50 @@ use serde_json::Value;
 use crate::room::{self, Room};
 
 #[derive(Debug, Default)]
-pub struct Roster(Mutex<BTreeMap<SessionId, Room>>);
+pub struct Roster(Mutex<BTreeMap<SessionId, Entry>>);
+
+#[derive(Debug)]
+struct Entry {
+    room: Room,
+    seen_live: bool,
+}
 
 impl Roster {
     /// A room announcing itself, at the head of its stream. A reopen says the
-    /// same thing again and must not forget what the frames after the first
-    /// one folded in, so only a room this process had not seen is handed back
-    /// — the moment, and the only one, at which its journal is re-derived.
+    /// same thing again and must not forget its folded metadata. Hand it back
+    /// only on the first live announcement, even if discovery restored it.
     pub fn register(&self, summary: &SessionSummary) -> Option<Room> {
         let room = Room::of(summary)?;
         let mut rooms = self.rooms();
-        if rooms.contains_key(&summary.id) {
+        let entry = rooms.entry(summary.id.clone()).or_insert(Entry {
+            room,
+            seen_live: false,
+        });
+        if entry.seen_live {
             return None;
         }
-        rooms.insert(summary.id.clone(), room.clone());
-        Some(room)
+        entry.seen_live = true;
+        Some(entry.room.clone())
+    }
+
+    /// A background read must not overwrite a room already observed live.
+    /// Arm under the roster lock so a live closing cannot precede stale timers.
+    pub(crate) fn restore(&self, state: &bingo_sdk::SessionState, arm: impl FnOnce(&Room)) {
+        let Some(room) = Room::of(&state.summary).map(|room| room.seated(state)) else {
+            return;
+        };
+        let mut rooms = self.rooms();
+        if rooms.contains_key(&state.summary.id) {
+            return;
+        }
+        arm(&room);
+        rooms.insert(
+            state.summary.id.clone(),
+            Entry {
+                room,
+                seen_live: false,
+            },
+        );
     }
 
     /// The rooms this process has seen under one session: everyone its card
@@ -34,8 +63,8 @@ impl Roster {
     pub fn under(&self, parent: &SessionId) -> Vec<(SessionId, Room)> {
         self.rooms()
             .iter()
-            .filter(|(_, room)| &room.parent == parent)
-            .map(|(id, room)| (id.clone(), room.clone()))
+            .filter(|(_, entry)| &entry.room.parent == parent)
+            .map(|(id, entry)| (id.clone(), entry.room.clone()))
             .collect()
     }
 
@@ -44,7 +73,7 @@ impl Roster {
     /// ended. Nothing else it publishes is a room's business.
     pub fn extended(&self, session: &SessionId, kind: &str, payload: &Value) {
         let mut rooms = self.rooms();
-        let Some(room) = rooms.get_mut(session) else {
+        let Some(Entry { room, .. }) = rooms.get_mut(session) else {
             return;
         };
         match kind.strip_prefix(room::EAR) {
@@ -64,10 +93,10 @@ impl Roster {
     /// The room a session is, for a caller that is about to await: a copy, so
     /// no lock is held across one.
     pub fn get(&self, session: &SessionId) -> Option<Room> {
-        self.rooms().get(session).cloned()
+        self.rooms().get(session).map(|entry| entry.room.clone())
     }
 
-    fn rooms(&self) -> MutexGuard<'_, BTreeMap<SessionId, Room>> {
+    fn rooms(&self) -> MutexGuard<'_, BTreeMap<SessionId, Entry>> {
         self.0.lock().unwrap_or_else(|held| held.into_inner())
     }
 }
@@ -81,6 +110,37 @@ mod tests {
 
     fn members(names: [&str; 2]) -> Value {
         payload(&names.map(Seat::live))
+    }
+
+    #[test]
+    fn a_restored_room_is_handed_back_once_when_first_seen_live() {
+        let fleet = crate::tests::Fleet::default();
+        let parent = fleet.root();
+        let id = fleet.room(&parent, "design");
+        fleet.remember(&id, crate::tests::extension(members(["reviewer", "scout"])));
+        let snapshot = fleet.state(&id);
+        let roster = Roster::default();
+        roster.restore(&snapshot, |_| {});
+
+        let room = roster
+            .register(&snapshot.summary)
+            .expect("first live announcement");
+        assert_eq!(room.members, ["reviewer", "scout"]);
+        assert_eq!(roster.register(&snapshot.summary), None);
+        assert_eq!(roster.get(&id), Some(room));
+    }
+
+    #[test]
+    fn a_late_background_snapshot_does_not_replace_a_live_roster_or_its_timers() {
+        let fleet = crate::tests::Fleet::default();
+        let parent = fleet.root();
+        let id = fleet.room(&parent, "design");
+        let snapshot = fleet.state(&id);
+        let roster = Roster::default();
+        roster.register(&snapshot.summary);
+        roster.extended(&id, MEMBERS, &members(["reviewer", "scout"]));
+        roster.restore(&snapshot, |_| panic!("a live room already owns its timers"));
+        assert_eq!(roster.get(&id).unwrap().members, ["reviewer", "scout"]);
     }
 
     #[test]

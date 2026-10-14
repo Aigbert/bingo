@@ -1,5 +1,7 @@
 //! Persistence of the journal. The actor appends before it publishes.
 
+pub mod reader;
+
 mod checkpoint;
 pub use checkpoint::{CHECKPOINT_FORMAT, CHECKPOINT_VERSION, Checkpoint, Resumed};
 

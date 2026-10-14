@@ -32,3 +32,5 @@ The journal is the session (ADR-0002): a session on disk is that journal written
 2026-10-13 — [ADR-0066](0066-resume-starts-at-a-checkpoint.md) amends §5 and §7: a derived `checkpoint.json` verifies the resume boundary; the kernel folds its state plus the journal tail and reads older history from storage.
 
 2026-10-13 — [ADR-0067](0067-the-picture-is-kept-once.md) amends §8: journal v2 stores decoded pictures once in session blobs and persists references; live ContentPart stays inline. Checkpoint codec v2 rejects old checkpoints before seeking.
+
+2026-10-14 — Stores may expose the SDK `SessionReader` service for durable, read-only folds without ownership, journal repair or live actors; live reads requiring mailbox ordering still use `Host::open`.
