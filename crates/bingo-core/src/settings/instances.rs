@@ -46,11 +46,37 @@ pub fn change(
     name: &str,
     url: Option<&str>,
 ) -> Result<Vec<String>, KernelError> {
+    edit(path, key, name, url, false)
+}
+
+pub fn change_address(
+    path: &Path,
+    key: &str,
+    name: &str,
+    url: &str,
+    clear_key: bool,
+) -> Result<Vec<String>, KernelError> {
+    edit(path, key, name, Some(url), clear_key)
+}
+
+fn edit(
+    path: &Path,
+    key: &str,
+    name: &str,
+    url: Option<&str>,
+    clear_key: bool,
+) -> Result<Vec<String>, KernelError> {
     let mut document = read(path)?;
     let entries = instances(&mut document, key)?;
     let entry = entries
         .get_mut(name)
         .ok_or_else(|| invalid("only instances in user settings can be changed or removed"))?;
+    if clear_key {
+        entry
+            .as_object_mut()
+            .ok_or_else(|| invalid("instance settings must be an object"))?
+            .remove("apiKey");
+    }
     if let Some(url) = url {
         entry
             .as_object_mut()

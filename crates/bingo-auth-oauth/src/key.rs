@@ -49,6 +49,14 @@ pub struct ApiKey {
 }
 
 impl ApiKey {
+    /// A changed origin must not inherit a configured key.
+    pub fn without_configured(&self) -> Self {
+        Self {
+            configured: None,
+            ..self.clone()
+        }
+    }
+
     pub fn new(
         provider: impl Into<String>,
         places: Places,

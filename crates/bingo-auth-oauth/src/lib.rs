@@ -29,6 +29,7 @@ pub mod exchange;
 pub mod issuer;
 pub mod jwt;
 pub mod key;
+pub mod lifetime;
 pub mod mcp;
 mod percent;
 pub mod pkce;

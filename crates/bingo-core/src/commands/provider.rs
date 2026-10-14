@@ -32,8 +32,8 @@ impl Command for ProviderCommand {
         let message = match words.as_slice() {
             ["add", name, shape, url] => add(&host, cx, name, shape, url).await?,
             ["set", name, "url", url] => {
-                let result = provider::set_provider(&host, name, url).await?;
-                outcome(&host, &result, "updated")
+                let changed = provider::set_provider(&host, name, url).await?;
+                finish(&host, cx, name, "updated", changed).await?
             }
             ["remove", name] => provider::remove_provider(&host, name).await?,
             _ => return Err(KernelError::new(ErrorCode::InvalidInput, USAGE)),
@@ -51,7 +51,17 @@ async fn add(
     shape: &str,
     url: &str,
 ) -> Result<String, KernelError> {
-    let (provider, takes_key, mut result) = provider::add_provider(host, name, shape, url).await?;
+    let added = provider::add_provider(host, name, shape, url).await?;
+    finish(host, cx, name, shape, added).await
+}
+
+async fn finish(
+    host: &std::sync::Arc<Host>,
+    cx: &CommandContext,
+    name: &str,
+    shape: &str,
+    (provider, takes_key, mut result): (std::sync::Arc<dyn Provider>, bool, Refreshed),
+) -> Result<String, KernelError> {
     let mut login = None;
     if takes_key {
         match provider

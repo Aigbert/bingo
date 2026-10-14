@@ -84,6 +84,7 @@ const CODEX_MODELS_TIMEOUT: Duration = Duration::from_secs(10);
 /// the registry holds.
 #[derive(Clone, Debug)]
 pub struct OpenAiProvider {
+    lifetime: bingo_auth_oauth::lifetime::Lifetime,
     http: reqwest::Client,
     /// What `--provider`, `/model <id>/<model>` and `auth.json` call this
     /// endpoint: `openai`, `codex`, or an instance's own name (ADR-0017 §2).
@@ -156,6 +157,7 @@ impl OpenAiProvider {
         base_url: impl Into<String>,
     ) -> Self {
         Self {
+            lifetime: Default::default(),
             http,
             id: id.into(),
             credential,
@@ -182,6 +184,7 @@ impl OpenAiProvider {
     /// credential, so the CLI can fail with `AUTH_REQUIRED` before any turn
     /// starts.
     async fn headers(&self) -> Result<HeaderMap, ProviderError> {
+        self.lifetime.check()?;
         self.compose(&self.credential.bearer().await?)
     }
 
@@ -332,11 +335,26 @@ impl Provider for OpenAiProvider {
 
     /// A named instance serves its variant's models (ADR-0017): an
     /// OpenAI-shaped proxy answers `openai`, a second subscription `codex`.
+    fn credential_origin(&self) -> Option<String> {
+        bingo_auth_oauth::lifetime::origin(&self.base_url)
+    }
+
+    fn retire(&self, reason: &str) {
+        self.lifetime.retire(reason);
+    }
+
     fn readdress(&self, spec: &bingo_sdk::InstanceSpec) -> Result<Arc<dyn Provider>, PluginError> {
         shape::validate(spec)?;
         let mut provider = self.clone();
         if let Some(url) = &spec.base_url {
             provider.base_url = url.trim_end_matches('/').into();
+        }
+        if provider.credential_origin() != self.credential_origin() {
+            provider.credential = match &self.credential {
+                Credential::Key(key) => Credential::Key(key.without_configured()),
+                Credential::Tokens(source) => Credential::Tokens(source.clone()),
+            };
+            provider.lifetime = Default::default();
         }
         if let Some(images) = spec.images {
             provider.images = images;
@@ -401,6 +419,9 @@ impl Provider for OpenAiProvider {
     }
 
     fn auth(&self) -> AuthStatus {
+        if let Some(hint) = self.lifetime.hint() {
+            return AuthStatus::Missing { hint };
+        }
         self.credential.status()
     }
 
@@ -409,6 +430,7 @@ impl Provider for OpenAiProvider {
         prompter: Arc<dyn Prompter>,
         method: Option<LoginMethod>,
     ) -> Result<String, ProviderError> {
+        self.lifetime.check()?;
         match &self.credential {
             Credential::Key(key) => key.login(prompter, method).await,
             Credential::Tokens(source) => self.sign_in(source, prompter, method).await,
@@ -653,24 +675,27 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn readdress_keeps_configuration_but_a_new_instance_has_no_old_key() {
+    fn readdress_keeps_keys_only_for_the_same_origin() {
         let directory = tempfile::tempdir().unwrap();
         let configured = providers(
             &directory,
             json!({"openai":{"instances":{"work":{"apiKey":"configured-secret", "images":false}}}}),
         );
         let old = configured.iter().find(|p| p.id() == "work").unwrap();
+        let same_origin = bingo_sdk::InstanceSpec {
+            base_url: Some(format!("{}/other", old.address().unwrap())),
+            images: None,
+        };
+        assert!(matches!(
+            old.readdress(&same_origin).unwrap().auth(),
+            AuthStatus::Ready { .. }
+        ));
         let spec = bingo_sdk::InstanceSpec {
             base_url: Some("http://localhost:1234".into()),
             images: None,
         };
         let changed = old.readdress(&spec).unwrap();
-        assert_eq!(
-            changed.auth(),
-            AuthStatus::Ready {
-                from: Some(bingo_sdk::KeySource::Setting)
-            }
-        );
+        assert!(matches!(changed.auth(), AuthStatus::Missing { .. }));
         assert!(!changed.endpoint("m").images);
         assert_eq!(changed.address(), Some("http://localhost:1234"));
         assert_ne!(old.address(), changed.address());

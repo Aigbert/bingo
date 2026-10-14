@@ -61,8 +61,8 @@ pub(crate) async fn set_provider(
     host: &Arc<Host>,
     name: &str,
     url: &str,
-) -> Result<Refreshed, KernelError> {
-    let provider = {
+) -> Result<(Arc<dyn Provider>, bool, Refreshed), KernelError> {
+    let (provider, needs_key) = {
         let _edit = host.registry.provider_state.instances.edit.lock().await;
         let old = instance_provider(host, name).await?;
         let shape = provider_shape(
@@ -75,16 +75,34 @@ pub(crate) async fn set_provider(
             images: Some(old.endpoint("").images),
         };
         let provider = old.readdress(&spec).map_err(|_| invalid("could not build provider; use an http(s) URL without credentials, query or fragment"))?;
-        instances::change(
+        let changed_origin = old.credential_origin() != provider.credential_origin();
+        instances::change_address(
             &settings::user_path(host.env()),
             shape.settings_key(),
             name,
-            Some(url),
+            url,
+            changed_origin,
         )?;
+        if changed_origin {
+            old.retire(&format!(
+                "Provider {name} changed origin; choose it again and sign in."
+            ));
+            old.logout().await.map_err(|_| {
+                invalid("address saved, but the old credential could not be removed")
+            })?;
+        }
         install_provider(host, name, Some(provider.clone()));
-        provider
+        (provider, changed_origin)
     };
-    Ok(refresh::one(host, provider).await)
+    let result = if needs_key {
+        Refreshed {
+            provider: name.into(),
+            answer: Err("paste a key before checking models".into()),
+        }
+    } else {
+        refresh::one(host, provider.clone()).await
+    };
+    Ok((provider, needs_key, result))
 }
 
 pub(crate) async fn remove_provider(host: &Host, name: &str) -> Result<String, KernelError> {
