@@ -125,6 +125,7 @@ impl Runner {
 mod discover;
 pub use discover::imports_testing;
 mod environment;
+pub(crate) use environment::Started;
 pub use environment::{Environment, Paused};
 
 async fn bounded<T>(

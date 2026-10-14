@@ -41,6 +41,10 @@ impl Driver {
             }
             "reload" => {
                 self.modules.reload(&self.root).await.map_err(error)?;
+                self.environment
+                    .wait_for_start(&self.session.snapshot.summary.id)
+                    .await?;
+                self.settle().await?;
                 for mount in self.mounts.values_mut() {
                     let request = mount.request.request_id.clone();
                     mount.invalidate(std::slice::from_ref(&request));

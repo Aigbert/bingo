@@ -134,6 +134,7 @@ async fn build(
     environment: Arc<Environment>,
     options: Value,
 ) -> Result<(Arc<Host>, ModsPlugin, Attachment), String> {
+    environment.reset_starts();
     let cwd = options
         .get("cwd")
         .and_then(Value::as_str)
@@ -150,7 +151,7 @@ async fn build(
     let modules = ModsPlugin::default()
         .with_dirs(vec![root.into()])
         .with_project(cwd.clone())
-        .with_testing(environment);
+        .with_testing(environment.clone());
     let plugins: Vec<Box<dyn Plugin>> = vec![
         Box::new(FakePlugin::new(Arc::new(FakeProvider::new(script)))),
         Box::new(bingo_tool_fs::FsPlugin),
@@ -178,6 +179,13 @@ async fn build(
         )
         .await
         .map_err(error)?;
+    if let Err(error) = environment
+        .wait_for_start(&session.snapshot.summary.id)
+        .await
+    {
+        host.shutdown().await;
+        return Err(error);
+    }
     Ok((host, modules, session))
 }
 async fn admitted(host: &Arc<Host>, root: &Path) -> Result<(), String> {

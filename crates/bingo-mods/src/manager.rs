@@ -230,6 +230,15 @@ impl PluginSource for Manager {
         {
             let denied = result.is_err();
             module.admission.finish(result);
+            if let Some(testing) = self.dollar.get().and_then(|dollar| dollar.testing.as_ref()) {
+                let observes = !denied
+                    && crate::link::Link(module.clone())
+                        .matcher()
+                        .matches(catalogue::SESSION_START, &Value::Null);
+                if let Some(started) = testing.track_start(name, observes) {
+                    let _ = module.started.set(started);
+                }
+            }
             if denied {
                 module.close().await;
             }

@@ -3,13 +3,14 @@ use crate::engine::{Engine, Limits};
 use bingo_plugin_host::{admission::Admission, discovery::Found, manifest::Launch, state::Store};
 use bingo_sdk::*;
 use serde_json::Value;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 pub(crate) struct Module {
     pub found: Found,
     pub admission: Admission,
     pub engine: Option<Arc<Engine>>,
     pub store: Store,
+    pub started: OnceLock<crate::testing::Started>,
 }
 impl Module {
     pub async fn load(
@@ -44,6 +45,7 @@ impl Module {
             found,
             admission,
             engine,
+            started: OnceLock::new(),
         })
     }
     pub fn identity(&self) -> crate::dollar::table::PluginData {
