@@ -218,6 +218,7 @@ fn params_for(method: &str) -> Value {
     let session = json!(session_id());
     let intent = json!(IntentId::from_raw("req_1"));
     match method {
+        name::APPROVE => json!({"root":"repo", "what":"plugin:fixture"}),
         name::UI_RENDER => {
             json!({"session":session,"component":"Pane","requestId":"fixture","surface":"terminal","props":{},"viewport":{"columns":80,"rows":8}})
         }
@@ -817,4 +818,25 @@ async fn an_interrupted_intent_crosses_ndjson_as_a_rejection() {
         frame
     );
     assert_eq!(wire.finish().await, Exit { code: 0 });
+}
+
+#[tokio::test]
+async fn approval_crosses_the_wire_as_one_explicit_person_action() {
+    let host = bingo_sdk::testing::TestHost::default();
+    host.on_approve(|request| async move {
+        assert!(bingo_sdk::render::asked());
+        assert_eq!(request.what, "plugin:fixture");
+        assert_eq!(request.root, std::path::PathBuf::from("repo"));
+        Ok("sha256:fixture".into())
+    });
+    let mut wire = Wire::started(host.handle()).await;
+    let receipt = wire
+        .call(
+            name::APPROVE,
+            json!({"root":"repo", "what":"plugin:fixture"}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(receipt, json!({"digest":"sha256:fixture"}));
+    assert_eq!(wire.finish().await.code, 0);
 }

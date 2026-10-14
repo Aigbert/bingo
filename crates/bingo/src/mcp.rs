@@ -36,6 +36,8 @@ use bingo_mcp::SETTING as KEY;
 pub enum Action {
     /// Every configured server, merged across the settings layers.
     List,
+    /// Approve one repository server for its current configuration.
+    Approve { name: String },
     /// One server in full. Header and environment *names* only: their values
     /// are the person's secrets.
     Get {
@@ -110,13 +112,48 @@ pub async fn run(
 ) -> Result<i32, KernelError> {
     let said = match action {
         Action::Add { .. } | Action::Remove { .. } => written(action, env)?,
+        Action::Approve { name } => approve(env, cwd, settings_path, extra, name)?,
         _ => {
             let configured = configured(env, cwd, settings_path, extra)?;
-            asked(action, env, &configured).await?
+            if let Action::Login { name, .. } | Action::Logout { name } = action
+                && configured.waiting.iter().any(|entry| &entry.name == name)
+            {
+                return Err(invalid(format!(
+                    "{name} waits for your yes; bingo mcp approve {name}"
+                )));
+            }
+            asked(action, env, &configured.mcp_servers).await?
         }
     };
     println!("{said}");
     Ok(0)
+}
+
+fn approve(
+    env: &Env,
+    cwd: &Path,
+    path: Option<&Path>,
+    extra: Option<Layer>,
+    name: &str,
+) -> Result<String, KernelError> {
+    let mut layers = settings::load(env, cwd, path).map_err(|e| invalid(e.to_string()))?;
+    layers.extend(extra);
+    let claims: Vec<_> = Claim::from_manifest(&bingo_mcp::MANIFEST)
+        .into_iter()
+        .collect();
+    let merged = settings::merge(&layers, &claims).map_err(|e| invalid(e.to_string()))?;
+    let authority = bingo_core::approval::Authority::new(
+        env.clone(),
+        merged.kernel.approved,
+        merged.repository_entries,
+    );
+    let digest = authority.approve(&bingo_sdk::Approval {
+        root: cwd.into(),
+        what: format!("{KEY}:{name}"),
+    })?;
+    Ok(format!(
+        "approved {name} ({digest}); takes effect at the next start"
+    ))
 }
 
 /// The verbs that change the settings. They write the user layer and read
@@ -389,7 +426,7 @@ fn configured(
     cwd: &Path,
     settings_path: Option<&Path>,
     extra: Option<Layer>,
-) -> Result<BTreeMap<String, Server>, KernelError> {
+) -> Result<Settings, KernelError> {
     let mut layers = settings::load(env, cwd, settings_path).map_err(|e| invalid(e.to_string()))?;
     layers.extend(extra);
     let claim = Claim::from_manifest(McpPlugin::default().manifest())
@@ -397,7 +434,7 @@ fn configured(
     let merged = settings::merge(&layers, &[claim]).map_err(|e| invalid(e.to_string()))?;
     let slice = merged.plugins.get(PLUGIN).cloned().unwrap_or(Value::Null);
     let settings: Settings = serde_json::from_value(slice).map_err(|e| invalid(e.to_string()))?;
-    Ok(settings.mcp_servers)
+    Ok(settings)
 }
 
 fn invalid(message: impl Into<String>) -> KernelError {

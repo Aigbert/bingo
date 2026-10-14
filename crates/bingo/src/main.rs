@@ -333,10 +333,10 @@ async fn run(cli: Cli) -> Result<i32, KernelError> {
     let merged = composition::merged(&config.layers, &platforms)?;
     let listening = composition::listening(&cli, &merged, &platforms)?;
     let composition = Composition::for_cli(&cli, &merged);
-    let host = Host::build(plugins(composition, &platforms)?, config)
+    let host = Host::build(plugins(composition, &platforms, &cwd)?, config)
         .await
         .map_err(|e| KernelError::new(ErrorCode::Internal, e.to_string()))?;
-    report_notices(&host);
+    report_notices(&host).await;
     if let Some(code) = credentials(&host, &cli).await {
         return code;
     }
@@ -403,7 +403,20 @@ fn migrate_settings(cwd: &std::path::Path) -> Result<(), KernelError> {
 
 /// What a built host has to say for itself: a plugin that could not be
 /// registered, a setting nobody claimed. On stderr, as every diagnostic is.
-fn report_notices(host: &Host) {
+async fn report_notices(host: &Host) {
+    if let Ok(catalog) = host.handle().catalog(bingo_sdk::CatalogKind::Plugins).await {
+        let waiting: Vec<_> = catalog
+            .entries
+            .iter()
+            .filter_map(bingo_core::plugins::waiting_line)
+            .collect();
+        if !waiting.is_empty() {
+            eprintln!(
+                "{}",
+                notice_report("PROJECT_WAITING", &waiting.join("; "), false)
+            );
+        }
+    }
     for (code, text) in host.notices() {
         let human = std::io::IsTerminal::is_terminal(&std::io::stderr());
         eprintln!("{}", notice_report(&code, &text, human));
@@ -521,7 +534,7 @@ async fn switched_plugins(
         .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e.to_string()))?;
     layers.push(settings::Layer::new("cli", cli_layer(cli)));
     let merged = composition::merged(&layers, platforms)?;
-    let composed = plugins(Composition::for_cli(cli, &merged), platforms)?;
+    let composed = plugins(Composition::for_cli(cli, &merged), platforms, cwd)?;
     plugins::run(action, env, cwd, &layers, composed)
 }
 
@@ -657,6 +670,7 @@ fn platforms(env: &Env) -> Platforms {
 fn plugins(
     composition: Composition,
     platforms: &Platforms,
+    cwd: &std::path::Path,
 ) -> Result<Vec<Box<dyn Plugin>>, KernelError> {
     // The fake provider exists for the scripted harness alone: without
     // `BINGO_FAKE_SCRIPT` it is not registered, so a packaged binary never
@@ -683,9 +697,10 @@ fn plugins(
         Box::new(WebPlugin),
         Box::new(SkillsPlugin::default()),
         Box::new(McpPlugin::default()),
-        Box::new(PluginRpcPlugin::default()),
+        Box::new(PluginRpcPlugin::default().with_project(cwd.into())),
         Box::new(
             bingo_mods::ModsPlugin::default()
+                .with_project(cwd.into())
                 .with_dirs(composition.mods.plugin_dirs)
                 .with_settings(composition.mods.plugins),
         ),
@@ -718,12 +733,14 @@ async fn added_provider(env: &Env, platforms: &Platforms) -> Result<i32, KernelE
 /// the manifests the plugins publish (`provider:<id>`): a name to refuse is
 /// nothing this file knows on its own.
 fn provider_ids(platforms: &Platforms) -> Result<BTreeSet<String>, KernelError> {
-    Ok(plugins(Composition::default(), platforms)?
-        .iter()
-        .flat_map(|plugin| plugin.manifest().provides)
-        .filter_map(|provided| provided.strip_prefix("provider:"))
-        .map(str::to_string)
-        .collect())
+    Ok(
+        plugins(Composition::default(), platforms, std::path::Path::new("."))?
+            .iter()
+            .flat_map(|plugin| plugin.manifest().provides)
+            .filter_map(|provided| provided.strip_prefix("provider:"))
+            .map(str::to_string)
+            .collect(),
+    )
 }
 
 fn host_config(
@@ -850,6 +867,7 @@ mod tests {
                 ..Default::default()
             },
             &platforms,
+            std::path::Path::new("."),
         )
         .unwrap()
         .iter()

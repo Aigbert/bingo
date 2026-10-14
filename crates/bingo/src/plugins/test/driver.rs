@@ -194,13 +194,13 @@ async fn admitted(host: &Arc<Host>, root: &Path) -> Result<(), String> {
     if !catalogue
         .entries
         .iter()
-        .any(|entry| entry.id == name && entry.meta["enabled"] == true)
+        .any(|entry| entry.id == name && entry.meta["state"]["kind"] == "on")
     {
         let reason = catalogue
             .entries
             .iter()
             .find(|entry| entry.id == name)
-            .map(|entry| entry.meta["reason"].to_string())
+            .map(|entry| entry.meta["state"]["why"].to_string())
             .unwrap_or_else(|| "module was not discovered".into());
         host.shutdown().await;
         return Err(format!("{name}: {reason}"));

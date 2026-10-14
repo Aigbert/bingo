@@ -52,6 +52,7 @@ pub(crate) fn merged(
             ..Default::default()
         },
         platforms,
+        std::path::Path::new("."),
     )?;
     let claims: Vec<_> = candidates
         .iter()

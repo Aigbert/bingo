@@ -55,7 +55,7 @@ fn reload_waits_for_session_start() {
 }
 
 #[test]
-fn replacement_waits_for_other_modules_with_wildcard_start_hooks() {
+fn replacement_does_not_start_unapproved_repository_modules() {
     let home = tempfile::tempdir().unwrap();
     let plugin = home.path().join("primary");
     let peer = plugin.join(".bingo/plugins/peer");
@@ -80,10 +80,13 @@ fn replacement_waits_for_other_modules_with_wildcard_start_hooks() {
     }"#).unwrap();
     std::fs::write(
         plugin.join("startup.test.ts"),
-        r#"import {test,mock} from 'bingo/testing';
-      test('other modules finish startup', async $ => {
+        r#"import {test,mock,expect} from 'bingo/testing';
+      test('repository peers wait for approval', async $ => {
         await mock.session({cwd:$.plugin.root});
-        await $.command.run({name:'peer',args:{}});
+        let refused = false;
+        try { await $.command.run({name:'peer',args:{}}); }
+        catch(error) { refused = String(error).includes('peer'); }
+        expect(refused).toBe(true);
       });"#,
     )
     .unwrap();

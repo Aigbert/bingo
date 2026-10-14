@@ -316,6 +316,33 @@
         "form"
       ]
     },
+    "Approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "what": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "root",
+        "what"
+      ]
+    },
+    "ApproveResult": {
+      "type": "object",
+      "properties": {
+        "digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "digest"
+      ]
+    },
     "AssetProps": {
       "type": "object",
       "properties": {
@@ -3559,6 +3586,87 @@
       ],
       "description": "A connection-local pinned value is never accessible from a different\nsession, even when a caller learns its token."
     },
+    "PluginState": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "on"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "why": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "off"
+            }
+          },
+          "required": [
+            "kind",
+            "why"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "why": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "failed"
+            }
+          },
+          "required": [
+            "kind",
+            "why"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "changed": {
+              "type": "boolean"
+            },
+            "kind": {
+              "type": "string",
+              "const": "waiting"
+            }
+          },
+          "required": [
+            "kind",
+            "changed"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "pending"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "Preview": {
       "oneOf": [
         {
@@ -6732,6 +6840,14 @@
       },
       "result": {
         "$ref": "#/$defs/Empty"
+      }
+    },
+    "approval/approve": {
+      "params": {
+        "$ref": "#/$defs/Approval"
+      },
+      "result": {
+        "$ref": "#/$defs/ApproveResult"
       }
     },
     "catalog/read": {

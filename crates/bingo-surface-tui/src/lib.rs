@@ -214,6 +214,7 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     provides: &["surface:tui", "service:bingo.surface.tui.pages"],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[],
         keys: &[
             (bingo_update::SETTING, Merge::Replace),
             (settings::SETTING, Merge::Replace),

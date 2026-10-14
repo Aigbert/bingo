@@ -135,6 +135,9 @@ fn middle(
     if !placed.is_empty() {
         return (join(placed), false);
     }
+    if let Some(waiting) = repository_waiting(ui, now) {
+        return (vec![waiting], false);
+    }
     let crew = crate::crew::spans(tree, width, room, now);
     if !crew.is_empty() {
         return (crew, true);
@@ -164,6 +167,23 @@ fn middle(
         return (lines.into_iter().next().unwrap_or_default().spans, false);
     }
     (Vec::new(), false)
+}
+
+fn repository_waiting(ui: &Ui, now: Now) -> Option<Span<'static>> {
+    let count = ui
+        .catalogs
+        .plugins
+        .iter()
+        .filter(|entry| entry.meta["state"]["kind"] == "waiting")
+        .count();
+    if count == 0 {
+        return None;
+    }
+    let verb = if count == 1 { "waits" } else { "wait" };
+    Some(Span::styled(
+        format!("{count} from this repo {verb} for you"),
+        theme::attention(now),
+    ))
 }
 
 pub fn next_change(tree: &Tree, now: Now) -> Option<std::time::Instant> {
@@ -502,6 +522,35 @@ mod tests {
                 },
             },
         )]))
+    }
+
+    #[test]
+    fn repository_waiting_count_is_drawn_from_catalogue_states() {
+        let (mut ui, now) = scene();
+        ui.catalogs.plugins.push(bingo_sdk::CatalogEntry {
+            id: "plugins:repo".into(),
+            label: "repo".into(),
+            meta: serde_json::json!({"state":{"kind":"waiting","changed":false}}),
+        });
+        let tree = solo(&state_without_a_model());
+        let (line, _) = components(&tree, &ui, 120, now, &mut Vec::new());
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 1)).unwrap();
+        terminal
+            .draw(|frame| {
+                frame.render_widget(ratatui::widgets::Paragraph::new(line.clone()), frame.area())
+            })
+            .unwrap();
+        let drawn: String = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(drawn.contains("1 from this repo waits for you"), "{drawn}");
+        ui.catalogs.plugins[0].meta = serde_json::json!({"state":{"kind":"on"}});
+        assert!(!at(&tree, &ui, 120, now).contains("waits for you"));
     }
 
     #[test]

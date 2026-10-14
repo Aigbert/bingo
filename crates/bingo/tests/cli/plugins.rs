@@ -311,3 +311,113 @@ fn surface_values_match_the_help_snapshot() {
         ]
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn repository_processes_wait_for_a_byte_bound_personal_approval() {
+    let home = tempfile::tempdir().unwrap();
+    let repo = tempfile::tempdir().unwrap();
+    let dir = repo.path().join(".bingo/plugins/repo-code");
+    std::fs::create_dir_all(&dir).unwrap();
+    let marker = repo.path().join("ran");
+    let manifest = serde_json::json!({"name":"repo-code", "version":"1", "entry":{
+        "command":"/bin/sh", "args":["-c", "printf ran > \"$1\"", "sh", marker]}});
+    std::fs::write(dir.join("plugin.json"), manifest.to_string()).unwrap();
+    let root = bingo_core::approval::root_key(repo.path()).unwrap();
+    let digest = bingo_core::approval::digest_dir(&dir).unwrap();
+    // Neither the approval record nor an explicit-directory alias may authorize itself.
+    std::fs::write(
+        repo.path().join(".bingo/settings.json"),
+        serde_json::json!({
+            "approved":{root:{"plugin:repo-code":digest}}, "pluginDirs":[dir]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let before = repository_print(home.path(), repo.path(), "/plugins");
+    assert_eq!(before.status.code(), Some(0), "{}", stderr(&before));
+    assert!(!marker.exists(), "repository process ran before the yes");
+    assert!(
+        stderr(&before).contains("PROJECT_WAITING"),
+        "{}",
+        stderr(&before)
+    );
+    assert!(stderr(&before).contains("bingo plugins approve repo-code"));
+    assert!(stderr(&before).contains("APPROVED_IGNORED"));
+    let approved = run(bingo()
+        .envs(home_env(home.path()))
+        .arg("--cwd")
+        .arg(repo.path())
+        .args(["plugins", "approve", "repo-code"]));
+    assert_eq!(approved.status.code(), Some(0), "{}", stderr(&approved));
+    assert!(!marker.exists(), "headless approval must not start a host");
+    let after = repository_print(home.path(), repo.path(), "/plugins");
+    assert_eq!(after.status.code(), Some(0), "{}", stderr(&after));
+    assert!(
+        marker.exists(),
+        "approved process did not run: {}",
+        stderr(&after)
+    );
+    std::fs::remove_file(&marker).unwrap();
+    std::fs::write(dir.join("extra.txt"), "new code").unwrap();
+    let changed = repository_print(home.path(), repo.path(), "/plugins");
+    assert!(!marker.exists(), "changed process reused a stale yes");
+    assert!(
+        stderr(&changed).contains("changed since your yes"),
+        "{}",
+        stderr(&changed)
+    );
+}
+
+#[cfg(unix)]
+fn repository_print(home: &std::path::Path, repo: &std::path::Path, prompt: &str) -> Output {
+    let fake = script(UNUSED);
+    let output = run(bingo()
+        .envs(home_env(home))
+        .env("BINGO_FAKE_SCRIPT", fake.path())
+        .arg("--cwd")
+        .arg(repo)
+        .args(["--print", "--output-format", "stream-json", prompt]));
+    for line in stdout(&output).lines() {
+        serde_json::from_str::<serde_json::Value>(line).expect("stdout is pure NDJSON");
+    }
+    output
+}
+
+#[cfg(unix)]
+#[test]
+fn repository_stdio_servers_cannot_dial_through_enable_or_reconnect() {
+    let home = tempfile::tempdir().unwrap();
+    let repo = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(repo.path().join(".bingo")).unwrap();
+    let marker = repo.path().join("mcp-ran");
+    std::fs::write(
+        repo.path().join(".bingo/settings.json"),
+        serde_json::json!({"mcpServers":{"repo-server":{
+            "command":"/bin/sh", "args":["-c", "printf ran > \"$1\"", "sh", marker]
+        }}})
+        .to_string(),
+    )
+    .unwrap();
+    for prompt in [
+        "/mcp",
+        "/mcp enable repo-server",
+        "/mcp reconnect repo-server",
+    ] {
+        let output = repository_print(home.path(), repo.path(), prompt);
+        assert!(!marker.exists(), "MCP ran before approval: {prompt}");
+        assert!(
+            stderr(&output).contains("PROJECT_WAITING"),
+            "{}",
+            stderr(&output)
+        );
+    }
+    let approved = run(bingo()
+        .envs(home_env(home.path()))
+        .arg("--cwd")
+        .arg(repo.path())
+        .args(["mcp", "approve", "repo-server"]));
+    assert_eq!(approved.status.code(), Some(0), "{}", stderr(&approved));
+    assert!(!marker.exists());
+    assert!(settings_json(home.path())["approved"].is_object());
+}

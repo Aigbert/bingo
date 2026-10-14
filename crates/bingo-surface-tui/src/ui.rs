@@ -155,8 +155,29 @@ pub struct Card {
 /// at start — the dropdown ranks them, it does not watch them.
 #[derive(Clone, Debug, Default)]
 pub struct Catalogs {
+    pub plugins: Vec<bingo_sdk::CatalogEntry>,
     pub commands: Vec<CommandSpec>,
     pub values: commands::Catalogues,
+}
+
+impl Catalogs {
+    fn values(&self) -> commands::Catalogues {
+        let mut values = self.values.clone();
+        values.insert(
+            "plugins".into(),
+            self.plugins
+                .iter()
+                .map(|entry| {
+                    entry
+                        .id
+                        .strip_prefix("plugins:")
+                        .unwrap_or(&entry.id)
+                        .to_string()
+                })
+                .collect(),
+        );
+        values
+    }
 }
 
 /// The one list of sessions, opened by `↓` on an empty composer or by
@@ -517,7 +538,7 @@ impl Ui {
         let line = self.composer.text();
         match complete::mention(line) {
             Some(partial) => self.mentioned(cwd, partial, line, mentions),
-            None => commands::suggestions(line, &self.commands(), &self.catalogs.values),
+            None => commands::suggestions(line, &self.commands(), &self.catalogs.values()),
         }
     }
 

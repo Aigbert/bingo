@@ -34,6 +34,8 @@ pub enum Action {
     },
     /// List plugins for the next start; use /plugins reload in a running session.
     List,
+    /// Approve the current bytes of one repository plugin.
+    Approve { name: String },
     /// Turn one on in the user settings layer.
     Enable {
         /// The plugin's name, as `list` writes it.
@@ -55,6 +57,19 @@ pub fn run(
     composed: Vec<Box<dyn Plugin>>,
 ) -> Result<i32, KernelError> {
     let settings = configuration(&composed, layers)?;
+    let authority = bingo_core::approval::Authority::new(
+        env.clone(),
+        settings.kernel.approved.clone(),
+        settings.repository_entries.clone(),
+    );
+    if let Action::Approve { name } = action {
+        let digest = authority.approve(&bingo_sdk::Approval {
+            root: cwd.into(),
+            what: format!("plugin:{name}"),
+        })?;
+        println!("approved {name} ({digest}); takes effect at the next start");
+        return Ok(0);
+    }
     let switched_off = settings.kernel.switched_off();
     for (_, text) in &settings.notices {
         eprintln!("{text}");
@@ -67,21 +82,17 @@ pub fn run(
             .unwrap_or_else(|| serde_json::json!({})),
     )
     .map_err(|error| invalid(error.to_string()))?;
-    let mut listed = listing(&composed, env, cwd, &switched_off, &runtime.plugin_dirs);
-    for status in &mut listed {
-        if let Some(execution) = &mut status.execution
-            && let Some(trust) = settings.kernel.plugin_trust.get(&status.id)
-        {
-            execution.grant = bingo_plugin_host::grant::grant(
-                execution.runtime,
-                execution.origin,
-                Some(trust),
-                &execution.grant.uses.iter().cloned().collect::<Vec<_>>(),
-            );
-        }
-    }
+    let mut listed = listing(
+        &composed,
+        env,
+        cwd,
+        &switched_off,
+        &runtime.plugin_dirs,
+        Some(&authority),
+    );
+    apply_trust(&mut listed, &settings.kernel.plugin_trust);
     let said = match action {
-        Action::Validate { .. } | Action::Test { .. } => {
+        Action::Approve { .. } | Action::Validate { .. } | Action::Test { .. } => {
             return Err(invalid(
                 "author kit action reached the switch command".into(),
             ));
@@ -92,6 +103,21 @@ pub fn run(
     };
     println!("{said}");
     Ok(0)
+}
+
+fn apply_trust(listed: &mut [PluginStatus], trust: &BTreeMap<String, bingo_sdk::PluginTrust>) {
+    for status in listed {
+        if let Some(execution) = &mut status.execution
+            && let Some(trust) = trust.get(&status.id)
+        {
+            execution.grant = bingo_plugin_host::grant::grant(
+                execution.runtime,
+                execution.origin,
+                Some(trust),
+                &execution.grant.uses.iter().cloned().collect::<Vec<_>>(),
+            );
+        }
+    }
 }
 
 /// The names the layers turned off. The claims come from the composition, so
@@ -116,9 +142,10 @@ fn listing(
     cwd: &Path,
     switched_off: &BTreeSet<String>,
     explicit: &[PathBuf],
+    authority: Option<&dyn bingo_sdk::ApprovalReader>,
 ) -> Vec<PluginStatus> {
     let mut listed = built_in(composed, switched_off);
-    listed.extend(external(env, cwd, switched_off, explicit));
+    listed.extend(external(env, cwd, switched_off, explicit, authority));
     listed
 }
 
@@ -143,9 +170,10 @@ fn external(
     cwd: &Path,
     switched_off: &BTreeSet<String>,
     explicit: &[PathBuf],
+    authority: Option<&dyn bingo_sdk::ApprovalReader>,
 ) -> Vec<PluginStatus> {
     let notices = Notices::default();
-    let found = discovery::with_explicit(&discovery::dirs(env, cwd), explicit, &notices);
+    let found = discovery::approved(&discovery::dirs(env, cwd), explicit, &notices, authority);
     let human = std::io::IsTerminal::is_terminal(&std::io::stderr());
     for notice in notices.drain() {
         eprintln!("{}", notice_report(&notice.code, &notice.text, human));
@@ -174,8 +202,13 @@ fn installed(found: Found, switched_off: &BTreeSet<String>) -> PluginStatus {
     PluginStatus {
         id: found.name,
         version: found.manifest.version,
-        enabled: reason.is_none(),
-        reason,
+        state: if !found.state.is_on() {
+            found.state
+        } else if let Some(why) = reason {
+            bingo_sdk::PluginState::Off { why }
+        } else {
+            bingo_sdk::PluginState::On
+        },
         execution: Some(bingo_sdk::PluginExecution {
             origin: found.origin,
             runtime,
@@ -200,7 +233,7 @@ fn list_with_uses(
         .filter(|plugin| {
             listed
                 .iter()
-                .any(|status| status.id == plugin.manifest().id && status.enabled)
+                .any(|status| status.id == plugin.manifest().id && status.state.is_on())
         })
         .flat_map(|plugin| {
             plugin
@@ -255,7 +288,7 @@ fn missing_uses<'a>(
     composed: &'a [Box<dyn Plugin>],
     provided: &BTreeSet<&str>,
 ) -> Vec<&'a str> {
-    if !status.enabled {
+    if !status.state.is_on() {
         return Vec::new();
     }
     composed
@@ -272,8 +305,12 @@ fn row(status: &PluginStatus) -> String {
         "{}\t{}\t{}\t{}",
         status.id,
         status.version,
-        state(status.enabled),
-        status.reason.clone().unwrap_or_default()
+        status.state.label(),
+        bingo_core::plugins::waiting_reason(&status.id, &status.state).unwrap_or_else(|| status
+            .state
+            .reason()
+            .unwrap_or_default()
+            .to_string())
     )
 }
 
@@ -325,11 +362,26 @@ mod tests {
         PluginStatus {
             id: id.into(),
             version: "0.1.0".into(),
-            enabled,
-            reason: reason.map(str::to_string),
+            state: if enabled {
+                bingo_sdk::PluginState::On
+            } else {
+                bingo_sdk::PluginState::Off {
+                    why: reason.unwrap_or_default().into(),
+                }
+            },
             execution: None,
             from: bingo_sdk::BUILT_IN.into(),
         }
+    }
+
+    #[test]
+    fn a_waiting_listing_names_both_approval_commands() {
+        let mut plugin = status("plugins:example", false, None);
+        plugin.state = bingo_sdk::PluginState::Waiting { changed: true };
+        let said = row(&plugin);
+        assert!(said.contains("changed since your yes"));
+        assert!(said.contains("/plugins approve example"));
+        assert!(said.contains("bingo plugins approve example"));
     }
 
     /// One line each, four columns, and a standing plugin's reason is empty

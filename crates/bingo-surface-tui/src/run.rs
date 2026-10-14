@@ -84,7 +84,7 @@ enum Reply {
     Stored(Vec<SessionSummary>),
     Commands(Vec<CommandSpec>),
     /// One catalogue's ids, by the source name a command's argument gives.
-    Catalogue(String, Vec<String>),
+    Catalogue(String, Vec<bingo_sdk::CatalogEntry>),
     /// A line whose pictures have been read in (ADR-0041): the loop asked for
     /// them off its own thread, so a slow web server costs it no frame.
     Mentioned(Box<submit::Mentioned>),
@@ -613,6 +613,7 @@ impl Run {
     }
 
     fn applied(&mut self, result: &Value) {
+        self.fetch_catalogue("plugins", CatalogKind::Plugins);
         if let Some(message) = result.get("message").and_then(Value::as_str) {
             self.ui
                 .notify(Level::Info, message.to_string(), Instant::now());
@@ -852,12 +853,9 @@ impl Run {
     fn fetch_catalogue(&mut self, source: &'static str, kind: CatalogKind) {
         let host = self.host.clone();
         self.spawn(async move {
-            host.catalog(kind).await.map(|c| {
-                Reply::Catalogue(
-                    source.to_string(),
-                    c.entries.into_iter().map(|e| e.id).collect(),
-                )
-            })
+            host.catalog(kind)
+                .await
+                .map(|c| Reply::Catalogue(source.to_string(), c.entries))
         });
     }
 
@@ -922,7 +920,14 @@ impl Run {
                 site_keys::notices(self);
             }
             Reply::Catalogue(source, ids) => {
-                self.ui.catalogs.values.insert(source, ids);
+                if source == "plugins" {
+                    self.ui.catalogs.plugins = ids;
+                } else {
+                    self.ui
+                        .catalogs
+                        .values
+                        .insert(source, ids.into_iter().map(|entry| entry.id).collect());
+                }
             }
             Reply::Mentioned(waiting) => self.mentioned(*waiting),
             Reply::Linked(answer) => self.ui.linked.answered(*answer),

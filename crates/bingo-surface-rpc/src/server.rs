@@ -31,12 +31,13 @@ use crate::codec::{
     PARSE_ERROR, Request, Response, RpcError,
 };
 use crate::methods::{
-    AnswerParams, CatalogParams, ChildrenParams, ChildrenResult, DeliverParams, Empty, EventParams,
-    EventsParams, ExtendParams, GatewaySubscribeParams, HeadField, HeadOmission, HistoryParams,
-    HistoryResult, InitializeParams, InitializeResult, InterruptParams, ItemPartParams,
-    ListHeadsParams, ListHeadsResult, ListParams, ListResult, MAX_BOUNDED_LINE_BYTES, OmittedField,
-    OpenParams, OpenResult, PinnedPartParams, ReferenceAvailability, SessionParams, SignalParams,
-    SubmitParams, SummaryHead, TreeSnapshot, WireOversizedItem, name,
+    AnswerParams, ApproveResult, CatalogParams, ChildrenParams, ChildrenResult, DeliverParams,
+    Empty, EventParams, EventsParams, ExtendParams, GatewaySubscribeParams, HeadField,
+    HeadOmission, HistoryParams, HistoryResult, InitializeParams, InitializeResult,
+    InterruptParams, ItemPartParams, ListHeadsParams, ListHeadsResult, ListParams, ListResult,
+    MAX_BOUNDED_LINE_BYTES, OmittedField, OpenParams, OpenResult, PinnedPartParams,
+    ReferenceAvailability, SessionParams, SignalParams, SubmitParams, SummaryHead, TreeSnapshot,
+    WireOversizedItem, name,
 };
 use crate::session::{Forwarder, Pump};
 use bounded::{Kind, Pins, fnv1a64};
@@ -256,6 +257,7 @@ impl Server {
             name::SESSION_SUBMIT => self.submit(params),
             name::SESSION_INTERRUPT => self.interrupt(params),
             name::SESSION_ANSWER => self.answer(params),
+            name::APPROVE => self.approve(params).await,
             name::CATALOG_READ => self.catalog(params).await,
             name::GATEWAY_SUBSCRIBE => self.subscribe(params),
             unknown => Err(RpcError::new(
@@ -615,6 +617,14 @@ impl Server {
             params.activation,
         );
         Reply::empty()
+    }
+
+    async fn approve(&self, params: Value) -> Result<Reply, RpcError> {
+        let request: bingo_sdk::Approval = parse(params)?;
+        let digest = bingo_sdk::render::under_input(true, self.host.approve(request))
+            .await
+            .map_err(crate::codec::from_kernel)?;
+        Reply::of(&ApproveResult { digest })
     }
 
     async fn catalog(&mut self, params: Value) -> Result<Reply, RpcError> {

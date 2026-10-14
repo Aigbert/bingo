@@ -1286,12 +1286,14 @@ mod tests {
             instant: true,
             family: "kernel".into(),
         }];
-        ui.catalogs.values = crate::commands::Catalogues::from([(
-            "plugins".to_string(),
-            ["bingo.tools.web", "bingo.tasks", "wordcount"]
-                .map(str::to_string)
-                .to_vec(),
-        )]);
+        ui.catalogs.plugins = ["bingo.tools.web", "bingo.tasks", "wordcount"]
+            .into_iter()
+            .map(|id| bingo_sdk::CatalogEntry {
+                id: id.into(),
+                label: id.into(),
+                meta: serde_json::json!({"state":{"kind":"on"}}),
+            })
+            .collect();
         write(&mut ui, &state, "/plugins disable ", now);
         insta::assert_snapshot!(render(&state, &mut ui, now));
     }

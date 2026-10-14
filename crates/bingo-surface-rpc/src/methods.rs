@@ -53,6 +53,7 @@ pub mod name {
     pub const SESSION_EXTEND: &str = "session/extend";
     pub const UI_RENDER: &str = "ui/render";
     pub const SESSION_SIGNAL: &str = "session/signal";
+    pub const APPROVE: &str = "approval/approve";
     pub const CATALOG_READ: &str = "catalog/read";
     pub const GATEWAY_SUBSCRIBE: &str = "gateway/subscribe";
 
@@ -64,6 +65,11 @@ pub mod name {
     pub const GATEWAY_EVENT: &str = "gateway/event";
     /// An oversized created summary invalidates the bounded head list by id.
     pub const GATEWAY_SESSION_HEAD: &str = "gateway/sessionHead";
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ApproveResult {
+    pub digest: String,
 }
 
 /// A method that answers nothing, and a method that asks for nothing.
@@ -601,6 +607,11 @@ pub static METHODS: &[Method] = &[
         schema_of::<Empty>,
     ),
     (
+        name::APPROVE,
+        schema_of::<bingo_sdk::Approval>,
+        schema_of::<ApproveResult>,
+    ),
+    (
         name::CATALOG_READ,
         schema_of::<CatalogParams>,
         schema_of::<Catalog>,
@@ -628,7 +639,7 @@ mod tests {
 
     #[test]
     fn the_wire_has_explicit_methods_and_notifications() {
-        assert_eq!(METHODS.len(), 22);
+        assert_eq!(METHODS.len(), 23);
         assert_eq!(NOTIFICATIONS.len(), 4);
     }
 

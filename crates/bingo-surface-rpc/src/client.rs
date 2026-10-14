@@ -23,9 +23,9 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::codec::{self, Message, Notification, Outcome};
 use crate::methods::{
-    AnswerParams, CatalogParams, DeliverParams, Empty, EventParams, EventsParams, ExtendParams,
-    HistoryParams, InitializeParams, InitializeResult, InterruptParams, ListParams, ListResult,
-    OpenParams, OpenResult, PROTOCOL, SessionParams, SignalParams, SubmitParams, name,
+    AnswerParams, ApproveResult, CatalogParams, DeliverParams, Empty, EventParams, EventsParams,
+    ExtendParams, HistoryParams, InitializeParams, InitializeResult, InterruptParams, ListParams,
+    ListResult, OpenParams, OpenResult, PROTOCOL, SessionParams, SignalParams, SubmitParams, name,
 };
 
 /// Where a session's frames go. The receiver waits here until `open` claims it,
@@ -412,6 +412,11 @@ impl HostApi for RemoteKernel {
         };
         let Empty {} = self.connection.call(name::SESSION_SIGNAL, &params).await?;
         Ok(())
+    }
+
+    async fn approve(&self, request: bingo_sdk::Approval) -> Result<String, KernelError> {
+        let result: ApproveResult = self.connection.call(name::APPROVE, &request).await?;
+        Ok(result.digest)
     }
 
     async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
