@@ -283,3 +283,42 @@ fn removing_a_match_discards_the_cached_replacement() {
     assert!(!draw_tree(80, 24, &solo(&state), &mut ui, now).contains("replacement"));
     assert!(ui.shown.pulls.is_empty());
 }
+
+#[test]
+fn revalidating_above_prompt_keeps_previous_art() {
+    let mut state = site(Component::AbovePrompt);
+    state.config.kernel["render"] = json!({"AbovePrompt":[{}]});
+    let (mut ui, now) = scene();
+    draw_sized(80, 30, &state, &mut ui, now);
+    let first = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == Component::AbovePrompt)
+        .unwrap()
+        .clone();
+    ui.placed.pulled.request(&first);
+    ui.placed
+        .pulled
+        .answer(first.clone(), bingo_sdk::View::text("BAND ART"));
+    assert!(draw_sized(80, 30, &state, &mut ui, now).contains("BAND ART"));
+    state
+        .invalidated
+        .insert(first.request.request_id.clone(), 1);
+    draw_sized(40, 24, &state, &mut ui, now);
+    let next = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == Component::AbovePrompt)
+        .unwrap()
+        .clone();
+    ui.placed.pulled.retain(std::slice::from_ref(&next));
+    ui.placed.pulled.request(&next);
+    let screen = draw_sized(40, 24, &state, &mut ui, now);
+    assert!(screen.contains("BAND ART"), "{screen}");
+    ui.placed
+        .pulled
+        .answer(next, bingo_sdk::View::text("NEW BAND"));
+    assert!(draw_sized(40, 24, &state, &mut ui, now).contains("NEW BAND"));
+}

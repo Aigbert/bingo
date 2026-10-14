@@ -27,7 +27,7 @@ pub fn mouse(
         if ui.shown.seating.collapsed.contains(&key) {
             ui.placed.panes.moved.insert(key.clone(), Place::Overlay);
         }
-        ui.focus = Focus::Pane(key);
+        focus(ui, state, &key);
         return Some(vec![]);
     }
     let capture = matches!(
@@ -55,6 +55,28 @@ pub fn mouse(
         .clone();
     Some(on_pane(ui, state, &seat, event, now))
 }
+fn focus(ui: &mut Ui, state: &SessionState, key: &str) {
+    let seating = super::seating(ui, state, ui.shown.seating.area);
+    let focusable = placed(state).iter().any(|pane| {
+        pane.key == key
+            && pane.focus
+            && seating
+                .panes
+                .iter()
+                .find(|seat| seat.key == key)
+                .and_then(|seat| super::view(ui, state, pane, seat))
+                .is_some_and(|view| {
+                    let mut items = Vec::new();
+                    super::controls(view, &mut items);
+                    !items.is_empty()
+                })
+    });
+    ui.focus = if focusable {
+        Focus::Pane(key.into())
+    } else {
+        Focus::Composer
+    };
+}
 fn on_pane(
     ui: &mut Ui,
     state: &SessionState,
@@ -80,7 +102,7 @@ fn on_pane(
 fn press(ui: &mut Ui, state: &SessionState, seat: &Seated, event: MouseEvent, now: Now) {
     let focused = matches!(&ui.focus,Focus::Pane(key) if key==&seat.key);
     ui.select.dragging = None;
-    ui.focus = Focus::Pane(seat.key.clone());
+    focus(ui, state, &seat.key);
     ui.placed.panes.selection = None;
     if event.row == seat.area.y {
         let width = moved::label(seat.place).width() as u16;
