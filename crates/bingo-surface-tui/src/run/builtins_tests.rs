@@ -626,3 +626,42 @@ async fn escape_discards_keys_waiting_for_the_asking_sessions_handle() {
     assert_eq!(child.answers().len(), 1);
     assert!(root.answers().is_empty());
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_late_owner_handle_cannot_revive_a_resolved_question() {
+    let (host, root, child) = crate::doubles::TestHost::tree(Vec::new());
+    let now = still(scene().1);
+    let mut run = tests::idle_in(state(), root, now.instant);
+    run.host = host;
+    let (replies, mut waiting) = mpsc::channel(4);
+    run.replies = replies;
+    let open = cross_session_question(&mut run, true);
+    pull_question(&mut run, 108, now);
+    run.terminal_event(Term::Key(typed('2')));
+    run.frame(
+        &child_frame(
+            4,
+            Event::InteractionResolved {
+                id: open.id,
+                answer: bingo_sdk::Answer::Choice {
+                    ids: vec!["a".into()],
+                    other: None,
+                },
+                by: bingo_sdk::ResolvedBy::Kernel,
+            },
+        ),
+        &mut Recorder::default(),
+    )
+    .unwrap();
+    let reply = tokio::time::timeout(Duration::from_secs(1), waiting.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    run.reply(reply, &mut None);
+    assert!(
+        child.submitted().is_empty(),
+        "the answer may have arrived from another surface"
+    );
+    assert!(run.site_keys.is_empty());
+    assert!(run.mine.is_empty());
+}

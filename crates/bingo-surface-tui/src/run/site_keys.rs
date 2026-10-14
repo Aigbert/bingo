@@ -83,8 +83,25 @@ fn open(run: &mut Run, session: SessionId, intent: IntentId, action: bingo_sdk::
 
 pub(super) fn opened(run: &mut Run, opened: Opened) {
     let Some(pending) = run.site_keys.get(&opened.intent) else {
+        run.mine.remove(&opened.intent);
         return;
     };
+    let live = run
+        .session
+        .tree
+        .state(&pending.session)
+        .is_some_and(|owner| {
+            owner
+                .interactions
+                .iter()
+                .any(|open| open.id.as_str() == pending.focus)
+        });
+    if !live {
+        run.site_keys.remove(&opened.intent);
+        run.mine.remove(&opened.intent);
+        drain(run);
+        return;
+    }
     match opened.handle {
         Ok(handle) => {
             run.session
