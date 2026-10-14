@@ -287,6 +287,7 @@ fn place(by: &ResolvedBy, here: &str) -> String {
         ResolvedBy::Client { surface, .. } => format!(" in {}", surface_name(surface)),
         ResolvedBy::Kernel => " by the session".into(),
         ResolvedBy::Policy => " by a rule".into(),
+        ResolvedBy::Plugin { name, .. } => format!(" by plugin {name}"),
     }
 }
 
@@ -666,6 +667,19 @@ mod tests {
         assert_eq!(
             withdrawn(&CancelReason::TurnEnded),
             "withdrawn: the turn ended"
+        );
+    }
+    #[test]
+    fn plugin_resolution_is_named_even_when_it_claims_this_client() {
+        assert_eq!(
+            place(
+                &ResolvedBy::Plugin {
+                    name: "here".into(),
+                    surface: "terminal".into()
+                },
+                "here"
+            ),
+            " by plugin here"
         );
     }
 }
