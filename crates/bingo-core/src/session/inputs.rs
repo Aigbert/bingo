@@ -96,6 +96,7 @@ impl Actor {
             self.cancel_command_interactions().await?;
         }
         match outcome {
+            Ok(CommandOutcome::Acknowledged { result }) => self.applied(intent, result).await?,
             Ok(CommandOutcome::Surface { action, fallback }) => {
                 let mut result = json!({"handled": true, "surface": action});
                 if let Some(message) = fallback {

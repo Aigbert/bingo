@@ -528,3 +528,17 @@ async fn a_shell_line_with_no_shell_registered_says_so() {
     assert_eq!(error.code, ErrorCode::InvalidInput);
     assert!(error.message.contains("shell"), "{}", error.message);
 }
+
+#[tokio::test]
+async fn an_acknowledged_result_is_forwarded_without_another_item() {
+    let result = json!({"item":"already-recorded","surface":{"name":"Composer","args":{"text":"/rename "}},"answer":{"kind":"cancel"},"view":{"kind":"text","text":"done"},"message":"done"});
+    let outcome: CommandOutcome = serde_json::from_value(json!({"kind":"acknowledged","result":result})).unwrap();
+    let command = ScriptedCommand::new("forward", true, Ok(outcome));
+    let mailbox = with_commands(ScriptedProvider::new(vec![]), vec![command]);
+    let (mut state, mut events) = mailbox.attach().await.unwrap();
+    let intent = IntentId::mint();
+    mailbox.submit(intent.clone(), Input::text("/forward", Origin::surface("test")));
+    let frames = collect(&mut events, &mut state, |f| matches!(f.event, Event::IntentAck { .. })).await;
+    assert_eq!(ack_of(&frames, &intent), Some(IntentOutcome::Applied { result }));
+    assert!(state.transcript.items().is_empty());
+}

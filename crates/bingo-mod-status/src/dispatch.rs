@@ -53,15 +53,8 @@ fn result(outcome: IntentOutcome) -> Option<Result<CommandOutcome, KernelError>>
     })
 }
 
-fn applied(mut result: Value) -> Result<CommandOutcome, KernelError> {
-    if let Some(view) = result.get_mut("view") {
-        return Ok(CommandOutcome::View {
-            view: serde_json::from_value(view.take()).map_err(crate::error)?,
-        });
-    }
-    Ok(CommandOutcome::Applied {
-        message: result["message"].as_str().map(str::to_owned),
-    })
+fn applied(result: Value) -> Result<CommandOutcome, KernelError> {
+    Ok(CommandOutcome::Acknowledged { result })
 }
 
 #[cfg(test)]
@@ -73,15 +66,11 @@ mod tests {
     fn acknowledgements_forward_views_messages_and_refusals() {
         assert_eq!(
             applied(json!({"view":View::text("next screen")})).unwrap(),
-            CommandOutcome::View {
-                view: View::text("next screen")
-            }
+            CommandOutcome::Acknowledged { result: json!({"view":View::text("next screen")}) }
         );
         assert_eq!(
             applied(json!({"message":"forgot rule"})).unwrap(),
-            CommandOutcome::Applied {
-                message: Some("forgot rule".into())
-            }
+            CommandOutcome::Acknowledged { result: json!({"message":"forgot rule"}) }
         );
         assert_eq!(
             result(IntentOutcome::Queued { position: 1 }),
@@ -96,5 +85,18 @@ mod tests {
             }),
             Some(Err(error))
         );
+    }
+}
+
+#[cfg(test)]
+mod forwarding_tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn acknowledgements_preserve_every_result_without_recording_twice() {
+        for result in [json!({"view":View::text("screen")}), json!({"message":"done"}), json!({"surface":{"name":"Composer","args":{"text":"/rename "}},"message":"fallback"}), json!({"item":"existing-item"}), json!({"answer":{"kind":"cancel"},"handled":true})] {
+            let forwarded = serde_json::to_value(applied(result.clone()).unwrap()).unwrap();
+            assert_eq!(forwarded, json!({"kind":"acknowledged","result":result}));
+        }
     }
 }
