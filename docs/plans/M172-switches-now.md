@@ -388,3 +388,99 @@ cargo test --locked -p bingo-sdk -p bingo-plugin-rpc -p bingo-surface-rpc --lib
 No live/credential tests, external dependencies, allowlist edits, push, merge
 or PR. After committing this record and auditing the clean tree, the final
 worktree command is `cargo clean`.
+
+## Verified — 2026-10-15 (review round 3)
+
+Rebased onto `dev` at `c33b0700`, retaining all 37 prior commits separately.
+The palette rebase keeps retirement checks and render epochs together;
+Commands changes invalidate drawings and retain M168's targeted catalogue
+fetch, while acknowledgements still refetch Plugins. Both palette and switch
+fixtures remain. New palette/permissions fixtures needed the internal signal
+conversion; workspace checking caught both before the final gates. The layer
+accessor moved to host/config.rs to keep host.rs within the size limit.
+
+Round 3 decisions and regression evidence:
+
+- [x] **1 — Commit point.** Update the reload off-set immediately after module
+  replacement, before any await. Publication errors do not roll back a live
+  switch. `failed_publication_keeps_the_committed_switch_on_reload`: 1 failed
+  before the fix, 1 passed afterward, including a subsequent reload.
+- [x] **2 — Wire compatibility.** Keep signal ownership on the server-side
+  value, skipped by serialization; snapshots and the band example again use
+  raw payloads. Reject stale clears before broadcasting. Retain derived switch
+  pending metadata deliberately, with the legacy `pending` admission tag and
+  a `registering` read alias. Old serde clients read both pending forms.
+  SDK wire regressions: 14 passed / 2 failed before; the complete SDK generator
+  run passed afterward. The serialized-client stale-clear regression also
+  failed before the server guard, then both real-host signal tests passed.
+- [x] **3 — Bounded retirement.** Wake on reap/supersession notifications;
+  report after-turn at five seconds and next-start after thirty seconds total.
+  Paused-clock wake/deadline tests: 2 failed before; all 16 switching tests
+  passed after this change. A held generation is never interrupted to enable.
+- [x] **4 — Worker ownership.** Prune completed handles on insertion, retain
+  unfinished handles for shutdown. Regression: 1 failed → 1 passed.
+- [x] **5 — Validate without writes.** Preview the standing user layer without
+  migration; only the accepted write may migrate it. File sources are absolute
+  so missing files can be reread as empty rather than confused with named
+  in-memory layers. Legacy-migration and deleted-layer tests: 2 failed →
+  2 passed; deletion covers project and explicit settings files.
+- [x] **6 — Bound callbacks.** Returned executor handles restore their owner's
+  generation scope even without an ambient scope, and reject a foreign scope
+  or stopped owner. The retained-handle regression failed before the fix;
+  all 36 plugin-host tests passed afterward.
+- [x] **7 — Method documentation.** Each host method has its own comment.
+  Source association check: failed before → all four associations passed.
+
+Regenerated through the existing generators, then checked for drift by the
+full workspace tests (without the update flag):
+
+```text
+BINGO_UPDATE_SCHEMA=1 cargo test --locked -p bingo-sdk
+  200 passed; 0 failed; exit 0
+BINGO_UPDATE_SCHEMA=1 cargo test --locked -p bingo-plugin-rpc -p bingo-surface-rpc --lib
+  150 passed; 0 failed; exit 0
+BINGO_UPDATE_SCHEMA=1 cargo test --locked -p bingo-mods --lib schema_and_types_are_generated_from_the_same_rows
+  1 passed; 0 failed; exit 0
+```
+
+Compared with dev, plugin/rpc schema definitions differ only at `PluginState`
+and the deliberate `NextStart` addition. Event and snapshot definitions match
+dev; TypeScript has only the corresponding two type changes. The band example
+matches dev. Module-generation ownership is absent from both wire schemas.
+The events catalogue retains ADR-0088's deliberate `shapesRequest` flags.
+
+Final gates ran sequentially; every cargo test used `RUST_TEST_THREADS=4` with
+all `OPENAI_*` and `ANTHROPIC_*` variables removed. No live credentials or paid
+services were used. No test contention flake occurred in this round.
+
+```text
+cargo fmt --all -- --check: exit 0; no output
+cargo check --workspace --all-targets --locked: Finished dev profile in 15.12s; exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev profile in 54.99s; exit 0
+cargo test --workspace --locked: 5715 passed; 0 failed; 5 ignored (171 summaries); exit 0
+bash scripts/check_discipline.sh: discipline ok; advisory warnings; exit 0
+bash scripts/budget.sh: 414/414 normal dependencies; warm core 1s; isolation 0; budget ok
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok; exit 0
+bash scripts/tui-smoke.sh: tui-smoke ok; exit 0
+cargo check -p bingo-sdk -p bingo-plugin-host --all-targets --target x86_64-pc-windows-msvc --locked: exit 0
+cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked: exit 0
+cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc --locked: exit 101 (C toolchain)
+cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc --locked: exit 101 (C toolchain)
+cargo check -p bingo-permissions --all-targets --target x86_64-pc-windows-msvc --locked: exit 101 (C toolchain)
+npm --prefix sdk/typescript test: 31 passed; 0 failed; exit 0
+```
+
+- [x] Native gates, isolated smoke, generator drift checks and SDK/plugin-host/core Windows checks.
+- [ ] Mods/TUI Windows checks: aws-lc-sys lacks Windows C headers; mods also
+  hits rquickjs-sys MSVC flags rejected by host clang. No Rust diagnostic.
+- [ ] Permissions Windows check: tree-sitter and tree-sitter-bash cannot find
+  `stdio.h` / `stdlib.h` for the Windows target. No Rust diagnostic.
+
+The first smoke attempt stopped before bingo launched: inherited mise shell
+hooks asked for trust under the temporary HOME, so the initial shell handshake
+could not finish. The complete rerun used a minimal PATH/environment, temporary
+HOME/data/config directories, and the script's own `tmux -L` socket initialized
+with `-f /dev/null`; all smoke cases passed. No terminal application or foreign
+process was controlled. Budget's 23 GB debug-output soft warning is recorded;
+`cargo clean` is the final worktree command after committing and auditing this
+record. No external dependencies, allowlist edits, log files, push, merge or PR.
