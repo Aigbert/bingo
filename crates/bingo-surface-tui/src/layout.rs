@@ -5,7 +5,7 @@ use crate::clock::Now;
 use crate::frame::Regions;
 use crate::graphics::Placed;
 use crate::tree::Tree;
-use crate::ui::{Card, Listed, Ui};
+use crate::ui::{Card, Ui};
 use ratatui::layout::Rect;
 use std::time::Instant;
 
@@ -36,8 +36,6 @@ pub struct Layout {
     pub top: usize,
     /// The card on the screen, when one is open.
     pub card: Option<Card>,
-    /// The list of sessions on the screen, when it is open.
-    pub list: Option<Listed>,
     /// The thumbnails the composer's strip drew, in the line's own order.
     pub strip: Vec<crate::graphics::Picture>,
     /// Where this frame drew each picture's cells, in the terminal's own rows

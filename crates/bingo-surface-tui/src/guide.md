@@ -29,7 +29,8 @@ where you are, the window used against the whole, and the model.
   keys. `⏎` while a turn runs *steers* it — the turn absorbs the line at its
   next barrier — and `tab` *queues*; the box says so.
 - `up/down` — your own prompt history, at the first and last line of the box.
-  `down` on an empty box walks the sessions, the same list `ctrl+g` opens.
+  `down` keeps the history gesture; `ctrl+r` opens sessions in the palette.
+  `ctrl+g` returns to a pending ask.
 - `ctrl+a/e` — start and end of the line (`home` and `end` too). `alt+b/f` —
   one word. `ctrl+w/u/k` — delete a word, to the line start, to the line end.
 - `pgup/pgdn` — scroll the transcript. While it is held back, the row under it
@@ -51,15 +52,15 @@ where you are, the window used against the whole, and the model.
 - `ctrl+o` — open the newest fold one rung further, and again until it is
   whole. It only ever opens; `esc` comes back.
 - `ctrl+b` — background the running command.
-- `/ · !` — a command, and a shell line in the session's directory.
+- `/ · !` — `/` opens commands in the palette; `!` runs a shell line in the session's directory.
 - `click` — on a picture, open it. Mouse reporting has to reach us at all:
   inside tmux that wants `set -g mouse on`.
-- `?` — the panel with this whole table in it.
+- `?` — keys in the palette; type to search commands and sessions too.
 
 ## The composer
 
-`/help`, `/clear`, `/resume [id]` and `/exit` (`/quit`) are this surface's own
-and reach no kernel. Every other `/name` and every `!line` is submitted
+`/clear` and `/exit` (`/quit`) are this surface's own and reach no kernel.
+The palette mod owns `/help` and `/resume [id]`. Every other `/name` and every `!line` is submitted
 verbatim — the session actor parses commands, not the client — so a plugin's
 command and a skill's `/name` are typed here and answered there.
 
@@ -121,7 +122,8 @@ wheel scrolling and drag-to-copy selection.
 
 ## Choosing a model
 
-`/model` shows the session's provider, model and requested thinking level.
+Choose `/model` in the palette to list models, with the current one selected.
+Its row shows the current provider/model; `/think` shows the requested effort.
 Use `/model openai/gpt-5.4` to try a model in this session, or
 `/model openai/gpt-5.4 --keep` to also save the provider and model for new
 sessions. Project and command-line settings still take precedence at startup.

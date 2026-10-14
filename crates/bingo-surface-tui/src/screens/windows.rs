@@ -7,7 +7,6 @@
 use super::*;
 
 use crate::rewind::Rewind;
-use crate::ui::Picker;
 
 /// One picker at 80×24, the size every card must be readable at (§7).
 fn shot(name: &str, tree: &Tree, ui: &mut Ui, now: Now) -> String {
@@ -31,103 +30,6 @@ fn cuts(screen: &str) -> usize {
         .lines()
         .filter(|row| row.replace(['"', '│'], "").trim() == "…")
         .count()
-}
-
-/// Twenty sessions the root spawned in an earlier process, which is more rows
-/// than the dropdown has.
-fn crowded_switcher(at: usize) -> (Tree, Ui, Now) {
-    let tree = spawned_tree(busy_child("reviewer"));
-    let (mut ui, now) = scene();
-    let stored = (20..40)
-        .map(|i| stored_summary(&format!("ses_{i}"), &format!("scout {i}")))
-        .collect();
-    shown(
-        &mut ui,
-        Open::Switcher(Switcher {
-            cursor: crate::roster::Cursor { at },
-            stored,
-            ..Default::default()
-        }),
-        now,
-    );
-    (tree, ui, now)
-}
-
-#[test]
-fn the_switcher_scrolls_under_the_row_the_keyboard_is_on() {
-    let (tree, mut ui, now) = crowded_switcher(21);
-    let screen = shot("switcher_end", &tree, &mut ui, now);
-    assert!(marked(&screen).contains("scout 39"), "{screen}");
-    assert_eq!(
-        cuts(&screen),
-        1,
-        "the list goes on above it and nowhere else"
-    );
-
-    let (tree, mut ui, now) = crowded_switcher(11);
-    let screen = shot("switcher_middle", &tree, &mut ui, now);
-    assert!(marked(&screen).contains("scout 29"), "{screen}");
-    assert_eq!(cuts(&screen), 2, "and here it goes on at both ends");
-}
-
-fn spec(name: &str) -> bingo_sdk::CommandSpec {
-    bingo_sdk::CommandSpec {
-        keys: vec![],
-        hidden: false,
-        name: name.into(),
-        aliases: vec![],
-        hint: "what it does".into(),
-        args: bingo_sdk::ArgSpec::None,
-        instant: true,
-        family: "kernel".into(),
-    }
-}
-
-/// A `/` with more commands behind it than the dropdown's eight rows.
-fn crowded_menu(from_the_end: usize) -> (bingo_sdk::SessionState, Ui, Now) {
-    let state = folded(answered());
-    let (mut ui, now) = scene();
-    ui.catalogs.commands = (1..=12).map(|i| spec(&format!("plugin-{i:02}"))).collect();
-    write(&mut ui, &state, "/", now);
-    let rows = ui.suggestions(&state.summary.cwd, &[]).len();
-    ui.menu.selected = rows - 1 - from_the_end;
-    (state, ui, now)
-}
-
-#[test]
-fn the_command_dropdown_scrolls_under_the_row_the_keyboard_is_on() {
-    let (state, mut ui, now) = crowded_menu(0);
-    let screen = shot("dropdown_end", &solo(&state), &mut ui, now);
-    assert!(marked(&screen).contains("/plugin-12"), "{screen}");
-    assert_eq!(cuts(&screen), 1);
-
-    let (state, mut ui, now) = crowded_menu(6);
-    let screen = shot("dropdown_middle", &solo(&state), &mut ui, now);
-    assert!(marked(&screen).contains("/plugin-06"), "{screen}");
-    assert_eq!(cuts(&screen), 2);
-}
-
-/// Two dozen sessions to resume: more than the sheet has rows for.
-fn crowded_picker(selected: usize) -> (bingo_sdk::SessionState, Ui, Now) {
-    let (mut ui, now) = scene();
-    let sessions = (10..34)
-        .map(|i| stored_summary(&format!("ses_{i}"), &format!("session {i}")))
-        .collect();
-    shown(&mut ui, Open::Picker(Picker { sessions, selected }), now);
-    (state(), ui, now)
-}
-
-#[test]
-fn the_resume_picker_scrolls_under_the_row_the_keyboard_is_on() {
-    let (state, mut ui, now) = crowded_picker(23);
-    let screen = shot("resume_end", &solo(&state), &mut ui, now);
-    assert!(marked(&screen).contains("session 33"), "{screen}");
-    assert_eq!(cuts(&screen), 1);
-
-    let (state, mut ui, now) = crowded_picker(12);
-    let screen = shot("resume_middle", &solo(&state), &mut ui, now);
-    assert!(marked(&screen).contains("session 22"), "{screen}");
-    assert_eq!(cuts(&screen), 2);
 }
 
 /// A transcript of fourteen turns, so the rewind card has more of them to list

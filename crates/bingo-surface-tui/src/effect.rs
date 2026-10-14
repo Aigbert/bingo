@@ -35,7 +35,7 @@ pub enum Effect {
     /// Attach to another session; the loop closes the old attachment first.
     Open(SessionSelector),
     /// Fill the session picker from the host.
-    ListSessions,
+
     /// Fill the switcher's stored rows from the host: one read per opening.
     ListStored,
     /// Put a selection on the terminal's own clipboard (OSC 52). The loop

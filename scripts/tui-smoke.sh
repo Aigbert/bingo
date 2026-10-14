@@ -247,27 +247,23 @@ keys Enter
 await '> @Cargo.toml'
 finish
 
-step 'the help sheet opens on ? and closes on esc'
+step 'the keys palette opens on ? and closes on esc'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '?'
-await 'shift+tab'
+await 'type to search commands, sessions and keys together'
 keys Escape
 await '? for shortcuts'
-vanish 'shift+tab'
+vanish 'type to search commands, sessions and keys together'
 finish
 
-# The fixture has one session, so `↓` on an empty box rightly keeps its old
-# job (there is nowhere to walk to) and `ctrl+g` is the door that always opens.
-# What this drives is the layer, not the walk: a real terminal draws it, keys
-# reach it, and `esc` gives the frame back.
-step 'ctrl+g opens the one list of sessions and esc closes it'
+step 'ctrl+r opens the session palette and esc closes it'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys 'ask me' Enter
 await 'nothing to do'
-keys C-g
-await '❯ ◗  ask me  idle · completed'
+keys C-r
+await 'this one'
 keys Escape
-vanish '❯ ◗  ask me'
+vanish 'this one'
 await '? for shortcuts'
 finish
 

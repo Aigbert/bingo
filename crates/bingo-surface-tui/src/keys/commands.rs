@@ -32,7 +32,6 @@ pub const STATIC: &[&str] = &[
     "pgdn",
     "ctrl+f",
     "ctrl+v",
-    "ctrl+g",
     "ctrl+t",
     "ctrl+o",
     "ctrl+b",
@@ -118,6 +117,40 @@ fn editing(key: &str) -> bool {
 
 pub fn line(ui: &Ui, state: &SessionState, key: KeyEvent) -> Option<String> {
     bindings(ui, state).commands.get(&chord(key)?).cloned()
+}
+
+/// The single chords the palette can replay after releasing focus.
+pub fn event(key: &str) -> Option<KeyEvent> {
+    let mut modifiers = KeyModifiers::empty();
+    let mut parts = key.split('+').collect::<Vec<_>>();
+    let name = parts.pop()?;
+    for part in parts {
+        modifiers |= match part {
+            "ctrl" => KeyModifiers::CONTROL,
+            "alt" => KeyModifiers::ALT,
+            "shift" => KeyModifiers::SHIFT,
+            _ => return None,
+        };
+    }
+    let code = match name {
+        "enter" => KeyCode::Enter,
+        "esc" => KeyCode::Esc,
+        "tab" if modifiers.contains(KeyModifiers::SHIFT) => KeyCode::BackTab,
+        "tab" => KeyCode::Tab,
+        "up" => KeyCode::Up,
+        "down" => KeyCode::Down,
+        "pgup" => KeyCode::PageUp,
+        "pgdn" => KeyCode::PageDown,
+        _ => {
+            let mut chars = name.chars();
+            let c = chars.next()?;
+            if chars.next().is_some() {
+                return None;
+            }
+            KeyCode::Char(c)
+        }
+    };
+    Some(KeyEvent::new(code, modifiers))
 }
 
 #[cfg(test)]

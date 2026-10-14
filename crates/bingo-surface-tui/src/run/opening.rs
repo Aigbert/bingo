@@ -8,10 +8,9 @@
 //! These are functions over the run rather than more of its methods: `Run`'s
 //! own `impl` is spread as far as it may be (`scripts/check_discipline.sh` §5).
 
-use super::{RECENT, Reply, Run};
+use super::Run;
 use crate::clock::Now;
 use crate::welcome;
-use bingo_sdk::{SessionFilter, SessionSummary};
 
 /// Whether this run opens with the piece, asked once when the surface has its
 /// session and its screen. The rule itself is [`welcome::opens`]; this is only
@@ -64,34 +63,6 @@ pub(super) fn find_resume(run: &mut Run) {
             )
         })
     });
-}
-
-/// The `/resume` picker's candidates. The cut to the card's size happens
-/// after the roots are kept, not in the filter: a project full of agents
-/// must not crowd the person's own sessions off the card.
-pub(super) fn list_sessions(run: &mut Run) {
-    let host = run.host.clone();
-    let filter = SessionFilter {
-        cwd: Some(std::path::PathBuf::from(
-            &run.session.tree.root().summary.cwd,
-        )),
-        parent: None,
-        limit: None,
-    };
-    run.spawn(async move {
-        host.sessions(filter)
-            .await
-            .map(|sessions| Reply::Sessions(recent_roots(sessions)))
-    });
-}
-
-/// The person's own sessions, newest first as the host answers: a child
-/// or a room hangs under a root and is reached through it — the switcher
-/// (M31) — never resumed on its own.
-pub(super) fn recent_roots(mut sessions: Vec<SessionSummary>) -> Vec<SessionSummary> {
-    sessions.retain(|session| session.parent.is_none());
-    sessions.truncate(RECENT);
-    sessions
 }
 
 #[cfg(test)]

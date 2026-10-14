@@ -7,18 +7,17 @@
 //! of answers the keys give (§7: a key means one direction, a click means
 //! both).
 
-use bingo_sdk::{Level, SessionId, SessionState};
+use bingo_sdk::{Level, SessionState};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Position;
 
 use crate::clock::Now;
 use crate::effect::Effect;
 use crate::fold;
-use crate::input::{self, item_of, scroll, walk_to};
-use crate::roster;
+use crate::input::{self, item_of, scroll};
 use crate::select::{Cell, Edge};
 use crate::tree::Tree;
-use crate::ui::{Open, Ui};
+use crate::ui::Ui;
 
 /// Lines one notch of the wheel moves the transcript.
 pub const WHEEL: isize = 3;
@@ -36,7 +35,7 @@ pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Ef
             return Vec::new();
         }
         crate::focus::Owner::Search => return Vec::new(),
-        crate::focus::Owner::Layer => return layer_mouse(ui, tree, mouse),
+        crate::focus::Owner::Layer => return Vec::new(),
         crate::focus::Owner::Interaction => {
             return if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
                 if let Some(target) = ui
@@ -75,17 +74,6 @@ pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Ef
     Vec::new()
 }
 
-fn layer_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent) -> Vec<Effect> {
-    if mouse.kind != MouseEventKind::Down(MouseButton::Left) {
-        return Vec::new();
-    }
-    let Some(cursor) = listed_row(ui, mouse) else {
-        return Vec::new();
-    };
-    let chosen = under(ui, tree, cursor);
-    walk_to(ui, tree, cursor, chosen)
-}
-
 /// A press lands on whatever is under it: a card's option answers, a block
 /// takes the focus, opens what is folded under it and starts a run.
 fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect> {
@@ -104,7 +92,7 @@ fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect>
         return input::on_key(
             ui,
             tree,
-            KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
             now,
         );
     }
@@ -297,25 +285,6 @@ fn answer(ui: &mut Ui, tree: &Tree, index: usize, now: Now) -> Vec<Effect> {
 /// What a click on a card row means: the row it landed on, chosen.
 fn mouse_enter() -> KeyEvent {
     KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)
-}
-
-/// The row of the list under the pointer, against the frame the last draw
-/// left: which line it landed on, and what that line is a row of.
-fn listed_row(ui: &Ui, mouse: MouseEvent) -> Option<roster::Cursor> {
-    if !ui.focus.captures() {
-        return None;
-    }
-    let painted = &ui.shown;
-    painted.list.as_ref()?.at(mouse.row)
-}
-
-/// The session a row of the list names — the list as the query left it, so a
-/// click lands on the row a person can see.
-fn under(ui: &Ui, tree: &Tree, cursor: roster::Cursor) -> Option<SessionId> {
-    let Open::Switcher(open) = ui.focus.open() else {
-        return None;
-    };
-    open.session(tree, ui.composer.text(), cursor)
 }
 
 /// The transcript cell under the pointer, when it is over the transcript.

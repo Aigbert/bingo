@@ -121,13 +121,7 @@ impl Focus {
             layer.close(now);
         }
     }
-    pub fn toggle(&mut self, open: crate::ui::Open, now: std::time::Instant) {
-        if self.open() == &open && self.showing() {
-            self.close(now);
-        } else {
-            self.show(open, now);
-        }
-    }
+
     pub fn showing(&self) -> bool {
         matches!(self, Self::Layer(layer) if layer.showing())
     }
@@ -179,7 +173,7 @@ mod tests {
     fn focus_has_one_owner_for_every_key_class_and_left_press() {
         let (_, now) = scene();
         let mut layer = Layer::shut(now.instant);
-        layer.show(Open::Help, now.instant);
+        layer.show(Open::Rewind(Default::default()), now.instant);
         let cases = [
             (Focus::Composer, Owner::Composer),
             (Focus::Intro(Playing::from(now.instant)), Owner::Intro),
@@ -274,7 +268,8 @@ mod dispatch_tests {
             assert!(crate::pointer::on_mouse(&mut ui, &tree, mouse, now).is_empty());
             assert!(ui.focus.selection().is_none());
         }
-        ui.focus.show(crate::ui::Open::Help, now.instant);
+        ui.focus
+            .show(crate::ui::Open::Rewind(Default::default()), now.instant);
         assert_eq!(owner(&ui, &tree), Owner::Layer);
         assert!(crate::pointer::on_mouse(&mut ui, &tree, mouse, now).is_empty());
         assert_eq!(owner(&ui, &tree), Owner::Layer);

@@ -77,6 +77,7 @@ pub fn span(past: Duration) -> String {
 /// The same span behind now. Coarser at the near end: a row that offers a
 /// session to resume has to tell this morning from last week, and a count of
 /// seconds there would be read as precision nobody asked for.
+#[cfg(test)]
 pub fn ago(past: Duration) -> String {
     match past.as_secs() < MINUTE {
         true => "just now".to_string(),

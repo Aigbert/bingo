@@ -15,7 +15,6 @@ use bingo_sdk::{Event, ItemStatus, TurnStatus};
 use ratatui::style::Style;
 
 use crate::clock::{FRAME, Now};
-use crate::fold::Folds;
 use crate::test_support::*;
 use crate::tree::Tree;
 use crate::{keys, theme};
@@ -53,25 +52,6 @@ fn row(tree: &Tree, ui: &mut crate::ui::Ui, now: Now, needle: &str) -> String {
         .find(|line| line.contains(needle))
         .map(|line| line.trim_matches('"').trim_end().to_string())
         .unwrap_or_else(|| panic!("no row carries {needle:?}"))
-}
-
-/// The style of the span carrying `needle` in the transcript itself, which is
-/// where a cue lives before a card dims the world in front of it.
-fn transcript_style(tree: &Tree, now: Now, needle: &str) -> Style {
-    let mut blocks = crate::blocks::Blocks::default();
-    let state = tree.viewed();
-    let folds = Folds::new();
-    let pictures = crate::graphics::Decoded::default();
-    let linked = crate::graphics::Linked::default();
-    let rows = crate::transcript::Rows::of(state, 80, &folds, &[], &pictures, &linked, now);
-    let height = blocks.sync(state, &tree.agents(), &rows);
-    blocks
-        .window(0, height)
-        .iter()
-        .flat_map(|line| line.spans.clone())
-        .find(|span| span.content.contains(needle))
-        .map(|span| span.style)
-        .unwrap_or_else(|| panic!("no span carries {needle:?}"))
 }
 
 /// What a block does as it lands: it takes its own room and nothing more, one
@@ -572,7 +552,9 @@ fn a_card_reveals_top_down_and_a_sheet_slides_up() {
     insta::assert_snapshot!("card_reveal", card.join("\n"));
 
     let (mut sheet, now) = scene();
-    sheet.focus.show(crate::ui::Open::Help, now.instant);
+    sheet
+        .focus
+        .show(crate::ui::Open::Rewind(Default::default()), now.instant);
     let plain = solo(&state());
     let frames: Vec<String> = (0..5)
         .map(|f| screen(&plain, &mut sheet, later(now, f * 33)))
@@ -583,7 +565,7 @@ fn a_card_reveals_top_down_and_a_sheet_slides_up() {
 #[test]
 fn esc_runs_a_sheet_back_down_the_way_it_came() {
     let (mut ui, now) = scene();
-    shown(&mut ui, crate::ui::Open::Help, now);
+    shown(&mut ui, crate::ui::Open::Rewind(Default::default()), now);
     ui.focus.close(now.instant);
     let tree = solo(&state());
     let closing: Vec<String> = (0..5)
@@ -683,48 +665,6 @@ fn an_inline_ask_keeps_its_attention_marker_without_a_border() {
     for ms in [0, 1000, 2000] {
         assert!(draw_tree(80, 24, &tree, &mut ui, later(now, ms)).contains("needs you"));
     }
-}
-
-#[test]
-fn a_waiting_childs_row_and_its_switcher_line_pulse_with_it() {
-    let mut tree = spawned_tree(vec![
-        child_frame(1, announced("reviewer")),
-        child_frame(2, opened(child_permission())),
-    ]);
-    let (_, now) = scene();
-    assert_eq!(transcript_style(&tree, now, "asking"), theme::presence());
-    assert_eq!(
-        transcript_style(&tree, later(now, 1_000), "asking"),
-        theme::text(),
-        "the child's row is on the same beat"
-    );
-
-    let root = tree.root_id().clone();
-    tree.show(&root);
-    let switcher = |at: Now| {
-        let rows = tree.rows();
-        crate::roster::lines(
-            &tree,
-            &rows,
-            crate::roster::Cursor::default(),
-            "",
-            80,
-            8,
-            at,
-        )
-        .lines
-        .iter()
-        .flat_map(|line| line.spans.clone())
-        .find(|span| span.content.contains("needs you"))
-        .map(|span| span.style)
-        .expect("the row that is asking")
-    };
-    assert_eq!(switcher(now), theme::presence());
-    assert_eq!(
-        switcher(later(now, 1_000)),
-        theme::text(),
-        "and so is its line in the switcher"
-    );
 }
 
 // ---- the context notice -------------------------------------------------
@@ -830,7 +770,8 @@ fn motion_off_holds_every_cue_at_its_resting_frame() {
 #[test]
 fn motion_off_puts_a_layer_up_whole_and_takes_it_away_at_once() {
     let (mut ui, now) = scene();
-    ui.focus.show(crate::ui::Open::Help, now.instant);
+    ui.focus
+        .show(crate::ui::Open::Rewind(Default::default()), now.instant);
     let still = still(now);
     let tree = solo(&state());
     assert_eq!(

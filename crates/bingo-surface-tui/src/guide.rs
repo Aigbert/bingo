@@ -12,7 +12,7 @@ use bingo_sdk::{Contribution, Page, Pages, Registrar};
 pub static PAGES: Pages = Pages(&[Page {
     name: "tui",
     description: "The terminal surface a person sits in front of: every key it \
-                  binds, the four commands it answers itself, `@` mentions and \
+                  binds, the two commands it answers itself, `@` mentions and \
                   pasted pictures in the composer, which terminals draw \
                   pictures, and the `tui.measure` and `update.check` settings.",
     body: include_str!("guide.md"),

@@ -79,6 +79,7 @@ fn site(component: Component) -> bingo_sdk::SessionState {
     use bingo_sdk::{ItemStatus, ToolOutput};
     let completed_item = |item| folded(vec![frame(1, Event::ItemCompleted { item })]);
     match component {
+        Component::Palette => state(),
         Component::Permission | Component::SignIn => sealed_site(component),
         Component::Question => folded(vec![frame(
             1,
@@ -440,6 +441,9 @@ fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
         let (mut ui, now) = scene();
         let now = later(now, 2000);
         let tree = solo(&state);
+        if component == Component::Palette {
+            crate::palette::open(&mut ui, bingo_sdk::component::PaletteOpen::Commands, now);
+        }
         let original = drawn(80, 30, &tree, &mut ui, now);
         let key = ui
             .shown

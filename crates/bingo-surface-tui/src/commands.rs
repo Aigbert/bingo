@@ -1,8 +1,6 @@
-//! Commands as this surface sees them: the four it answers itself (ADR-0008
-//! §6) and the dropdown that merges them with the kernel's catalogue. Every
+//! Commands as this surface sees them: its two local commands (ADR-0008
+//! §6) and the names-only fallback for the shared catalogue. Every
 //! other `/name` and every `!line` is submitted verbatim — the actor parses it.
-
-use std::collections::BTreeMap;
 
 use bingo_sdk::{ArgSpec, Catalog, CommandSpec};
 
@@ -17,17 +15,13 @@ pub const SURFACE: &str = "command";
 /// A command the surface owns. Nothing here reaches the kernel.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Local {
-    Help,
     Clear,
-    Resume(Option<String>),
     Exit,
 }
 
 /// Name and hint of each local command, in dropdown order.
 const LOCAL: &[(&str, &str)] = &[
-    ("help", "keyboard shortcuts"),
     ("clear", "start a fresh session here"),
-    ("resume", "reopen a session"),
     ("exit", "leave bingo"),
 ];
 
@@ -45,13 +39,7 @@ pub fn local_specs() -> Vec<CommandSpec> {
                 Vec::new()
             },
             hint: (*hint).to_string(),
-            args: if *name == "resume" {
-                ArgSpec::Free {
-                    hint: "[id]".into(),
-                }
-            } else {
-                ArgSpec::None
-            },
+            args: ArgSpec::None,
             instant: true,
             family: "surface".into(),
         })
@@ -70,11 +58,10 @@ pub fn specs_from(catalog: &Catalog) -> Vec<CommandSpec> {
 
 /// Which local command a line is, if any.
 pub fn local(line: &str) -> Option<Local> {
-    let (name, args) = split(line.trim())?;
+    let (name, _) = split(line.trim())?;
     match name {
-        "help" => Some(Local::Help),
         "clear" => Some(Local::Clear),
-        "resume" => Some(Local::Resume((!args.is_empty()).then(|| args.to_string()))),
+
         "exit" | "quit" => Some(Local::Exit),
         _ => None,
     }
@@ -91,8 +78,7 @@ pub fn split(line: &str) -> Option<(&str, &str)> {
 }
 
 /// Which run of the dropdown a row belongs to. The runs are told apart by a
-/// label above each of them only while there is another beside it — the list's
-/// own grammar ([`crate::roster`]) — so a dropdown offering one kind of thing
+/// label above each of them only while there is another beside it, so a list offering one kind of thing
 /// wears no label at all.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Group {
@@ -128,20 +114,15 @@ pub struct Suggestion {
 
 /// The dropdown for the line being typed: command names while the caret is
 /// still in the name, the values its spec lists once the command is known.
-pub fn suggestions(line: &str, specs: &[CommandSpec], catalogues: &Catalogues) -> Vec<Suggestion> {
+pub fn suggestions(line: &str, specs: &[CommandSpec]) -> Vec<Suggestion> {
     let Some(rest) = line.strip_prefix('/') else {
         return Vec::new();
     };
     match rest.split_once(char::is_whitespace) {
         None => rank(rest, specs),
-        Some((name, partial)) => arguments(name, partial.trim_start(), specs, catalogues),
+        Some(_) => Vec::new(),
     }
 }
-
-/// The ids of each catalogue a command's argument may name, by the source
-/// its `ArgSpec::Catalog` gives (`models`, `providers`, `plugins`), read once
-/// at start.
-pub type Catalogues = BTreeMap<String, Vec<String>>;
 
 /// The commands that match, best first: [`crate::matching`]'s order, which is
 /// the one every list in this surface is narrowed by. A command is offered once
@@ -165,6 +146,7 @@ fn rank(partial: &str, specs: &[CommandSpec]) -> Vec<Suggestion> {
 fn spellings(specs: &[CommandSpec]) -> Vec<(String, &CommandSpec)> {
     specs
         .iter()
+        .filter(|spec| !spec.hidden)
         .flat_map(|spec| {
             std::iter::once(&spec.name)
                 .chain(spec.aliases.iter())
@@ -174,498 +156,28 @@ fn spellings(specs: &[CommandSpec]) -> Vec<(String, &CommandSpec)> {
 }
 
 /// One row of the `/` menu: the spelling that matched, and what it does.
-fn named(name: &str, spec: &CommandSpec) -> Suggestion {
+fn named(name: &str, _spec: &CommandSpec) -> Suggestion {
     Suggestion {
         value: format!("/{name} "),
         label: format!("/{name}"),
-        hint: spec.hint.clone(),
+        hint: String::new(),
         group: Group::Commands,
     }
 }
 
-/// Values for a command whose spec lists them: the first word from the spec
-/// itself, the word after a verb from that verb's `then` (ADR-0008 §6a).
-fn arguments(
-    name: &str,
-    partial: &str,
-    specs: &[CommandSpec],
-    catalogues: &Catalogues,
-) -> Vec<Suggestion> {
-    let Some(spec) = specs
-        .iter()
-        .find(|s| s.name == name || s.aliases.iter().any(|a| a == name))
-    else {
-        return Vec::new();
-    };
-    if let ArgSpec::Options { args, flags } = &spec.args {
-        return options(name, partial, args, flags, catalogues);
-    }
-    match partial.split_once(char::is_whitespace) {
-        None => offered(&format!("/{name}"), partial, &spec.args, catalogues),
-        Some((word, rest)) => after(name, word, rest.trim_start(), &spec.args, catalogues),
-    }
-}
-
-fn options(
-    name: &str,
-    partial: &str,
-    args: &ArgSpec,
-    flags: &[String],
-    catalogues: &Catalogues,
-) -> Vec<Suggestion> {
-    let flag_args = ArgSpec::Words {
-        alone: vec![],
-        values: flags.to_vec(),
-        then: None,
-    };
-    match partial.rsplit_once(char::is_whitespace) {
-        Some((head, rest))
-            if !head
-                .split_whitespace()
-                .any(|word| flags.iter().any(|flag| flag == word)) =>
-        {
-            offered(&format!("/{name} {head}"), rest, &flag_args, catalogues)
-        }
-        Some(_) => Vec::new(),
-        None => offered(&format!("/{name}"), partial, args, catalogues),
-    }
-}
-
-/// The word after a verb, from what the verb said follows it. A spec that
-/// says nothing about it, a word the spec does not list, and a third word all
-/// offer nothing: the line has moved past what anyone here can complete.
-fn after(
-    name: &str,
-    word: &str,
-    partial: &str,
-    args: &ArgSpec,
-    catalogues: &Catalogues,
-) -> Vec<Suggestion> {
-    let ArgSpec::Words {
-        values,
-        alone,
-        then: Some(then),
-    } = args
-    else {
-        return Vec::new();
-    };
-    if partial.contains(char::is_whitespace)
-        || !values.iter().any(|value| value == word)
-        || alone.iter().any(|value| value == word)
-    {
-        return Vec::new();
-    }
-    offered(&format!("/{name} {word}"), partial, then, catalogues)
-}
-
-/// The rows one `ArgSpec` offers for the partial being typed, each completing
-/// the line `head` has so far.
-fn offered(head: &str, partial: &str, args: &ArgSpec, catalogues: &Catalogues) -> Vec<Suggestion> {
-    let values: &[String] = match args {
-        ArgSpec::Catalog { source } => match catalogues.get(source) {
-            Some(ids) => ids,
-            None => return Vec::new(),
-        },
-        ArgSpec::Words { values, .. } => values,
-        ArgSpec::Options { args, .. } => return offered(head, partial, args, catalogues),
-        ArgSpec::None | ArgSpec::Free { .. } => return Vec::new(),
-    };
-    matching::rank(partial, values, String::as_str)
-        .into_iter()
-        .map(|id| Suggestion {
-            value: format!("{head} {id}"),
-            label: id.clone(),
-            hint: String::new(),
-            group: Group::Commands,
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn a_model_choice_offers_keep_after_the_id() {
-        let specs = vec![spec(
-            "model",
-            ArgSpec::Options {
-                args: Box::new(ArgSpec::Catalog {
-                    source: "models".into(),
-                }),
-                flags: vec!["--keep".into()],
-            },
-        )];
-        let catalogues = BTreeMap::from([("models".into(), vec!["vendor/model".into()])]);
-        assert_eq!(
-            suggestions("/model vendor", &specs, &catalogues)[0].value,
-            "/model vendor/model"
-        );
-        assert_eq!(
-            suggestions("/model vendor/model --", &specs, &catalogues)[0].value,
-            "/model vendor/model --keep"
-        );
-        assert!(suggestions("/model vendor/model --keep ", &specs, &catalogues).is_empty());
-    }
-
-    #[test]
-    fn rough_edges_quit_is_an_alias_not_a_second_row() {
-        let specs = local_specs();
-        assert!(!specs.iter().any(|s| s.name == "quit"));
-        assert!(
-            specs
-                .iter()
-                .find(|s| s.name == "exit")
-                .unwrap()
-                .aliases
-                .contains(&"quit".into())
-        );
-        assert_eq!(local("/quit"), Some(Local::Exit));
-    }
-
     use super::*;
-    use bingo_sdk::{CatalogEntry, CatalogKind};
-
-    fn spec(name: &str, args: ArgSpec) -> CommandSpec {
-        CommandSpec {
-            keys: vec![],
-            hidden: false,
-            name: name.into(),
-            aliases: Vec::new(),
-            hint: format!("the {name} command"),
-            args,
-            instant: false,
-            family: "kernel".into(),
-        }
-    }
-
     #[test]
-    fn the_four_local_commands_are_recognised_and_nothing_else_is() {
-        assert_eq!(local("/help"), Some(Local::Help));
-        assert_eq!(local("  /clear  "), Some(Local::Clear));
-        assert_eq!(local("/resume"), Some(Local::Resume(None)));
-        assert_eq!(
-            local("/resume ses_1"),
-            Some(Local::Resume(Some("ses_1".into())))
-        );
-        assert_eq!(local("/exit"), Some(Local::Exit));
+    fn fallback_lists_names_only_and_never_hidden_commands() {
+        let mut specs = local_specs();
+        specs.push(CommandSpec::ui("hidden"));
+        let rows = suggestions("/", &specs);
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().all(|row| row.hint.is_empty()));
+        assert!(suggestions("/clear anything", &specs).is_empty());
         assert_eq!(local("/quit"), Some(Local::Exit));
-        assert_eq!(local("/model fake-1"), None, "the kernel owns /model");
-        assert_eq!(local("!ls"), None);
-        assert_eq!(local("hello"), None);
-    }
-
-    fn labels(line: &str, specs: &[CommandSpec]) -> Vec<String> {
-        suggestions(line, specs, &Catalogues::new())
-            .iter()
-            .map(|row| row.label.clone())
-            .collect()
-    }
-
-    fn labels_with(line: &str, specs: &[CommandSpec]) -> Vec<String> {
-        suggestions(line, specs, &installed())
-            .iter()
-            .map(|row| row.label.clone())
-            .collect()
-    }
-
-    /// M55: the dropdown is ranked, not prefix-tested. A name a person typed
-    /// the bones of is the name they meant.
-    #[test]
-    fn a_subsequence_of_a_command_offers_it() {
-        let specs = vec![spec("compact", ArgSpec::None), spec("model", ArgSpec::None)];
-        assert_eq!(labels("/mo", &specs), vec!["/model"]);
-        assert_eq!(labels("/mdl", &specs), vec!["/model"], "no prefix at all");
-        assert_eq!(labels("/co", &specs), vec!["/compact"]);
-        assert_eq!(
-            labels("/o", &specs),
-            vec!["/compact", "/model"],
-            "the one letter says nothing to tell them apart, so catalogue \
-             order decides"
-        );
-        assert!(labels("/mdoel", &specs).is_empty(), "a typo is a typo");
-    }
-
-    /// A command with aliases is one row however many of its spellings match,
-    /// and the row is the spelling that matched.
-    #[test]
-    fn an_alias_offers_the_command_once_under_the_name_that_matched() {
-        let mut spec = spec("permission", ArgSpec::None);
-        spec.aliases = vec!["mode".to_string()];
-        let specs = vec![spec];
-        assert_eq!(labels("/perm", &specs), vec!["/permission"]);
-        assert_eq!(labels("/mode", &specs), vec!["/mode"]);
-        assert_eq!(labels("/m", &specs), vec!["/mode"], "one row, the best of");
-    }
-
-    #[test]
-    fn a_catalogue_argument_completes_from_that_catalogue() {
-        let specs = vec![spec(
-            "model",
-            ArgSpec::Catalog {
-                source: "models".into(),
-            },
-        )];
-        let models = vec!["fake/fake-1".to_string(), "openai/gpt-5".to_string()];
-        let catalogues = Catalogues::from([("models".to_string(), models)]);
-        let rows = suggestions("/model fak", &specs, &catalogues);
-        assert_eq!(
-            rows,
-            vec![Suggestion {
-                value: "/model fake/fake-1".into(),
-                label: "fake/fake-1".into(),
-                hint: String::new(),
-                group: Group::Commands,
-            }]
-        );
-    }
-
-    /// The values of a catalogue are ranked by the same matcher the names are,
-    /// so `son` finds the model whose family it names, tightest first.
-    #[test]
-    fn a_catalogue_value_is_ranked_and_not_substring_tested() {
-        let specs = vec![spec(
-            "model",
-            ArgSpec::Catalog {
-                source: "models".into(),
-            },
-        )];
-        let models = ["openai/gpt-5.4", "anthropic/claude-sonnet-5", "some/on-1"]
-            .map(str::to_string)
-            .to_vec();
-        let catalogues = Catalogues::from([("models".to_string(), models)]);
-        let labels: Vec<String> = suggestions("/model son", &specs, &catalogues)
-            .iter()
-            .map(|row| row.label.clone())
-            .collect();
-        assert_eq!(
-            labels,
-            vec!["anthropic/claude-sonnet-5", "some/on-1"],
-            "the contiguous match leads, and the one with a gap follows"
-        );
-    }
-
-    /// A command that lists its own words is completed from them, in its own
-    /// order when the partial says nothing, ranked when it does.
-    #[test]
-    fn a_word_list_completes_from_the_command_s_own_words() {
-        let specs = vec![spec(
-            "think",
-            ArgSpec::Words {
-                alone: vec![],
-                values: ["low", "high", "off"].map(str::to_string).to_vec(),
-                then: None,
-            },
-        )];
-        assert_eq!(labels("/think ", &specs), vec!["low", "high", "off"]);
-        assert_eq!(labels("/think o", &specs), vec!["off", "low"]);
-        assert_eq!(
-            suggestions("/think hi", &specs, &Catalogues::new())[0].value,
-            "/think high"
-        );
-    }
-
-    /// A spec that says nothing about the word after its verb completes the
-    /// verb and stops there, exactly as it did before `then` existed.
-    #[test]
-    fn a_second_word_is_not_completed_from_the_first_word_s_list() {
-        let specs = vec![spec(
-            "mcp",
-            ArgSpec::Words {
-                alone: vec![],
-                values: vec!["login".into(), "logout".into()],
-                then: None,
-            },
-        )];
-        assert_eq!(labels("/mcp lo", &specs), vec!["login", "logout"]);
-        assert!(labels("/mcp login ", &specs).is_empty());
-        assert!(labels("/mcp login lo", &specs).is_empty());
-    }
-
-    /// The verb a command lists, and after it the names its `then` points at
-    /// (ADR-0008 §6a): `/plugins enable ` is the whole listing, and a partial
-    /// narrows it the way every other list in this surface is narrowed.
-    fn plugins() -> Vec<CommandSpec> {
-        vec![spec(
-            "plugins",
-            ArgSpec::Words {
-                alone: vec!["reload".into()],
-                values: vec!["enable".into(), "disable".into(), "reload".into()],
-                then: Some(Box::new(ArgSpec::Catalog {
-                    source: "plugins".into(),
-                })),
-            },
-        )]
-    }
-
-    #[test]
-    fn a_word_declared_alone_offers_no_following_argument() {
-        assert_eq!(
-            suggestions("/plugins rel", &plugins(), &installed())[0].value,
-            "/plugins reload"
-        );
-        assert!(suggestions("/plugins reload ", &plugins(), &installed()).is_empty());
-        assert_eq!(
-            suggestions("/plugins enable ", &plugins(), &installed())
-                .iter()
-                .map(|row| row.value.as_str())
-                .collect::<Vec<_>>(),
-            [
-                "/plugins enable bingo.tools.web",
-                "/plugins enable bingo.tasks",
-                "/plugins enable wordcount"
-            ]
-        );
-        let mut specs = plugins();
-        specs[0].name = "extensions".into();
-        specs[0].aliases = vec!["ext".into()];
-        for name in ["extensions", "ext"] {
-            assert!(suggestions(&format!("/{name} reload "), &specs, &installed()).is_empty());
-            assert_eq!(
-                suggestions(&format!("/{name} enable "), &specs, &installed()).len(),
-                3
-            );
-        }
-    }
-
-    fn installed() -> Catalogues {
-        Catalogues::from([(
-            "plugins".to_string(),
-            ["bingo.tools.web", "bingo.tasks", "wordcount"]
-                .map(str::to_string)
-                .to_vec(),
-        )])
-    }
-
-    #[test]
-    fn the_word_after_a_verb_comes_from_the_catalogue_the_verb_named() {
-        let rows = suggestions("/plugins enable bin", &plugins(), &installed());
-        assert_eq!(
-            rows.iter().map(|row| row.label.clone()).collect::<Vec<_>>(),
-            ["bingo.tools.web", "bingo.tasks"],
-            "the two the partial names, in the catalogue's own order"
-        );
-        assert_eq!(
-            rows[0].value, "/plugins enable bingo.tools.web",
-            "the row completes the whole line, verb and all"
-        );
-    }
-
-    /// The exit criterion the user asked for: a verb and a space offers every
-    /// plugin, built-in and external alike.
-    #[test]
-    fn a_verb_and_a_space_offers_every_name_the_catalogue_holds() {
-        assert_eq!(
-            suggestions("/plugins disable ", &plugins(), &installed())
-                .iter()
-                .map(|row| row.value.clone())
-                .collect::<Vec<_>>(),
-            [
-                "/plugins disable bingo.tools.web",
-                "/plugins disable bingo.tasks",
-                "/plugins disable wordcount",
-            ],
-            "the catalogue's own order, nothing typed to narrow it"
-        );
-    }
-
-    #[test]
-    fn a_half_typed_verb_is_still_a_verb_and_a_third_word_is_nobody_s() {
-        assert_eq!(labels_with("/plugins enabl", &plugins()), ["enable"]);
-        assert!(
-            suggestions("/plugins enable wordcount x", &plugins(), &installed()).is_empty(),
-            "a third word is past what any spec describes"
-        );
-        assert!(
-            suggestions("/plugins toggle bin", &plugins(), &installed()).is_empty(),
-            "a word the command does not list says nothing about what follows"
-        );
-    }
-
-    /// A `then` of words needs no catalogue at all: `/mcp` carries the
-    /// servers it was configured with inside its own spec.
-    #[test]
-    fn a_verb_may_name_its_own_words_for_the_word_after_it() {
-        let specs = vec![spec(
-            "mcp",
-            ArgSpec::Words {
-                alone: vec![],
-                values: vec!["reconnect".into()],
-                then: Some(Box::new(ArgSpec::Words {
-                    alone: vec![],
-                    values: vec!["files".into(), "remote".into()],
-                    then: None,
-                })),
-            },
-        )];
-        let rows = suggestions("/mcp reconnect fi", &specs, &Catalogues::new());
-        assert_eq!(
-            rows,
-            vec![Suggestion {
-                value: "/mcp reconnect files".into(),
-                label: "files".into(),
-                hint: String::new(),
-                group: Group::Commands,
-            }]
-        );
-    }
-
-    /// A `then` naming a catalogue nobody fetched offers nothing, as an
-    /// unfetched first word always has.
-    #[test]
-    fn a_catalogue_that_has_not_arrived_yet_offers_nothing() {
-        assert!(suggestions("/plugins enable ", &plugins(), &Catalogues::new()).is_empty());
-    }
-
-    /// An alias reaches the same list its command does.
-    #[test]
-    fn an_alias_completes_the_argument_its_command_does() {
-        let mut spec = spec(
-            "permission",
-            ArgSpec::Words {
-                alone: vec![],
-                values: vec!["plan".into()],
-                then: None,
-            },
-        );
-        spec.aliases = vec!["permissions".to_string()];
-        assert_eq!(labels("/permissions p", &[spec]), vec!["plan"]);
-    }
-
-    #[test]
-    fn a_free_argument_offers_nothing() {
-        let specs = vec![spec(
-            "compact",
-            ArgSpec::Free {
-                hint: "[why]".into(),
-            },
-        )];
-        assert!(suggestions("/compact any", &specs, &Catalogues::new()).is_empty());
-    }
-
-    #[test]
-    fn a_line_that_is_not_a_command_has_no_dropdown() {
-        assert!(suggestions("hello", &local_specs(), &Catalogues::new()).is_empty());
-        assert!(suggestions("!ls", &local_specs(), &Catalogues::new()).is_empty());
-    }
-
-    #[test]
-    fn catalogue_entries_that_are_not_specs_are_skipped() {
-        let catalog = Catalog {
-            kind: CatalogKind::Commands,
-            entries: vec![
-                CatalogEntry {
-                    id: "model".into(),
-                    label: "model".into(),
-                    meta: serde_json::to_value(spec("model", ArgSpec::None)).unwrap(),
-                },
-                CatalogEntry {
-                    id: "junk".into(),
-                    label: "junk".into(),
-                    meta: serde_json::Value::Null,
-                },
-            ],
-        };
-        let specs = specs_from(&catalog);
-        assert_eq!(specs.len(), 1);
-        assert_eq!(specs[0].name, "model");
+        assert_eq!(local("/help"), None);
+        assert_eq!(local("/resume"), None);
     }
 }

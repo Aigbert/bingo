@@ -24,6 +24,7 @@ mod look;
 mod notices;
 /// The opening: whether it plays, and when it started (M70, M72).
 mod opening;
+mod palette;
 #[path = "run/pulling.rs"]
 mod pulling;
 /// The pictures a frame drew, on their way to the terminal.
@@ -43,7 +44,7 @@ use bingo_pictures::Cache;
 use crate::graphics::{Stored, decoded, linked};
 use crate::terminal::{Notification, Screen};
 use crate::tree::{self, Tree};
-use crate::ui::{Open, Picker, Ui};
+use crate::ui::{Open, Ui};
 use crate::{SURFACE_ID, clipboard, commands, history, input, late, pictures, pointer, viewer};
 
 /// How often a frame is redrawn *while something is moving*: thirty a second
@@ -54,8 +55,7 @@ const TICK: Duration = clock::FRAME;
 /// A draw that costs this much is itself the latency a person feels, and is
 /// owned up to once per run (`slow_draw`).
 const SLOW_DRAW: Duration = Duration::from_millis(100);
-/// Sessions the `/resume` picker lists.
-const RECENT: usize = 20;
+
 /// The catalogues whose ids a command's argument may name, by the source name
 /// its `ArgSpec::Catalog` gives.
 const CATALOGUES: &[(&str, CatalogKind)] = &[
@@ -80,10 +80,10 @@ enum Reply {
     /// attachment's own stream is dropped: the tree's carries the child.
     Handle(SessionId, SessionHandle),
     SiteKeyOpened(Box<site_keys::Opened>),
-    Sessions(Vec<SessionSummary>),
+
     Resume(SessionId, Option<Box<SessionSummary>>),
     /// What the store holds, for the switcher's stored rows.
-    Stored(Vec<SessionSummary>),
+    Stored(String, Vec<SessionSummary>),
     Commands(Vec<CommandSpec>),
     /// One catalogue's ids, by the source name a command's argument gives.
     Catalogue(String, Vec<bingo_sdk::CatalogEntry>),
@@ -579,9 +579,6 @@ impl Run {
             self.session.handles.remove(id);
             self.ui.embers.forget(id);
         }
-        if let Some(Open::Switcher(open)) = self.ui.focus.open_mut() {
-            open.stored.retain(|stored| !removed.contains(&stored.id));
-        }
     }
 
     /// Only this client's intents have a line to restore on refusal.
@@ -610,7 +607,12 @@ impl Run {
     }
 
     fn applied(&mut self, result: &Value) {
-        self.fetch_catalogue("plugins", CatalogKind::Plugins);
+        if let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone()) {
+            palette::surface_action(self, action);
+        }
+        if result.get("handled").is_none() {
+            self.fetch_catalogs();
+        }
         if let Some(message) = result.get("message").and_then(Value::as_str) {
             self.ui
                 .notify(Level::Info, message.to_string(), Instant::now());
@@ -668,12 +670,15 @@ impl Run {
     fn terminal_event(&mut self, event: Term) {
         match event {
             Term::Key(key) => {
-                if matches!(
-                    crate::keys::commands::chord(key).as_deref(),
-                    Some("esc" | "ctrl+c")
-                ) {
+                let chord = crate::keys::commands::chord(key);
+                if chord.as_deref() == Some("ctrl+c")
+                    || (chord.as_deref() == Some("esc") && !crate::palette::active(&self.ui))
+                {
                     self.site_keys.clear();
                     self.site_queue.clear();
+                    if crate::palette::active(&self.ui) {
+                        crate::palette::close(&mut self.ui, self.detection.now());
+                    }
                 }
                 if site_keys::blocked(self) {
                     site_keys::queue(self, key);
@@ -732,8 +737,8 @@ impl Run {
             } => interactions::answer(self, interaction, answer, activation),
             Effect::View(session) => self.show(session),
             Effect::Open(selector) => self.open(selector),
-            Effect::ListSessions => opening::list_sessions(self),
-            Effect::ListStored => self.list_stored(),
+
+            Effect::ListStored => palette::list_stored(self),
             Effect::Copy(text) => self.clipboard = Some(text),
             Effect::PasteImage => self.paste_image(),
             Effect::OpenPicture(source) => showing::open(self, &source),
@@ -818,19 +823,6 @@ impl Run {
         });
     }
 
-    /// What the switcher lists besides the tree: everything the host knows of,
-    /// unfiltered — which of them hang under this root is the roster's own
-    /// question, and a child need not work where its root does. One read per
-    /// opening; nothing watches the store.
-    fn list_stored(&mut self) {
-        let host = self.host.clone();
-        self.spawn(async move {
-            host.sessions(SessionFilter::default())
-                .await
-                .map(Reply::Stored)
-        });
-    }
-
     /// The catalogues are read at start and again whenever the host says one
     /// of them was rebuilt: the dropdown follows, it does not poll.
     fn fetch_catalogs(&mut self) {
@@ -858,6 +850,10 @@ impl Run {
     /// A catalogue the host rebuilt — a provider's endpoint answered what it
     /// serves (ADR-0026 §4) — is read again, and only that one.
     fn catalog_changed(&mut self, kind: CatalogKind) {
+        if kind == CatalogKind::Commands {
+            self.fetch_catalogs();
+            return;
+        }
         let Some((source, _)) = CATALOGUES.iter().find(|(_, listed)| *listed == kind) else {
             return;
         };
@@ -902,19 +898,12 @@ impl Run {
             Reply::Handle(session, handle) => {
                 self.session.handles.insert(session, handle);
             }
-            Reply::Sessions(sessions) => self.ui.focus.show(
-                Open::Picker(Picker {
-                    sessions,
-                    selected: 0,
-                }),
-                Instant::now(),
-            ),
             Reply::Resume(session, previous) => {
                 if &session == self.session.tree.root_id() {
                     self.ui.welcome.resume = previous.map(|summary| *summary);
                 }
             }
-            Reply::Stored(sessions) => self.fill_switcher(sessions),
+            Reply::Stored(request, sessions) => palette::fill_palette(self, &request, sessions),
             Reply::Commands(specs) => {
                 self.ui.catalogs.commands = specs;
                 site_keys::notices(self);
@@ -923,10 +912,7 @@ impl Run {
                 if source == "plugins" {
                     self.ui.catalogs.plugins = ids;
                 } else {
-                    self.ui
-                        .catalogs
-                        .values
-                        .insert(source, ids.into_iter().map(|entry| entry.id).collect());
+                    self.ui.catalogs.values.insert(source, ids);
                 }
             }
             Reply::Mentioned(waiting) => self.mentioned(*waiting),
@@ -938,14 +924,6 @@ impl Run {
                 self.ui.opening = false;
                 self.ui.notify(Level::Error, error.message, Instant::now());
             }
-        }
-    }
-
-    /// The store's answer lands after the card is already up. It fills the
-    /// card while that is still what is open, and is dropped when it is not.
-    fn fill_switcher(&mut self, sessions: Vec<SessionSummary>) {
-        if let Some(Open::Switcher(open)) = self.ui.focus.open_mut() {
-            open.stored = sessions;
         }
     }
 
@@ -1232,117 +1210,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_line_typed_in_a_childs_view_is_submitted_on_the_childs_handle() {
-        let mut harness = Harness::new();
-        let (host, root, child) = TestHost::tree(vec![
-            child_frame(1, announced("reviewer")),
-            child_frame(2, started("trn_9")),
-        ]);
-        let script = vec![
-            ctrl('g'),
-            key(KeyCode::Down),
-            key(KeyCode::Enter),
-            typed('h'),
-            typed('i'),
-            key(KeyCode::Enter),
-            ctrl('d'),
-        ];
-        let ended = drive(
-            &host,
-            options(None, harness.home.path()),
-            &mut harness.recorder,
-            keys(script),
-        )
-        .await
-        .expect("the loop ran");
-        assert_eq!(ended.exit, Exit { code: 0 });
-        assert_eq!(
-            child.submitted(),
-            vec![Input::text("hi", bingo_sdk::Origin::surface("tui"))]
-        );
-        assert!(root.submitted().is_empty(), "the root was not written to");
-    }
-
-    /// M35: a provider's endpoint answered what it serves, the host says the
-    /// models catalogue was rebuilt, and the completions follow — on the same
-    /// spawned lane, so no keystroke waited for the kernel.
-    #[tokio::test]
-    async fn the_completions_follow_a_catalogue_the_host_rebuilt() {
-        let mut harness = Harness::new();
-        let (host, _) = TestHost::announcing(vec![bingo_sdk::GatewayEvent::CatalogChanged {
-            kind: CatalogKind::Models,
-        }]);
-        // ctrl+c empties the composer, so ctrl+d can end the run at all.
-        let typing = "/model fake".chars().map(typed);
-        let script: Vec<_> = typing.chain([ctrl('c'), ctrl('d')]).collect();
-        let ended = drive(
-            &host,
-            options(None, harness.home.path()),
-            &mut harness.recorder,
-            keys(script),
-        )
-        .await
-        .expect("the loop ran");
-        assert_eq!(ended.exit, Exit { code: 0 });
-        let offered = |id: &str| {
-            harness
-                .recorder
-                .frames
-                .iter()
-                .any(|frame| frame.contains(id))
-        };
-        assert!(offered("fake-1"), "{}", harness.recorder.last());
-        assert!(
-            offered("fake-2"),
-            "the model the refresh found is offered: {}",
-            harness.recorder.last()
-        );
-    }
-
-    /// M31 §2: opening the switcher spawns one `sessions` read on the loop's
-    /// own host-call lane — no key waits on it — and what comes back fills
-    /// the card that is already on the screen.
-    #[tokio::test]
-    async fn opening_the_switcher_reads_the_store_and_the_card_fills() {
-        let mut harness = Harness::new();
-        let (host, _) = TestHost::with_stored(vec![], vec![stored_summary("ses_7", "scout")]);
-        let ended = drive(
-            &host,
-            options(None, harness.home.path()),
-            &mut harness.recorder,
-            keys(vec![ctrl('g'), ctrl('d')]),
-        )
-        .await
-        .expect("the loop ran");
-        assert_eq!(ended.exit, Exit { code: 0 });
-        let screen = harness.recorder.last();
-        assert!(screen.contains("✦  scout"), "{screen}");
-        assert!(screen.contains("stored"), "{screen}");
-    }
-
-    /// A child and a room hang under a root and are reached through it —
-    /// the switcher — so the `/resume` picker never offers one, and the cut
-    /// to the card's size happens after they are gone.
-    #[test]
-    fn the_resume_picker_offers_roots_and_never_a_child_or_a_room() {
-        let mut sessions = vec![summary(), stored_summary("ses_7", "scout")];
-        sessions.extend((0..RECENT).map(|at| SessionSummary {
-            id: SessionId::from_raw(format!("ses_r{at}")),
-            ..summary()
-        }));
-        let offered = opening::recent_roots(sessions);
-        assert_eq!(offered.len(), RECENT, "the cut comes after the keep");
-        assert!(
-            offered.iter().all(|s| s.parent.is_none()),
-            "only the person's own sessions are offered"
-        );
-        assert!(
-            !offered.iter().any(|s| s.id == SessionId::from_raw("ses_7")),
-            "the child was never a candidate"
-        );
-    }
-
-    #[tokio::test]
     async fn a_child_that_is_deleted_leaves_the_tree_and_the_run_goes_on() {
         let mut harness = Harness::new();
         let frames = vec![
@@ -1444,52 +1311,6 @@ mod tests {
             assert!(run.session.handles.contains_key(run.session.tree.root_id()));
             assert!(run.exit.is_none());
         }
-    }
-
-    /// A resumed tree replays each child's journal, and a journal holds the
-    /// close of every process that ran it. That close is not the child
-    /// leaving: it stays in the tree, its stream goes on with the summary
-    /// that reopened it, and the person who steps into it finds everything
-    /// it said before the close still there.
-    #[tokio::test]
-    async fn a_child_closed_by_a_shutdown_keeps_what_it_said_for_its_reopening() {
-        let mut harness = Harness::new();
-        let (host, _, _) = TestHost::tree(vec![
-            child_frame(1, announced("reviewer")),
-            child_frame(
-                2,
-                Event::ItemCompleted {
-                    item: assistant("itm_2", "reviewed it", ItemStatus::Completed),
-                },
-            ),
-            child_frame(
-                3,
-                Event::SessionClosed {
-                    reason: CloseReason::Shutdown,
-                },
-            ),
-            child_frame(4, announced("reviewer")),
-        ]);
-        let script = vec![
-            ctrl('g'),
-            key(KeyCode::Down),
-            key(KeyCode::Enter),
-            ctrl('d'),
-        ];
-        let ended = drive(
-            &host,
-            options(None, harness.home.path()),
-            &mut harness.recorder,
-            keys(script),
-        )
-        .await
-        .expect("the loop ran");
-        assert_eq!(ended.exit, Exit { code: 0 });
-        let screen = harness.recorder.last();
-        assert!(
-            screen.contains("reviewed it"),
-            "the child's transcript survived its close: {screen}"
-        );
     }
 
     #[tokio::test(start_paused = true)]
@@ -2423,120 +2244,6 @@ mod tests {
         );
     }
 
-    /// M61 brick 3, in bytes: the tree switcher opened over a picture and
-    /// closed again writes **no graphics at all**.
-    ///
-    /// The list is drawn over the transcript, so the placeholder cells under
-    /// it are written over and written back — but the terminal is holding the
-    /// picture the whole time (`6dffe3a8`) and nothing on this path asks it to
-    /// hold it again. Whatever a person sees when the list goes, it is not
-    /// bytes this surface sent.
-    #[tokio::test]
-    async fn the_switcher_opened_over_a_picture_writes_no_graphics() {
-        let read = tool(
-            "itm_1",
-            "Read",
-            serde_json::json!({ "file_path": "shot.png" }),
-            Some(bingo_sdk::ToolOutput {
-                parts: vec![bingo_sdk::ContentPart::Image(bingo_pictures::testing::png(
-                    100, 200,
-                ))],
-                display: None,
-                is_error: false,
-            }),
-            ItemStatus::Completed,
-        );
-        let (mut run, mut waiting) =
-            replying(folded(vec![frame(1, Event::ItemCompleted { item: read })]));
-        // A store with rows in it, so the list that comes down is a list.
-        let stored: Vec<SessionSummary> = (0..4)
-            .map(|at| stored_summary(&format!("ses_{at}"), &format!("scout {at}")))
-            .collect();
-        run.host = TestHost::with_stored(vec![], stored).0;
-        let mut recorder = Recorder::default();
-        // Still, so the list is whole on the frame it opens on rather than a
-        // quarter of the way down it.
-        let now = crate::test_support::still(crate::test_support::scene().1);
-        let drawing = crate::graphics::drawing();
-        crate::graphics::with(drawing, || {
-            run.detection = crate::render::Render {
-                motion: now.motion,
-                ..crate::render::current()
-            }
-            .into();
-            run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
-        });
-        settle(&mut run, &mut waiting).await;
-        crate::graphics::with(drawing, || {
-            run.detection = crate::render::Render {
-                motion: now.motion,
-                ..crate::render::current()
-            }
-            .into();
-            run.paint(&mut recorder, Wake::Frame, now)
-                .expect("the picture");
-        });
-        assert_eq!(recorder.places.len(), 1, "the terminal has the picture");
-        let cells = placeholders(recorder.last());
-        assert!(cells > 0, "and its cells are drawn:\n{}", recorder.last());
-
-        // ctrl+g: the list comes down over the transcript, and what the store
-        // holds fills it.
-        run.terminal_event(Term::Key(ctrl('g')));
-        settle(&mut run, &mut waiting).await;
-        crate::graphics::with(drawing, || {
-            run.detection = crate::render::Render {
-                motion: now.motion,
-                ..crate::render::current()
-            }
-            .into();
-            run.paint(&mut recorder, Wake::Frame, now)
-                .expect("the list");
-        });
-        assert!(run.ui.focus.showing(), "the switcher is open");
-        assert!(
-            placeholders(recorder.last()) < cells,
-            "and it covers cells the picture had:\n{}",
-            recorder.last()
-        );
-        assert_eq!(
-            recorder.places.len(),
-            1,
-            "nothing went out for it: {:?}",
-            places(&recorder)
-        );
-
-        // esc: the list goes, and the cells under it are written back.
-        run.terminal_event(Term::Key(key(KeyCode::Esc)));
-        crate::graphics::with(drawing, || {
-            run.detection = crate::render::Render {
-                motion: now.motion,
-                ..crate::render::current()
-            }
-            .into();
-            run.paint(&mut recorder, Wake::Frame, now)
-                .expect("back again");
-        });
-        assert!(!run.ui.focus.showing());
-        assert_eq!(
-            placeholders(recorder.last()),
-            cells,
-            "every cell is back:\n{}",
-            recorder.last()
-        );
-        assert_eq!(
-            recorder.places.len(),
-            1,
-            "and still nothing went out: {:?}",
-            places(&recorder)
-        );
-    }
-
-    /// How many of a screen's cells are a picture's placeholders.
-    fn placeholders(screen: &str) -> usize {
-        screen.matches(crate::graphics::kitty::PLACEHOLDER).count()
-    }
-
     /// A picture an answer's own words named, through the whole seam (M51):
     /// the first frame draws the chip and sends the loop after the file, the
     /// read comes back, the frame after it measures the picture and owes the
@@ -2720,7 +2427,9 @@ mod tests {
     fn a_frame_is_owed_while_the_one_on_the_screen_is_still_arriving() {
         let (_, opened) = scene();
         let mut run = idle(opened.instant);
-        run.ui.focus.show(Open::Help, opened.instant);
+        run.ui
+            .focus
+            .show(Open::Rewind(Default::default()), opened.instant);
         let after = later(opened, 200);
         run.ui.shown = crate::layout::layout(
             crate::layout::Layout::default(),
@@ -2917,3 +2626,6 @@ mod builtins_tests;
 
 #[cfg(test)]
 mod action_tests;
+
+#[cfg(test)]
+mod palette_tests;

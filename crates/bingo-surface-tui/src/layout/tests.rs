@@ -218,7 +218,8 @@ fn layout_running_turn_schedules_each_motion_sample() {
 fn layout_layer_send_and_drag_report_their_own_deadlines() {
     let (mut ui, now) = scene();
     let tree = solo(&state());
-    ui.focus.show(crate::ui::Open::Help, now.instant);
+    ui.focus
+        .show(crate::ui::Open::Rewind(Default::default()), now.instant);
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
     assert_eq!(first.next_frame, Some(now.instant + crate::clock::FRAME));
     let arrived = later(now, 200);

@@ -7,7 +7,7 @@
 
 use std::time::{Duration, Instant};
 
-use bingo_sdk::{CommandSpec, Level, SessionId, SessionSummary, View};
+use bingo_sdk::{CommandSpec, Level, View};
 
 use crate::clock::{Anim, FRAME, Now};
 use crate::commands::{self, Suggestion};
@@ -18,10 +18,8 @@ use crate::layers::{self, Reveal};
 use crate::layout::Layout;
 use crate::pager::Pager;
 use crate::rewind::Rewind;
-use crate::roster;
 use crate::scroll::Scroll;
 use crate::select::{self, Cell, Dragging, Edge};
-use crate::tree::{self, Row, Tree};
 
 mod controls;
 
@@ -116,31 +114,6 @@ pub struct Menu {
     pub dismissed: bool,
 }
 
-/// The `/resume` picker, filled by the host and answered by Enter.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Picker {
-    pub sessions: Vec<SessionSummary>,
-    pub selected: usize,
-}
-
-/// The list of sessions as it was drawn: where its rows are, and which row of
-/// the list each drawn line is — what a click on it needs to know. A memo of
-/// the draw, like [`Card`].
-#[derive(Clone, Debug, Default)]
-pub struct Listed {
-    pub area: ratatui::layout::Rect,
-    pub roster: roster::Roster,
-}
-
-impl Listed {
-    /// The row a pointer is over: which line of the list it landed on, and the
-    /// cursor that line answers to. A label and a `…` mark answer nobody.
-    pub fn at(&self, row: u16) -> Option<roster::Cursor> {
-        let line = row.checked_sub(self.area.y)?;
-        self.roster.rows.get(usize::from(line)).copied().flatten()
-    }
-}
-
 /// A card as it was drawn: where its box is, and which option each of its
 /// rows belongs to — what a click on it needs to know.
 #[derive(Clone, Debug, Default)]
@@ -157,77 +130,16 @@ pub struct Card {
 pub struct Catalogs {
     pub plugins: Vec<bingo_sdk::CatalogEntry>,
     pub commands: Vec<CommandSpec>,
-    pub values: commands::Catalogues,
+    pub values: std::collections::BTreeMap<String, Vec<bingo_sdk::CatalogEntry>>,
 }
 
 impl Catalogs {
-    fn values(&self) -> commands::Catalogues {
-        let mut values = self.values.clone();
-        values.insert(
-            "plugins".into(),
-            self.plugins
-                .iter()
-                .map(|entry| {
-                    entry
-                        .id
-                        .strip_prefix("plugins:")
-                        .unwrap_or(&entry.id)
-                        .to_string()
-                })
-                .collect(),
-        );
-        values
-    }
-}
-
-/// The one list of sessions, opened by `↓` on an empty composer or by
-/// `ctrl+g`. Its rows are derived at render time; what is the surface's own is
-/// where the cursor is, the line the box was holding when it opened, the one
-/// listing the host answered with, and where the gesture started — nothing
-/// here watches the store.
-///
-/// The query is **not** here (M58): what narrows the list is what is in the
-/// input box, as it is under the `/` and `@` dropdowns.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Switcher {
-    pub cursor: roster::Cursor,
-    /// The line a person was writing when the list went up, set aside while
-    /// the box is the query line and put back exactly as it was when the list
-    /// goes. A fact about the gesture, not a second composer.
-    pub draft: String,
-    /// Empty until the read the opening spawned lands.
-    pub stored: Vec<SessionSummary>,
-    /// The session the list was opened from: what `esc` gives back after a
-    /// walk has switched the view. A fact about the gesture, like
-    /// [`Ui::esc_armed`] — not a second copy of what the tree is showing.
-    pub from: Option<SessionId>,
-}
-
-impl Switcher {
-    /// The session a row of this list names. The list is composed here from
-    /// the tree, the store's answer and the query the box holds, so a click
-    /// and a keypress cannot be reading two different lists.
-    pub fn session(&self, tree: &Tree, query: &str, cursor: roster::Cursor) -> Option<SessionId> {
-        self.of(tree, query, cursor, |row| row.session.clone())
-    }
-
-    /// What that row is called — a session's name, a room's `#name`: what
-    /// `tab` completes into the box.
-    pub fn name(&self, tree: &Tree, query: &str, cursor: roster::Cursor) -> Option<String> {
-        self.of(tree, query, cursor, |row| row.name.clone())
-    }
-
-    /// One walk of the list, and whatever the caller wants off the row it
-    /// lands on.
-    fn of<T>(
+    pub(crate) fn values(
         &self,
-        tree: &Tree,
-        query: &str,
-        cursor: roster::Cursor,
-        want: impl Fn(&Row<'_>) -> T,
-    ) -> Option<T> {
-        let rows = tree::roster(tree, &self.stored);
-        cursor.row(&roster::listing(tree, &rows, query)).map(want)
+    ) -> std::collections::BTreeMap<String, Vec<bingo_sdk::CatalogEntry>> {
+        let mut values = self.values.clone();
+        values.insert("plugins".into(), self.plugins.clone());
+        values
     }
 }
 
@@ -237,32 +149,24 @@ impl Switcher {
 pub enum Open {
     #[default]
     Nothing,
-    /// The binding table and the commands, as a sheet.
-    Help,
-    /// The `/resume` list, as a sheet.
-    Picker(Picker),
+    Palette(crate::palette::Opened),
     /// One block, whole, as a sheet.
     Pager(Pager),
     /// The turns of this transcript, as a card above the input box.
     Rewind(Rewind),
-    /// The tree, as a card above the input box.
-    Switcher(Switcher),
 }
 
 impl Open {
     /// Whether the keyboard belongs to it while it is open. The lists and the
     /// panel answer keys; help is read while a person goes on typing.
     pub fn captures(&self) -> bool {
-        matches!(
-            self,
-            Open::Picker(_) | Open::Pager(_) | Open::Switcher(_) | Open::Rewind(_)
-        )
+        matches!(self, Open::Palette(_) | Open::Pager(_) | Open::Rewind(_))
     }
 
     /// How many frames its arrival takes: a card comes down, a sheet rises.
     fn frames(&self) -> u16 {
         match self {
-            Open::Switcher(_) | Open::Rewind(_) => layers::CARD_FRAMES,
+            Open::Palette(_) | Open::Rewind(_) => layers::CARD_FRAMES,
             _ => layers::SHEET_FRAMES,
         }
     }
@@ -532,13 +436,13 @@ impl Ui {
     /// handed in rather than read here: what is the surface's own is the caret
     /// and the memo of the walk, and neither of those is the tree.
     pub fn suggestions(&self, cwd: &str, mentions: &[String]) -> Vec<Suggestion> {
-        if self.menu.dismissed || self.listing() {
+        if self.menu.dismissed || crate::palette::active(self) {
             return Vec::new();
         }
         let line = self.composer.text();
         match complete::mention(line) {
             Some(partial) => self.mentioned(cwd, partial, line, mentions),
-            None => commands::suggestions(line, &self.commands(), &self.catalogs.values()),
+            None => commands::suggestions(line, &self.commands()),
         }
     }
 
@@ -571,13 +475,6 @@ impl Ui {
         let rows = self.suggestions(cwd, mentions);
         rows.get(self.menu.selected.min(rows.len().saturating_sub(1)))
             .cloned()
-    }
-
-    /// Whether the input box is the list's query line rather than a message
-    /// being written (M58). What is typed there names a session, so no `/` or
-    /// `@` dropdown answers it and none is drawn over it.
-    pub fn listing(&self) -> bool {
-        self.focus.captures() && matches!(*self.focus.open(), Open::Switcher(_))
     }
 
     /// The composer changed: the dropdown reopens and the history walk ends.
@@ -769,7 +666,7 @@ mod tests {
     #[test]
     fn dismissing_the_dropdown_hides_it_until_the_next_edit() {
         let mut ui = ui();
-        ui.composer.insert("/he");
+        ui.composer.insert("/cle");
         assert!(!ui.suggestions("/tmp/project", &[]).is_empty());
         ui.menu.dismissed = true;
         assert!(ui.suggestions("/tmp/project", &[]).is_empty());

@@ -7,7 +7,7 @@
 //! `compose` fills an owned layout without borrowing a terminal frame.
 
 use crate::layout::Layout;
-use bingo_sdk::{Driver, SessionState, SessionSummary};
+use bingo_sdk::{Driver, SessionState};
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Padding, Paragraph};
@@ -18,10 +18,10 @@ use crate::commands::{Group, Suggestion};
 use crate::composer::strip;
 use crate::frame::{self, Demand, Regions};
 use crate::tree::{self, Tree};
-use crate::ui::{Card, Listed, Open, Picker, Switcher, Ui};
+use crate::ui::{Card, Open, Ui};
 use crate::{
     activity, composer as prompt, dialog, foot, graphics, keys, layers, mentions, pager, rewind,
-    roster, search, select, status, theme, transcript, views, window, wrap,
+    search, select, status, theme, transcript, views, window, wrap,
 };
 
 /// How tall the composer box may grow before it scrolls internally.
@@ -220,23 +220,26 @@ fn layer(
     frame: &mut Layout,
     above: Rect,
     reveal: layers::Reveal,
-    width: usize,
-    now: Now,
+    _width: usize,
+    _now: Now,
 ) {
     // Every list a cursor walks is drawn in the room the layer has, and no
     // more of it than that: what is off the window's ends says so (§3).
     let rows = usize::from(above.height);
     match ui.focus.open() {
         Open::Nothing => {}
-        // A dropdown above the input box, like the `/` menu: nothing dims.
-        Open::Switcher(switcher) => {
-            let lines = switcher_lines(tree, ui, switcher, now, above, frame);
-            over(frame, above, lines)
+        Open::Palette(_) => {
+            let lines = crate::palette::draw(
+                ui,
+                tree.viewed(),
+                frame,
+                above.width,
+                (frame.canvas.area().height / 2).min(above.height),
+            );
+            over(frame, above, lines);
         }
-        Open::Help => sheet(frame, above, help(width, ui, tree.viewed()), reveal),
-        Open::Picker(picker) => sheet(frame, above, picker_lines(picker, now, rows), reveal),
         Open::Pager(open) => paged(tree, frame, above, open, reveal),
-        // A dropdown above the input box, like the switcher's.
+        // Rewind shares the space above the input box.
         Open::Rewind(card) => over(
             frame,
             above,
@@ -619,112 +622,6 @@ fn lined(area: Rect, padding: usize) -> Rect {
     }
 }
 
-/// The binding table answers keys; the command menu answers commands.
-fn help(width: usize, ui: &Ui, state: &SessionState) -> Vec<Line<'static>> {
-    let mut out = keys::help_lines(width);
-    for (key, command) in keys::commands::bindings(ui, state).commands {
-        out.extend(crate::wrap::wrap(
-            &Line::from(format!("{key}  {command}")),
-            width,
-        ));
-    }
-    out.push(Line::default());
-    out.push(Line::from(Span::styled(
-        "/ for commands · ! for a shell line",
-        theme::dim(),
-    )));
-    out
-}
-
-/// The one list of sessions, in the room the dropdown has for it. Where each
-/// of its rows landed is kept for the pointer, the way a card's options are.
-fn switcher_lines(
-    tree: &Tree,
-    ui: &Ui,
-    switcher: &Switcher,
-    now: Now,
-    above: Rect,
-    frame: &mut Layout,
-) -> Vec<Line<'static>> {
-    let rows = tree::roster(tree, &switcher.stored);
-    let drawn = roster::lines(
-        tree,
-        &rows,
-        switcher.cursor,
-        // The box is the list's query line (M58).
-        ui.composer.text(),
-        usize::from(above.width),
-        usize::from(above.height),
-        now,
-    );
-    let height = u16::try_from(drawn.lines.len()).unwrap_or(u16::MAX);
-    frame.list = Some(Listed {
-        area: Rect {
-            y: above.bottom().saturating_sub(height),
-            height,
-            ..above
-        },
-        roster: drawn.clone(),
-    });
-    drawn.lines
-}
-
-/// The `Resume` sheet: its title, and the sessions under it in the rows left.
-fn picker_lines(picker: &Picker, now: Now, rows: usize) -> Vec<Line<'static>> {
-    let mut out = vec![Line::from(Span::styled(
-        "Resume".to_string(),
-        theme::bold(),
-    ))];
-    let sessions = picker
-        .sessions
-        .iter()
-        .enumerate()
-        .map(|(index, session)| picker_line(session, index, index == picker.selected, now))
-        .collect();
-    out.extend(window::around(
-        sessions,
-        picker.selected,
-        rows.saturating_sub(out.len()),
-    ));
-    out
-}
-
-/// One session as the picker draws it: the number `1-9` answers with, and what
-/// the row says it is.
-fn picker_line(session: &SessionSummary, index: usize, selected: bool, now: Now) -> Line<'static> {
-    let style = if selected {
-        theme::text()
-    } else {
-        theme::dim()
-    };
-    Line::from(vec![
-        theme::cursor_span(selected),
-        Span::styled(
-            format!("{}. {}", index + 1, picker_row(session, now)),
-            style,
-        ),
-    ])
-}
-
-/// What a row says a session is: what it was about, how much was said in it,
-/// and how long ago. The id is what `/resume <id>` takes for hands and is not
-/// what a person recognises a conversation by, so it is not here. A summary
-/// written before the count says nothing rather than a `0` it does not mean.
-fn picker_row(session: &SessionSummary, now: Now) -> String {
-    let mut said = vec![
-        session
-            .title
-            .clone()
-            .unwrap_or_else(|| "untitled".to_string()),
-    ];
-    if let Some(messages) = session.messages {
-        let plural = if messages == 1 { "" } else { "s" };
-        said.push(format!("{messages} msg{plural}"));
-    }
-    said.push(clock::ago(now.past(session.updated_at)));
-    said.join(" · ")
-}
-
 /// The prompt box: the caret lives here and nowhere else. Its border is the
 /// one box the frame draws itself; what is inside it is [`crate::composer`]'s.
 fn render_composer(
@@ -926,10 +823,9 @@ fn suggestion_line(row: &Suggestion, column: usize, focused: bool) -> Line<'stat
 mod tests {
     use super::*;
     use crate::test_support::*;
-    use crate::ui::Picker;
     use bingo_sdk::{
         ContentPart, ContextUsage, Event, InterruptReason, ItemBody, ItemStatus, KernelError,
-        Level, Preview, QueueEntry, SessionSummary, ToolOutput, TurnId, TurnStatus, View,
+        Level, Preview, QueueEntry, ToolOutput, TurnId, TurnStatus, View,
     };
     use crossterm::event::KeyCode;
     use serde_json::json;
@@ -1254,14 +1150,6 @@ mod tests {
     }
 
     #[test]
-    fn help_panel() {
-        let state = state();
-        let (mut ui, now) = scene();
-        shown(&mut ui, Open::Help, now);
-        insta::assert_snapshot!(draw_sized(100, 28, &state, &mut ui, now));
-    }
-
-    #[test]
     fn dropdown() {
         let state = state();
         let (mut ui, now) = scene();
@@ -1278,40 +1166,6 @@ mod tests {
             family: "kernel".into(),
         }];
         write(&mut ui, &state, "/", now);
-        insta::assert_snapshot!(render(&state, &mut ui, now));
-    }
-
-    /// ADR-0008 §6a: the word after a verb is drawn like every other value,
-    /// so `/plugins disable ` shows the plugins rather than an empty menu.
-    #[test]
-    fn the_word_after_a_verb_is_drawn_under_the_verb() {
-        let state = state();
-        let (mut ui, now) = scene();
-        ui.catalogs.commands = vec![bingo_sdk::CommandSpec {
-            keys: vec![],
-            hidden: false,
-            name: "plugins".into(),
-            aliases: vec!["modules".into()],
-            hint: "[enable|disable <name>]".into(),
-            args: bingo_sdk::ArgSpec::Words {
-                alone: vec![],
-                values: vec!["enable".into(), "disable".into()],
-                then: Some(Box::new(bingo_sdk::ArgSpec::Catalog {
-                    source: "plugins".into(),
-                })),
-            },
-            instant: true,
-            family: "kernel".into(),
-        }];
-        ui.catalogs.plugins = ["bingo.tools.web", "bingo.tasks", "wordcount"]
-            .into_iter()
-            .map(|id| bingo_sdk::CatalogEntry {
-                id: id.into(),
-                label: id.into(),
-                meta: serde_json::json!({"state":{"kind":"on"}}),
-            })
-            .collect();
-        write(&mut ui, &state, "/plugins disable ", now);
         insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
@@ -1560,83 +1414,6 @@ mod tests {
         insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
-    /// A row says what a session is — its first ask, how much was said, how
-    /// long ago — and never its id. The three counts are the three states:
-    /// many, one, and a summary written before the count existed, which shows
-    /// nothing rather than a `0` it does not mean.
-    #[test]
-    fn the_session_picker_lists_what_can_be_resumed() {
-        let state = state();
-        let (mut ui, now) = scene();
-        let stale = |hours: i64| now.wall - jiff::SignedDuration::from_hours(hours);
-        shown(
-            &mut ui,
-            Open::Picker(Picker {
-                sessions: vec![
-                    SessionSummary {
-                        title: Some("fix the parser".into()),
-                        messages: Some(12),
-                        updated_at: stale(2),
-                        ..summary()
-                    },
-                    SessionSummary {
-                        id: bingo_sdk::SessionId::from_raw("ses_2"),
-                        title: Some("请帮我把这个解析器修好".into()),
-                        messages: Some(1),
-                        updated_at: stale(30),
-                        ..summary()
-                    },
-                    SessionSummary {
-                        id: bingo_sdk::SessionId::from_raw("ses_3"),
-                        title: None,
-                        messages: None,
-                        updated_at: stale(24 * 5),
-                        ..summary()
-                    },
-                ],
-                selected: 0,
-            }),
-            now,
-        );
-        insta::assert_snapshot!(render(&state, &mut ui, now));
-    }
-
-    /// A name as long as the mint allows is twice as wide as it is long when
-    /// it is CJK, and wider than the card. The sheet clips rather than wraps,
-    /// so the row under it is still the row under it.
-    #[test]
-    fn a_row_wider_than_the_card_is_cut_and_pushes_nothing_down() {
-        let state = state();
-        let (mut ui, now) = scene();
-        shown(
-            &mut ui,
-            Open::Picker(Picker {
-                sessions: vec![
-                    SessionSummary {
-                        title: Some("解".repeat(48)),
-                        messages: Some(9),
-                        ..summary()
-                    },
-                    SessionSummary {
-                        id: bingo_sdk::SessionId::from_raw("ses_2"),
-                        title: Some("the row under it".into()),
-                        messages: Some(1),
-                        ..summary()
-                    },
-                ],
-                selected: 0,
-            }),
-            now,
-        );
-        let screen = render(&state, &mut ui, now);
-        let rows: Vec<&str> = screen.lines().collect();
-        assert!(rows[1].contains("❯ 1. 解解解"), "{screen}");
-        assert!(
-            rows[2].contains("2. the row under it"),
-            "the second row stayed second: {screen}"
-        );
-    }
-
     // ---- the tree -------------------------------------------------------
 
     /// A transcript whose tool call spawned `reviewer`, and the child's own
@@ -1710,79 +1487,6 @@ mod tests {
         insta::assert_snapshot!(screen);
     }
 
-    /// The cursor on a row of the list, by its number.
-    fn on(at: usize) -> crate::roster::Cursor {
-        crate::roster::Cursor { at }
-    }
-
-    #[test]
-    fn the_switcher_lists_the_root_and_its_agents() {
-        let tree = spawned(vec![child_frame(2, opened(child_permission()))]);
-        let (mut ui, now) = scene();
-        shown(
-            &mut ui,
-            Open::Switcher(Switcher {
-                cursor: on(1),
-                ..Default::default()
-            }),
-            now,
-        );
-        insta::assert_snapshot!(render_tree(&tree, &mut ui, now));
-    }
-
-    /// M31: the two states of one row. A session the store knows and this
-    /// process does not is listed and marked; when the head frames of the
-    /// session it named arrive, the same row is the reducer's and says what
-    /// it is doing — nothing was moved and nothing was stored twice.
-    #[test]
-    fn a_stored_row_turns_live_in_place_when_its_frames_arrive() {
-        let scout = stored_summary("ses_7", "scout");
-        let (mut ui, now) = scene();
-        shown(
-            &mut ui,
-            Open::Switcher(Switcher {
-                cursor: on(2),
-                stored: vec![scout.clone()],
-                ..Default::default()
-            }),
-            now,
-        );
-        let mut tree = spawned(vec![child_frame(2, started("trn_9"))]);
-        let asleep = render_tree(&tree, &mut ui, now);
-        assert!(asleep.contains("✦  scout"), "{asleep}");
-        assert!(asleep.contains("stored"), "{asleep}");
-        insta::assert_snapshot!("switcher_row_stored", asleep);
-
-        tree.fold.apply(&woken(1, scout));
-        let awake = render_tree(&tree, &mut ui, now);
-        assert!(!awake.contains("stored"), "{awake}");
-        assert!(awake.contains("✦  scout"), "{awake}");
-        insta::assert_snapshot!("switcher_row_live", awake);
-    }
-
-    /// The list is a layer, not a row: it covers the tail of the transcript
-    /// like every dropdown, and the input box and the status line under it do
-    /// not move (§3, layers not reflows).
-    #[test]
-    fn the_list_covers_the_transcript_and_moves_nothing_under_it() {
-        let tree = spawned(vec![child_frame(2, started("trn_9"))]);
-        let (mut ui, now) = scene();
-        let before = render_tree(&tree, &mut ui, now);
-        shown(&mut ui, Open::Switcher(Switcher::default()), now);
-        let with_list = render_tree(&tree, &mut ui, now);
-
-        let rows = |screen: &str| screen.lines().map(str::to_string).collect::<Vec<_>>();
-        let (was, is) = (rows(&before), rows(&with_list));
-        assert_eq!(was.len(), is.len(), "the frame keeps its rows");
-        assert_eq!(
-            was[was.len() - 4..],
-            is[is.len() - 4..],
-            "the box and the one line of furniture stay where they were"
-        );
-        assert!(is.iter().any(|row| row.contains("❯ ◆  project")));
-        insta::assert_snapshot!(with_list);
-    }
-
     // ---- a session nothing answers --------------------------------------
 
     /// A room under the root, with the room in view: what a member of it sees.
@@ -1850,29 +1554,6 @@ mod tests {
         insta::assert_snapshot!(screen);
     }
 
-    /// A room answers nothing, so it is not among the sessions that do: it
-    /// sits after them, under a label of its own.
-    #[test]
-    fn a_room_sits_under_its_own_label() {
-        let mut tree = room(vec![child_frame(1, announced("reviewer"))]);
-        let root = tree.root_id().clone();
-        tree.show(&root);
-        let (mut ui, now) = scene();
-        shown(
-            &mut ui,
-            Open::Switcher(Switcher {
-                cursor: on(1),
-                ..Default::default()
-            }),
-            now,
-        );
-        let screen = render_tree(&tree, &mut ui, now);
-        assert!(screen.contains("Agents"), "{screen}");
-        assert!(screen.contains("Rooms"), "{screen}");
-        assert!(screen.contains("#design"), "{screen}");
-        insta::assert_snapshot!(screen);
-    }
-
     // ---- the plugin-state panel -----------------------------------------
 
     fn tasks() -> Event {
@@ -1936,23 +1617,6 @@ mod tests {
         assert!(screen.contains("⎿  id  task"), "{screen}");
         assert!(!screen.contains("2 open"), "the model's text is not drawn");
         insta::assert_snapshot!(screen);
-    }
-
-    #[test]
-    fn the_composer_survives_a_screen_too_small_for_the_chrome() {
-        let state = folded(vec![frame(
-            1,
-            opened(permission(Some("E(s/)"), Some(long_diff()))),
-        )]);
-        let (mut ui, now) = scene();
-        shown(&mut ui, Open::Help, now);
-        ui.dialog.focus_on(state.interactions.first());
-        let screen = draw_sized(60, 12, &state, &mut ui, now);
-        let rows: Vec<&str> = screen.lines().collect();
-        assert!(rows[rows.len() - 4].contains('\u{256d}'), "{screen}");
-        assert!(rows[rows.len() - 3].contains("│ > "), "{screen}");
-        assert!(rows[rows.len() - 2].contains('\u{256f}'), "{screen}");
-        assert!(rows[rows.len() - 1].contains("? for shortcuts"), "{screen}");
     }
 
     #[test]

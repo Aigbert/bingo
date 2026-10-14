@@ -132,16 +132,6 @@ impl TestHost {
         (host, session)
     }
 
-    /// A host with sessions in its store that no attachment carries.
-    pub fn with_stored(
-        frames: Vec<bingo_sdk::Frame>,
-        stored: Vec<SessionSummary>,
-    ) -> (HostHandle, Arc<TestSession>) {
-        let session = scripted(frames, std::time::Duration::ZERO);
-        let host = Self::over(Arc::clone(&session), stored, Vec::new());
-        (Arc::new(host).scripted().handle(), session)
-    }
-
     /// A host whose frames arrive `pace` apart: what a storm of deltas looks
     /// like from the loop's side.
     pub fn paced(
@@ -150,14 +140,6 @@ impl TestHost {
     ) -> (HostHandle, Arc<TestSession>) {
         let session = scripted(frames, pace);
         let host = Self::over(Arc::clone(&session), Vec::new(), Vec::new());
-        (Arc::new(host).scripted().handle(), session)
-    }
-
-    /// A host that says something happened to the whole process while the
-    /// loop is running — a catalogue rebuilt, a session created elsewhere.
-    pub fn announcing(announcements: Vec<GatewayEvent>) -> (HostHandle, Arc<TestSession>) {
-        let session = scripted(Vec::new(), std::time::Duration::ZERO);
-        let host = Self::over(Arc::clone(&session), Vec::new(), announcements);
         (Arc::new(host).scripted().handle(), session)
     }
 

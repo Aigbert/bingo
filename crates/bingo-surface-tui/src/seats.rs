@@ -25,6 +25,7 @@ pub struct Seat {
 /// What a room's own row says: how many seats it has, and how many of them
 /// owe an answer. A member with two debts is one debtor, as `/room` says it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg(test)]
 pub struct Counts {
     pub seats: usize,
     pub owed: usize,
@@ -45,6 +46,7 @@ pub fn seat(tree: &Tree, state: &SessionState) -> Option<Seat> {
 }
 
 /// What a room's row says about itself.
+#[cfg(test)]
 pub fn counts(tree: &Tree, room: &SessionState) -> Counts {
     let title = tree::name(room);
     let mut debtors: Vec<String> = Vec::new();

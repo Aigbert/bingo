@@ -1,10 +1,6 @@
 //! The one binding table. The `?` panel and the footer hint both read it, so a
 //! key can never be documented in one place and bound in another.
 
-use ratatui::text::{Line, Span};
-use unicode_width::UnicodeWidthStr;
-
-use crate::theme;
 pub mod commands;
 
 pub struct Binding {
@@ -16,6 +12,11 @@ pub struct Binding {
 
 /// In the order the panel lists them.
 pub const BINDINGS: &[Binding] = &[
+    Binding {
+        keys: "/",
+        group: "sessions",
+        description: "commands in the palette",
+    },
     Binding {
         keys: "enter",
         group: "write",
@@ -56,7 +57,7 @@ pub const BINDINGS: &[Binding] = &[
     Binding {
         keys: "down",
         group: "sessions",
-        description: "sessions (empty input)",
+        description: "next history entry",
     },
     Binding {
         keys: "ctrl+a/e",
@@ -89,9 +90,9 @@ pub const BINDINGS: &[Binding] = &[
         description: "select; arrows/drag extend; y/ctrl+c/release copy",
     },
     Binding {
-        keys: "ctrl+g",
+        keys: "ctrl+r",
         group: "sessions",
-        description: "sessions · ↑↓ to walk",
+        description: "sessions in the palette",
     },
     Binding {
         keys: "ctrl+t",
@@ -146,7 +147,7 @@ pub const BINDINGS: &[Binding] = &[
     Binding {
         keys: "?",
         group: "sessions",
-        description: "toggle this panel",
+        description: "keys in the palette",
     },
 ];
 
@@ -293,111 +294,8 @@ pub fn interrupt(at: Pressed) -> Interrupt {
     }
 }
 
-/// From this width the table pairs its rows; below it one column reads better
-/// than two cut-off ones.
-pub const TWO_COLUMNS: usize = 80;
-/// Cells between the two columns.
-const GUTTER: usize = 2;
-
-/// Pair groups on a wide screen; wrap words instead of clipping bindings.
-pub fn help_lines(width: usize) -> Vec<Line<'static>> {
-    if width < TWO_COLUMNS {
-        return group_lines(&["write", "move", "turn", "sessions"], width);
-    }
-    let cell_width = width.saturating_sub(GUTTER) / 2;
-    let left = group_lines(&["write", "move"], cell_width);
-    let right = group_lines(&["turn", "sessions"], cell_width);
-    (0..left.len().max(right.len()))
-        .map(|row| {
-            let first = left.get(row).map(ToString::to_string).unwrap_or_default();
-            let second = right.get(row).map(ToString::to_string).unwrap_or_default();
-            Line::from(Span::styled(
-                format!("{}{}{second}", pad(&first, cell_width), " ".repeat(GUTTER))
-                    .trim_end()
-                    .to_string(),
-                theme::dim(),
-            ))
-        })
-        .collect()
-}
-
-fn group_lines(groups: &[&str], width: usize) -> Vec<Line<'static>> {
-    groups
-        .iter()
-        .flat_map(|group| {
-            let heading = Line::from(Span::styled(group.to_string(), theme::dim()));
-            std::iter::once(heading)
-                .chain(
-                    BINDINGS
-                        .iter()
-                        .filter(|binding| binding.group == *group)
-                        .flat_map(|binding| {
-                            crate::wrap::wrap(
-                                &Line::from(Span::styled(
-                                    cell(binding, key_column()),
-                                    theme::dim(),
-                                )),
-                                width,
-                            )
-                        }),
-                )
-                .collect::<Vec<_>>()
-        })
-        .collect()
-}
-
-fn pad(text: &str, width: usize) -> String {
-    format!("{text}{}", " ".repeat(width.saturating_sub(text.width())))
-}
-
-fn key_column() -> usize {
-    BINDINGS.iter().map(|b| b.keys.width()).max().unwrap_or(0)
-}
-
-fn cell(binding: &Binding, key_column: usize) -> String {
-    format!(
-        "{:<key_column$}  {}",
-        binding.keys,
-        binding.description,
-        key_column = key_column
-    )
-}
-
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn a_small_terminal_shows_every_binding_and_the_footer() {
-        use crate::test_support::*;
-        let state = state();
-        let (mut ui, now) = scene();
-        shown(&mut ui, crate::ui::Open::Help, now);
-        let small = draw_sized(80, 24, &state, &mut ui, now);
-        for binding in crate::keys::BINDINGS {
-            assert!(
-                small.contains(binding.keys),
-                "missing {}: {small}",
-                binding.keys
-            );
-        }
-        assert!(
-            small.contains("/ for commands · ! for a shell line"),
-            "{small}"
-        );
-    }
-
-    #[test]
-    fn rough_edges_help_groups_keys_without_clipping_at_100() {
-        let lines = help_lines(96);
-        let text = lines
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join("\n");
-        for group in ["write", "move", "turn", "sessions"] {
-            assert!(text.contains(group), "{text}");
-        }
-        assert!(!text.contains('…'), "{text}");
-    }
 
     use super::*;
 
@@ -411,53 +309,6 @@ mod tests {
             u
         };
         assert_eq!(seen, unique, "one key, one row");
-    }
-
-    #[test]
-    fn a_narrow_terminal_stacks_the_groups() {
-        let lines = help_lines(79);
-        assert_eq!(lines.first().unwrap().to_string(), "write");
-        assert!(lines.iter().any(|line| line.to_string() == "sessions"));
-    }
-
-    #[test]
-    fn a_wide_terminal_pairs_the_groups_without_losing_words() {
-        for width in [100, 120, 160] {
-            let lines = help_lines(width);
-            assert!(lines[0].to_string().contains("turn"));
-            assert!(lines.iter().all(|line| line.width() <= width));
-            let text = lines
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(" ");
-            for binding in BINDINGS {
-                assert!(text.contains(binding.keys), "missing {}", binding.keys);
-            }
-            assert!(!text.contains('…'));
-        }
-    }
-
-    /// The order `esc` is obeyed in is the order the help prints, because
-    /// there is only one of it.
-    #[test]
-    fn the_help_prints_the_escape_stack() {
-        let stack = ESCAPES
-            .iter()
-            .map(|(_, word)| *word)
-            .collect::<Vec<_>>()
-            .join(" → ");
-        let esc = BINDINGS
-            .iter()
-            .find(|binding| binding.keys == "esc")
-            .expect("a row for esc");
-        assert_eq!(esc.description, stack);
-        assert!(
-            help_lines(120)
-                .iter()
-                .any(|line| line.to_string().contains(&stack)),
-            "the sheet prints it"
-        );
     }
 
     /// One test per rung: what is innermost is what closes.
@@ -565,32 +416,5 @@ mod tests {
         assert_eq!(pressed(false, true, true), Interrupt::Clear);
         assert_eq!(pressed(false, false, true), Interrupt::Exit);
         assert_eq!(pressed(false, false, false), Interrupt::Arm);
-    }
-
-    #[test]
-    fn no_row_overflows_the_width_it_was_built_for() {
-        for width in [40usize, 80, 120, 200] {
-            for line in help_lines(width) {
-                assert!(line.to_string().width() <= width, "width {width}");
-            }
-        }
-    }
-}
-
-#[cfg(test)]
-mod m148 {
-    use crate::test_support::*;
-    #[test]
-    fn m148_control_p_is_unbound_and_absent_from_help() {
-        let (mut ui, now) = scene();
-        let state = state();
-        assert!(crate::input::on_key(&mut ui, &solo(&state), ctrl('p'), now).is_empty());
-        assert!(!ui.focus.showing());
-        let help = super::help_lines(200)
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join("\n");
-        assert!(!help.contains(concat!("ctrl", "+p")));
     }
 }

@@ -1,6 +1,6 @@
 //! M150's face and screen contracts, exercised before implementation.
 use crate::test_support::*;
-use crate::{face, painted, roster, status, theme};
+use crate::{face, painted, status, theme};
 use bingo_sdk::{Event, Level};
 use ratatui::style::Color;
 
@@ -132,28 +132,6 @@ fn child_row_has_a_face_and_keeps_lifecycle_words() {
 }
 
 #[test]
-fn roster_keeps_a_face_beside_the_live_ear() {
-    let tree = crew();
-    let list = roster::lines(
-        &tree,
-        &tree.rows(),
-        roster::Cursor::default(),
-        "",
-        120,
-        20,
-        scene().1,
-    );
-    let row = list
-        .lines
-        .iter()
-        .find(|line| line.to_string().contains("reviewer"))
-        .unwrap()
-        .to_string();
-    assert!(row.contains(face::face("reviewer").sigil()), "{row}");
-    assert!(row.contains('~'), "{row}");
-}
-
-#[test]
 fn strip_names_the_work_and_yields_to_notices() {
     let tree = crew();
     let (mut ui, now) = scene();
@@ -245,26 +223,6 @@ fn a_child_permission_and_room_posts_keep_the_selected_room_in_front() {
 }
 
 #[test]
-fn a_room_query_also_matches_its_members_and_keeps_the_cursor() {
-    let mut tree = crew();
-    let (mut ui, now) = scene();
-    tree.show(&child_id());
-    let keys = std::iter::once(ctrl('g')).chain("#design".chars().map(typed));
-    for key in keys {
-        for effect in crate::input::on_key(&mut ui, &tree, key, now) {
-            if let crate::effect::Effect::View(id) = effect {
-                tree.show(&id);
-            }
-        }
-    }
-    assert_eq!(tree.view(), &child_id());
-    let screen = draw_tree(120, 40, &tree, &mut ui, later(now, 200));
-    let selected = screen.lines().find(|line| line.contains('❯')).unwrap();
-    assert!(selected.contains("reviewer"), "{screen}");
-    assert!(selected.contains("#design"), "{screen}");
-}
-
-#[test]
 fn room_groups_authors_marks_the_reader_and_lists_members() {
     let (mut ui, now) = scene();
     let screen = draw_tree(120, 40, &chat(), &mut ui, now);
@@ -319,6 +277,16 @@ fn live_faces_pulse_through_the_cache_and_stillness_preserves_words() {
 fn strip_scopes_overflows_finishes_and_clicks() {
     let mut tree = crew();
     let (mut ui, now) = scene();
+    ui.catalogs.commands.push(bingo_sdk::CommandSpec {
+        name: "resume".into(),
+        keys: vec!["ctrl+r".into()],
+        aliases: vec![],
+        hint: String::new(),
+        args: bingo_sdk::ArgSpec::None,
+        instant: true,
+        hidden: false,
+        family: "session".into(),
+    });
     let tiny = crate::crew::spans(&tree, 120, 14, now);
     assert_eq!(
         tiny.iter()
@@ -343,7 +311,10 @@ fn strip_scopes_overflows_finishes_and_clicks() {
         !effects.is_empty(),
         "opening the list requests stored sessions"
     );
-    assert!(ui.focus.captures());
+    assert!(
+        !ui.focus.captures(),
+        "the mod command opens its site on acknowledgement"
+    );
     tree.fold.apply(&child_frame(
         20,
         completed("trn_9", bingo_sdk::TurnStatus::Completed),

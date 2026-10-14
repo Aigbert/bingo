@@ -27,10 +27,8 @@ use crate::ui::{Menu, Open, Ui};
 use crate::views;
 
 mod interaction;
-mod switcher;
-pub(crate) use interaction::{cancel, interaction_keys, interaction_unhandled};
 
-pub(crate) use switcher::walk_to;
+pub(crate) use interaction::{cancel, interaction_keys, interaction_unhandled};
 
 /// What the first ctrl+c on an empty composer says.
 pub const ARM_HINT: &str = "press ctrl+c again to exit";
@@ -65,6 +63,9 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
         && let Some(action) = crate::pane::key_handler(ui, tree.viewed(), key)
     {
         return vec![Effect::SiteKey { action, key }];
+    }
+    if crate::palette::active(ui) {
+        return crate::palette::key(ui, tree, key, now);
     }
     match owner {
         crate::focus::Owner::Pane => pane_keys(ui, tree, key, now),
@@ -141,23 +142,15 @@ fn tabbed(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effect>> {
     if ui.focus.captures() {
         match ui.focus.open() {
-            Open::Picker(_) => return Some(picker(ui, key, now)),
             Open::Pager(_) => return Some(pager::keys(ui, tree, key, now)),
             Open::Rewind(_) => return Some(rewind_keys(ui, tree, key, now)),
             _ => {}
         }
     }
     if let Some(chord) = chorded(key) {
-        // `ctrl+g` closes the list below; every other chord here opens
-        // something over it. Either way the list goes, so the draft it set
-        // aside comes back to the box first (M58) — otherwise the query a
-        // person typed would be left there for `⏎` to send.
-        if chord != switcher::CHORD {
-            switcher::put_away(ui, now);
-        }
         match chord {
             'f' => ui.focus = crate::focus::Focus::Search(Search::open()),
-            switcher::CHORD => return Some(switcher::toggle(ui, tree, now)),
+
             'o' => deepen(ui, tree, now),
             'b' => return Some(background(ui, tree, now)),
             // No other chord reaches here: `LAYERS` is what `chorded` answers.
@@ -168,14 +161,14 @@ fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effe
     if !ui.focus.captures() {
         return None;
     }
-    Some(switcher::keys(ui, tree, key, now))
+    None
 }
 
 /// The control chords that open a layer of their own — the one table there is
 /// of them. Every other control chord is the line's ([`control`]): `ctrl+w`
 /// deletes a word wherever a person is typing, the list's own query included,
 /// so it must not be mistaken for a layer's key.
-const LAYERS: [char; 4] = ['f', switcher::CHORD, 'o', 'b'];
+const LAYERS: [char; 3] = ['f', 'o', 'b'];
 
 /// The letter of a layer's control chord, if that is what this key is.
 fn chorded(key: KeyEvent) -> Option<char> {
@@ -488,31 +481,6 @@ fn rewind_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect>
     Vec::new()
 }
 
-fn picker(ui: &mut Ui, key: KeyEvent, now: Now) -> Vec<Effect> {
-    let Some(Open::Picker(picker)) = ui.focus.open_mut() else {
-        return Vec::new();
-    };
-    match key.code {
-        KeyCode::Up => picker.selected = picker.selected.saturating_sub(1),
-        KeyCode::Down => {
-            picker.selected = (picker.selected + 1).min(picker.sessions.len().saturating_sub(1))
-        }
-        KeyCode::Char(c @ '1'..='9') => {
-            picker.selected = (c as usize) - ('1' as usize);
-        }
-        KeyCode::Esc => ui.focus.close(now.instant),
-        KeyCode::Enter => {
-            let chosen = picker.sessions.get(picker.selected).map(|s| s.id.clone());
-            ui.focus.close(now.instant);
-            if let Some(id) = chosen {
-                return vec![Effect::Open(SessionSelector::ById { id })];
-            }
-        }
-        _ => {}
-    }
-    Vec::new()
-}
-
 /// A run owns the keyboard while it is being drawn: the arrows take its far
 /// end, `y` and `ctrl+c` copy it, anything else lets it go and is typed.
 fn selecting(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
@@ -711,7 +679,6 @@ fn plain(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         KeyCode::Up => return walk_back(ui, tree),
         // The list's other door: `↓` on an empty box opens the same list
         // `ctrl+g` does, with the cursor on the session already in view.
-        KeyCode::Down if switcher::opens(ui, tree) => return switcher::toggle(ui, tree, now),
         KeyCode::Down => walk_forward(ui),
         KeyCode::PageUp => scroll(ui, ui.page() as isize, now),
         KeyCode::PageDown => scroll(ui, -(ui.page() as isize), now),
@@ -726,7 +693,12 @@ fn plain(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         KeyCode::End => ui.composer.end(),
         KeyCode::Backspace => edit(ui, |c| c.backspace()),
         KeyCode::Delete => edit(ui, |c| c.delete()),
-        KeyCode::Char('?') if ui.composer.is_empty() => ui.focus.toggle(Open::Help, now.instant),
+        KeyCode::Char('/') if ui.composer.is_empty() => {
+            return crate::palette::open(ui, bingo_sdk::component::PaletteOpen::Commands, now);
+        }
+        KeyCode::Char('?') if ui.composer.is_empty() => {
+            return command_line(ui, tree, now, "/help".into());
+        }
         KeyCode::Char('v') if reading(ui) => start_selection(ui),
         // A key belongs to the focused card's buttons while one is focused and
         // nothing is being typed; the rest of the time it is a letter.
@@ -796,7 +768,7 @@ fn enter(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 ///
 /// `delivery` is the whole of the difference between the two keys that send:
 /// `⏎` steers a running turn at its next barrier, `tab` waits for it to end.
-fn command_line(ui: &mut Ui, tree: &Tree, now: Now, line: String) -> Vec<Effect> {
+pub(crate) fn command_line(ui: &mut Ui, tree: &Tree, now: Now, line: String) -> Vec<Effect> {
     let composer = std::mem::take(&mut ui.composer);
     ui.composer.set(&line);
     let effects = submit(ui, tree, now, Delivery::default());
@@ -813,20 +785,12 @@ fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect>
     ui.edited();
     ui.scroll.end();
     match commands::local(&text) {
-        Some(Local::Help) => {
-            ui.focus.toggle(Open::Help, now.instant);
-            Vec::new()
-        }
         Some(Local::Clear) => vec![Effect::Open(SessionSelector::Create {
             spec: SessionSpec {
                 cwd: PathBuf::from(&tree.root().summary.cwd),
                 ..SessionSpec::default()
             },
         })],
-        Some(Local::Resume(Some(id))) => vec![Effect::Open(SessionSelector::ById {
-            id: bingo_sdk::SessionId::from_raw(id),
-        })],
-        Some(Local::Resume(None)) => vec![Effect::ListSessions],
         Some(Local::Exit) => vec![Effect::Exit],
         // The pictures — the tokens the line still names and the `@word`s
         // in it — are files, read by the loop, which knows the directory and
@@ -911,9 +875,8 @@ fn edit(ui: &mut Ui, change: impl FnOnce(&mut crate::composer::Composer)) {
 mod tests {
     use super::*;
     use crate::pointer::{WHEEL, on_mouse};
-    use crate::roster;
     use crate::test_support::*;
-    use bingo_sdk::{Activation, Answer, SessionId, TurnId, TurnStatus};
+    use bingo_sdk::{Activation, Answer, TurnId, TurnStatus};
     use crossterm::event::KeyCode;
 
     /// A session whose own directory has two files a mention could name.
@@ -1124,19 +1087,6 @@ mod tests {
         assert!(ui.notices.is_empty(), "and it is silent about it");
     }
 
-    /// Where the list's cursor is, when it is the layer that is open.
-    fn selected(ui: &Ui) -> Option<roster::Cursor> {
-        match ui.focus.open() {
-            Open::Switcher(switcher) => Some(switcher.cursor),
-            _ => None,
-        }
-    }
-
-    /// A row of the list, by its number.
-    fn at(index: usize) -> Option<roster::Cursor> {
-        Some(roster::Cursor { at: index })
-    }
-
     fn press(
         ui: &mut Ui,
         state: &SessionState,
@@ -1204,30 +1154,6 @@ mod tests {
                 }
             })]
         );
-    }
-
-    #[test]
-    fn exit_and_quit_leave_and_resume_opens_or_asks() {
-        let (mut ui, now) = scene();
-        assert_eq!(line(&mut ui, &state(), "/exit", now), vec![Effect::Exit]);
-        assert_eq!(line(&mut ui, &state(), "/quit", now), vec![Effect::Exit]);
-        assert_eq!(
-            line(&mut ui, &state(), "/resume ses_9", now),
-            vec![Effect::Open(SessionSelector::ById {
-                id: SessionId::from_raw("ses_9")
-            })]
-        );
-        assert_eq!(
-            line(&mut ui, &state(), "/resume", now),
-            vec![Effect::ListSessions]
-        );
-    }
-
-    #[test]
-    fn help_is_the_surfaces_own_and_reaches_nobody() {
-        let (mut ui, now) = scene();
-        assert!(line(&mut ui, &state(), "/help", now).is_empty());
-        assert!(ui.focus.is(&Open::Help));
     }
 
     // ---- the permission mode --------------------------------------------
@@ -1356,36 +1282,6 @@ mod tests {
     }
 
     // ---- esc ------------------------------------------------------------
-
-    #[test]
-    fn esc_stops_an_open_ask_even_under_a_sheet() {
-        let state = folded(vec![
-            frame(1, started("trn_1")),
-            frame(2, opened(permission(None, None))),
-        ]);
-        let (mut ui, now) = scene();
-        ui.dialog.focus_on(state.interactions.first());
-        ui.focus.show(Open::Help, now.instant);
-        assert_eq!(
-            press(&mut ui, &state, key(KeyCode::Esc), now),
-            vec![Effect::StopInteraction {
-                session: state.summary.id.clone(),
-                interaction: state.interactions[0].id.clone(),
-                answer: Some(Answer::Deny { feedback: None }),
-            }]
-        );
-        ui.focus = crate::focus::Focus::Composer;
-        let busy = busy();
-        write(&mut ui, &busy, "/he", now);
-        assert!(press(&mut ui, &busy, key(KeyCode::Esc), now).is_empty());
-        assert!(ui.menu.dismissed, "then the dropdown");
-
-        assert_eq!(
-            press(&mut ui, &busy, key(KeyCode::Esc), now),
-            vec![Effect::Interrupt],
-            "then the running turn"
-        );
-    }
 
     /// Both keys that stop a turn leave the same mark, and it names the turn
     /// they stopped: the activity row reads it on this very frame, and the
@@ -1660,22 +1556,6 @@ mod tests {
     // ---- the dropdown and the history ------------------------------------
 
     #[test]
-    fn tab_completes_and_enter_runs_what_is_already_whole() {
-        let (mut ui, now) = scene();
-        write(&mut ui, &state(), "/cle", now);
-        press(&mut ui, &state(), key(KeyCode::Tab), now);
-        assert_eq!(ui.composer.text(), "/clear ");
-
-        let (mut ui, now) = scene();
-        write(&mut ui, &state(), "/clear", now);
-        assert_eq!(
-            press(&mut ui, &state(), key(KeyCode::Enter), now).len(),
-            1,
-            "a name that is already whole runs instead of completing"
-        );
-    }
-
-    #[test]
     fn the_arrows_walk_the_prompt_history_at_the_edges() {
         let (mut ui, now) = scene();
         line(&mut ui, &state(), "first", now);
@@ -1688,33 +1568,6 @@ mod tests {
         assert_eq!(ui.composer.text(), "second");
         press(&mut ui, &state(), key(KeyCode::Down), now);
         assert_eq!(ui.composer.text(), "", "and back to the draft");
-    }
-
-    /// A recalled `/…` line is not typed, so the dropdown does not open over
-    /// it and take the arrows: `↑` walks on past it, and `enter` runs it as
-    /// it was rather than completing it to a row.
-    #[test]
-    fn the_walk_goes_on_past_a_recalled_command_and_enter_runs_it() {
-        let (mut ui, now) = scene();
-        line(&mut ui, &state(), "first", now);
-        line(&mut ui, &state(), "/help", now);
-        press(&mut ui, &state(), key(KeyCode::Up), now);
-        assert_eq!(ui.composer.text(), "/help");
-        assert!(ui.menu.dismissed, "the dropdown stays closed over a recall");
-        press(&mut ui, &state(), key(KeyCode::Up), now);
-        assert_eq!(ui.composer.text(), "first", "the walk went on");
-        press(&mut ui, &state(), key(KeyCode::Down), now);
-        assert_eq!(ui.composer.text(), "/help");
-        press(&mut ui, &state(), key(KeyCode::Enter), now);
-        assert_eq!(
-            ui.composer.text(),
-            "",
-            "enter ran the recalled line; a completion would have left it"
-        );
-        assert!(
-            !ui.focus.is(&Open::Help),
-            "and /help toggled its sheet off again, as a run does"
-        );
     }
 
     #[test]
@@ -1738,19 +1591,6 @@ mod tests {
     }
 
     #[test]
-    fn the_question_mark_only_opens_the_panel_on_an_empty_composer() {
-        let (mut ui, now) = scene();
-        press(&mut ui, &state(), typed('?'), now);
-        assert!(ui.focus.is(&Open::Help));
-        press(&mut ui, &state(), typed('?'), now);
-        assert!(!ui.focus.is(&Open::Help));
-        write(&mut ui, &state(), "why", now);
-        press(&mut ui, &state(), typed('?'), now);
-        assert_eq!(ui.composer.text(), "why?");
-        assert!(!ui.focus.is(&Open::Help));
-    }
-
-    #[test]
     fn a_release_event_is_not_a_press() {
         let (mut ui, now) = scene();
         let mut key = typed('x');
@@ -1759,482 +1599,13 @@ mod tests {
         assert!(ui.composer.is_empty());
     }
 
-    #[test]
-    fn the_picker_opens_the_session_it_lands_on() {
-        let (mut ui, now) = scene();
-        ui.focus.show(
-            Open::Picker(crate::ui::Picker {
-                sessions: vec![
-                    summary(),
-                    bingo_sdk::SessionSummary {
-                        id: SessionId::from_raw("ses_2"),
-                        ..summary()
-                    },
-                ],
-                selected: 0,
-            }),
-            now.instant,
-        );
-        press(&mut ui, &state(), key(KeyCode::Down), now);
-        assert_eq!(
-            press(&mut ui, &state(), key(KeyCode::Enter), now),
-            vec![Effect::Open(SessionSelector::ById {
-                id: SessionId::from_raw("ses_2")
-            })]
-        );
-        assert!(!ui.focus.showing());
-    }
-
     // ---- the switcher ---------------------------------------------------
-
-    #[test]
-    fn ctrl_g_lists_the_tree_and_enter_switches_the_view() {
-        let tree = with_child(vec![]);
-        let (mut ui, now) = scene();
-        assert_eq!(
-            press_tree(&mut ui, &tree, ctrl('g'), now),
-            vec![Effect::ListStored],
-            "the tree is on the card at once and the store is asked for the rest"
-        );
-        assert_eq!(selected(&ui), at(0), "it opens on the session in view");
-        assert_eq!(
-            walked_to(&mut ui, &tree, key(KeyCode::Down), now),
-            Some(child_id()),
-            "the walk is the switch"
-        );
-        assert!(press_tree(&mut ui, &tree, key(KeyCode::Enter), now).is_empty());
-        assert!(!ui.focus.showing());
-    }
-
-    #[test]
-    fn ctrl_g_toggles_and_esc_closes_the_switcher() {
-        let tree = with_child(vec![]);
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        assert!(!ui.focus.showing(), "the same chord closes it");
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        press_tree(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(!ui.focus.showing());
-    }
-
-    /// A root alone in this process may still have children in the store, and
-    /// only the store knows: the card goes up and the read fills it.
-    #[test]
-    fn ctrl_g_on_a_lone_root_still_asks_what_the_store_holds() {
-        let (mut ui, now) = scene();
-        assert_eq!(
-            press(&mut ui, &state(), ctrl('g'), now),
-            vec![Effect::ListStored]
-        );
-        assert!(ui.focus.showing());
-        assert!(ui.notices.is_empty(), "nothing is said about an empty tree");
-    }
-
-    /// The stored rows the read answered with: chosen by `⏎`, they are
-    /// reopened by id, and the loop's `View` is what does it.
-    #[test]
-    fn enter_on_a_stored_row_steps_into_the_session_it_names() {
-        let tree = with_child(vec![]);
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        let Some(Open::Switcher(open)) = ui.focus.open_mut() else {
-            panic!("the switcher is open");
-        };
-        open.stored = vec![stored_summary("ses_7", "scout")];
-        for _ in 0..2 {
-            press_tree(&mut ui, &tree, key(KeyCode::Down), now);
-        }
-        assert_eq!(selected(&ui), at(2), "the stored row is walked to");
-        assert!(
-            press_tree(&mut ui, &tree, key(KeyCode::Enter), now).is_empty(),
-            "the walk already showed it; `⏎` only settles on where it landed"
-        );
-        assert!(!ui.focus.showing());
-    }
-
-    /// The session a walk switched the view to, when it switched it.
-    fn walked_to(
-        ui: &mut Ui,
-        tree: &Tree,
-        key: crossterm::event::KeyEvent,
-        now: Now,
-    ) -> Option<SessionId> {
-        match press_tree(ui, tree, key, now).first() {
-            Some(Effect::View(id)) => Some(id.clone()),
-            _ => None,
-        }
-    }
-
-    #[test]
-    fn the_switcher_opens_on_the_child_that_is_already_in_view() {
-        let mut tree = with_child(vec![]);
-        tree.show(&child_id());
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        assert_eq!(selected(&ui), at(1));
-        assert!(
-            press_tree(&mut ui, &tree, key(KeyCode::Enter), now).is_empty(),
-            "it is already the session on screen, so settling on it asks for nothing"
-        );
-    }
 
     // ---- the list is typed into (M55, re-cut by M58) ---------------------
 
-    /// A root with two sub-agents under it, so a query has rows to leave out:
-    /// `project`, `reviewer`, `scout`.
-    fn with_agents() -> Tree {
-        folded_tree(vec![
-            child_frame(1, announced("reviewer")),
-            agent_frame(3, 2, agent_announced(3, "scout")),
-        ])
-    }
-
-    /// The line the list set aside when it went up, if it is up.
-    fn draft(ui: &Ui) -> String {
-        match ui.focus.open() {
-            Open::Switcher(switcher) => switcher.draft.clone(),
-            _ => String::new(),
-        }
-    }
-
-    fn typing(ui: &mut Ui, tree: &Tree, text: &str, now: Now) -> Vec<Effect> {
-        let mut effects = Vec::new();
-        for c in text.chars() {
-            effects = press_tree(ui, tree, key(KeyCode::Char(c)), now);
-        }
-        effects
-    }
-
-    /// The ask M55 answers, in the shape M58 gave it: what is typed lands in
-    /// the **input box**, the list narrows on it, the cursor lands on what is
-    /// left, and the view follows the cursor as it does on a walk — so `⏎`
-    /// keeps what a person is looking at.
-    #[test]
-    fn a_typed_query_narrows_the_list_and_the_view_follows_it() {
-        let tree = with_agents();
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        assert_eq!(selected(&ui), at(0), "it opens on the session in view");
-        let effects = typing(&mut ui, &tree, "sco", now);
-        assert_eq!(ui.composer.text(), "sco", "the query is the box's line");
-        assert_eq!(selected(&ui), at(0), "the one row left is the first row");
-        assert_eq!(
-            effects,
-            vec![Effect::View(agent_id(3))],
-            "and the row the cursor landed on is the view"
-        );
-    }
-
-    /// `esc` is one ordered stack (§7): the query a person typed is the first
-    /// thing it takes back, and the list itself the next.
-    #[test]
-    fn esc_takes_the_query_back_before_it_closes_the_list() {
-        let mut tree = with_agents();
-        let root = tree.root_id().clone();
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        typing(&mut ui, &tree, "sco", now);
-        // The loop applied the `View` the narrowing asked for.
-        tree.show(&agent_id(3));
-
-        let effects = press_tree(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(ui.focus.showing(), "the first `esc` is the query's");
-        assert!(ui.composer.is_empty(), "and it takes the box's line back");
-        assert_eq!(
-            selected(&ui),
-            at(2),
-            "and the cursor keeps the session it was on"
-        );
-        assert!(effects.is_empty(), "nothing moved, so nothing is asked for");
-
-        let effects = press_tree(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(!ui.focus.showing(), "the second closes the list");
-        assert_eq!(
-            effects,
-            vec![Effect::View(root)],
-            "and gives back the session it was opened from"
-        );
-    }
-
-    /// Backspace gives the rows back a letter at a time, and one on an empty
-    /// box is the box's own no-op — it never reaches the `esc` stack.
-    #[test]
-    fn backspace_gives_the_rows_back_letter_by_letter() {
-        let mut tree = with_agents();
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        typing(&mut ui, &tree, "sco", now);
-        tree.show(&agent_id(3));
-        for _ in 0..3 {
-            press_tree(&mut ui, &tree, key(KeyCode::Backspace), now);
-        }
-        assert!(ui.composer.is_empty());
-        assert_eq!(selected(&ui), at(2), "still on the row it narrowed to");
-        press_tree(&mut ui, &tree, key(KeyCode::Backspace), now);
-        assert!(ui.focus.showing(), "and the list is still up");
-    }
-
-    /// A second opening starts with nothing typed: the query is a fact about
-    /// this gesture, like where it started from.
-    #[test]
-    fn the_list_opens_with_nothing_typed_into_it() {
-        let tree = with_agents();
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        typing(&mut ui, &tree, "sco", now);
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        assert!(ui.composer.is_empty());
-    }
-
-    /// M58's own ask: the box is the query line, so the line a person was
-    /// writing is set aside while the list is up and is back in the box —
-    /// caret at its end — the moment the list goes, whichever key took it.
-    #[test]
-    fn the_line_being_written_is_set_aside_and_given_back() {
-        let tree = with_agents();
-        // `esc` is a stack: the first press is the query's, the second the
-        // list's (§7).
-        for (closing, presses) in [
-            (key(KeyCode::Enter), 1),
-            (key(KeyCode::Esc), 2),
-            (ctrl('g'), 1),
-        ] {
-            let (mut ui, now) = scene();
-            write(&mut ui, tree.viewed(), "half a thought", now);
-            press_tree(&mut ui, &tree, ctrl('g'), now);
-            assert!(ui.composer.is_empty(), "the box opens the list empty");
-            assert_eq!(draft(&ui), "half a thought", "and the line is kept");
-
-            typing(&mut ui, &tree, "sco", now);
-            assert_eq!(ui.composer.text(), "sco");
-
-            for _ in 0..presses {
-                press_tree(&mut ui, &tree, closing, now);
-            }
-            assert!(!ui.focus.showing());
-            assert_eq!(
-                ui.composer.text(),
-                "half a thought",
-                "the draft is back exactly as it was"
-            );
-        }
-    }
-
-    /// A chord is never the list's own, so it takes the list away and gives
-    /// the draft back before it opens what it opens — a query left in the box
-    /// would be a line `⏎` sends.
-    #[test]
-    fn a_chord_that_opens_something_else_puts_the_list_away() {
-        let tree = with_agents();
-        let (mut ui, now) = scene();
-        write(&mut ui, tree.viewed(), "half a thought", now);
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        typing(&mut ui, &tree, "sco", now);
-        press_tree(&mut ui, &tree, ctrl('f'), now);
-        assert!(
-            ui.focus.search().is_some(),
-            "the chord's own layer is what is up"
-        );
-        assert_eq!(ui.composer.text(), "half a thought");
-    }
-
-    /// A chord that edits a line edits the query, because the query *is* a
-    /// line: `ctrl+w` takes a word of it and leaves the list up, where a
-    /// layer's chord would have taken the list away.
-    #[test]
-    fn a_word_chord_edits_the_query_and_leaves_the_list_up() {
-        let tree = with_agents();
-        let (mut ui, now) = scene();
-        write(&mut ui, tree.viewed(), "half a thought", now);
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        typing(&mut ui, &tree, "sco ut", now);
-        press_tree(&mut ui, &tree, ctrl('w'), now);
-        assert_eq!(ui.composer.text(), "sco ", "the last word of the query");
-        assert!(ui.focus.showing(), "and the list is still up");
-        assert_eq!(draft(&ui), "half a thought", "with the draft still aside");
-    }
-
-    /// The box is the list's line while the list is up: nothing it holds
-    /// offers a command or a mention, so no second dropdown is drawn over the
-    /// one that is open.
-    #[test]
-    fn the_query_offers_no_command_of_its_own() {
-        let tree = with_agents();
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        typing(&mut ui, &tree, "/mo", now);
-        assert_eq!(ui.composer.text(), "/mo");
-        assert!(
-            ui.suggestions(&tree.viewed().summary.cwd, &[]).is_empty(),
-            "the list owns the line"
-        );
-    }
-
     // ---- `tab` completes (M58) ------------------------------------------
 
-    /// `tab` completes the name the cursor is on into the box, the way `tab`
-    /// on the `/` dropdown completes a command; the list then holds the one
-    /// row the completed name leaves.
-    #[test]
-    fn tab_completes_the_name_the_cursor_is_on() {
-        let mut tree = with_agents();
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        assert_eq!(
-            walked_to(&mut ui, &tree, key(KeyCode::Down), now),
-            Some(child_id()),
-        );
-        // The loop applied the `View` the walk asked for.
-        tree.show(&child_id());
-
-        let effects = press_tree(&mut ui, &tree, key(KeyCode::Tab), now);
-        assert_eq!(ui.composer.text(), "reviewer", "the name is in the box");
-        assert_eq!(
-            selected(&ui),
-            at(0),
-            "and the list is the one row it narrowed to"
-        );
-        assert!(
-            effects.is_empty(),
-            "the walk already showed it, so nothing is asked for"
-        );
-        assert!(
-            press_tree(&mut ui, &tree, key(KeyCode::Enter), now).is_empty(),
-            "`⏎` keeps the session the completed name named"
-        );
-        assert!(!ui.focus.showing());
-        assert!(ui.composer.is_empty(), "and the box is the draft's again");
-    }
-
-    /// A room completes as its own `#name`: the sigil is part of what it is
-    /// called, and it is by that name the list finds it again.
-    #[test]
-    fn tab_completes_a_rooms_name_with_its_sigil() {
-        let tree = folded_tree(vec![
-            child_frame(1, announced("reviewer")),
-            log_frame(2, log_announced("#design")),
-        ]);
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        typing(&mut ui, &tree, "des", now);
-        press_tree(&mut ui, &tree, key(KeyCode::Tab), now);
-        assert_eq!(ui.composer.text(), "#design");
-        assert_eq!(selected(&ui), at(0));
-    }
-
-    /// A list with nothing left on it has no name to complete, and `tab`
-    /// leaves the line a person is typing exactly as it is.
-    #[test]
-    fn tab_completes_nothing_where_the_query_left_no_row() {
-        let tree = with_agents();
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        typing(&mut ui, &tree, "zzz", now);
-        press_tree(&mut ui, &tree, key(KeyCode::Tab), now);
-        assert_eq!(ui.composer.text(), "zzz");
-        assert!(ui.focus.showing(), "and the list is still up");
-    }
-
     // ---- one list, two doors --------------------------------------------
-
-    /// `↓` means two things and the box holding a query changes neither: on an
-    /// empty box it opens the list, and inside it it walks — the rows the
-    /// query left — while the line a person typed stays where it was put.
-    #[test]
-    fn down_opens_the_list_and_then_walks_what_the_query_left() {
-        let tree = with_agents();
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, key(KeyCode::Down), now);
-        // `o` is in `project` and in `scout` and in neither's way.
-        typing(&mut ui, &tree, "o", now);
-        assert_eq!(ui.composer.text(), "o", "the box is holding the query");
-        assert_eq!(selected(&ui), at(0), "the root is still the row in view");
-        assert_eq!(
-            walked_to(&mut ui, &tree, key(KeyCode::Down), now),
-            Some(agent_id(3)),
-            "and the step goes to the next row the query left, not the tree's"
-        );
-        assert_eq!(selected(&ui), at(1));
-        assert_eq!(
-            ui.composer.text(),
-            "o",
-            "the walk is the list's; the box keeps the line it was given"
-        );
-    }
-
-    /// `↓` on an empty composer opens the same list `ctrl+g` does, and asks
-    /// the store the same question: they are one gesture with two keys, so
-    /// what they leave behind is one state.
-    #[test]
-    fn down_on_an_empty_line_opens_the_list_ctrl_g_opens() {
-        let tree = with_child(vec![]);
-        let (mut down, now) = scene();
-        let (mut chord, _) = scene();
-        assert_eq!(
-            press_tree(&mut down, &tree, key(KeyCode::Down), now),
-            vec![Effect::ListStored]
-        );
-        press_tree(&mut chord, &tree, ctrl('g'), now);
-        assert_eq!(down.focus.open(), chord.focus.open());
-        assert!(down.focus.showing());
-    }
-
-    /// Walking is switching: the transcript changes as the cursor moves, as
-    /// the strip's walk did (§3).
-    #[test]
-    fn walking_the_list_switches_the_view_as_the_cursor_moves() {
-        let tree = with_child(vec![]);
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, key(KeyCode::Down), now);
-        assert_eq!(
-            walked_to(&mut ui, &tree, key(KeyCode::Down), now),
-            Some(child_id()),
-            "the row below the root is the child, and the view goes with it"
-        );
-        assert_eq!(selected(&ui), at(1));
-        assert!(ui.focus.showing(), "and the list stays up to be walked on");
-    }
-
-    /// The column is walked to its ends and stops there: a list is not a ring,
-    /// and there is nothing past either end to wrap round to.
-    #[test]
-    fn the_column_stops_at_its_ends() {
-        let tree = with_child(vec![]);
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        press_tree(&mut ui, &tree, key(KeyCode::Up), now);
-        assert_eq!(selected(&ui), at(0), "the first row is the first row");
-        for _ in 0..4 {
-            press_tree(&mut ui, &tree, key(KeyCode::Down), now);
-        }
-        assert_eq!(selected(&ui), at(1), "and the last is the last");
-    }
-
-    /// `esc` puts back the session the list was opened from, however far the
-    /// walk went; `⏎` keeps the one it landed on.
-    #[test]
-    fn esc_gives_back_where_the_walk_started_and_enter_keeps_where_it_ended() {
-        let tree = with_child(vec![]);
-        let (mut ui, now) = scene();
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        walked_to(&mut ui, &tree, key(KeyCode::Down), now);
-        assert_eq!(
-            walked_to(&mut ui, &tree, key(KeyCode::Esc), now),
-            Some(tree.root_id().clone()),
-            "back to the session the list was opened from"
-        );
-        assert!(!ui.focus.showing());
-
-        press_tree(&mut ui, &tree, ctrl('g'), now);
-        walked_to(&mut ui, &tree, key(KeyCode::Down), now);
-        assert!(
-            press_tree(&mut ui, &tree, key(KeyCode::Enter), now).is_empty(),
-            "the walked-to session is already on screen"
-        );
-        assert!(!ui.focus.showing());
-    }
 
     /// `esc` on the list closes the list and nothing else: it is the one thing
     /// a person opened, so it is the one thing that press takes away.
@@ -3277,20 +2648,6 @@ mod tests {
         });
     }
 
-    /// While a sheet is over the frame the cells under it are the sheet's: a
-    /// click cannot open a picture the screen is not showing.
-    #[test]
-    fn a_sheet_over_the_frame_takes_the_click_with_it() {
-        let state = read_a_picture();
-        let (mut ui, now) = scene();
-        crate::graphics::with(crate::graphics::drawing(), || {
-            let screen = render(&state, &mut ui, now);
-            let row = cells_row(&screen);
-            ui.focus.show(crate::ui::Open::Help, now.instant);
-            assert!(on_mouse(&mut ui, &solo(&state), click(6, row), now).is_empty());
-        });
-    }
-
     #[test]
     fn a_click_on_a_card_row_answers_it() {
         let state = folded(vec![frame(1, opened(permission(Some("Edit(src/)"), None)))]);
@@ -3414,18 +2771,9 @@ mod tests {
     }
 
     #[test]
-    fn one_layer_at_a_time_replaces_the_last() {
-        let (mut ui, now) = scene();
-        press(&mut ui, &state(), typed('?'), now);
-        assert!(ui.focus.is(&Open::Help));
-        press(&mut ui, &state(), ctrl('f'), now);
-        assert!(ui.focus.search().is_some(), "focus moves, never sideways");
-    }
-
-    #[test]
     fn what_is_closing_stays_on_screen_until_it_has_gone() {
         let (mut ui, now) = scene();
-        press(&mut ui, &state(), typed('?'), now);
+        ui.focus.show(Open::Rewind(Default::default()), now.instant);
         press(&mut ui, &state(), key(KeyCode::Esc), now);
         assert!(!ui.focus.showing(), "it is on its way out");
         assert!(
@@ -3627,7 +2975,11 @@ mod tests {
             press(&mut ui, &busy(), key(KeyCode::Tab), now).is_empty(),
             "the dropdown is what tab is for while one is open"
         );
-        assert_eq!(ui.composer.text(), "/compact ");
+        assert_eq!(
+            ui.composer.text(),
+            "/comp",
+            "fallback leaves explicit typing alone"
+        );
 
         let (mut ui, now) = scene();
         assert!(
@@ -3750,4 +3102,11 @@ mod m148 {
             },
         );
     }
+}
+
+pub(crate) fn palette_edit(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
+    editing(ui, tree, key, now)
+}
+pub(crate) fn palette_submit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+    submit(ui, tree, now, Delivery::default())
 }

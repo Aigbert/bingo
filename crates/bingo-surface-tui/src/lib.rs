@@ -85,6 +85,7 @@ mod mentions;
 /// product already has.
 mod opening;
 mod pager;
+mod palette;
 mod pane;
 mod paths;
 mod pictures;
@@ -93,7 +94,6 @@ mod preview;
 mod pulled;
 mod render;
 mod rewind;
-mod roster;
 mod run;
 mod scroll;
 mod search;

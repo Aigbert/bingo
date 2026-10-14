@@ -216,15 +216,6 @@ pub fn stored_summary(id: &str, title: &str) -> SessionSummary {
     }
 }
 
-/// The head frame a reopened session's stream opens with: the summary the
-/// listing named it by, now on the tree's own stream (ADR-0010 §3).
-pub fn woken(seq: u64, summary: SessionSummary) -> Frame {
-    Frame {
-        session: summary.id.clone(),
-        ..frame(seq, Event::SessionUpdated { summary })
-    }
-}
-
 /// A room under the same root: a session nothing answers, whose journal is
 /// the point (ADR-0011 §1). Its id sorts before the sub-agent's, so a switcher
 /// can show it between two model rows.

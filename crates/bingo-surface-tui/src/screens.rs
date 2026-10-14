@@ -16,7 +16,7 @@ use crate::clock::Now;
 use crate::painted::{ascii, assert_row_styled, daylight, in_look, no_colour, painted, truecolor};
 use crate::test_support::*;
 use crate::tree::Tree;
-use crate::ui::{Open, Switcher, Ui};
+use crate::ui::{Open, Ui};
 
 /// The screens a call an ACP agent ran on its own side is read through
 /// (ADR-0035 §4).
@@ -521,67 +521,6 @@ fn a_child_transcript() {
     both("child_transcript", &tree, &mut ui, now);
 }
 
-/// The cursor on a row of the list, by its number.
-fn on(at: usize) -> crate::roster::Cursor {
-    crate::roster::Cursor { at }
-}
-
-#[test]
-fn the_switcher_dropdown() {
-    let mut frames = busy_child("reviewer");
-    frames.push(log_frame(9, log_announced("#design")));
-    let tree = spawned_tree(frames);
-    let (mut ui, now) = scene();
-    shown(
-        &mut ui,
-        Open::Switcher(Switcher {
-            cursor: on(1),
-            ..Default::default()
-        }),
-        now,
-    );
-    both("switcher", &tree, &mut ui, now);
-}
-
-/// M55, re-cut by M58: the list is typed into and what is typed is in the
-/// **input box**, not on a line of the list's own. Only the rows the box
-/// matches are drawn, and the box under them holds the query.
-#[test]
-fn the_switcher_dropdown_narrowed_by_a_query() {
-    let mut frames = busy_child("reviewer");
-    frames.push(log_frame(9, log_announced("#design")));
-    let tree = spawned_tree(frames);
-    let (mut ui, now) = scene();
-    shown(
-        &mut ui,
-        Open::Switcher(Switcher {
-            cursor: on(0),
-            ..Default::default()
-        }),
-        now,
-    );
-    ui.composer.set("rev");
-    both("switcher_query", &tree, &mut ui, now);
-}
-
-/// What was spawned in an earlier process is in the store and not here
-/// (M31): its row sits under the live ones, dim, and says so in a word.
-#[test]
-fn the_switcher_lists_what_is_only_in_the_store() {
-    let tree = spawned_tree(busy_child("reviewer"));
-    let (mut ui, now) = scene();
-    shown(
-        &mut ui,
-        Open::Switcher(Switcher {
-            cursor: on(2),
-            stored: vec![stored_summary("ses_7", "scout")],
-            ..Default::default()
-        }),
-        now,
-    );
-    both("switcher_stored", &tree, &mut ui, now);
-}
-
 #[test]
 fn the_command_dropdown() {
     let state = folded(answered());
@@ -600,15 +539,6 @@ fn the_command_dropdown() {
     }];
     write(&mut ui, &state, "/", now);
     both("dropdown", &solo(&state), &mut ui, now);
-}
-
-#[test]
-fn the_help_sheet() {
-    let state = folded(answered());
-    let (mut ui, now) = scene();
-    shown(&mut ui, Open::Help, now);
-    insta::assert_snapshot!("help_80x30", draw_sized(80, 30, &state, &mut ui, now));
-    insta::assert_snapshot!("help_100x30", draw_sized(100, 30, &state, &mut ui, now));
 }
 
 #[test]

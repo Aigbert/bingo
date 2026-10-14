@@ -1,7 +1,9 @@
 ---
-source: crates/bingo-surface-tui/src/screens.rs
-expression: "draw_tree(80, 24, tree, ui, now)"
+source: crates/bingo-surface-tui/src/palette/tests.rs
+expression: screen
 ---
+"                                                                                "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -15,14 +17,12 @@ expression: "draw_tree(80, 24, tree, ui, now)"
 "█      ▀                                                                        "
 "█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█                                                   "
 "█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍                                                 "
-"Agents                                                                          "
-"❯ ◆  project   idle · what is in this workspace?                                "
-"  ◗~ reviewer  working · in #design · 3 unread · live · owes an answer · 22m · …"
-"  ●  watcher   idle · in #design · listening · 600s                             "
-"  ✦  scout     idle · completed · 0 tools · ↓ 0                                 "
-"Rooms                                                                           "
-"  #design  2 seats · 1 owed                                                     "
+"   /think  choose think                                                         "
+"   off                                                                          "
+"   low                                                                          "
+" ❯ high                                                                    now  "
+"   ↑↓ choose · enter run · esc back                                             "
 "╭──────────────────────────────────────────────────────────────────────────────╮"
-"│ > ask anything · / for commands · ! for shell                                │"
+"│ > /think                                                                     │"
 "╰──────────────────────────────────────────────────────────────────────────────╯"
-"◗                                                                    fake/fake-1"
+"                                                                     fake/fake-1"

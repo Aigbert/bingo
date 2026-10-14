@@ -52,6 +52,15 @@ fn target(run: &Run) -> Option<(SessionId, String, bool)> {
     {
         return Some((owner.summary.id.clone(), open.id.to_string(), true));
     }
+    if crate::palette::active(&run.ui) {
+        return crate::palette::request(&run.ui).map(|id| {
+            (
+                run.session.tree.viewed().summary.id.clone(),
+                id.into(),
+                false,
+            )
+        });
+    }
     if let crate::focus::Focus::Pane(focus) = &run.ui.focus {
         return Some((
             run.session.tree.viewed().summary.id.clone(),
@@ -122,6 +131,24 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
     let Some(pending) = run.site_keys.remove(intent) else {
         return;
     };
+    if crate::palette::active(&run.ui)
+        && crate::palette::request(&run.ui) == Some(pending.focus.as_str())
+    {
+        if let IntentOutcome::Applied { result } = outcome {
+            let now = run.detection.now();
+            let effects = if let Ok(action) =
+                serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
+            {
+                crate::palette::result(&mut run.ui, &run.session.tree, &action, now)
+            } else if result["handled"] == false {
+                input::palette_edit(&mut run.ui, &run.session.tree, pending.key, now)
+            } else {
+                Vec::new()
+            };
+            run.apply(effects);
+        }
+        return;
+    }
     if let Some((_, open)) = run.session.tree.open_interaction()
         && open.id.as_str() == pending.focus
         && matches!(
@@ -173,6 +200,17 @@ pub(super) fn notices(run: &mut Run) {
 }
 
 fn focus(run: &Run) -> Option<String> {
+    if let Some((_, open)) = run
+        .session
+        .tree
+        .open_interaction()
+        .filter(|_| !run.ui.dialog.aside)
+    {
+        return Some(open.id.to_string());
+    }
+    if crate::palette::active(&run.ui) {
+        return crate::palette::request(&run.ui).map(str::to_owned);
+    }
     if let Some((_, open)) = run.session.tree.open_interaction() {
         return Some(open.id.to_string());
     }
@@ -181,7 +219,14 @@ fn focus(run: &Run) -> Option<String> {
     }
     None
 }
+fn palette_waiting(run: &Run) -> bool {
+    (run.ui.dialog.aside || run.session.tree.open_interaction().is_none())
+        && crate::palette::waiting(&run.ui, run.session.tree.viewed())
+}
 pub(super) fn blocked(run: &Run) -> bool {
+    if palette_waiting(run) {
+        return true;
+    }
     focus(run).is_some_and(|focus| {
         run.site_keys.values().any(|p| p.focus == focus)
             || run.site_queue.iter().any(|(site, _)| site == &focus)
@@ -197,6 +242,9 @@ pub(super) fn drain(run: &mut Run) {
         if focus(run).as_ref() != Some(&site) {
             run.site_queue.pop_front();
             continue;
+        }
+        if palette_waiting(run) {
+            break;
         }
         if run.site_keys.values().any(|p| p.focus == site) {
             break;
