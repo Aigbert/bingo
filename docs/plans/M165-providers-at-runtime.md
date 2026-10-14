@@ -41,7 +41,7 @@ Add, re-address, check and remove named providers without restarting. Sessions k
 - Repository-controlled sign-in first asks for destination confirmation showing canonical origin and source file, before paste, browser or device flows. Cancellation writes nothing and sends no HTTP. Same-origin rebinding retains provenance; a changed origin gets its new source. Reserved-name notices use the declaring manifest even when disabled; composition-only reservations name the binary.
 - Round 5 fails closed on HTTP redirects: scheme, host and effective port must match the initial request, with the existing ten-hop bound. Only credential-free page fetching, image loading and public release downloads opt into cross-origin redirects; Brave search keeps a separate same-origin client. Same-origin OAuth 307 bodies still replay.
 - Every readdress discards the configured key and resolves current settings through the existing trust/origin policy. The settings writer returns the document it just persisted, replacing the boot user-layer snapshot without a second read race; only the owning family's values cross the SDK boundary. A→B→A cannot revive a removed key, and same-origin edits pick up newly configured keys.
-- OAuth refresh compares the complete stored entry (credential, owner, issuer origin and resource origin) under the shared lock before replacement or expiry deletion. A late response cannot overwrite or remove a newer sign-in. This is process-local compare-and-set, consistent with the store's existing concurrency boundary.
+- OAuth refresh compares the complete stored entry (credential, owner, issuer origin and resource origin) under the shared lock before replacement or expiry deletion. A late response cannot overwrite or remove a newer sign-in. This is process-local compare-and-set, consistent with the store's existing concurrency boundary. A CAS mismatch clears the cache and re-reads the replacement: only a matching binding with a nonempty, unexpired credential may serve the waiting request. An expiry persistence error instead logs a warning and retains Cached::Expired, so repairing the store cannot retry the retired refresh token.
 - Follow-ups: replacing `default_cleared` with mutable settings affects selection and approval consumers (>40 lines). SDK argument secrecy also needs declaration access in history/queue readers plus constructors/wire fixtures (>40 lines). Defer both optional cleanups; retain tested redaction and cleared-default behavior.
 - Guides use the owning crate's Page (ADR-0054), never docs/guide/. No dependencies or allowlist changes. HTTP tests use local fakes/wiremock with provider environment unset.
 
@@ -237,3 +237,26 @@ bash scripts/check_discipline.sh => discipline ok (advisory warnings)
 ```
 
 Final `cargo clean` follows this commit.
+
+## Verified — 2026-10-15 (refresh recovery follow-up)
+
+Both regressions failed before their fixes. A late success or expired reply now
+serves a usable same-binding replacement, including a newly pasted key or an
+unexpired token inside the proactive refresh window. Removed, empty, expired,
+unknown-expiry and different-resource replacements remain refused. Portable
+read/write I/O failures during expiry retain Cached::Expired; after the store
+is repaired, subsequent normal and forced refresh calls send no HTTP retry.
+
+Sequential checks with OPENAI_* / ANTHROPIC_* unset, `RUST_TEST_THREADS=4`,
+Cargo offline, synthetic credentials and wiremock only:
+
+```text
+cargo test -p bingo-auth-oauth -p bingo-provider-openai -p bingo-provider-anthropic --locked => 313 passed, 0 failed, 0 ignored
+cargo fmt --all -- --check => exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings => exit 0
+bash scripts/check_discipline.sh => discipline ok (advisory warnings)
+```
+
+Clippy's initial boolean-simplification finding was corrected; tests and checks
+passed again. No timing flake or dependency change. Final `cargo clean` follows
+this commit.

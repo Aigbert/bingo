@@ -321,8 +321,14 @@ impl TokenSource {
     /// A credential the issuer has retired is removed, not kept around to
     /// fail again: the way back is a login, and `status()` now says so.
     fn expire(&self, reason: String, snapshot: &Snapshot) -> Result<String, AuthError> {
-        if !self.store.replace(&self.provider, snapshot, None)? {
-            return self.replacement();
+        match self.store.replace(&self.provider, snapshot, None) {
+            Ok(false) => return self.replacement(),
+            Ok(true) => {}
+            Err(error) => tracing::warn!(
+                provider = %self.provider,
+                %error,
+                "the expired credential could not be removed"
+            ),
         }
         self.remember(Cached::Expired(reason.clone()));
         Err(AuthError::Expired(reason))

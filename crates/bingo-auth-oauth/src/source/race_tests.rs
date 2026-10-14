@@ -146,3 +146,63 @@ async fn a_late_refresh_refuses_an_unusable_replacement() {
         }
     }
 }
+
+#[tokio::test]
+async fn an_expiry_store_error_still_retires_the_cached_refresh_token() {
+    for unreadable in [false, true] {
+        let server = MockServer::start().await;
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(
+            CredentialStore::new(dir.path().into())
+                .owned_by("family")
+                .at_origin(&server.uri(), "user settings"),
+        );
+        let old = credential("old", 1);
+        store.write("work", old.clone()).unwrap();
+        let auth = store.path().to_path_buf();
+        let backup = dir.path().join("saved-auth.json");
+        let obstacle = if unreadable {
+            auth.clone()
+        } else {
+            dir.path().join("auth.json.tmp")
+        };
+        let restore = (auth.clone(), backup.clone(), obstacle.clone());
+        Mock::given(path("/oauth/token"))
+            .respond_with(move |_: &wiremock::Request| {
+                // A directory forces portable I/O failure, without relying on permissions.
+                if unreadable {
+                    std::fs::rename(&auth, &backup).unwrap();
+                }
+                std::fs::create_dir(&obstacle).unwrap();
+                ResponseTemplate::new(400).set_body_json(json!({"error":"refresh_token_expired"}))
+            })
+            .expect(1)
+            .mount(&server)
+            .await;
+        let source = TokenSource::new(
+            "work",
+            crate::issuer::tests::issuer(&server.uri()),
+            store.clone(),
+            bingo_http::client(bingo_http::Bounds::CALL).unwrap(),
+        );
+        assert!(matches!(
+            source.access_token().await,
+            Err(AuthError::Expired(_))
+        ));
+        assert!(matches!(source.status(), Status::Expired { .. }));
+        std::fs::remove_dir(restore.2).unwrap();
+        if unreadable {
+            std::fs::rename(restore.1, restore.0).unwrap();
+        }
+        assert_eq!(store.read("work").unwrap(), Some(old));
+        assert!(matches!(
+            source.access_token().await,
+            Err(AuthError::Expired(_))
+        ));
+        assert!(matches!(
+            source.refreshed().await,
+            Err(AuthError::Expired(_))
+        ));
+        assert!(matches!(source.status(), Status::Expired { .. }));
+    }
+}
