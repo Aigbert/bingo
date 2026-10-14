@@ -35,6 +35,9 @@ async fn overridden(family: &str, name: &str, field: &str) {
     let home = tempfile::tempdir().unwrap();
     let mut endpoint = json!({"baseUrl": trusted.uri()});
     endpoint[field] = json!(trusted.uri());
+    if family == "codex" {
+        endpoint["issuer"] = json!(trusted.uri());
+    }
     let user = if name == family {
         json!({family: endpoint})
     } else {
@@ -48,14 +51,10 @@ async fn overridden(family: &str, name: &str, field: &str) {
         json!({family: {"instances": {name: override_value}}})
     };
     let root = project(home.path(), overlay);
-    let mut entry = if field == "issuer" {
-        json!({"type": "oauth", "access": "stored-test-key", "refresh": "refresh-test-key", "expires": 1})
-    } else {
-        json!({"type": "api", "key": "stored-test-key"})
-    };
-    entry["owner"] = json!(family);
-    entry["origin"] = json!(trusted.uri());
-    write_auth(home.path(), json!({name: entry}));
+    write_auth(
+        home.path(),
+        json!({name: bound_entry(family, &trusted.uri())}),
+    );
     let h = home.path().to_path_buf();
     let n = name.to_string();
     let r = root.clone();
@@ -79,6 +78,18 @@ async fn overridden(family: &str, name: &str, field: &str) {
     assert!(!notice.contains("stored-test-key"), "{notice}");
 }
 
+fn bound_entry(family: &str, address: &str) -> Value {
+    let mut entry = if family == "codex" {
+        json!({"type":"oauth", "access":"stored-test-key", "refresh":"refresh-test-key", "expires":1,
+            "resourceOrigin":address})
+    } else {
+        json!({"type":"api", "key":"stored-test-key"})
+    };
+    entry["owner"] = json!(family);
+    entry["origin"] = json!(address);
+    entry
+}
+
 #[tokio::test]
 async fn project_override_cannot_redirect_named_key() {
     overridden("openai", "work", "baseUrl").await;
@@ -92,6 +103,11 @@ async fn project_override_cannot_redirect_default_key() {
 #[tokio::test]
 async fn project_override_cannot_redirect_oauth_issuer() {
     overridden("codex", "work", "issuer").await;
+}
+
+#[tokio::test]
+async fn project_override_cannot_redirect_oauth_resource() {
+    overridden("codex", "work", "baseUrl").await;
 }
 
 #[tokio::test]
@@ -217,4 +233,21 @@ async fn foreign_owner_notice_names_both_families_and_the_override() {
     assert!(notice.contains("rename or delete"), "{notice}");
     assert!(!notice.contains("/provider remove work"), "{notice}");
     assert_eq!(stored(home.path())["work"]["owner"], "anthropic");
+}
+
+#[test]
+fn a_reserved_instance_cannot_adopt_a_disabled_familys_legacy_key() {
+    let home = tempfile::tempdir().unwrap();
+    user_settings(
+        home.path(),
+        json!({
+            "enabledPlugins":{"bingo.provider.anthropic":false},
+            "openai":{"instances":{"anthropic":{}}}
+        }),
+    );
+    let legacy = json!({"anthropic":{"type":"api","key":"legacy-test-key"}});
+    write_auth(home.path(), legacy.clone());
+    let out = run(&mut at(home.path(), home.path(), "openai"));
+    assert!(stderr(&out).contains("Skipped"), "{}", stderr(&out));
+    assert_eq!(stored(home.path()), legacy);
 }

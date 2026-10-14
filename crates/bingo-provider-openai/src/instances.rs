@@ -32,23 +32,7 @@ pub fn providers(
     let store = Arc::new(CredentialStore::new(env.data_dir.clone()));
     let file = env.user_settings();
     let mut named = BTreeSet::new();
-    let default_store = bound(registrar, &store, "openai", "openai");
-    let codex_store = bound(registrar, &store, "codex", "codex");
-    let mut providers = vec![
-        registered(default_openai(
-            http.clone(),
-            settings.openai.endpoint.clone(),
-            &file,
-            &default_store,
-        )),
-        registered(OpenAiProvider::subscription(
-            http.clone(),
-            oauth.clone(),
-            Variant::Codex.provider_id(),
-            settings.codex.endpoint.clone(),
-            codex_store,
-        )),
-    ];
+    let mut providers = defaults(&http, &oauth, &settings, registrar, &store, &file);
     for (name, endpoint) in settings.openai.instances {
         let store = bound(registrar, &store, "openai", &name);
         if !allowed(&mut named, &name, "openai", &store, registrar) {
@@ -76,6 +60,33 @@ pub fn providers(
         )));
     }
     Ok(providers)
+}
+
+fn defaults(
+    http: &reqwest::Client,
+    oauth: &reqwest::Client,
+    settings: &Settings,
+    registrar: &mut Registrar,
+    store: &Arc<CredentialStore>,
+    file: &Path,
+) -> Vec<Arc<dyn Provider>> {
+    let default_store = bound(registrar, store, "openai", "openai");
+    let codex_store = bound(registrar, store, "codex", "codex");
+    vec![
+        registered(default_openai(
+            http.clone(),
+            settings.openai.endpoint.clone(),
+            file,
+            &default_store,
+        )),
+        registered(OpenAiProvider::subscription(
+            http.clone(),
+            oauth.clone(),
+            Variant::Codex.provider_id(),
+            settings.codex.endpoint.clone(),
+            codex_store,
+        )),
+    ]
 }
 
 fn registered(provider: OpenAiProvider) -> Arc<dyn Provider> {

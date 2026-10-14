@@ -95,7 +95,20 @@ impl Registry {
         env: &Env,
         switched_off: &BTreeSet<String>,
         layers: &[crate::settings::Layer],
+        reserved: &BTreeSet<String>,
     ) -> Result<Self, HostError> {
+        let reserved = reserved
+            .iter()
+            .cloned()
+            .chain(
+                plugins
+                    .iter()
+                    .flat_map(|plugin| plugin.manifest().provides)
+                    .filter_map(|capability| {
+                        capability.strip_prefix("provider:").map(str::to_string)
+                    }),
+            )
+            .collect();
         let mut registry = Registry {
             notices: ignored_switches(plugins, switched_off),
             ..Registry::default()
@@ -109,7 +122,14 @@ impl Registry {
                     .push(PluginStatus::disabled(manifest, reason));
                 continue;
             }
-            registry.register(plugin.as_ref(), slices, env, switched_off, layers)?;
+            registry.register(
+                plugin.as_ref(),
+                slices,
+                env,
+                switched_off,
+                layers,
+                &reserved,
+            )?;
             registry.plugins.push(PluginStatus::loaded(manifest));
         }
         Ok(registry)
@@ -123,6 +143,7 @@ impl Registry {
         env: &Env,
         switched_off: &BTreeSet<String>,
         layers: &[crate::settings::Layer],
+        reserved: &BTreeSet<String>,
     ) -> Result<(), HostError> {
         let manifest = plugin.manifest();
         let slice = slices
@@ -130,7 +151,9 @@ impl Registry {
             .cloned()
             .unwrap_or_else(|| Value::Object(Map::new()));
         let mut registrar = Registrar::new(manifest.id, slice, env.clone(), switched_off.clone())
-            .with_sources(crate::settings::sources::for_plugin(layers, manifest));
+            .with_sources(crate::settings::sources::for_plugin(
+                layers, manifest, reserved,
+            ));
         plugin
             .register(&mut registrar)
             .map_err(|source| HostError::Register {
@@ -577,6 +600,7 @@ mod tests {
             &Env::rooted("/nowhere"),
             &off,
             &[],
+            &BTreeSet::new(),
         )
         .expect("nothing here fails to register")
     }

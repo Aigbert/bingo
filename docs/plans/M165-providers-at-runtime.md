@@ -33,7 +33,8 @@ keep their resolved endpoint; credentials never enter errors or recorded input.
 - Legacy named entries gain missing metadata only from exactly one user-layer family
   declaration, using that layer's addresses before merging. Project/local never adopt.
   Default legacy entries use user-layer addresses or the shipped defaults; never overrides.
-  Existing metadata is retained. Explicit legacy API-key and Codex regressions remain.
+  Existing metadata is retained; reserved names cannot adopt another family's legacy key.
+  Explicit legacy API-key and Codex regressions remain.
 - Reserved names include registered providers/shapes and all shipped families, switched
   on or off, supplied by binary config. Boot collisions skip instances with notices;
   late providers take precedence. Notices name the instance, winning plugin/family and

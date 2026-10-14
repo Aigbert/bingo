@@ -91,7 +91,9 @@ impl Endpoint<'_> {
         let allowed = if self.family == self.name {
             true
         } else {
-            value.is_some() && registrar.sources().user_instances.get(self.name) == Some(&1)
+            value.is_some()
+                && registrar.sources().user_instances.get(self.name) == Some(&1)
+                && !registrar.sources().reserved_providers.contains(self.name)
         };
         if !allowed {
             return;

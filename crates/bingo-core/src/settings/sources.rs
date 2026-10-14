@@ -3,8 +3,15 @@ use super::Layer;
 use bingo_sdk::PluginManifest;
 use bingo_sdk::plugin::{ConfigLayer, ConfigSources};
 
-pub(crate) fn for_plugin(layers: &[Layer], manifest: &PluginManifest) -> ConfigSources {
-    let mut sources = ConfigSources::default();
+pub(crate) fn for_plugin(
+    layers: &[Layer],
+    manifest: &PluginManifest,
+    reserved: &std::collections::BTreeSet<String>,
+) -> ConfigSources {
+    let mut sources = ConfigSources {
+        reserved_providers: reserved.clone(),
+        ..Default::default()
+    };
     for layer in layers {
         if layer.is_user() {
             for family in layer.value.values() {

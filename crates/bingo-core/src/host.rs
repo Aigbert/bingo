@@ -142,6 +142,7 @@ impl Host {
             &config.env,
             &switched_off,
             &config.layers,
+            &config.reserved_providers,
         )?;
         registry.reserve_providers(&config.reserved_providers, &config.layers);
         for link in &mut registry.links {

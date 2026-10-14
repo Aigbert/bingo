@@ -1,5 +1,5 @@
 //! The source of claimed settings, before field-by-field merging.
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Map, Value};
 
@@ -15,6 +15,8 @@ pub struct ConfigSources {
     pub layers: Vec<ConfigLayer>,
     /// Counts across all families, without exposing another plugin's settings.
     pub user_instances: BTreeMap<String, usize>,
+    /// Provider identities reserved by the composition, including disabled families.
+    pub reserved_providers: BTreeSet<String>,
 }
 
 impl ConfigSources {
