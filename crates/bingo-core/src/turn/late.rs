@@ -212,6 +212,9 @@ impl ProviderSet {
     }
 
     fn take(providers: &mut Vec<Arc<dyn Provider>>, source: &str, provider: Arc<dyn Provider>) {
+        if !provider.instance() {
+            providers.retain(|held| held.id() != provider.id() || !held.instance());
+        }
         if providers.iter().any(|held| held.id() == provider.id()) {
             tracing::debug!(
                 source,

@@ -137,6 +137,7 @@ impl Host {
         ));
         let switched_off = settings.kernel.switched_off();
         let mut registry = Registry::load(&plugins, &settings.plugins, &config.env, &switched_off)?;
+        registry.reserve_providers(&config.reserved_providers);
         for link in &mut registry.links {
             if let Some(name) = &link.external {
                 link.tier = settings
@@ -247,6 +248,7 @@ impl Host {
         unknown
             .chain(self.settings.notices.iter().cloned())
             .chain(self.registry.notices.iter().cloned())
+            .chain(self.registry.provider_state.instances.notices())
             .collect()
     }
 

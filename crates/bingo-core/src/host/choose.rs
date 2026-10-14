@@ -22,7 +22,16 @@ impl Host {
         }
         .gather()
         .await;
-        self.registry.provider_state.instances.gather(providers)
+        let instances = &self.registry.provider_state.instances;
+        for held in self.registry.providers.iter().filter(|p| p.instance()) {
+            if providers
+                .iter()
+                .any(|p| p.id() == held.id() && !p.instance())
+            {
+                instances.skip(held.id());
+            }
+        }
+        instances.gather(providers)
     }
 
     /// The provider `id` names; with none, the settings' provider; with

@@ -745,14 +745,16 @@ async fn added_provider(env: &Env, platforms: &Platforms) -> Result<i32, KernelE
 /// the manifests the plugins publish (`provider:<id>`): a name to refuse is
 /// nothing this file knows on its own.
 fn provider_ids(platforms: &Platforms) -> Result<BTreeSet<String>, KernelError> {
-    Ok(
+    let mut names: BTreeSet<String> =
         plugins(Composition::default(), platforms, std::path::Path::new("."))?
             .iter()
             .flat_map(|plugin| plugin.manifest().provides)
             .filter_map(|provided| provided.strip_prefix("provider:"))
             .map(str::to_string)
-            .collect(),
-    )
+            .collect();
+    // This shipped family is only instantiated when the local harness is enabled.
+    names.insert("fake".into());
+    Ok(names)
 }
 
 fn host_config(
@@ -761,6 +763,7 @@ fn host_config(
     platforms: &Platforms,
 ) -> Result<HostConfig, KernelError> {
     let mut config = HostConfig::new(environment(cwd));
+    config.reserved_providers = provider_ids(platforms)?;
     config.layers = settings::load(&config.env, cwd, cli.settings.as_deref())
         .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e.to_string()))?;
     if let Some(path) = &cli.mcp_config {

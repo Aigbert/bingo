@@ -7,6 +7,8 @@ use serde_json::Value;
 pub struct HostConfig {
     /// Settings layers, lowest priority first; the command line is the last.
     pub layers: Vec<Layer>,
+    /// Provider families shipped by the embedding binary, including disabled plugins.
+    pub reserved_providers: std::collections::BTreeSet<String>,
     /// A system block appended after the kernel's own (hosts, tests).
     pub extra_system: Option<String>,
     pub budget: TurnBudget,
@@ -21,6 +23,7 @@ impl HostConfig {
     pub fn new(env: Env) -> Self {
         Self {
             layers: Vec::new(),
+            reserved_providers: Default::default(),
             extra_system: None,
             budget: TurnBudget::default(),
             env,

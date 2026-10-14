@@ -274,3 +274,76 @@ async fn readding_a_name_does_not_restore_its_cleared_default() {
         "m"
     );
 }
+
+#[tokio::test]
+async fn shipped_families_stay_reserved_when_disabled() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = HostConfig::new(Env::rooted(dir.path()));
+    config.reserved_providers.insert("disabled-family".into());
+    let host = Host::build(
+        vec![TestPlugin::boxed(
+            &PROVIDER,
+            vec![Contribution::ProviderShape(Arc::new(Shape))],
+        )],
+        config,
+    )
+    .await
+    .unwrap();
+    assert!(
+        provider::add_provider(&host, "disabled-family", "local", "http://up")
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn colliding_boot_instances_never_prevent_a_host_build() {
+    for instance_first in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let mut contributions = vec![
+            Contribution::Provider(ScriptedProvider::new(vec![])),
+            Contribution::Provider(Arc::new(Local {
+                name: "scripted".into(),
+                url: "http://up".into(),
+            })),
+        ];
+        if instance_first {
+            contributions.reverse();
+        }
+        let host = Host::build(
+            vec![TestPlugin::boxed(&PROVIDER, contributions)],
+            HostConfig::new(Env::rooted(dir.path())),
+        )
+        .await
+        .unwrap();
+        assert!(!host.provider(Some("scripted")).await.unwrap().instance());
+        assert!(
+            host.notices()
+                .iter()
+                .any(|(_, text)| text.contains("scripted") && text.contains("Skipped"))
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_late_provider_takes_precedence_over_a_boot_instance() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = ScriptedProviderSource::new(vec![]);
+    let host = Host::build(
+        vec![TestPlugin::boxed(
+            &PROVIDER,
+            vec![
+                Contribution::Provider(Arc::new(Local {
+                    name: "scripted".into(),
+                    url: "http://up".into(),
+                })),
+                Contribution::Providers(source.clone()),
+            ],
+        )],
+        HostConfig::new(Env::rooted(dir.path())),
+    )
+    .await
+    .unwrap();
+    source.set(vec![ScriptedProvider::new(vec![])]);
+    assert!(!host.provider(Some("scripted")).await.unwrap().instance());
+}

@@ -1,6 +1,6 @@
 //! Live replacements and removals; sessions keep their previously resolved Arc.
 use bingo_sdk::{Provider, ProviderShape};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
@@ -14,6 +14,7 @@ pub(super) struct ProviderState {
 #[derive(Default)]
 pub(super) struct Instances {
     entries: Mutex<BTreeMap<String, Option<Arc<dyn Provider>>>>,
+    skipped: Mutex<BTreeSet<String>>,
     pub edit: tokio::sync::Mutex<()>,
     pub command: tokio::sync::Mutex<()>,
 }
@@ -21,9 +22,40 @@ pub(super) struct Instances {
 impl Instances {
     pub fn gather(&self, mut providers: Vec<Arc<dyn Provider>>) -> Vec<Arc<dyn Provider>> {
         let entries = self.entries.lock().unwrap_or_else(|p| p.into_inner());
-        providers.retain(|p| !entries.contains_key(p.id()));
-        providers.extend(entries.values().filter_map(Clone::clone));
+        providers.retain(|p| !p.instance() || !entries.contains_key(p.id()));
+        for (name, entry) in entries.iter() {
+            if providers.iter().any(|p| p.id() == name && !p.instance()) {
+                if entry.is_some() {
+                    self.skip(name);
+                }
+            } else if let Some(provider) = entry {
+                providers.push(provider.clone());
+            }
+        }
         providers
+    }
+
+    pub fn skip(&self, name: &str) {
+        self.skipped
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert(name.into());
+    }
+
+    pub fn notices(&self) -> Vec<(String, String)> {
+        self.skipped
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .iter()
+            .map(|name| {
+                (
+                    "provider.instance".into(),
+                    format!(
+                        "Skipped instance `{name}`: that name belongs to a registered provider."
+                    ),
+                )
+            })
+            .collect()
     }
 
     pub fn current(&self, provider: &Arc<dyn Provider>) -> Option<bool> {

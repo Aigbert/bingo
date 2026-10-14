@@ -300,39 +300,31 @@ async fn an_instance_is_reachable_by_provider_and_by_model() {
     assert_eq!(body["model"], "gpt-5.4");
 }
 
-/// A name is an identity: taking one that is already a provider's stops the
-/// boot, whether the collision is inside one plugin's settings or across two.
+/// A conflicting instance is skipped without preventing unrelated turns.
 #[test]
-fn a_colliding_instance_name_stops_the_boot_and_is_named() {
+fn a_colliding_instance_name_is_skipped_and_named() {
     let home = tempfile::tempdir().unwrap();
-    let refused = |value: serde_json::Value| {
+    for (name, value) in [
+        (
+            "codex",
+            serde_json::json!({"openai":{"instances":{"codex":{}}}}),
+        ),
+        (
+            "anthropic",
+            serde_json::json!({"openai":{"instances":{"anthropic":{}}}}),
+        ),
+        (
+            "shared",
+            serde_json::json!({"openai":{"instances":{"shared":{}}}, "anthropic":{"instances":{"shared":{}}}}),
+        ),
+    ] {
         let file = settings(home.path(), value);
         let out = run(bingo_with(home.path(), &file).args(["--print", "--provider", "fake", "hi"]));
-        assert_ne!(out.status.code(), Some(0), "stdout: {}", stdout(&out));
+        assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+        let notice = stderr(&out);
         assert!(
-            out.stdout.is_empty(),
-            "a boot refusal prints no model output"
+            notice.contains("Skipped") && notice.contains(name),
+            "{notice}"
         );
-        stderr(&out)
-    };
-    let err = refused(serde_json::json!({ "openai": { "instances": { "codex": {} } } }));
-    assert!(
-        err.contains("`codex`") && err.starts_with("[error]"),
-        "{err}"
-    );
-
-    let err = refused(serde_json::json!({ "openai": { "instances": { "anthropic": {} } } }));
-    assert!(
-        err.contains("provider anthropic is already registered"),
-        "{err}"
-    );
-
-    let err = refused(serde_json::json!({
-        "openai": { "instances": { "proxy1": {}, "shared": {} } },
-        "anthropic": { "instances": { "shared": {} } },
-    }));
-    assert!(
-        err.contains("shared") && err.starts_with("[error]"),
-        "two plugins cannot both answer to one name: {err}"
-    );
+    }
 }

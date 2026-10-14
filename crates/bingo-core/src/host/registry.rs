@@ -252,16 +252,53 @@ impl Registry {
     }
 
     fn add_provider(&mut self, provider: Arc<dyn Provider>) -> Result<(), String> {
-        if self.providers.iter().any(|p| p.id() == provider.id())
-            || self.agents.iter().any(|a| a.id() == provider.id())
-        {
-            return Err(format!("provider {} is already registered", provider.id()));
+        let collision = self.providers.iter().find(|p| p.id() == provider.id());
+        if collision.is_some() || self.endpoint_name_taken(provider.id()) {
+            if provider.instance() {
+                self.skip_instance(provider.id());
+                return Ok(());
+            }
+            if collision.is_some_and(|p| p.instance()) {
+                self.skip_instance(provider.id());
+                self.providers.retain(|p| p.id() != provider.id());
+            } else {
+                return Err(format!("provider {} is already registered", provider.id()));
+            }
         }
         self.providers.push(provider);
         Ok(())
     }
 
+    fn skip_instance(&mut self, id: &str) {
+        self.notices.push((
+            "provider.instance".into(),
+            format!("Skipped instance `{id}`: that name belongs to a registered provider."),
+        ));
+    }
+
+    pub(super) fn reserve_providers(&mut self, names: &BTreeSet<String>) {
+        let skipped: Vec<String> = self
+            .providers
+            .iter()
+            .filter(|p| p.instance() && names.contains(p.id()))
+            .map(|p| p.id().to_string())
+            .collect();
+        self.providers
+            .retain(|p| !p.instance() || !names.contains(p.id()));
+        for name in skipped {
+            self.skip_instance(&name);
+        }
+    }
+
     fn add_agent(&mut self, agent: Arc<dyn Agent>) -> Result<(), String> {
+        if self
+            .providers
+            .iter()
+            .any(|p| p.id() == agent.id() && p.instance())
+        {
+            self.skip_instance(agent.id());
+            self.providers.retain(|p| p.id() != agent.id());
+        }
         if self.providers.iter().any(|p| p.id() == agent.id())
             || self.agents.iter().any(|a| a.id() == agent.id())
         {
