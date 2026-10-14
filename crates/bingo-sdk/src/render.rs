@@ -70,6 +70,14 @@ pub struct HandlerEvent {
 mod tests {
     use super::*;
     #[test]
+    fn question_is_named_for_its_drawing() {
+        let wire = serde_json::json!("Question");
+        let component: Component = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(serde_json::to_value(component).unwrap(), wire);
+        assert!(serde_json::from_value::<Component>(serde_json::json!("AskUserQuestion")).is_err());
+    }
+
+    #[test]
     fn render_request_round_trips_and_permission_is_not_a_component() {
         let wire = serde_json::json!({"component":"Pane","requestId":"counter","surface":"terminal",
             "props":{},"viewport":{"columns":80,"rows":8}});

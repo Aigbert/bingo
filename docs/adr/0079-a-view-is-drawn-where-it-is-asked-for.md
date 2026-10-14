@@ -66,7 +66,7 @@ the state the host holds (ADR-0078 §6). This door opens, no other.
    a render hook may answer: `UserMessage`, `AssistantMessage`,
    `ToolUse`, `ToolResult`, `ToolGroup`, `ToolProgress`, `CommandOutput`,
    `Spinner`, `TurnDuration`, `InfoNotice`, `SessionMode`, `PromptHint`,
-   `AbovePrompt`, `Pane` and `AskUserQuestion`.
+   `AbovePrompt`, `Pane` and `Question`.
    - Its props are an sdk type: the item, `viewport`, `focused`,
      `expanded`.
    - The config view lists the components some loaded hook matches; a
@@ -118,3 +118,5 @@ Refs: ADR-0002, ADR-0013, ADR-0065, ADR-0070, ADR-0078, ADR-0080; design/mods-pa
 Non-goals: `Client` modules, meaning code that runs on a surface's
 drawing thread, and `$.ui.blit`. A mod drawing the permission prompt.
 Styling beyond the table.
+
+2026-10-14, person's delegate: pre-release, M140: the AskUserQuestion component is Question; the kernel names no tool (check_discipline 4c).

@@ -73,7 +73,7 @@ After M121, M123–M125, M137, M138.
 - 2026-10-14, person's delegate: authorize print Invalidated ignore arms and all mechanical Event/Shown/element sibling mappings; record files below, stop only for new out-of-scope behaviour.
 - 2026-10-14, person's delegate: authorize theme-test file additions only for fitting token roles, keep ember/accent lists and theme values unchanged; merge dev before regenerating and running final gates.
 - Pure flex layout adds no dependency; fixed-axis and legacy narrow fixtures pass. Budget remains unverified at this stop.
-- Stopped 2026-10-14 (protocol step 6): discipline bans the ADR-0079-required `Component::AskUserQuestion`; `scripts/check_discipline.sh` is outside Files. Authorize an exception for exactly this component declaration, preserving the ban elsewhere, or revise the ADR. Final gates (including the isolated ACP token tests), full smoke and Windows checks remain pending; ADR-0079 stays proposed.
+- 2026-10-14, person's delegate: rename the component to `Question` (wire `Question`), amend ADR-0079 and regenerate contracts; keep discipline 4c unchanged.
 ## Verified (2026-10-14)
 
 Theme allowlist additions: text → `toast.rs`, `views/{input,select}.rs`; dim → `views/{button,flex,input,link,mod,text}.rs`; bad → `views/button.rs`; no ember/accent additions.
