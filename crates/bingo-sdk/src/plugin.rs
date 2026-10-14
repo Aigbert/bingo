@@ -2,7 +2,9 @@
 //! `register` that only adds contributions, and `start`/`stop` for I/O.
 
 mod reload;
+mod settings;
 pub use reload::PluginReload;
+pub use settings::{ConfigLayer, ConfigSources};
 
 use std::any::Any;
 use std::collections::BTreeSet;
@@ -418,6 +420,7 @@ impl fmt::Debug for Contribution {
 pub struct Registrar {
     plugin_id: String,
     config: Value,
+    sources: ConfigSources,
     env: Env,
     switched_off: BTreeSet<String>,
     contributions: Vec<Contribution>,
@@ -462,11 +465,21 @@ impl Registrar {
         Self {
             plugin_id: plugin_id.into(),
             config,
+            sources: ConfigSources::default(),
             env,
             switched_off,
             contributions: Vec::new(),
             notices: Vec::new(),
         }
+    }
+
+    pub fn with_sources(mut self, sources: ConfigSources) -> Self {
+        self.sources = sources;
+        self
+    }
+
+    pub fn sources(&self) -> &ConfigSources {
+        &self.sources
     }
 
     /// Where the host lives: home, config and data directories.

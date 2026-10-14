@@ -136,7 +136,13 @@ impl Host {
             std::mem::take(&mut settings.repository_entries),
         ));
         let switched_off = settings.kernel.switched_off();
-        let mut registry = Registry::load(&plugins, &settings.plugins, &config.env, &switched_off)?;
+        let mut registry = Registry::load(
+            &plugins,
+            &settings.plugins,
+            &config.env,
+            &switched_off,
+            &config.layers,
+        )?;
         registry.reserve_providers(&config.reserved_providers);
         for link in &mut registry.links {
             if let Some(name) = &link.external {

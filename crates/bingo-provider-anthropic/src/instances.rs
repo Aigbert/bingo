@@ -134,9 +134,27 @@ fn allowed(
     store: &CredentialStore,
     registrar: &mut Registrar,
 ) -> bool {
+    let file = registrar
+        .sources()
+        .source(&[owner, "instances", name])
+        .unwrap_or("settings")
+        .to_string();
     if let Err(error) = claim(named, name) {
-        registrar.notice("provider.instance", format!("Skipped instance: {error}"));
+        registrar.notice(
+            "provider.instance",
+            format!("Skipped instance `{name}` in {file}: {error}; rename or delete it there."),
+        );
         return false;
+    }
+    if store.read(name).is_err() {
+        registrar.notice(
+            "provider.credentials",
+            format!(
+                "{} is unreadable; stored keys are unavailable.",
+                store.path().display()
+            ),
+        );
+        return true;
     }
     if store.owned_by(owner).read(name).is_err() {
         registrar.notice("provider.instance", format!(

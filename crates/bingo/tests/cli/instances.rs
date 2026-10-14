@@ -332,3 +332,44 @@ fn a_colliding_instance_name_is_skipped_and_named() {
         );
     }
 }
+
+#[test]
+fn invalid_instance_notice_names_the_declaration_file() {
+    let home = tempfile::tempdir().unwrap();
+    let file = settings(
+        home.path(),
+        serde_json::json!({
+            "openai": {"instances": {"channels.telegram": {}}}
+        }),
+    );
+    let out = run(bingo_with(home.path(), &file).args(["--print", "--provider", "openai", "hi"]));
+    let notice = stderr(&out);
+    assert!(
+        notice.contains("channels.telegram") && notice.contains(&file.display().to_string()),
+        "{notice}"
+    );
+}
+
+#[test]
+fn corrupt_credentials_report_once_without_skipping_instances() {
+    let home = tempfile::tempdir().unwrap();
+    let file = settings(
+        home.path(),
+        serde_json::json!({
+            "openai": {"instances": {"work": {}}},
+            "anthropic": {"instances": {"personal": {}}}
+        }),
+    );
+    write_auth(home.path(), serde_json::json!({}));
+    std::fs::write(auth_json(home.path()), "{broken").unwrap();
+    let out = run(bingo_with(home.path(), &file).args(["--print", "--provider", "work", "hi"]));
+    let notice = stderr(&out);
+    assert!(!notice.contains("Skipped"), "{notice}");
+    assert!(!notice.contains("unknown owner"), "{notice}");
+    assert_eq!(
+        notice.matches("auth.json is unreadable").count(),
+        1,
+        "{notice}"
+    );
+    assert!(notice.contains("AUTH_REQUIRED"), "{notice}");
+}

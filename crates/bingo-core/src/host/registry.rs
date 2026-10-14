@@ -94,6 +94,7 @@ impl Registry {
         slices: &BTreeMap<String, Value>,
         env: &Env,
         switched_off: &BTreeSet<String>,
+        layers: &[crate::settings::Layer],
     ) -> Result<Self, HostError> {
         let mut registry = Registry {
             notices: ignored_switches(plugins, switched_off),
@@ -108,7 +109,7 @@ impl Registry {
                     .push(PluginStatus::disabled(manifest, reason));
                 continue;
             }
-            registry.register(plugin.as_ref(), slices, env, switched_off)?;
+            registry.register(plugin.as_ref(), slices, env, switched_off, layers)?;
             registry.plugins.push(PluginStatus::loaded(manifest));
         }
         Ok(registry)
@@ -121,20 +122,26 @@ impl Registry {
         slices: &BTreeMap<String, Value>,
         env: &Env,
         switched_off: &BTreeSet<String>,
+        layers: &[crate::settings::Layer],
     ) -> Result<(), HostError> {
         let manifest = plugin.manifest();
         let slice = slices
             .get(manifest.id)
             .cloned()
             .unwrap_or_else(|| Value::Object(Map::new()));
-        let mut registrar = Registrar::new(manifest.id, slice, env.clone(), switched_off.clone());
+        let mut registrar = Registrar::new(manifest.id, slice, env.clone(), switched_off.clone())
+            .with_sources(crate::settings::sources::for_plugin(layers, manifest));
         plugin
             .register(&mut registrar)
             .map_err(|source| HostError::Register {
                 plugin: manifest.id.to_string(),
                 source,
             })?;
-        self.notices.extend(registrar.take_notices());
+        for notice in registrar.take_notices() {
+            if !self.notices.contains(&notice) {
+                self.notices.push(notice);
+            }
+        }
         for contribution in registrar.into_contributions() {
             declared_service(manifest, &contribution)?;
             self.add(manifest.id, contribution)?;
@@ -536,8 +543,14 @@ mod tests {
     /// The same load, with the names a person turned off.
     fn switched(plugins: Vec<Box<dyn Plugin>>, off: &[&str]) -> Registry {
         let off: BTreeSet<String> = off.iter().map(|n| (*n).to_string()).collect();
-        Registry::load(&plugins, &BTreeMap::new(), &Env::rooted("/nowhere"), &off)
-            .expect("nothing here fails to register")
+        Registry::load(
+            &plugins,
+            &BTreeMap::new(),
+            &Env::rooted("/nowhere"),
+            &off,
+            &[],
+        )
+        .expect("nothing here fails to register")
     }
 
     fn status<'a>(registry: &'a Registry, id: &str) -> &'a PluginStatus {

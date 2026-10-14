@@ -13,6 +13,7 @@ mod format;
 pub mod instances;
 mod merge;
 mod migrate;
+pub(crate) mod sources;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
