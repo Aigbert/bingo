@@ -393,10 +393,12 @@ for width in 80 200; do
   keys 'i'
   await 'Count: 1'
   keys Tab
+  step "${width}x24: editing Counter Input"
   keys 'Ada'
   await 'Name: Ada'
   keys Escape
   vanish 'Count: 1'
+  step "${width}x24: reopening Counter to verify saved Input"
   keys '/counter' Enter
   await 'Count: 1'
   await 'Name: Ada'
