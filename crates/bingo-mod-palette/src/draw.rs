@@ -25,21 +25,32 @@ impl Interceptor for Drawing {
         _: Next<'_, Value, Value>,
     ) -> Result<Value, KernelError> {
         let request: render::RenderRequest = serde_json::from_value(value).map_err(crate::error)?;
-        let mut props: PaletteProps =
-            serde_json::from_value(request.props).map_err(crate::error)?;
-        enrich(&mut props, &cx.host);
+        let props: PaletteProps = serde_json::from_value(request.props).map_err(crate::error)?;
         let mut shared = self.0.lock().map_err(crate::error)?;
         let (groups, initial) = groups(&props, shared.recent.names());
         let cursor = shared
             .cursors
             .entry((cx.session.clone(), request.request_id.clone()))
-            .or_default();
+            .or_insert_with(|| crate::Cursor {
+                query: props.query.clone(),
+                selected: initial,
+            });
         if cursor.query != props.query {
             cursor.query = props.query.clone();
             cursor.selected = initial;
         }
         let count = groups.iter().map(|group| group.rows.len()).sum::<usize>();
         cursor.selected = cursor.selected.min(count.saturating_sub(1));
+        let rows = groups.iter().flat_map(|g| &g.rows).collect::<Vec<_>>();
+        if rows
+            .get(cursor.selected)
+            .is_some_and(|row| matches!(row.target, crate::rows::Target::Inert))
+        {
+            cursor.selected = rows
+                .iter()
+                .position(|row| !matches!(row.target, crate::rows::Target::Inert))
+                .unwrap_or(0);
+        }
         serde_json::to_value(tree(
             &props,
             &groups,
@@ -48,33 +59,6 @@ impl Interceptor for Drawing {
             request.viewport.rows,
         ))
         .map_err(crate::error)
-    }
-}
-fn enrich(props: &mut PaletteProps, host: &HostHandle) {
-    if let Some(reader) = host.service(&command::COMMAND_CATALOG) {
-        let mut state = SessionState::new(props.summary.clone());
-        state.config = props.config.clone();
-        state.context = props.context;
-        state.signals = props.signals.clone();
-        let providers = props
-            .catalogs
-            .get("providers")
-            .into_iter()
-            .flatten()
-            .filter_map(|entry| serde_json::from_value(entry.meta["auth"].clone()).ok())
-            .collect::<Vec<_>>();
-        props.commands = reader
-            .catalog(
-                Catalog {
-                    kind: CatalogKind::Commands,
-                    entries: std::mem::take(&mut props.commands),
-                },
-                &command::SessionView {
-                    state: &state,
-                    providers: &providers,
-                },
-            )
-            .entries;
     }
 }
 pub(crate) fn groups(props: &PaletteProps, recent: &[String]) -> (Vec<Group>, usize) {
@@ -95,10 +79,41 @@ pub(crate) fn groups(props: &PaletteProps, recent: &[String]) -> (Vec<Group>, us
         &props.bindings,
         &props.sessions,
         recent,
-        props.summary.id.as_str(),
+        props.session.as_str(),
     );
+    let conversation =
+        crate::rows::conversation(&props.conversation, query, props.session.as_str());
+    let at = if props.open == component::PaletteOpen::Sessions {
+        0
+    } else {
+        groups
+            .iter()
+            .position(|g| g.name == "sessions")
+            .unwrap_or(groups.len())
+    };
+    for group in &mut groups {
+        if group.name == "sessions" {
+            group.name = "stored sessions".into();
+        }
+    }
+    if !conversation.is_empty()
+        && (!query.is_empty() || props.open == component::PaletteOpen::Sessions)
+    {
+        groups.insert(
+            at,
+            Group {
+                name: "this conversation".into(),
+                rows: conversation,
+            },
+        );
+    }
     crate::hints::append(&mut groups, props, query);
-    (groups, 0)
+    let selected = if props.open == component::PaletteOpen::Sessions && query.is_empty() {
+        groups.iter().flat_map(|g| &g.rows).position(|row| matches!(&row.target, crate::rows::Target::View(id) if id == props.session.as_str())).unwrap_or(0)
+    } else {
+        0
+    };
+    (groups, selected)
 }
 pub fn tree(
     props: &PaletteProps,
@@ -147,18 +162,20 @@ pub fn tree(
     }
 }
 fn row_view(row: &Row, selected: bool) -> View {
+    let inert = matches!(row.target, crate::rows::Target::Inert);
+    let selected = selected && !inert;
     let label = View::Box {
-        children: vec![marked(&row.label, &row.marks, false)],
+        children: vec![marked(&row.label, &row.marks, inert)],
         layout: Box::new(view::BoxStyle {
             width: match row.target {
                 crate::rows::Target::Command(_) => Some(14),
-                crate::rows::Target::Key(_) => Some(13),
+                crate::rows::Target::Key(_) | crate::rows::Target::Inert => Some(13),
                 _ => None,
             },
             ..Default::default()
         }),
     };
-    let children = vec![
+    let mut children = vec![
         View::text(if selected { " ❯ " } else { "   " }),
         label,
         marked(
@@ -167,6 +184,15 @@ fn row_view(row: &Row, selected: bool) -> View {
             true,
         ),
     ];
+    if let Some(alert) = &row.alert {
+        children.push(View::Text {
+            children: vec![view::TextChild::String(format!(" · {alert}"))],
+            style: view::TextStyle {
+                color: Some("yellow".into()),
+                ..Default::default()
+            },
+        });
+    }
     View::Box {
         children: vec![
             View::Box {

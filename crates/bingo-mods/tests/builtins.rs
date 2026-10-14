@@ -28,7 +28,7 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
     }
     let config = HostConfig::new(Env::rooted(home)).with_layer(
         "test",
-        json!({"enabledPlugins":{"hello":!disabled,"ask":!disabled,"palette":!disabled}}),
+        json!({"enabledPlugins":{"hello":!disabled,"ask":!disabled,"bingo.mod.palette":!disabled}}),
     );
     let host = Host::build(plugins, config).await.unwrap();
     let attachment = host
@@ -254,10 +254,8 @@ async fn palette_request(host: &Host, attachment: &Attachment) -> render::Render
         bindings: keys::bindings(&specs, &Default::default(), &[]).commands,
         key_hints: Default::default(),
         sessions: vec![],
-        summary: attachment.snapshot.summary.clone(),
-        config: attachment.snapshot.config.clone(),
-        context: None,
-        signals: attachment.snapshot.signals.clone(),
+        session: attachment.snapshot.summary.id.clone(),
+        conversation: vec![],
         action: Action {
             name: "surface:palette".into(),
             args: json!({"handler":"palette"}),

@@ -26,7 +26,7 @@ struct State {
 }
 type Shared = Arc<Mutex<State>>;
 static MANIFEST: PluginManifest = PluginManifest {
-    id: "palette",
+    id: "bingo.mod.palette",
     version: env!("CARGO_PKG_VERSION"),
     uses: &[],
     requires: &[],
@@ -34,7 +34,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "command:help",
         "command:resume",
         "command:palette:ui",
-        "service:palette.pages",
+        "service:bingo.mod.palette.pages",
     ],
     config: None,
 };

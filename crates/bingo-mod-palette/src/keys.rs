@@ -77,14 +77,26 @@ impl Handler {
             .collect::<Vec<_>>();
         let cursor = shared
             .cursors
-            .entry((props.summary.id.clone(), request.into()))
-            .or_default();
+            .entry((props.session.clone(), request.into()))
+            .or_insert_with(|| crate::Cursor {
+                query: props.query.clone(),
+                selected: initial,
+            });
         if cursor.query != props.query {
             cursor.query = props.query.clone();
             cursor.selected = initial;
         }
+        if rows
+            .get(cursor.selected)
+            .is_some_and(|row| matches!(row.target, Target::Inert))
+        {
+            cursor.selected = rows
+                .iter()
+                .position(|row| !matches!(row.target, Target::Inert))
+                .unwrap_or(0);
+        }
         let target = rows.get(cursor.selected).map(|row| row.target.clone());
-        let (handled, operation) = operation(cursor, rows.len(), target, key, props);
+        let (handled, operation) = operation(cursor, &rows, target, key, props);
         if !handled {
             return Ok(CommandOutcome::Handled { handled: false });
         }
@@ -97,10 +109,12 @@ impl Handler {
         if operation.get("close").is_some()
             || operation.get("run").is_some()
             || operation.get("resume").is_some()
+            || operation.get("view").is_some()
+            || operation.get("key").is_some()
         {
             shared
                 .cursors
-                .remove(&(props.summary.id.clone(), request.into()));
+                .remove(&(props.session.clone(), request.into()));
         }
         surface(props, operation)
     }
@@ -111,7 +125,10 @@ fn surface(props: &PaletteProps, operation: Value) -> Result<CommandOutcome, Ker
         return Ok(CommandOutcome::Handled { handled: false });
     }
     action.args["value"] = operation;
-    Ok(CommandOutcome::Surface { action, fallback: None })
+    Ok(CommandOutcome::Surface {
+        action,
+        fallback: None,
+    })
 }
 
 fn activate(target: Target, props: &PaletteProps) -> Value {
@@ -133,29 +150,41 @@ fn activate(target: Target, props: &PaletteProps) -> Value {
         }
         Target::Key(line) | Target::Run(line) => json!({"run":line}),
         Target::Edit(line) => json!({"edit":line}),
-        Target::Session(id) if id == props.summary.id.as_str() => {
+        Target::Session(id) | Target::View(id) if id == props.session.as_str() => {
             json!({"message":"this session is already in view"})
         }
         Target::Session(id) => json!({"resume":id}),
+        Target::View(id) => json!({"view":id}),
+        Target::Inert => Value::Null,
     }
 }
 
 fn operation(
     cursor: &mut crate::Cursor,
-    count: usize,
+    rows: &[&crate::rows::Row],
     target: Option<Target>,
     key: &str,
     props: &PaletteProps,
 ) -> (bool, Option<Value>) {
     let operation = match key {
         "up" => {
-            cursor.selected = cursor.selected.saturating_sub(1);
+            if let Some(at) = (0..cursor.selected)
+                .rev()
+                .find(|at| !matches!(rows[*at].target, Target::Inert))
+            {
+                cursor.selected = at;
+            }
             None
         }
         "down" => {
-            cursor.selected = (cursor.selected + 1).min(count.saturating_sub(1));
+            if let Some(at) = (cursor.selected + 1..rows.len())
+                .find(|at| !matches!(rows[*at].target, Target::Inert))
+            {
+                cursor.selected = at;
+            }
             None
         }
+        "ctrl+c" => Some(json!({"close":true})),
         "esc" => Some(
             crate::args::parent(&props.query, &props.commands)
                 .map(|edit| json!({"edit":edit}))
@@ -166,11 +195,87 @@ fn operation(
             Target::Command(name) => Some(json!({"edit":format!("/{name} ")})),
             _ => None,
         }),
-        "enter" => target.map(|target| activate(target, props)).or_else(|| {
-            (props.query.starts_with('/') && props.query.len() > 1)
-                .then(|| json!({"run":props.query.trim()}))
-        }),
+        "enter" => target
+            .filter(|target| !matches!(target, Target::Inert))
+            .map(|target| activate(target, props))
+            .or_else(|| {
+                (props.query.starts_with('/') && props.query.len() > 1)
+                    .then(|| json!({"run":props.query.trim()}))
+            }),
         _ => return (false, None),
     };
     (true, operation)
+}
+
+#[cfg(test)]
+mod review_tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    fn props() -> PaletteProps {
+        serde_json::from_value(json!({"query":"", "open":"keys", "commands":[], "keyHints":{}, "bindings":{}, "session":"s", "conversation":[], "sessions":[], "action":{"name":"client", "args":{}}, "catalogs":{}})).unwrap()
+    }
+    #[test]
+    fn informational_and_interrupt_keys_are_not_actionable() {
+        let mut props = props();
+        for key in [
+            "ctrl+a/e",
+            "esc esc",
+            "up/down",
+            "alt+b/f",
+            "1-9 · y/a/n",
+            "v · drag",
+            "click",
+            "esc",
+            "ctrl+c",
+            "ctrl+d",
+        ] {
+            props.key_hints.insert(key.into(), "informational".into());
+        }
+        let (groups, _) = crate::draw::groups(&props, &[]);
+        assert!(
+            groups
+                .iter()
+                .flat_map(|g| &g.rows)
+                .all(|row| !matches!(row.target, Target::Key(_)))
+        );
+    }
+    #[test]
+    fn ctrl_c_clears_the_closed_openings_cursor() {
+        let home = tempfile::tempdir().unwrap();
+        let props = props();
+        let state = Arc::new(Mutex::new(crate::State {
+            recent: crate::recent::Recent::load(home.path().join("recent.json")),
+            cursors: Default::default(),
+        }));
+        state.lock().unwrap().cursors.insert(
+            (props.session.clone(), "opening".into()),
+            Default::default(),
+        );
+        let outcome = Handler(state.clone())
+            .press("opening", "ctrl+c", &props)
+            .unwrap();
+        assert!(
+            matches!(outcome, CommandOutcome::Surface { action, .. } if action.args["value"]["close"] == true)
+        );
+        assert!(state.lock().unwrap().cursors.is_empty());
+    }
+    #[test]
+    fn arrow_navigation_skips_inert_rows_and_enter_releases_its_cursor() {
+        let home = tempfile::tempdir().unwrap();
+        let mut props = props();
+        for key in ["shift+tab", "esc", "ctrl+o", "ctrl+c"] {
+            props.key_hints.insert(key.into(), key.into());
+        }
+        let state = Arc::new(Mutex::new(crate::State {
+            recent: crate::recent::Recent::load(home.path().join("recent.json")),
+            cursors: Default::default(),
+        }));
+        let handler = Handler(state.clone());
+        handler.press("opening", "down", &props).unwrap();
+        let outcome = handler.press("opening", "enter", &props).unwrap();
+        assert!(
+            matches!(outcome, CommandOutcome::Surface { action, .. } if action.args["value"]["key"] == "ctrl+o")
+        );
+        assert!(state.lock().unwrap().cursors.is_empty());
+    }
 }

@@ -64,10 +64,30 @@ fn rows(props: &PaletteProps, query: &str) -> Vec<Row> {
             label: key.clone(),
             hint: hint.clone(),
             now: String::new(),
+            alert: None,
             marks: vec![],
             hint_marks: vec![],
-            target: crate::rows::Target::Key(format!("@key:{key}")),
+            target: if actionable(key) {
+                crate::rows::Target::Key(format!("@key:{key}"))
+            } else {
+                crate::rows::Target::Inert
+            },
         })
         .filter_map(|row| crate::rows::filter(row, query))
         .collect()
+}
+
+fn actionable(key: &str) -> bool {
+    if matches!(key, "esc" | "ctrl+c" | "ctrl+d") {
+        return false;
+    }
+    let parts = key.split('+').collect::<Vec<_>>();
+    let Some((key, modifiers)) = parts.split_last() else {
+        return false;
+    };
+    modifiers
+        .iter()
+        .all(|part| matches!(*part, "ctrl" | "alt" | "shift"))
+        && (key.chars().count() == 1
+            || matches!(*key, "enter" | "tab" | "up" | "down" | "pgup" | "pgdn"))
 }

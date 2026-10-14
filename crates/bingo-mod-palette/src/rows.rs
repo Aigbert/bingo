@@ -1,4 +1,7 @@
-use bingo_sdk::{CatalogEntry, CommandSpec, SessionSummary, component::PaletteOpen};
+use bingo_sdk::{
+    CatalogEntry, CommandSpec,
+    component::{PaletteOpen, PaletteSession},
+};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -6,6 +9,8 @@ pub enum Target {
     Command(String),
     Key(String),
     Session(String),
+    View(String),
+    Inert,
     Edit(String),
     Run(String),
 }
@@ -13,6 +18,7 @@ pub enum Target {
 pub struct Row {
     pub label: String,
     pub hint: String,
+    pub alert: Option<String>,
     pub now: String,
     pub marks: Vec<usize>,
     pub hint_marks: Vec<usize>,
@@ -41,14 +47,14 @@ pub fn rows(
     query: &str,
     commands: &[CatalogEntry],
     bindings: &BTreeMap<String, String>,
-    sessions: &[SessionSummary],
+    sessions: &[PaletteSession],
     recent: &[String],
     current: &str,
 ) -> Vec<Group> {
     let mut groups = vec![
         Group {
             name: "commands".into(),
-            rows: command_rows(commands),
+            rows: command_rows(commands, query),
         },
         Group {
             name: "sessions".into(),
@@ -93,7 +99,7 @@ pub fn rows(
     groups.retain(|group| !group.rows.is_empty());
     groups
 }
-fn command_rows(entries: &[CatalogEntry]) -> Vec<Row> {
+fn command_rows(entries: &[CatalogEntry], query: &str) -> Vec<Row> {
     const FIRST: &[&str] = &[
         "model",
         "think",
@@ -110,7 +116,10 @@ fn command_rows(entries: &[CatalogEntry]) -> Vec<Row> {
         "memory",
         "help",
     ];
-    let mut rows = entries.iter().filter_map(command).collect::<Vec<_>>();
+    let mut rows = entries
+        .iter()
+        .filter_map(|entry| command(entry, query))
+        .collect::<Vec<_>>();
     rows.sort_by_key(|row| {
         FIRST
             .iter()
@@ -156,16 +165,25 @@ pub(crate) fn filter(mut row: Row, query: &str) -> Option<Row> {
         None
     }
 }
-fn command(entry: &CatalogEntry) -> Option<Row> {
+fn command(entry: &CatalogEntry, query: &str) -> Option<Row> {
     let spec: CommandSpec = serde_json::from_value(entry.meta.clone()).ok()?;
     (!spec.hidden).then(|| Row {
-        label: format!("/{}", spec.name),
+        label: format!("/{}", spelling(&spec, query)),
         hint: spec.hint,
+        alert: None,
         now: entry.meta["now"].as_str().unwrap_or_default().into(),
         marks: vec![],
         hint_marks: vec![],
         target: Target::Command(spec.name),
     })
+}
+fn spelling<'a>(spec: &'a CommandSpec, query: &str) -> &'a str {
+    let names =
+        || std::iter::once(spec.name.as_str()).chain(spec.aliases.iter().map(String::as_str));
+    names()
+        .find(|name| *name == query)
+        .or_else(|| names().find(|name| matched(name, query).is_some()))
+        .unwrap_or(&spec.name)
 }
 fn binding(key: &str, line: &str, commands: &[CatalogEntry]) -> Option<Row> {
     let name = line
@@ -180,35 +198,42 @@ fn binding(key: &str, line: &str, commands: &[CatalogEntry]) -> Option<Row> {
     Some(Row {
         label: key.into(),
         hint: entry.meta["hint"].as_str().unwrap_or(line).into(),
+        alert: None,
         now: entry.meta["now"].as_str().unwrap_or_default().into(),
         marks: vec![],
         hint_marks: vec![],
         target: Target::Key(line.into()),
     })
 }
-fn session(summary: &SessionSummary, current: &str) -> Row {
+fn session(summary: &PaletteSession, current: &str) -> Row {
     Row {
-        label: summary
-            .title
-            .clone()
-            .unwrap_or_else(|| summary.id.to_string()),
+        label: summary.label.clone(),
         hint: String::new(),
+        alert: summary.attention.clone(),
         now: if summary.id.as_str() == current {
             "this one".into()
         } else {
-            format!(
-                "{}{}",
-                summary.updated_at,
-                summary
-                    .messages
-                    .map(|n| format!(" · {n} messages"))
-                    .unwrap_or_default()
-            )
+            summary.detail.clone()
         },
         marks: vec![],
         hint_marks: vec![],
         target: Target::Session(summary.id.to_string()),
     }
+}
+pub fn conversation(sessions: &[PaletteSession], query: &str, current: &str) -> Vec<Row> {
+    sessions
+        .iter()
+        .map(|summary| {
+            let mut row = session(summary, current);
+            row.target = Target::View(summary.id.to_string());
+            row.hint = summary.detail.clone();
+            if summary.id.as_str() != current {
+                row.now.clear();
+            }
+            row
+        })
+        .filter_map(|row| filter(row, query))
+        .collect()
 }
 
 #[cfg(test)]
@@ -308,5 +333,30 @@ mod tests {
             );
             assert_eq!(found[0].rows[0].target, Target::Command("model".into()));
         }
+    }
+}
+
+#[cfg(test)]
+mod review_tests {
+    use super::*;
+    #[test]
+    fn aliases_are_searchable_and_keep_the_canonical_target() {
+        let entry = CatalogEntry {
+            id: "exit".into(),
+            label: "exit".into(),
+            meta: serde_json::json!({"name":"exit","aliases":["quit"],"hint":"leave","args":{"kind":"none"},"family":"surface"}),
+        };
+        let rows = rows(
+            PaletteOpen::Commands,
+            "quit",
+            &[entry],
+            &BTreeMap::new(),
+            &[],
+            &[],
+            "s",
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].rows[0].label, "/quit");
+        assert_eq!(rows[0].rows[0].target, Target::Command("exit".into()));
     }
 }

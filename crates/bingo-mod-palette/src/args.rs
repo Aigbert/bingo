@@ -89,6 +89,7 @@ fn offered(
             },
             hint: String::new(),
             now: current.into(),
+            alert: None,
             marks: vec![],
             hint_marks: vec![],
             target: Target::Run(format!("{prefix}{query}").trim_end().into()),
@@ -97,6 +98,7 @@ fn offered(
             label: format!("⏎ runs {}", format!("{prefix}{query}").trim_end()),
             hint: String::new(),
             now: String::new(),
+            alert: None,
             marks: vec![],
             hint_marks: vec![],
             target: Target::Run(format!("{prefix}{query}").trim_end().into()),
@@ -122,6 +124,7 @@ fn choice(
         } else {
             String::new()
         },
+        alert: None,
         marks,
         hint_marks: vec![],
         target: if more {
