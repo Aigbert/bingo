@@ -55,7 +55,7 @@ async fn released(name: &str, archive: Vec<u8>, list: String) -> MockServer {
 
 /// `bingo update`, in its own home, against the release `server` serves.
 fn updating(binary: &std::path::Path, home: &std::path::Path, server: &MockServer) -> Command {
-    let mut cmd = Command::new(binary);
+    let mut cmd = isolated::at(binary);
     cmd.envs(home_env(home))
         .env("BINGO_UPDATE_API", server.uri())
         .stdin(Stdio::null())
@@ -155,7 +155,7 @@ async fn the_binary_becomes_the_release_it_was_told_about() {
         format!("{}updated to {NEWER}\n", reported(NEWER))
     );
 
-    let after = run(Command::new(&copy)
+    let after = run(isolated::at(&copy)
         .arg("--version")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped()));

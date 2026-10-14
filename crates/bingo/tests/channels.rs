@@ -120,7 +120,7 @@ impl Chat {
         std::fs::write(&script_path, script).unwrap();
         let settings_path = home.path().join("channels.json");
         std::fs::write(&settings_path, with_peer(settings, &peer).to_string()).unwrap();
-        let mut command = Command::new(env!("CARGO_BIN_EXE_bingo"));
+        let mut command = Command::from(support::command::bingo());
         command
             .args(["channels", "--cwd"])
             .arg(home.path())
@@ -649,7 +649,7 @@ fn a_legacy_channel_pid_file_refuses_loudly() {
     )
     .unwrap();
     let command = || {
-        let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_bingo"));
+        let mut command = support::command::bingo();
         command
             .args(["channels", "--cwd"])
             .arg(home.path())
@@ -730,7 +730,7 @@ async fn a_path_that_is_not_there_is_refused_in_words_the_model_reads() {
 #[tokio::test]
 async fn loopback_without_the_switch_is_refused_before_listening() {
     let home = tempfile::tempdir().unwrap();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_bingo"));
+    let mut command = Command::from(support::command::bingo());
     command
         .args(["channels", "--channels", "loopback=127.0.0.1:9", "--cwd"])
         .arg(home.path())

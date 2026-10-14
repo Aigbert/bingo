@@ -8,6 +8,7 @@
 // uses is not dead.
 #![allow(clippy::unwrap_used, clippy::expect_used, dead_code)]
 
+pub mod command;
 pub mod home;
 pub mod process;
 
@@ -60,7 +61,7 @@ impl Server {
             .unwrap()
             .write_all(script.as_bytes())
             .unwrap();
-        let mut command = Command::new(env!("CARGO_BIN_EXE_bingo"));
+        let mut command = Command::from(command::bingo());
         command
             .args(["serve", "--stdio", "--cwd"])
             .arg(cwd)

@@ -13,7 +13,7 @@ async fn a_live_channel_host_excludes_another_and_a_killed_one_releases() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap().to_string();
     let command = || {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_bingo"));
+        let mut command = Command::from(support::command::bingo());
         command
             .args(["channels", "--cwd"])
             .arg(home.path())

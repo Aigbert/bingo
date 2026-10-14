@@ -169,7 +169,7 @@ fn spelled(script: &str, prompt: &str, home: &tempfile::TempDir) -> CommandBuild
         r#"{ "update": { "check": false } }"#,
     )
     .unwrap();
-    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_bingo"));
+    let mut command = super::isolated::pty();
     command.args(["--print", "--cwd", &home.path().to_string_lossy(), prompt]);
     command.env("HOME", home.path());
     command.env("BINGO_FAKE_SCRIPT", &path);

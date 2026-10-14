@@ -23,17 +23,12 @@ fn isolated_home() -> &'static std::path::Path {
 }
 
 fn bingo() -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_bingo"));
+    let mut cmd = isolated::bingo();
     // Nor may a run inherit the developer's credentials: a host asks every
     // endpoint it can sign in to what it serves (ADR-0026 §4), and a suite
     // must not reach the network because whoever ran it has a key exported.
     // A test that wants one sets it itself, and still wins — this is a floor.
     cmd.envs(home_env(isolated_home()))
-        .env_remove("ANTHROPIC_API_KEY")
-        .env_remove("OPENAI_API_KEY")
-        // Endpoint overrides can redirect a fixture key away from its local server.
-        .env_remove("ANTHROPIC_BASE_URL")
-        .env_remove("OPENAI_BASE_URL")
         .env_remove("BINGO_FAKE_SCRIPT")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -766,6 +761,9 @@ fn scripted_run_within(
         failure,
     )
 }
+
+#[path = "../support/command.rs"]
+mod isolated;
 
 #[path = "../support/home.rs"]
 mod home;

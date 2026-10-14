@@ -22,6 +22,9 @@ use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 #[path = "../support/home.rs"]
 mod home;
 
+#[path = "../support/command.rs"]
+mod isolated;
+
 mod look;
 
 /// How long any one wait may take before the run is called stalled.
@@ -264,7 +267,7 @@ impl Terminal {
                 pixel_height: 0,
             })
             .unwrap();
-        let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_bingo"));
+        let mut command = isolated::pty();
         command.args(["--cwd", &home.path().to_string_lossy()]);
         command.args(extra);
         for (name, value) in home::home_env(home.path()) {

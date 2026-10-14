@@ -6,6 +6,9 @@ use std::process::Command;
 #[path = "support/home.rs"]
 mod home;
 
+#[path = "support/command.rs"]
+mod isolated;
+
 fn workspace() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
@@ -106,7 +109,7 @@ fn committed_examples_validate_and_test_in_an_isolated_home() {
         let plugin = temp.path().join(name);
         copy_example(&workspace().join("examples/plugins").join(name), &plugin);
         for verb in ["validate", "test"] {
-            let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+            let output = isolated::bingo()
                 .args(["plugins", verb])
                 .arg(&plugin)
                 .current_dir(temp.path())
@@ -166,7 +169,7 @@ fn tool_evidence(node: bool) -> Vec<serde_json::Value> {
         {"steps":[{"toolCall":{"name":"Bash","input":{"command":"  echo parity  "}}}]},
         {"steps":[{"text":"Parity complete."}]}
     ]}).to_string()).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+    let output = isolated::bingo()
         .args([
             "--print",
             "--output-format",

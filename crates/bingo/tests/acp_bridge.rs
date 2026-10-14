@@ -9,6 +9,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+#[path = "support/command.rs"]
+mod isolated;
+
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
@@ -63,7 +66,7 @@ impl Doors for Echo {
 /// The proxy as an agent spawns it: this binary, one hidden mode, and the two
 /// words it needs in its environment rather than in its argv.
 fn proxy(address: &Address, token: &str) -> tokio::process::Command {
-    let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_bingo"));
+    let mut command = tokio::process::Command::from(isolated::bingo());
     command
         .arg("acp-mcp-proxy")
         .env(ADDRESS_VAR, address.as_str())

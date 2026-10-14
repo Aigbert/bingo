@@ -6,6 +6,9 @@ use std::process::{Command, Output};
 #[path = "support/home.rs"]
 mod home;
 
+#[path = "support/command.rs"]
+mod isolated;
+
 fn node_available() -> bool {
     let version = Command::new("node")
         .arg("--version")
@@ -57,7 +60,7 @@ fn fixture(root: &Path, name: &str) -> PathBuf {
 }
 
 fn run(root: &Path, verb: &str, plugin: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_bingo"))
+    isolated::bingo()
         .args(["plugins", verb])
         .arg(plugin)
         .current_dir(root)
@@ -190,7 +193,7 @@ fn module_listing_names_the_runtime_and_its_disabled_reason() {
     .unwrap();
     std::fs::write(plugin.join("main.ts"), "export function register(on) {}").unwrap();
     let list = || {
-        Command::new(env!("CARGO_BIN_EXE_bingo"))
+        isolated::bingo()
             .args(["plugins", "list"])
             .current_dir(root.path())
             .envs(home::home_env(root.path()))
@@ -233,7 +236,7 @@ fn the_cli_composes_the_module_runtime_for_an_explicit_directory() {
     std::fs::write(plugin.join("main.ts"), "export function register(on) { on('tool.call', () => ({parts:[{type:'text',text:'module result'}],isError:false})); }").unwrap();
     let script = root.path().join("fake.json");
     std::fs::write(&script, r#"{"responses":[{"steps":[{"toolCall":{"name":"Read","input":{"file_path":"missing.txt"}}}]},{"steps":[{"text":"offline"}]}]}"#).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+    let output = isolated::bingo()
         .args([
             "--print",
             "--output-format",
@@ -270,7 +273,7 @@ fn listing_includes_explicit_modules_without_starting_them() {
         r#"{"name":"hello","version":"1","module":"missing.ts"}"#,
     )
     .unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+    let output = isolated::bingo()
         .arg("--plugin-dir")
         .arg(&plugin)
         .args(["plugins", "list"])
@@ -299,7 +302,7 @@ mod startup;
 fn world_output(root: &Path, plugin: &Path, url: Option<&str>) -> Vec<bingo_sdk::Frame> {
     let script = root.join("world-script.json");
     std::fs::write(&script,r#"{"responses":[{"steps":[{"toolCall":{"name":"Read","input":{"file_path":"world.txt"}}}]},{"steps":[{"text":"offline"}]}]}"#).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+    let output = isolated::bingo()
         .args([
             "--print",
             "--output-format",
@@ -432,7 +435,7 @@ fn the_models_spawn_agent_call_crosses_the_agent_noun_chain() {
     std::fs::write(plugin.join("main.ts"),"export function register(on) { on('agent.spawn', () => ({parts:[{type:'text',text:'agent noun intercepted'}],isError:false})); }").unwrap();
     let script = root.path().join("script.json");
     std::fs::write(&script,r#"{"responses":[{"steps":[{"toolCall":{"name":"SpawnAgent","input":{"prompt":"must be intercepted"}}}]},{"steps":[{"text":"offline"}]}]}"#).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+    let output = isolated::bingo()
         .args([
             "--print",
             "--output-format",
@@ -469,7 +472,7 @@ fn module_tests_report_ndjson_and_use_the_real_host() {
     .unwrap();
     std::fs::write(plugin.join("main.ts"), "export const register = on => {};").unwrap();
     std::fs::write(plugin.join("main.test.ts"), "import {test,expect} from 'bingo/testing'; test('real host', async $ => expect(await $.session.id()).not.toBe(undefined)); test('wrong', () => expect(1).toBe(2));").unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_bingo"))
+    let output = isolated::bingo()
         .args(["plugins", "test"])
         .arg(&plugin)
         .arg("--json")

@@ -53,7 +53,7 @@ fn script(dir: &Path, json: &str) -> PathBuf {
 }
 
 fn bingo(home: &Path, project: &Path) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_bingo"));
+    let mut command = support::command::bingo();
     command
         .envs(home_env(home))
         .env_remove("BINGO_FAKE_SCRIPT")

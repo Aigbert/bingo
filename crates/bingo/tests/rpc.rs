@@ -361,7 +361,7 @@ async fn a_retry_is_visible_on_the_wire() {
 async fn a_session_written_by_a_print_run_reopens_by_id_with_its_items() {
     let mut server = Server::spawn(TEXT_TURN);
     let cwd = server.cwd();
-    let out = std::process::Command::new(env!("CARGO_BIN_EXE_bingo"))
+    let out = support::command::bingo()
         .env("BINGO_FAKE_SCRIPT", cwd.join("script.json"))
         .envs(support::home::home_env(&cwd))
         .args(["--print", "--output-format", "json", "--cwd"])
