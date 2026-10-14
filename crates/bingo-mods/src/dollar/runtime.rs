@@ -97,6 +97,9 @@ impl Runtime {
     pub(crate) fn tools(&self) -> Vec<Arc<dyn Tool>> {
         self.registered.tools()
     }
+    pub(crate) fn contents(&self, name: &str) -> bingo_sdk::plugin::PluginContents {
+        self.registered.contents(name)
+    }
     pub(crate) fn commands(&self) -> Vec<Arc<dyn Command>> {
         self.registered.commands()
     }

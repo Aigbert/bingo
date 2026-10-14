@@ -8,6 +8,7 @@ mod login;
 mod model;
 mod models;
 mod pin;
+mod plugin_trust;
 mod plugins;
 mod provider;
 mod rename;

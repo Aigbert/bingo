@@ -360,3 +360,19 @@ async fn switches_preserve_state_and_store_and_never_replace_repository_approval
     );
     run.host.shutdown().await;
 }
+
+#[tokio::test]
+async fn approval_with_a_tier_admits_the_first_generation_with_that_grant() {
+    let mut run = Running::new().await;
+    fixture(&run.project(), "grant", "export function register(on) {} ");
+    run.reload().await;
+    let result = run.command("/plugins approve grant full").await;
+    assert!(result.contains("approved grant"), "{result}");
+    let meta = run.listed("grant").await.unwrap();
+    assert_eq!(meta["state"]["kind"], "on");
+    assert_eq!(meta["tier"], "full");
+    let saved = std::fs::read_to_string(run.home.path().join(".bingo/settings.toml")).unwrap();
+    assert!(saved.contains("full"));
+    assert!(!run.project.path().join(".bingo/settings.toml").exists());
+    run.host.shutdown().await;
+}

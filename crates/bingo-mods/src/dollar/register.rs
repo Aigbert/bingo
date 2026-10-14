@@ -75,6 +75,21 @@ impl Registrations {
                     && !entry.stopped.is_cancelled()
             })
     }
+    pub fn contents(&self, plugin: &str) -> plugin::PluginContents {
+        let entries = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let mut contents = plugin::PluginContents::default();
+        for entry in entries
+            .values()
+            .filter(|entry| entry.plugin == plugin && !entry.stopped.is_cancelled())
+        {
+            match &entry.spec {
+                Spec::Command(spec) if !spec.hidden => contents.commands.push(spec.clone()),
+                Spec::Tool(spec) => contents.tools.push(spec.name.clone()),
+                _ => {}
+            }
+        }
+        contents
+    }
     pub fn tools(&self) -> Vec<Arc<dyn Tool>> {
         self.0
             .lock()

@@ -184,6 +184,26 @@ impl Manager {
         tools
     }
 
+    pub async fn contents(&self, name: &str) -> bingo_sdk::plugin::PluginContents {
+        let Some(bridge) = self.active_bridges().find(|bridge| bridge.name() == name) else {
+            return Default::default();
+        };
+        bingo_sdk::plugin::PluginContents {
+            commands: bridge
+                .commands()
+                .await
+                .iter()
+                .map(|command| command.spec())
+                .filter(|spec| !spec.hidden)
+                .collect(),
+            tools: bridge
+                .tools()
+                .await
+                .iter()
+                .map(|tool| tool.spec().name)
+                .collect(),
+        }
+    }
     pub async fn commands(&self) -> Vec<Arc<dyn Command>> {
         let mut commands = Vec::new();
         for bridge in self.active_bridges() {

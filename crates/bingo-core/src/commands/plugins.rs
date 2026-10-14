@@ -31,7 +31,7 @@ impl Command for PluginsCommand {
             aliases: vec!["modules".into()],
             ..super::spec(
                 "plugins",
-                "list, approve, reload, enable or disable plugins",
+                "list, trust, approve, reload, enable or disable plugins",
                 ArgSpec::Words {
                     alone: vec!["reload".into()],
                     values: vec![
@@ -39,6 +39,7 @@ impl Command for PluginsCommand {
                         DISABLE.into(),
                         "reload".into(),
                         "approve".into(),
+                        "trust".into(),
                     ],
                     then: Some(Box::new(ArgSpec::Catalog {
                         source: PLUGINS.into(),
@@ -63,6 +64,9 @@ impl Command for PluginsCommand {
                 message: Some(report.message()),
             });
         }
+        if let Some(args) = args.trim().strip_prefix("trust ") {
+            return super::plugin_trust::run(&host, args).await;
+        }
         if let Some(name) = args.trim().strip_prefix("approve ") {
             return approve(&host, name.trim()).await;
         }
@@ -77,9 +81,22 @@ impl Command for PluginsCommand {
 }
 
 async fn approve(host: &Host, name: &str) -> Result<CommandOutcome, KernelError> {
+    let words = name.split_whitespace().collect::<Vec<_>>();
+    let (name, tier) = match words.as_slice() {
+        [name] => (*name, None),
+        [name, tier @ ("tighten" | "rewrite" | "full")] => (*name, Some(*tier)),
+        _ => {
+            return Err(invalid(
+                "usage: /plugins approve <name> [tighten|rewrite|full]".into(),
+            ));
+        }
+    };
     let mut request = None;
     for source in &host.registry().sources.plugins {
-        if let Some(found) = source.approval(name).await {
+        if let Some(found) = source
+            .approval(name.strip_prefix("plugins:").unwrap_or(name))
+            .await
+        {
             if request.as_ref().is_some_and(|previous| previous != &found) {
                 return Err(invalid(format!(
                     "more than one waiting plugin named `{name}`"
@@ -89,6 +106,10 @@ async fn approve(host: &Host, name: &str) -> Result<CommandOutcome, KernelError>
         }
     }
     let request = request.ok_or_else(|| invalid(format!("no waiting plugin named `{name}`")))?;
+    if let Some(tier) = tier {
+        let waiting = format!("plugins:{}", name.strip_prefix("plugins:").unwrap_or(name));
+        super::plugin_trust::set(host, &waiting, tier).await?;
+    }
     let digest = host.approve(request).await?;
     let mut report = PluginReload::default();
     for source in &host.registry().sources.plugins {
@@ -253,7 +274,7 @@ mod tests {
         else {
             panic!("a verb is one of the words");
         };
-        assert_eq!(values, [ENABLE, DISABLE, "reload", "approve"]);
+        assert_eq!(values, [ENABLE, DISABLE, "reload", "approve", "trust"]);
         assert_eq!(alone, ["reload"]);
         assert_eq!(
             then.as_deref(),

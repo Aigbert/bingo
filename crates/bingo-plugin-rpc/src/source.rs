@@ -148,6 +148,9 @@ impl PluginSource for PluginPlugins {
     async fn plugins(&self) -> Vec<PluginStatus> {
         self.manager.plugins().await
     }
+    async fn contents(&self, name: &str) -> bingo_sdk::plugin::PluginContents {
+        self.manager.contents(name).await
+    }
     async fn registrations(
         &self,
         trust: &std::collections::BTreeMap<String, bingo_sdk::PluginTrust>,

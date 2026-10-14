@@ -323,6 +323,12 @@ impl PluginSource for Manager {
             .collect()
     }
 
+    async fn contents(&self, name: &str) -> plugin::PluginContents {
+        self.dollar
+            .get()
+            .map(|dollar| dollar.contents(name))
+            .unwrap_or_default()
+    }
     async fn registrations(
         &self,
         trust: &BTreeMap<String, PluginTrust>,

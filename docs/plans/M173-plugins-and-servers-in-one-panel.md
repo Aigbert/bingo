@@ -97,3 +97,16 @@ panel; per-tool switches inside a server; the desktop's drawing.
 - Guides use the new crate's registered Page (ADR-0054). No docs/guide directory is added.
 - Add only workspace edges for the new mod and its test consumers. The normal dependency
   count grows 414 → 415 because the budget counts workspace members.
+
+- The template's registered guide is a typed static `Pages` service. Classifying it as a
+  runtime service pinned every documented mod to next-start. Treat only typed `Pages`
+  as catalogue facts; ordinary services still pin. The disable/fallback integration
+  test exposed this and now checks a live panel disable.
+- Trust changes read fresh user grants at registration and use existing module retirement
+  before reenabling a reloadable generation; process/tool grants apply at next start.
+  Handlers carry opening identity only and reread catalogue facts when pressed.
+
+- External command ownership is held by each source, not the native registry. Add a
+  default-empty typed `PluginSource::contents` projection, implemented by module and
+  process sources from their live registrations, so cards also name external commands
+  and tools without another cache or a guessed owner.

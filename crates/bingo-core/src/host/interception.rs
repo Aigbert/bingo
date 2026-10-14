@@ -83,6 +83,7 @@ pub(super) async fn catalogue_answer(
         && let Ok(catalog) = &mut result
     {
         protect_grants(host, catalog).await;
+        catalog::details(host, catalog).await;
     }
     if kind == CatalogKind::Commands
         && let Ok(catalog) = &mut result
@@ -126,11 +127,9 @@ impl InterceptorSource for RegisteredSource {
 }
 
 pub(super) async fn register_pending(host: &Host) {
+    let trust = host.current_trust().unwrap_or_default();
     for source in &host.registry.sources.plugins {
-        for registration in source
-            .registrations(&host.settings.kernel.plugin_trust)
-            .await
-        {
+        for registration in source.registrations(&trust).await {
             let name = registration.name.clone();
             let links = registration_links(host).await;
             let result = crate::chain::registration::register(

@@ -1,7 +1,9 @@
 //! How a plugin enters the process: a static manifest, one synchronous
 //! `register` that only adds contributions, and `start`/`stop` for I/O.
 
+mod contents;
 mod reload;
+pub use contents::PluginContents;
 mod settings;
 mod state;
 pub use reload::PluginReload;
@@ -326,6 +328,9 @@ pub trait HookSource: Send + Sync {
 pub trait PluginSource: Send + Sync {
     fn id(&self) -> &str;
     async fn plugins(&self) -> Vec<PluginStatus>;
+    async fn contents(&self, _name: &str) -> PluginContents {
+        PluginContents::default()
+    }
     /// The discovery record owns the repository root, independently of a session cwd.
     async fn approval(&self, _name: &str) -> Option<crate::Approval> {
         None

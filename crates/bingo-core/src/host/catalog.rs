@@ -245,7 +245,7 @@ async fn plugins(registry: &Registry) -> Vec<CatalogEntry> {
 /// One plugin as a client reads it: whether it runs, why not, and which
 /// listing it came from — the row `/plugins` draws, in a catalogue's shape.
 pub(super) fn plugin_entry(status: &PluginStatus) -> CatalogEntry {
-    let mut meta = json!({ "state": status.state, "from": status.from });
+    let mut meta = json!({ "state": status.state, "from": status.from, "version": status.version });
     if let (Some(execution), Some(meta)) = (&status.execution, meta.as_object_mut())
         && let Ok(Value::Object(fields)) = serde_json::to_value(execution)
     {
@@ -567,13 +567,13 @@ mod tests {
         assert_eq!(web.label, "bingo.tools.web 1.0.0");
         assert_eq!(
             web.meta,
-            json!({ "state": {"kind":"on"}, "from": BUILT_IN })
+            json!({ "state": {"kind":"on"}, "from": BUILT_IN, "version":"1.0.0" })
         );
         assert_eq!(
             entry(&entries, "wordcount").meta,
             json!({
                 "state": {"kind":"off", "why":"switched off in the settings"},
-                "from": "bridge",
+                "from": "bridge", "version":"0.2.0",
             }),
             "a plugin only a source has seen says where it came from"
         );
@@ -821,3 +821,6 @@ mod linear_values {
         host.shutdown().await;
     }
 }
+
+mod details;
+pub(super) use details::details;

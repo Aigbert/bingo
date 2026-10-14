@@ -51,3 +51,26 @@ impl super::Host {
         &self.config.layers
     }
 }
+
+impl super::Host {
+    pub(crate) fn current_trust(
+        &self,
+    ) -> Result<
+        std::collections::BTreeMap<String, bingo_sdk::PluginTrust>,
+        crate::settings::SettingsError,
+    > {
+        let path = crate::settings::user_path(self.env());
+        let mut layers = self
+            .settings_layers()
+            .iter()
+            .filter(|layer| !layer.is_user() || !std::path::Path::new(&layer.source).is_absolute())
+            .cloned()
+            .collect::<Vec<_>>();
+        layers.push(Layer::new(
+            crate::settings::LayerOrigin::User,
+            path.display().to_string(),
+            crate::settings::preview_document(&path)?,
+        ));
+        Ok(crate::settings::merge(&layers, &[])?.kernel.plugin_trust)
+    }
+}
