@@ -1,10 +1,11 @@
-//! Live replacements and removals; sessions keep their previously resolved Arc.
+//! Registered providers and live replacements; sessions keep their resolved Arc.
 use bingo_sdk::{Provider, ProviderShape};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
 pub(super) struct ProviderState {
+    pub registered: Vec<Arc<dyn Provider>>,
     pub default_cleared: std::sync::atomic::AtomicBool,
     pub shapes: BTreeMap<String, Arc<dyn ProviderShape>>,
     pub instances: Instances,

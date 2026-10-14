@@ -17,13 +17,19 @@ impl Host {
     /// reading of `<provider>/<model>` all read this and nothing else.
     pub async fn providers(&self) -> Vec<Arc<dyn Provider>> {
         let providers = ProviderSet {
-            fixed: self.registry.providers.clone(),
+            fixed: self.registry.provider_state.registered.clone(),
             sources: self.registry.sources.providers.clone(),
         }
         .gather()
         .await;
         let instances = &self.registry.provider_state.instances;
-        for held in self.registry.providers.iter().filter(|p| p.instance()) {
+        for held in self
+            .registry
+            .provider_state
+            .registered
+            .iter()
+            .filter(|p| p.instance())
+        {
             if let Some(winner) = providers
                 .iter()
                 .find(|p| p.id() == held.id() && !p.instance())

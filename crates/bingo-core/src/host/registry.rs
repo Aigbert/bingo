@@ -53,7 +53,6 @@ pub struct Switches {
 #[derive(Default)]
 pub struct Registry {
     pub tools: Vec<Arc<dyn Tool>>,
-    pub providers: Vec<Arc<dyn Provider>>,
     pub(super) provider_state: super::instances::ProviderState,
     pub agents: Vec<Arc<dyn Agent>>,
     pub policy: Option<Arc<dyn PermissionPolicy>>,
@@ -411,7 +410,8 @@ impl Registry {
         layers: &[crate::settings::Layer],
     ) -> Result<(), String> {
         let collision = self
-            .providers
+            .provider_state
+            .registered
             .iter()
             .find(|p| p.id() == provider.id())
             .cloned();
@@ -425,12 +425,14 @@ impl Registry {
             }
             if let Some(held) = collision.filter(|p| p.instance()) {
                 self.skip_instance(held.as_ref(), plugin, layers);
-                self.providers.retain(|p| p.id() != provider.id());
+                self.provider_state
+                    .registered
+                    .retain(|p| p.id() != provider.id());
             } else {
                 return Err(format!("provider {} is already registered", provider.id()));
             }
         }
-        self.providers.push(provider);
+        self.provider_state.registered.push(provider);
         Ok(())
     }
 
@@ -453,12 +455,14 @@ impl Registry {
         layers: &[crate::settings::Layer],
     ) {
         let skipped: Vec<_> = self
-            .providers
+            .provider_state
+            .registered
             .iter()
             .filter(|p| p.instance() && names.contains(p.id()))
             .cloned()
             .collect();
-        self.providers
+        self.provider_state
+            .registered
             .retain(|p| !p.instance() || !names.contains(p.id()));
         for instance in skipped {
             let capability = format!("provider:{}", instance.id());
@@ -489,15 +493,22 @@ impl Registry {
         layers: &[crate::settings::Layer],
     ) -> Result<(), String> {
         if let Some(held) = self
-            .providers
+            .provider_state
+            .registered
             .iter()
             .find(|p| p.id() == agent.id() && p.instance())
             .cloned()
         {
             self.skip_instance(held.as_ref(), plugin, layers);
-            self.providers.retain(|p| p.id() != agent.id());
+            self.provider_state
+                .registered
+                .retain(|p| p.id() != agent.id());
         }
-        if self.providers.iter().any(|p| p.id() == agent.id())
+        if self
+            .provider_state
+            .registered
+            .iter()
+            .any(|p| p.id() == agent.id())
             || self.agents.iter().any(|a| a.id() == agent.id())
         {
             return Err(format!("endpoint {} is already registered", agent.id()));
