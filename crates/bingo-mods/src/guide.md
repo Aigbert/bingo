@@ -100,32 +100,31 @@ arguments. Calls need their noun in the grant. A service can add another noun.
 
 ## Drawing and state
 
-Register `ui.render` with a component matcher: `Pane`, `AbovePrompt`, `Question`, `UserMessage`,
-`AssistantMessage`, `ToolUse`, `ToolResult`, `ToolGroup`, `ToolProgress`, `CommandOutput`, `Spinner`,
-`TurnDuration`, `InfoNotice`, `SessionMode`, `PromptHint`, `Permission` or `SignIn`.
-Event: `component`, `requestId`, `surface`, `props`, `viewport`. Use `await $.ui.resolve(e)` for elements;
-return a tree or wrap `await next(e)`. Handlers can update state; keep writes out of render hooks.
+Match `ui.render` to replace a component or wrap `await next(e)`. The event carries `component`, `requestId`, `surface`, `props` and `viewport`. `await $.ui.resolve(e)` provides
+supported element names (`Box`, `Text`, `Button`); text surfaces use folds. Handlers such as `onPress` may write state; render hooks may not.
 
-Only `Permission` and `SignIn` are sealed, on terminal, desktop and text. Wrap `await next(e)` exactly once
-with unchanged props. Missing, duplicated or rewritten engine nodes yield the host drawing and a plugin-named
-notice. Permission props are `interactionId`, `tool`, full `input` and `answers`; sign-in props are
-`interactionId`, `provider` and `flow` (browser URL, device URL/code, or paste). The terminal rejects hidden,
-zero-size or clipped cards with one local notice. Leave room for the host's full input and choices. Wrapper
-buttons handle clicks; answer keys remain the host's. Text clients keep their folds. `plugins validate`
-advises on sealed matchers; runtime checks decide. See the `sealed-frame` test fixture.
+Components: `Pane`, `AbovePrompt`, `Question`, `UserMessage`, `AssistantMessage`, `ToolUse`, `ToolResult`, `ToolGroup`, `ToolProgress`, `CommandOutput`, `Spinner`, `TurnDuration`,
+`InfoNotice`, `SessionMode`, `PromptHint`. Fact-only sites: `Reasoning`, `Compaction`, `Rewind`, `Interruption`, `QuestionAnswer`, `PermissionReceipt`, `Asset`, `ShellRun`, pending
+`Action`, `TurnProgress`, `SessionStatus`, `Toast`, `Welcome`. All list `terminal`, `desktop`, `text` in `Component::surfaces()`; validate warns about surfaces that never ask for a
+site.
 
-`await $.ui.open({id:'counter', title:'Counter'})` opens a pane; render it by matching `{component:'Pane',
-requestId:'counter'}`. `$.ui.close(id)` removes it. `place`, `size`, `focus` and `closeOnEscape` control seating
-and keys. A pane opened without person input waits as `1 pane waiting` unless the person previously opened it.
-Clicks and commands remember open; Escape, close controls and commands remember closed. Choices are keyed by
-plugin and pane id in the user's data, across projects and starts. Autonomous moves never change them;
-missing or corrupt memory means waiting. `$.ui.status('Ready', {key:'counter'})` places status; `null` removes it.
-`$.ui.toast('Finished')` shows a temporary notification. `AbovePrompt` draws the band without opening a pane.
+Only `Permission` and `SignIn` are sealed, also on all three surfaces. Wrap `await next(e)` exactly once with unchanged props. Missing, duplicated or rewritten engine nodes yield
+the host drawing and a plugin-named notice. Permission props are `interactionId`, `tool`, full `input` and `answers`; sign-in props are `interactionId`, `provider` and `flow`
+(browser URL, device URL/code, or paste). The terminal rejects hidden, zero-size or clipped cards with one local notice. Leave room for full input and choices. Wrapper buttons
+handle clicks; answer keys remain the host's. Text clients keep their folds. `plugins validate` advises on sealed matchers; runtime checks decide. See the `sealed-frame` test
+fixture.
 
-Import `atom`, `read`, `update` (and optionally `derive`) from `'bingo'`: `const calls = atom('calls', 0)`,
-`await read($, calls)`, `await update($, calls, n => n + 1)`. Render reads subscribe to state changes;
-writes invalidate those renders. Host state survives reload and restart. Declare literal state keys in
-`types/index.d.ts`, keyed by manifest name:
+`Spinner.word` is the animated verb; `message` overrides it or is `null`; `suffix` is `…`. This fixes older bingo builds' interrupt-hint/token misuse of those props. `TurnProgress`
+carries `elapsedMs`, `tokensOut`, `interruptible`, `stopping`; surfaces format them. The terminal asks once per elapsed second or changed fact.
+
+`await $.ui.open({id:'counter', title:'Counter'})` publishes a pulled pane. Match `{component:'Pane', requestId:'counter'}` to render it; `$.ui.close(id)` removes it. The pulling
+client supplies `surface`. `place`, `size`, `focus`, `closeOnEscape` control placement and keys. Autonomous opens wait as `1 pane waiting` until a person opens them. Clicks and
+commands remember open; Escape and close remember closed. Preferences persist by plugin and pane id across projects and starts; autonomous moves never change them, and missing or
+corrupt memory means waiting. `$.ui.status('Ready', {key:'counter'})` places status; `null` removes it. `$.ui.toast('Finished')` shows a notification. `AbovePrompt` draws above the
+prompt.
+
+Import `atom`, `read`, `update`, optionally `derive`, from `'bingo'`: `const calls = atom('calls', 0)`, `await read($, calls)`, `await update($, calls, n => n + 1)`. Reads
+subscribe renders to changes; writes invalidate them. State survives reload/restart. Declare literal keys in `types/index.d.ts`, keyed by manifest name:
 
 ```ts
 export interface PluginState { 'counter': { calls: number } }

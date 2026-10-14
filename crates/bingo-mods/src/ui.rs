@@ -4,7 +4,7 @@ use bingo_plugin_host::{
     ops::{self, Caller},
 };
 use bingo_sdk::{
-    render::{Component, RenderRequest, SurfaceName, Viewport},
+    render::{Component, PullRequest, SurfaceName, Viewport},
     slot::{Shown, Slot},
     *,
 };
@@ -185,10 +185,9 @@ async fn open(
     caller: &Caller,
     input: Open,
 ) -> Result<Value, ServiceError> {
-    let request = RenderRequest {
+    let request = PullRequest {
         component: Component::Pane,
         request_id: input.id.clone(),
-        surface: SurfaceName::Terminal,
         props: input.props,
         viewport: Viewport {
             place: None,

@@ -288,7 +288,10 @@ async fn a_corner_declares_a_rect_and_fills_its_received_viewport() {
         rows: 9,
     };
     let view = kernel
-        .render(&attachment.snapshot.summary.id, request)
+        .render(
+            &attachment.snapshot.summary.id,
+            request.on(bingo_sdk::render::SurfaceName::Terminal),
+        )
         .await
         .unwrap();
     assert!(

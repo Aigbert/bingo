@@ -17,6 +17,11 @@ pub(super) fn check(semantic: &Semantic<'_>, source: &mut Source<'_>) {
             .and_then(|arg| pattern(arg, semantic))
         {
             Some(pattern) => {
+                if bingo_sdk::catalogue::Pattern::parse(&pattern)
+                    .is_ok_and(|pattern| pattern.matches("ui.render"))
+                {
+                    super::surfaces::check(call, semantic, source);
+                }
                 source.output.events.insert(pattern);
             }
             None => source.finding(
@@ -154,5 +159,19 @@ fn sealed(call: &CallExpression<'_>, semantic: &Semantic<'_>, source: &mut Sourc
             source.finding(property.span.start, Rule::SealedSite, Severity::Warning,
                 format!("{} is sealed: wrap next(e) exactly once with unchanged props; the host keeps its keys and falls back if clipped", name.value));
         }
+    }
+}
+
+pub(super) fn resolved<'a>(
+    value: &'a Expression<'a>,
+    semantic: &Semantic<'a>,
+    depth: usize,
+) -> Option<&'a Expression<'a>> {
+    if depth > 32 {
+        return None;
+    }
+    match value {
+        Expression::Identifier(id) => resolved(constant(id, semantic)?, semantic, depth + 1),
+        _ => Some(value),
     }
 }

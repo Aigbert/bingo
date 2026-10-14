@@ -13,6 +13,7 @@ pub enum Rule {
     StateContract,
     PropSubset,
     SealedSite,
+    ComponentSurface,
     Import,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -53,6 +54,7 @@ mod hooks;
 mod keys;
 mod props;
 mod source;
+mod surfaces;
 mod uses;
 pub fn validate(
     root: &Path,
