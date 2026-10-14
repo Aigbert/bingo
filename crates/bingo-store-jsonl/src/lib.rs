@@ -11,6 +11,7 @@ pub mod gc;
 pub mod journal;
 pub mod layout;
 pub mod lock;
+mod reader;
 mod record;
 pub mod summary;
 
@@ -198,7 +199,7 @@ static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.store.jsonl",
     version: env!("CARGO_PKG_VERSION"),
     uses: &[],
-    provides: &["store:jsonl"],
+    provides: &["store:jsonl", "service:bingo.sessions.reader"],
     requires: &[],
     config: None,
 };
@@ -222,7 +223,12 @@ impl Plugin for JsonlStorePlugin {
         let store = Arc::new(JsonlStore::new(registrar.env().data_dir.join("sessions")));
         // One host registers a plugin once; a second attempt keeps the first.
         let _ = self.store.set(Arc::clone(&store));
-        registrar.add(Contribution::Store(store));
+        registrar.add(Contribution::Store(store.clone()));
+        registrar.add(Contribution::service(
+            &bingo_sdk::store::reader::KEY,
+            store as Arc<dyn bingo_sdk::store::reader::SessionReader>,
+            None,
+        ));
         Ok(())
     }
 
@@ -595,7 +601,10 @@ pub(crate) mod tests {
     #[test]
     fn the_manifest_says_what_it_provides() {
         assert_eq!(MANIFEST.id, "bingo.store.jsonl");
-        assert_eq!(MANIFEST.provides, ["store:jsonl"]);
+        assert_eq!(
+            MANIFEST.provides,
+            ["store:jsonl", "service:bingo.sessions.reader"]
+        );
         assert!(MANIFEST.config.is_none(), "the store claims no settings");
     }
 
@@ -612,7 +621,7 @@ pub(crate) mod tests {
         plugin.register(&mut registrar).expect("register");
 
         let contributions = registrar.into_contributions();
-        assert_eq!(contributions.len(), 1);
+        assert_eq!(contributions.len(), 2);
         assert!(matches!(contributions[0], Contribution::Store(_)));
         assert_eq!(
             plugin.store.get().expect("the store").root(),

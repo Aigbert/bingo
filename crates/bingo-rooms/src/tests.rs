@@ -88,6 +88,7 @@ struct Inner {
     sessions: Mutex<Vec<Live>>,
     /// The sessions this plugin asked for, and the messages it sent.
     created: Mutex<Vec<SessionSpec>>,
+    opened: Mutex<Vec<SessionId>>,
     delivered: Mutex<Vec<(SessionId, Input, Delivery)>>,
     /// What another plugin registered, for the one lookup this plugin makes
     /// of one (ADR-0031).
@@ -140,6 +141,17 @@ impl Fleet {
             summary,
             history: Vec::new(),
         });
+    }
+
+    pub(crate) fn opened(&self) -> usize {
+        locked(&self.0.opened)
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+    }
+
+    pub(crate) fn open_calls(&self) -> usize {
+        locked(&self.0.opened).len()
     }
 
     pub(crate) fn created(&self) -> Vec<SessionSpec> {
@@ -315,6 +327,7 @@ impl Fleet {
                         "no such session",
                     ));
                 }
+                locked(&fixture.0.opened).push(id.clone());
                 Ok(Attachment {
                     snapshot: fixture.state(&id),
                     session: id,
@@ -383,9 +396,20 @@ impl Fleet {
     fn script_service_any(&self, host: &bingo_sdk::testing::TestHost) {
         let fixture = self.clone();
         host.on_service_any(move |key| {
-            let key = &key;
-            fixture.0.services.value(key)
+            if key == bingo_sdk::store::reader::KEY.name() {
+                let reader: Arc<dyn bingo_sdk::store::reader::SessionReader> =
+                    Arc::new(fixture.clone());
+                return Some(Arc::new(reader) as Arc<dyn std::any::Any + Send + Sync>);
+            }
+            fixture.0.services.value(&key)
         });
+    }
+}
+
+#[async_trait]
+impl bingo_sdk::store::reader::SessionReader for Fleet {
+    async fn read(&self, summary: &SessionSummary) -> Result<SessionState, KernelError> {
+        Ok(self.state(&summary.id))
     }
 }
 

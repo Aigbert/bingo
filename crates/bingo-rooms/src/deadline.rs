@@ -36,17 +36,32 @@ impl Deadline {
         let Some(state) = room::read(host, id).await else {
             return;
         };
+        let Ok(siblings) = post::siblings_of(host, room).await else {
+            return;
+        };
+        self.restore(host, id, room, &state, &siblings, now);
+    }
+
+    pub(crate) fn restore(
+        &self,
+        host: &HostHandle,
+        id: &SessionId,
+        room: &Room,
+        state: &bingo_sdk::SessionState,
+        siblings: &[bingo_sdk::SessionSummary],
+        now: jiff::Timestamp,
+    ) {
         let mut wanted = Vec::new();
         if !room.closed {
             for member in &room.members {
                 let Ear::Patient(patience) = room.ears.of(member) else {
                     continue;
                 };
-                let unread = Unread::of(&state, member);
+                let unread = Unread::of(state, member);
                 let Some(first) = unread.posts.first() else {
                     continue;
                 };
-                let Some(seat) = post::seat_of(host, room, member).await else {
+                let Some(seat) = post::seat(room, siblings, member) else {
                     continue;
                 };
                 wanted.push((seat.clone(), id.clone()));
@@ -103,7 +118,7 @@ async fn wake_if_behind(
     member: &str,
     seat: &SessionId,
 ) {
-    let Some(state) = room::read(host, id).await else {
+    let Some(state) = room::activate(host, room, id).await else {
         return;
     };
     if room::closed_of(&state) || Unread::of(&state, member).is_empty() {

@@ -51,6 +51,21 @@ impl Hook for RoomsHook {
         if phase != Phase::Start || !is_root(cx).await {
             return;
         }
+        if let Err(error) = self
+            .restore(
+                &cx.host,
+                SessionFilter {
+                    parent: Some(cx.session.clone()),
+                    ..SessionFilter::default()
+                },
+            )
+            .await
+        {
+            tracing::warn!(%error, "the session's rooms could not be restored");
+        }
+        if !self.rooms.under(&cx.session).is_empty() {
+            self.show(&cx.session, &cx.host).await;
+        }
         self.seat_declared(cx).await;
     }
 
@@ -74,38 +89,65 @@ impl Hook for RoomsHook {
 
 impl RoomsHook {
     pub(crate) async fn start(&self, host: &HostHandle) -> Result<(), KernelError> {
-        let mut parents = std::collections::BTreeSet::new();
-        for summary in host.sessions(SessionFilter::default()).await? {
-            let Some(room) = Room::of(&summary) else {
-                continue;
-            };
-            // Room observers may publish to the parent while its journal opens.
-            // Open it first so those writes share its live mailbox.
-            self.rooms.register(&summary);
-            if room::read(host, &room.parent).await.is_none() {
-                continue;
-            }
-            let Some(state) = room::read(host, &summary.id).await else {
-                continue;
-            };
-            if let Some(kinds) = state.extensions.get(PLUGIN) {
-                for (kind, payload) in kinds {
-                    self.rooms.extended(&summary.id, kind, payload);
-                }
-            }
-            let room = room.seated(&state);
-            parents.insert(room.parent.clone());
-            let open = mentions::of_state(&state);
-            self.chaser
-                .reconcile(host, &room, &summary.id, &open, Timestamp::now());
-            self.deadline
-                .reconcile(host, &summary.id, &room, Timestamp::now())
+        self.restore(host, SessionFilter::default()).await
+    }
+
+    async fn restore(&self, host: &HostHandle, filter: SessionFilter) -> Result<(), KernelError> {
+        let Some(reader) = host.service(&bingo_sdk::store::reader::KEY) else {
+            return Ok(());
+        };
+        let summaries = host.sessions(filter).await?;
+        for summary in &summaries {
+            self.restore_room(host, reader.as_ref(), summary, &summaries)
                 .await;
         }
-        for parent in parents {
-            self.show(&parent, host).await;
-        }
         Ok(())
+    }
+
+    async fn restore_room(
+        &self,
+        host: &HostHandle,
+        reader: &dyn bingo_sdk::store::reader::SessionReader,
+        summary: &bingo_sdk::SessionSummary,
+        summaries: &[bingo_sdk::SessionSummary],
+    ) {
+        if Room::of(summary).is_none() || self.rooms.get(&summary.id).is_some() {
+            return;
+        }
+        let state = match reader.read(summary).await {
+            Ok(state) => state,
+            Err(error) => {
+                tracing::warn!(%error, session = %summary.id, "a room could not be restored");
+                return;
+            }
+        };
+        self.rooms.restore(&state, |room| {
+            self.arm_restored(host, room, &state, summaries)
+        });
+    }
+
+    fn arm_restored(
+        &self,
+        host: &HostHandle,
+        room: &Room,
+        state: &bingo_sdk::SessionState,
+        summaries: &[bingo_sdk::SessionSummary],
+    ) {
+        let siblings: Vec<_> = summaries
+            .iter()
+            .filter(|s| s.parent.as_ref().is_some_and(|p| p.session == room.parent))
+            .cloned()
+            .collect();
+        let now = Timestamp::now();
+        let open = if room.closed {
+            Vec::new()
+        } else {
+            mentions::of_state(state)
+        };
+        self.chaser
+            .reconcile(host, room, &state.summary.id, &open, now);
+        self.deadline
+            .restore(host, &state.summary.id, room, state, &siblings, now);
     }
 
     pub(crate) fn stop(&self) {
@@ -194,11 +236,9 @@ impl RoomsHook {
         self.show(&room.parent, &cx.host).await;
     }
 
-    /// A room this process had not seen before, read for the first time: what
-    /// it owes now, and whose patience ran out while nobody was timing it
-    /// (ADR-0029 §3). Both come from the room's own snapshot, because the
-    /// announce carries neither — and a room that closed before this process
-    /// started asks nothing of anybody.
+    /// A room's first live announcement refreshes its parent's card, including
+    /// when background discovery already registered it. The announcement carries
+    /// no roster or debts, so the live snapshot remains the authority.
     async fn first_read(&self, session: &SessionId, room: &Room, cx: &HookContext) {
         let Some(state) = room::read(&cx.host, session).await else {
             return;
@@ -281,6 +321,124 @@ mod tests {
     use bingo_sdk::Delivery;
     use serde_json::json;
     use std::path::Path;
+
+    #[tokio::test]
+    async fn a_restored_room_gets_one_first_read_across_two_live_updates() {
+        let fleet = Fleet::default();
+        let parent = fleet.root();
+        let rooms: Vec<_> = (0..10)
+            .map(|n| fleet.room(&parent, &format!("room{n}")))
+            .collect();
+        let room = &rooms[0];
+        let hook = RoomsHook::default();
+        hook.start(&fleet.handle()).await.unwrap();
+        assert_eq!(fleet.open_calls(), 0);
+
+        let cx = hook_context(room, &fleet, Path::new("/work/project"));
+        hook.on_event(&stamped(1, updated(&fleet.summary(room)), room), &cx)
+            .await;
+        let first_reads = fleet.open_calls();
+        assert!(
+            first_reads > 0,
+            "background discovery still needs a live refresh"
+        );
+        assert_eq!(fleet.signalled(&parent, owed::KIND).len(), 1);
+
+        hook.on_event(&stamped(2, updated(&fleet.summary(room)), room), &cx)
+            .await;
+        assert_eq!(
+            fleet.open_calls(),
+            first_reads,
+            "only the first update reads"
+        );
+        assert_eq!(fleet.signalled(&parent, owed::KIND).len(), 1);
+        hook.stop();
+    }
+
+    #[tokio::test]
+    async fn startup_opens_no_sessions_in_a_store_with_twenty_rooms() {
+        let fleet = Fleet::default();
+        for n in 0..20 {
+            let parent = fleet.root();
+            let room = fleet.room(&parent, &format!("room{n}"));
+            fleet.remember(&room, extension(payload(&seats(&["parent"]))));
+            fleet.post(
+                &room,
+                "@parent pending work",
+                Some("scout"),
+                Timestamp::now(),
+            );
+        }
+        let hook = RoomsHook::default();
+        hook.start(&fleet.handle()).await.expect("restore rooms");
+        assert_eq!(fleet.opened(), 0, "restoration must not revive sessions");
+        for summary in fleet
+            .handle()
+            .sessions(SessionFilter::default())
+            .await
+            .unwrap()
+        {
+            if Room::of(&summary).is_some() {
+                assert_eq!(hook.rooms.get(&summary.id).unwrap().members, ["parent"]);
+            }
+        }
+        assert!(
+            fleet.delivered().is_empty(),
+            "pending work waits for its deadline"
+        );
+        hook.stop();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn restored_deadlines_and_mentions_fire_without_entering_the_room() {
+        let fleet = Fleet::default();
+        let parent = fleet.root();
+        let room = fleet.room(&parent, "design");
+        fleet.remember(&room, extension(payload(&seats(&["parent"]))));
+        fleet.post(
+            &room,
+            "@parent review this",
+            Some("scout"),
+            Timestamp::now(),
+        );
+        let hook = RoomsHook::default();
+        hook.start(&fleet.handle()).await.unwrap();
+        assert_eq!(fleet.opened(), 0);
+        settle().await;
+        tokio::time::advance(crate::chase::PATIENCE).await;
+        settle().await;
+        assert_eq!(chases(&fleet).len(), 1);
+        assert_eq!(
+            nudges(&fleet).len(),
+            2,
+            "one mention and one unread deadline"
+        );
+        assert_eq!(fleet.opened(), 2, "ownership starts when the timers fire");
+        hook.stop();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn restored_timers_recheck_a_room_closed_before_they_fire() {
+        let fleet = Fleet::default();
+        let parent = fleet.root();
+        let room = fleet.room(&parent, "design");
+        fleet.remember(&room, extension(payload(&seats(&["parent"]))));
+        fleet.post(
+            &room,
+            "@parent review this",
+            Some("scout"),
+            Timestamp::now(),
+        );
+        let hook = RoomsHook::default();
+        hook.start(&fleet.handle()).await.unwrap();
+        assert_eq!(fleet.opened(), 0);
+        fleet.remember(&room, extended(room::CLOSED, json!({"by": "parent"})));
+        settle().await;
+        tokio::time::advance(crate::chase::PATIENCE).await;
+        settle().await;
+        assert!(fleet.delivered().is_empty());
+        hook.stop();
+    }
 
     /// The seats a roster line asks for: a bare name is patient, `name:0` live.
     fn seats(roster: &[&str]) -> Vec<Seat> {

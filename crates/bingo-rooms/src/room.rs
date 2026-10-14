@@ -46,6 +46,17 @@ pub async fn read(host: &HostHandle, session: &SessionId) -> Option<SessionState
     }
 }
 
+/// A timer takes ownership only when it fires. Observers of the room can
+/// publish to its parent, so the parent's mailbox must already stand.
+pub(crate) async fn activate(
+    host: &HostHandle,
+    room: &Room,
+    id: &SessionId,
+) -> Option<SessionState> {
+    read(host, &room.parent).await?;
+    read(host, id).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

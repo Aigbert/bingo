@@ -137,16 +137,17 @@ pub(crate) fn waited(at: Timestamp, now: Timestamp) -> Duration {
 async fn chase(host: HostHandle, room: Room, id: SessionId, mention: Mention, nudges: u8) {
     for n in 0..nudges {
         if n > 0 {
-            // A delivery may itself close the debt. Ask the journal again
-            // before taking another patience, even if no hook saw its answer.
-            let open = crate::mentions::of_room(&host, &id).await;
-            if !open
+            tokio::time::sleep(PATIENCE).await;
+        }
+        let Some(state) = crate::room::activate(&host, &room, &id).await else {
+            return;
+        };
+        if crate::room::closed_of(&state)
+            || !crate::mentions::of_state(&state)
                 .iter()
                 .any(|owed| owed.post == mention.post && owed.owed_by == mention.owed_by)
-            {
-                return;
-            }
-            tokio::time::sleep(PATIENCE).await;
+        {
+            return;
         }
         nudge(&host, &room, &mention).await;
     }
@@ -333,6 +334,21 @@ mod tests {
             std::slice::from_ref(&mention),
             fresh(),
         );
+        for frame in fleet.state(&design).transcript.items() {
+            fleet.remember(
+                &standup,
+                bingo_sdk::Event::ItemCompleted {
+                    item: frame.as_ref().clone(),
+                },
+            );
+        }
+        fleet.remember(
+            &standup,
+            crate::tests::extended(
+                crate::room::MEMBERS,
+                crate::room::payload(&[crate::ear::Seat::named("scout")]),
+            ),
+        );
         chaser.reconcile(&host, &other, &standup, &[mention], fresh());
 
         // The design room's fold speaks for the design room alone.
@@ -385,7 +401,15 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_debt_the_holder_owes_is_nudged_at_the_session_the_room_hangs_under() {
         let (fleet, id, room, _) = asked(&["scout"]);
-        let owed = mention(Owed::Member(crate::name::PARENT.into()));
+        fleet.remember(
+            &id,
+            crate::tests::extended(
+                crate::room::MEMBERS,
+                crate::room::payload(&[crate::ear::Seat::named("parent")]),
+            ),
+        );
+        fleet.post(&id, "@parent look at the build", Some("scout"), fresh());
+        let owed = crate::mentions::of_state(&fleet.state(&id)).pop().unwrap();
         let chaser = Chaser::default();
         chaser.reconcile(&fleet.handle(), &room, &id, &[owed], fresh());
         wait(1).await;

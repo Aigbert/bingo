@@ -74,3 +74,5 @@ was a second room.
 
 ADR-0021 §3's "same idempotent reset of a standing room" for the agent's
 door (the person's keeps it); ADR-0021's non-goal "invite/kick verbs".
+
+2026-10-14 — Restore room timers in cancellable background discovery through the read-only store service, without opening parents or publishing their cards. Entering a session restores its own rooms and card; a timer acquires live sessions and rechecks the journal only when it fires.
