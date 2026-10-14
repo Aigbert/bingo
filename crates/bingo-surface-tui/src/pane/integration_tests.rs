@@ -154,6 +154,13 @@ fn collapse_click_and_title_and_key_cycle_fit_without_changing_session_data() {
         KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL),
     );
     draw_tree(200, 50, &tree, &mut ui, now);
+    assert_eq!(ui.shown.seating.panes[0].place, Place::Overlay);
+    super::key(
+        &mut ui,
+        &state,
+        KeyEvent::new(KeyCode::Char('p'), KeyModifiers::ALT),
+    );
+    draw_tree(200, 50, &tree, &mut ui, now);
     assert_eq!(ui.shown.seating.panes[0].place, Place::Above);
     let area = ui.shown.seating.panes[0].area;
     crate::pointer::on_mouse(
