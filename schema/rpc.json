@@ -1552,16 +1552,6 @@
         {
           "type": "object",
           "properties": {
-            "generation": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/ItemId"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "plugin": {
               "type": "string"
             },
@@ -3184,26 +3174,6 @@
         "sessions"
       ]
     },
-    "LiveSignal": {
-      "type": "object",
-      "properties": {
-        "generation": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ItemId"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "payload": true
-      },
-      "required": [
-        "payload"
-      ],
-      "description": "Ownership travels with the payload, including attachment snapshots."
-    },
     "LiveTurn": {
       "type": "object",
       "properties": {
@@ -3843,7 +3813,7 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "registering"
+              "const": "pending"
             }
           },
           "required": [
@@ -5183,9 +5153,7 @@
           "type": "object",
           "additionalProperties": {
             "type": "object",
-            "additionalProperties": {
-              "$ref": "#/$defs/LiveSignal"
-            }
+            "additionalProperties": true
           }
         }
       },

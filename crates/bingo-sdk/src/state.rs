@@ -51,13 +51,15 @@ pub struct SessionState {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub invalidated: BTreeMap<String, u64>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[schemars(with = "BTreeMap<String, BTreeMap<String, Value>>")]
     pub signals: BTreeMap<String, BTreeMap<String, LiveSignal>>,
 }
 
-/// Ownership travels with the payload, including attachment snapshots.
+/// Server-side ownership stays beside the payload and never changes its wire shape.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
 pub struct LiveSignal {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip)]
     generation: Option<ItemId>,
     payload: Value,
 }
@@ -968,7 +970,36 @@ mod tests {
     }
 
     #[test]
-    fn generation_ownership_survives_snapshots_and_rejects_old_cleanup() {
+    fn signal_wire_keeps_the_payload_and_hides_internal_ownership() {
+        let mut state = SessionState::new(summary());
+        let signal = Event::Signal {
+            plugin: "fixture".into(),
+            kind: "pane".into(),
+            generation: Some(ItemId::mint()),
+            payload: serde_json::json!({"slots":[], "generation":"plugin data", "payload":true}),
+        };
+        state.apply(&frame(1, signal.clone()));
+        let wire = serde_json::to_value(&state).unwrap();
+        assert_eq!(
+            wire["signals"]["fixture"]["pane"],
+            serde_json::json!({"slots":[], "generation":"plugin data", "payload":true})
+        );
+        assert!(
+            serde_json::to_value(signal)
+                .unwrap()
+                .get("generation")
+                .is_none()
+        );
+        let decoded: SessionState = serde_json::from_value(wire).unwrap();
+        assert_eq!(
+            decoded.signals["fixture"]["pane"].payload(),
+            state.signals["fixture"]["pane"].payload()
+        );
+        assert!(decoded.signals["fixture"]["pane"].generation().is_none());
+    }
+
+    #[test]
+    fn internal_generation_ownership_survives_clones_and_rejects_old_cleanup() {
         let mut st = SessionState::new(summary());
         let old = ItemId::mint();
         let new = ItemId::mint();
@@ -987,12 +1018,7 @@ mod tests {
                 },
             ));
         }
-        let wire = serde_json::to_value(&st).unwrap();
-        assert_eq!(
-            wire["signals"]["fixture"]["pane"]["generation"],
-            serde_json::json!(new)
-        );
-        let mut restored: SessionState = serde_json::from_value(wire).unwrap();
+        let mut restored = st.clone();
         assert_eq!(restored.signals["fixture"]["pane"].generation(), Some(&new));
         restored.apply(&frame(
             4,

@@ -3,6 +3,7 @@
 
 mod reload;
 mod settings;
+mod state;
 pub use reload::PluginReload;
 pub use settings::{ConfigLayer, ConfigOrigin, ConfigSources};
 
@@ -130,17 +131,25 @@ pub struct PluginRegistration {
     pub execution: PluginExecution,
 }
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub enum PluginState {
     On,
-    Off { why: String },
-    Failed { why: String },
-    Waiting { changed: bool },
+    Off {
+        why: String,
+    },
+    Failed {
+        why: String,
+    },
+    Waiting {
+        changed: bool,
+    },
+    #[serde(rename = "pending")]
     Registering,
-    Pending { now: bool, at: NextStart },
+    Pending {
+        now: bool,
+        at: NextStart,
+    },
 }
 
 impl PluginState {

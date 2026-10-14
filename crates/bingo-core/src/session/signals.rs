@@ -8,6 +8,19 @@ pub(super) async fn publish(
     payload: Value,
     generation: Option<ItemId>,
 ) -> Result<(), KernelError> {
+    if payload.is_null()
+        && generation.as_ref().is_some_and(|owner| {
+            actor
+                .state
+                .signals
+                .get(&plugin)
+                .and_then(|kinds| kinds.get(&kind))
+                .and_then(|signal| signal.generation())
+                != Some(owner)
+        })
+    {
+        return Ok(());
+    }
     actor
         .publish(
             Event::Signal {

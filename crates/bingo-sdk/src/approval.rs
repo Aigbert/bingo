@@ -53,7 +53,7 @@ mod tests {
                 PluginState::Waiting { changed: true },
                 json!({"kind":"waiting","changed":true}),
             ),
-            (PluginState::Registering, json!({"kind":"registering"})),
+            (PluginState::Registering, json!({"kind":"pending"})),
             (
                 PluginState::Pending {
                     now: false,

@@ -96,12 +96,19 @@ async fn generation_owned_signals_survive_older_cleanup_and_attachment() {
         .unwrap();
     }
     let mut state = a.snapshot.clone();
+    let mut wire_state: SessionState =
+        serde_json::from_value(serde_json::to_value(&state).unwrap()).unwrap();
     let mut signals = 0;
-    while signals < 3 {
+    while signals < 2 {
         let frame = a.events.next().await.unwrap();
         signals += usize::from(matches!(frame.event, Event::Signal { .. }));
+        wire_state.apply(&serde_json::from_value(serde_json::to_value(&frame).unwrap()).unwrap());
         state.apply(&frame);
     }
+    while let Some(Some(frame)) = a.events.next().now_or_never() {
+        wire_state.apply(&serde_json::from_value(serde_json::to_value(&frame).unwrap()).unwrap());
+    }
+    assert_eq!(wire_state.signals["fixture"]["pane"], json!("new"));
     assert_eq!(state.signals["fixture"]["pane"], json!("new"));
     assert_eq!(state.signals["fixture"]["pane"].generation(), Some(&new));
     let a = host

@@ -182,7 +182,7 @@ pub enum Event {
         requests: Vec<String>,
     },
     Signal {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(skip)]
         generation: Option<ItemId>,
         plugin: String,
         kind: String,

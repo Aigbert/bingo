@@ -58,9 +58,15 @@ and says why. The listing tells the wish from what runs.
 
 ## Decisions
 
-- Admission's old unit `Pending` becomes `Registering`; `Pending { now, at }`
-  exclusively describes a wish differing from the running state. This avoids
-  conflating M171 admission with a restart and keeps pending derived.
+- Admission's internal unit `Pending` becomes `Registering`; `Pending { now, at }`
+  describes a wish differing from the running state and remains derived.
+  Round 3 preserves the legacy wire tag: admission serializes as bare `pending`,
+  switching as `pending { now, at }`. Old serde clients still read both;
+  new readers also accept `registering` from earlier M172 builds.
+- Generation ownership stays on each live signal beside its payload, but is
+  skipped on the wire. Snapshot values remain the plugin's raw JSON as on dev;
+  the server rejects stale clears before broadcasting to unowned wire clients.
+  Internal snapshot clones retain ownership; deserialization cannot claim it.
 - Retain registered native contributions for eligible plugins switched off at
   boot. Initialize these resident plugins once; dispatch controls visibility.
   Off-plugin add/start failures downgrade to next-start, leave dispatch out,

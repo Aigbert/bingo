@@ -3268,16 +3268,6 @@
         {
           "type": "object",
           "properties": {
-            "generation": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/ItemId"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "plugin": {
               "type": "string"
             },
@@ -6231,7 +6221,7 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "registering"
+              "const": "pending"
             }
           },
           "required": [
