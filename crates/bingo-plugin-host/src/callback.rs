@@ -44,7 +44,8 @@ impl Registry {
             .remove(plugin);
     }
     pub fn get(&self, plugin: &str) -> Result<Arc<dyn Executor>, String> {
-        self.0
+        let executor = self
+            .0
             .read()
             .unwrap_or_else(|error| error.into_inner())
             .get(plugin)
@@ -60,10 +61,122 @@ impl Registry {
                     })
                     .cloned()
             })
-            .ok_or_else(|| format!("{plugin}: callback runtime is unavailable"))
+            .ok_or_else(|| format!("{plugin}: callback runtime is unavailable"))?;
+        Ok(Arc::new(Bound {
+            plugin: plugin.into(),
+            executor,
+        }))
     }
     pub async fn prepared(&self, plugin: &str) -> Result<Arc<dyn Executor>, String> {
         self.get(plugin)?.prepare().await?;
         self.get(plugin)
+    }
+}
+
+/// A retained handle restores its owner's scope when invoked by a timer.
+struct Bound {
+    plugin: String,
+    executor: Arc<dyn Executor>,
+}
+#[async_trait::async_trait]
+impl Executor for Bound {
+    fn stopped(&self) -> CancellationToken {
+        self.executor.stopped()
+    }
+    fn generation(&self) -> Option<bingo_sdk::ItemId> {
+        self.executor.generation()
+    }
+    fn is_current(&self) -> bool {
+        self.executor.is_current()
+    }
+    async fn prepare(&self) -> Result<(), String> {
+        self.executor.prepare().await
+    }
+    async fn call(&self, id: &str, input: Value, cx: &HookContext) -> Result<Value, String> {
+        let owner = self.generation();
+        if self.stopped().is_cancelled()
+            || bingo_sdk::generation::current(&self.plugin)
+                .is_some_and(|current| Some(current) != owner)
+        {
+            return Err(format!(
+                "{}: callback generation mismatch or stopped",
+                self.plugin
+            ));
+        }
+        let call = self.executor.call(id, input, cx);
+        match owner {
+            Some(generation) => bingo_sdk::generation::scope(&self.plugin, &generation, call).await,
+            None => call.await,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bingo_sdk::*;
+    struct Probe {
+        generation: ItemId,
+        registry: Arc<Registry>,
+    }
+    #[async_trait::async_trait]
+    impl Executor for Probe {
+        fn stopped(&self) -> CancellationToken {
+            CancellationToken::new()
+        }
+        fn generation(&self) -> Option<ItemId> {
+            Some(self.generation.clone())
+        }
+        async fn prepare(&self) -> Result<(), String> {
+            Ok(())
+        }
+        async fn call(&self, _: &str, _: Value, _: &HookContext) -> Result<Value, String> {
+            Ok(serde_json::json!(
+                self.registry.get("fixture")?.generation()
+            ))
+        }
+    }
+    #[tokio::test]
+    async fn retained_callback_handle_keeps_its_generation_without_ambient_scope() {
+        let registry = Arc::new(Registry::default());
+        let old = ItemId::mint();
+        let new = ItemId::mint();
+        registry.insert(
+            "fixture".into(),
+            Arc::new(Probe {
+                generation: old.clone(),
+                registry: registry.clone(),
+            }),
+        );
+        let timer = registry.get("fixture").unwrap();
+        registry.insert(
+            "fixture".into(),
+            Arc::new(Probe {
+                generation: new.clone(),
+                registry: registry.clone(),
+            }),
+        );
+        let cx = HookContext {
+            session: SessionId::mint(),
+            turn: None,
+            item: None,
+            cwd: ".".into(),
+            provider: None,
+            model: None,
+            host: testing::NoHost::handle(),
+        };
+        let answer = timer.call("callback-1", Value::Null, &cx).await.unwrap();
+        assert_eq!(
+            answer,
+            serde_json::json!(old),
+            "timer dispatched into the replacement"
+        );
+        let mismatch =
+            generation::scope("fixture", &new, timer.call("callback-1", Value::Null, &cx)).await;
+        assert!(
+            mismatch.is_err(),
+            "foreign generation accepted callback handle"
+        );
+        registry.remove("fixture");
     }
 }
