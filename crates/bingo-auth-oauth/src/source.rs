@@ -19,7 +19,7 @@ use crate::exchange;
 use crate::issuer::Issuer;
 use crate::pkce;
 use crate::redirect;
-use crate::store::{CredentialStore, Entry};
+use crate::store::{CredentialStore, Entry, Snapshot};
 use crate::tokens::{Tokens, unix_now};
 
 /// What a person is, as far as this provider is concerned.
@@ -264,29 +264,40 @@ impl TokenSource {
     /// different one now means somebody else already renewed.
     async fn refresh(&self, seen: u64) -> Result<String, AuthError> {
         let _guard = self.refreshing.lock().await;
-        self.store.read(&self.provider)?;
+        let snapshot = self.store.snapshot(&self.provider)?;
         let (entry, generation) = self.cached();
         if generation != seen {
             return Self::usable(entry);
         }
         let tokens = match entry {
-            Some(Cached::Tokens(tokens)) => tokens,
+            Some(Cached::Tokens(_)) => {
+                Tokens::from_entry(snapshot.entry()).ok_or(AuthError::SignedOut)?
+            }
             other => return Self::usable(other),
         };
         let Some(refresh_token) = tokens.refresh.clone() else {
-            return Err(self.expire("the stored credential has no refresh token".into()));
+            return Err(self.expire(
+                "the stored credential has no refresh token".into(),
+                &snapshot,
+            ));
         };
         match exchange::refresh(&self.http, &self.issuer, &refresh_token).await {
-            Ok(reply) => self.renewed(reply, &tokens),
-            Err(AuthError::Expired(reason)) => Err(self.expire(reason)),
+            Ok(reply) => self.renewed(reply, &tokens, &snapshot),
+            Err(AuthError::Expired(reason)) => Err(self.expire(reason, &snapshot)),
             Err(error) => Err(error),
         }
     }
 
-    fn renewed(&self, reply: Value, previous: &Tokens) -> Result<String, AuthError> {
+    fn renewed(
+        &self,
+        reply: Value,
+        previous: &Tokens,
+        snapshot: &Snapshot,
+    ) -> Result<String, AuthError> {
         let tokens = Tokens::from_response(&reply, unix_now()).merged(previous);
         let access = tokens.access.clone();
-        self.store.write(&self.provider, tokens.entry())?;
+        self.store
+            .replace(&self.provider, snapshot, Some(tokens.entry()))?;
         self.remember(Cached::Tokens(tokens));
         Ok(access)
     }
@@ -305,13 +316,9 @@ impl TokenSource {
 
     /// A credential the issuer has retired is removed, not kept around to
     /// fail again: the way back is a login, and `status()` now says so.
-    fn expire(&self, reason: String) -> AuthError {
-        if let Err(error) = self.store.remove(&self.provider) {
-            tracing::warn!(
-                provider = %self.provider,
-                %error,
-                "the expired credential could not be removed"
-            );
+    fn expire(&self, reason: String, snapshot: &Snapshot) -> AuthError {
+        if let Err(error) = self.store.replace(&self.provider, snapshot, None) {
+            return error;
         }
         self.remember(Cached::Expired(reason.clone()));
         AuthError::Expired(reason)
@@ -1036,3 +1043,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod race_tests;

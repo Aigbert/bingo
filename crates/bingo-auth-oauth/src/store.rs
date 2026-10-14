@@ -6,6 +6,8 @@
 //! ours, and neither reads the other's file.
 
 mod binding;
+mod refresh;
+pub(crate) use refresh::Snapshot;
 mod signin;
 use binding::Binding;
 pub use binding::Metadata;
@@ -78,7 +80,7 @@ pub struct CredentialStore {
     resource: Result<Option<Binding>, String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct Stored {
     #[serde(flatten)]
     entry: Entry,
