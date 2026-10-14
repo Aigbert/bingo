@@ -9,8 +9,11 @@ fn pane() -> Value {
 
 #[test]
 fn pane_places_and_sizes_survive_the_wire() {
-    for place in [json!(["side","above"]), json!([{"rect":{
-        "anchor":"bottomRight","width":"40%","height":"30%"}}])] {
+    for place in [
+        json!(["side", "above"]),
+        json!([{"rect":{
+        "anchor":"bottomRight","width":"40%","height":"30%"}}]),
+    ] {
         let mut wire = pane();
         wire["place"] = place.clone();
         wire["size"] = json!({"rows":{"min":4,"ideal":8,"max":12},
@@ -35,11 +38,15 @@ fn legacy_pane_rows_become_one_size_and_default_above() {
 
 #[test]
 fn published_panes_refuse_invalid_lengths_and_reversed_bounds() {
-    for invalid in [json!({"place":[{"rect":{"width":"101%","height":8}}]}),
+    for invalid in [
+        json!({"place":[{"rect":{"width":"101%","height":8}}]}),
         json!({"size":{"rows":{"min":10,"ideal":8,"max":4}}}),
-        json!({"size":{"columns":{"min":"80%","ideal":"90%","max":"50%"}}})] {
+        json!({"size":{"columns":{"min":"80%","ideal":"90%","max":"50%"}}}),
+    ] {
         let mut wire = pane();
-        wire.as_object_mut().unwrap().extend(invalid.as_object().unwrap().clone());
+        wire.as_object_mut()
+            .unwrap()
+            .extend(invalid.as_object().unwrap().clone());
         let slot = serde_json::from_value::<Slot>(wire);
         assert!(slot.is_err() || !slot.unwrap().published_ok());
     }

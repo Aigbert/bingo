@@ -28,9 +28,13 @@ export type Payload = null;
 export type UiSelect = UiSelectInput.Payload;
 export namespace UiRenderInput {
 // Generated from JSON Schema. Do not edit.
+export type Anchor = ("topLeft" | "topRight" | "bottomLeft" | "bottomRight" | "center");
 export type Component = ("Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane");
+export type Length = (number | string);
+export type PanePlace = (("above" | "side" | "overlay") | { "rect": Rect; });
+export type Rect = { "anchor"?: Anchor; "height": Length; "width": Length; "x"?: Length; "y"?: Length; [key: string]: unknown; };
 export type SurfaceName = ("terminal" | "desktop" | "text");
-export type Viewport = { "columns": number; "rows": number; [key: string]: unknown; };
+export type Viewport = { "columns": number; "place"?: (PanePlace | null); "rows": number; [key: string]: unknown; };
 export type Payload = { "component": Component; "props": unknown; "requestId": string; "surface": SurfaceName; "viewport": Viewport; [key: string]: unknown; };
 }
 export namespace UiRenderResult {

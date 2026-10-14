@@ -11,7 +11,8 @@ impl Serialize for Slot {
 impl<'de> Deserialize<'de> for Slot {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let mut value = Value::deserialize(deserializer)?;
-        if value["kind"] == "pane" && value.get("size").is_none()
+        if value["kind"] == "pane"
+            && value.get("size").is_none()
             && let Some(rows) = value.get("rows").cloned()
         {
             value["size"] = serde_json::json!({"rows":{

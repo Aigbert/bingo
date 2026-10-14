@@ -99,12 +99,15 @@ pub enum Slot {
 impl Slot {
     pub fn published_ok(&self) -> bool {
         match self {
-            Self::Activity { view, .. }
-            | Self::Rail { view, .. }
-            | Self::Panel { view, .. } => view.published_ok(),
-            Self::Pane { place, size, view, .. } => {
+            Self::Activity { view, .. } | Self::Rail { view, .. } | Self::Panel { view, .. } => {
+                view.published_ok()
+            }
+            Self::Pane {
+                place, size, view, ..
+            } => {
                 place.iter().copied().all(Place::published_ok)
-                    && size.published_ok() && view.published_ok()
+                    && size.published_ok()
+                    && view.published_ok()
             }
             Self::Row { body, .. } => body
                 .as_ref()

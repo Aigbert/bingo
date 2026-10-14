@@ -186,7 +186,7 @@
               "place": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/Place"
+                    "$ref": "#/$defs/PanePlace"
                   },
                   {
                     "type": "null"
@@ -211,7 +211,7 @@
               "rows"
             ]
           },
-          "Place": {
+          "PanePlace": {
             "oneOf": [
               {
                 "type": "string",

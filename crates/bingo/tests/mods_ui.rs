@@ -62,12 +62,13 @@ async fn a_pulled_counter_invalidates_and_renders_after_a_press() {
         surface: SurfaceName::Terminal,
         props: serde_json::json!({}),
         viewport: Viewport {
-                place: None,
+            place: None,
             columns: 80,
             rows: 8,
         },
     };
     let session = attachment.snapshot.summary.id.clone();
+    assert_seated_viewports(&kernel, &session, &request).await;
     let first = kernel.render(&session, request.clone()).await.unwrap();
     assert!(first.fold().contains("Count: 0"), "{first:?}");
     let action = button(&first);
@@ -128,6 +129,31 @@ fn button(view: &View) -> Action {
         .unwrap()
 }
 
+async fn assert_seated_viewports(
+    kernel: &bingo_surface_rpc::RemoteKernel,
+    session: &SessionId,
+    request: &RenderRequest,
+) {
+    for (place, columns, rows) in [(slot::Place::Side, 64, 43), (slot::Place::Above, 100, 9)] {
+        let mut seated = request.clone();
+        seated.viewport = Viewport {
+            place: Some(place),
+            columns,
+            rows,
+        };
+        let view = kernel.render(session, seated).await.unwrap();
+        let label = match place {
+            slot::Place::Side => "side",
+            _ => "above",
+        };
+        assert!(
+            view.fold()
+                .contains(&format!("Seat: {label} {columns}x{rows}")),
+            "{view:?}"
+        );
+    }
+}
+
 async fn edit_and_close(
     kernel: &bingo_surface_rpc::RemoteKernel,
     attachment: &mut Attachment,
@@ -142,7 +168,7 @@ async fn edit_and_close(
                 surface: SurfaceName::Terminal,
                 props: serde_json::json!({}),
                 viewport: Viewport {
-                place: None,
+                    place: None,
                     columns: 80,
                     rows: 8,
                 },
@@ -187,5 +213,93 @@ async fn edit_and_close(
         !slot::placed(&attachment.snapshot)
             .iter()
             .any(|placed| matches!(&placed.slot,Slot::Pane{id,..} if id=="counter"))
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_corner_declares_a_rect_and_fills_its_received_viewport() {
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mods/corner");
+    let home = tempfile::tempdir().unwrap();
+    let installed = home.path().join(".bingo/plugins/corner");
+    std::fs::create_dir_all(&installed).unwrap();
+    for name in ["plugin.json", "main.ts"] {
+        std::fs::copy(fixture.join(name), installed.join(name)).unwrap();
+    }
+    let mut server = Server::spawn_at(
+        home,
+        r#"{"responses":[{"steps":[{"text":"Ready."}]}]}"#,
+        &["--provider", "fake"],
+    );
+    let kernel = ready(&mut server).await;
+    let mut attachment = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    tokio::time::timeout(LIMIT, async {
+        loop {
+            if kernel
+                .catalog(CatalogKind::Commands)
+                .await
+                .unwrap()
+                .entries
+                .iter()
+                .any(|entry| entry.id == "corner")
+            {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    let intent = IntentId::mint();
+    attachment.handle.submit(
+        intent.clone(),
+        Input::text("/corner", Origin::surface("test")),
+    );
+    assert!(matches!(
+        ack_for(&mut attachment, &intent).await,
+        IntentOutcome::Applied { .. }
+    ));
+    let placed = slot::placed(&attachment.snapshot);
+    let (place, mut request) = placed
+        .into_iter()
+        .find_map(|placed| match placed.slot {
+            Slot::Pane {
+                place,
+                view: Shown::Pull { request },
+                ..
+            } => Some((place[0], request)),
+            _ => None,
+        })
+        .unwrap();
+    assert!(matches!(
+        place,
+        slot::Place::Rect(slot::Rect {
+            anchor: slot::Anchor::BottomRight,
+            width: slot::Length::Percent(40),
+            height: slot::Length::Percent(30),
+            ..
+        })
+    ));
+    request.viewport = Viewport {
+        place: Some(place),
+        columns: 48,
+        rows: 9,
+    };
+    let view = kernel
+        .render(&attachment.snapshot.summary.id, request)
+        .await
+        .unwrap();
+    assert!(
+        matches!(view,View::Raster{columns:48,rows:9,ref cells} if cells.len()==9 && cells.iter().all(|line|line.chars().count()==48))
+    );
+    kernel.shutdown().await.unwrap();
+    assert!(
+        tokio::time::timeout(LIMIT, server.child.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
     );
 }
