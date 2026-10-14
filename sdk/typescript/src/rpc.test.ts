@@ -58,7 +58,7 @@ test('catalogue subscriptions wrap a service event added after initialization', 
   } });
   assert.deepEqual(messages[0].result.links, []);
   assert.deepEqual(messages[0].result.subscriptions,
-    [{ patterns: ['mcp.*', 'session.start'], prefilter: null }]);
+    [{ patterns: ['mcp.*', 'session.start'], prefilter: null, render: [] }]);
   await peer.receive({ id: 2, method: 'intercept/mcp.servers', params: { chain: 'c', input: null, site: { session: 's' } } });
   assert.deepEqual(messages[1].result, { next: null });
   await peer.receive({ id: 3, method: 'intercept/mcp.servers/after', params: { chain: 'c', result: { servers: {} } } });

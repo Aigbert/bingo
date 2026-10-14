@@ -16,8 +16,8 @@ pub use canvas::Canvas;
 
 #[derive(Debug, Default)]
 pub struct Layout {
-    pub panes: Vec<(String, Rect)>,
     pub band_actions: Vec<crate::views::targets::Target>,
+    pub seating: crate::pane::seat::Seating,
     pub waiting: Vec<(String, Rect)>,
     pub pulls: Vec<crate::pulled::Key>,
     pub blocks: Blocks,

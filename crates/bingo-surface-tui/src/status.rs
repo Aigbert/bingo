@@ -27,15 +27,6 @@ const CONTEXT_BAD: u64 = 90;
 pub const HINT: &str = keys::FOOTER_HINT;
 
 /// The status line at this width.
-#[cfg(test)]
-pub fn compose(
-    tree: &Tree,
-    ui: &Ui,
-    width: usize,
-    now: Now,
-) -> (Line<'static>, Option<std::ops::Range<usize>>) {
-    components(tree, ui, width, now, &mut Vec::new())
-}
 
 pub fn components(
     tree: &Tree,
@@ -444,6 +435,16 @@ fn cut(span: &Span<'static>, room: usize) -> Span<'static> {
 
 /// Every span of a drawn status line with the style it carries, for the tests
 /// that assert where a colour landed.
+#[cfg(test)]
+pub fn compose(
+    tree: &Tree,
+    ui: &Ui,
+    width: usize,
+    now: Now,
+) -> (Line<'static>, Option<std::ops::Range<usize>>) {
+    components(tree, ui, width, now, &mut Vec::new())
+}
+
 #[cfg(test)]
 pub fn line(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Line<'static> {
     compose(tree, ui, width, now).0

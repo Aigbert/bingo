@@ -92,15 +92,11 @@ pub fn render(view: &View, width: usize) -> Vec<Line<'static>> {
 pub type Engine<'a> =
     dyn Fn(bingo_sdk::render::Component, &serde_json::Value, usize) -> Vec<Line<'static>> + 'a;
 
-pub fn render_with(view: &View, width: usize, engine: &Engine<'_>) -> Vec<Line<'static>> {
-    marked_with(view, width, &Marks::default(), engine)
-}
-
 pub fn marked(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
     marked_with(view, width, marks, &|_, _, _| Vec::new())
 }
 
-fn marked_with(
+pub fn marked_with(
     view: &View,
     width: usize,
     marks: &Marks,

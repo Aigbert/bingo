@@ -13,6 +13,16 @@ pub fn draw(
     width: usize,
     own: impl Fn(&Props, usize) -> Vec<Line<'static>>,
 ) -> Vec<Line<'static>> {
+    draw_marked(props, answer, width, &crate::views::Marks::default(), own)
+}
+
+pub fn draw_marked(
+    props: &Props,
+    answer: Option<&View>,
+    width: usize,
+    marks: &crate::views::Marks,
+    own: impl Fn(&Props, usize) -> Vec<Line<'static>>,
+) -> Vec<Line<'static>> {
     let Some(answer) = answer else {
         return own(props, width);
     };
@@ -27,7 +37,7 @@ pub fn draw(
             own(props, width)
         }
     };
-    let mut lines = crate::views::render_with(answer, width, &engine);
+    let mut lines = crate::views::marked_with(answer, width, marks, &engine);
     if invalid.get() {
         lines.extend(crate::views::render(
             &View::Text {
@@ -106,6 +116,7 @@ pub fn key(
         surface: SurfaceName::Terminal,
         props: props.value(),
         viewport: Viewport {
+            place: None,
             columns: width,
             rows,
         },

@@ -2,117 +2,143 @@
 
 ## Goal
 
-[ADR-0081](../adr/0081-the-screen-is-the-persons.md) §7, the person's
-word of 2026-10-13: a pane declares its place — a word (`above`, `side`,
-`overlay`) or a rect — in order of preference, and its size as `{ min,
-ideal, max }`; the TUI seats it at the first place that fits, collapses
-it to the status line when none does, and tells the mod what it got
-through the render `viewport`. M140 seats every asked pane `above`; this
-milestone adds the rest. No new dependency. After M140 and M148.
+Implement [ADR-0081](../adr/0081-the-screen-is-the-persons.md) §7:
+a pane declares preferred places and bounded sizes; the TUI seats it at the
+first fit, collapses it to status otherwise, and reports the actual viewport.
+No new dependency. Hard prerequisites M140 and M148 have landed.
+
+Re-verified at `ba70fdf6` on 2026-10-14, clean branch
+`m151-a-pane-says-where`. Landed dependencies: M137 (runtime), M138 (host),
+M139 (world), M140 (pulled views), M147 (rough edges), M148 (screen),
+M149 (ember), M150 (crew). ADR-0078 §5 grants remain unchanged.
 
 ## Bricks, in build order
 
-1. **Contract first** (sdk `slot.rs`, `render.rs`). `Place = Above |
-   Side | Overlay | Rect(Rect)`; `Rect { anchor, x, y, width, height }`;
-   `Anchor = TopLeft | TopRight | BottomLeft | BottomRight | Center`
-   (default `TopLeft`); `Length = Cells(u16) | Percent(u8)`, JSON `12`
-   or `"40%"`; `Span { min, ideal, max }`; `PaneSize { rows, columns }`.
-   `Slot::Pane` gains `place: Vec<Place>` and `size`. Golden fixtures:
-   `["side", "above"]`, `[{ "rect": { "anchor": "bottomRight", "width":
-   "40%", "height": "30%" } }]`, and a pane without either, which reads
-   as `["above"]` at M140's size. `Viewport` gains `place`.
-   `published_ok` refuses a percentage above 100 and a `min` above a
-   `max`. Every test fails first.
-2. **The pure brick** (TUI `pane/seat.rs`). `seat(area, wanted, moved)
-   -> Seating`, pure in sizes: for each asked pane, the first place that
-   fits, with its rect; the transcript's remaining rect; the collapsed
-   list. Fit is ADR-0081 §7's: `TRANSCRIPT_MIN_COLUMNS = 60`,
-   `TRANSCRIPT_MIN_ROWS = 8`; one `above`, one `side`, `FLOATING_MAX =
-   3`; a rect past an edge moves in, then shrinks to the area, and does
-   not fit below its minimum. Table tests, each a named case:
-   - 200×50: `side` fits at its ideal; the transcript keeps the rest.
-   - 100×30: `side` leaves under 60 columns, so the pane is `above`.
-   - 60×15: nothing fits; collapsed.
-   - a rect at each anchor, in cells and percentages; one past the right
-     edge moves in; one larger than the area shrinks; one under its min
-     after shrinking does not fit.
-   - two panes asking `side`: the second takes its next place.
-   - a fourth floating pane takes its next place or collapses.
-   - a move the person made wins over the declaration while it fits.
-3. **Layout** (M124's pass). The transcript's region is `Seating`'s;
-   `above` sits between it and the composer; `side` to its right;
-   floating panes draw after the transcript, newest last; the permission
-   prompt and toasts draw over them all. Pointer routing (`pointer.rs`):
-   a click, a wheel and a drag-to-select (M92) go to the topmost pane
-   under the pointer; the transcript's selection never starts inside a
-   pane.
-4. **What the mod is told** (`pulled.rs`). The render request's
-   `viewport` is `{ place, columns, rows }` as seated; the memo key gains
-   `place` and, for a pane only, `rows` (ADR-0079 §5, dated note). A
-   resize that moves a pane from `side` to `above` asks it again at its
-   new width. A collapsed pane is not asked.
-5. **Collapsed and waiting** (`status.rs`). A collapsed pane is `<title>
-   ▸` in the status line's right part; a click seats it as `overlay`. A
-   pane not asked keeps M140's `1 pane waiting`.
-6. **The person's move.** A focused pane's title row ends in `place ▾`;
-   a click cycles the places that fit, in `above`, `side`, `overlay`
-   order, then the declared rect. The same on a key, chosen at the start
-   against `keys.rs` and listed in the `?` sheet. Moves are kept by pane
-   id in the TUI's process (`pane/moved.rs`), never in the session.
-7. **The mod's side.** `$.ui.open({ id, title, place, size })` in the
-   mod runtime and `sdk/typescript/src/ui.ts`; plugin-rpc's
-   `Slot::Pane` through the schema, regenerated with
-   `BINGO_UPDATE_SCHEMA=1`. M140's fixture mod `counter` declares
-   `place: ["side", "above"]`; a second fixture, `corner`, declares a
-   bottom-right rect of `"40%"` by `"30%"` with a `Raster` that fills it.
-8. **Records.** ADR-0081 accepted for §7; dated notes on ADR-0079 §3 §5;
-   tui.md (the pane's places), mods-parity §4 and §8, the guide page on
-   panes with one example per place.
+1. **Contract first.** SDK `Place = Above | Side | Overlay | Rect(Rect)`;
+   rect anchors `topLeft`, `topRight`, `bottomLeft`, `bottomRight`, `center`;
+   lengths are cells or percentages. `Span { min, ideal, max }` and
+   `PaneSize { rows, columns }`. A pane defaults to `["above"]` and the
+   legacy row size. Normalize legacy `rows` on read; keep only `size`.
+   Golden tests pin ordered places, bottom-right percentages, legacy reads,
+   percentages over 100 and reversed bounds. `Viewport` gains `place`.
+2. **Pure seating.** `pane::seat(area, wanted, moved) -> Seating` returns
+   seats, remaining transcript and collapsed ids. Reserve 60 columns and
+   8 rows; one above, one side, three floating. Rects move inside before
+   shrinking, and cannot shrink below minimum. Tests cover 200×50 side,
+   100×30 above, 60×15 collapse, every anchor in both length units, edge
+   clamping, excess docking/floating, existing pane minima and user moves.
+3. **Layout and pointer.** `view.rs` composes M124's layout. Panes use
+   the transcript area; floats draw newest last. Permission and toasts
+   remain above them. Topmost hit testing owns clicks, wheel and selection;
+   a pane gesture never starts a transcript selection.
+4. **Pulled viewport.** Request `{ place, columns, rows }` uses the seated
+   content dimensions. Memo keys include place and, for panes only, rows.
+   Resize/move asks again; collapsed panes are never asked (ADR-0079 §5).
+5. **Status.** The right edge shows `<title> ▸` for collapsed panes; clicking
+   tries overlay. Unasked panes retain `1 pane waiting` and open on click.
+6. **Moves.** Focused title `place ▾` and `alt+p` cycle fitting above,
+   side, overlay, then declared rects; `?` lists the key.
+   Moves are keyed by pane identity in the TUI process, never the session.
+7. **Runtime.** `$.ui.open({ id, title, place, size })` in QuickJS/Node.
+   Regenerate schema and TypeScript with `BINGO_UPDATE_SCHEMA=1`; scoped
+   pre-release amendment recorded in ADR-0075. Counter prefers side/above;
+   Corner declares a bottom-right 40%×30% rect and fills it with Raster.
+8. **Records.** Accept ADR-0081 §7; dated ADR-0079 §3/§5 note; update
+   tui.md, mods-parity §4/§8, TUI guide and mod guide with every place.
 
 ## Files
 
-- `crates/bingo-sdk/src/{slot,render}.rs` and their fixtures;
-  `schema/{rpc,plugin-2}.json` (regenerated, additive)
-- `crates/bingo-surface-tui/src/pane/{mod,seat,moved}.rs` (`pane.rs`
-  becomes the module), `{layout,pointer,pulled,status,keys}.rs`
-- `crates/bingo-mods/src/` (`$.ui.open`), `sdk/typescript/src/ui.ts`
-- `crates/bingo/tests/{mods_ui.rs,fixtures/mods/{counter,corner}/}`
-- `docs/adr/{0079,0081}-*.md`, `docs/design/{tui,mods-parity-2026-10}.md`,
-  the panes guide page
+- `crates/bingo-sdk/src/{slot,render}.rs`, `slot/` helpers/tests and fixtures.
+- `crates/bingo-surface-tui/src/pane/` (formerly `pane.rs`),
+  `{view,layout,pointer,pulled,status,keys}.rs`, affected tests/snapshots.
+- `theme.rs`: only the dim file allowlist in `every_token_is_spent_where_the_design_says` (delegate-authorized).
+- `crates/bingo-mods/src/`, `sdk/typescript/src/ui.ts`.
+- `crates/bingo/tests/mods_ui.rs`, `tests/fixtures/mods/{counter,corner}/`.
+- Generated `schema/{rpc,plugin,plugin-2,events}.json`, TypeScript wire/events.
+- ADR-0075/0079/0081; `docs/design/{tui,mods-parity-2026-10}.md`;
+  `crates/bingo-mods/guide.md`, TUI guide.
 
 ## Exit criteria
 
-- [ ] Brick 1's and brick 2's tests failed first (output pasted) and pass:
-      `cargo test -p bingo-sdk slot:: render::`, `cargo test -p
-      bingo-surface-tui pane::`.
-- [ ] `TestBackend` snapshots: `side` at 200×50, `above` at 100×30,
-      collapsed at 60×15, the `corner` rect at 120×40 over the
-      transcript, the permission prompt drawn over a floating pane.
-- [ ] `cargo test -p bingo --test mods_ui`: the render request carries
-      the seated `place`, columns and rows; a resize from 200 to 100
-      columns asks `counter` again with `place: "above"`.
-- [ ] A tmux drive (own session only) with `counter` and `corner`: open
-      at 200×50, resize to 100×30 and 60×15, click `<title> ▸`, click
-      `place ▾`; each step's `capture-pane` pasted.
-- [ ] `scripts/tui-smoke.sh` passes; all gates of the upgrade protocol;
-      the Windows check of `bingo-surface-tui`, `bingo-sdk`, `bingo-mods`.
+- [x] SDK contract and pure seating tests failed first for expected reasons,
+      then passed; `cargo test -p bingo-sdk slot::`, `cargo test -p
+      bingo-sdk render::`, `cargo test -p bingo-surface-tui pane::`.
+- [x] Five TestBackend snapshots: side 200×50, above 100×30, collapsed
+      60×15, corner rect 120×40, permission above floating pane.
+- [x] `cargo test -p bingo --test mods_ui`: seated place/dimensions cross
+      RPC and resize; coexistence passes with unchanged assertions.
+- [x] Own isolated tmux drive: Counter/Corner at 200×50, 100×30, 60×15;
+      collapsed click, title cycle, alt+p cycle and Corner raster pass
+      without foreign-handler notices. Capture results recorded.
+- [x] `scripts/tui-smoke.sh` and all sequential native gates pass; SDK/core
+      MSVC checks pass. TUI/mods/bin defer only for known C headers to Windows CI.
 
 ## Non-goals
 
-- Dragging a pane's edge or body with the mouse; the move is a cycle.
-- Keeping the person's moves across processes or in the session.
-- A pane over the composer, the status line or the permission prompt.
-- `open`'s `isPlaced`: the mod learns its seat from each render's
-  `viewport`, and `open` still resolves `{}` (design §8).
-- An unasked pane taking the screen at any width.
+Dragging/resizing panes; moves persisted across processes; an unasked pane
+taking the screen; covering composer/status/permission; `open.isPlaced`
+(the mod reads each viewport and `open` still resolves `{}`).
 
 ## Risks
 
-- **Pointer routing.** Floating panes put a second hit-test over the
-  transcript; select-to-copy (M92) and the wheel are the likely breaks.
-  Brick 3's tests drive both before the drawing lands.
-- **Redraw cost.** A pane asked again on every resize step; the memo and
-  M140's four-in-flight cap hold it, and the drive says if it lags.
-- Re-verify at start: M140's `Slot::Pane`, `Viewport` and `pane.rs`;
-  M124's layout targets after M148; `pointer.rs` after M92 and M148;
-  which key is free.
+- Pointer routing competes with M92 selection; tests cover topmost wheel,
+  click and drag-to-copy. Render memo and M140's in-flight cap bound redraw.
+- M140 composes panes in `view.rs`; this owns integration, not `status.rs`.
+  M141 shares sdk `render.rs` and TUI `status.rs`; edits stay additive.
+  M142 owns the mod kit. Generated files reconcile at merge.
+- Latest released tag is v0.6.5; delegate authorizes scoped protocol-2
+  amendments with a dated ADR-0075 line. Kernel/sdk name no tool;
+  discipline 4c is unchanged. No live or credential tests.
+- Windows CI owns TUI (`aws-lc-sys`) and mods/bin (`aws-lc-sys`, `rquickjs-sys`) C-header deferrals; no Rust error reported or toolchain installed.
+- Mechanical constructors outside Files: core `host/render_queue.rs`
+  (`Viewport.place: None`) and TUI `toast.rs` (pane defaults).
+
+- 2026-10-14, delegate: keep `ctrl+p` absent and M148’s test unchanged; use dim for the focused label, add only `pane/draw.rs` to the dim allowlist, keep presence/tokens fixed, and correct/review the 80×24 help snapshots.
+- `alt+p` means “place”; `keys.rs` has no binding and composer `alt()` handles only b/f/Enter, so this chord is free and applies only to a focused pane.
+
+- 2026-10-14: merged dev fix `5446e403` in `7402c179`; inherited-handler coexistence regression passes with its assertions unchanged.
+
+## Verified (2026-10-14)
+
+| Command | Result |
+|---|---|
+| `cargo test -p bingo-sdk pane_ --locked` | FAILED: 0 passed, 4 failed (place/size dropped, invalid bounds accepted). |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --lib --locked` | ok: 151 passed, 0 failed. |
+| `cargo test -p bingo-surface-tui pane::seat --locked` (before implementation) | FAILED: 0 passed, 4 failed (no seats). |
+| `cargo test -p bingo-surface-tui pane::integration_tests --locked` (before integration) | FAILED: 0 passed, 1 failed (inline viewport). |
+| `cargo test -p bingo-surface-tui pane --locked` | ok: 15 passed, 0 failed; five pane snapshots. |
+| `cargo test -p bingo --test mods_ui --locked` | ok: 2 passed, 0 failed. |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk catalogue::tests::the_committed_catalogue_is_generated --locked` | ok: 1 passed. |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc the_committed_schema_is_this_document --lib --locked` | ok: 1 passed. |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc committed_ --lib --locked` | ok: 5 passed. |
+| `cargo test -p bingo-plugin-rpc protocol_two_keeps_every_frozen_shape --lib --locked` | ok: 1 passed. |
+| `git diff --name-only ba70fdf6 -- crates/bingo-core/src/host/render_queue.rs crates/bingo-surface-tui/src/toast.rs` | Mechanical constructors: `crates/bingo-core/src/host/render_queue.rs`, `crates/bingo-surface-tui/src/toast.rs`. |
+| `cargo fmt --all -- --check` | exit 0. |
+| `cargo check --workspace --all-targets --locked` | Finished dev profile in 26.23s; exit 0 (post-merge). |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Finished dev profile in 29.24s; exit 0 (post-merge). |
+| `cargo test --workspace --locked` (before delegate corrections) | FAILED: TUI 1110 passed, 6 failed, 2 ignored; exit 101. |
+| `scripts/check_discipline.sh` | `discipline ok`; existing advisories; rule 4c unchanged. |
+| `scripts/budget.sh` | `budget ok`; 411/411 dependencies; core 0s; relink 0; target/debug 10 GB (soft max 5). |
+| `cargo deny check` | `advisories ok, bans ok, licenses ok, sources ok`; exit 0. |
+| `scripts/tui-smoke.sh` | `tui-smoke ok`; board/activity at 80×24, 120×40, 200×50; Counter at 80×24/200×24; ctrl+p unbound. |
+| `tmux -L <isolated-socket> capture-pane -p -t m151` (Counter, post-merge) | 200×50: `Seat: side 64x43`; 100×30: `Seat: above 100x9`; 60×15: `Counter ▸`. |
+| `tmux -L <isolated-socket> capture-pane -p -t m151` (click/key, post-merge) | Click collapsed: `overlay ▾`; click title: `Seat: above 200x9`; alt+p: `Seat: side 64x43`. |
+| `tmux -L <isolated-socket> capture-pane -p -t m151` (both, post-merge) | 200×50: side/Corner; 100×30: above/Corner; 60×15: Counter collapsed/Corner; raster rendered at every size; no foreign-handler notices. |
+| `cargo test -p bingo-surface-tui collapse_click_and_title_and_key_cycle_fit_without_changing_session_data --locked` (before key correction) | FAILED: 0 passed, 1 failed; ctrl+p moved the pane. |
+| `INSTA_UPDATE=always cargo test -p bingo-surface-tui --lib --locked` | ok: 1116 passed, 0 failed, 2 ignored; unchanged M148 test and 80×24 footer test pass. |
+| `git diff -- crates/bingo-surface-tui/src/snapshots/` (delegate correction) | Reviewed sheet_slide, sheet_close, help_80x30, help_100x30 and help_panel; binding rows only, footer retained. |
+| `cargo build -p bingo --locked` | Finished dev profile in 25.81s; exit 0 (post-merge). |
+| `cargo test -p bingo --test mods_ui --locked unrelated_pane_mods_pass_through_each_others_handlers_without_notices -- --exact` | FAILED: 0 passed, 1 failed; valid inherited handler rejected: `corner (ui.render): /children/2: handler belongs to another command`. |
+| `cargo test -p bingo --test mods_ui --locked` (after merging dev) | ok: 3 passed, 0 failed; coexistence assertions unchanged. |
+| `cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed` | exit 0; summed 5311 passed, 0 failed, 5 existing manual/stress ignores; PTY 16 passed. |
+| `cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1` | ok: 1 passed, 0 failed. |
+| `cargo test -p bingo-provider-acp --test bridge --locked token -- --test-threads=1` | ok: 3 passed, 0 failed; the other three excluded token tests. |
+| `cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc --locked` | Finished dev profile in 6.55s; exit 0. |
+| `cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked` | Finished dev profile in 13.69s; exit 0. |
+| `cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc --locked` | exit 101; Windows CI: aws-lc-sys lacks stdlib.h/windows.h. |
+| `cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc --locked` | exit 101; rquickjs-sys MSVC flags need Clang cl mode; aws-lc-sys lacks Windows headers. |
+| `cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc --locked` | exit 101; rquickjs-sys MSVC flags need Clang cl mode; aws-lc-sys lacks Windows headers. |
+| `CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc --locked` | exit 101; Windows CI: rquickjs-sys lacks stdlib.h; aws-lc-sys lacks stdlib.h/windows.h. |
+| `CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc --locked` | exit 101; Windows CI: rquickjs-sys lacks stdlib.h; aws-lc-sys lacks stdlib.h/windows.h. |
+| `git diff cb2a1f35 -- crates/bingo/tests/mods_ui.rs` | Empty; regression assertions unchanged. |
+| `git diff --check` | exit 0. |

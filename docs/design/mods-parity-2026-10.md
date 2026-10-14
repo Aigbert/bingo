@@ -149,6 +149,8 @@ further than Claude Code's: a bingo pane declares its place (`above`,
 `side`, `overlay` or a rect) and size, the TUI seats it at the first that
 fits when the person asked for it, and the mod reads its seat from each
 render's `viewport` (ADR-0081 §7, M151, the person's word of 2026-10-13).
+M151 adds seated place and content height to pane invalidation; other
+components still ignore height-only changes.
 
 ## 5. State
 
@@ -221,8 +223,9 @@ M142.
 - `audio`.
 - `classic.*`.
 - The vscode and mobile surfaces.
-- A pane seated unasked: a bingo pane waits until the person opens it
-  (ADR-0081 §7).
+- A pane seated unasked: a bingo pane waits in status until the person
+  opens it (ADR-0081 §7). M151 adds explicit place/size declarations and
+  process-local moves; `open` still resolves `{}`.
 - `$.ui.scroll`, `focus`, `selection`, `copy`, and `open`'s `isPlaced`:
   a surface's scroll, focus, selection, clipboard and placement are its
   own (ADR-0013 §4), and the host has no verb toward a surface.

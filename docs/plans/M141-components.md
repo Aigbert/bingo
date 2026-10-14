@@ -53,9 +53,9 @@ After M138 and M140; landed dependencies are recorded below.
 - `crates/bingo-core/src/{chain/render.rs,session.rs,session/catalogue.rs}` (config publication)
 - `crates/bingo-mods/tests/components.rs` (QuickJS helper/log contract); `crates/bingo-mods/src/` `$.ui.log`, the embedded helpers; `sdk/typescript/src/{state.ts (new),state.test.ts (new),index.ts,ui.ts}`
 - `crates/bingo-surface-tui/src/{component.rs (new),views/mod.rs,transcript.rs,transcript/{said,output}.rs,
-  activity.rs,worked.rs,status.rs,form.rs,dialog.rs,blocks.rs,pane.rs,pulled.rs,view.rs,run/pulling.rs,lib.rs}`
+  activity.rs,worked.rs,status.rs,form.rs,dialog.rs,blocks.rs,pane/,pulled.rs,view.rs,run/pulling.rs,lib.rs}`
 - `crates/bingo-{surface-rpc,plugin-rpc}/src/schema.rs`; `schema/{rpc,events,plugin,plugin-2}.json`; generated TypeScript
-- `sdk/typescript/src/{on.ts,plugin.ts}` (shared matcher metadata); `docs/adr/0075-plugin-protocol-2.md`
+- `sdk/typescript/src/{on.ts,on.test.ts,plugin.ts,rpc.test.ts}` (shared matcher metadata); `docs/adr/0075-plugin-protocol-2.md`
 - `examples/plugins/{tool-call,band,pane}/` (new)
 - `crates/bingo/tests/mods_components.rs` (new); `scripts/tui-smoke.sh`
 
@@ -108,6 +108,8 @@ height without scroll jumps. Only visible rows ask, through the bounded queue.
   dated ADR-0075 note and `BINGO_UPDATE_SCHEMA=1`. Discipline 4c is unchanged.
 
 ## Verified (2026-10-14, in progress)
+
+- `git merge --no-ff dev -m 'merge: dev into M141'`: merged `5446e403` and `6fad64ce`; preserve inherited handlers, pane seating/hit-testing, add typed Pane projection and band route.
 
 - `cargo test -p bingo-surface-rpc component_props_are_published_for_wire_clients --locked`: expected FAIL, missing QuestionProps, before schema registration.
 - `cargo test -p bingo-sdk component:: --locked`: PASS, 2 tests.

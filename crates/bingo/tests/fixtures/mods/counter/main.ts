@@ -1,7 +1,7 @@
 export function register(on) {
   on('session.start', async $ => {
     await $.command.register({name:'counter', hint:'Open counter', aliases:[], args:{kind:'none'}, instant:true, family:'ui'}, async api => {
-      await api.ui.open({id:'counter',title:'Counter',focus:true,closeOnEscape:true,holdToasts:true});
+      await api.ui.open({id:'counter',title:'Counter',place:['side','above'],size:{rows:{min:8,ideal:10,max:20},columns:{min:48,ideal:64,max:80}},focus:true,closeOnEscape:true,holdToasts:true});
       return {kind:'applied'};
     });
   });
@@ -10,6 +10,7 @@ export function register(on) {
     const name = (await $.state.get('name'))?.value ?? '';
     return {kind:'Box',flexDirection:'column',children:[
       {kind:'Text',children:[`Count: ${count}`]},
+      {kind:'Text',children:[`Seat: ${event.viewport.place} ${event.viewport.columns}x${event.viewport.rows}`]},
       {kind:'Button',label:'Increment',hotkey:'i',onPress:async () => { await $.state.set('count',count+1); }},
       {kind:'Input',key:'name',label:'Name',value:name,onInput:async value => { await $.state.set('name',value); }},
     ]};

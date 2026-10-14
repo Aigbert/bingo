@@ -128,7 +128,8 @@ fn site(component: Component) -> bingo_sdk::SessionState {
                 close_on_escape: true,
                 hold_toasts: false,
                 asked: true,
-                rows: 5,
+                place: vec![bingo_sdk::slot::Place::Above],
+                size: bingo_sdk::slot::PaneSize::from_rows(5),
                 view: Shown::Pull {
                     request: RenderRequest {
                         component,
@@ -136,6 +137,7 @@ fn site(component: Component) -> bingo_sdk::SessionState {
                         surface: SurfaceName::Terminal,
                         props: json!({}),
                         viewport: Viewport {
+                            place: None,
                             columns: 0,
                             rows: 0,
                         },

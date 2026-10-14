@@ -68,10 +68,7 @@ pub fn next_change(tree: &Tree, ui: &Ui, now: Now) -> Option<std::time::Instant>
 /// The rows between the transcript and the input box: what the turn is doing
 /// — or, between turns, what it is waiting on — the session's task list, and
 /// whatever the person has queued behind it.
-#[cfg(test)]
-pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'static>> {
-    components(tree, ui, width, now, &mut Vec::new())
-}
+
 pub(crate) fn components(
     tree: &Tree,
     ui: &Ui,
@@ -485,6 +482,11 @@ fn arriving(item: &bingo_sdk::Item) -> bool {
 fn blocking(item: &bingo_sdk::Item) -> bool {
     matches!(item.body, bingo_sdk::ItemBody::ToolCall { .. })
         && item.status == bingo_sdk::ItemStatus::Running
+}
+
+#[cfg(test)]
+pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'static>> {
+    components(tree, ui, width, now, &mut Vec::new())
 }
 
 #[cfg(test)]

@@ -1,23 +1,39 @@
 use bingo_sdk::{component::*, slot::Shown};
 
-pub fn props(pane: &crate::pane::Pane, focused: bool, columns: u16, rows: u16) -> Props {
+pub fn props(
+    pane: &crate::pane::Pane,
+    focused: bool,
+    seat: &crate::pane::seat::Seated,
+    offset: usize,
+) -> Props {
     Props::Pane(PaneProps {
         title: pane.title.clone(),
         is_focused: focused,
-        body_columns: columns,
-        placement: "above".into(),
+        body_columns: seat.area.width,
+        placement: match seat.place {
+            bingo_sdk::slot::Place::Above => "above",
+            bingo_sdk::slot::Place::Side => "side",
+            bingo_sdk::slot::Place::Overlay => "overlay",
+            bingo_sdk::slot::Place::Rect(_) => "rect",
+        }
+        .into(),
         scroll: SiteScroll {
-            offset: 0,
-            body_rows: usize::from(rows),
+            offset,
+            body_rows: usize::from(seat.area.height.saturating_sub(1)),
         },
         view: SiteView { agent_id: None },
     })
 }
-pub fn shown(pane: &crate::pane::Pane, focused: bool, columns: u16, rows: u16) -> Shown {
+pub fn shown(
+    pane: &crate::pane::Pane,
+    focused: bool,
+    seat: &crate::pane::seat::Seated,
+    offset: usize,
+) -> Shown {
     let mut shown = pane.view.clone();
     if let Shown::Pull { request } = &mut shown {
         let mut value = request.props.as_object().cloned().unwrap_or_default();
-        if let serde_json::Value::Object(fields) = props(pane, focused, columns, rows).value() {
+        if let serde_json::Value::Object(fields) = props(pane, focused, seat, offset).value() {
             value.extend(fields);
         }
         request.props = value.into();

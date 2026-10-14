@@ -460,6 +460,16 @@
         "name"
       ]
     },
+    "Anchor": {
+      "type": "string",
+      "enum": [
+        "topLeft",
+        "topRight",
+        "bottomLeft",
+        "bottomRight",
+        "center"
+      ]
+    },
     "Answer": {
       "oneOf": [
         {
@@ -4687,6 +4697,19 @@
       ],
       "description": "An error as it appears on the wire and in the journal."
     },
+    "Length": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
     "Level": {
       "type": "string",
       "enum": [
@@ -5468,6 +5491,30 @@
       ],
       "description": "The actor's factual observation; only the RPC server can add a\nconnection-scoped availability token after pinning an immutable Item."
     },
+    "PanePlace": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "above",
+            "side",
+            "overlay"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "rect": {
+              "$ref": "#/$defs/Rect"
+            }
+          },
+          "required": [
+            "rect"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "PaneProps": {
       "type": "object",
       "properties": {
@@ -5501,6 +5548,27 @@
         "scroll",
         "view"
       ]
+    },
+    "PaneSize": {
+      "type": "object",
+      "properties": {
+        "rows": {
+          "$ref": "#/$defs/Span",
+          "default": {
+            "min": 2,
+            "ideal": 8,
+            "max": "100%"
+          }
+        },
+        "columns": {
+          "$ref": "#/$defs/Span",
+          "default": {
+            "min": 1,
+            "ideal": 64,
+            "max": "100%"
+          }
+        }
+      }
     },
     "ParentLink": {
       "type": "object",
@@ -7085,6 +7153,30 @@
         }
       ]
     },
+    "Rect": {
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "x": {
+          "$ref": "#/$defs/Length"
+        },
+        "y": {
+          "$ref": "#/$defs/Length"
+        },
+        "width": {
+          "$ref": "#/$defs/Length"
+        },
+        "height": {
+          "$ref": "#/$defs/Length"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ]
+    },
     "RegisterCommand": {
       "type": "object",
       "properties": {
@@ -7895,11 +7987,29 @@
             "asked": {
               "type": "boolean"
             },
-            "rows": {
-              "type": "integer",
-              "format": "uint16",
-              "minimum": 0,
-              "maximum": 65535
+            "place": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PanePlace"
+              },
+              "default": [
+                "above"
+              ]
+            },
+            "size": {
+              "$ref": "#/$defs/PaneSize",
+              "default": {
+                "rows": {
+                  "min": 2,
+                  "ideal": 8,
+                  "max": "100%"
+                },
+                "columns": {
+                  "min": 1,
+                  "ideal": 64,
+                  "max": "100%"
+                }
+              }
             },
             "view": {
               "$ref": "#/$defs/Shown"
@@ -7917,7 +8027,6 @@
             "closeOnEscape",
             "holdToasts",
             "asked",
-            "rows",
             "view"
           ]
         },
@@ -8028,6 +8137,25 @@
             "actions"
           ]
         }
+      ]
+    },
+    "Span": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "$ref": "#/$defs/Length"
+        },
+        "ideal": {
+          "$ref": "#/$defs/Length"
+        },
+        "max": {
+          "$ref": "#/$defs/Length"
+        }
+      },
+      "required": [
+        "min",
+        "ideal",
+        "max"
       ]
     },
     "SpinnerProps": {
@@ -9622,6 +9750,16 @@
     "Viewport": {
       "type": "object",
       "properties": {
+        "place": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PanePlace"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "columns": {
           "type": "integer",
           "format": "uint16",

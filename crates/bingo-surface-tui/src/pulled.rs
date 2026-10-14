@@ -27,6 +27,20 @@ impl Key {
             request,
         }
     }
+    pub fn seated(
+        state: &SessionState,
+        request: &RenderRequest,
+        pane: &crate::pane::seat::Seated,
+    ) -> Self {
+        let mut key = Self::new(
+            state,
+            request,
+            pane.area.width,
+            pane.area.height.saturating_sub(1),
+        );
+        key.request.viewport.place = Some(pane.place);
+        key
+    }
     fn same(&self, other: &Self) -> bool {
         self.session == other.session
             && self.generation == other.generation
@@ -34,6 +48,9 @@ impl Key {
             && self.request.request_id == other.request.request_id
             && self.request.props == other.request.props
             && self.request.viewport.columns == other.request.viewport.columns
+            && self.request.viewport.place == other.request.viewport.place
+            && (self.request.component != bingo_sdk::render::Component::Pane
+                || self.request.viewport.rows == other.request.viewport.rows)
     }
 }
 #[derive(Debug, Default)]
@@ -86,6 +103,9 @@ impl Memo {
             .find(|(held, _, _)| held.same(key))
             .and_then(|(_, answer, _)| answer.as_ref())
     }
+    pub fn answer_for(&self, key: &Key) -> Option<&View> {
+        self.get(key)
+    }
     pub fn version(&self, id: &str) -> u64 {
         self.entries
             .iter()
@@ -107,11 +127,12 @@ mod tests {
     fn width_props_and_generation_replace_answers_but_height_does_not() {
         let mut state = crate::test_support::state();
         let request = RenderRequest {
-            component: Component::Pane,
+            component: Component::AbovePrompt,
             request_id: "counter".into(),
             surface: SurfaceName::Terminal,
             props: serde_json::json!({}),
             viewport: Viewport {
+                place: None,
                 columns: 0,
                 rows: 0,
             },
@@ -152,5 +173,43 @@ mod tests {
         assert!(memo.request(&Key::new(&state, &request, 200, 8)));
         memo.retain(&[]);
         assert!(memo.entries.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod pane_tests {
+    use super::*;
+    use bingo_sdk::{
+        render::{Component, Viewport},
+        slot::Place,
+    };
+    #[test]
+    fn a_pane_reasks_for_height_or_place_and_rejects_a_late_answer() {
+        let state = crate::test_support::state();
+        let request = RenderRequest {
+            component: Component::Pane,
+            request_id: "counter".into(),
+            surface: SurfaceName::Terminal,
+            props: serde_json::json!({}),
+            viewport: Viewport {
+                place: Some(Place::Side),
+                columns: 64,
+                rows: 20,
+            },
+        };
+        let first = Key::new(&state, &request, 64, 20);
+        let mut memo = Memo::default();
+        assert!(memo.request(&first));
+        memo.answer(first.clone(), View::text("old"));
+        let height = Key::new(&state, &request, 64, 21);
+        assert!(memo.request(&height));
+        let mut moved = height.clone();
+        moved.request.viewport.place = Some(Place::Above);
+        assert!(memo.request(&moved));
+        memo.answer(height, View::text("stale"));
+        assert!(memo.answer_for(&moved).is_none());
+        memo.answer(moved.clone(), View::text("new"));
+        assert_eq!(memo.answer_for(&moved).unwrap().fold(), "new");
+        assert!(!memo.request(&moved));
     }
 }

@@ -35,6 +35,8 @@ pub enum SurfaceName {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Viewport {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<crate::slot::Place>,
     pub columns: u16,
     pub rows: u16,
 }
@@ -91,6 +93,13 @@ pub struct HandlerEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pane_viewport_keeps_its_seated_place() {
+        let wire = serde_json::json!({"columns":64,"rows":24,"place":"side"});
+        let viewport: Viewport = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(serde_json::to_value(viewport).unwrap(), wire);
+    }
+
     #[test]
     fn question_is_named_for_its_drawing() {
         let wire = serde_json::json!("Question");

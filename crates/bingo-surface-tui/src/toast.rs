@@ -143,7 +143,8 @@ mod tests {
                 close_on_escape: true,
                 hold_toasts: true,
                 asked: true,
-                rows: 8,
+                place: bingo_sdk::slot::above(),
+                size: bingo_sdk::slot::PaneSize::default(),
                 view: bingo_sdk::View::text("hold").into(),
             },
         ];
