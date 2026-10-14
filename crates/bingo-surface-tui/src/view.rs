@@ -532,7 +532,19 @@ fn component_requests(state: &SessionState, ui: &Ui, frame: &mut Layout, area: R
                 area.width,
                 area.height,
             ) {
+                let hides_children = matches!(
+                    props,
+                    bingo_sdk::component::Props::ToolGroup(_)
+                        | bingo_sdk::component::Props::ToolUse(_)
+                ) && ui
+                    .placed
+                    .pulled
+                    .get(&key)
+                    .is_some_and(|view| !crate::component::has_engine(view, props.component()));
                 frame.pulls.push(key);
+                if hides_children {
+                    break;
+                }
             }
         }
     }

@@ -32,6 +32,7 @@ use crate::welcome;
 #[derive(Clone, Debug, PartialEq)]
 struct Revision {
     component: (u64, u64),
+    render_config: serde_json::Value,
     status: ItemStatus,
     /// Names and room data affect prose even when an item's bytes stay put.
     names: Vec<crate::markdown::mentions::Name>,
@@ -86,6 +87,7 @@ fn revision(
                 .copied()
                 .unwrap_or_default(),
         ),
+        render_config: rows.state.config.kernel["render"].clone(),
         status: item.status,
         names: rows.names.clone(),
         room: (rows.state.summary.driver == bingo_sdk::Driver::Log).then_some(rows.state.seq),

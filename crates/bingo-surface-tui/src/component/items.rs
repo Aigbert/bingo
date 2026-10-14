@@ -34,6 +34,17 @@ pub fn props(item: &Item, expanded: bool) -> Option<Props> {
                 .as_ref()
                 .and_then(|output| serde_json::to_value(output).ok()),
         })),
+        ItemBody::Shell {
+            command,
+            output,
+            exit,
+            ..
+        } => Some(Props::CommandOutput(CommandOutputProps {
+            command: command.clone(),
+            args: String::new(),
+            text: output.clone(),
+            is_errored: exit.is_some_and(|exit| exit != 0),
+        })),
         ItemBody::Action {
             name,
             args,
@@ -97,6 +108,19 @@ pub fn changed(item: &Item, props: &Props) -> Item {
             } else {
                 ItemStatus::Completed
             };
+        }
+        (
+            ItemBody::Shell {
+                command,
+                output,
+                exit,
+                ..
+            },
+            Props::CommandOutput(props),
+        ) => {
+            *command = props.command.clone();
+            *output = props.text.clone();
+            *exit = Some(if props.is_errored { 1 } else { 0 });
         }
         (ItemBody::Notice { text, .. }, Props::InfoNotice(props)) => {
             *text = props.text.clone();
@@ -168,8 +192,9 @@ pub fn tail(item: &Item) -> Option<Props> {
 }
 
 pub fn all(item: &Item, expanded: bool) -> Vec<Props> {
-    props(item, expanded)
+    group(item, expanded)
         .into_iter()
+        .chain(props(item, expanded))
         .chain(tail(item))
         .collect()
 }

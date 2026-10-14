@@ -68,6 +68,7 @@ pub fn next_change(tree: &Tree, ui: &Ui, now: Now) -> Option<std::time::Instant>
 /// The rows between the transcript and the input box: what the turn is doing
 /// — or, between turns, what it is waiting on — the session's task list, and
 /// whatever the person has queued behind it.
+#[cfg(test)]
 pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'static>> {
     components(tree, ui, width, now, &mut Vec::new())
 }

@@ -27,6 +27,7 @@ const CONTEXT_BAD: u64 = 90;
 pub const HINT: &str = keys::FOOTER_HINT;
 
 /// The status line at this width.
+#[cfg(test)]
 pub fn compose(
     tree: &Tree,
     ui: &Ui,

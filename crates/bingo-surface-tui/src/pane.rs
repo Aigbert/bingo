@@ -138,7 +138,8 @@ pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, _now:
             rect.width,
             rect.height.saturating_sub(1),
         );
-        if let Shown::Pull { request } = &shown {
+        let matched = crate::component::pane::matched(state, &shown);
+        if matched && let Shown::Pull { request } = &shown {
             frame.pulls.push(crate::pulled::Key::new(
                 state,
                 request,
@@ -146,7 +147,10 @@ pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, _now:
                 rect.height.saturating_sub(1),
             ));
         }
-        match ui.placed.pulled.view(&shown, state, rect.width) {
+        match matched
+            .then(|| ui.placed.pulled.view(&shown, state, rect.width))
+            .flatten()
+        {
             Some(view) => {
                 let mut view = view.clone();
                 let index = ui
@@ -176,7 +180,8 @@ pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, _now:
                     |_, _| Vec::new(),
                 ));
             }
-            None => lines.push(Line::from(theme::ellipsis())),
+            None if matched => lines.push(Line::from(theme::ellipsis())),
+            None => {}
         }
         frame.render_widget(Paragraph::new(lines), rect);
     }

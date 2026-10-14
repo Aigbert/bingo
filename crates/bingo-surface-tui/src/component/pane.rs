@@ -24,3 +24,12 @@ pub fn shown(pane: &crate::pane::Pane, focused: bool, columns: u16, rows: u16) -
     }
     shown
 }
+
+pub fn matched(state: &bingo_sdk::SessionState, shown: &Shown) -> bool {
+    match shown {
+        Shown::View(_) => true,
+        Shown::Pull { request } => {
+            bingo_sdk::render::matched(&state.config).asks(request.component, request)
+        }
+    }
+}

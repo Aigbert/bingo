@@ -50,6 +50,7 @@ pub fn rows(
     let Some(answer) = ui.placed.pulled.get(&key) else {
         return original;
     };
+    let options = std::cell::RefCell::new(Vec::new());
     let lines = super::draw(&props, Some(answer), width, |changed, width| {
         let mut changed_interaction = interaction.clone();
         if let Props::Question(props) = changed {
@@ -65,9 +66,26 @@ pub fn rows(
         }
         own(&changed_interaction, width)
             .into_iter()
-            .map(|(line, _)| line)
+            .map(|(line, option)| {
+                if let Some(option) = option {
+                    options
+                        .borrow_mut()
+                        .push((line.to_string().trim().to_owned(), option));
+                }
+                line
+            })
             .collect()
     });
-    // Replacement trees have no engine option geometry; keyboard answers remain the interaction's.
-    lines.into_iter().map(|line| (line, None)).collect()
+    lines
+        .into_iter()
+        .map(|line| {
+            let text = line.to_string();
+            let option = options
+                .borrow()
+                .iter()
+                .find(|(label, _)| label == text.trim())
+                .map(|(_, option)| *option);
+            (line, option)
+        })
+        .collect()
 }

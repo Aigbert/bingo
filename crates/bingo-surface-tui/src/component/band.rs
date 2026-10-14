@@ -18,7 +18,12 @@ pub fn draw(
     let area = frame.area();
     let max_rows = area.height / 2;
     let props = Props::AbovePrompt(AbovePromptProps {
-        has_survey: false,
+        has_survey: state.interactions.iter().any(|interaction| {
+            matches!(
+                interaction.kind,
+                bingo_sdk::InteractionKind::Question(_) | bingo_sdk::InteractionKind::Form { .. }
+            )
+        }),
         is_working: state.busy(),
         max_rows,
         body_columns: area.width,

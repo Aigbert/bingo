@@ -211,3 +211,14 @@ impl Site<'_> {
         resolve(self.state, Some(self.memo), id, props, self.width, own)
     }
 }
+
+pub fn has_engine(view: &View, component: bingo_sdk::render::Component) -> bool {
+    match view {
+        View::Engine {
+            component: found, ..
+        } => *found == component,
+        View::Box { children, .. } => children.iter().any(|child| has_engine(child, component)),
+        View::Panel { child, .. } => has_engine(child, component),
+        _ => false,
+    }
+}

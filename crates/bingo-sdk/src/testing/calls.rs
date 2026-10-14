@@ -5,6 +5,10 @@ use std::sync::Arc;
 /// Every HostApi verb, with the arguments supplied by its caller.
 #[derive(Clone)]
 pub enum HostCall {
+    Render {
+        session: SessionId,
+        request: crate::render::RenderRequest,
+    },
     Complete {
         session: SessionId,
         turn: Option<TurnId>,
@@ -89,6 +93,11 @@ pub enum HostCall {
 impl std::fmt::Debug for HostCall {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Render { session, request } => f
+                .debug_struct("Render")
+                .field("session", session)
+                .field("request", request)
+                .finish(),
             Self::Complete {
                 session,
                 turn,
