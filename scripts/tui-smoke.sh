@@ -139,7 +139,7 @@ finish() {
   keys C-u
   # While a turn runs the status line says `esc to interrupt`, and a ctrl+c
   # then interrupts the turn instead of asking to leave: wait for it to end.
-  await '? for shortcuts'
+  await "${1:-? for shortcuts}"
   keys C-c
   await 'press ctrl+c again to exit'
   keys C-c
@@ -405,5 +405,37 @@ for width in 80 200; do
   finish
   step "${width}x24: Counter 0→1; Input Ada persisted; Escape closed"
 done
+
+step 'M141 tool-call, band and pane examples'
+for example in tool-call band pane; do
+  mkdir -p "$WORK/$example/types"
+  cp "$ROOT/examples/plugins/$example/"{plugin.json,register.ts,README.md} "$WORK/$example/"
+  cp "$ROOT/examples/plugins/$example/types/index.d.ts" "$WORK/$example/types/"
+done
+printf 'original' >"$WORK/cwd/protected.txt"
+start '{"responses":[
+  {"steps":[{"toolCall":{"name":"Edit","input":{"file_path":"protected.txt","old_string":"original","new_string":"changed"}}}]},
+  {"steps":[{"toolCall":{"name":"Bash","input":{"command":"echo before"}}}]},
+  {"steps":[{"toolCall":{"name":"Read","input":{"file_path":"protected.txt"}}}]},
+  {"steps":[{"text":"All done."}]}]}' 'BINGO_MOTION=off' "--plugin-dir $WORK/tool-call --plugin-dir $WORK/band --plugin-dir $WORK/pane --allowed-tools 'Edit,Bash(echo:*),Read'"
+await 'A small band above your prompt'
+keys M-h
+vanish 'Hide band'
+keys '/ledger' Enter
+await 'No calls yet'
+keys Escape
+vanish 'Tool ledger'
+keys 'Run the example calls' Enter
+await 'All done.'
+await 'Example calls: 2'
+[ "$(cat "$WORK/cwd/protected.txt")" = original ]
+keys '/ledger' Enter
+await 'Tool ledger'
+await 'Bash ·'
+await 'Read ·'
+keys Escape
+vanish 'Tool ledger'
+finish 'Example calls: 2'
+step 'M141: band hidden; Edit denied; Bash rewritten; two pane rows; Escape closed'
 
 echo 'tui-smoke ok'

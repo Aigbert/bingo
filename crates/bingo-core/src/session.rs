@@ -155,7 +155,10 @@ impl Actor {
                 ));
             }
             Msg::CatalogueEvent(event) => {
-                self.publish(*event, None).await?;
+                if !matches!(event.as_ref(), Event::ConfigChanged { config } if *config == self.state.config)
+                {
+                    self.publish(*event, None).await?;
+                }
             }
             Msg::CompletionReady(completed) => return catalogue::finished(self, *completed).await,
             Msg::Observe(entry, payload) => self.observe_named(entry, payload),

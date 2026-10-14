@@ -143,11 +143,32 @@ fn view<'a>(
 ) -> Option<&'a View> {
     match &pane.view {
         Shown::View(view) => Some(view),
-        Shown::Pull { request } => ui
-            .placed
-            .pulled
-            .answer_for(&crate::pulled::Key::seated(state, request, seated)),
+        Shown::Pull { .. } => {
+            let shown = shown(ui, pane, seated);
+            if !crate::component::pane::matched(state, &shown) {
+                return None;
+            }
+            let Shown::Pull { request } = shown else {
+                return None;
+            };
+            ui.placed
+                .pulled
+                .answer_for(&crate::pulled::Key::seated(state, &request, seated))
+        }
     }
+}
+fn shown(ui: &Ui, pane: &Pane, seated: &seat::Seated) -> Shown {
+    crate::component::pane::shown(
+        pane,
+        matches!(&ui.focus, Focus::Pane(key) if key == &pane.key),
+        seated,
+        ui.placed
+            .panes
+            .scroll
+            .get(&pane.key)
+            .copied()
+            .unwrap_or_default(),
+    )
 }
 #[derive(Clone)]
 enum Control {
@@ -258,7 +279,6 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
     };
     if key.code == KeyCode::Esc {
         ui.placed.panes.selection = None;
-        ui.focus = Focus::Composer;
         if pane.close {
             return submit(
                 Action {
@@ -268,6 +288,7 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
                 None,
             );
         }
+        ui.focus = Focus::Composer;
         return Vec::new();
     }
     if key.code == KeyCode::Char('p') && key.modifiers == KeyModifiers::ALT {

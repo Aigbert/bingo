@@ -17,6 +17,9 @@ pub type LinkPoint = &'static crate::catalogue::Entry;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct LinkMatcher {
+    /// Per-hook render partials, when one link contains several hooks.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub render: Option<Vec<serde_json::Value>>,
     #[serde(default)]
     pub patterns: Vec<crate::catalogue::Pattern>,
     #[serde(default)]
@@ -25,6 +28,7 @@ pub struct LinkMatcher {
 impl LinkMatcher {
     pub fn at(entry: LinkPoint) -> Self {
         Self {
+            render: None,
             patterns: crate::catalogue::Pattern::parse(&entry.name)
                 .into_iter()
                 .collect(),

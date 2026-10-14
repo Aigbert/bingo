@@ -3,6 +3,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+mod matched;
+pub use matched::{Matched, matched};
+
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
@@ -45,6 +48,25 @@ pub struct RenderRequest {
     pub surface: SurfaceName,
     pub props: Value,
     pub viewport: Viewport,
+}
+impl Component {
+    pub const ALL: [Self; 15] = [
+        Self::Question,
+        Self::UserMessage,
+        Self::AssistantMessage,
+        Self::ToolUse,
+        Self::ToolResult,
+        Self::ToolGroup,
+        Self::ToolProgress,
+        Self::CommandOutput,
+        Self::Spinner,
+        Self::TurnDuration,
+        Self::InfoNotice,
+        Self::SessionMode,
+        Self::PromptHint,
+        Self::AbovePrompt,
+        Self::Pane,
+    ];
 }
 impl RenderRequest {
     pub fn engine(&self) -> crate::View {

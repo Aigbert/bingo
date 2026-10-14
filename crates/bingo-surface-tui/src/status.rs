@@ -27,24 +27,69 @@ const CONTEXT_BAD: u64 = 90;
 pub const HINT: &str = keys::FOOTER_HINT;
 
 /// The status line at this width.
-pub fn compose(
+pub fn components(
     tree: &Tree,
     ui: &Ui,
     width: usize,
     now: Now,
+    pulls: &mut Vec<crate::pulled::Key>,
 ) -> (Line<'static>, Option<std::ops::Range<usize>>) {
     crate::layout::count::band(3);
+    let mut site = crate::component::Site {
+        state: tree.viewed(),
+        memo: &ui.placed.pulled,
+        width,
+        pulls,
+    };
     let right = clip(right(tree), width);
-    let left = clip(left(tree.viewed()), width.saturating_sub(cells(&right)));
+    let left = clip(
+        mode(tree.viewed(), &mut site),
+        width.saturating_sub(cells(&right)),
+    );
     let gaps = GAP * (!left.is_empty() as usize + !right.is_empty() as usize);
     let room = width.saturating_sub(cells(&left) + cells(&right) + gaps);
-    let (middle, crew) = middle(tree, ui, width, room, now);
+    let (middle, crew) = middle(tree, ui, width, room, now, &mut site);
     let middle = clip(middle, room);
     let slack = width.saturating_sub(cells(&left) + cells(&middle) + cells(&right));
     let before = if left.is_empty() { 0 } else { slack / 2 };
     let start = cells(&left) + before;
     let hit = (crew && !middle.is_empty()).then_some(start..start + cells(&middle));
     (place(left, middle, right, width), hit)
+}
+
+fn mode(state: &SessionState, site: &mut crate::component::Site<'_>) -> Vec<Span<'static>> {
+    let modes: Vec<String> = bingo_sdk::slot::placed(state)
+        .into_iter()
+        .filter_map(|placed| match placed.slot {
+            bingo_sdk::slot::Slot::Mode { current, modes }
+                if modes.first().is_none_or(|mode| mode.label != current) =>
+            {
+                Some(current)
+            }
+            _ => None,
+        })
+        .collect();
+    if modes.is_empty() {
+        return Vec::new();
+    }
+    let props =
+        bingo_sdk::component::Props::SessionMode(bingo_sdk::component::SessionModeProps { modes });
+    site.draw("SessionMode", &props, |changed, _| {
+        if changed == &props {
+            return vec![Line::from(left(state))];
+        }
+        let bingo_sdk::component::Props::SessionMode(props) = changed else {
+            return Vec::new();
+        };
+        vec![Line::from(Span::styled(
+            props.modes.join(" · "),
+            theme::mode(),
+        ))]
+    })
+    .into_iter()
+    .next()
+    .unwrap_or_default()
+    .spans
 }
 
 /// A mode may leave its first, resting choice unsaid.
@@ -68,7 +113,14 @@ fn left(state: &SessionState) -> Vec<Span<'static>> {
 }
 
 /// Only what is true now, in the order the eye should take it.
-fn middle(tree: &Tree, ui: &Ui, width: usize, room: usize, now: Now) -> (Vec<Span<'static>>, bool) {
+fn middle(
+    tree: &Tree,
+    ui: &Ui,
+    width: usize,
+    room: usize,
+    now: Now,
+    site: &mut crate::component::Site<'_>,
+) -> (Vec<Span<'static>>, bool) {
     if ui.exit_armed(now.instant) {
         return (
             vec![Span::styled(crate::input::ARM_HINT, theme::text())],
@@ -97,7 +149,19 @@ fn middle(tree: &Tree, ui: &Ui, width: usize, room: usize, now: Now) -> (Vec<Spa
         );
     }
     if ui.composer.is_empty() {
-        return (vec![Span::styled(HINT, theme::dim())], false);
+        let props =
+            bingo_sdk::component::Props::PromptHint(bingo_sdk::component::PromptHintProps {
+                is_draft: false,
+                is_working: tree.viewed().busy(),
+                hint: HINT.into(),
+            });
+        let lines = site.draw("PromptHint", &props, |props, _| {
+            let bingo_sdk::component::Props::PromptHint(props) = props else {
+                return Vec::new();
+            };
+            vec![Line::from(Span::styled(props.hint.clone(), theme::dim()))]
+        });
+        return (lines.into_iter().next().unwrap_or_default().spans, false);
     }
     (Vec::new(), false)
 }
@@ -370,6 +434,16 @@ fn cut(span: &Span<'static>, room: usize) -> Span<'static> {
 
 /// Every span of a drawn status line with the style it carries, for the tests
 /// that assert where a colour landed.
+#[cfg(test)]
+pub fn compose(
+    tree: &Tree,
+    ui: &Ui,
+    width: usize,
+    now: Now,
+) -> (Line<'static>, Option<std::ops::Range<usize>>) {
+    components(tree, ui, width, now, &mut Vec::new())
+}
+
 #[cfg(test)]
 pub fn line(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Line<'static> {
     compose(tree, ui, width, now).0

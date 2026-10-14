@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { matches, patternMatches } from './on.ts';
+import { matches, patternMatches, renderMatcher } from './on.ts';
 import { Hooks } from './cross.ts';
 import cases from '../test/cases.json' with { type: 'json' };
 
@@ -121,4 +121,14 @@ test('a hook catch receives the original error and continuation state', async ()
   });
   assert.deepEqual(await hooks.before('tool.call', { chain: 'caught', input: {} }, {}), { next: {} });
   assert.deepEqual(await hooks.after({ chain: 'caught', result: 7 }), { result: 7 });
+});
+
+ test('render metadata preserves data and widens opaque matchers', () => {
+  const partial = { component: 'ToolUse', props: { tool: 'sample' }, requestId: 'call' };
+  assert.deepEqual(renderMatcher(partial), partial);
+  assert.deepEqual(renderMatcher({ component: 'ToolUse', props: { tool: /sample/ } }), { component: 'ToolUse' });
+  assert.deepEqual(renderMatcher({ component: 'Pane', props: () => true }), { component: 'Pane' });
+  assert.deepEqual(renderMatcher(/Pane/), {});
+  assert.deepEqual(renderMatcher(() => true), {});
+  assert.deepEqual(renderMatcher(undefined), {});
 });

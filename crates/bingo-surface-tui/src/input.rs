@@ -695,7 +695,7 @@ fn alt(ui: &mut Ui, key: KeyEvent) -> Vec<Effect> {
         KeyCode::Char('b') => ui.composer.word_left(),
         KeyCode::Char('f') => ui.composer.word_right(),
         KeyCode::Enter => newline(ui),
-        _ => {}
+        _ => return crate::component::band::hotkey(ui, key).unwrap_or_default(),
     }
     Vec::new()
 }

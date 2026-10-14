@@ -37,7 +37,10 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let state = tree.viewed();
     let draft = ui.composer.layout(inner_width(state, area.width as usize));
     let strip = strip(state, ui, &frame.measurements, area.width);
-    let activity = activity::lines(tree, ui, area.width as usize, now);
+    let mut activity = activity::components(tree, ui, area.width as usize, now, &mut frame.pulls);
+    let band_offset = activity.len();
+    let band = crate::component::band::draw(state, ui, frame);
+    activity.extend(band.lines.iter().cloned());
     let toasts = ui.placed.toasts.lines(state, now, usize::from(area.width));
     let toast_rows = (toasts.len() as u16).min(area.height / 3);
     let reduced = Rect::new(
@@ -75,6 +78,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     frame.regions = regions;
     render_transcript(tree, ui, frame, regions.transcript, now);
     render_activity(ui, frame, regions.activity, activity);
+    crate::component::band::place(&band, frame, regions.activity, band_offset);
     render_strip(frame, regions.strip, strip);
     render_composer(tree.viewed(), ui, frame, regions.composer, now, draft);
     crate::pane::draw(ui, state, frame, now);
@@ -132,7 +136,7 @@ fn render_status(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now)
     let line = match ui.focus.search() {
         Some(search) => search::row(search),
         None => {
-            let (line, crew) = status::compose(tree, ui, width, now);
+            let (line, crew) = status::components(tree, ui, width, now, &mut frame.pulls);
             frame.crew = crew.map(|columns| {
                 Rect::new(
                     area.x + columns.start as u16,
@@ -307,13 +311,14 @@ fn card(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
     // The shape's own rows and the title it keeps: what is left is what the
     // answers have to be walked in, and what a card lays itself out within.
     let room = usize::from(above.height).saturating_sub(usize::from(shape.chrome()) + 1);
-    let rows: Vec<(Line<'static>, Option<usize>)> = dialog::rows(
-        &ui.dialog,
+    let rows: Vec<(Line<'static>, Option<usize>)> = crate::component::question::rows(
+        owner,
+        ui,
         interaction,
         agent.as_deref(),
-        &owner.summary.cwd,
         width,
         room,
+        &mut frame.pulls,
     )
     .into_iter()
     .flat_map(|(line, option)| {
@@ -459,12 +464,15 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
             now,
         )
         .in_tree(tree)
+        .components(&ui.placed.pulled)
         .saying(ui.welcome.update.as_deref())
         .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
         .opening(ui.focus.intro().map(|intro| intro.seconds(now)))
         .measuring(ui.measure),
     );
     frame.top = ui.scroll.top(frame.height, rows, now.instant);
+    component_requests(state, ui, frame, area);
+    crate::component::closing::requests(state, ui, frame, area.width, area.height, now);
     let mut shown = frame.blocks.window(frame.top, rows);
     mark_row(ui, frame, &mut shown);
     // A short transcript hangs from the composer, not from the top of the screen.
@@ -484,6 +492,41 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     }
     if ui.crossfading(now) {
         layers::hush(frame, area);
+    }
+}
+
+fn component_requests(state: &SessionState, ui: &Ui, frame: &mut Layout, area: Rect) {
+    for item in state.transcript.items() {
+        let Some((from, to)) = frame.blocks.span(&item.id) else {
+            continue;
+        };
+        if to <= frame.top || from >= frame.top + usize::from(area.height) {
+            continue;
+        }
+        let expanded = crate::fold::fold_of(&ui.folds, item) == crate::fold::Fold::Open;
+        for props in crate::component::items::all(item, expanded) {
+            if let Some(key) = crate::component::key(
+                state,
+                &crate::component::items::id(item),
+                &props,
+                area.width,
+                area.height,
+            ) {
+                let hides_children = matches!(
+                    props,
+                    bingo_sdk::component::Props::ToolGroup(_)
+                        | bingo_sdk::component::Props::ToolUse(_)
+                ) && ui
+                    .placed
+                    .pulled
+                    .get(&key)
+                    .is_some_and(|view| !crate::component::has_engine(view, props.component()));
+                frame.pulls.push(key);
+                if hides_children {
+                    break;
+                }
+            }
+        }
     }
 }
 

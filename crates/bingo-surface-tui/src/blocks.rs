@@ -31,6 +31,8 @@ use crate::welcome;
 /// terminal item's revision never moves again, so its block is rendered once.
 #[derive(Clone, Debug, PartialEq)]
 struct Revision {
+    component: (u64, u64),
+    render_config: serde_json::Value,
     status: ItemStatus,
     /// Names and room data affect prose even when an item's bytes stay put.
     names: Vec<crate::markdown::mentions::Name>,
@@ -75,7 +77,17 @@ fn revision(
     fold: Fold,
     rows: &Rows<'_>,
 ) -> Revision {
+    let request = crate::component::items::id(item);
     Revision {
+        component: (
+            rows.pulled.map_or(0, |memo| memo.version(&request)),
+            rows.state
+                .invalidated
+                .get(&request)
+                .copied()
+                .unwrap_or_default(),
+        ),
+        render_config: rows.state.config.kernel["render"].clone(),
         status: item.status,
         names: rows.names.clone(),
         room: (rows.state.summary.driver == bingo_sdk::Driver::Log).then_some(rows.state.seq),
@@ -247,6 +259,9 @@ pub struct Blocks {
 }
 
 impl Blocks {
+    pub fn closing_start(&self) -> usize {
+        self.height.saturating_sub(self.tail.len())
+    }
     /// Bring the cache up to date with the state and answer with the height of
     /// the whole transcript, in wrapped lines.
     pub fn sync(&mut self, state: &SessionState, agents: &Agents<'_>, rows: &Rows<'_>) -> usize {

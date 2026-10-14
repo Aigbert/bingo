@@ -4,6 +4,7 @@ use serde_json::json;
 
 fn state_with(place: serde_json::Value) -> bingo_sdk::SessionState {
     let mut state = state();
+    state.config.kernel["render"] = json!({"Pane":[{}]});
     let slot: Slot = serde_json::from_value(json!({"kind":"pane","id":"counter","title":"Counter",
         "focus":true,"closeOnEscape":true,"holdToasts":false,"asked":true,
         "place":place,"size":{"rows":{"min":8,"ideal":10,"max":20},
@@ -172,4 +173,56 @@ fn collapse_click_and_title_and_key_cycle_fit_without_changing_session_data() {
     draw_tree(200, 50, &tree, &mut ui, now);
     assert_eq!(ui.shown.seating.panes[0].place, Place::Side);
     assert_eq!(tree.viewed().signals, state.signals);
+}
+
+#[test]
+fn escape_closes_a_focused_pane_despite_a_retained_or_late_answer() {
+    use crate::{effect::Effect, focus::Focus};
+    use bingo_sdk::{Event, Input, View};
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    let mut state = state_with(json!(["above"]));
+    let (mut ui, now) = scene();
+    ui.sync_panes(&state);
+    draw_sized(80, 24, &state, &mut ui, now);
+    let request = ui.shown.pulls[0].clone();
+    ui.placed.pulled.request(&request);
+    ui.placed
+        .pulled
+        .answer(request.clone(), View::text("Count: 1"));
+    assert!(draw_sized(80, 24, &state, &mut ui, now).contains("Count: 1"));
+    let effects = crate::input::on_key(
+        &mut ui,
+        &solo(&state),
+        KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+        now,
+    );
+    assert!(
+        matches!(&effects[..], [Effect::Submit(Input::Action { action })]
+        if action.name == "counter:ui" && action.args == json!({"handler":"counter","event":"close"}))
+    );
+    let closing = draw_sized(80, 24, &state, &mut ui, now);
+    assert!(
+        closing.contains("Count: 1"),
+        "a pending close must not look closed before its slot is removed: {closing}"
+    );
+    assert_eq!(ui.shown.pulls, vec![request.clone()]);
+    state.apply(&frame(
+        1,
+        Event::Signal {
+            plugin: "counter".into(),
+            kind: "pane".into(),
+            payload: serde_json::Value::Null,
+        },
+    ));
+    ui.sync_panes(&state);
+    assert!(matches!(ui.focus, Focus::Composer));
+    ui.placed.pulled.retain(&[]);
+    ui.placed
+        .pulled
+        .answer(request, View::text("late Count: 1"));
+    let screen = draw_sized(80, 24, &state, &mut ui, now);
+    assert!(!screen.contains("Count: 1"), "{screen}");
+    assert!(!screen.contains("Counter"), "{screen}");
+    assert!(ui.shown.seating.panes.is_empty());
+    assert!(ui.shown.pulls.is_empty());
 }

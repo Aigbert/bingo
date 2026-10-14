@@ -119,3 +119,5 @@ ADR-0065, ADR-0071, ADR-0076; Plans: M121, M123; audit-2026-10 §2;
 design/tui.md §8
 
 **2026-10-14 (M140, ADR-0079 §§3,5):** Shown admits a View or Pull request in view slots; Pane and Toast add the drawn places. The TUI pulls at drawn width, opens asked panes above the composer, keeps unasked panes waiting, and pauses toast expiry while held. Other pane placements remain M151.
+
+**2026-10-14 (M141, ADR-0079 §4):** drawn Pane and AbovePrompt sites project typed props and pull only matched hooks; pane focus ends with slot removal, and closed panes discard their cached answers.

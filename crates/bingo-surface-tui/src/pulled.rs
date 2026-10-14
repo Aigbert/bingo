@@ -55,23 +55,28 @@ impl Key {
 }
 #[derive(Debug, Default)]
 pub struct Memo {
-    entries: Vec<(Key, Option<View>)>,
+    entries: Vec<(Key, Option<View>, u64)>,
+    next: u64,
 }
 impl Memo {
     pub fn request(&mut self, key: &Key) -> bool {
-        if self.entries.iter().any(|(one, _)| one.same(key)) {
+        if self.entries.iter().any(|(one, _, _)| one.same(key)) {
             return false;
         }
-        self.entries.retain(|(one, _)| {
+        self.entries.retain(|(one, _, _)| {
             one.session != key.session
                 || one.request.component != key.request.component
                 || one.request.request_id != key.request.request_id
         });
-        self.entries.push((key.clone(), None));
+        self.entries.push((key.clone(), None, 0));
         true
     }
     pub fn answer(&mut self, key: Key, view: View) {
-        if let Some((_, answer)) = self.entries.iter_mut().find(|(one, _)| one.same(&key)) {
+        if let Some((_, answer, version)) =
+            self.entries.iter_mut().find(|(one, _, _)| one.same(&key))
+        {
+            self.next += 1;
+            *version = self.next;
             *answer = Some(view);
         }
     }
@@ -87,20 +92,33 @@ impl Memo {
                 let key = Key::new(state, request, columns, 0);
                 self.entries
                     .iter()
-                    .find(|(one, _)| one.same(&key))
-                    .and_then(|(_, view)| view.as_ref())
+                    .find(|(one, _, _)| one.same(&key))
+                    .and_then(|(_, view, _)| view.as_ref())
             }
         }
     }
-    pub fn answer_for(&self, key: &Key) -> Option<&View> {
+    pub fn get(&self, key: &Key) -> Option<&View> {
         self.entries
             .iter()
-            .find(|(one, _)| one.same(key))
-            .and_then(|(_, view)| view.as_ref())
+            .find(|(held, _, _)| held.same(key))
+            .and_then(|(_, answer, _)| answer.as_ref())
+    }
+    pub fn answer_for(&self, key: &Key) -> Option<&View> {
+        self.get(key)
+    }
+    pub fn version(&self, id: &str) -> u64 {
+        self.entries
+            .iter()
+            .filter(|(key, _, _)| key.request.request_id == id)
+            .map(|(_, _, version)| *version)
+            .max()
+            .unwrap_or_default()
     }
     pub fn retain(&mut self, drawn: &[Key]) {
-        self.entries
-            .retain(|(key, _)| drawn.iter().any(|one| one.same(key)));
+        self.entries.retain(|(key, answer, _)| {
+            (answer.is_some() && key.request.component != bingo_sdk::render::Component::Pane)
+                || drawn.iter().any(|one| one.same(key))
+        });
     }
 }
 #[cfg(test)]
@@ -195,5 +213,39 @@ mod pane_tests {
         memo.answer(moved.clone(), View::text("new"));
         assert_eq!(memo.answer_for(&moved).unwrap().fold(), "new");
         assert!(!memo.request(&moved));
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    use bingo_sdk::render::{Component, RenderRequest, SurfaceName, Viewport};
+
+    #[test]
+    fn an_undrawn_pane_reasks_on_reopen_but_scrolled_messages_keep_answers() {
+        let state = crate::test_support::state();
+        for component in [Component::Pane, Component::UserMessage] {
+            let request = RenderRequest {
+                component,
+                request_id: "one".into(),
+                surface: SurfaceName::Terminal,
+                props: serde_json::json!({}),
+                viewport: Viewport {
+                    columns: 80,
+                    rows: 8,
+                    place: None,
+                },
+            };
+            let key = Key::new(&state, &request, 80, 8);
+            let mut memo = Memo::default();
+            memo.request(&key);
+            memo.answer(key.clone(), View::text("before"));
+            memo.retain(&[]);
+            memo.answer(key.clone(), View::text("late"));
+            assert_eq!(memo.request(&key), component == Component::Pane);
+            if component == Component::Pane {
+                assert!(memo.get(&key).is_none());
+            }
+        }
     }
 }

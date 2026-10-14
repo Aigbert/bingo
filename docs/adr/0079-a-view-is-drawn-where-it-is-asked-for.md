@@ -1,6 +1,6 @@
 # ADR-0079 — A view is drawn where it is asked for
 
-Status: accepted for M140 (§§1–3,5–7) · 2026-10-14; §4 component integration remains proposed for M141 · Amends: ADR-0013 §1 §3, ADR-0070 §1
+Status: accepted · 2026-10-14 · Plans: M140 (§§1–3,5–7), M141 (§4) · Amends: ADR-0013 §1 §3, ADR-0070 §1
 
 **2026-10-14:** §3 pane docking and §5’s pane viewport are amended by accepted ADR-0081 §7 (M151), detailed below. M148 implements ADR-0081 §§1–6: no rail or panel sheet.
 

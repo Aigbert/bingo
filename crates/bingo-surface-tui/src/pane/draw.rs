@@ -48,7 +48,10 @@ fn draw_one(
             Rect::new(area.right() - width, area.y, width, area.height.min(1)),
         );
     }
-    if let Shown::Pull { request } = &pane.view {
+    let shown = super::shown(ui, pane, seated);
+    if crate::component::pane::matched(state, &shown)
+        && let Shown::Pull { request } = &shown
+    {
         frame
             .pulls
             .push(crate::pulled::Key::seated(state, request, seated));
@@ -88,7 +91,11 @@ pub(super) fn lines(
     now: Now,
 ) -> Vec<Line<'static>> {
     let Some(view) = view(ui, state, pane, seated) else {
-        return vec![Line::from(theme::ellipsis())];
+        return if crate::component::pane::matched(state, &super::shown(ui, pane, seated)) {
+            vec![Line::from(theme::ellipsis())]
+        } else {
+            Vec::new()
+        };
     };
     let mut view = view.clone();
     let index = ui
@@ -106,13 +113,26 @@ pub(super) fn lines(
         focused,
         &mut 0,
     );
-    views::marked(
-        &view,
+    let props = crate::component::pane::props(
+        pane,
+        focused,
+        seated,
+        ui.placed
+            .panes
+            .scroll
+            .get(&pane.key)
+            .copied()
+            .unwrap_or_default(),
+    );
+    crate::component::draw_marked(
+        &props,
+        Some(&view),
         usize::from(seated.area.width),
         &views::Marks {
             pending: ui.pending_ui.as_ref().map(|(_, action)| action.clone()),
             ..views::Marks::at(now)
         },
+        |_, _| Vec::new(),
     )
 }
 

@@ -1,5 +1,5 @@
 //! A small cell layout: measure children, distribute spare cells, then decorate.
-use super::{Marks, fit, indent, marked, text};
+use super::{Engine, Marks, fit, indent, marked_with, text};
 use crate::theme;
 use bingo_sdk::{
     View,
@@ -12,6 +12,7 @@ pub fn lines(
     style: &BoxStyle,
     width: usize,
     marks: &Marks,
+    engine: &Engine<'_>,
 ) -> Vec<Line<'static>> {
     if style.display.as_deref() == Some("none") || width == 0 {
         return Vec::new();
@@ -41,7 +42,7 @@ pub fn lines(
             .min(1024)
             .saturating_sub(2 * (py + border))
     });
-    let mut out = body(&children, style, inner, height, marks);
+    let mut out = body(&children, style, inner, height, marks, engine);
     if let Some(height) = height {
         out.resize(height, Line::default());
         out.truncate(height);
@@ -97,6 +98,7 @@ fn body(
     width: usize,
     height: Option<usize>,
     marks: &Marks,
+    engine: &Engine<'_>,
 ) -> Vec<Line<'static>> {
     let gap = space(style.gap);
     let desired: usize = children
@@ -107,14 +109,14 @@ fn body(
     let is_row = style.flex_direction == Some(Direction::Row)
         && !(style.flex_wrap == Some(Wrap::Wrap) && desired > width);
     if is_row {
-        return row(children, style, width, height, marks);
+        return row(children, style, width, height, marks, engine);
     }
     let gap = if style.flex_direction == Some(Direction::Row) {
         0
     } else {
         gap
     };
-    column(children, style, width, height, gap, marks)
+    column(children, style, width, height, gap, marks, engine)
 }
 fn column(
     children: &[&View],
@@ -123,10 +125,11 @@ fn column(
     height: Option<usize>,
     gap: usize,
     marks: &Marks,
+    engine: &Engine<'_>,
 ) -> Vec<Line<'static>> {
     let mut drawn: Vec<_> = children
         .iter()
-        .map(|child| column_child(child, style, width, marks))
+        .map(|child| column_child(child, style, width, marks, engine))
         .collect();
     let used = drawn.iter().map(Vec::len).sum::<usize>() + gap * children.len().saturating_sub(1);
     let spare = height.unwrap_or(used).saturating_sub(used);
@@ -139,7 +142,7 @@ fn column(
                 if let View::Box { layout, .. } = &mut child {
                     layout.height = Some((lines.len() + extra).min(1024) as u16);
                 }
-                *lines = column_child(&child, style, width, marks);
+                *lines = column_child(&child, style, width, marks, engine);
             }
         }
     }
@@ -158,7 +161,13 @@ fn column(
     }
     out
 }
-fn column_child(child: &View, style: &BoxStyle, width: usize, marks: &Marks) -> Vec<Line<'static>> {
+fn column_child(
+    child: &View,
+    style: &BoxStyle,
+    width: usize,
+    marks: &Marks,
+    engine: &Engine<'_>,
+) -> Vec<Line<'static>> {
     let child_width = if matches!(
         style.align_items,
         Some(Align::Center | Align::FlexEnd | Align::FlexStart)
@@ -172,7 +181,7 @@ fn column_child(child: &View, style: &BoxStyle, width: usize, marks: &Marks) -> 
         Some(Align::FlexEnd) => width.saturating_sub(child_width),
         _ => 0,
     };
-    marked(child, child_width, marks)
+    marked_with(child, child_width, marks, engine)
         .into_iter()
         .map(|line| indent(line, by))
         .collect()
@@ -184,6 +193,7 @@ fn row(
     width: usize,
     height: Option<usize>,
     marks: &Marks,
+    engine: &Engine<'_>,
 ) -> Vec<Line<'static>> {
     let gap = space(style.gap);
     let gaps = gap * children.len().saturating_sub(1);
@@ -204,7 +214,7 @@ fn row(
     let drawn: Vec<_> = children
         .iter()
         .zip(&widths)
-        .map(|(child, size)| marked(child, (*size).min(width), marks))
+        .map(|(child, size)| marked_with(child, (*size).min(width), marks, engine))
         .collect();
     let height = height.unwrap_or_else(|| drawn.iter().map(Vec::len).max().unwrap_or(0));
     (0..height)

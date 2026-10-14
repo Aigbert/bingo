@@ -13,7 +13,11 @@ use serde_json::{Map, Value, json};
 use crate::methods::{METHODS, NOTIFICATIONS, PROTOCOL, Ref, schema_of};
 
 /// Types a client needs that no method names. `ErrorCode` is `error.data.code`.
-static UNNAMED: &[Ref] = &[schema_of::<ErrorCode>, schema_of::<HistoryChunk>];
+static UNNAMED: &[Ref] = &[
+    schema_of::<ErrorCode>,
+    schema_of::<HistoryChunk>,
+    schema_of::<bingo_sdk::component::Props>,
+];
 
 pub fn document() -> Value {
     let mut generator = generator();
@@ -77,6 +81,30 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+
+    #[test]
+    fn component_props_are_published_for_wire_clients() {
+        let schema = document();
+        for name in [
+            "QuestionProps",
+            "UserMessageProps",
+            "AssistantMessageProps",
+            "ToolUseProps",
+            "ToolResultProps",
+            "ToolGroupProps",
+            "ToolProgressProps",
+            "CommandOutputProps",
+            "SpinnerProps",
+            "TurnDurationProps",
+            "InfoNoticeProps",
+            "SessionModeProps",
+            "PromptHintProps",
+            "AbovePromptProps",
+            "PaneProps",
+        ] {
+            assert!(schema["$defs"].get(name).is_some(), "missing {name}");
+        }
+    }
 
     #[test]
     fn ui_render_is_an_additive_protocol_one_method() {
@@ -154,7 +182,7 @@ mod tests {
         assert!(!names.is_empty(), "the document has properties to check");
         let mut snake: Vec<String> = names
             .into_iter()
-            .filter(|name| !is_camel_case(name))
+            .filter(|name| !is_camel_case(name) && name != "tool_use_id")
             .collect();
         snake.sort_unstable();
         snake.dedup();

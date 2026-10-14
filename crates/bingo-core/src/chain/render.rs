@@ -100,10 +100,51 @@ pub(crate) async fn dispatch(
     .await
 }
 
+/// The config is a projection of the currently admitted links, never a registry.
+pub(crate) fn matched(links: &[Link]) -> bingo_sdk::render::Matched {
+    let mut matched = bingo_sdk::render::Matched::default();
+    for link in links {
+        let matcher = link.interceptor.matcher();
+        if !matcher.patterns.is_empty()
+            && !matcher
+                .patterns
+                .iter()
+                .any(|pattern| pattern.matches("ui.render"))
+        {
+            continue;
+        }
+        let partials = matcher.render.unwrap_or_else(|| vec![matcher.prefilter]);
+        for component in bingo_sdk::render::Component::ALL {
+            let event = serde_json::json!({"component":component});
+            for partial in &partials {
+                if partial.is_null() || catalogue::prefilter(partial, &event) {
+                    matched
+                        .0
+                        .entry(component)
+                        .or_default()
+                        .push(partial.clone());
+                }
+            }
+        }
+    }
+    matched
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::{Value, json};
+    #[test]
+    fn only_ui_render_links_publish_components() {
+        let link = Link {
+            external: None,
+            interceptor: Arc::new(Answer(false)),
+            tier: Tier::Rewrite,
+        };
+        let exposed = matched(&[link]);
+        assert_eq!(exposed.0.len(), 15);
+        assert!(matched(&[]).0.is_empty());
+    }
     struct Answer(bool);
     #[async_trait::async_trait]
     impl Interceptor for Answer {

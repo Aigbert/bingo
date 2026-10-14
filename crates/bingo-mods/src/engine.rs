@@ -43,6 +43,7 @@ impl Fault {
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct RegisteredHook {
+    pub matcher: Value,
     pub pattern: String,
     pub recover: bool,
 }
