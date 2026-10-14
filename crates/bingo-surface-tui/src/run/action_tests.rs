@@ -290,7 +290,7 @@ async fn switching_discards_only_an_empty_bare_resume_bootstrap() {
 }
 
 #[tokio::test]
-async fn queued_edits_hold_pane_callbacks_but_not_question_drawings() {
+async fn queued_actions_do_not_block_first_pane_or_status_drawings() {
     use bingo_sdk::render::{Component, RenderRequest, SurfaceName, Viewport};
     let now = still(scene().1);
     let session = Arc::new(TestSession::default());
@@ -322,13 +322,10 @@ async fn queued_edits_hold_pane_callbacks_but_not_question_drawings() {
         )
     };
     let pane = request(Component::Pane, "counter");
-    let question = request(Component::Question, "question");
-    assert!(!pulling::request(&mut run, std::slice::from_ref(&pane)));
-    assert!(pulling::request(&mut run, &[question, pane.clone()]));
-    assert!(run.ui.placed.pulled.get(&pane).is_none());
-    let (saved, _) = finish_newest(&mut run, &session);
-    assert_eq!(saved, "Ada");
-    assert!(pulling::request(&mut run, std::slice::from_ref(&pane)));
+    let status = request(Component::Status, "status");
+    assert!(pulling::request(&mut run, &[status.clone(), pane.clone()]));
+    assert!(run.ui.placed.pulled.get(&status).is_some());
+    assert!(run.ui.actions.action().is_some());
     assert_eq!(
         run.ui.placed.pulled.get(&pane).unwrap().fold(),
         "new callbacks"

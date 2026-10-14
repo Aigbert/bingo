@@ -44,7 +44,9 @@ pub async fn run(command: &str, cx: &CommandContext) -> Result<CommandOutcome, K
 
 fn result(outcome: IntentOutcome) -> Option<Result<CommandOutcome, KernelError>> {
     Some(match outcome {
-        IntentOutcome::Queued { .. } => return None,
+        IntentOutcome::Queued { position } => Ok(CommandOutcome::Applied {
+            message: Some(format!("queued (position {position})")),
+        }),
         IntentOutcome::Rejected { error } => Err(error),
         IntentOutcome::TurnStarted { .. } => Ok(CommandOutcome::Handled { handled: true }),
         IntentOutcome::Applied { result } => applied(result),
@@ -81,7 +83,7 @@ mod tests {
                 message: Some("forgot rule".into())
             }
         );
-        assert!(result(IntentOutcome::Queued { position: 1 }).is_none());
+        assert_eq!(result(IntentOutcome::Queued { position: 1 }), Some(Ok(CommandOutcome::Applied { message: Some("queued (position 1)".into()) })));
         let error = KernelError::new(ErrorCode::InvalidInput, "refused");
         assert_eq!(
             result(IntentOutcome::Rejected {

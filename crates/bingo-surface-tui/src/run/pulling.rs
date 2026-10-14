@@ -18,16 +18,6 @@ pub(super) fn request(run: &mut Run, keys: &[crate::pulled::Key]) -> bool {
     let mut answered = false;
     run.ui.placed.pulled.retain(keys);
     for key in keys {
-        // A new pane drawing replaces callback tokens. Keep the current tokens
-        // valid until the existing action FIFO has acknowledged its edits.
-        if run.ui.actions.action().is_some()
-            && matches!(
-                key.request.component,
-                bingo_sdk::render::Component::Pane | bingo_sdk::render::Component::Status
-            )
-        {
-            continue;
-        }
         if !run.ui.placed.pulled.request(key) {
             continue;
         }
