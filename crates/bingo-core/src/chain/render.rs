@@ -128,7 +128,11 @@ mod tests {
     use serde_json::{Value, json};
     #[test]
     fn only_ui_render_links_publish_components() {
-        let link = Link { external: None, interceptor: Arc::new(Answer(false)), tier: Tier::Rewrite };
+        let link = Link {
+            external: None,
+            interceptor: Arc::new(Answer(false)),
+            tier: Tier::Rewrite,
+        };
         let exposed = matched(&[link]);
         assert_eq!(exposed.0.len(), 15);
         assert!(matched(&[]).0.is_empty());

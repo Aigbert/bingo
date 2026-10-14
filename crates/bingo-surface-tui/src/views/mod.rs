@@ -86,7 +86,23 @@ pub fn render(view: &View, width: usize) -> Vec<Line<'static>> {
 }
 
 /// A view as styled lines.
+pub type Engine<'a> =
+    dyn Fn(bingo_sdk::render::Component, &serde_json::Value, usize) -> Vec<Line<'static>> + 'a;
+
+pub fn render_with(view: &View, width: usize, engine: &Engine<'_>) -> Vec<Line<'static>> {
+    marked_with(view, width, &Marks::default(), engine)
+}
+
 pub fn marked(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
+    marked_with(view, width, marks, &|_, _, _| Vec::new())
+}
+
+fn marked_with(
+    view: &View,
+    width: usize,
+    marks: &Marks,
+    engine: &Engine<'_>,
+) -> Vec<Line<'static>> {
     match view {
         View::Text { children, style } => text::styled(children, style, width),
         View::Markdown { text, dim_color } => {
@@ -112,7 +128,7 @@ pub fn marked(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
         } => progress::lines(*value, *total, label.as_deref(), width, marks.beat),
         View::Badge { text, tone } => badge::lines(text, *tone),
         View::Tree { nodes } => tree::lines(nodes),
-        View::Box { children, layout } => flex::lines(children, layout, width, marks),
+        View::Box { children, layout } => flex::lines(children, layout, width, marks, engine),
         View::Button { children, button } => button::lines(children, button, width, marks),
         View::Input { input } => input::lines(input, width),
         View::Select { select } => select::lines(select, width),
@@ -129,8 +145,8 @@ pub fn marked(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
             cells,
         } => raster::lines(*columns, *rows, cells, width),
         View::Svg { alt, .. } => text::lines(alt),
-        View::Engine { .. } => Vec::new(),
-        View::Panel { title, child } => panel::lines(title, child, width, marks),
+        View::Engine { component, props } => engine(*component, props, width),
+        View::Panel { title, child } => panel::lines(title, child, width, marks, engine),
         View::Actions { items } => actions::lines(items, width, marks),
         // A word this surface has not learned is the text its author wrote
         // for exactly this (ADR-0038 §1). Learning a kind richly is a
