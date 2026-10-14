@@ -95,3 +95,19 @@ fn existing_examples_and_registered_callback_parameters_validate_cleanly() {
         );
     }
 }
+
+#[test]
+fn passing_a_noun_or_method_cannot_hide_an_alias() {
+    let result = checked(
+        "export const register = on => on('*', $ => { helper($); helper($.state); helper($.state.get); });",
+        "",
+    );
+    assert_eq!(
+        result
+            .findings
+            .iter()
+            .filter(|f| f.rule == Rule::DollarStatic)
+            .count(),
+        2
+    );
+}
