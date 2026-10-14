@@ -49,3 +49,39 @@ pub(crate) fn for_plugin(
     }
     sources
 }
+
+/// The just-written user document replaces the boot snapshot for a runtime edit.
+pub(crate) fn for_instance(
+    layers: &[Layer],
+    user_path: &std::path::Path,
+    key: &str,
+    user: serde_json::Map<String, serde_json::Value>,
+) -> ConfigSources {
+    let user = Layer::new(
+        super::LayerOrigin::User,
+        user_path.display().to_string(),
+        user,
+    );
+    let layers = std::iter::once(&user).chain(layers.iter().filter(|layer| !layer.is_user()));
+    ConfigSources {
+        layers: layers
+            .map(|layer| ConfigLayer {
+                source: layer.source.clone(),
+                origin: if layer.is_user() {
+                    ConfigOrigin::User
+                } else if layer.repository().is_some() {
+                    ConfigOrigin::Repository
+                } else {
+                    ConfigOrigin::Explicit
+                },
+                values: layer
+                    .value
+                    .iter()
+                    .filter(|(name, _)| name.as_str() == key)
+                    .map(|(name, value)| (name.clone(), value.clone()))
+                    .collect(),
+            })
+            .collect(),
+        ..Default::default()
+    }
+}

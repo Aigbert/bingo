@@ -42,7 +42,7 @@ pub fn change(
     name: &str,
     url: Option<&str>,
 ) -> Result<Vec<String>, KernelError> {
-    edit(path, key, name, url, false)
+    edit(path, key, name, url, false).map(|(_, cleared)| cleared)
 }
 
 pub fn ensure_user_key(layers: &[super::Layer], key: &str, name: &str) -> Result<(), KernelError> {
@@ -83,8 +83,8 @@ pub fn change_address(
     name: &str,
     url: &str,
     clear_key: bool,
-) -> Result<Vec<String>, KernelError> {
-    edit(path, key, name, Some(url), clear_key)
+) -> Result<Map<String, Value>, KernelError> {
+    edit(path, key, name, Some(url), clear_key).map(|(document, _)| document)
 }
 
 fn edit(
@@ -93,7 +93,7 @@ fn edit(
     name: &str,
     url: Option<&str>,
     clear_key: bool,
-) -> Result<Vec<String>, KernelError> {
+) -> Result<(Map<String, Value>, Vec<String>), KernelError> {
     let mut document = read(path)?;
     let entries = instances(&mut document, key)?;
     let entry = entries
@@ -119,7 +119,7 @@ fn edit(
         Vec::new()
     };
     save(path, &document)?;
-    Ok(cleared)
+    Ok((document, cleared))
 }
 
 fn clear_choices(document: &mut Map<String, Value>, name: &str) -> Vec<String> {

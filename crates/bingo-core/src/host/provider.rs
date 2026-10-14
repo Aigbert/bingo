@@ -66,42 +66,7 @@ pub(crate) async fn set_provider(
     url: &str,
 ) -> Result<(Arc<dyn Provider>, bool, Refreshed), KernelError> {
     instances::validate_name(name)?;
-    let (provider, needs_key) = {
-        let _edit = host.registry.provider_state.instances.edit.lock().await;
-        let old = instance_provider(host, name).await?;
-        let shape = provider_shape(
-            host,
-            old.shape()
-                .ok_or_else(|| invalid("provider has no registered shape"))?,
-        )?;
-        let spec = InstanceSpec {
-            base_url: Some(url.into()),
-            images: Some(old.endpoint("").images),
-        };
-        let provider = old.readdress(&spec).map_err(|_| invalid("could not build provider; use an http(s) URL without credentials, query or fragment"))?;
-        instances::ensure_user(&settings::user_path(host.env()), shape.settings_key(), name)?;
-        let changed_origin = old.credential_origin() != provider.credential_origin();
-        if changed_origin {
-            instances::ensure_user_key(&host.config.layers, shape.settings_key(), name)?;
-            old.logout().await.map_err(|_| {
-                invalid("address unchanged; the old credential could not be removed")
-            })?;
-        }
-        instances::change_address(
-            &settings::user_path(host.env()),
-            shape.settings_key(),
-            name,
-            url,
-            changed_origin,
-        )?;
-        if changed_origin {
-            old.retire(&format!(
-                "Provider {name} changed origin; choose it again and sign in."
-            ));
-        }
-        install_provider(host, name, Some(provider.clone()));
-        (provider, changed_origin)
-    };
+    let (provider, needs_key) = readdress_provider(host, name, url).await?;
     let result = if needs_key {
         Refreshed {
             provider: name.into(),
@@ -111,6 +76,60 @@ pub(crate) async fn set_provider(
         refresh::one(host, provider.clone()).await
     };
     Ok((provider, needs_key, result))
+}
+
+async fn readdress_provider(
+    host: &Host,
+    name: &str,
+    url: &str,
+) -> Result<(Arc<dyn Provider>, bool), KernelError> {
+    let _edit = host.registry.provider_state.instances.edit.lock().await;
+    let old = instance_provider(host, name).await?;
+    let shape = provider_shape(
+        host,
+        old.shape()
+            .ok_or_else(|| invalid("provider has no registered shape"))?,
+    )?;
+    let spec = InstanceSpec {
+        base_url: Some(url.into()),
+        images: Some(old.endpoint("").images),
+    };
+    let provider = old.readdress(&spec, &Default::default()).map_err(|_| {
+        invalid(
+            "could not build provider; use an http(s) URL without credentials, query or fragment",
+        )
+    })?;
+    instances::ensure_user(&settings::user_path(host.env()), shape.settings_key(), name)?;
+    let changed_origin = old.credential_origin() != provider.credential_origin();
+    if changed_origin {
+        instances::ensure_user_key(&host.config.layers, shape.settings_key(), name)?;
+        old.logout()
+            .await
+            .map_err(|_| invalid("address unchanged; the old credential could not be removed"))?;
+    }
+    let document = instances::change_address(
+        &settings::user_path(host.env()),
+        shape.settings_key(),
+        name,
+        url,
+        changed_origin,
+    )?;
+    let sources = settings::sources::for_instance(
+        &host.config.layers,
+        &settings::user_path(host.env()),
+        shape.settings_key(),
+        document,
+    );
+    let provider = old
+        .readdress(&spec, &sources)
+        .map_err(|_| invalid("address saved, but provider configuration could not be reloaded"))?;
+    if changed_origin {
+        old.retire(&format!(
+            "Provider {name} changed origin; choose it again and sign in."
+        ));
+    }
+    install_provider(host, name, Some(provider.clone()));
+    Ok((provider, changed_origin))
 }
 
 pub(crate) async fn remove_provider(host: &Host, name: &str) -> Result<String, KernelError> {

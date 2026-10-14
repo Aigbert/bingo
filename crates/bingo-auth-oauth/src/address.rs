@@ -47,7 +47,10 @@ pub fn configured(
     resolve(address, default, environment)
 }
 
-fn value<'a>(values: &'a serde_json::Map<String, Value>, path: &[&str]) -> Option<&'a Value> {
+pub(crate) fn value<'a>(
+    values: &'a serde_json::Map<String, Value>,
+    path: &[&str],
+) -> Option<&'a Value> {
     let (first, rest) = path.split_first()?;
     rest.iter()
         .try_fold(values.get(*first)?, |value, key| value.get(*key))

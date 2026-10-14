@@ -159,8 +159,12 @@ pub trait Provider: Send + Sync {
     /// Stop resolved sessions from reading credentials for a retired endpoint.
     fn retire(&self, _reason: &str) {}
 
-    /// Replace endpoint options; a changed origin discards configured credentials.
-    fn readdress(&self, _spec: &InstanceSpec) -> Result<Arc<dyn Provider>, crate::PluginError> {
+    /// Replace endpoint options; discard configured credentials and resolve them from fresh settings.
+    fn readdress(
+        &self,
+        _spec: &InstanceSpec,
+        _sources: &crate::plugin::ConfigSources,
+    ) -> Result<Arc<dyn Provider>, crate::PluginError> {
         Err(crate::PluginError::Config(
             "this provider cannot be re-addressed".into(),
         ))

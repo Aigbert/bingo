@@ -179,16 +179,24 @@ impl Provider for AnthropicProvider {
         self.lifetime.retire(reason);
     }
 
-    fn readdress(&self, spec: &bingo_sdk::InstanceSpec) -> Result<Arc<dyn Provider>, PluginError> {
+    fn readdress(
+        &self,
+        spec: &bingo_sdk::InstanceSpec,
+        sources: &bingo_sdk::plugin::ConfigSources,
+    ) -> Result<Arc<dyn Provider>, PluginError> {
         shape::validate(spec)?;
         let mut provider = self.clone();
         if let Some(url) = &spec.base_url {
             provider.base_url = url.trim_end_matches('/').into();
         }
+        provider.key = self.key.readdress(
+            "anthropic",
+            &provider.base_url,
+            sources,
+            DEFAULT_BASE_URL,
+            std::env::var(BASE_URL_ENV).ok().as_deref(),
+        );
         if provider.credential_origin() != self.credential_origin() {
-            provider.key = self
-                .key
-                .at_origin("anthropic", &provider.base_url, "user settings");
             provider.lifetime = Default::default();
         }
         if let Some(images) = spec.images {
@@ -438,18 +446,40 @@ pub(crate) mod tests {
         };
         assert!(matches!(
             provider
-                .readdress(&spec("http://localhost:1234/path"))
-                .unwrap()
-                .auth(),
-            AuthStatus::Ready { .. }
-        ));
-        assert!(matches!(
-            provider
-                .readdress(&spec("http://localhost:5678"))
+                .readdress(&spec("http://localhost:1234/path"), &Default::default())
                 .unwrap()
                 .auth(),
             AuthStatus::Missing { .. }
         ));
+        assert!(matches!(
+            provider
+                .readdress(&spec("http://localhost:5678"), &Default::default())
+                .unwrap()
+                .auth(),
+            AuthStatus::Missing { .. }
+        ));
+    }
+
+    #[test]
+    fn readdress_cannot_revive_a_removed_configured_key() {
+        let directory = tempfile::tempdir().unwrap();
+        let configured = providers(
+            &directory,
+            json!({"anthropic":{"instances":{"work":{"apiKey":"dummy", "baseUrl":"http://localhost:1234"}}}}),
+        );
+        let old = configured.iter().find(|p| p.id() == "work").unwrap();
+        assert!(matches!(old.auth(), AuthStatus::Ready { .. }));
+        let spec = |url: &str| bingo_sdk::InstanceSpec {
+            base_url: Some(url.into()),
+            images: None,
+        };
+        let changed = old
+            .readdress(&spec("http://localhost:5678"), &Default::default())
+            .unwrap();
+        let returned = changed
+            .readdress(&spec("http://localhost:1234"), &Default::default())
+            .unwrap();
+        assert!(matches!(returned.auth(), AuthStatus::Missing { .. }));
     }
 
     #[test]
@@ -465,14 +495,30 @@ pub(crate) mod tests {
             images: None,
         };
         assert!(matches!(
-            old.readdress(&same_origin).unwrap().auth(),
+            old.readdress(
+                &same_origin,
+                &bingo_sdk::plugin::ConfigSources {
+                    layers: vec![bingo_sdk::plugin::ConfigLayer {
+                        source: "user settings".into(),
+                        origin: bingo_sdk::plugin::ConfigOrigin::User,
+                        values:
+                            json!({"anthropic":{"instances":{"work":{"apiKey":"fresh-secret"}}}})
+                                .as_object()
+                                .unwrap()
+                                .clone()
+                    }],
+                    ..Default::default()
+                }
+            )
+            .unwrap()
+            .auth(),
             AuthStatus::Ready { .. }
         ));
         let spec = bingo_sdk::InstanceSpec {
             base_url: Some("http://localhost:1234".into()),
             images: None,
         };
-        let changed = old.readdress(&spec).unwrap();
+        let changed = old.readdress(&spec, &Default::default()).unwrap();
         assert!(matches!(changed.auth(), AuthStatus::Missing { .. }));
         assert!(!changed.endpoint("m").images);
         assert_eq!(changed.address(), Some("http://localhost:1234"));
@@ -501,7 +547,7 @@ pub(crate) mod tests {
             images: None,
         };
         assert!(
-            !old.readdress(&refused)
+            !old.readdress(&refused, &Default::default())
                 .err()
                 .unwrap()
                 .to_string()

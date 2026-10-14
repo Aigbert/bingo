@@ -24,7 +24,11 @@ impl Provider for Changing {
     fn retire(&self, _: &str) {
         self.retired.store(true, Ordering::Relaxed);
     }
-    fn readdress(&self, spec: &InstanceSpec) -> Result<Arc<dyn Provider>, PluginError> {
+    fn readdress(
+        &self,
+        spec: &InstanceSpec,
+        _sources: &bingo_sdk::plugin::ConfigSources,
+    ) -> Result<Arc<dyn Provider>, PluginError> {
         Ok(Arc::new(Self {
             retired: AtomicBool::new(false),
             origin: spec.base_url.clone().unwrap(),

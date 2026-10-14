@@ -8,6 +8,8 @@
 //! The variable belongs to the default instance alone: one ambient key must
 //! not feed every proxy, so a named instance is built without one.
 //!
+mod readdress;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 

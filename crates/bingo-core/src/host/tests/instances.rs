@@ -30,7 +30,11 @@ impl Provider for Local {
     fn id(&self) -> &str {
         &self.name
     }
-    fn readdress(&self, spec: &InstanceSpec) -> Result<Arc<dyn Provider>, PluginError> {
+    fn readdress(
+        &self,
+        spec: &InstanceSpec,
+        _sources: &bingo_sdk::plugin::ConfigSources,
+    ) -> Result<Arc<dyn Provider>, PluginError> {
         Shape.build(&self.name, spec)
     }
     fn shape(&self) -> Option<&str> {
