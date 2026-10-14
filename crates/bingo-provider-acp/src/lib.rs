@@ -34,6 +34,7 @@ use futures::StreamExt;
 use tokio::task::JoinHandle;
 
 pub mod agent;
+mod approval;
 pub mod bridge;
 pub mod child;
 pub mod config;
@@ -72,7 +73,7 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     provides: &["service:bingo.acp.pages"],
     requires: &[],
     config: Some(ConfigClaim {
-        approve: &[],
+        approve: &["acp.adapters"],
         keys: &[("acp", Merge::ByName)],
         schema,
     }),
@@ -108,7 +109,13 @@ impl Plugin for AcpPlugin {
         // The page first: what an agent is and how to configure one is worth
         // reading before there is one to read about.
         registrar.add(guide::contribution(registrar));
-        let rows = config::adapters(registrar.config()?)?;
+        let settings: config::Settings = registrar.config()?;
+        if !settings.waiting.is_empty() {
+            let waiting = Arc::new(approval::WaitingAdapters(settings.waiting.clone()));
+            registrar.add(Contribution::Plugins(waiting.clone()));
+            registrar.add(Contribution::Command(waiting));
+        }
+        let rows = config::adapters(settings)?;
         if rows.is_empty() {
             return Ok(());
         }
@@ -210,6 +217,20 @@ mod tests {
             let contributions = registered(config);
             assert_eq!(contributions, ["Service(bingo.acp.pages)"]);
         }
+    }
+
+    #[test]
+    fn waiting_repository_adapter_never_registers_for_catalogue_probes() {
+        let contributions = registered(json!({
+            "acp":{"adapters":{
+                "personal":{"command":"personal-command"},
+                "repository":{"command":"must-never-spawn"}
+            }},
+            "waiting":[{"root":"/repo","key":"acp.adapters","name":"repository","changed":false}]
+        }));
+        assert!(contributions.contains(&"Agent(personal)".to_string()));
+        assert!(!contributions.contains(&"Agent(repository)".to_string()));
+        assert_eq!(MANIFEST.config.unwrap().approve, &["acp.adapters"]);
     }
 
     #[test]

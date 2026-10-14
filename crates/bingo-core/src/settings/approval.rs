@@ -25,14 +25,12 @@ pub(super) fn entries(
             })?
             .to_string();
         for key in claims.iter().flat_map(|claim| &claim.approve) {
-            for name in layer
-                .value
-                .get(key)
+            for name in at(&layer.value, key)
                 .and_then(Value::as_object)
                 .into_iter()
                 .flat_map(|map| map.keys())
             {
-                if let Some(value) = merged.get(key).and_then(|entries| entries.get(name)) {
+                if let Some(value) = at(merged, key).and_then(|entries| entries.get(name)) {
                     entries.insert((root.clone(), format!("{key}:{name}")), digest_entry(value));
                 }
             }
@@ -40,6 +38,15 @@ pub(super) fn entries(
     }
     Ok(entries)
 }
+fn at<'a>(map: &'a Map<String, Value>, path: &str) -> Option<&'a Value> {
+    let mut parts = path.split('.');
+    let mut value = map.get(parts.next()?)?;
+    for part in parts {
+        value = value.get(part)?;
+    }
+    Some(value)
+}
+
 pub(super) fn waiting(
     plugins: &mut BTreeMap<String, Value>,
     claims: &[Claim],
@@ -182,6 +189,38 @@ mod tests {
                 .iter()
                 .any(|(code, _)| code == "PROJECT_SETTING_IGNORED")
         );
+    }
+
+    #[test]
+    fn nested_runnable_entries_keep_each_adapters_provenance() {
+        let repo = tempfile::tempdir().unwrap();
+        let claim = Claim {
+            plugin: "test".into(),
+            keys: vec![("acp".into(), bingo_sdk::Merge::ByName)],
+            approve: vec!["acp.adapters".into()],
+        };
+        let user = Layer::new(
+            "user",
+            serde_json::from_value(json!({
+                "acp":{"adapters":{"personal":{"command":"personal"}}}
+            }))
+            .unwrap(),
+        )
+        .user();
+        let project = Layer::new(
+            "project",
+            serde_json::from_value(json!({
+                "acp":{"adapters":{"repository":{"command":"never"}}}
+            }))
+            .unwrap(),
+        )
+        .project(repo.path())
+        .unwrap();
+        let merged = super::super::merge(&[user, project], &[claim]).unwrap();
+        let waiting = merged.plugins["test"]["waiting"].as_array().unwrap();
+        assert_eq!(waiting.len(), 1);
+        assert_eq!(waiting[0]["name"], "repository");
+        assert_eq!(waiting[0]["key"], "acp.adapters");
     }
 
     #[test]

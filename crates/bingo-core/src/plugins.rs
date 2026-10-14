@@ -133,6 +133,12 @@ pub fn waiting_reason(id: &str, state: &bingo_sdk::PluginState) -> Option<String
         return None;
     }
     let (command, name) = id.split_once(':')?;
+    if command == "acp" {
+        return Some(format!(
+            "{}; /acp approve {name}",
+            state.reason().unwrap_or_default()
+        ));
+    }
     Some(format!(
         "{}; /{command} approve {name} (bingo {command} approve {name})",
         state.reason().unwrap_or_default()

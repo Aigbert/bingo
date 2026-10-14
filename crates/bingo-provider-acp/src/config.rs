@@ -78,6 +78,8 @@ pub const AGENT: &str = "agent";
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub acp: Acp,
+    #[schemars(skip)]
+    pub waiting: Vec<bingo_sdk::Waiting>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema)]
@@ -146,7 +148,12 @@ pub fn adapters(settings: Settings) -> Result<Vec<(String, Adapter)>, PluginErro
     let mut named = BTreeSet::new();
     let mut rows = Vec::new();
     for (name, adapter) in settings.acp.adapters {
-        if !adapter.enabled {
+        if !adapter.enabled
+            || settings
+                .waiting
+                .iter()
+                .any(|entry| entry.key == "acp.adapters" && entry.name == name)
+        {
             continue;
         }
         claim(&mut named, &name)?;
