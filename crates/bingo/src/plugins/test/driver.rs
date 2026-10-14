@@ -166,7 +166,8 @@ impl Driver {
             "reload" => {
                 self.modules.reload(&self.root).await.map_err(error)?;
                 for mount in self.mounts.values_mut() {
-                    mount.invalidate(&[mount.request.request_id.clone()]);
+                    let request = mount.request.request_id.clone();
+                    mount.invalidate(std::slice::from_ref(&request));
                 }
                 Ok(Value::Null)
             }
