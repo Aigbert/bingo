@@ -9,6 +9,7 @@
 //! ```
 
 mod agent;
+mod compact;
 mod endpoint;
 pub use endpoint::Endpoint;
 mod config;
@@ -221,7 +222,7 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
                 Some(agent) => turn.agent_turn(agent).await,
                 None => turn.respond().await,
             },
-            TurnKind::Compact { instructions } => turn.compact_only(instructions).await,
+            TurnKind::Compact { instructions } => compact::run(&mut turn, instructions).await,
         },
         None => turn.interrupted_status(),
     };
@@ -246,33 +247,6 @@ impl Turn<'_> {
                 Step::Closing(status) => break status,
             };
         }
-    }
-
-    /// One manual compaction, then done. What it bought or did not is said
-    /// on the stream, as for any other compaction.
-    async fn compact_only(&mut self, instructions: Option<String>) -> TurnStatus {
-        let Some(compactor) = self.late.compactor.clone() else {
-            return TurnStatus::Failed {
-                error: KernelError::new(
-                    ErrorCode::InvalidInput,
-                    "no compaction strategy is registered",
-                ),
-            };
-        };
-        let Some((request, usage)) = self.assemble_request().await else {
-            return self.interrupted_status();
-        };
-        self.compact(
-            compactor.as_ref(),
-            CompactReason::Manual { instructions },
-            usage,
-            &request,
-        )
-        .await;
-        if self.cancel.is_cancelled() {
-            return self.interrupted_status();
-        }
-        TurnStatus::Completed
     }
 
     /// This turn's cancel across one await; see [`racing`].

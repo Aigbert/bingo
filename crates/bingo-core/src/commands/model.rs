@@ -1,8 +1,4 @@
-//! `/model [<provider>/]<model>`: the next turn runs on it, and so does the
-//! next start — the choice is written into the user settings layer the way
-//! Claude Code's `/model` writes its `model` key (ADR-0003 §5, amended
-//! 2026-09-04). A `--model` on the command line is a layer of its own and is
-//! not touched here: a one-run override stays one run.
+//! `/model` chooses for this session; `--keep` also writes the user layer.
 
 use std::sync::{Arc, Weak};
 
@@ -10,7 +6,7 @@ use async_trait::async_trait;
 use bingo_sdk::*;
 use serde_json::json;
 
-use crate::host::Host;
+use crate::host::{Host, model_switch};
 use crate::turn::ModelChoice;
 
 const USAGE: &str = "usage: /model [<provider>/]<model>";
@@ -25,15 +21,34 @@ impl Command for ModelCommand {
         super::spec(
             "model",
             "choose the model for this session",
-            ArgSpec::Catalog {
+            super::keep_args(ArgSpec::Catalog {
                 source: "models".into(),
-            },
+            }),
             true,
         )
     }
 
+    async fn is_instant(&self, args: &str, state: &SessionState) -> bool {
+        if args.trim().is_empty() || super::pin::parse(args).is_some() {
+            return true;
+        }
+        let Ok(host) = super::host(&self.host) else {
+            return true;
+        };
+        let Ok((wanted, _)) = super::choice_args(args) else {
+            return true;
+        };
+        match target(&host, &state.summary.id, wanted).await {
+            Ok(choice) => !crate::host::model_switch::needs_compaction(state, &choice),
+            Err(_) => true,
+        }
+    }
+
     async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
         let host = super::host(&self.host)?;
+        if let Some((pin, id)) = super::pin::parse(args) {
+            return super::pin::run(&host, cx, id, pin).await;
+        }
         match args.trim() {
             "" => report(&host, cx).await,
             wanted => set(&host, cx, wanted).await,
@@ -51,28 +66,56 @@ async fn report(host: &Arc<Host>, cx: &CommandContext) -> Result<CommandOutcome,
     })
 }
 
-/// `/model [<provider>/]<model>`: the next turn runs on it, and it is
-/// remembered for the next start.
+async fn target(
+    host: &Host,
+    session: &SessionId,
+    wanted: &str,
+) -> Result<ModelChoice, KernelError> {
+    let known = host.catalog(CatalogKind::Providers).await?.entries;
+    let (provider, model) = split(wanted, |id| known.iter().any(|p| p.id == id));
+    model_switch::proposed_model(host, session, provider.map(str::to_owned), model.to_owned()).await
+}
+
 async fn set(
     host: &Arc<Host>,
     cx: &CommandContext,
-    wanted: &str,
+    args: &str,
 ) -> Result<CommandOutcome, KernelError> {
-    let known = host.catalog(CatalogKind::Providers).await?.entries;
-    let (provider, model) = split(wanted, |id| known.iter().any(|p| p.id == id));
-    let provider = provider.map(str::to_owned);
-    let model = model.to_owned();
-    host.reconfigure(&cx.session, SessionChange::Model { provider, model })
-        .await?;
-    let choice = running_on(host, cx).await?;
-    let mut message = said(&choice);
+    let (wanted, keep) = super::choice_args(args)?;
+    let choice = target(host, &cx.session, wanted).await?;
+    let pictures = !choice.capabilities.images
+        && crate::host::model_switch::has_pictures(&host.session_state(&cx.session).await?);
+    let compacted = model_switch::compact_for_switch(host, &cx.session, &choice).await?;
+    if cx.cancel.is_cancelled() {
+        return Err(KernelError::new(
+            ErrorCode::Interrupted,
+            "model switch cancelled",
+        ));
+    }
+    host.reconfigure(
+        &cx.session,
+        SessionChange::Model {
+            provider: Some(choice.endpoint.id().to_owned()),
+            model: choice.id.clone(),
+        },
+    )
+    .await?;
     let keys = [
         ("provider", json!(choice.endpoint.id())),
         ("model", json!(choice.id)),
     ];
-    if let Some(refused) = super::remember(host, &keys) {
-        message.push('\n');
-        message.push_str(&refused);
+    let mut message = format!(
+        "⇄ {} · {} · thinking {} · {}",
+        choice.id,
+        choice.endpoint.id(),
+        Effort::word(choice.reasoning),
+        super::kept(host, keep, &keys)
+    );
+    if let Some((before, after)) = compacted {
+        message.push_str(&format!(" · compacted {before} → {after}"));
+    }
+    if pictures {
+        message.push_str(&format!(" · pictures stay, {} won't see them", choice.id));
     }
     Ok(CommandOutcome::Applied {
         message: Some(message),
@@ -87,9 +130,7 @@ async fn running_on(host: &Arc<Host>, cx: &CommandContext) -> Result<ModelChoice
         .ok_or_else(|| KernelError::new(ErrorCode::InvalidInput, "a log session has no model"))
 }
 
-/// The three facts a person asked for, in the vocabulary `/think` uses for
-/// the third. The effort is the one the turn will ask for, so a model that
-/// does not reason shows none rather than a level no request carries.
+/// The session's model and requested effort, in the vocabulary `/think` uses.
 fn said(choice: &ModelChoice) -> String {
     let mut text = format!("model: {}/{}", choice.endpoint.id(), choice.id);
     if let Some(effort) = choice.reasoning {

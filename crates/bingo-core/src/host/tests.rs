@@ -12,6 +12,7 @@ mod checkpoint;
 mod commands;
 mod complete;
 mod login;
+mod model_choice;
 mod models;
 mod policy;
 mod providers;

@@ -197,9 +197,37 @@ fn arguments(
     else {
         return Vec::new();
     };
+    if let ArgSpec::Options { args, flags } = &spec.args {
+        return options(name, partial, args, flags, catalogues);
+    }
     match partial.split_once(char::is_whitespace) {
         None => offered(&format!("/{name}"), partial, &spec.args, catalogues),
         Some((word, rest)) => after(name, word, rest.trim_start(), &spec.args, catalogues),
+    }
+}
+
+fn options(
+    name: &str,
+    partial: &str,
+    args: &ArgSpec,
+    flags: &[String],
+    catalogues: &Catalogues,
+) -> Vec<Suggestion> {
+    let flag_args = ArgSpec::Words {
+        alone: vec![],
+        values: flags.to_vec(),
+        then: None,
+    };
+    match partial.rsplit_once(char::is_whitespace) {
+        Some((head, rest))
+            if !head
+                .split_whitespace()
+                .any(|word| flags.iter().any(|flag| flag == word)) =>
+        {
+            offered(&format!("/{name} {head}"), rest, &flag_args, catalogues)
+        }
+        Some(_) => Vec::new(),
+        None => offered(&format!("/{name}"), partial, args, catalogues),
     }
 }
 
@@ -239,6 +267,7 @@ fn offered(head: &str, partial: &str, args: &ArgSpec, catalogues: &Catalogues) -
             None => return Vec::new(),
         },
         ArgSpec::Words { values, .. } => values,
+        ArgSpec::Options { args, .. } => return offered(head, partial, args, catalogues),
         ArgSpec::None | ArgSpec::Free { .. } => return Vec::new(),
     };
     matching::rank(partial, values, String::as_str)
@@ -254,6 +283,29 @@ fn offered(head: &str, partial: &str, args: &ArgSpec, catalogues: &Catalogues) -
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_model_choice_offers_keep_after_the_id() {
+        let specs = vec![spec(
+            "model",
+            ArgSpec::Options {
+                args: Box::new(ArgSpec::Catalog {
+                    source: "models".into(),
+                }),
+                flags: vec!["--keep".into()],
+            },
+        )];
+        let catalogues = BTreeMap::from([("models".into(), vec!["vendor/model".into()])]);
+        assert_eq!(
+            suggestions("/model vendor", &specs, &catalogues)[0].value,
+            "/model vendor/model"
+        );
+        assert_eq!(
+            suggestions("/model vendor/model --", &specs, &catalogues)[0].value,
+            "/model vendor/model --keep"
+        );
+        assert!(suggestions("/model vendor/model --keep ", &specs, &catalogues).is_empty());
+    }
+
     #[test]
     fn rough_edges_quit_is_an_alias_not_a_second_row() {
         let specs = local_specs();

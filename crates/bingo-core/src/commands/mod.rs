@@ -7,6 +7,7 @@ mod compact;
 mod login;
 mod model;
 mod models;
+mod pin;
 mod plugins;
 mod rename;
 mod status;
@@ -59,4 +60,31 @@ fn spec(name: &str, hint: &str, args: ArgSpec, instant: bool) -> CommandSpec {
         instant,
         family: "session".into(),
     }
+}
+
+/// A single value and an optional trailing persistence flag.
+fn choice_args(args: &str) -> Result<(&str, bool), KernelError> {
+    let words: Vec<_> = args.split_whitespace().collect();
+    match words.as_slice() {
+        [value] if !value.starts_with("--") => Ok((value, false)),
+        [value, "--keep"] if !value.starts_with("--") => Ok((value, true)),
+        _ => Err(KernelError::new(
+            ErrorCode::InvalidInput,
+            "expected a value followed by optional --keep",
+        )),
+    }
+}
+
+fn keep_args(args: ArgSpec) -> ArgSpec {
+    ArgSpec::Options {
+        args: Box::new(args),
+        flags: vec!["--keep".into()],
+    }
+}
+
+fn kept(host: &Host, keep: bool, keys: &[(&str, serde_json::Value)]) -> String {
+    if !keep {
+        return "this session".into();
+    }
+    remember(host, keys).unwrap_or_else(|| "kept for new sessions".into())
 }

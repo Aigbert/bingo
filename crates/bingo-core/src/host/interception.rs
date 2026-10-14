@@ -46,7 +46,8 @@ pub(super) async fn catalogue_answer(
 ) -> Result<Catalog, KernelError> {
     register_pending(host).await;
     let resolved = host.providers().await;
-    let catalog = Catalog {
+    let pins = super::pins::pinned_models(host);
+    let mut catalog = Catalog {
         kind,
         entries: catalog::entries(
             &host.registry,
@@ -57,6 +58,18 @@ pub(super) async fn catalogue_answer(
         )
         .await,
     };
+    if kind == CatalogKind::Models {
+        for entry in &mut catalog.entries {
+            if entry.meta.get("context").is_some() || pins.contains(&entry.id) {
+                entry.meta["pinned"] = serde_json::json!(pins.contains(&entry.id));
+            }
+        }
+        catalog.entries.sort_by_key(|entry| {
+            pins.iter()
+                .position(|id| id == &entry.id)
+                .unwrap_or(usize::MAX)
+        });
+    }
     let report = crate::chain::Report::default();
     let mut result = crate::chain::autocomplete::catalog(
         catalog,

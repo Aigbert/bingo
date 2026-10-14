@@ -88,5 +88,8 @@ async fn a_pasted_credential_is_stored_and_the_provider_is_usable_at_once() {
     let IntentOutcome::Applied { result } = ack_for(&mut session, &switch).await else {
         panic!("the switch is applied");
     };
-    assert_eq!(result["message"], "model: codex/gpt-5.4");
+    assert_eq!(
+        result["message"],
+        "⇄ gpt-5.4 · codex · thinking off · this session"
+    );
 }

@@ -1,5 +1,4 @@
-//! `/think <level|off>`: the reasoning effort the next turn asks for, and the
-//! next start — remembered in the user settings layer as `/model` is.
+//! `/think <level|off> [--keep]` chooses the requested reasoning effort.
 
 use std::sync::{Arc, Weak};
 
@@ -18,11 +17,11 @@ impl Command for ThinkCommand {
         super::spec(
             "think",
             "set the reasoning effort",
-            ArgSpec::Words {
+            super::keep_args(ArgSpec::Words {
                 alone: vec![],
                 values: Effort::words().map(str::to_string).collect(),
                 then: None,
-            },
+            }),
             true,
         )
     }
@@ -50,6 +49,7 @@ async fn set(
     cx: &CommandContext,
     wanted: &str,
 ) -> Result<CommandOutcome, KernelError> {
+    let (wanted, keep) = super::choice_args(wanted)?;
     let level = Effort::spoken(wanted).ok_or_else(|| {
         KernelError::new(
             ErrorCode::InvalidInput,
@@ -59,11 +59,11 @@ async fn set(
     host.reconfigure(&cx.session, SessionChange::Thinking(level))
         .await?;
     let level = host.session_thinking(&cx.session)?;
-    let mut message = said(level);
-    if let Some(refused) = super::remember(host, &[("thinking", serde_json::json!(level))]) {
-        message.push('\n');
-        message.push_str(&refused);
-    }
+    let message = format!(
+        "{} · {}",
+        said(level),
+        super::kept(host, keep, &[("thinking", serde_json::json!(level))])
+    );
     Ok(CommandOutcome::Applied {
         message: Some(message),
     })

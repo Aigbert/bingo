@@ -36,6 +36,7 @@ pub const KERNEL_KEYS: &[&str] = &[
     crate::plugins::KEY,
     "pluginTrust",
     "keys",
+    "pinned",
 ];
 
 /// The one key under `pictures`: the spelling every other kernel key uses, and
@@ -112,6 +113,8 @@ pub struct KernelSettings {
     /// directory name for one a bridge found. Absent is on (ADR-0057 §1).
     pub enabled_plugins: BTreeMap<String, bool>,
     pub keys: BTreeMap<String, String>,
+    /// Ordered model ids offered by every model chooser.
+    pub pinned: Vec<String>,
 }
 
 impl KernelSettings {

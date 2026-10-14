@@ -3318,6 +3318,30 @@
         {
           "type": "object",
           "properties": {
+            "args": {
+              "$ref": "#/$defs/ArgSpec"
+            },
+            "flags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "options"
+            }
+          },
+          "required": [
+            "kind",
+            "args",
+            "flags"
+          ],
+          "description": "An argument followed by optional flags, completed from the same spec."
+        },
+        {
+          "type": "object",
+          "properties": {
             "hint": {
               "type": "string"
             },

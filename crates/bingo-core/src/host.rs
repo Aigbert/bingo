@@ -10,6 +10,8 @@ mod choose;
 mod completion;
 mod interception;
 mod live;
+pub(crate) mod model_switch;
+pub(crate) mod pins;
 use live::Live;
 mod refresh;
 mod registry;
@@ -116,6 +118,7 @@ pub struct Host {
     /// this one's own refresh (ADR-0026 §4).
     served: Arc<ServedModels>,
     weak: Weak<Host>,
+    pinned: Mutex<Vec<String>>,
 }
 
 /// A knob moved, written into the spec that holds it.
@@ -151,7 +154,7 @@ impl Host {
             .iter()
             .filter_map(|p| Claim::from_manifest(p.manifest()))
             .collect();
-        let settings = settings::merge(&config.layers, &claims)?;
+        let mut settings = settings::merge(&config.layers, &claims)?;
         let switched_off = settings.kernel.switched_off();
         let mut registry = Registry::load(&plugins, &settings.plugins, &config.env, &switched_off)?;
         for link in &mut registry.links {
@@ -173,6 +176,7 @@ impl Host {
         let served = Arc::new(ServedModels::load(
             config.env.data_dir.join("served-models.json"),
         ));
+        let pinned = Mutex::new(std::mem::take(&mut settings.kernel.pinned));
         let host = Arc::new_cyclic(|weak| {
             registry.add_builtins(crate::commands::builtins(weak.clone()));
             Host {
@@ -185,6 +189,7 @@ impl Host {
                 learned,
                 served,
                 weak: weak.clone(),
+                pinned,
             }
         });
         host.start_plugins().await?;

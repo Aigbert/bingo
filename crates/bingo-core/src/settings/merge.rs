@@ -269,6 +269,7 @@ fn kernel_settings(
         plugin_trust: user_grants(layers)?,
         enabled_plugins: typed(merged, layers, crate::plugins::KEY)?.unwrap_or_default(),
         keys: typed(merged, layers, "keys")?.unwrap_or_default(),
+        pinned: typed(merged, layers, "pinned")?.unwrap_or_default(),
     })
 }
 
@@ -318,6 +319,24 @@ mod tests {
             panic!("layers are objects")
         };
         Layer::new(source, map)
+    }
+
+    #[test]
+    fn pinned_replaces_the_lower_list_and_preserves_order() {
+        let layers = [
+            Layer::new(
+                "user",
+                serde_json::from_value(serde_json::json!({"pinned":["a/one","b/two"]})).unwrap(),
+            ),
+            Layer::new(
+                "local",
+                serde_json::from_value(serde_json::json!({"pinned":["b/two","a/one"]})).unwrap(),
+            ),
+        ];
+        assert_eq!(
+            merge(&layers, &[]).unwrap().kernel.pinned,
+            ["b/two", "a/one"]
+        );
     }
 
     #[test]

@@ -50,7 +50,7 @@ impl Actor {
         command: Arc<dyn Command>,
         queued: bool,
     ) -> Result<(), KernelError> {
-        let instant = command.spec().instant;
+        let instant = command.is_instant(&parsed.args, &self.state).await;
         if !instant && !queued && (self.busy() || self.queue.ready()) {
             return self.enqueue(intent, input).await;
         }

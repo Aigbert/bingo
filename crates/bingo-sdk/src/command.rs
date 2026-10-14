@@ -54,6 +54,11 @@ impl CommandSpec {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ArgSpec {
     None,
+    /// An argument followed by optional flags, completed from the same spec.
+    Options {
+        args: Box<ArgSpec>,
+        flags: Vec<String>,
+    },
     Free {
         hint: String,
     },
@@ -124,6 +129,12 @@ pub enum CommandOutcome {
 pub trait Command: Send + Sync {
     fn spec(&self) -> CommandSpec;
 
+    /// Whether this invocation may run beside the current turn. Implementations
+    /// inspect the supplied state without calling back into its session actor.
+    async fn is_instant(&self, _args: &str, _state: &crate::SessionState) -> bool {
+        self.spec().instant
+    }
+
     async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError>;
 }
 
@@ -131,6 +142,13 @@ pub trait Command: Send + Sync {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn optional_flags_wrap_an_existing_argument_contract() {
+        let wire = serde_json::json!({"kind":"options","args":{"kind":"catalog","source":"models"},"flags":["--keep"]});
+        let args: ArgSpec = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(serde_json::to_value(args).unwrap(), wire);
+    }
 
     #[test]
     fn a_frame_without_alone_keeps_its_following_argument() {
