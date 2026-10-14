@@ -136,3 +136,116 @@ fn noun_data_reads_are_values_but_noun_and_method_aliases_are_not() {
         4
     );
 }
+
+#[tokio::test]
+async fn erased_type_imports_validate_and_load_with_the_same_boundary() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(root.path().join("hooks")).unwrap();
+    std::fs::create_dir(root.path().join("types")).unwrap();
+    std::fs::write(
+        root.path().join("types/index.d.ts"),
+        "export interface Shape { label: string }\nexport interface Other {}\n",
+    )
+    .unwrap();
+    for import in [
+        "import type { Shape } from '../types';",
+        "import { type Shape, type Other } from '../types';",
+        "import type { Shape } from '../types/index.d.ts';",
+        "import type { Shape } from 'unavailable-types';",
+    ] {
+        let source =
+            format!("{import}\nexport const register = on => on('session.start', () => 'loaded');");
+        std::fs::write(root.path().join("hooks/main.ts"), &source).unwrap();
+        let manifest = serde_json::from_value(
+            serde_json::json!({"name":"fixture","version":"1","module":"hooks/main.ts"}),
+        )
+        .unwrap();
+        assert!(
+            validate(root.path(), &manifest).unwrap().valid(),
+            "{import}"
+        );
+        let stripped = crate::strip::strip(Path::new("hooks/main.ts"), &source).unwrap();
+        assert!(!stripped.contains("import"), "{stripped}");
+        let engine = crate::engine::Engine::start(
+            root.path(),
+            "hooks/main.ts",
+            serde_json::json!({}),
+            Default::default(),
+        )
+        .await
+        .unwrap();
+        let mut call = engine
+            .call(
+                "session.start",
+                serde_json::json!({}),
+                serde_json::json!({"session":"s"}),
+            )
+            .unwrap();
+        assert_eq!((&mut call.result).await.unwrap().unwrap(), "loaded");
+        engine.close().await;
+    }
+}
+
+#[tokio::test]
+async fn directory_value_imports_resolve_but_declarations_never_execute() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir(root.path().join("helper")).unwrap();
+    std::fs::write(
+        root.path().join("helper/index.ts"),
+        "export const label = 'directory';",
+    )
+    .unwrap();
+    std::fs::write(root.path().join("main.ts"), "import { label } from './helper'; export const register = on => on('session.start', () => label);").unwrap();
+    let manifest = serde_json::from_value(
+        serde_json::json!({"name":"fixture","version":"1","module":"main.ts"}),
+    )
+    .unwrap();
+    assert!(validate(root.path(), &manifest).unwrap().valid());
+    let engine = crate::engine::Engine::start(
+        root.path(),
+        "main.ts",
+        serde_json::json!({}),
+        Default::default(),
+    )
+    .await
+    .unwrap();
+    let mut call = engine
+        .call(
+            "session.start",
+            serde_json::json!({}),
+            serde_json::json!({"session":"s"}),
+        )
+        .unwrap();
+    assert_eq!((&mut call.result).await.unwrap().unwrap(), "directory");
+    engine.close().await;
+    std::fs::rename(
+        root.path().join("helper/index.ts"),
+        root.path().join("helper/index.d.ts"),
+    )
+    .unwrap();
+    for specifier in ["./helper", "./helper/index.d.ts"] {
+        std::fs::write(root.path().join("main.ts"), format!("import {{ label }} from '{specifier}'; export const register = on => on('session.start', () => label);")).unwrap();
+        assert!(
+            validate(root.path(), &manifest)
+                .unwrap_err()
+                .contains("declaration")
+        );
+        assert!(
+            crate::load::Root::new(root.path(), 4096)
+                .unwrap()
+                .source("helper/index.d.ts")
+                .unwrap_err()
+                .contains("declaration")
+        );
+        assert!(
+            crate::engine::Engine::start(
+                root.path(),
+                "main.ts",
+                serde_json::json!({}),
+                Default::default()
+            )
+            .await
+            .is_err()
+        );
+    }
+}
