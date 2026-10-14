@@ -171,7 +171,7 @@ pub async fn publish(manager: &Arc<Manager>, listener: &Listening) {
             {
                 register(&manager).await;
                 for status in manager.plugins().await {
-                    let mut meta = json!({"enabled":status.enabled, "reason":status.reason});
+                    let mut meta = json!({"state":status.state});
                     if let Some(execution) = status.execution {
                         meta.as_object_mut().unwrap().extend(
                             serde_json::to_value(execution)

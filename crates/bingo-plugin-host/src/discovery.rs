@@ -1,9 +1,6 @@
 //! Where a plugin lives, and what reading one directory finds.
 //!
-//! Two layers: the person's own `<config_dir>/plugins`, then the project's
-//! `.bingo/plugins` (ADR-0015 §1). A name in both is the project's — a
-//! repository that ships a plugin is describing that repository, and the
-//! person who installed one of the same name did not mean this one.
+//! Repository candidates wait before they can take a user plugin's name.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -30,6 +27,7 @@ pub struct Found {
     pub root: PathBuf,
     pub origin: bingo_sdk::PluginOrigin,
     pub manifest: Manifest,
+    pub state: bingo_sdk::PluginState,
 }
 
 /// Every directory a plugin may live in, least important first: a later layer
@@ -46,7 +44,21 @@ pub fn dirs(env: &Env, cwd: &Path) -> Vec<PathBuf> {
 /// What the layers hold, by name, the last layer winning. A directory that is
 /// not there is not an error: most people have no plugins.
 pub fn discover(dirs: &[PathBuf], notices: &Notices) -> Vec<Found> {
-    let mut found: BTreeMap<String, Found> = BTreeMap::new();
+    approved(dirs, &[], notices, None)
+}
+
+pub fn with_explicit(dirs: &[PathBuf], explicit: &[PathBuf], notices: &Notices) -> Vec<Found> {
+    approved(dirs, explicit, notices, None)
+}
+
+pub fn approved(
+    dirs: &[PathBuf],
+    explicit: &[PathBuf],
+    notices: &Notices,
+    authority: Option<&dyn bingo_sdk::ApprovalReader>,
+) -> Vec<Found> {
+    let mut found = BTreeMap::new();
+    let mut waiting = Vec::new();
     for (index, dir) in dirs.iter().enumerate() {
         for mut plugin in layer(dir, notices) {
             plugin.origin = if index == 0 {
@@ -54,24 +66,42 @@ pub fn discover(dirs: &[PathBuf], notices: &Notices) -> Vec<Found> {
             } else {
                 bingo_sdk::PluginOrigin::Project
             };
+            if index != 0 {
+                plugin.state = project_state(&plugin, authority);
+                if !plugin.state.is_on() {
+                    waiting.push(plugin);
+                    continue;
+                }
+            }
             found.insert(plugin.name.clone(), plugin);
         }
     }
-    found.into_values().collect()
-}
-
-/// Explicit directories form the final layer, in argument order.
-pub fn with_explicit(dirs: &[PathBuf], explicit: &[PathBuf], notices: &Notices) -> Vec<Found> {
-    let mut found: BTreeMap<_, _> = discover(dirs, notices)
-        .into_iter()
-        .map(|plugin| (plugin.name.clone(), plugin))
-        .collect();
     for root in explicit {
         if let Some(plugin) = read(root, notices) {
             found.insert(plugin.name.clone(), plugin);
         }
     }
-    found.into_values().collect()
+    let mut found: Vec<_> = found.into_values().collect();
+    found.extend(waiting);
+    found
+}
+
+pub fn request(found: &Found) -> Option<bingo_sdk::Approval> {
+    Some(bingo_sdk::Approval {
+        root: found.root.parent()?.parent()?.parent()?.to_path_buf(),
+        what: format!("plugin:{}", found.name),
+    })
+}
+pub fn project_state(
+    found: &Found,
+    authority: Option<&dyn bingo_sdk::ApprovalReader>,
+) -> bingo_sdk::PluginState {
+    let Some((authority, request)) = authority.zip(request(found)) else {
+        return bingo_sdk::PluginState::Waiting { changed: false };
+    };
+    authority
+        .state(&request)
+        .unwrap_or_else(|error| bingo_sdk::PluginState::Failed { why: error.message })
 }
 
 fn layer(dir: &Path, notices: &Notices) -> Vec<Found> {
@@ -99,6 +129,7 @@ pub fn read(root: &Path, notices: &Notices) -> Option<Found> {
             root: root.to_path_buf(),
             origin: bingo_sdk::PluginOrigin::Explicit,
             manifest,
+            state: bingo_sdk::PluginState::On,
         }),
         Ok(manifest) => {
             notices.push(Notice::warn(
@@ -190,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn the_project_wins_a_name_the_person_also_installed() {
+    fn a_waiting_project_keeps_the_persons_namesake() {
         let config = tempfile::tempdir().expect("a config directory");
         let project = tempfile::tempdir().expect("a project directory");
         plugin(config.path(), "wordcount", &manifest("wordcount"));
@@ -200,8 +231,13 @@ mod tests {
             &[config.path().to_path_buf(), project.path().to_path_buf()],
             &notices,
         );
-        assert_eq!(found.len(), 1);
-        assert_eq!(found[0].root, project.path().join("wordcount"));
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].root, config.path().join("wordcount"));
+        assert_eq!(found[1].root, project.path().join("wordcount"));
+        assert_eq!(
+            found[1].state,
+            bingo_sdk::PluginState::Waiting { changed: false }
+        );
     }
 
     #[test]

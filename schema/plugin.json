@@ -669,6 +669,22 @@
         "payload"
       ]
     },
+    "Approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "what": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "root",
+        "what"
+      ]
+    },
     "ArgSpec": {
       "oneOf": [
         {
@@ -5936,6 +5952,87 @@
       "required": [
         "name",
         "root"
+      ]
+    },
+    "PluginState": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "on"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "why": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "off"
+            }
+          },
+          "required": [
+            "kind",
+            "why"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "why": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "failed"
+            }
+          },
+          "required": [
+            "kind",
+            "why"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "changed": {
+              "type": "boolean"
+            },
+            "kind": {
+              "type": "string",
+              "const": "waiting"
+            }
+          },
+          "required": [
+            "kind",
+            "changed"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "pending"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
       ]
     },
     "Preview": {

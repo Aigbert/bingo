@@ -220,7 +220,10 @@ impl Bridge {
     /// is filed, so a call that arrives at once finds a bridge that is ready.
     pub async fn connect(self: &Arc<Self>) {
         let _guard = self.lifecycle.lock().await;
-        if !self.claim().await {
+        if !self.approved() || !self.claim().await {
+            return;
+        }
+        if !self.approved() {
             return;
         }
         let outcome = self.handshake().await;
@@ -231,6 +234,38 @@ impl Bridge {
             .unwrap_or_default();
         self.file(outcome).await;
         self.publish(declared).await;
+    }
+
+    fn approved(&self) -> bool {
+        let Some(registration) = &self.registration else {
+            return true;
+        };
+        if registration.origin != bingo_sdk::PluginOrigin::Project {
+            return true;
+        }
+        let Some(root) = registration
+            .root
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+        else {
+            return false;
+        };
+        let request = bingo_sdk::Approval {
+            root: root.into(),
+            what: format!("plugin:{}", self.name),
+        };
+        let state = self
+            .host
+            .service(&bingo_sdk::APPROVALS)
+            .map(|authority| authority.state(&request))
+            .unwrap_or(Ok(bingo_sdk::PluginState::Waiting { changed: false }))
+            .unwrap_or_else(|error| bingo_sdk::PluginState::Failed { why: error.message });
+        if !state.is_on() {
+            registration.admission.stop(state);
+            return false;
+        }
+        true
     }
 
     /// Put every service this process declared where the registry routes it,
@@ -472,6 +507,9 @@ impl Bridge {
         }
         *self.launch.write().unwrap_or_else(|e| e.into_inner()) =
             (entry.rooted(&self.root), manifest.call_timeout);
+        if !self.approved() {
+            return;
+        }
         let outcome = self.handshake().await;
         let restart = match (&old, &outcome) {
             (Some(old), Ok(new)) => old.providers != new.providers || old.services != new.services,

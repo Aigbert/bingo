@@ -292,6 +292,18 @@ async fn project_world_calls_need_user_layer_grants() {
         )
         .await
         .unwrap();
+        bingo_sdk::render::under_input(
+            true,
+            host.approve(Approval {
+                root: project.path().into(),
+                what: "plugin:project-world".into(),
+            }),
+        )
+        .await
+        .unwrap();
+        for source in &host.registry().sources.plugins {
+            source.reload().await.unwrap();
+        }
         host.open_service("testworld", Arc::new(Echo)).unwrap();
         let session = host
             .open(

@@ -181,6 +181,7 @@ mod tests {
     async fn a_dollar_await_has_a_wall_bound_while_own_time_is_paused() {
         let home = tempfile::tempdir().unwrap();
         let found = bingo_plugin_host::discovery::Found {
+            state: PluginState::On,
             name: "fixture".into(),
             root: home.path().into(),
             origin: PluginOrigin::Explicit,
@@ -204,7 +205,7 @@ mod tests {
                 entries: vec![CatalogEntry {
                     id: "fixture".into(),
                     label: "fixture".into(),
-                    meta: json!({"enabled":true,"tier":"rewrite","uses":["held"]}),
+                    meta: json!({"state":{"kind":"on"},"tier":"rewrite","uses":["held"]}),
                 }],
             })
         });

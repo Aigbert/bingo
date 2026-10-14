@@ -38,12 +38,17 @@ impl Installed {
     /// plugin has no process to ask, and a dead one answers with why.
     async fn status(&self) -> PluginStatus {
         let mut status = self.registration.status(ID);
-        if status.enabled
+        if status.state.is_on()
             && let Some(bridge) = &self.bridge
         {
             let (enabled, reason) = bridge.standing().await;
-            status.enabled = enabled;
-            status.reason = reason;
+            status.state = if enabled {
+                bingo_sdk::PluginState::On
+            } else {
+                bingo_sdk::PluginState::Failed {
+                    why: reason.unwrap_or_else(|| "process is unavailable".into()),
+                }
+            };
         }
         status
     }
@@ -132,10 +137,12 @@ impl Manager {
     /// session has whatever they contribute; with nothing discovered it does
     /// nothing at all.
     pub async fn start(&self, cwd: &Path, host: HostHandle) {
-        let found = discovery::with_explicit(
+        let authority = host.service(&bingo_sdk::APPROVALS);
+        let found = discovery::approved(
             &discovery::dirs(&self.env, cwd),
             &self.directories,
             &self.notices,
+            authority.as_deref(),
         );
         let installed: Vec<Installed> = found
             .into_iter()
@@ -328,9 +335,13 @@ impl Manager {
     /// never started (ADR-0057 §4).
     fn install(&self, found: Found, host: HostHandle) -> Installed {
         let registration = Arc::new(Registration::new(&found, bingo_sdk::PluginRuntime::Process));
-        let on = !self.switched_off.contains(&found.name);
-        if !on {
-            registration.admission.refuse(SWITCHED_OFF.into());
+        let on = found.state.is_on() && !self.switched_off.contains(&found.name);
+        if !found.state.is_on() {
+            registration.admission.stop(found.state.clone());
+        } else if !on {
+            registration.admission.stop(bingo_sdk::PluginState::Off {
+                why: SWITCHED_OFF.into(),
+            });
         }
         let bridge = on
             .then(|| self.bridge(found, host, registration.clone()))
@@ -481,8 +492,8 @@ mod tests {
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].id, "wordcount");
         assert_eq!(listed[0].version, "0.4.2");
-        assert!(!listed[0].enabled);
-        assert_eq!(listed[0].reason.as_deref(), Some(SWITCHED_OFF));
+        assert!(!listed[0].state.is_on());
+        assert_eq!(listed[0].state.reason(), Some(SWITCHED_OFF));
         assert_eq!(listed[0].from, ID, "the source says where it came from");
         assert!(manager.tools().await.is_empty());
         assert!(
@@ -501,8 +512,8 @@ mod tests {
         let manager = started(home.path(), &[]).await;
 
         let listed = manager.plugins().await;
-        assert!(!listed[0].enabled, "its command does not exist");
-        let reason = listed[0].reason.clone().unwrap_or_default();
+        assert!(!listed[0].state.is_on(), "its command does not exist");
+        let reason = listed[0].state.reason().unwrap_or_default();
         assert_ne!(reason, SWITCHED_OFF, "nobody switched it off: {reason}");
         assert!(!reason.is_empty(), "a listing says why it is not running");
         let said = manager.notices().drain();

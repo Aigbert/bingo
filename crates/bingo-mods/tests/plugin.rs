@@ -33,7 +33,7 @@ async fn an_explicit_module_is_listed_with_its_granted_runtime() {
     assert_eq!(fixture.meta["runtime"], "module");
     assert_eq!(fixture.meta["tier"], "rewrite");
     assert_eq!(fixture.meta["uses"], json!(["state"]));
-    assert_eq!(fixture.meta["enabled"], true);
+    assert_eq!(fixture.meta["state"]["kind"], "on");
     host.shutdown().await;
 }
 

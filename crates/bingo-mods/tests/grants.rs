@@ -43,8 +43,8 @@ async fn registration_can_deny_a_module_with_a_named_reason() {
         .iter()
         .find(|row| row.id == "target")
         .unwrap();
-    assert_eq!(target.meta["enabled"], false, "{target:?}");
-    let reason = target.meta["reason"].as_str().unwrap();
+    assert_eq!(target.meta["state"]["kind"], "failed", "{target:?}");
+    let reason = target.meta["state"]["why"].as_str().unwrap();
     assert!(
         reason.contains("target") && reason.contains("disabled by local policy"),
         "{reason}"
@@ -98,6 +98,18 @@ async fn a_project_model_call_requires_the_users_grant() {
         )
         .await
         .unwrap();
+        bingo_sdk::render::under_input(
+            true,
+            host.approve(bingo_sdk::Approval {
+                root: project.path().into(),
+                what: "plugin:target".into(),
+            }),
+        )
+        .await
+        .unwrap();
+        for source in &host.registry().sources.plugins {
+            source.reload().await.unwrap();
+        }
         host.open_service("fixture", std::sync::Arc::new(Echo))
             .unwrap();
         host.service_wire("fixture")
@@ -157,9 +169,9 @@ async fn module_options_are_validated_before_register_runs() {
         .iter()
         .find(|row| row.id == "target")
         .unwrap();
-    assert_eq!(row.meta["enabled"], false);
+    assert_eq!(row.meta["state"]["kind"], "failed");
     assert!(
-        row.meta["reason"].as_str().unwrap().contains("label"),
+        row.meta["state"]["why"].as_str().unwrap().contains("label"),
         "{row:?}"
     );
     host.shutdown().await;

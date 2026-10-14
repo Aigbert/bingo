@@ -152,6 +152,10 @@ impl Manager {
             )));
         }
         found.origin = old.found.origin;
+        if found.origin == PluginOrigin::Project {
+            let authority = self.host.get().and_then(|host| host.service(&APPROVALS));
+            found.state = discovery::project_state(&found, authority.as_deref());
+        }
         self.install_generation(found, Some(&old)).await?;
         if let Some(host) = self.host.get() {
             self.write_types(host).await;

@@ -21,8 +21,13 @@ impl Module {
         switched_off: bool,
     ) -> Arc<Self> {
         let admission = Admission::default();
-        let engine = if switched_off {
-            admission.refuse(SWITCHED_OFF.into());
+        let engine = if !found.state.is_on() {
+            admission.stop(found.state.clone());
+            None
+        } else if switched_off {
+            admission.stop(PluginState::Off {
+                why: SWITCHED_OFF.into(),
+            });
             None
         } else if let Some(schema) = &found.manifest.config
             && let Err(reason) = bingo_plugin_host::config::validate(schema, &config)

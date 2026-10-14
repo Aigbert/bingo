@@ -79,7 +79,7 @@ impl Manager {
                 host.clone(),
                 self.stop.clone(),
             )));
-        let found = self.directories.read(true, &self.notices);
+        let found = self.directories.read(true, &self.notices, Some(&host));
         let mut modules = Vec::new();
         for found in found.into_iter().filter(|found| {
             bingo_plugin_host::runtime::runtime_of(&found.manifest, true)
@@ -117,7 +117,11 @@ impl Manager {
                 .catalog(CatalogKind::Tools)
                 .await
                 .map_err(|e| e.to_string())?;
-            for module in self.modules() {
+            for module in self
+                .modules()
+                .into_iter()
+                .filter(|module| module.found.origin != PluginOrigin::Project)
+            {
                 if let Err(reason) = crate::types::write(&module.found.root, &events, &tools) {
                     self.notices.push(Notice::warn(
                         "MOD_TYPES",
@@ -162,6 +166,9 @@ impl Manager {
         self.limits.every_time
     }
     pub(crate) fn publish_callbacks(&self, module: Arc<Module>) {
+        if module.engine.is_none() {
+            return;
+        }
         self.callbacks.insert(
             module.found.name.clone(),
             Arc::new(crate::dollar::callback::Native {
@@ -225,11 +232,9 @@ impl PluginSource for Manager {
             .collect()
     }
     async fn registered(&self, name: &str, result: Result<PluginGrant, String>) {
-        if let Some(module) = self
-            .modules()
-            .iter()
-            .find(|module| module.found.name == name)
-        {
+        if let Some(module) = self.modules().iter().find(|module| {
+            module.found.name == name && matches!(module.admission.state(), PluginState::Pending)
+        }) {
             let denied = result.is_err();
             module.admission.finish(result);
             if let Some(testing) = self.dollar.get().and_then(|dollar| dollar.testing.as_ref()) {

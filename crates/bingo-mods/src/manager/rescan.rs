@@ -8,13 +8,21 @@ impl Manager {
         let old = self.modules();
         let (found, mut report) = self.discovered(project, &old);
         for module in &old {
-            if !found.iter().any(|found| found.name == module.found.name) {
+            let replacement = found.iter().find(|found| found.root == module.found.root);
+            let changed = replacement.is_none_or(|found| {
+                module.found != *found
+                    || (project || found.origin != PluginOrigin::Project)
+                        && self.changed(&found.root)
+            });
+            if changed {
                 self.remove_module(module).await;
-                report.removed.push(module.found.name.clone());
+                if replacement.is_none() {
+                    report.removed.push(module.found.name.clone());
+                }
             }
         }
         for found in found {
-            let previous = old.iter().find(|module| module.found.name == found.name);
+            let previous = old.iter().find(|module| module.found.root == found.root);
             if !project && found.origin == PluginOrigin::Project {
                 continue;
             }
@@ -22,7 +30,7 @@ impl Manager {
                 continue;
             }
             let name = found.name.clone();
-            match self.install_generation(found, previous).await {
+            match self.install_generation(found, None).await {
                 Ok(()) => {
                     if previous.is_some() {
                         report.reloaded.push(name);
@@ -46,7 +54,7 @@ impl Manager {
     }
     fn discovered(&self, project: bool, old: &[Arc<Module>]) -> (Vec<Found>, PluginReload) {
         let notices = Notices::default();
-        let mut found = self.directories.read(project, &notices);
+        let mut found = self.directories.read(project, &notices, self.host.get());
         let mut report = PluginReload::default();
         for notice in notices.drain() {
             report.errors.push(notice.text.clone());
@@ -59,11 +67,13 @@ impl Manager {
                 .filter(|module| module.found.origin == PluginOrigin::Project)
             {
                 if found.iter().any(|found| {
-                    found.name == module.found.name && found.origin == PluginOrigin::Explicit
+                    found.root == module.found.root && found.origin == PluginOrigin::Explicit
                 }) {
                     continue;
                 }
-                found.retain(|found| found.name != module.found.name);
+                if module.found.state.is_on() {
+                    found.retain(|found| found.name != module.found.name);
+                }
                 found.push(module.found.clone());
             }
         }

@@ -9,11 +9,8 @@ plugin protocol; it is the other code-authoring path, described below. Keys, `on
 
 ## Files and loading
 
-The user directory is `~/.bingo/plugins/<name>/`, the project layer is
-`<cwd>/.bingo/plugins/<name>/`, and `--plugin-dir <dir>` names a plugin directory
-directly (repeatable). Later layers win by directory name: user, project, then
-explicit directories in argument order. The user directory follows bingo's
-config directory. There is no separate `mods/` discovery directory.
+The user directory follows bingo's config directory: `~/.bingo/plugins/<name>/`; repository plugins live in `<cwd>/.bingo/plugins/<name>/`.
+`--plugin-dir <dir>` is repeatable. Approved project plugins override user namesakes; explicit directories win in argument order.
 A minimal `plugin.json`, in a directory named `counter`:
 
 ```json
@@ -133,11 +130,8 @@ export interface PluginState { 'counter': { calls: number } }
 
 ## Types and checks
 
-Loading a mod writes host-derived types into its `.bingo/types/`, including
-`bingo`, `bingo/testing` and `bingo-tools`, plus `.bingo/tsconfig.json`. If absent,
-a root `tsconfig.json` is created extending it; an existing one is preserved.
-After loading, run `tsc --noEmit -p <dir>/tsconfig.json` with TypeScript installed.
-The runtime strips types; it does not run the TypeScript checker.
+Loading a personal mod writes host-derived `bingo`, `bingo/testing` and `bingo-tools` types under `.bingo/types/`, plus `.bingo/tsconfig.json` and an absent root `tsconfig.json`. Repository startup leaves approved bytes unchanged.
+Run `tsc --noEmit -p <dir>/tsconfig.json` separately; the runtime strips types without checking them.
 
 - `bingo plugins validate <dir>` statically checks the module and reports events,
   calls, keys and uses. Keep event names, `$` member accesses, state keys and env
@@ -197,3 +191,9 @@ Start from the repository's `examples/plugins/` and read the adjacent tests:
 - `examples/plugins/pane` — a tool ledger, commands, pane rendering, resize and Escape.
 - `examples/plugins/ts-status` — persistent call count, status and a permission hook.
 - `examples/plugins/wordcount` — the Python external-process example, with `plugin.json` and `main.py`.
+
+## Repository approval
+
+`/plugins approve <name>` approves the current directory bytes and loads modules now; process plugins start next time. CI uses `bingo plugins approve <name>` during setup.
+A changed directory waits again. A waiting project plugin leaves the user namesake running. Approval names the canonical checkout path and lives only in user settings; `pluginTrust` separately limits authority.
+Fingerprints cover paths and bytes, capped at 8 MiB or 2,000 entries. Escaping/looping symlinks and special files cannot be approved. Repository `pluginDirs` is ignored; personal settings and explicit `--plugin-dir` still work. Project shell hooks are outside this mechanism.

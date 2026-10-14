@@ -379,7 +379,7 @@ mod tests {
                 entries: vec![bingo_sdk::CatalogEntry {
                     id: "caller".into(),
                     label: "caller".into(),
-                    meta: json!({"enabled":true,"tier":"rewrite","uses":["kv"]}),
+                    meta: json!({"state":{"kind":"on"},"tier":"rewrite","uses":["kv"]}),
                 }],
             })
         });
@@ -418,7 +418,7 @@ mod tests {
                 entries: vec![bingo_sdk::CatalogEntry {
                     id: "caller".into(),
                     label: "caller".into(),
-                    meta: json!({"enabled":true,"tier":"rewrite","uses":[]}),
+                    meta: json!({"state":{"kind":"on"},"tier":"rewrite","uses":[]}),
                 }],
             })
         });

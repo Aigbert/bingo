@@ -9,7 +9,8 @@ struct Descriptor {
 }
 pub struct Registration {
     pub name: String,
-    origin: PluginOrigin,
+    pub origin: PluginOrigin,
+    pub root: std::path::PathBuf,
     runtime: PluginRuntime,
     descriptor: RwLock<Descriptor>,
     pub admission: Admission,
@@ -18,6 +19,7 @@ impl Registration {
     pub fn new(found: &Found, runtime: PluginRuntime) -> Self {
         Self {
             name: found.name.clone(),
+            root: found.root.clone(),
             origin: found.origin,
             runtime,
             descriptor: RwLock::new(Descriptor {
@@ -47,21 +49,24 @@ impl Registration {
         })
     }
     pub fn status(&self, from: &str) -> PluginStatus {
-        let (grant, reason) = match self.admission.decision() {
-            Ok(Some(grant)) => (Some(grant), None),
-            Ok(None) => (None, Some("registration pending".into())),
-            Err(reason) => (None, Some(reason)),
-        };
+        let grant = self.admission.decision().ok().flatten();
         PluginStatus {
-            id: self.name.clone(),
+            id: if self.origin == PluginOrigin::Project
+                && matches!(
+                    self.admission.state(),
+                    PluginState::Waiting { .. } | PluginState::Failed { .. }
+                ) {
+                format!("plugins:{}", self.name)
+            } else {
+                self.name.clone()
+            },
             version: self
                 .descriptor
                 .read()
                 .unwrap_or_else(|e| e.into_inner())
                 .version
                 .clone(),
-            enabled: grant.is_some(),
-            reason,
+            state: self.admission.state(),
             from: from.into(),
             execution: grant.map(|grant| PluginExecution {
                 origin: self.origin,

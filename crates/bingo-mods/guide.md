@@ -12,7 +12,7 @@ run under Node through the TypeScript SDK with a separate `entry` manifest.
 `examples/plugins/ts-status` and its plugin-kit tests exercise both transports.
 
 The runtime reads user plugins, project `.bingo/plugins`, then explicit
-`--plugin-dir` directories; the last directory for a name wins. Disabling
+`--plugin-dir` directories; approved project plugins override user namesakes. A repository plugin waits for `/plugins approve <name>` (or `bingo plugins approve <name>` in CI); changed bytes wait again, and a waiting plugin shadows nothing. Repository `pluginDirs` is ignored. Disabling
 `bingo.mods` refuses module plugins. Listings name `native`, `process` or
 `module`; the live plugin catalogue carries the granted tier, nouns and refusal.
 

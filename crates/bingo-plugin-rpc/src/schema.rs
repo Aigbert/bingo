@@ -18,6 +18,8 @@ use crate::wire::{METHODS, NOTIFICATIONS, PROTOCOL, Ref, schema_of};
 /// Types the method table does not name. The manifest is the first thing a
 /// plugin author writes and the last thing the wire mentions.
 static UNNAMED: &[Ref] = &[
+    schema_of::<bingo_sdk::PluginState>,
+    schema_of::<bingo_sdk::Approval>,
     schema_of::<Manifest>,
     schema_of::<bingo_sdk::component::Props>,
     schema_of::<bingo_sdk::render::RenderRequest>,

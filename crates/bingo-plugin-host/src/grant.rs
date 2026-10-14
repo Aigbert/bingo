@@ -65,19 +65,13 @@ pub async fn granted(host: &bingo_sdk::HostHandle, plugin: &str) -> Result<Grant
         .into_iter()
         .find(|entry| entry.id == plugin)
         .ok_or_else(|| format!("{plugin}: plugin is not registered"))?;
-    if entry
-        .meta
-        .get("enabled")
-        .and_then(serde_json::Value::as_bool)
-        != Some(true)
-    {
+    let state: bingo_sdk::PluginState =
+        serde_json::from_value(entry.meta.get("state").cloned().unwrap_or_default())
+            .map_err(|_| format!("{plugin}: plugin has no admission state"))?;
+    if !state.is_on() {
         return Err(format!(
             "{plugin}: {}",
-            entry
-                .meta
-                .get("reason")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("plugin is not enabled")
+            state.reason().unwrap_or("plugin is not enabled")
         ));
     }
     serde_json::from_value(entry.meta).map_err(|_| format!("{plugin}: plugin has no granted nouns"))

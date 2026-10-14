@@ -67,6 +67,7 @@ static MANIFEST: PluginManifest = PluginManifest {
     ],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[],
         keys: &[("mods", Merge::ByName)],
         schema: || schemars::schema_for!(crate::config::Settings),
     }),

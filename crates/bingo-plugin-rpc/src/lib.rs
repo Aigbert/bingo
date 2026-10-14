@@ -93,9 +93,10 @@ static MANIFEST: PluginManifest = PluginManifest {
     ],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[],
         keys: &[
             ("plugins", Merge::ByName),
-            ("pluginDirs", Merge::Accumulate),
+            ("pluginDirs", Merge::PersonalAccumulate),
         ],
         schema,
     }),
@@ -244,7 +245,7 @@ mod tests {
             claim.keys,
             [
                 ("plugins", Merge::ByName),
-                ("pluginDirs", Merge::Accumulate)
+                ("pluginDirs", Merge::PersonalAccumulate)
             ]
         );
     }

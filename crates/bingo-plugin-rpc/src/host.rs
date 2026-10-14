@@ -182,6 +182,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_plugin_cannot_approve_repository_code_through_the_bridge() {
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_approve(|_| async { panic!("plugin reached the approval writer") });
+        let home = tempfile::tempdir().unwrap();
+        let server = Server::new(
+            "stub",
+            host.handle(),
+            Arc::new(NoServices),
+            crate::state::Store::new(home.path(), "stub"),
+        );
+        server.initialize(&crate::wire::capabilities());
+        let error = server
+            .answer("host/approve", json!({"root":"repo", "what":"plugin:stub"}))
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, METHOD_NOT_FOUND);
+    }
+
+    #[tokio::test]
     async fn model_completion_requires_the_catalogues_granted_noun() {
         let host = bingo_sdk::testing::TestHost::default();
         host.on_catalog(|kind| async move {
@@ -191,7 +210,7 @@ mod tests {
                 entries: vec![CatalogEntry {
                     id: "stub".into(),
                     label: "stub".into(),
-                    meta: json!({"enabled":true, "tier":"rewrite", "uses":[]}),
+                    meta: json!({"state":{"kind":"on"}, "tier":"rewrite", "uses":[]}),
                 }],
             })
         });
@@ -224,7 +243,7 @@ mod tests {
                 entries: vec![CatalogEntry {
                     id: "stub".into(),
                     label: "stub".into(),
-                    meta: json!({"enabled":true, "tier":"rewrite", "uses":[]}),
+                    meta: json!({"state":{"kind":"on"}, "tier":"rewrite", "uses":[]}),
                 }],
             })
         });

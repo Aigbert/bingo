@@ -82,7 +82,7 @@ impl callback::Executor for Callback {
 fn host() -> testing::TestHost {
     let host = testing::TestHost::default();
     host.on_notice(|_, _, _| async { Ok(()) });
-    host.on_catalog(|kind| async move {Ok(Catalog{kind,entries:if kind == CatalogKind::Plugins {vec![CatalogEntry{id:"fixture".into(),label:"fixture".into(),meta:json!({"enabled":true,"tier":"rewrite","uses":ROWS.iter().map(|row|row.noun).collect::<Vec<_>>()})}]}else{Vec::new()}})});
+    host.on_catalog(|kind| async move {Ok(Catalog{kind,entries:if kind == CatalogKind::Plugins {vec![CatalogEntry{id:"fixture".into(),label:"fixture".into(),meta:json!({"state":{"kind":"on"},"tier":"rewrite","uses":ROWS.iter().map(|row|row.noun).collect::<Vec<_>>()})}]}else{Vec::new()}})});
     host.on_open(|_,_,_| async {Ok(Attachment{session:SessionId::from_raw("s"),snapshot:SessionState::new(serde_json::from_value(json!({"id":"s","cwd":".","createdAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-01T00:00:00Z","usage":Usage::default()})).unwrap()),history:None,events:Box::pin(futures::stream::pending()),handle:SessionHandle(Arc::new(Port))})});
     host.on_complete(|_, _, _| async {
         Ok(vec![ModelEvent::TextDelta {

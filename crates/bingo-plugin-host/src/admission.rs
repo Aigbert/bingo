@@ -10,10 +10,23 @@ enum State {
     Checking(PluginGrant),
     Allowed(PluginGrant),
     Refused(Option<PluginGrant>, String),
+    Stopped(PluginState),
 }
 #[derive(Default)]
 pub struct Admission(Mutex<State>);
 impl Admission {
+    pub fn stop(&self, state: PluginState) {
+        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = State::Stopped(state);
+    }
+    pub fn state(&self) -> PluginState {
+        match &*self.0.lock().unwrap_or_else(|e| e.into_inner()) {
+            State::Pending | State::Checking(_) => PluginState::Pending,
+            State::Allowed(_) => PluginState::On,
+            State::Refused(_, why) => PluginState::Failed { why: why.clone() },
+            State::Stopped(state) => state.clone(),
+        }
+    }
+
     pub fn refuse(&self, reason: String) {
         self.finish(Err(reason));
     }
@@ -49,7 +62,7 @@ impl Admission {
     }
     pub fn decision(&self) -> Result<Option<PluginGrant>, String> {
         match &*self.0.lock().unwrap_or_else(|e| e.into_inner()) {
-            State::Pending | State::Checking(_) => Ok(None),
+            State::Pending | State::Checking(_) | State::Stopped(_) => Ok(None),
             State::Allowed(grant) => Ok(Some(grant.clone())),
             State::Refused(_, reason) => Err(reason.clone()),
         }
@@ -59,7 +72,7 @@ impl Admission {
         let previous = match &*state {
             State::Checking(grant) | State::Allowed(grant) => Some(grant.clone()),
             State::Refused(grant, _) => grant.clone(),
-            State::Pending => None,
+            State::Pending | State::Stopped(_) => None,
         };
         *state = match result {
             Ok(grant) => State::Allowed(grant),
@@ -73,22 +86,15 @@ impl Admission {
         )
     }
     pub fn status(&self, found: &Found, runtime: PluginRuntime, from: &str) -> PluginStatus {
-        let state = self.0.lock().unwrap_or_else(|e| e.into_inner());
-        let (enabled, grant, reason) = match &*state {
-            State::Pending => (false, None, Some("registration pending".into())),
-            State::Checking(grant) => (
-                false,
-                Some(grant.clone()),
-                Some("registration pending".into()),
-            ),
-            State::Allowed(grant) => (true, Some(grant.clone()), None),
-            State::Refused(grant, reason) => (false, grant.clone(), Some(reason.clone())),
-        };
+        let grant = self.decision().ok().flatten();
         PluginStatus {
-            id: found.name.clone(),
+            id: if found.origin == PluginOrigin::Project && !found.state.is_on() {
+                format!("plugins:{}", found.name)
+            } else {
+                found.name.clone()
+            },
             version: found.manifest.version.clone(),
-            enabled,
-            reason,
+            state: self.state(),
             from: from.into(),
             execution: grant.map(|grant| PluginExecution {
                 origin: found.origin,

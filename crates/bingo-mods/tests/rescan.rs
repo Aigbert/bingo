@@ -57,6 +57,17 @@ impl Running {
     fn project(&self) -> PathBuf {
         self.project.path().join(".bingo/plugins")
     }
+    async fn approve(&self, name: &str) {
+        bingo_sdk::render::under_input(
+            true,
+            self.host.approve(Approval {
+                root: self.project.path().into(),
+                what: format!("plugin:{name}"),
+            }),
+        )
+        .await
+        .unwrap();
+    }
     async fn reload(&mut self) -> String {
         let intent = IntentId::mint();
         self.attachment.handle.submit(
@@ -125,13 +136,14 @@ async fn explicit_reload_adds_removes_replaces_and_isolates_broken_mods() {
     let mut run = Running::new().await;
     fixture(&run.user(), "user", SOURCE);
     let project = fixture(&run.project(), "project", SOURCE);
+    run.approve("project").await;
     let answer = run.reload().await;
     assert!(
         answer.contains("added") && answer.contains("project"),
         "{answer}"
     );
-    assert!(run.listed("user").await.unwrap()["enabled"] == true);
-    assert!(run.listed("project").await.unwrap()["enabled"] == true);
+    assert!(run.listed("user").await.unwrap()["state"]["kind"] == "on");
+    assert!(run.listed("project").await.unwrap()["state"]["kind"] == "on");
     assert!(run.reload().await.contains("nothing changed"));
     std::fs::write(project.join("main.ts"), format!("{SOURCE}\n// changed")).unwrap();
     fixture(
@@ -139,13 +151,15 @@ async fn explicit_reload_adds_removes_replaces_and_isolates_broken_mods() {
         "broken",
         "export function register( { syntax error",
     );
+    run.approve("project").await;
+    run.approve("broken").await;
     let answer = run.reload().await;
     assert!(
         answer.contains("1 reloaded") && answer.contains("broken") && answer.contains("errors:"),
         "{answer}"
     );
-    assert!(run.listed("user").await.unwrap()["enabled"] == true);
-    assert!(run.listed("broken").await.unwrap()["enabled"] == false);
+    assert!(run.listed("user").await.unwrap()["state"]["kind"] == "on");
+    assert!(run.listed("broken").await.unwrap()["state"]["kind"] == "failed");
     let store =
         bingo_plugin_host::state::Store::new(&Env::rooted(run.home.path()).data_dir, "project");
     assert_eq!(
@@ -178,6 +192,7 @@ async fn explicit_reload_adds_removes_replaces_and_isolates_broken_mods() {
 async fn user_add_edit_remove_are_watched_and_project_edits_wait() {
     let mut run = Running::new().await;
     let project = fixture(&run.project(), "project", SOURCE);
+    run.approve("project").await;
     run.reload().await;
     std::fs::write(
         project.join("main.ts"),
@@ -187,7 +202,7 @@ async fn user_add_edit_remove_are_watched_and_project_edits_wait() {
     fixture(&run.project(), "later-project", SOURCE);
     let user = fixture(&run.user(), "watched", SOURCE);
     run.notice("PLUGIN_RELOADED", "watched").await;
-    assert!(run.listed("watched").await.unwrap()["enabled"] == true);
+    assert!(run.listed("watched").await.unwrap()["state"]["kind"] == "on");
     assert!(run.listed("later-project").await.is_none());
     let shadow = fixture(&run.project(), "watched", SOURCE);
     std::fs::write(user.join("main.ts"), format!("{SOURCE}\n// watched edit")).unwrap();
@@ -215,14 +230,51 @@ async fn refused_generation_stays_refused_after_reload() {
     );
     run.reload().await;
     let target = fixture(&run.project(), "target", SOURCE);
+    run.approve("target").await;
+    run.approve("target").await;
     assert!(run.reload().await.contains("refused by policy"));
-    assert!(run.listed("target").await.unwrap()["enabled"] == false);
+    assert!(run.listed("target").await.unwrap()["state"]["kind"] == "failed");
     std::fs::write(
         target.join("main.ts"),
         format!("{SOURCE}\n// still refused"),
     )
     .unwrap();
+    run.approve("target").await;
     assert!(run.reload().await.contains("refused by policy"));
-    assert!(run.listed("target").await.unwrap()["enabled"] == false);
+    assert!(run.listed("target").await.unwrap()["state"]["kind"] == "failed");
+    run.host.shutdown().await;
+}
+
+#[tokio::test]
+async fn waiting_project_cannot_shadow_user_and_edits_need_a_fresh_yes() {
+    let mut run = Running::new().await;
+    fixture(&run.user(), "same", SOURCE);
+    let project = fixture(
+        &run.project(),
+        "same",
+        "throw new Error('repository code executed');",
+    );
+    run.reload().await;
+    assert_eq!(run.listed("same").await.unwrap()["origin"], "user");
+    assert_eq!(
+        run.listed("plugins:same").await.unwrap()["state"],
+        json!({"kind":"waiting","changed":false})
+    );
+    // A successfully loaded generation replaces the user's only after approval.
+    std::fs::write(project.join("main.ts"), SOURCE).unwrap();
+    run.approve("same").await;
+    run.reload().await;
+    assert_eq!(run.listed("same").await.unwrap()["origin"], "project");
+    std::fs::write(
+        project.join("main.ts"),
+        "throw new Error('changed code executed');",
+    )
+    .unwrap();
+    run.reload().await;
+    assert_eq!(run.listed("same").await.unwrap()["origin"], "user");
+    assert_eq!(
+        run.listed("plugins:same").await.unwrap()["state"],
+        json!({"kind":"waiting","changed":true})
+    );
     run.host.shutdown().await;
 }
