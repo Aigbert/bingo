@@ -26,7 +26,10 @@ fn pull(run: &mut Run, now: crate::clock::Now) {
         }),
     };
     run.ui.placed.pulled.request(&key);
-    run.reply(Reply::Rendered(run.ui.placed.pulled.epoch(), key, Box::new(view)), &mut None);
+    run.reply(
+        Reply::Rendered(run.ui.placed.pulled.epoch(), key, Box::new(view)),
+        &mut None,
+    );
 }
 
 #[tokio::test]

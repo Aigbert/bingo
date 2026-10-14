@@ -613,8 +613,7 @@ impl Run {
         if let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone()) {
             palette::surface_action(self, action);
         }
-        // Plugin reload/enable/disable do not yet emit CatalogChanged. Keep this
-        // one refresh until they do; other catalogues follow their change events.
+        // Acknowledgements refresh the palette alongside asynchronous changes.
         self.fetch_catalogue("plugins", CatalogKind::Plugins);
         if result.get("surface").is_none()
             && let Some(message) = result.get("message").and_then(Value::as_str)

@@ -94,7 +94,10 @@ async fn a_palette_render_finishing_after_ctrl_c_is_retired() {
     run.ui.placed.pulled = Default::default();
     run.terminal_event(Term::Key(ctrl('c')));
     assert!(!crate::palette::active(&run.ui));
-    run.reply(Reply::Rendered(run.ui.placed.pulled.epoch(), key, Box::new(view)), &mut None);
+    run.reply(
+        Reply::Rendered(run.ui.placed.pulled.epoch(), key, Box::new(view)),
+        &mut None,
+    );
     assert_eq!(
         session.submissions().len(),
         1,
