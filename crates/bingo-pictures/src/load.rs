@@ -125,7 +125,8 @@ async fn fetch(url: &str) -> Result<Vec<u8>, PictureError> {
 fn client() -> Result<reqwest::Client, PictureError> {
     bingo_http::client(bingo_http::Bounds {
         connect: bingo_http::CONNECT_TIMEOUT,
-        redirects: bingo_http::Redirects::SameOrigin,
+        // Image URLs redirect to a CDN; this client carries no credentials.
+        redirects: bingo_http::Redirects::FollowAny,
         call: Some(TIMEOUT),
     })
     .map_err(|e| shorn(e.0))
@@ -283,6 +284,30 @@ mod tests {
         let image = load(&source, None).await.expect("a picture");
         assert_eq!(image.media_type, "image/jpeg");
         assert_eq!(decoded(&image), bytes);
+    }
+
+    #[tokio::test]
+    async fn a_cross_origin_redirect_is_followed_and_decoded() {
+        let link = MockServer::start().await;
+        let cdn = MockServer::start().await;
+        let bytes = drawn(9, 4, ImageFormat::Png);
+        serving(
+            &cdn,
+            ResponseTemplate::new(200).set_body_bytes(bytes.clone()),
+        )
+        .await;
+        let source = serving(
+            &link,
+            ResponseTemplate::new(302).insert_header("location", format!("{}/shot", cdn.uri())),
+        )
+        .await;
+
+        let image = load(&source, None).await.expect("the redirected picture");
+        assert_eq!(image.media_type, "image/png");
+        assert_eq!(decoded(&image), bytes);
+        assert_eq!(png_size(&decoded(&image)), Some((9, 4)));
+        assert_eq!(asked(&link).await, 1);
+        assert_eq!(asked(&cdn).await, 1);
     }
 
     /// The `Content-Type` is not the evidence either: a server calling a TIFF

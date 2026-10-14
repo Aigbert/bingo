@@ -39,7 +39,7 @@ Add, re-address, check and remove named providers without restarting. Sessions k
 - Round 4 binds configured keys too: environment keys use the default or their BASE_URL variable; settings keys use addresses from their own or more trusted layers. One request-time guard also applies after readdressing. Round 5 drops directly embedded keys on every readdress because they have no settings source to re-read. SDK provenance is an origin enum, so user/repository/explicit cannot contradict each other.
 - Boot, migration and provider construction share address resolution, including environment URLs and blank-as-unset. Invalid origins retain a refusal, never a binding or credential write. Canonical tests cover case, userinfo, IPv6 and trailing dots (distinct, failing closed).
 - Repository-controlled sign-in first asks for destination confirmation showing canonical origin and source file, before paste, browser or device flows. Cancellation writes nothing and sends no HTTP. Same-origin rebinding retains provenance; a changed origin gets its new source. Reserved-name notices use the declaring manifest even when disabled; composition-only reservations name the binary.
-- Round 5 fails closed on HTTP redirects: scheme, host and effective port must match the initial request, with the existing ten-hop bound. Only credential-free page fetching and public release downloads opt into cross-origin redirects; Brave search keeps a separate same-origin client. Same-origin OAuth 307 bodies still replay.
+- Round 5 fails closed on HTTP redirects: scheme, host and effective port must match the initial request, with the existing ten-hop bound. Only credential-free page fetching, image loading and public release downloads opt into cross-origin redirects; Brave search keeps a separate same-origin client. Same-origin OAuth 307 bodies still replay.
 - Every readdress discards the configured key and resolves current settings through the existing trust/origin policy. The settings writer returns the document it just persisted, replacing the boot user-layer snapshot without a second read race; only the owning family's values cross the SDK boundary. A→B→A cannot revive a removed key, and same-origin edits pick up newly configured keys.
 - OAuth refresh compares the complete stored entry (credential, owner, issuer origin and resource origin) under the shared lock before replacement or expiry deletion. A late response cannot overwrite or remove a newer sign-in. This is process-local compare-and-set, consistent with the store's existing concurrency boundary.
 - Follow-ups: replacing `default_cleared` with mutable settings affects selection and approval consumers (>40 lines). SDK argument secrecy also needs declaration access in history/queue readers plus constructors/wire fixtures (>40 lines). Defer both optional cleanups; retain tested redaction and cleared-default behavior.
@@ -220,3 +220,20 @@ its refresh persistence methods now live in store.rs. Check, Clippy, the full
 workspace tests and discipline passed again after that structural correction.
 No dependencies or allowlists changed. Native-only review: earlier Windows and
 TUI-smoke records stand. Final `cargo clean` follows this verification commit.
+
+## Verified — 2026-10-15 (image redirect follow-up)
+
+Image loading also opts into bounded cross-origin redirects: it attaches no
+credentials. Grep for request-header setters, authorization, cookies and API-key
+headers in load.rs found no matches. A two-server wiremock 302 regression failed
+with `cross-origin redirect refused` before the fix, then followed and decoded
+the expected PNG after it. Provider environment was unset; fixtures were local.
+
+```text
+RUST_TEST_THREADS=4 cargo test -p bingo-pictures --locked => 69 passed, 0 failed
+cargo fmt --all -- --check => exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings => exit 0
+bash scripts/check_discipline.sh => discipline ok (advisory warnings)
+```
+
+Final `cargo clean` follows this commit.
