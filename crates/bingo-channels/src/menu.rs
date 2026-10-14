@@ -11,7 +11,7 @@ pub fn entries(catalog: &Catalog, mapped: Vec<MenuEntry>) -> (Vec<MenuEntry>, bo
     let mut entries: Vec<_> = catalog
         .entries
         .iter()
-        .filter(|e| e.meta["hidden"] != true)
+        .filter(|e| e.meta["hidden"] != true && e.meta["family"] != "terminal")
         .map(|e| MenuEntry {
             name: e.id.trim_start_matches('/').into(),
             description: e.label.clone(),
@@ -178,5 +178,19 @@ mod publish_tests {
             ["new", "stop"]
         );
         job.abort();
+    }
+}
+
+#[cfg(test)]
+mod terminal_commands {
+    use super::*;
+    #[test]
+    fn terminal_commands_are_not_published_to_chat() {
+        let catalog = Catalog { kind: CatalogKind::Commands, entries: vec![
+            bingo_sdk::CatalogEntry { id: "help".into(), label: "keys".into(), meta: serde_json::json!({"family":"terminal"}) },
+            bingo_sdk::CatalogEntry { id: "status".into(), label: "status".into(), meta: serde_json::json!({"family":"session"}) },
+        ] };
+        let (menu, _) = entries(&catalog, vec![]);
+        assert_eq!(menu.iter().map(|entry| entry.name.as_str()).collect::<Vec<_>>(), ["status"]);
     }
 }

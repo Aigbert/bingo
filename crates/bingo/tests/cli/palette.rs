@@ -43,5 +43,5 @@ fn palette_commands_return_client_actions_as_clean_ndjson_without_a_turn() {
         PATIENCE,
     );
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
-    assert!(stdout(&out).is_empty(), "{}", stdout(&out));
+    assert_eq!(stdout(&out).trim(), "/help is terminal only.");
 }

@@ -107,6 +107,8 @@ pub enum CommandOutcome {
     /// A client interprets only actions it supports; the host does not dispatch them.
     Surface {
         action: crate::Action,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fallback: Option<String>,
     },
     /// A site key chose an answer; the surface decides whether to send it.
     Answer {
@@ -300,7 +302,7 @@ mod surface_contract {
     use super::*;
     #[test]
     fn a_client_action_round_trips_without_host_dispatch() {
-        let wire = serde_json::json!({"kind":"surface","action":{"name":"client","args":{"handler":"one"}}});
+        let wire = serde_json::json!({"kind":"surface","action":{"name":"client","args":{"handler":"one"}},"fallback":"This command is terminal only."});
         let outcome: CommandOutcome = serde_json::from_value(wire.clone()).unwrap();
         assert_eq!(serde_json::to_value(outcome).unwrap(), wire);
     }

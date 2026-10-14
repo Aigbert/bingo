@@ -16,7 +16,7 @@ impl Command for Open {
             .into(),
             args: ArgSpec::None,
             instant: true,
-            family: "session".into(),
+            family: "terminal".into(),
             hidden: false,
             keys: if self.0 == "resume" {
                 vec!["ctrl+r".into()]
@@ -32,6 +32,7 @@ impl Command for Open {
             json!({"open":if self.0=="help"{"keys"}else{"sessions"}})
         };
         Ok(CommandOutcome::Surface {
+            fallback: Some(format!("/{} is terminal only.", self.0)),
             action: Action {
                 name: "Palette".into(),
                 args: value,
@@ -110,7 +111,7 @@ fn surface(props: &PaletteProps, operation: Value) -> Result<CommandOutcome, Ker
         return Ok(CommandOutcome::Handled { handled: false });
     }
     action.args["value"] = operation;
-    Ok(CommandOutcome::Surface { action })
+    Ok(CommandOutcome::Surface { action, fallback: None })
 }
 
 fn activate(target: Target, props: &PaletteProps) -> Value {

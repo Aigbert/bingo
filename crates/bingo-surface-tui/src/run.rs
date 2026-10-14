@@ -613,7 +613,8 @@ impl Run {
         if result.get("handled").is_none() {
             self.fetch_catalogs();
         }
-        if let Some(message) = result.get("message").and_then(Value::as_str) {
+        if result.get("surface").is_none()
+            && let Some(message) = result.get("message").and_then(Value::as_str) {
             self.ui
                 .notify(Level::Info, message.to_string(), Instant::now());
         }

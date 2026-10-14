@@ -130,7 +130,7 @@ impl Fixture {
             .await
             .unwrap()
         {
-            CommandOutcome::Surface { action } => result(ui, &tree, &action, now),
+            CommandOutcome::Surface { action, .. } => result(ui, &tree, &action, now),
             CommandOutcome::Handled { handled: false } => {
                 crate::input::palette_edit(ui, &tree, key, now)
             }
