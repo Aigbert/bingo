@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn command_hooks_use_the_command_field_and_text_answers() {
         let input = CommandRun {
-                surface: None,
+            surface: None,
             name: "inspect".into(),
             args: "".into(),
         };

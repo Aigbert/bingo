@@ -80,11 +80,9 @@ async fn status_opens_updates_dispatches_and_closes_over_rpc() {
         .await
         .unwrap();
     let outcome = key(&mut attachment, &tree, "enter").await;
-    assert!(
-        serde_json::to_value(outcome)
-            .unwrap()
-            .to_string()
-            .contains("usage: /rename <title>")
+    assert_eq!(
+        serde_json::to_value(outcome).unwrap()["result"]["surface"],
+        json!({"name":"Composer","args":{"text":"/rename "}})
     );
     assert!(
         !slot::placed(&attachment.snapshot)
@@ -191,14 +189,27 @@ async fn an_outside_mod_can_wrap_or_replace_the_status_tree() {
 async fn noninteractive_callers_keep_text_status_on_a_shared_host() {
     let mut server = Server::spawn(r#"{"responses":[]}"#);
     let host = ready(&mut server).await;
-    let mut attachment = host.open(create(server.cwd()), who(), OpenOptions::default()).await.unwrap();
+    let mut attachment = host
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
     for surface in ["channels", "print", "rpc"] {
         let intent = IntentId::mint();
-        attachment.handle.submit(intent.clone(), Input::text("/status", Origin::surface(surface)));
+        attachment.handle.submit(
+            intent.clone(),
+            Input::text("/status", Origin::surface(surface)),
+        );
         let outcome = ack_for(&mut attachment, &intent).await;
         let value = serde_json::to_value(outcome).unwrap();
-        assert_eq!(value["result"]["view"]["kind"], "keyValue", "{surface}: {value}");
-        assert!(!slot::placed(&attachment.snapshot).iter().any(|p| p.plugin == "bingo.mod.status"));
+        assert_eq!(
+            value["result"]["view"]["kind"], "keyValue",
+            "{surface}: {value}"
+        );
+        assert!(
+            !slot::placed(&attachment.snapshot)
+                .iter()
+                .any(|p| p.plugin == "bingo.mod.status")
+        );
     }
     host.shutdown().await.unwrap();
     assert!(server.child.wait().await.unwrap().success());

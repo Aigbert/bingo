@@ -8,7 +8,7 @@ use crate::{
     tree::Tree,
     ui::{Open, Ui},
 };
-pub use actions::{composer, result};
+pub use actions::result;
 use bingo_sdk::{
     component::{BrowseProps, Props},
     *,

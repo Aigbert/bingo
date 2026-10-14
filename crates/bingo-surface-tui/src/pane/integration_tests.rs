@@ -302,6 +302,13 @@ fn escape_keeps_an_ordinary_panes_close_behavior_during_a_turn() {
     state.apply(&frame(1, started("running")));
     let (mut ui, now) = scene();
     ui.sync_panes(&state);
-    let effects = crate::input::on_key(&mut ui, &solo(&state), KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE), now);
-    assert!(matches!(&effects[..], [Effect::Submit(Input::Action { action })] if action.args["event"] == "close"));
+    let effects = crate::input::on_key(
+        &mut ui,
+        &solo(&state),
+        KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+        now,
+    );
+    assert!(
+        matches!(&effects[..], [Effect::Submit(Input::Action { action, .. })] if action.args["event"] == "close")
+    );
 }

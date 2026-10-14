@@ -59,15 +59,3 @@ fn selected_item<'a>(ui: &Ui, tree: &'a Tree, value: &serde_json::Value) -> Opti
         .find(|t| Some(&t.id) == props.selected.as_ref())?;
     state.transcript.items().get(turn.first).map(AsRef::as_ref)
 }
-pub fn composer(ui: &mut Ui, text: &str, now: Now) {
-    if ui.composer.is_empty() {
-        ui.composer.set(text);
-        ui.edited();
-    } else {
-        ui.notify(
-            Level::Info,
-            "Rewound prompt was not inserted; your draft was kept",
-            now.instant,
-        );
-    }
-}

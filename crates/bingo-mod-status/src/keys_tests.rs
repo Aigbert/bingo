@@ -78,7 +78,11 @@ async fn enter_submits_each_rows_command_after_removing_the_card() {
     let handler = keys::Handler(selections.clone());
     for row in rows::rows(&(&state).into(), &[], &[], None)
         .into_iter()
-        .filter(|r| r.command.is_some())
+        .filter(|r| {
+            r.command
+                .as_deref()
+                .is_some_and(|command| !matches!(command, "rename" | "permission"))
+        })
     {
         selections
             .lock()
@@ -113,5 +117,43 @@ async fn enter_submits_each_rows_command_after_removing_the_card() {
                 ..
             }
         )));
+    }
+}
+
+#[tokio::test]
+async fn editable_rows_prefill_instead_of_submitting_bare_commands() {
+    let Event::SessionUpdated { summary } = serde_json::from_str(include_str!(
+        "../../bingo-sdk/fixtures/record/event/sessionUpdated.json"
+    ))
+    .unwrap() else {
+        panic!("summary")
+    };
+    let state = SessionState::new(summary);
+    let inputs = Arc::new(Mutex::new(Vec::new()));
+    let host = host(state.clone(), inputs.clone());
+    let cx = CommandContext {
+        session: state.summary.id.clone(),
+        cwd: "/unused".into(),
+        host: host.handle(),
+        cancel: Default::default(),
+    };
+    let selections = Selections::default();
+    for (label, text) in [("session", "/rename "), ("permission", "/permission ")] {
+        selections
+            .lock()
+            .unwrap()
+            .insert(cx.session.clone(), label.into());
+        let outcome = keys::Handler(selections.clone()).run(&json!({"handler":"status","event":"press","value":{"key":"enter"},"rows":rows::rows(&(&state).into(), &[], &[], None)}).to_string(), &cx).await.unwrap();
+        assert_eq!(
+            outcome,
+            CommandOutcome::Surface {
+                action: Action {
+                    name: "Composer".into(),
+                    args: json!({"text":text})
+                },
+                fallback: Some(text.into())
+            }
+        );
+        assert!(inputs.lock().unwrap().is_empty());
     }
 }

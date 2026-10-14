@@ -22,8 +22,12 @@ impl Interceptor for Open {
         input: Value,
         next: Next<'_, Value, Value>,
     ) -> Result<Value, KernelError> {
-        let command: catalogue::CommandRun = serde_json::from_value(input.clone()).map_err(error)?;
-        if !matches!(command.surface.as_deref(), Some("tui" | "terminal" | "desktop")) {
+        let command: catalogue::CommandRun =
+            serde_json::from_value(input.clone()).map_err(error)?;
+        if !matches!(
+            command.surface.as_deref(),
+            Some("tui" | "terminal" | "desktop")
+        ) {
             return next.run(input).await;
         }
         self.0

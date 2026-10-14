@@ -67,6 +67,16 @@ async fn enter(
         .and_then(|r| r.command.as_ref());
     if let Some(command) = command {
         crate::command::close(&cx.host, &cx.session, selections).await?;
+        if matches!(command.as_str(), "rename" | "permission") {
+            let text = format!("/{command} ");
+            return Ok(CommandOutcome::Surface {
+                action: Action {
+                    name: "Composer".into(),
+                    args: serde_json::json!({"text":text}),
+                },
+                fallback: Some(text),
+            });
+        }
         return crate::dispatch::run(command, cx).await;
     }
     Ok(CommandOutcome::Handled { handled: true })

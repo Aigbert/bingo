@@ -331,3 +331,16 @@ async fn queued_actions_do_not_block_first_pane_or_status_drawings() {
         "new callbacks"
     );
 }
+
+#[tokio::test]
+async fn a_surface_action_prefills_the_composer_without_submitting() {
+    let now = still(scene().1);
+    let session = Arc::new(TestSession::default());
+    let mut run = tests::idle_in(state(), session.clone(), now.instant);
+    for text in ["/rename ", "/permission "] {
+        run.ui.composer.set("");
+        run.applied(&json!({"surface":{"name":"Composer","args":{"text":text}}}));
+        assert_eq!(run.ui.composer.text(), text);
+        assert!(session.submissions().is_empty());
+    }
+}

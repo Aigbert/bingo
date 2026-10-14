@@ -183,7 +183,10 @@ impl Invocation {
             Input::Action { .. } => Origin::default(),
         };
         Self {
-            surface: match input { Input::Text { origin, .. } => Some(origin.surface.clone()), Input::Action { .. } => None },
+            surface: match input {
+                Input::Text { origin, .. } => Some(origin.surface.clone()),
+                Input::Action { .. } => None,
+            },
             line: bingo_sdk::command::recorded_line(&parsed.typed()).into(),
             origin: Origin {
                 voice: Some(bingo_sdk::Voice::Quiet),
@@ -331,7 +334,9 @@ impl Commands {
         let pressed = vouched.is_some();
         let own = Arc::new(AtomicBool::new(false));
         let input = bingo_sdk::catalogue::CommandRun {
-            name: command.spec().name, args, surface: invocation.surface.clone(),
+            name: command.spec().name,
+            args,
+            surface: invocation.surface.clone(),
         };
         self.inflight.insert(
             intent.clone(),

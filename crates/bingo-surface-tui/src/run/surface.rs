@@ -5,8 +5,8 @@ pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
     match action.name.as_str() {
         "Browse" => crate::browse::open(&mut run.ui, &run.session.tree, None, false, now),
         "Composer" => {
-            if let Some(text) = action.args["text"].as_str() {
-                crate::browse::composer(&mut run.ui, text, now);
+            if let Ok(fill) = serde_json::from_value(action.args) {
+                crate::composer::fill::fill(&mut run.ui, fill, now);
             }
         }
         "Pager" => page(run, &action.args, now),
@@ -41,13 +41,8 @@ fn focus(run: &mut Run, args: &Value) {
 
 pub(super) fn restore_prompt(run: &mut Run, text: Option<String>) {
     if let Some(text) = text {
-        action(
-            run,
-            bingo_sdk::Action {
-                name: "Composer".into(),
-                args: serde_json::json!({"text":text}),
-            },
-        );
+        let now = run.detection.now();
+        crate::composer::fill::fill(&mut run.ui, crate::composer::fill::Fill { text }, now);
     }
 }
 
