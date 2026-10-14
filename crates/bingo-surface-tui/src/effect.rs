@@ -18,6 +18,11 @@ pub enum Effect {
     /// answers with the line, or says it is no longer there to take.
     Withdraw(IntentId),
     Interrupt,
+    StopInteraction {
+        session: SessionId,
+        interaction: InteractionId,
+        answer: Answer,
+    },
     Answer {
         interaction: InteractionId,
         answer: Answer,

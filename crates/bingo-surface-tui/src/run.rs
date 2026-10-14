@@ -716,6 +716,11 @@ impl Run {
             Effect::SiteKey { action, key } => site_keys::send(self, action, key),
             Effect::Withdraw(intent) => withdraw::ask(self, intent),
             Effect::Interrupt => self.interrupt(),
+            Effect::StopInteraction {
+                session,
+                interaction,
+                answer,
+            } => self.stop_interaction(session, interaction, answer),
             Effect::Answer {
                 interaction,
                 answer,
@@ -749,6 +754,38 @@ impl Run {
                 .ui
                 .notify(Level::Warn, format!("clipboard: {why}"), Instant::now()),
         }
+    }
+
+    fn stop_interaction(
+        &mut self,
+        session: SessionId,
+        interaction: bingo_sdk::InteractionId,
+        answer: bingo_sdk::Answer,
+    ) {
+        let deny = self.mint(None);
+        let stop = self.mint(None);
+        if let Some(handle) = self.session.handles.get(&session) {
+            handle.answer(deny, interaction, answer, bingo_sdk::Activation::Keyboard);
+            handle.interrupt(stop, InterruptScope::Head);
+            return;
+        }
+        let host = self.host.clone();
+        self.spawn(async move {
+            let attachment = host
+                .open(
+                    SessionSelector::ById {
+                        id: session.clone(),
+                    },
+                    identity(),
+                    OpenOptions::default(),
+                )
+                .await?;
+            attachment
+                .handle
+                .answer(deny, interaction, answer, bingo_sdk::Activation::Keyboard);
+            attachment.handle.interrupt(stop, InterruptScope::Head);
+            Ok(Reply::Handle(session, attachment.handle))
+        });
     }
 
     fn interrupt(&mut self) {

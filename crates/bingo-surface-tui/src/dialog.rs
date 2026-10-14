@@ -68,7 +68,9 @@ impl Dialog {
             self.expanded = !self.expanded;
             return Vec::new();
         }
-        if key.code == KeyCode::Esc && self.words.take().is_some() {
+        if key == KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL)
+            && self.words.take().is_some()
+        {
             self.changing = None;
             return Vec::new();
         }

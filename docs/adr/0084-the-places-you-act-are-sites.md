@@ -41,7 +41,10 @@ record adds component names and props to the sdk.
 4. **`KeyBar` is sealed while an interaction is open** (ADR-0082 §6):
    the keys that answer a permission ask, a question or a sign-in are
    the host's drawing.
-5. **`surfaces()`**: `Composer`, `KeyBar`, `Palette`, `ModelPicker`,
+5. **Escape ends the asking turn.** In every ask state, including a draft set aside and the change
+   editor, Escape denies or cancels and interrupts the session that owns the interaction. Ctrl+G
+   returns from the composer to the ask or leaves the change editor without answering.
+6. **`surfaces()`**: `Composer`, `KeyBar`, `Palette`, `ModelPicker`,
    `Browse`: terminal and desktop. `Ledger`, `TurnFold`: terminal,
    desktop, text. The chat answers none of them.
 

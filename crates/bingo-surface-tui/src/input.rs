@@ -42,6 +42,13 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
         return Vec::new();
     }
     ui.prepare(&tree.viewed().summary.cwd);
+    if key.code == KeyCode::Esc && tree.open_interaction().is_some() {
+        return cancel(ui, tree, now);
+    }
+    if key == KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL) && ui.dialog.aside {
+        ui.dialog.aside = false;
+        return Vec::new();
+    }
     let owner = crate::focus::owner(ui, tree);
     if owner == crate::focus::Owner::Intro {
         ui.focus = crate::focus::Focus::Composer;
@@ -451,10 +458,6 @@ fn interrupt_or_exit(ui: &mut Ui, state: &SessionState, now: Now) -> Vec<Effect>
 /// order of [`keys::ESCAPES`]. Leaving a card is the card's own answer, so
 /// that rung goes back to the dialog.
 fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
-    if ui.dialog.aside && tree.open_interaction().is_some() {
-        ui.dialog.aside = false;
-        return Vec::new();
-    }
     if ui.focus.row().is_some() {
         ui.focus = crate::focus::Focus::Composer;
     }
@@ -543,24 +546,33 @@ fn rewind_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect>
 /// Leaving the card that is asking: the kernel's own cancel or denial, which
 /// the dialog knows and this does not.
 fn cancel(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
-    let Some((_, interaction)) = tree.open_interaction() else {
+    let Some((owner, interaction)) = tree.open_interaction() else {
         return Vec::new();
     };
-    let editing = ui.dialog.words.is_some();
-    let mut effects = ui.dialog.on_key(
+    ui.dialog.words = None;
+    ui.dialog.changing = None;
+    ui.dialog.aside = false;
+    let effects = ui.dialog.on_key(
         interaction,
         KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
         now,
     );
-    if !editing
-        && matches!(
-            interaction.kind,
-            bingo_sdk::InteractionKind::Permission { .. }
-        )
-    {
-        effects.extend(ask_to_stop(ui, tree.viewed()));
-    }
+    ui.stop_asked = owner.turn.as_ref().map(|turn| turn.id.clone());
     effects
+        .into_iter()
+        .map(|effect| match effect {
+            Effect::Answer {
+                interaction,
+                answer,
+                ..
+            } => Effect::StopInteraction {
+                session: owner.summary.id.clone(),
+                interaction,
+                answer,
+            },
+            other => other,
+        })
+        .collect()
 }
 
 fn picker(ui: &mut Ui, key: KeyEvent, now: Now) -> Vec<Effect> {

@@ -151,7 +151,7 @@ fn change_prefills_then_submits_and_plain_typing_sets_aside() {
     assert!(crate::input::on_key(&mut ui, &tree, typed('x'), now).is_empty());
     assert!(ui.dialog.aside);
     assert_eq!(ui.composer.text(), "x");
-    assert!(crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now).is_empty());
+    assert!(crate::input::on_key(&mut ui, &tree, ctrl('g'), now).is_empty());
     assert!(!ui.dialog.aside);
 }
 
@@ -168,13 +168,10 @@ fn caution_starts_on_no_and_escape_denies_and_stops() {
     let effects = crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
     assert!(matches!(
         effects.as_slice(),
-        [
-            crate::effect::Effect::Answer {
-                answer: Answer::Deny { .. },
-                ..
-            },
-            crate::effect::Effect::Interrupt
-        ]
+        [crate::effect::Effect::StopInteraction {
+            answer: Answer::Deny { .. },
+            ..
+        }]
     ));
 }
 

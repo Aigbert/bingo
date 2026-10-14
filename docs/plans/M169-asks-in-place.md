@@ -32,7 +32,7 @@ its step and in the turn's folded line.
    ticks a multi choice, a form walks fields with `tab`, `←→` picks, `space` toggles, `⏎` sends, `esc`
    declines. It replaces `form.rs`, `dialog.rs` and `component/question.rs` drawings.
 6. **Set aside.** A printable key that answers nothing, or any typing within 900 ms before the ask
-   appeared, puts the draft in the composer and the ask on the activity line (`… is waiting for you · esc
+   appeared, puts the draft in the composer and the ask on the activity line (`… is waiting for you · ctrl+g
    back to it`); `⏎` queues the draft after the turn (existing queue). Pure `aside(now, last_typed, key,
    options)`; table test.
 7. **Many askers.** Several open asks (crew members) show one at a time in arrival order; the activity
@@ -60,7 +60,7 @@ its step and in the turn's folded line.
 - [x] Snapshots per prototype scenario (edit, bash, danger, question, multi, form, aside, crew) at 108×30
   and 80×24.
 - [x] `TestBackend`: arrow and number answers, No with a reason, change then run, danger starts on No, esc
-  stops the turn, typed `x` sets aside and `esc` returns.
+  stops the turn, typed `x` sets aside and `ctrl+g` returns.
 - [x] An outside mod cannot replace the permission list (sealed test); it can wrap `Question` with `next`.
 - [x] tmux drive against the fake provider in a temp HOME, captured; tui-smoke and all native gates as
   M167.
@@ -80,6 +80,10 @@ write's whole file in place.
   fake clock, not wall time.
 
 ## Decisions
+
+- Review: Escape always ends the asking session’s turn, including aside and change editing; Ctrl+G
+  backs out without answering. The old Escape-to-return prototype conflicted with AGENTS.md.
+  A single owner-targeted operation sends both the denial and interrupt (ADR-0084).
 
 - Options read `Interaction`: accepted answer specs are stored there, not on `InteractionKind`. This
   preserves the kernel's authoritative answer list.

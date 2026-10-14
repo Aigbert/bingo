@@ -168,3 +168,60 @@ async fn a_malformed_handler_cannot_panic_the_surface() {
     draw_sized(120, 40, &state, &mut ui, now);
     assert!(crate::pane::key_handler(&ui, &state, typed('x')).is_none());
 }
+
+#[tokio::test]
+async fn escape_stops_the_asking_session_in_every_ask_state() {
+    for child_asks in [false, true] {
+        for editing in ["list", "aside", "change"] {
+            let root = Arc::new(TestSession::default());
+            let child = Arc::new(TestSession::default());
+            let now = still(scene().1);
+            let mut run = tests::idle_in(state(), root.clone(), now.instant);
+            let mut open = permission(None, None);
+            let owner = if child_asks {
+                child_id()
+            } else {
+                state().summary.id
+            };
+            open.session = owner.clone();
+            run.session.tree = folded_tree(vec![child_frame(1, announced("child"))]);
+            let event = opened(open.clone());
+            run.session.tree.fold.apply(&if child_asks {
+                child_frame(2, event)
+            } else {
+                frame(2, event)
+            });
+            run.session.tree.show(&if child_asks {
+                state().summary.id
+            } else {
+                child_id()
+            });
+            run.session
+                .handles
+                .insert(child_id(), SessionHandle(child.clone()));
+            run.ui.dialog.focus_on(Some(&open));
+            if editing == "aside" {
+                run.ui.dialog.aside = true;
+            }
+            if editing == "change" {
+                run.ui.dialog.words = Some(Default::default());
+            }
+            let effects = input::on_key(
+                &mut run.ui,
+                &run.session.tree,
+                key(crossterm::event::KeyCode::Esc),
+                now,
+            );
+            run.apply(effects);
+            let (asking, other) = if child_asks {
+                (&child, &root)
+            } else {
+                (&root, &child)
+            };
+            assert_eq!(asking.interrupts(), 1, "{child_asks} {editing}");
+            assert_eq!(asking.answers().len(), 1, "{child_asks} {editing}");
+            assert_eq!(other.interrupts(), 0);
+            assert!(other.answers().is_empty());
+        }
+    }
+}

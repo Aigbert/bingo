@@ -118,7 +118,7 @@ pub fn activity(tree: &Tree, ui: &Ui) -> Option<Line<'static>> {
         _ => "a question".into(),
     };
     let waiting = if ui.dialog.aside {
-        format!("{name} is waiting for you · esc back to it")
+        format!("{name} is waiting for you · ctrl+g back to it")
     } else {
         "waiting for you".into()
     };
@@ -146,10 +146,10 @@ pub fn activity(tree: &Tree, ui: &Ui) -> Option<Line<'static>> {
 
 pub fn keys(open: &Interaction, ui: &Ui) -> Option<&'static str> {
     if ui.dialog.aside {
-        return Some("esc back to it · enter queue draft");
+        return Some("ctrl+g back to it · enter queue draft · esc stop");
     }
     if ui.dialog.words.is_some() {
-        return Some("enter send · esc back to the question");
+        return Some("enter send · ctrl+g back · esc stop");
     }
     Some(match &open.kind {
         InteractionKind::Permission { .. } => {
