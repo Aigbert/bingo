@@ -85,3 +85,12 @@ Each server may set `toolTimeout` to a positive number of seconds for a tool
 call. Both stdio and HTTP default to 600 seconds (10 minutes). A call past
 that deadline returns a tool error naming the server and the bound. Set a
 longer value for builds or crawls; zero does not disable the deadline.
+
+## Repository approval
+
+Project and local `mcpServers` entries wait for your yes. `/mcp approve <name>`
+records this checkout and the current configuration in user settings, then dials
+it. `bingo mcp approve <name>` is the headless setup command. A changed entry
+waits again. Enable, reconnect, and server export cannot bypass approval.
+User-layer servers keep their existing behavior. Project scripts configured by
+other plugins (for example shell hooks) are outside this approval mechanism.

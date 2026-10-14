@@ -19,6 +19,9 @@ use serde_json::{Value, json};
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     #[serde(default)]
+    #[schemars(skip)]
+    pub waiting: Vec<bingo_sdk::Waiting>,
+    #[serde(default)]
     pub mcp_servers: BTreeMap<String, Server>,
     /// Names that start disabled; a disabled server is never dialled.
     #[serde(default)]

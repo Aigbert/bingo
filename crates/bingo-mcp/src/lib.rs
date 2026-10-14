@@ -50,12 +50,14 @@ pub static MANIFEST: PluginManifest = PluginManifest {
     uses: &[],
     provides: &[
         "tools:mcp",
+        "plugins:mcp",
         "command:mcp",
         mcp::CAPABILITY,
         "service:bingo.mcp.pages",
     ],
     requires: &[],
     config: Some(ConfigClaim {
+        approve: &[SETTING],
         keys: &[
             (SETTING, Merge::ByName),
             ("disabledMcpServers", Merge::Accumulate),
@@ -84,13 +86,16 @@ impl Plugin for McpPlugin {
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
         let settings: Settings = registrar.config()?;
-        let manager = Arc::new(Manager::new(
-            bingo_http::client(bingo_http::Bounds::CALL)
-                .map_err(|e| PluginError::Failed(e.to_string()))?,
-            settings.mcp_servers,
-            &settings.disabled_mcp_servers,
-            registrar.env().data_dir.clone(),
-        ));
+        let manager = Arc::new(
+            Manager::new(
+                bingo_http::client(bingo_http::Bounds::CALL)
+                    .map_err(|e| PluginError::Failed(e.to_string()))?,
+                settings.mcp_servers,
+                &settings.disabled_mcp_servers,
+                registrar.env().data_dir.clone(),
+            )
+            .with_waiting(settings.waiting),
+        );
         registrar.add(Contribution::Tools(
             Arc::new(McpSource::new(Arc::clone(&manager))) as Arc<dyn ToolSource>,
         ));
@@ -99,6 +104,7 @@ impl Plugin for McpPlugin {
         ));
         registrar.add(service(Arc::clone(&manager)));
         registrar.add(guide::contribution(registrar));
+        registrar.add(Contribution::Plugins(manager.clone()));
         self.manager
             .set(manager)
             .map_err(|_| PluginError::Failed("the mcp plugin registered twice".into()))

@@ -80,7 +80,23 @@ impl McpCommand {
         if !self.manager.knows(server) {
             return Err(unknown_server(&self.manager, server));
         }
+        if self.manager.waiting(server).await && verb != Verb::Approve && verb != Verb::Tools {
+            return Err(KernelError::new(
+                ErrorCode::PermissionDenied,
+                format!("{server} waits for your yes; /mcp approve {server}"),
+            ));
+        }
         let message = match verb {
+            Verb::Approve => {
+                if !bingo_sdk::render::asked() {
+                    return Err(KernelError::new(
+                        ErrorCode::PermissionDenied,
+                        "approval requires person input",
+                    ));
+                }
+                self.manager.approve(server, &cx.host).await?;
+                format!("approved {server}; dialling it")
+            }
             Verb::Tools => return self.tools(server).await,
             Verb::Login => self.login(server, cx).await?,
             Verb::Logout => self.logout(server).await?,
@@ -198,6 +214,18 @@ impl Prompter for SessionPrompter {
 /// its sign-in stands.
 fn row(line: &Line) -> Vec<String> {
     let (state, tools) = match &line.status {
+        Status::Waiting { changed } => (
+            format!(
+                "{}; /mcp approve {}",
+                if *changed {
+                    "changed since your yes"
+                } else {
+                    "waits for your yes"
+                },
+                line.server
+            ),
+            String::new(),
+        ),
         Status::Connecting => ("connecting".to_string(), String::new()),
         Status::Connected { tools } => ("connected".to_string(), tools.to_string()),
         Status::NeedsAuth { .. } => (NEEDS_AUTH.to_string(), String::new()),
@@ -249,6 +277,7 @@ pub enum Request {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verb {
+    Approve,
     Login,
     Logout,
     Tools,
@@ -258,7 +287,8 @@ pub enum Verb {
 }
 
 impl Verb {
-    pub(crate) const ALL: [Verb; 6] = [
+    pub(crate) const ALL: [Verb; 7] = [
+        Verb::Approve,
         Verb::Login,
         Verb::Logout,
         Verb::Tools,
@@ -269,6 +299,7 @@ impl Verb {
 
     pub(crate) fn as_str(self) -> &'static str {
         match self {
+            Verb::Approve => "approve",
             Verb::Login => "login",
             Verb::Logout => "logout",
             Verb::Tools => "tools",

@@ -23,6 +23,7 @@ use crate::tool::McpTool;
 /// answering, waiting for a person to sign in, out of action with a reason, or
 /// switched off.
 enum State {
+    Waiting(bingo_sdk::Waiting),
     Connecting,
     Connected(Box<Connection>),
     /// The server answered `401` and this run holds no credential it accepts
@@ -48,6 +49,7 @@ struct Slot {
 /// behind, so no view ever holds one.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Status {
+    Waiting { changed: bool },
     Connecting,
     Connected { tools: usize },
     NeedsAuth { why: String },
@@ -119,6 +121,59 @@ impl Manager {
         }
     }
 
+    pub fn with_waiting(mut self, waiting: Vec<bingo_sdk::Waiting>) -> Self {
+        for entry in waiting
+            .into_iter()
+            .filter(|entry| entry.key == crate::SETTING)
+        {
+            if let Some(slot) = self.slots.get_mut().get_mut(&entry.name) {
+                slot.state = State::Waiting(entry);
+            }
+        }
+        self
+    }
+    pub async fn approve(
+        self: &Arc<Self>,
+        name: &str,
+        host: &bingo_sdk::HostHandle,
+    ) -> Result<(), bingo_sdk::KernelError> {
+        let (request, epoch) = {
+            let slots = self.slots.read().await;
+            let Some(Slot {
+                state: State::Waiting(entry),
+                epoch,
+            }) = slots.get(name)
+            else {
+                return Err(bingo_sdk::KernelError::new(
+                    bingo_sdk::ErrorCode::InvalidInput,
+                    "server is not waiting for approval",
+                ));
+            };
+            (
+                bingo_sdk::Approval {
+                    root: entry.root.clone(),
+                    what: format!("{}:{}", entry.key, entry.name),
+                },
+                *epoch,
+            )
+        };
+        host.approve(request).await?;
+        let claimed = {
+            let mut slots = self.slots.write().await;
+            slots
+                .get_mut(name)
+                .filter(|slot| slot.epoch == epoch && matches!(slot.state, State::Waiting(_)))
+                .map(begin)
+        };
+        self.spawn_dial(name, claimed);
+        Ok(())
+    }
+    pub async fn waiting(&self, name: &str) -> bool {
+        matches!(
+            self.slots.read().await.get(name).map(|slot| &slot.state),
+            Some(State::Waiting(_))
+        )
+    }
     pub fn bind(&self, host: &bingo_sdk::HostHandle) {
         let _ = self.host.set(Arc::downgrade(&host.0));
     }
@@ -157,6 +212,11 @@ impl Manager {
                 bingo_sdk::ServiceError(format!("MCP server {name} is not configured"))
             })?;
             match slot.state {
+                State::Waiting(_) => {
+                    return Err(bingo_sdk::ServiceError(format!(
+                        "MCP server {name} waits for your yes; /mcp approve {name}"
+                    )));
+                }
                 State::Disabled => {
                     return Err(bingo_sdk::ServiceError(format!(
                         "MCP server {name} is disabled"
@@ -295,7 +355,9 @@ impl Manager {
         let claimed = {
             let mut slots = self.slots.write().await;
             match slots.get_mut(name) {
-                Some(slot) if !matches!(slot.state, State::Disabled) => Some(begin(slot)),
+                Some(slot) if !matches!(slot.state, State::Disabled | State::Waiting(_)) => {
+                    Some(begin(slot))
+                }
                 _ => None,
             }
         };
@@ -322,7 +384,7 @@ impl Manager {
         let Some(slot) = slots.get_mut(name) else {
             return false;
         };
-        if matches!(slot.state, State::Disabled) {
+        if matches!(slot.state, State::Disabled | State::Waiting(_)) {
             return false;
         }
         slot.epoch += 1;
@@ -490,11 +552,14 @@ fn first_line(description: &str) -> String {
 
 /// Whether a person has switched this server off.
 fn off(slot: &Slot) -> bool {
-    matches!(slot.state, State::Disabled)
+    matches!(slot.state, State::Disabled | State::Waiting(_))
 }
 
 fn status_of(state: &State) -> Status {
     match state {
+        State::Waiting(entry) => Status::Waiting {
+            changed: entry.changed,
+        },
         State::Connecting => Status::Connecting,
         State::Connected(connection) => Status::Connected {
             tools: connection.tools.len(),
@@ -502,6 +567,31 @@ fn status_of(state: &State) -> Status {
         State::NeedsAuth { why } => Status::NeedsAuth { why: why.clone() },
         State::Failed { why } => Status::Failed { why: why.clone() },
         State::Disabled => Status::Disabled,
+    }
+}
+
+#[async_trait::async_trait]
+impl bingo_sdk::PluginSource for Manager {
+    fn id(&self) -> &str {
+        "bingo.mcp"
+    }
+    async fn plugins(&self) -> Vec<bingo_sdk::PluginStatus> {
+        self.lines()
+            .await
+            .into_iter()
+            .filter_map(|line| {
+                let Status::Waiting { changed } = line.status else {
+                    return None;
+                };
+                Some(bingo_sdk::PluginStatus {
+                    id: format!("mcp:{}", line.server),
+                    version: String::new(),
+                    state: bingo_sdk::PluginState::Waiting { changed },
+                    from: "bingo.mcp".into(),
+                    execution: None,
+                })
+            })
+            .collect()
     }
 }
 
@@ -684,5 +774,73 @@ mod tests {
         manager.shutdown().await;
         assert!(manager.tools().await.is_empty());
         assert!(manager.pending().await.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod approval_tests {
+    use super::*;
+    #[tokio::test]
+    async fn every_dial_and_export_path_refuses_a_waiting_server() {
+        let dir = tempfile::tempdir().unwrap();
+        let servers = BTreeMap::from([(
+            "repo".into(),
+            Server::Stdio {
+                command: "must-never-spawn".into(),
+                args: vec![],
+                env: BTreeMap::new(),
+                cwd: None,
+                tool_timeout: None,
+            },
+        )]);
+        let manager = Arc::new(
+            Manager::new(
+                bingo_http::client(bingo_http::Bounds::CALL).unwrap(),
+                servers,
+                &[],
+                dir.path().into(),
+            )
+            .with_waiting(vec![bingo_sdk::Waiting {
+                root: dir.path().into(),
+                key: crate::SETTING.into(),
+                name: "repo".into(),
+                changed: true,
+            }]),
+        );
+        manager.dial_enabled().await;
+        assert!(manager.connect("repo").await.is_err());
+        assert!(!manager.enable("repo").await);
+        assert!(!manager.reconnect("repo").await);
+        assert!(!manager.disable("repo").await);
+        assert!(
+            !manager.enable("repo").await,
+            "disable/enable must not clear waiting"
+        );
+        assert!(manager.rows().await.is_empty());
+        assert!(manager.tools().await.is_empty());
+        assert!(manager.pending().await.is_empty());
+        assert_eq!(
+            manager.lines().await[0].status,
+            Status::Waiting { changed: true }
+        );
+        assert!(
+            manager
+                .approve("repo", &bingo_sdk::testing::NoHost::handle())
+                .await
+                .is_err()
+        );
+        assert!(
+            manager.waiting("repo").await,
+            "a failed approval must keep the gate closed"
+        );
+        let host = bingo_sdk::testing::TestHost::default();
+        host.on_approve(|request| async move {
+            assert_eq!(request.what, "mcpServers:repo");
+            Ok("sha256:approved".into())
+        });
+        manager.approve("repo", &host.handle()).await.unwrap();
+        assert!(!manager.waiting("repo").await);
+        assert!(manager.rows().await.contains_key("repo"));
+        manager.shutdown().await;
     }
 }
