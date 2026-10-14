@@ -16,6 +16,7 @@ mod config;
 mod contributors;
 mod host;
 mod late;
+mod measure;
 mod ruler;
 mod stream;
 
@@ -362,37 +363,13 @@ impl Turn<'_> {
         );
     }
 
+    fn measure(&mut self, system: &[SystemBlock], messages: &[Message]) -> ContextUsage {
+        let tools = self.tool_specs();
+        measure::context(&mut self.ruler, system, messages, &tools)
+    }
+
     fn tool_specs(&self) -> Vec<ToolSpec> {
         self.late.tools.iter().map(|t| t.spec()).collect()
-    }
-
-    fn measure(&mut self, system: &[SystemBlock], messages: &[Message]) -> ContextUsage {
-        let estimate = estimate_tokens(system, messages, &self.tool_specs());
-        let mut usage = self.ruler.measure(estimate);
-        if !self.ruler.holds() {
-            usage.parts = Some(bingo_sdk::tokens::composition(
-                system,
-                messages,
-                &self.tool_specs(),
-            ));
-        }
-        usage
-    }
-
-    fn measure_request(&mut self, request: &ModelRequest) -> ContextUsage {
-        let mut usage = self.ruler.measure(estimate_tokens(
-            &request.system,
-            &request.messages,
-            &request.tools,
-        ));
-        if !self.ruler.holds() {
-            usage.parts = Some(bingo_sdk::tokens::composition(
-                &request.system,
-                &request.messages,
-                &request.tools,
-            ));
-        }
-        usage
     }
 
     /// Only overflow recovery projects away stale results; normal requests
@@ -506,7 +483,7 @@ impl Turn<'_> {
             self.record(notice);
         }
         let request = result.ok()?;
-        let usage = self.measure_request(&request);
+        let usage = measure::request(&mut self.ruler, &request);
         self.recount(&request).await?;
         let usage = self.ruler.anchored(usage);
         self.warn_once(&usage);
@@ -517,7 +494,7 @@ impl Turn<'_> {
         &mut self,
         mut request: ModelRequest,
     ) -> Result<ModelRequest, KernelError> {
-        let preliminary = self.measure_request(&request);
+        let preliminary = measure::request(&mut self.ruler, &request);
         let original = ContextView::model_view(&self.transcript);
         let extra = self
             .contribute(
