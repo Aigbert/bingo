@@ -23,6 +23,7 @@ mod markdown;
 mod panel;
 mod progress;
 mod raster;
+pub mod sealed;
 mod select;
 /// A GFM table in an answer is the same table a plugin publishes, so
 /// [`crate::markdown`] hands its rows straight to this renderer (M11e).
@@ -49,6 +50,7 @@ pub const MISSING: &str = "–";
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Marks {
     pub pending: Option<Action>,
+    pub sealed: Option<std::rc::Rc<std::cell::RefCell<Vec<usize>>>>,
     pub targets: Option<std::rc::Rc<std::cell::RefCell<Vec<bingo_sdk::ActionItem>>>>,
     /// Where an unbounded bar's sheen is in its turn: 0 at the head, which is
     /// where a frame that says nothing about it leaves it (§6's rest).
@@ -61,6 +63,7 @@ impl Marks {
         Self {
             pending: None,
             targets: None,
+            sealed: None,
             beat: progress::walk(now),
         }
     }
@@ -152,7 +155,7 @@ pub fn marked_with(
         // surface's own affair, and no kind is learned here yet.
         View::Custom { fold, .. } => text::lines(fold),
     };
-    targets::mask(view, lines, marks)
+    sealed::mask(view, targets::mask(view, lines, marks), marks)
 }
 
 /// Whether a column of values reads as numbers, which is what right-aligning

@@ -39,6 +39,16 @@ pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Ef
         crate::focus::Owner::Layer => return layer_mouse(ui, tree, mouse),
         crate::focus::Owner::Interaction => {
             return if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+                if let Some(target) = ui
+                    .shown
+                    .card_actions
+                    .iter()
+                    .find(|target| target.area.contains(Position::new(mouse.column, mouse.row)))
+                {
+                    return vec![Effect::Submit(bingo_sdk::Input::Action {
+                        action: target.item.action.clone(),
+                    })];
+                }
                 card_option(ui, mouse)
                     .map(|index| answer(ui, tree, index, now))
                     .unwrap_or_default()
@@ -258,6 +268,13 @@ fn on_foot(ui: &Ui, mouse: MouseEvent) -> bool {
 fn card_option(ui: &Ui, mouse: MouseEvent) -> Option<usize> {
     let painted = &ui.shown;
     let card = painted.card.as_ref()?;
+    if !card.sealed_options.is_empty() {
+        return card
+            .sealed_options
+            .iter()
+            .find(|(area, _)| area.contains(Position::new(mouse.column, mouse.row)))
+            .map(|(_, option)| *option);
+    }
     let inside = card.area.contains(Position {
         x: mouse.column,
         y: mouse.row,

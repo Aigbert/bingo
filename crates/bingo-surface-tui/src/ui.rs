@@ -147,6 +147,7 @@ impl Listed {
 pub struct Card {
     pub area: ratatui::layout::Rect,
     pub options: Vec<Option<usize>>,
+    pub sealed_options: Vec<(ratatui::layout::Rect, usize)>,
 }
 
 /// What the kernel told this surface it can offer: the commands a session

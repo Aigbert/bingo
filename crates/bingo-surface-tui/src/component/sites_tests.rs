@@ -81,6 +81,9 @@ fn site(component: Component) -> bingo_sdk::SessionState {
     };
     let completed_item = |item| folded(vec![frame(1, Event::ItemCompleted { item })]);
     match component {
+        Component::Permission | Component::SignIn => {
+            unreachable!("sealed sites have dedicated tests")
+        }
         Component::Question => folded(vec![frame(
             1,
             Event::InteractionOpened {

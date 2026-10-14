@@ -6,6 +6,7 @@ pub mod closing;
 pub mod items;
 pub mod pane;
 pub mod question;
+pub mod sealed;
 
 pub fn draw(
     props: &Props,
