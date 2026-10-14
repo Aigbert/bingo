@@ -12,6 +12,7 @@ pub enum Rule {
     Uses,
     StateContract,
     PropSubset,
+    SealedSite,
     Import,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

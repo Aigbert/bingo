@@ -100,32 +100,32 @@ arguments. Calls need their noun in the grant. A service can add another noun.
 
 ## Drawing and state
 
-Register `ui.render` with a component matcher. Components are `Pane`,
-`AbovePrompt`, `Question`, `UserMessage`, `AssistantMessage`, `ToolUse`,
-`ToolResult`, `ToolGroup`, `ToolProgress`, `CommandOutput`, `Spinner`,
-`TurnDuration`, `InfoNotice`, `SessionMode` and `PromptHint`.
-The event has `component`, `requestId`, `surface`, `props` and `viewport`.
-`await $.ui.resolve(e)` supplies supported elements such as `Box`, `Text` and
-`Button`; return an element tree, or wrap `await next(e)`. Element handlers such
-as `onPress` can update state. Keep writes out of the render hook itself.
+Register `ui.render` with a component matcher: `Pane`, `AbovePrompt`, `Question`, `UserMessage`,
+`AssistantMessage`, `ToolUse`, `ToolResult`, `ToolGroup`, `ToolProgress`, `CommandOutput`, `Spinner`,
+`TurnDuration`, `InfoNotice`, `SessionMode`, `PromptHint`, `Permission` or `SignIn`.
+Event: `component`, `requestId`, `surface`, `props`, `viewport`. Use `await $.ui.resolve(e)` for elements;
+return a tree or wrap `await next(e)`. Handlers can update state; keep writes out of render hooks.
 
-`await $.ui.open({id:'counter', title:'Counter'})` opens a pane; render it by
-matching `{component:'Pane', requestId:'counter'}`. `$.ui.close(id)` removes it.
-`place`, `size`, `focus` and `closeOnEscape` say where it seats and how keys
-reach it. A pane opened while no person asked (from `session.start`, a timer)
-waits as `1 pane waiting` unless the person previously opened it. Clicks and
-commands remember open; Escape, close controls and commands remember closed.
-Choices are keyed by plugin and pane id in the user's data, across projects and
-starts. Autonomous moves never change them; missing or corrupt memory means waiting.
-`$.ui.status('Ready', {key:'counter'})` places status; pass `null` to remove it.
-`$.ui.toast('Finished')` shows a temporary notification. `AbovePrompt` draws the
-band above the prompt without opening a pane.
+Only `Permission` and `SignIn` are sealed, on terminal, desktop and text. Wrap `await next(e)` exactly once
+with unchanged props. Missing, duplicated or rewritten engine nodes yield the host drawing and a plugin-named
+notice. Permission props are `interactionId`, `tool`, full `input` and `answers`; sign-in props are
+`interactionId`, `provider` and `flow` (browser URL, device URL/code, or paste). The terminal rejects hidden,
+zero-size or clipped cards with one local notice. Leave room for the host's full input and choices. Wrapper
+buttons handle clicks; answer keys remain the host's. Text clients keep their folds. `plugins validate`
+advises on sealed matchers; runtime checks decide. See the `sealed-frame` test fixture.
 
-Import `atom`, `read`, `update` (and optionally `derive`) from `'bingo'`:
-`const calls = atom('calls', 0)`, `await read($, calls)`,
-`await update($, calls, n => n + 1)`. Render reads subscribe to state changes;
-writes invalidate those renders. Host state survives reload and restart.
-Declare literal state keys in `types/index.d.ts`, keyed by manifest name:
+`await $.ui.open({id:'counter', title:'Counter'})` opens a pane; render it by matching `{component:'Pane',
+requestId:'counter'}`. `$.ui.close(id)` removes it. `place`, `size`, `focus` and `closeOnEscape` control seating
+and keys. A pane opened without person input waits as `1 pane waiting` unless the person previously opened it.
+Clicks and commands remember open; Escape, close controls and commands remember closed. Choices are keyed by
+plugin and pane id in the user's data, across projects and starts. Autonomous moves never change them;
+missing or corrupt memory means waiting. `$.ui.status('Ready', {key:'counter'})` places status; `null` removes it.
+`$.ui.toast('Finished')` shows a temporary notification. `AbovePrompt` draws the band without opening a pane.
+
+Import `atom`, `read`, `update` (and optionally `derive`) from `'bingo'`: `const calls = atom('calls', 0)`,
+`await read($, calls)`, `await update($, calls, n => n + 1)`. Render reads subscribe to state changes;
+writes invalidate those renders. Host state survives reload and restart. Declare literal state keys in
+`types/index.d.ts`, keyed by manifest name:
 
 ```ts
 export interface PluginState { 'counter': { calls: number } }
