@@ -61,20 +61,20 @@ After M138 and M140; landed dependencies are recorded below.
 
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-sdk component::` and `cargo test -p bingo-sdk render::matched` pass: each
+- [x] `cargo test -p bingo-sdk component::` and `cargo test -p bingo-sdk render::matched` pass: each
       component's golden JSON, and `asks` over scalar, nested and
       RegExp-only matchers.
-- [ ] `cargo test -p bingo-surface-tui component::` passes: `draw` with
+- [x] `cargo test -p bingo-surface-tui component::` passes: `draw` with
       no answer, with a `Box` wrapping `Engine`, and with props that do
       not parse; one `TestBackend` test per component; a run that matches
       nothing makes zero `ui/render` requests (a counting host double).
-- [ ] The permission test (brick 5) and the `turn.complete` test (brick
+- [x] The permission test (brick 5) and the `turn.complete` test (brick
       4) pass; their names are pasted.
-- [ ] `cargo test -p bingo --test mods_components` passes (brick 9).
+- [x] `cargo test -p bingo --test mods_components` passes (brick 9).
 - [ ] `scripts/tui-smoke.sh` passes with all three examples; a tmux drive
-      of `pane` (open, call two tools, escape) is pasted.
-- [ ] Every gate, plus `cargo check -p bingo-surface-tui --all-targets
-      --target x86_64-pc-windows-msvc`.
+      of `pane` (open, call two tools, escape) is pasted. BLOCKED: Counter Escape fails before the M141 example step.
+- [x] Every gate, plus `cargo check -p bingo-surface-tui --all-targets
+      --target x86_64-pc-windows-msvc` (known C-header deferrals recorded below).
 
 ## Non-goals
 
@@ -87,6 +87,8 @@ Props must drive their own drawing; memo generations must account for changed
 height without scroll jumps. Only visible rows ask, through the bounded queue.
 
 2026-10-14 delegate decision: M141 owns additive band Action hit-testing in `pointer.rs` and unclaimed hotkeys in `input.rs`; composer keeps focus (no new Focus variant), and M151 owns pane placement and hit-testing.
+
+Stopped 2026-10-14, protocol §6: full PTY smoke and an isolated Counter-only rerun both leave `Count: 1` visible after Escape; focus returns to the composer. No fix attempted and no third run; the two attempts did not move the failure. Options: authorize investigation of the pane close Action versus concurrent typed render requests, or reproduce on dev to establish whether the merge baseline already has the failure. ADR-0079 §4 remains proposed until smoke and the final example drive pass.
 
 ## Re-verified (2026-10-14, ba70fdf6)
 
@@ -107,31 +109,34 @@ height without scroll jumps. Only visible rows ask, through the bounded queue.
 - Protocol 2 is unreleased (v0.6.5): scoped amendments are authorized with a
   dated ADR-0075 note and `BINGO_UPDATE_SCHEMA=1`. Discipline 4c is unchanged.
 
-## Verified (2026-10-14, in progress)
+## Verified (2026-10-14)
 
-- `git merge --no-ff dev -m 'merge: dev into M141'`: merged `5446e403` and `6fad64ce`; preserve inherited handlers, pane seating/hit-testing, add typed Pane projection and band route.
-
-- `cargo test -p bingo-surface-rpc component_props_are_published_for_wire_clients --locked`: expected FAIL, missing QuestionProps, before schema registration.
-- `cargo test -p bingo-sdk component:: --locked`: PASS, 2 tests.
-- `cargo test -p bingo-sdk render::matched --locked`: expected FAIL before selection; PASS, 1 test after implementation.
-- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc --locked`: PASS, 16 unit + 41 wire tests; 1 existing ignored test.
-- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc wire_ts:: --locked`: PASS, 1 test.
-- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema:: --locked`: PASS, 10 tests.
-- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked`: PASS, 130 tests.
-- `cargo test -p bingo-core chain::render --locked`: PASS, 1 test (before publication test was added).
-- `cargo test -p bingo-surface-tui component:: --locked`: expected FAIL, 2 tests before substitution; PASS, 2 tests after implementation, before band contract.
-- `cargo test -p bingo-surface-tui above_prompt_button_dispatches_its_handler_from_the_drawn_band --locked`: FAIL, 0 passed/1 failed; button drawn, effects: [].
-- `cargo fmt --all`: PASS.
-- `cargo fmt --all -- --check`: PENDING.
-- `cargo check --workspace --all-targets --locked`: PENDING.
-- `cargo clippy --workspace --all-targets --locked -- -D warnings`: PENDING.
-- `cargo test --workspace --locked`: PENDING.
-- `scripts/check_discipline.sh`: PENDING.
-- `scripts/budget.sh`: PENDING.
-- `cargo deny check`: PENDING.
-- `cargo check -p bingo-sdk -p bingo-core -p bingo-mods -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-surface-tui -p bingo --all-targets --target x86_64-pc-windows-msvc`: PENDING.
-- `scripts/tui-smoke.sh`: PENDING; no live/credential run.
-- `git diff --name-only ba70fdf6 -- crates/bingo/tests/catalogue.rs`: mechanical LinkMatcher constructor only (render: None); no new exhaustive variant arms.
-- `git diff --name-only ba70fdf6 -- crates/bingo-surface-tui/src/{pointer,input}.rs`: authorized additive band routes; pane routing unchanged.
-- `cargo test -p bingo-surface-tui component:: --locked`: PASS, 5 tests including band click, hotkey ownership and clipped/hidden action cells.
-- `git diff --name-only -- crates/bingo-surface-tui/src/layout.rs`: additive drawn band Action marks supporting authorized input routes; no seating change.
+- `git merge --no-ff dev -m 'merge: dev into M141'`: PASS, `82f8bd22` (`5446e403`) and `6c55f73a` (`6fad64ce`); inherited handlers and M151 pane seating/hit-testing retained.
+- `cargo test -p bingo-surface-rpc component_props_are_published_for_wire_clients --locked`: expected FAIL before schema registration (missing QuestionProps).
+- `cargo test -p bingo-sdk component:: --locked`: PASS, 2 tests, fifteen golden prop fixtures.
+- `cargo test -p bingo-sdk render::matched --locked`: expected FAIL before implementation; final PASS, 1 test.
+- `cargo test -p bingo-surface-tui component:: --locked`: expected FAIL before substitution; final PASS, 29 tests, fifteen TestBackend sites and counting host.
+- `cargo test -p bingo-surface-tui component:: --locked`: PASS, `permission_never_requests_question_even_with_unrestricted_hook`, `turn_complete_notice_and_duration_are_separate_ordered_requests`.
+- `cargo test -p bingo-surface-tui above_prompt_button_dispatches_its_handler_from_the_drawn_band --locked`: expected FAIL before band routing; final component suite PASS.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked`: PASS, 130 tests; plugin schemas and wire.ts regenerated after merging M151.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc --locked`: PASS, 16 unit + 41 wire tests; 1 ignored; RPC schema regenerated after merging M151.
+- `node --test sdk/typescript/src/*.test.ts`: PASS, 24 tests, opaque matcher metadata and shared helper semantics included.
+- `cargo test -p bingo --test mods_components --locked`: PASS, 2 tests (band hide; denial/rewrite/count and pane rows/reload).
+- `cargo fmt --all -- --check`: PASS.
+- `cargo check --workspace --all-targets --locked`: initial FAIL, new test missing Viewport.place; final PASS after mechanical constructor update.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: initial FAIL, doc spacing and boolean simplification; final PASS.
+- `cargo test --workspace --locked`: PASS after final refactor, 5353 passed, 0 failed, 5 ignored; inherited-handler regression and QuickJS helper/log contract pass; no live/credential run.
+- `scripts/check_discipline.sh`: initial FAIL, transcript size and test-call formatter length; final PASS after extraction; 4c unchanged, kernel names no tool.
+- `scripts/budget.sh`: PASS, 411/411 dependencies, warm core 0s, relink 0; target/debug 10 GB exceeds 5 GB soft limit (warning).
+- `cargo deny check`: PASS, advisories/bans/licenses/sources ok.
+- `cargo check -p bingo-sdk -p bingo-core -p bingo-mods -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-surface-tui -p bingo --all-targets --target x86_64-pc-windows-msvc`: Windows CI deferral, aws-lc-sys missing Windows C headers and rquickjs-sys C compiler mode; no reported Rust error.
+- `cargo check -p bingo-sdk -p bingo-core --all-targets --target x86_64-pc-windows-msvc`: PASS.
+- `cargo check -p bingo-surface-rpc --all-targets --target x86_64-pc-windows-msvc`: PASS.
+- `cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc`: Windows CI deferral, aws-lc-sys missing stdlib.h/windows.h.
+- `CC_x86_64_pc_windows_msvc='/usr/bin/clang --driver-mode=cl' cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc`: Windows CI deferral, rquickjs-sys missing stdlib.h.
+- `cargo build --locked`: PASS.
+- `scripts/tui-smoke.sh`: FAIL, `tui-smoke: it never left: Count: 1` at Counter 80×24 Escape; earlier board/activity scenarios pass at 80×24, 120×40, 200×50; M141 example step not reached.
+- `bash /tmp/m141-counter-smoke.sh`: FAIL on isolated rerun of the same Counter section, `tui-smoke: it never left: Count: 1`; both runs clean up their own temporary tmux server/home.
+- `git diff --name-only dev -- crates/bingo/tests/catalogue.rs`: mechanical LinkMatcher constructor (render: None); no exhaustive variant arms added outside Files.
+- `git diff --name-only dev -- crates/bingo-surface-tui/src/{pointer,input,layout}.rs`: authorized band routes and drawn Action marks; M151 pane routing/seating preserved.
+- `git diff --quiet dev -- scripts/check_discipline.sh`: PASS, unchanged.
