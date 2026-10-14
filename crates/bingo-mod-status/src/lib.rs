@@ -37,7 +37,6 @@ impl From<&str> for Selection {
 }
 
 pub struct Status {
-    card: bool,
     selections: Selections,
     started: Instant,
     stop: CancellationToken,
@@ -45,18 +44,10 @@ pub struct Status {
 impl Default for Status {
     fn default() -> Self {
         Self {
-            card: true,
             selections: Default::default(),
             started: Instant::now(),
             stop: Default::default(),
         }
-    }
-}
-impl Status {
-    /// Text-only compositions keep the kernel command while sharing the site.
-    pub fn with_card(mut self, card: bool) -> Self {
-        self.card = card;
-        self
     }
 }
 static MANIFEST: PluginManifest = PluginManifest {
@@ -79,16 +70,13 @@ impl Plugin for Status {
         registrar.add(Contribution::Command(Arc::new(keys::Handler(
             self.selections.clone(),
         ))));
-        let mut links = vec![
+        let links = vec![
             Arc::new(command::Open(self.selections.clone())) as Arc<dyn Interceptor>,
             Arc::new(draw::Drawing {
                 selections: self.selections.clone(),
                 started: self.started,
             }),
         ];
-        if !self.card {
-            links.remove(0);
-        }
         for link in links {
             registrar.add(Contribution::Interceptor {
                 placement: plugin::Placement::Builtin,
