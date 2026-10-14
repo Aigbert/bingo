@@ -50,7 +50,7 @@ settings key.
    them`. Unit tests with the fake provider for both, and for the
    ordinary instant path.
 8. **Docs.** ADR-0003 §5 and ADR-0004 §3 get a dated amendment line
-   pointing at ADR-0085; `docs/guide/` model page updated.
+   pointing at ADR-0085; the `guide-tui` page gains "Choosing a model".
 
 ## Decisions
 
@@ -78,7 +78,7 @@ settings key.
   emit the first multiplexed frame. Keep this gate-exposed test fix separate.
 - `cargo deny` exposed RUSTSEC-2026-0346 through 0349 in rustls 0.23.45.
   Update only that existing lockfile package to 0.23.46; add no dependency.
-- `docs/guide/` did not exist; add `docs/guide/models.md` as the model page.
+- Guides are per-crate pages; the model section lives on `guide-tui` (crates/bingo-surface-tui/src/guide.md) until M166 gives `bingo-mod-models` its own page.
 - Full upstream regeneration also changed existing request capabilities and
   dropped ids. Use `models_dev.sh --preserve-capabilities` to enrich this
   snapshot while retaining every old limit, reasoning flag and input modality.
