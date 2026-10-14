@@ -63,9 +63,9 @@ export function ui(rpc: Rpc, site: HookSite) {
   const toast = (method: string, text: string, options: {duration?:number} = {}) =>
     call<null>(method, {session:site.session,text,...options});
   return {
-    status: (text: string | null, options: {key?:string; tone?:Tone} = {}) =>
+    status: (text: string | null | undefined, options: {key?:string; tone?:Tone} = {}) =>
       rpc.request<null>('host/place', {session:site.session,slot:options.key ?? 'status',
-        view:text === null ? null : {kind:'status',text,tone:options.tone ?? 'neutral',until:null}}),
+        view:text == null ? null : {kind:'status',text,tone:options.tone ?? 'neutral',until:null}}),
     toast: (text: string, options?: {duration?:number}) => toast('toast', text, options),
     notify: (text: string, options?: {duration?:number}) => toast('notify', text, options),
     open: (options: OpenPane) => call<Record<string,never>>('open', {...options,session:site.session}),

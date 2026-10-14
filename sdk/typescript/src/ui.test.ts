@@ -58,3 +58,16 @@ test('the Node runtime declares its own hidden UI handler command', async () => 
     assert.deepEqual(initialized.commands, [{name:'counter:ui',aliases:[],hint:'',args:{kind:'none'},instant:true,hidden:true,family:'ui'}]);
   } finally {running.close();process.close();host.close();}
 });
+
+test('undefined status removes the same slot as null', async () => {
+  const { ui } = await import('./ui.ts');
+  const requests: any[] = [];
+  const api = ui({request: async (method: string, params: any) => {requests.push({method, params});return null;}} as any, {session:'s'} as any);
+  await api.status('failed');
+  await api.status(undefined);
+  await api.status(undefined, {key:'worker'});
+  assert.deepEqual(requests.map(({params}) => [params.slot, params.view]), [
+    ['status', {kind:'status',text:'failed',tone:'neutral',until:null}],
+    ['status', null], ['worker', null],
+  ]);
+});
