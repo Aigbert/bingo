@@ -38,6 +38,8 @@ record adds component names and props to the sdk.
    keys while it holds focus. A mod acts only through minted handlers
    (ADR-0079 §6). Entries come from catalogues (a mod's commands appear
    because it registered them), not from a drawing.
+   Interaction keys use the asking session's handle, opening it if absent. Their per-site order
+   stays outside the pane-action FIFO: a pane action may itself be waiting for this answer.
 4. **`KeyBar` is sealed while an interaction is open** (ADR-0082 §6):
    the keys that answer a permission ask, a question or a sign-in are
    the host's drawing.

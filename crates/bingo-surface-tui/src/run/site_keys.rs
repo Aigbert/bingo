@@ -7,27 +7,25 @@ pub(super) struct Pending {
     key: KeyEvent,
 }
 
+pub(super) struct Opened {
+    intent: IntentId,
+    action: bingo_sdk::Action,
+    handle: Result<SessionHandle, KernelError>,
+}
+
 pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
-    let (focus, asked) = if let Some((_, open)) = run
-        .session
-        .tree
-        .open_interaction()
-        .filter(|_| !run.ui.dialog.aside)
-    {
-        (open.id.to_string(), true)
-    } else if let crate::focus::Focus::Pane(focus) = &run.ui.focus {
-        (focus.clone(), false)
-    } else {
+    let Some((session, focus, asked)) = target(run) else {
         return;
     };
-    let Some(handle) = run.session.writer() else {
+    let handle = run.session.handles.get(&session).cloned();
+    if !asked && handle.is_none() {
         return run.not_yet();
-    };
+    }
     let intent = run.mint(None);
     run.site_keys.insert(
         intent.clone(),
         Pending {
-            session: run.session.tree.viewed().summary.id.clone(),
+            session: session.clone(),
             focus,
             key,
         },
@@ -35,14 +33,71 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
     if asked {
         // The action asking this question may still hold the shared queue.
         // Interaction keys already wait for their own site's acknowledgement.
-        handle.submit(intent, Input::Action { action });
-    } else {
-        run.ui.actions.push(
+        if let Some(handle) = handle {
+            handle.submit(intent, Input::Action { action });
+        } else {
+            open(run, session, intent, action);
+        }
+    } else if let Some(handle) = handle {
+        run.ui.actions.push(session, handle, intent, action);
+    }
+}
+
+fn target(run: &Run) -> Option<(SessionId, String, bool)> {
+    if let Some((owner, open)) = run
+        .session
+        .tree
+        .open_interaction()
+        .filter(|_| !run.ui.dialog.aside)
+    {
+        return Some((owner.summary.id.clone(), open.id.to_string(), true));
+    }
+    if let crate::focus::Focus::Pane(focus) = &run.ui.focus {
+        return Some((
             run.session.tree.viewed().summary.id.clone(),
-            handle,
+            focus.clone(),
+            false,
+        ));
+    }
+    None
+}
+
+fn open(run: &mut Run, session: SessionId, intent: IntentId, action: bingo_sdk::Action) {
+    let host = run.host.clone();
+    run.spawn(async move {
+        let handle = host
+            .open(
+                SessionSelector::ById { id: session },
+                identity(),
+                OpenOptions::default(),
+            )
+            .await
+            .map(|attachment| attachment.handle);
+        Ok(Reply::SiteKeyOpened(Box::new(Opened {
             intent,
             action,
-        );
+            handle,
+        })))
+    });
+}
+
+pub(super) fn opened(run: &mut Run, opened: Opened) {
+    let Some(pending) = run.site_keys.get(&opened.intent) else {
+        return;
+    };
+    match opened.handle {
+        Ok(handle) => {
+            run.session
+                .handles
+                .insert(pending.session.clone(), handle.clone());
+            handle.submit(
+                opened.intent,
+                Input::Action {
+                    action: opened.action,
+                },
+            );
+        }
+        Err(error) => run.ack(&opened.intent, &IntentOutcome::Rejected { error }),
     }
 }
 

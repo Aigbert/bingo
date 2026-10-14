@@ -79,6 +79,7 @@ enum Reply {
     /// A child's mailbox, so a line typed in its view reaches it. The
     /// attachment's own stream is dropped: the tree's carries the child.
     Handle(SessionId, SessionHandle),
+    SiteKeyOpened(Box<site_keys::Opened>),
     Sessions(Vec<SessionSummary>),
     Resume(SessionId, Option<Box<SessionSummary>>),
     /// What the store holds, for the switcher's stored rows.
@@ -897,6 +898,7 @@ impl Run {
                 site_keys::drain(self);
             }
             Reply::Attached(attachment) => self.attach(*attachment, events),
+            Reply::SiteKeyOpened(opened) => site_keys::opened(self, *opened),
             Reply::Handle(session, handle) => {
                 self.session.handles.insert(session, handle);
             }

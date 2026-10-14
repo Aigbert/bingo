@@ -470,3 +470,114 @@ async fn escape_interrupts_even_without_an_offered_cancellation_answer() {
         );
     }
 }
+
+fn cross_session_question(run: &mut Run, child_asks: bool) -> bingo_sdk::Interaction {
+    let mut open = question(false, true);
+    let stamp = if child_asks { child_frame } else { frame };
+    open.session = if child_asks {
+        child_id()
+    } else {
+        state().summary.id
+    };
+    run.session.tree = folded_tree(vec![
+        child_frame(1, announced("child")),
+        stamp(
+            2,
+            Event::ConfigChanged {
+                config: bingo_sdk::ConfigView {
+                    kernel: json!({"render":{"Question":[{}]}}),
+                    ..Default::default()
+                },
+            },
+        ),
+        stamp(3, opened(open.clone())),
+    ]);
+    run.session.tree.show(&if child_asks {
+        state().summary.id
+    } else {
+        child_id()
+    });
+    interactions::refocus(run);
+    open
+}
+
+async fn answer_across_sessions(child_asks: bool, cached: bool) {
+    let (host, root, child) = crate::doubles::TestHost::tree(Vec::new());
+    let now = still(scene().1);
+    let mut run = tests::idle_in(state(), root.clone(), now.instant);
+    run.host = host;
+    let (replies, mut waiting) = mpsc::channel(4);
+    run.replies = replies;
+    let open = cross_session_question(&mut run, child_asks);
+    if cached {
+        run.session
+            .handles
+            .insert(child_id(), SessionHandle(child.clone()));
+    }
+    pull_question(&mut run, 108, now);
+    run.terminal_event(Term::Key(typed('2')));
+    assert_eq!(
+        run.site_keys.len(),
+        1,
+        "retain the key for its asking session"
+    );
+    if child_asks && !cached {
+        let reply = tokio::time::timeout(Duration::from_secs(1), waiting.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        run.reply(reply, &mut None);
+    }
+    let (asking, other) = if child_asks {
+        (&child, &root)
+    } else {
+        (&root, &child)
+    };
+    assert_eq!(asking.submitted().len(), 1, "send to the ask's owner");
+    assert!(
+        other.submitted().is_empty(),
+        "the viewed session must not receive the key"
+    );
+    answer_key(&mut run, &asking.submissions()[0], &open);
+    assert!(matches!(&root.answers()[0].1, bingo_sdk::Answer::Choice { ids, .. } if ids == &["o"]));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_root_question_accepts_keys_while_viewing_a_child_without_a_writer() {
+    answer_across_sessions(false, false).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_child_question_uses_its_owner_handle_including_before_it_arrives() {
+    for cached in [true, false] {
+        answer_across_sessions(true, cached).await;
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_failed_owner_open_releases_the_pending_question_key() {
+    let (mut run, session, now) = question_run();
+    cross_session_question(&mut run, true);
+    let host = bingo_sdk::testing::TestHost::default();
+    host.on_open(|_, _, _| async {
+        Err(KernelError::new(
+            bingo_sdk::ErrorCode::NotFound,
+            "fixture owner closed",
+        ))
+    });
+    run.host = host.handle();
+    let (replies, mut waiting) = mpsc::channel(4);
+    run.replies = replies;
+    pull_question(&mut run, 108, now);
+    run.terminal_event(Term::Key(typed('2')));
+    assert_eq!(run.site_keys.len(), 1);
+    let reply = tokio::time::timeout(Duration::from_secs(1), waiting.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    run.reply(reply, &mut None);
+    assert!(run.site_keys.is_empty());
+    assert!(run.mine.is_empty());
+    assert!(session.submitted().is_empty());
+    assert!(session.answers().is_empty());
+}
