@@ -65,13 +65,13 @@ M149 (ember), M150 (crew). ADR-0078 §5 grants remain unchanged.
       bingo-sdk render::`, `cargo test -p bingo-surface-tui pane::`.
 - [x] Five TestBackend snapshots: side 200×50, above 100×30, collapsed
       60×15, corner rect 120×40, permission above floating pane.
-- [ ] `cargo test -p bingo --test mods_ui`: seated place/dimensions cross
-      RPC and resize pass individually; the added coexistence regression fails.
-- [ ] Own isolated tmux drive: Counter/Corner at 200×50, 100×30, 60×15;
-      collapsed click, title cycle and key cycle pass; false render notices
-      leave the combined acceptance drive unverified. Capture results recorded.
-- [ ] `scripts/tui-smoke.sh`, all sequential protocol gates, Windows checks
-      for each touched crate; only known third-party C-header deferrals.
+- [x] `cargo test -p bingo --test mods_ui`: seated place/dimensions cross
+      RPC and resize; coexistence passes with unchanged assertions.
+- [x] Own isolated tmux drive: Counter/Corner at 200×50, 100×30, 60×15;
+      collapsed click, title cycle, alt+p cycle and Corner raster pass
+      without foreign-handler notices. Capture results recorded.
+- [x] `scripts/tui-smoke.sh` and all sequential native gates pass; SDK/core
+      MSVC checks pass. TUI/mods/bin defer only for known C headers to Windows CI.
 
 ## Non-goals
 
@@ -89,25 +89,14 @@ taking the screen; covering composer/status/permission; `open.isPlaced`
 - Latest released tag is v0.6.5; delegate authorizes scoped protocol-2
   amendments with a dated ADR-0075 line. Kernel/sdk name no tool;
   discipline 4c is unchanged. No live or credential tests.
+- Windows CI owns TUI (`aws-lc-sys`) and mods/bin (`aws-lc-sys`, `rquickjs-sys`) C-header deferrals; no Rust error reported or toolchain installed.
 - Mechanical constructors outside Files: core `host/render_queue.rs`
   (`Viewport.place: None`) and TUI `toast.rs` (pane defaults).
 
 - 2026-10-14, delegate: keep `ctrl+p` absent and M148’s test unchanged; use dim for the focused label, add only `pane/draw.rs` to the dim allowlist, keep presence/tokens fixed, and correct/review the 80×24 help snapshots.
 - `alt+p` means “place”; `keys.rs` has no binding and composer `alt()` handles only b/f/Enter, so this chord is free and applies only to a focused pane.
 
-- **Stopped 2026-10-14, protocol §6: render ownership.** The isolated
-  drive completed every placement step on retry (the first harness click
-  landed on blank transcript space and Esc closed Counter). Both drives
-  emitted `corner (ui.render): /children/2: handler belongs to another command`.
-  A fake-provider coexistence test now reproduces that false notice.
-- `bingo-core/src/chain/render.rs` validates every link’s returned tree
-  against that link’s id, including a pass-through of another mod’s valid
-  handlers. The necessary repair is outside Files and in M141’s area;
-  no core behavior was changed and no further gates were run.
-- Options: authorize a scoped core fix that preserves validated inherited
-  handlers while rejecting forged/modified foreign handlers, coordinated
-  with M141; or resume after M141 supplies the equivalent fix. Do not hide
-  the notice or remove the coexistence assertion. ADR-0081 §7 stays proposed.
+- 2026-10-14: merged dev fix `5446e403` in `7402c179`; inherited-handler coexistence regression passes with its assertions unchanged.
 
 ## Verified (2026-10-14)
 
@@ -125,19 +114,31 @@ taking the screen; covering composer/status/permission; `open.isPlaced`
 | `cargo test -p bingo-plugin-rpc protocol_two_keeps_every_frozen_shape --lib --locked` | ok: 1 passed. |
 | `git diff --name-only ba70fdf6 -- crates/bingo-core/src/host/render_queue.rs crates/bingo-surface-tui/src/toast.rs` | Mechanical constructors: `crates/bingo-core/src/host/render_queue.rs`, `crates/bingo-surface-tui/src/toast.rs`. |
 | `cargo fmt --all -- --check` | exit 0. |
-| `cargo check --workspace --all-targets --locked` | Finished dev profile in 26.46s; exit 0. |
-| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Finished dev profile in 26.78s; exit 0. |
+| `cargo check --workspace --all-targets --locked` | Finished dev profile in 26.23s; exit 0 (post-merge). |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Finished dev profile in 29.24s; exit 0 (post-merge). |
 | `cargo test --workspace --locked` (before delegate corrections) | FAILED: TUI 1110 passed, 6 failed, 2 ignored; exit 101. |
-| `scripts/check_discipline.sh` | Pending after render-ownership stop. |
-| `scripts/budget.sh` | Pending after render-ownership stop. |
-| `cargo deny check` | Pending after render-ownership stop. |
-| `cargo check -p bingo-sdk -p bingo-core -p bingo-surface-tui -p bingo-mods -p bingo --all-targets --target x86_64-pc-windows-msvc --locked` | Pending after render-ownership stop. |
-| `scripts/tui-smoke.sh` | Pending after render-ownership stop. |
-| `tmux -L <isolated-socket> capture-pane -p -t m151` (Counter, isolated retry) | 200×50: `Seat: side 64x43`; 100×30: `Seat: above 100x9`; 60×15: `Counter ▸`. |
-| `tmux -L <isolated-socket> capture-pane -p -t m151` (click/key) | Click collapsed: `overlay ▾`; click title: `Seat: above 200x9`; alt+p: `Seat: side 64x43`. |
-| `tmux -L <isolated-socket> capture-pane -p -t m151` (both, isolated retry) | 200×50: Counter/Corner; 100×30: above/Corner; 60×15: Counter collapsed; repeated false foreign-handler notices. |
+| `scripts/check_discipline.sh` | `discipline ok`; existing advisories; rule 4c unchanged. |
+| `scripts/budget.sh` | `budget ok`; 411/411 dependencies; core 0s; relink 0; target/debug 10 GB (soft max 5). |
+| `cargo deny check` | `advisories ok, bans ok, licenses ok, sources ok`; exit 0. |
+| `scripts/tui-smoke.sh` | `tui-smoke ok`; board/activity at 80×24, 120×40, 200×50; Counter at 80×24/200×24; ctrl+p unbound. |
+| `tmux -L <isolated-socket> capture-pane -p -t m151` (Counter, post-merge) | 200×50: `Seat: side 64x43`; 100×30: `Seat: above 100x9`; 60×15: `Counter ▸`. |
+| `tmux -L <isolated-socket> capture-pane -p -t m151` (click/key, post-merge) | Click collapsed: `overlay ▾`; click title: `Seat: above 200x9`; alt+p: `Seat: side 64x43`. |
+| `tmux -L <isolated-socket> capture-pane -p -t m151` (both, post-merge) | 200×50: side/Corner; 100×30: above/Corner; 60×15: Counter collapsed/Corner; raster rendered at every size; no foreign-handler notices. |
 | `cargo test -p bingo-surface-tui collapse_click_and_title_and_key_cycle_fit_without_changing_session_data --locked` (before key correction) | FAILED: 0 passed, 1 failed; ctrl+p moved the pane. |
 | `INSTA_UPDATE=always cargo test -p bingo-surface-tui --lib --locked` | ok: 1116 passed, 0 failed, 2 ignored; unchanged M148 test and 80×24 footer test pass. |
 | `git diff -- crates/bingo-surface-tui/src/snapshots/` (delegate correction) | Reviewed sheet_slide, sheet_close, help_80x30, help_100x30 and help_panel; binding rows only, footer retained. |
-| `cargo build -p bingo --locked` | Finished dev profile in 20.73s; exit 0. |
+| `cargo build -p bingo --locked` | Finished dev profile in 25.81s; exit 0 (post-merge). |
 | `cargo test -p bingo --test mods_ui --locked unrelated_pane_mods_pass_through_each_others_handlers_without_notices -- --exact` | FAILED: 0 passed, 1 failed; valid inherited handler rejected: `corner (ui.render): /children/2: handler belongs to another command`. |
+| `cargo test -p bingo --test mods_ui --locked` (after merging dev) | ok: 3 passed, 0 failed; coexistence assertions unchanged. |
+| `cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed` | exit 0; summed 5311 passed, 0 failed, 5 existing manual/stress ignores; PTY 16 passed. |
+| `cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1` | ok: 1 passed, 0 failed. |
+| `cargo test -p bingo-provider-acp --test bridge --locked token -- --test-threads=1` | ok: 3 passed, 0 failed; the other three excluded token tests. |
+| `cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc --locked` | Finished dev profile in 6.55s; exit 0. |
+| `cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked` | Finished dev profile in 13.69s; exit 0. |
+| `cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc --locked` | exit 101; Windows CI: aws-lc-sys lacks stdlib.h/windows.h. |
+| `cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc --locked` | exit 101; rquickjs-sys MSVC flags need Clang cl mode; aws-lc-sys lacks Windows headers. |
+| `cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc --locked` | exit 101; rquickjs-sys MSVC flags need Clang cl mode; aws-lc-sys lacks Windows headers. |
+| `CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc --locked` | exit 101; Windows CI: rquickjs-sys lacks stdlib.h; aws-lc-sys lacks stdlib.h/windows.h. |
+| `CC_x86_64_pc_windows_msvc='clang --driver-mode=cl' cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc --locked` | exit 101; Windows CI: rquickjs-sys lacks stdlib.h; aws-lc-sys lacks stdlib.h/windows.h. |
+| `git diff cb2a1f35 -- crates/bingo/tests/mods_ui.rs` | Empty; regression assertions unchanged. |
+| `git diff --check` | exit 0. |
