@@ -15,6 +15,7 @@ journal, the turn state machine, the permission gate and the plugin host;
 providers, tools, the permission policy, hooks, skills, MCP servers, session
 storage and every surface are plugins behind `bingo-sdk` traits, and no surface
 holds session state. This page is the map; what a plugin owns is on its page.
+Extending bingo with code means a mod; read `guide-mods` to write, fix or explain one.
 
 ## Running it
 
@@ -82,8 +83,7 @@ that claims it, and is named on that plugin's page.
 ## Where things live
 
 - `~/.bingo/` — `settings.toml`, `skills/`, `data/` (sessions, logs, history).
-- `<project>/.bingo/` — `settings.toml`, `settings.local.toml`, `skills/`:
-  above the person's for settings, below them for skills.
+- `<project>/.bingo/` — `settings.toml`, `settings.local.toml`, `skills/`: above the user's settings, below their skills.
 - `AGENTS.md`, or `CLAUDE.md` where there is none, in each directory from the
   project root down to the working one: instructions the model is given, the
   nearest last.

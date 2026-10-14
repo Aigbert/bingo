@@ -2,6 +2,7 @@
 pub mod budget;
 pub mod engine;
 mod globals;
+mod guide;
 mod imports;
 pub mod load;
 mod meter;
