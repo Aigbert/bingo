@@ -44,7 +44,7 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
 - `docs/design/mods-parity-2026-10.md`: matrix evidence.
 - Owner plans, only to record missing §8 Non-goals (brick 6).
 
-2026-10-14: delegate widened scope to both validator blockers and shared loading/schema paths:
+2026-10-14: delegate widened scope to every port compatibility gap; no new kernel door/noun or ADR Decision change:
 - `crates/bingo-mods/src/validate/{dollar,source,tests}.rs`,
   `src/{lib,imports,strip,load,mount,module,chain}.rs`, `src/dollar/{table,tests,callback}.rs`,
   `tests/{strip,engine,testing,plugin}.rs`: schema-derived data reads and erased imports.
@@ -52,6 +52,11 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
   `crates/bingo-plugin-rpc/src/{wire,bridge,validate}.rs`, generated plugin schemas/wire,
   `docs/adr/0075-plugin-protocol-2.md`: plugin metadata in both transports.
 - `crates/bingo/src/plugins/test/driver.rs`: test metadata parity.
+- `crates/bingo-sdk/src/{catalogue,intercept}*`, `crates/bingo-core/src/chain/`:
+  deny-only results and core regressions; generated catalogue/protocol types.
+- `crates/bingo-mods/src/validate/{hooks,keys}.rs`, SDK state/UI/command/clock
+  helpers and their existing tests; shared dollar/runtime/testing paths:
+  static matchers, object atom keys, status clear, and port-required contracts.
 
 ## Exit criteria
 
@@ -84,20 +89,12 @@ Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected
   All originals read; tool inputs agree; Linux CI requires Node 24.17.0. Examples remain rewrites.
 - Both authorized blockers fixed: schema-derived data reads preserve alias refusals; erased imports share the runtime boundary and never load d.ts.
   mount.rs folds Views, not sources; Engine/Runner share load.rs/strip.rs.
-- STOP, protocol §6: the new port failures need additional Files/scope:
-  M142 `validate/{keys,hooks}.rs` rejects object atom keys and constant
-  matcher values; M138 SDK state helpers also require string atom keys.
-  M136/M137 tool.call rejects deny-only results; M140 ui.status(undefined)
-  does not clear status. Port tests reproduce denied edits running and a
-  failure status remaining after success. No runtime fix attempted for these.
-- Options: explicitly widen M146 to these validator/runtime contracts and
-  tests, or leave parity incomplete. No live milestone owner remains.
-  New kernel doors/nouns or changed Decisions still require a stop.
-- Source-inspected, not yet closed: numeric clock.now, callback-free command
-  registration (M138), synchronous ui.resolve (M140). Missing catch/120 s
-  tests and the band/pane behavior implementations remain pending.
+- Delegate authorized all exposed compatibility gaps, each in its own fix commit
+  after a failing test. New kernel doors/nouns or ADR Decision changes still stop.
+- Pending: deny-only results, status clear, static matchers, object atom keys,
+  numeric clock, callback-free commands, synchronous resolve, remaining parity.
 
-## Verified (2026-10-14, incomplete; stopped again)
+## Verified (2026-10-14, in progress)
 
 No live/credential tests, foreign processes, terminal apps or tmux runs.
 `cargo test -p bingo-mods --lib noun_data_reads_are_values_but_noun_and_method_aliases_are_not --locked`:
@@ -136,7 +133,7 @@ pane validate: exit 1; test: exit 1 (tool-calls not opened)
 ```
 The script now runs only committed *.parity.test.ts on originals; independent
 rewrite-only behavior tests still run on the committed examples.
-Gate commands/results: remaining gates not run after the protocol stop.
+Gate commands/results: pending completion of compatibility fixes.
 - `cargo fmt --all -- --check`: prior-run pass; formatting applied this run.
 - `cargo check --workspace --all-targets --locked`: not run.
 - `cargo clippy --workspace --all-targets --locked -- -D warnings`: not run.
