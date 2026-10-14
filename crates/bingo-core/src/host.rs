@@ -594,11 +594,6 @@ impl Host {
         self.live(id)?.mailbox.compact(instructions).await
     }
 
-    /// The settings layers used to resolve a live configuration change.
-    pub(crate) fn settings_layers(&self) -> &[settings::Layer] {
-        &self.config.layers
-    }
-
     /// The directories this process runs in; what a command that writes a
     /// settings file needs to find one (ADR-0008 §8).
     pub fn env(&self) -> &Env {

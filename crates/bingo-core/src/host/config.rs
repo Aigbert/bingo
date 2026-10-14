@@ -44,3 +44,10 @@ impl HostConfig {
         self
     }
 }
+
+impl super::Host {
+    /// The settings layers used to resolve a live configuration change.
+    pub(crate) fn settings_layers(&self) -> &[Layer] {
+        &self.config.layers
+    }
+}
