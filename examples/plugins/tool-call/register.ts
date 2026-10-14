@@ -7,6 +7,10 @@ export function register(on: On) {
   on('tool.check', {tool: 'Edit'}, async ($, event, next) => {
     const checked = await next(event);
     const path = String(event.file_path ?? '').replaceAll('\\', '/');
+    const basename = path.slice(path.lastIndexOf('/') + 1);
+    if (basename === '.env' || basename.startsWith('.env.')) {
+      return {...checked, decision: {kind: 'deny', reason: {kind: 'hook', hook: `${$.plugin.name}: protected environment file ${path}`}}};
+    }
     if (path === 'protected.txt' || path.endsWith('/protected.txt')) {
       return {...checked, decision: {kind: 'deny', reason: {kind: 'hook', hook: 'example-tool-call: protected file'}}};
     }
@@ -17,8 +21,11 @@ export function register(on: On) {
       await update($, calls, count => count + 1);
       await $.ui.status(`Example calls: ${await read($, calls)}`);
     }
-    if (event.tool === 'Bash' && event.command === 'echo before') {
-      return next({...event, command: 'echo after'});
+    if (event.tool === 'Bash') {
+      const command = event.command.trim();
+      const result = await next({...event, command: command === 'echo before' ? 'echo after' : command});
+      await $.ui.status(result.isError ? `failed: ${command}` : null, {key:'failure'});
+      return result;
     }
     return next(event);
   });
