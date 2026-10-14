@@ -121,11 +121,12 @@ async fn ask(host: Weak<Host>, provider: Endpoint) -> Refreshed {
 
 async fn current(host: &Host, endpoint: &Endpoint) -> bool {
     match endpoint {
-        Endpoint::Provider(provider) => host
-            .providers()
-            .await
-            .iter()
-            .any(|p| Arc::ptr_eq(p, provider)),
+        Endpoint::Provider(provider) => {
+            if let Some(current) = host.registry.provider_state.instances.current(provider) {
+                return current;
+            }
+            host.providers().await.iter().any(|p| p.id() == provider.id())
+        }
         Endpoint::Agent(_) => true,
     }
 }

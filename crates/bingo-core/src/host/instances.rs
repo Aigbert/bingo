@@ -25,6 +25,11 @@ impl Instances {
         providers
     }
 
+    pub fn current(&self, provider: &Arc<dyn Provider>) -> Option<bool> {
+        self.entries.lock().unwrap_or_else(|p| p.into_inner())
+            .get(provider.id()).map(|entry| entry.as_ref().is_some_and(|p| Arc::ptr_eq(p, provider)))
+    }
+
     pub fn replace(&self, name: &str, provider: Option<Arc<dyn Provider>>) {
         self.entries
             .lock()
