@@ -62,28 +62,27 @@ the kernel's `/status` key-value view stays as the plain fallback.
 
 ## Exit criteria
 
-- [ ] Parts fixture and sum test; spent and rows tables; forget test.
-- [ ] Snapshots: overview, long chat with two rules, a failed plugin,
+- [x] Parts fixture and sum test; spent and rows tables; forget test.
+- [x] Snapshots: overview, long chat with two rules, a failed plugin,
       a waiting one, an MCP server needing sign-in, at both sizes.
-- [ ] `TestBackend`: each row's `⏎` reaches its command; spent is
+- [x] `TestBackend`: each row's `⏎` reaches its command; spent is
       skipped by `↑↓`; esc closes; live redraw keeps the row.
-- [ ] `enabledPlugins: {"bingo.mod.status": false}`: `/status` draws the
+- [x] `enabledPlugins: {"bingo.mod.status": false}`: `/status` draws the
       kernel's key-value view.
-- [ ] tmux drive in a temp HOME against the fake provider, captured and
+- [x] tmux drive in a temp HOME against the fake provider, captured and
       compared with the prototype; tui-smoke; native gates as M167.
 - [ ] Windows checks for every touched crate (record C-toolchain deferrals).
 
 ## Decisions
 
-- The Status site lives in the existing focused, pulled pane above the composer,
-  capped at half the viewport. Its keys use the existing pane FIFO and escape
-  path. Empty pane titles omit surface chrome so the shared tree owns the
-  single header line. Pane props supply the body height to the pull cache.
-  No palette files or new action queue are needed.
-- A row command runs through the session handle; its terminal acknowledgement
-  returns as the original site key result. Otherwise the TUI ignores the view
-  on an intent it did not submit. The instant handler holds no actor queue,
-  so it can await that result while preserving the existing surface FIFO.
+- The Status site lives in the existing focused, pulled pane above the composer, capped at
+  half the viewport. Its keys use the existing pane FIFO and escape path. Empty pane titles
+  omit surface chrome so the shared tree owns the single header line. Pane props supply the
+  body height to the pull cache. No palette files or new action queue are needed.
+- A row command runs through the session handle; its terminal acknowledgement returns as the
+  original site key result. Otherwise the TUI ignores the view on an intent it did not submit.
+  The instant handler holds no actor queue, so it can await that result while preserving the
+  existing surface FIFO.
 - Pane/status pulls wait for the existing action FIFO to drain: replacing a
   drawing earlier can revoke callbacks still referenced by queued edits. Question
   and form pulls stay live; no queue or ordering state is added.
@@ -95,15 +94,13 @@ the kernel's `/status` key-value view stays as the plain fallback.
 - Cost is an estimate at the current model's catalogue rates, explicitly labelled;
   a session may have changed models. Cache writes have no catalogue rate, so cost
   is unknown when they occur, as it is for missing input/output/cache-read rates.
-- A Vec removed Copy and required edits in M172-owned mods. The four fixed
-  categories instead use an optional array and Copy ContextKind names. JSON
-  remains an additive array; absent means unknown. Consumers need only literal
-  updates. Shared token estimation owns the split.
-- Command::spec and catalog(Commands) are host-wide; command.describe receives
-  session "host", not the asking session. A dynamic rule ArgSpec would list no
-  rules or leak another session's rules. Keep a free rule argument; the card
-  supplies exact session rules. Session-aware completion belongs to a later
-  catalogue contract, outside M168's protected palette files.
+- A Vec removed Copy and required edits in M172-owned mods. The four fixed categories instead
+  use an optional array and Copy ContextKind names. JSON remains an additive array; absent
+  means unknown. Consumers need only literal updates. Shared token estimation owns the split.
+- Command::spec and catalog(Commands) are host-wide; command.describe receives session "host",
+  not the asking session. A dynamic rule ArgSpec would list no rules or leak another session's
+  rules. Keep a free rule argument; the card supplies exact session rules. Session-aware
+  completion belongs to a later catalogue contract, outside M168's protected palette files.
 - Command hooks carry no asking surface. Binary composition keeps the plain
   kernel command in print/channel-only runs; terminal and RPC runs install the
   opener. This preserves existing text/NDJSON status behavior without a new
@@ -125,3 +122,27 @@ a cost history across sessions; the desktop's drawing.
   `about`, and the sum test checks the independent local estimate.
 - A summary row that names every failing thing can overflow at 80
   columns: the row truncates names after the first with `+N`.
+
+## Verified — 2026-10-15
+
+Gates ran serially. Provider/proxy environment overrides were unset for local/fake-provider tests and isolated tmux runs; no live-provider or credential tests were added.
+
+| Command | Output summary |
+| --- | --- |
+| `cargo fmt --all -- --check` | exit 0 |
+| `cargo check --workspace --all-targets --locked` | Finished `dev` profile; exit 0 |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Finished `dev` profile; exit 0 |
+| `cargo test --workspace --locked` | 172 groups; 5719 passed; 0 failed; 5 ignored |
+| `bash scripts/check_discipline.sh` | discipline ok; advisory warnings only |
+| `bash scripts/budget.sh` | dependencies 414/414; warm core 0s; relink 0; budget ok; target/debug 8 GB soft-limit warning |
+| `cargo deny check` | advisories ok, bans ok, licenses ok, sources ok |
+| `bash scripts/tui-smoke.sh` | tui-smoke ok; Counter input persisted at 80/200 columns; question/form cases passed |
+| `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked` | Pass: bingo-context, bingo-core, bingo-experience, bingo-mod-status, bingo-persona, bingo-sdk, bingo-services, bingo-skills, bingo-tasks |
+| Same Windows command, remaining seven crates | Deferred: bingo, bingo-channel-feishu, bingo-mcp, bingo-plugin-rpc, bingo-surface-print, bingo-surface-tui (`aws-lc-sys`: missing Windows C headers); bingo-permissions (`tree-sitter`/`tree-sitter-bash`: missing stdio.h/stdlib.h) |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p <crate> --locked` generator tests | SDK, plugin-rpc, surface-rpc, store-jsonl and mods generators passed; schema/ and sdk/typescript regenerated |
+| `npm test` in sdk/typescript | tests 31; pass 31; fail 0 |
+| Status tests and isolated tmux drive | 10 TestBackend snapshots; 3 RPC tests; 7 mod tests; 108x30/80x24 captures compared with prototype; arrows skip spent, Escape closes, Enter displays /rename |
+
+An initial mock CLI test inherited OPENAI_BASE_URL and failed with AUTH_REQUIRED; sanitized runs pass. No auth code changed.
+PTY load flakes: `esc_twice_rewinds_the_turn_and_the_file_it_wrote` and `look::a_terminal_whose_ground_turns_light_is_followed_within_one_focus` each failed once, then passed alone in 3.03s/3.12s; the final full suite passes.
+The smoke exposed a stale counter callback during queued input; the existing-FIFO pull guard and its regression test fix it. The final smoke passes. Windows remains unticked because seven checks stop in native C dependencies before Rust checking completes.
