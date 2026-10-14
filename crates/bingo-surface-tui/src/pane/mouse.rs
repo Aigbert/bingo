@@ -72,7 +72,6 @@ fn focus(ui: &mut Ui, state: &SessionState, key: &str) {
     let seating = super::seating(ui, state, ui.shown.seating.area);
     let focusable = placed(state).iter().any(|pane| {
         pane.key == key
-            && pane.focus
             && seating
                 .panes
                 .iter()

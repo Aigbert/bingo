@@ -49,25 +49,60 @@ fn type_x(ui: &mut crate::ui::Ui, tree: &crate::tree::Tree, now: crate::clock::N
     assert_eq!(ui.composer.text(), "x");
 }
 #[test]
-fn waiting_unfocusable_pane_opens_without_taking_composer_keys() {
-    for (focus, button) in [(false, false), (false, true), (true, false)] {
+fn waiting_click_opens_without_taking_composer_keys() {
+    for (focus, button) in [(false, false), (false, true), (true, false), (true, true)] {
         let tree = solo(&fixture(focus, false, button));
         let (mut ui, now) = scene();
         draw_tree(80, 24, &tree, &mut ui, now);
         let area = ui.shown.waiting[0].1;
         click(&mut ui, &tree, area, now);
         assert!(matches!(ui.focus, Focus::Composer));
-        let tree = solo(&fixture(focus, true, button));
+        type_x(&mut ui, &tree, now);
+    }
+}
+#[test]
+fn text_only_pane_click_leaves_keys_with_the_composer() {
+    for focus in [false, true] {
+        let tree = solo(&fixture(focus, true, false));
+        let (mut ui, now) = scene();
         let screen = draw_tree(80, 24, &tree, &mut ui, now);
-        assert!(
-            screen.contains(if button { "Run" } else { "PANE ART" }),
-            "{screen}"
-        );
+        assert!(screen.contains("PANE ART"), "{screen}");
+        ui.focus = Focus::Composer;
         let area = ui.shown.seating.panes[0].area;
         click(&mut ui, &tree, area, now);
         assert!(matches!(ui.focus, Focus::Composer));
         type_x(&mut ui, &tree, now);
     }
+}
+/// `focus` asks for the keys when the pane opens; a person's click on a pane
+/// with controls gives them whatever the pane asked for at open.
+#[test]
+fn clicked_pane_with_a_hotkey_takes_its_letter() {
+    let mut state = fixture(false, true, true);
+    state
+        .signals
+        .get_mut("test")
+        .unwrap()
+        .get_mut("pane")
+        .unwrap()["slots"][0]["view"]["hotkey"] = json!("a");
+    let tree = solo(&state);
+    let (mut ui, now) = scene();
+    draw_tree(80, 24, &tree, &mut ui, now);
+    assert!(matches!(ui.focus, Focus::Composer));
+    let area = ui.shown.seating.panes[0].area;
+    click(&mut ui, &tree, area, now);
+    assert!(matches!(ui.focus, Focus::Pane(_)));
+    let effects = crate::input::on_key(
+        &mut ui,
+        &tree,
+        KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE),
+        now,
+    );
+    assert!(
+        matches!(&effects[..], [crate::effect::Effect::Submit(bingo_sdk::Input::Action { action })] if action.name == "test:run"),
+        "{effects:?}"
+    );
+    assert_eq!(ui.composer.text(), "");
 }
 #[test]
 fn composer_status_and_foot_clicks_release_a_button_pane() {
