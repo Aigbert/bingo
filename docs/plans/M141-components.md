@@ -2,16 +2,11 @@
 
 ## Goal
 
-ADR-0079 §4: the surface's own drawings become components a `ui.render`
-hook may answer — a tool row, a message, the spinner, the band above the
-prompt. The host publishes which components some loaded hook matches;
-the TUI asks only about those, draws its own drawing until the answer
-arrives, and draws an `Engine` node as its own drawing with the props
-the hook gave it. The permission prompt is never a component. `$.ui.log`
-finishes the pulled half of `$.ui`, and `'bingo'` gains its state
-helpers (ADR-0078 §8). The proof is three examples of bingo's own,
-`tool-call`, `band` and `pane`, which do what Claude Code's authoring
-examples of those names do and draw in the TUI. After M138 and M140; see the re-verification below.
+ADR-0079 §4: matched `ui.render` hooks answer the surface's own drawings.
+Typed props feed Engine substitution; unmatched sites keep their drawing.
+Permission prompts stay private. Add `$.ui.log`, shared state helpers and
+original tool-call/band/pane examples, proved over RPC and in the TUI.
+After M138 and M140; landed dependencies are recorded below.
 
 ## Bricks, in build order
 
@@ -82,50 +77,70 @@ examples of those names do and draw in the TUI. After M138 and M140; see the re-
 
 ## Non-goals
 
-- `$.ui.copy`, `scroll`, `focus`, `selection` and `open`'s `isPlaced`:
-  gaps in design §8, since a surface's scroll, focus, selection,
-  clipboard and placement are its own.
-- A desktop drawing components (ADR-0080); print and channels asking
-  (`text` folds); vscode and mobile.
-- `bingo plugins test`, `$.ui.mount` and the examples' tests (M142);
-  `prompt.edit`.
+Clipboard/scroll/focus/selection APIs, isPlaced, desktop/print/channel component
+pulls, prompt.edit, M142's kit/mount/example tests and M151's pane placement.
 
 ## Risks
 
-- **Props carry what `own` needs.** A component's drawing reads only its
-  props, or a rewritten prop changes nothing. Where today's drawing
-  reads more — local expansion, the width cut, the theme — that moves
-  into the props (`isExpanded`, `bodyColumns`) or the `Render` context
-  (M125), never into a second copy of the item.
-- **Height changes on arrival.** A row's own drawing is replaced by its
-  answer once per (request, generation); if the drive shows a jump, the
-  first ask happens before the row is first painted.
-- **Cost under `ToolUse`.** Every visible row asks; the four-in-flight
-  bound and the memo keep scrolling cheap, as the drive measures.
+Props must drive their own drawing; memo generations must account for changed
+height without scroll jumps. Only visible rows ask, through the bounded queue.
+
+**STOP — 2026-10-14, protocol step 6.** The TestBackend draws the AbovePrompt
+Button, but clicking it and pressing Enter returns `effects: []`. The failing
+`above_prompt_button_dispatches_its_handler_from_the_drawn_band` test pins this.
+`pointer.rs::pressed` routes pane clicks, then transcript clicks; `input.rs`
+routes controls only for `Focus::Pane`. The band has no focus/input route.
+The required behavioural edits to input/pointer/focus/layout are outside Files;
+this is not a mechanical exhaustive-match arm. Pointer work overlaps M151.
+Options: authorize M141's generic component-control routing in those modules
+with M151 coordination; or assign that routing to M151/a prerequisite and
+resume M141 afterward. Do not disguise an Activity band as a Pane to bypass
+scope. No ADR decision was changed; no out-of-scope input fix was attempted.
+
+Partial implementation: typed contracts/schemas, matcher publication, Engine
+substitution, transcript and AbovePrompt pulls. Remaining: other component
+sites, permission/completion tests, ui.log, helpers, examples, acceptance and
+all final gates. The branch deliberately retains the failing band contract.
 
 ## Re-verified (2026-10-14, ba70fdf6)
 
 - Landed prerequisites: M137 `c1d95e8c`, M138 `5581b978`, M139 `686ad289`,
   M140 `ba70fdf6`; the TUI baseline includes M147 `6e3b1b03`, M148
   `fddb62f3`, M149 `b2bee6f4`, M150 `a2f77d96`. No new dependency.
-- `render::Component` has fifteen variants including `Question` (ADR-0079's
-  dated amendment); `InteractionKind::Permission` must never project one.
-- `LinkMatcher` already has `prefilter`; sdk `catalogue::prefilter` is
-  conservative, while both runtimes share TypeScript `on.ts::matches`.
-  Mod metadata currently exports patterns only; publish serializable hook
-  partials, widening unsupported predicates rather than dropping matches.
-- `session.rs::refresh_config` writes config; catalogue completion handles
-  the reload boundary. M140's `answer_ok`, `Shown::Pull`, `pulled::Memo` and
-  core render queue are present. Memo currently drops off-screen requests;
-  M141 must retain component answers for scrolling and revise block caches.
-- `transcript::called` combines the tool heading/result; no ToolGroup
-  drawing exists yet. `status::middle` owns PromptHint; `worked` supplies
-  transcript closing rows. Ember/crew and removed rail/sheet remain intact.
-- Examples use `Edit.file_path` and `Bash.command`. User/explicit mods are
-  rewrite, project mods tighten; only user-layer trust grants full (§5).
-- M142 owns kit/mount/type emission and example `*.test.ts`; M151 owns
-  pane placement/viewport geometry. Shared render/status edits stay scoped.
-- Protocol 2 is unreleased (latest tag v0.6.5): scoped schema amendments
-  are authorized with one dated ADR-0075 line and generated with
-  `BINGO_UPDATE_SCHEMA=1`. Mechanical exhaustive arms outside Files are
-  listed in Verified. Discipline 4c stays unchanged; sdk/core name no tool.
+- `Component::Question` is the landed name; Permission is excluded.
+- Sdk `catalogue::prefilter` is conservative; both runtimes share `on.ts`.
+  M141 adds per-hook render metadata without duplicating dispatch links.
+- Config comes from `session.rs`; catalogue completion is the reload boundary.
+  M140 provides `answer_ok`, Shown/Pull and the bounded core render queue.
+  Its memo evicts off-screen answers; M141 retains them and revises blocks.
+- Tool headings/results share `transcript::called`; no ToolGroup drawing
+  exists. PromptHint is `status::middle`; closing rows use `worked`.
+- Examples use `Edit.file_path`/`Bash.command`. User/explicit mods are rewrite,
+  project mods tighten; only user-layer trust grants full (ADR-0078 §5).
+- M142 owns kit/mount/type emission and example tests; M151 owns placement.
+- Protocol 2 is unreleased (v0.6.5): scoped amendments are authorized with a
+  dated ADR-0075 note and `BINGO_UPDATE_SCHEMA=1`. Discipline 4c is unchanged.
+
+## Verified (2026-10-14, partial; stopped)
+
+- `cargo test -p bingo-surface-rpc component_props_are_published_for_wire_clients --locked`: expected FAIL, missing QuestionProps, before schema registration.
+- `cargo test -p bingo-sdk component:: --locked`: PASS, 2 tests.
+- `cargo test -p bingo-sdk render::matched --locked`: expected FAIL before selection; PASS, 1 test after implementation.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc --locked`: PASS, 16 unit + 41 wire tests; 1 existing ignored test.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc wire_ts:: --locked`: PASS, 1 test.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema:: --locked`: PASS, 10 tests.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked`: PASS, 130 tests.
+- `cargo test -p bingo-core chain::render --locked`: PASS, 1 test (before publication test was added).
+- `cargo test -p bingo-surface-tui component:: --locked`: expected FAIL, 2 tests before substitution; PASS, 2 tests after implementation, before band contract.
+- `cargo test -p bingo-surface-tui above_prompt_button_dispatches_its_handler_from_the_drawn_band --locked`: FAIL, 0 passed/1 failed; button drawn, effects: [].
+- `cargo fmt --all`: PASS.
+- `cargo fmt --all -- --check`: NOT RUN, protocol stop before final gates.
+- `cargo check --workspace --all-targets --locked`: NOT RUN, protocol stop.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: NOT RUN, protocol stop.
+- `cargo test --workspace --locked`: NOT RUN, protocol stop.
+- `scripts/check_discipline.sh`: NOT RUN, protocol stop.
+- `scripts/budget.sh`: NOT RUN, protocol stop.
+- `cargo deny check`: NOT RUN, protocol stop.
+- `cargo check -p bingo-sdk -p bingo-core -p bingo-mods -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-surface-tui -p bingo --all-targets --target x86_64-pc-windows-msvc`: NOT RUN, protocol stop.
+- `scripts/tui-smoke.sh`: NOT RUN, protocol stop; no tmux or live/credential run.
+- `git diff --name-only ba70fdf6 -- crates/bingo/tests/catalogue.rs`: mechanical LinkMatcher constructor only (render: None); no new exhaustive variant arms.
