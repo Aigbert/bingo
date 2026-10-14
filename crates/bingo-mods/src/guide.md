@@ -113,6 +113,9 @@ as `onPress` can update state. Keep writes out of the render hook itself.
 
 `await $.ui.open({id:'counter', title:'Counter'})` opens a pane; render it by
 matching `{component:'Pane', requestId:'counter'}`. `$.ui.close(id)` removes it.
+`place`, `size`, `focus` and `closeOnEscape` say where it seats and how keys
+reach it. A pane opened while no person asked (from `session.start`, a timer)
+waits as `1 pane waiting` until clicked; open it from a command instead.
 `$.ui.status('Ready', {key:'counter'})` places status; pass `null` to remove it.
 `$.ui.toast('Finished')` shows a temporary notification. `AbovePrompt` draws the
 band above the prompt without opening a pane.
@@ -164,7 +167,8 @@ For example, `[pluginTrust.counter]` with `tier = "rewrite"` and
 `process`, `http`, `env`, `model`, writes outside the mod's data directory and
 unsafe service methods require the corresponding authority.
 
-Only `--plugin-dir` mods are watched. A file change marks the mod stale; reload
+Only `--plugin-dir` mods are watched; a new or edited mod under the user or
+project directory loads at the next start. A file change marks the mod stale; reload
 waits for `turn.complete`, or happens before its own tool or command runs. The
 fresh runtime calls `register` and replays `session.start`; host state and panes
 stay. `PLUGIN_STALE`, `PLUGIN_RELOADED` and `PLUGIN_RELOAD` notices report it.
