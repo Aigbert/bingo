@@ -9,8 +9,13 @@ process against the real host and the fake provider; `bingo/testing`
 supplies `test`, `expect`, `mock.*` and `$.ui.mount`. Types land in
 `.bingo/types/` on load: `'bingo'` exports `Register`, each event's types
 under Claude Code's names, and the helpers M141 shipped. M133's
-scenarios give way to tests. After M137 and M140; proven on M141's
-examples, which gain their tests here.
+scenarios give way to tests. Re-verified at `ba70fdf6` (2026-10-14). Landed dependencies: M137
+(`c1d95e8c`), M138 (`5581b978`), M139 (`686ad289`), M140 (`ba70fdf6`),
+M147 (`6e3b1b03`), M148 (`fddb62f3`), M149 (`b2bee6f4`), M150
+(`a2f77d96`); M133's author CLI and M136's catalogue are also present.
+M141's helpers and `tool-call`, `band`, `pane` examples are absent:
+finish all independent work (including ts-status and type output) first;
+then stop if dev lacks `merge: M141`, pending the person's merge instruction.
 
 ## Bricks, in build order
 
@@ -38,7 +43,7 @@ examples, which gain their tests here.
    is named as a warning: the surface ignores it). Alongside the findings
    it lists hooked events, `$` calls, keys and `uses`.
 3. **`bingo plugins validate <dir>`** dispatches on the manifest:
-   `command` keeps M133's spawn-and-handshake, `module` runs brick 2 and
+   `entry.command` keeps M133's spawn-and-handshake, `module` runs brick 2 and
    spawns nothing. One `file:line:col rule text` line per finding, then
    the listing; exit 0 or 1.
 4. **`bingo/testing`.** A built-in module of the runtime (beside M137's
@@ -93,11 +98,16 @@ examples, which gain their tests here.
 
 ## Files
 
-- `crates/bingo-mods/src/validate/{mod,hooks,dollar,keys,uses,contract,props}.rs`,
-  `{testing,mount,types}.rs`, `js/testing.ts` (new); `tests/fixtures/validate/`
-- `crates/bingo/src/plugins/{validate.rs,test.rs (new)}`, `scenario.rs` (deleted), `main.rs`
+- `crates/bingo-mods/src/validate/`, `{testing,mount,types}/` or `.rs`,
+  `js/testing.ts`, `tests/fixtures/validate/` and kit contract tests (new)
+- `crates/bingo-mods/src/{lib,load,strip,engine,thread,module,manager,plugin}.rs`,
+  `thread.js`, `dollar/{runtime,env,clock}.rs`: load/test/type integration
+- `crates/bingo-mods/Cargo.toml`: promote existing `bingo-schema-ts` to
+  a normal library dependency for types on load; enable tokio test-util
+  for the isolated test clock (no new external crate)
+- `crates/bingo/src/plugins/{mod,switch,validate,test}.rs`, `main.rs`;
+  `{scenario,schema,expect}.rs` and `schema/plugin-scenario.json` deleted
 - `crates/bingo-surface-tui/src/lib.rs` (`pub fn drawn`)
-- `schema/plugin-scenario.json` (deleted)
 - `sdk/typescript/src/state.test.ts` (new)
 - `examples/plugins/ts-status/` (`hooks/register.test.ts` new, `scenarios/` deleted);
   `examples/plugins/{tool-call,band,pane}/` (one `*.test.ts` each)
@@ -142,9 +152,16 @@ examples, which gain their tests here.
   one; a test pins that.
 - **Writing into a project.** A project mod gains `.bingo/` on load; its
   `.gitignore` keeps it out of commits.
-- Re-verify at start: M137's built-in module mechanism, pinned oxc and
-  `bingo-plugin-host`; M133's `validate`, scenario runner and
-  `plugin_kit.rs` as landed; `bingo-schema-ts` and M136's `events.ts`; M140's
-  handlers, `HostApi::render` and `Invalidated`; M141's example paths;
-  M138's clock; whether the TUI can export `drawn` and keep `views`
-  private.
+- Runtime seams verified: `load::Root` embeds `bingo`; `thread::initialize`
+  registers hooks; `ModsPlugin::reload` uses the existing manager boundary.
+  `strip` already builds oxc semantic nodes; reuse that pinned AST version.
+  `dollar::table::ROWS` owns unsafe methods; `view::table::ELEMENTS` owns
+  drawn props. `views::render` can stay private behind `drawn` in TUI lib.
+  M138 timers use tokio time, but `clock.now` uses a wall timestamp:
+  the test clock must supply both through a test-only runtime seam.
+- Standing delegate decisions: scoped pre-release protocol-2 amendments
+  may regenerate the baseline with a dated ADR-0075 line; exhaustive-match
+  arms outside Files are mechanical and recorded. Keep discipline 4c;
+  neither sdk nor kernel names a tool. No live/credential tests.
+- Generated files use `BINGO_UPDATE_SCHEMA=1`. M141/M151 generated-file
+  overlap is reconciled only after the person authorizes merging dev.
