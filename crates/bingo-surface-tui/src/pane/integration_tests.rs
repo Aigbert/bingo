@@ -215,6 +215,7 @@ fn escape_closes_a_focused_pane_despite_a_retained_or_late_answer() {
         },
     ));
     ui.sync_panes(&state);
+    assert!(matches!(ui.focus, Focus::Composer));
     ui.placed.pulled.retain(&[]);
     ui.placed
         .pulled

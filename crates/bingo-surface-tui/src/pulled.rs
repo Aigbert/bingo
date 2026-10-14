@@ -213,3 +213,37 @@ mod pane_tests {
         assert!(!memo.request(&moved));
     }
 }
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    use bingo_sdk::render::{Component, RenderRequest, SurfaceName, Viewport};
+
+    #[test]
+    fn an_undrawn_pane_reasks_on_reopen_but_scrolled_messages_keep_answers() {
+        let state = crate::test_support::state();
+        for component in [Component::Pane, Component::UserMessage] {
+            let request = RenderRequest {
+                component,
+                request_id: "one".into(),
+                surface: SurfaceName::Terminal,
+                props: serde_json::json!({}),
+                viewport: Viewport {
+                    columns: 80,
+                    rows: 8,
+                    place: None,
+                },
+            };
+            let key = Key::new(&state, &request, 80, 8);
+            let mut memo = Memo::default();
+            memo.request(&key);
+            memo.answer(key.clone(), View::text("before"));
+            memo.retain(&[]);
+            memo.answer(key.clone(), View::text("late"));
+            assert_eq!(memo.request(&key), component == Component::Pane);
+            if component == Component::Pane {
+                assert!(memo.get(&key).is_none());
+            }
+        }
+    }
+}
