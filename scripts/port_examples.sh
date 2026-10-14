@@ -48,7 +48,7 @@ def layout(root, source, out, name, identity, extension, uses):
         (directory / 'types/index.d.ts').write_text('export interface PluginState {}\n')
     manifest = dict(name=identity, version='1', module=f'hooks/{file}', uses=uses)
     (directory / 'plugin.json').write_text(json.dumps(manifest) + '\n')
-    for test in sorted((root / 'examples/plugins' / name).glob('*.test.ts')):
+    for test in sorted((root / 'examples/plugins' / name).glob('*.parity.test.ts')):
         shutil.copyfile(test, directory / test.name)
     return directory
 
