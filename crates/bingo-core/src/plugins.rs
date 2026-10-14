@@ -218,7 +218,7 @@ fn effective_wish(
     let mut layers = vec![settings::Layer::new(
         settings::LayerOrigin::User,
         path.display().to_string(),
-        settings::read_document(&path)?,
+        settings::preview_document(&path)?,
     )];
     layers[0].value.insert(KEY.into(), proposed.clone());
     for layer in host
@@ -228,7 +228,7 @@ fn effective_wish(
     {
         let mut layer = layer.clone();
         let path = Path::new(&layer.source);
-        if path.is_file() {
+        if path.is_absolute() || path.is_file() {
             layer.value = settings::read_layer(settings::LayerOrigin::Explicit, path)?
                 .map(|fresh| fresh.value)
                 .unwrap_or_default();
@@ -292,7 +292,7 @@ async fn apply(
 /// What the user layer already says about the plugins, read to be written
 /// back. Only that layer, because only that layer is ever written.
 fn written(path: &Path) -> Result<Map<String, Value>, SettingsError> {
-    let document = settings::read_document(path)?;
+    let document = settings::preview_document(path)?;
     match document.get(KEY) {
         None | Some(Value::Null) => Ok(Map::new()),
         Some(Value::Object(switches)) => Ok(switches.clone()),

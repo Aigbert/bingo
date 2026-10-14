@@ -442,13 +442,27 @@ fn standing_layer(origin: LayerOrigin, path: &Path) -> Result<Option<Layer>, Set
     }
 }
 
+/// Read a writable layer without migrating it before validation succeeds.
+pub(crate) fn preview_document(path: &Path) -> Result<Map<String, Value>, SettingsError> {
+    Ok(standing_layer(LayerOrigin::User, path)?
+        .map(|layer| layer.value)
+        .unwrap_or_default())
+}
+
 /// One file as a layer; `None` when it does not exist.
 pub fn read_layer(origin: LayerOrigin, path: &Path) -> Result<Option<Layer>, SettingsError> {
     let Some(text) = read_text(path)? else {
         return Ok(None);
     };
     let value = format::parse(Format::of(path), path, &text)?;
-    let source = path.display().to_string();
+    // File sources remain distinguishable from named in-memory layers after deletion.
+    let source = std::path::absolute(path)
+        .map_err(|source| SettingsError::Read {
+            path: path.into(),
+            source,
+        })?
+        .display()
+        .to_string();
     match value {
         Value::Object(map) => Ok(Some(Layer::new(origin, source, map))),
         Value::Null => Ok(None),

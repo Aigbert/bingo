@@ -26,6 +26,7 @@ mod rewind;
 mod routes;
 mod services;
 mod spec_owner;
+mod switch_settings;
 mod tree;
 mod views;
 
