@@ -149,7 +149,7 @@ pub fn permission(scope: Option<&str>) -> Interaction {
             preview: None,
             session_scope: scope.map(str::to_owned),
             caution: None,
-                input: Default::default(),
+            input: Default::default(),
         },
         answers: vec![
             AnswerSpec::AllowOnce,

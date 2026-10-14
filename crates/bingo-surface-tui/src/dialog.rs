@@ -59,7 +59,7 @@ impl Dialog {
     }
 
     pub fn on_key(&mut self, interaction: &Interaction, key: KeyEvent, now: Now) -> Vec<Effect> {
-        if self.answered || (key.code != KeyCode::Esc && guarded(interaction, now)) {
+        if key.code != KeyCode::Esc && (self.answered || guarded(interaction, now)) {
             return Vec::new();
         }
         if matches!(key.code, KeyCode::Char('e' | 'o'))

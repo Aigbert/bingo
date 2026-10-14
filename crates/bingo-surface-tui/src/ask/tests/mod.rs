@@ -15,7 +15,10 @@ fn scene_for(mut open: Interaction, command: bool) -> (crate::tree::Tree, Ui, cr
         json!({"file_path":"src/main.rs","old_string":"old","new_string":"new"})
     };
     if let InteractionKind::Permission { input: current, .. } = &mut open.kind
-        && current.is_null() { *current = input.clone(); }
+        && current.is_null()
+    {
+        *current = input.clone();
+    }
     let mut state = folded(vec![
         frame(1, started("trn_1")),
         started_tool(
@@ -229,4 +232,23 @@ fn change_and_sealed_props_use_the_gates_rewritten_input() {
     assert_eq!(props.input, json!({"command":"echo rewritten"}));
     crate::input::on_key(&mut ui, &tree, typed('3'), now);
     assert_eq!(ui.dialog.words.as_ref().unwrap().text(), "echo rewritten");
+}
+
+#[test]
+fn changed_session_receipts_name_the_edit_and_the_rule() {
+    let body: bingo_sdk::ItemBody = serde_json::from_value(json!({"kind":"permissionReceipt", "interaction":"i", "tool":"sample", "decision":"allowChangedSession"})).unwrap();
+    assert_eq!(
+        super::receipts::label(&body).as_deref(),
+        Some("you changed it first; yes for this session")
+    );
+}
+#[test]
+fn ctrl_g_leaves_the_change_editor_and_the_hint_names_it() {
+    let (tree, mut ui, now) = scene_for(permission(None, None), true);
+    crate::input::on_key(&mut ui, &tree, typed('3'), now);
+    assert!(ui.dialog.words.is_some());
+    assert!(draw_tree(108, 30, &tree, &mut ui, now).contains("ctrl+g back"));
+    assert!(crate::input::on_key(&mut ui, &tree, ctrl('g'), now).is_empty());
+    assert!(ui.dialog.words.is_none());
+    assert!(ui.dialog.changing.is_none());
 }

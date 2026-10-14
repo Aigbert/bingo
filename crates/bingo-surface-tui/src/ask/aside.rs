@@ -4,9 +4,9 @@ use jiff::Timestamp;
 
 pub const RECENT_MS: i64 = 900;
 
-pub fn recent(opened: Timestamp, typed: Option<Timestamp>) -> bool {
+pub fn recent(received: Timestamp, typed: Option<Timestamp>) -> bool {
     typed.is_some_and(|typed| {
-        let elapsed = opened.as_millisecond() - typed.as_millisecond();
+        let elapsed = received.as_millisecond() - typed.as_millisecond();
         (0..RECENT_MS).contains(&elapsed)
     })
 }

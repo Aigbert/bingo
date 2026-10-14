@@ -277,7 +277,7 @@ start '{"responses":[
   {"steps":[{"text":"Wrote it."}]}]}'
 keys 'write the note' Enter
 await 'Do you want to '
-if pane | grep -qF 'esc back to it'; then keys Escape; fi
+if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
 # The framed preview belongs to the pending step in the transcript.
 await '│'
 press_until 'y' 'Wrote it.'
@@ -303,7 +303,7 @@ start '{"responses":[
 focus O
 keys 'write the note' Enter
 await 'Do you want to '
-if pane | grep -qF 'esc back to it'; then keys Escape; fi
+if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
 press_until 'y' 'Wrote it.'
 [ -f "$WORK/cwd/away.txt" ] || { echo "tui-smoke: the approved Write wrote nothing" >&2; exit 1; }
 if pane | grep -qE 'notify|777|Ptmux'; then
@@ -456,7 +456,7 @@ sealed_card() {
     {"steps":[{"text":"Sealed done."}]}]}' 'BINGO_MOTION=off' "--plugin-dir $installed"
   keys 'write sealed input' Enter
   await 'Do you want to '
-  if pane | grep -qF 'esc back to it'; then keys Escape; fi
+  if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
   case "$fixture" in
     sealed-frame)
       await 'SEALED FRAME'
@@ -501,13 +501,13 @@ start '{"responses":[
   {"steps":[{"text":"Changed done."}]}]}' 'BINGO_MOTION=off'
 keys 'run the command' Enter
 await 'Do you want to run this command?'
-if pane | grep -qF 'esc back to it'; then keys Escape; fi
+if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
 # Enter the editor only after its guard has lifted.
 press_until '4' 'enter send'
 keys C-u
 keys 'echo after' Enter
 await '$ echo after'
-if pane | grep -qF 'esc back to it'; then keys Escape; fi
+if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
 press_until 'y' 'Changed done.'
 await 'you changed it first'
 pane
@@ -519,12 +519,12 @@ start '{"responses":[
   {"steps":[{"text":"Question done."}]}]}' 'BINGO_MOTION=off'
 keys 'pick a route' Enter
 await 'Which route?'
-if pane | grep -qF 'esc back to it'; then keys Escape; fi
+if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
 await 'something else'
 keys x
-await 'esc back to it'
+await 'ctrl+g back to it'
 pane
-keys Escape
+keys C-g
 press_until '2' 'Question done.'
 await 'you: Route: Beta'
 pane

@@ -89,6 +89,7 @@ pub(super) fn paint(
         .map_err(stdio)?;
     pulling::request(run, &layout.pulls);
     run.ui.shown = layout;
+    site_keys::drain(run);
     run.grumble(began.elapsed());
     showing::hand(run, screen)?;
     showing::fit(run);

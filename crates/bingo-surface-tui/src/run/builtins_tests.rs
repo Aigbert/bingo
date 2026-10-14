@@ -225,3 +225,116 @@ async fn escape_stops_the_asking_session_in_every_ask_state() {
         }
     }
 }
+
+fn question_run() -> (Run, Arc<TestSession>, crate::clock::Now) {
+    let mut state = folded(vec![frame(1, opened(question(false, true)))]);
+    state.config.kernel["render"] = json!({"Question":[{}]});
+    let session = Arc::new(TestSession::default());
+    let now = still(scene().1);
+    let mut run = tests::idle_in(state, session.clone(), now.instant);
+    run.refocus();
+    (run, session, now)
+}
+fn pull_question(run: &mut Run, width: u16, now: crate::clock::Now) {
+    draw_tree(width, 24, &run.session.tree, &mut run.ui, now);
+    let key = run
+        .ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == bingo_sdk::render::Component::Question)
+        .unwrap()
+        .clone();
+    let props = serde_json::from_value(key.request.props.clone()).unwrap();
+    let view = bingo_mod_ask::drawing::tree(
+        &props,
+        &Default::default(),
+        &key.request.request_id,
+        &key.session,
+    );
+    run.ui.placed.pulled.request(&key);
+    run.ui.placed.pulled.answer(key, view);
+}
+#[tokio::test]
+async fn a_fast_unhandled_burst_keeps_its_key_order() {
+    let (mut run, session, now) = question_run();
+    pull_question(&mut run, 108, now);
+    for c in "hello".chars() {
+        run.terminal_event(Term::Key(typed(c)));
+    }
+    assert_eq!(
+        session.submitted().len(),
+        1,
+        "only one key may be in flight"
+    );
+    let intent = run.site_keys.keys().next().unwrap().clone();
+    run.ack(
+        &intent,
+        &IntentOutcome::Applied {
+            result: json!({"handled":false}),
+        },
+    );
+    assert_eq!(run.ui.composer.text(), "hello");
+}
+#[tokio::test]
+async fn resize_then_down_then_enter_uses_one_cursor() {
+    let (mut run, session, now) = question_run();
+    pull_question(&mut run, 108, now);
+    draw_tree(80, 24, &run.session.tree, &mut run.ui, now);
+    run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Down)));
+    run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Enter)));
+    assert!(
+        session.answers().is_empty(),
+        "wait for the mod before interpreting keys"
+    );
+    assert_eq!(
+        run.ui.dialog.focus, 0,
+        "the fallback must not move another cursor"
+    );
+    pull_question(&mut run, 80, now);
+    site_keys::drain(&mut run);
+    // The real mod's pure state interprets the requests in mailbox order.
+    let mut state = bingo_mod_ask::state::State::default();
+    let bingo_sdk::InteractionKind::Question(question) = question(false, true).kind else {
+        panic!("question")
+    };
+    for index in 0..2 {
+        let input = session
+            .submitted()
+            .get(index)
+            .cloned()
+            .expect("queued key dispatched");
+        let Input::Action { action } = input else {
+            panic!("action")
+        };
+        let (handled, answer) = state.key(
+            std::slice::from_ref(&question),
+            false,
+            action.args["value"]["key"].as_str().unwrap(),
+        );
+        let intent = run.site_keys.keys().next().unwrap().clone();
+        run.ack(
+            &intent,
+            &IntentOutcome::Applied {
+                result: json!({"handled":handled,"answer":answer}),
+            },
+        );
+    }
+    assert!(matches!(&session.answers()[0].1, bingo_sdk::Answer::Choice {ids,..} if ids == &["o"]));
+}
+
+#[tokio::test]
+async fn aside_uses_surface_reception_instead_of_the_kernel_clock() {
+    let now = scene().1;
+    let mut run = tests::idle_in(
+        folded(vec![frame(1, opened(question(false, true)))]),
+        Arc::new(TestSession::default()),
+        now.instant,
+    );
+    run.ui.last_typed = Some(run.detection.now().wall);
+    run.refocus();
+    assert!(
+        run.ui.dialog.aside,
+        "the fixture's remote opened_at is long before the local keystroke"
+    );
+}

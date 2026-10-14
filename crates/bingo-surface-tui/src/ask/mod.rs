@@ -30,6 +30,29 @@ pub fn handler(ui: &Ui, interaction: &Interaction, key: KeyEvent) -> Option<Acti
     Some(action)
 }
 
+pub fn waiting(ui: &Ui, owner: &SessionState, interaction: &Interaction) -> bool {
+    let Some(props) = crate::component::question::props(interaction) else {
+        return false;
+    };
+    let area = ui.shown.canvas.buffer.area;
+    let Some(key) = crate::component::key(
+        owner,
+        interaction.id.as_str(),
+        &props,
+        area.width,
+        area.height,
+    ) else {
+        return false;
+    };
+    let request = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.request_id == interaction.id.as_str())
+        .unwrap_or(&key);
+    ui.placed.pulled.get(request).is_none()
+}
+
 pub fn begin_change(
     ui: &mut Ui,
     owner: &SessionState,

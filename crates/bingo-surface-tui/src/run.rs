@@ -166,7 +166,9 @@ struct Run {
     /// meant for another client is not reported here and a refusal can name
     /// what was refused.
     mine: HashMap<IntentId, Option<String>>,
+    received_asks: HashMap<bingo_sdk::InteractionId, jiff::Timestamp>,
     site_keys: HashMap<IntentId, site_keys::Pending>,
+    site_queue: std::collections::VecDeque<(String, crossterm::event::KeyEvent)>,
     replies: mpsc::Sender<Reply>,
     /// A selection a key asked for, handed to the terminal between frames.
     clipboard: Option<String>,
@@ -312,7 +314,9 @@ async fn attach(
         session: Attached::new(attachment.snapshot, attachment.handle),
         ui: Ui::new(history::load(&opts.env.data_dir), Instant::now()),
         mine: HashMap::new(),
+        received_asks: HashMap::new(),
         site_keys: HashMap::new(),
+        site_queue: Default::default(),
         replies,
         clipboard: None,
         opener: viewer::system(),
@@ -579,11 +583,26 @@ impl Run {
     }
 
     fn refocus(&mut self) {
+        let now = self.detection.now().wall;
+        let open_ids: std::collections::HashSet<_> = self
+            .session
+            .tree
+            .sessions()
+            .flat_map(|state| state.interactions.iter().map(|open| open.id.clone()))
+            .collect();
+        self.received_asks.retain(|id, _| open_ids.contains(id));
+        for id in open_ids {
+            self.received_asks.entry(id).or_insert(now);
+        }
+
         let open = self.session.tree.open_interaction().map(|(_, open)| open);
         let changed = self.ui.dialog.current() != open.map(|open| &open.id);
         self.ui.dialog.focus_on(open);
         if changed && let Some(open) = open {
-            self.ui.dialog.aside = crate::ask::aside::recent(open.opened_at, self.ui.last_typed);
+            self.ui.dialog.aside = crate::ask::aside::recent(
+                self.received_asks.get(&open.id).copied().unwrap_or(now),
+                self.ui.last_typed,
+            );
         }
     }
 
@@ -591,6 +610,7 @@ impl Run {
     fn ack(&mut self, intent: &IntentId, outcome: &IntentOutcome) {
         site_keys::answered(self, intent, outcome);
         self.ui.actions.acknowledge(intent);
+        site_keys::drain(self);
         let Some(about) = self.mine.remove(intent) else {
             return;
         };
@@ -675,6 +695,11 @@ impl Run {
                     Some("esc" | "ctrl+c")
                 ) {
                     self.site_keys.clear();
+                    self.site_queue.clear();
+                }
+                if site_keys::blocked(self) {
+                    site_keys::queue(self, key);
+                    return;
                 }
                 self.session.tree.mark_read();
                 let effects =
@@ -713,6 +738,7 @@ impl Run {
     fn effect(&mut self, effect: Effect) {
         match effect {
             Effect::Submit(input) => self.submit(input),
+            Effect::AwaitSiteKey(key) => site_keys::queue(self, key),
             Effect::SiteKey { action, key } => site_keys::send(self, action, key),
             Effect::Withdraw(intent) => withdraw::ask(self, intent),
             Effect::Interrupt => self.interrupt(),
@@ -935,7 +961,10 @@ impl Run {
 
     fn reply(&mut self, reply: Reply, events: &mut Option<FrameStream>) {
         match reply {
-            Reply::Rendered(key, view) => self.ui.placed.pulled.answer(key, *view),
+            Reply::Rendered(key, view) => {
+                self.ui.placed.pulled.answer(key, *view);
+                site_keys::drain(self);
+            }
             Reply::Attached(attachment) => self.attach(*attachment, events),
             Reply::Handle(session, handle) => {
                 self.session.handles.insert(session, handle);
@@ -1897,7 +1926,9 @@ mod tests {
             session: Attached::new(state, SessionHandle(session)),
             ui: Ui::new(Vec::new(), at),
             mine: HashMap::new(),
+            received_asks: HashMap::new(),
             site_keys: HashMap::new(),
+            site_queue: Default::default(),
             replies: mpsc::channel(1).0,
             clipboard: None,
             opener: viewer::system(),

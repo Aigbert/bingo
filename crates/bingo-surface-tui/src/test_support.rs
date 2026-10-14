@@ -490,7 +490,7 @@ pub fn permission(scope: Option<&str>, preview: Option<Preview>) -> Interaction 
             preview,
             session_scope: scope.map(str::to_owned),
             caution: None,
-                input: Default::default(),
+            input: Default::default(),
         },
         answers,
     )

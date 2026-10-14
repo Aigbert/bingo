@@ -100,6 +100,16 @@ fn interaction_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Ef
         }
         return Vec::new();
     }
+    if ui.dialog.answered
+        || interaction
+            .guard_until
+            .is_some_and(|until| now.wall < until)
+    {
+        return Vec::new();
+    }
+    if crate::ask::waiting(ui, owner, interaction) {
+        return vec![Effect::AwaitSiteKey(key)];
+    }
     if let Some(action) = crate::ask::handler(ui, interaction, key) {
         return vec![Effect::SiteKey { action, key }];
     }
@@ -1444,11 +1454,8 @@ mod tests {
 
     // ---- esc ------------------------------------------------------------
 
-    /// One press per rung of [`keys::ESCAPES`], in the order the stack is
-    /// obeyed: a sheet over a card is what `esc` closes first, because
-    /// dismissing the help must never answer the question underneath it.
     #[test]
-    fn esc_closes_the_innermost_thing_then_interrupts() {
+    fn esc_stops_an_open_ask_even_under_a_sheet() {
         let state = folded(vec![
             frame(1, started("trn_1")),
             frame(2, opened(permission(None, None))),
@@ -1456,23 +1463,15 @@ mod tests {
         let (mut ui, now) = scene();
         ui.dialog.focus_on(state.interactions.first());
         ui.focus.show(Open::Help, now.instant);
-
-        assert!(press(&mut ui, &state, key(KeyCode::Esc), now).is_empty());
-        assert!(!ui.focus.showing(), "the sheet is the outermost thing");
-
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Esc), now),
-            vec![
-                Effect::Answer {
-                    interaction: state.interactions[0].id.clone(),
-                    answer: Answer::Deny { feedback: None },
-                    activation: Activation::Keyboard,
-                },
-                Effect::Interrupt
-            ],
-            "then the card, whose own answer leaving it is"
+            vec![Effect::StopInteraction {
+                session: state.summary.id.clone(),
+                interaction: state.interactions[0].id.clone(),
+                answer: Answer::Deny { feedback: None },
+            }]
         );
-
+        ui.focus = crate::focus::Focus::Composer;
         let busy = busy();
         write(&mut ui, &busy, "/he", now);
         assert!(press(&mut ui, &busy, key(KeyCode::Esc), now).is_empty());
@@ -1586,10 +1585,10 @@ mod tests {
         press(&mut ui, &state, key(KeyCode::Enter), now);
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Esc), now),
-            vec![Effect::Answer {
+            vec![Effect::StopInteraction {
+                session: state.summary.id.clone(),
                 interaction: state.interactions[0].id.clone(),
                 answer: Answer::Cancel,
-                activation: Activation::Keyboard,
             }]
         );
     }
@@ -1712,10 +1711,10 @@ mod tests {
         ui.dialog.focus_on(state.interactions.first());
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Esc), now),
-            vec![Effect::Answer {
+            vec![Effect::StopInteraction {
+                session: state.summary.id.clone(),
                 interaction: state.interactions[0].id.clone(),
                 answer: Answer::Cancel,
-                activation: Activation::Keyboard,
             }]
         );
     }

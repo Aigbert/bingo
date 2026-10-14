@@ -81,6 +81,10 @@ write's whole file in place.
 
 ## Decisions
 
+- Review: queue keys until the site's view is available and allow one key request in flight per site.
+  A resize cannot hand selection to a fallback cursor; an unhandled character is folded before the
+  next queued key. Recent typing uses the surface's reception time, including asks waiting their turn.
+
 - Review: Escape always ends the asking session’s turn, including aside and change editing; Ctrl+G
   backs out without answering. The old Escape-to-return prototype conflicted with AGENTS.md.
   A single owner-targeted operation sends both the denial and interrupt (ADR-0084).

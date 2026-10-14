@@ -17,6 +17,7 @@ pub enum Effect {
     /// waits in and into the composer (ADR-0008 §2, amended M68). The kernel
     /// answers with the line, or says it is no longer there to take.
     Withdraw(IntentId),
+    AwaitSiteKey(crossterm::event::KeyEvent),
     Interrupt,
     StopInteraction {
         session: SessionId,

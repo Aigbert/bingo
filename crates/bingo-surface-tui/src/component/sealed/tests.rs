@@ -24,7 +24,7 @@ fn state_with_card(login: bool) -> SessionState {
                 preview: None,
                 session_scope: Some("sample".into()),
                 caution: None,
-                input: Default::default(),
+                input: json!({"secret":"full input"}),
             },
             vec![
                 AnswerSpec::AllowOnce,
@@ -88,7 +88,7 @@ fn framed_cards_keep_host_facts_and_keys_at_both_sizes() {
             let effects =
                 crate::input::on_key(&mut ui, &tree, KeyEvent::new(code, KeyModifiers::NONE), now);
             assert!(
-                matches!(&effects[0], Effect::Answer { answer, .. } if *answer == if login { Answer::Cancel } else { Answer::AllowOnce })
+                matches!(&effects[0], Effect::Answer { answer, .. } | Effect::StopInteraction { answer, .. } if *answer == if login { Answer::Cancel } else { Answer::AllowOnce })
             );
         }
     }
@@ -134,7 +134,10 @@ fn clipped_rewritten_missing_and_duplicate_engines_fall_back_once() {
             assert!(
                 crate::input::on_key(&mut ui, &tree, KeyEvent::new(code, KeyModifiers::NONE), now)
                     .iter()
-                    .any(|effect| matches!(effect, Effect::Answer { .. }))
+                    .any(|effect| matches!(
+                        effect,
+                        Effect::Answer { .. } | Effect::StopInteraction { .. }
+                    ))
             );
         }
     }
@@ -194,7 +197,7 @@ fn a_button_gets_its_own_click_but_cannot_take_the_yes_key() {
 }
 
 #[test]
-fn absent_input_and_unmatched_cards_use_the_existing_drawing() {
+fn unmatched_cards_fall_back_and_input_needs_no_transcript_item() {
     let mut state = state_with_card(false);
     state.config.kernel["render"] = json!({});
     let tree = solo(&state);
@@ -207,7 +210,7 @@ fn absent_input_and_unmatched_cards_use_the_existing_drawing() {
     assert_eq!(before, after);
     let mut open = state.interactions[0].clone();
     open.item = None;
-    assert!(props(&state, &open).is_none());
+    assert_eq!(props(&state, &open), props(&state, &state.interactions[0]));
 }
 
 #[test]
