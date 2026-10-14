@@ -419,3 +419,39 @@ async fn accepted_plugin_answers_record_their_source() {
     assert_eq!(pending.await.unwrap().unwrap(), picked("allow_once"));
     host.shutdown().await;
 }
+
+struct WeakHost(Arc<std::sync::Mutex<Option<std::sync::Weak<dyn HostApi>>>>);
+#[async_trait]
+impl Plugin for WeakHost {
+    fn manifest(&self) -> &'static PluginManifest {
+        &STANCE
+    }
+    fn register(&self, _: &mut Registrar) -> Result<(), PluginError> {
+        Ok(())
+    }
+    async fn start(&self, host: HostHandle) -> Result<(), PluginError> {
+        *self.0.lock().unwrap() = Some(Arc::downgrade(&host.0));
+        Ok(())
+    }
+}
+#[tokio::test]
+async fn plugin_weak_handles_live_as_long_as_the_host_without_a_cycle() {
+    let captured = Arc::new(std::sync::Mutex::new(None));
+    let host = Host::build(
+        vec![Box::new(WeakHost(captured.clone()))],
+        HostConfig::new(env()),
+    )
+    .await
+    .unwrap();
+    let weak = captured.lock().unwrap().clone().unwrap();
+    assert!(
+        weak.upgrade().is_some(),
+        "the plugin's weak host must survive start"
+    );
+    host.shutdown().await;
+    drop(host);
+    assert!(
+        weak.upgrade().is_none(),
+        "the adapter must not keep the host alive"
+    );
+}

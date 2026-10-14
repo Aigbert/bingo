@@ -89,6 +89,7 @@ pub struct Host {
     /// this one's own refresh (ADR-0026 §4).
     served: Arc<ServedModels>,
     weak: Weak<Host>,
+    plugin_host: HostHandle,
     pinned: Mutex<Vec<String>>,
 }
 
@@ -167,6 +168,7 @@ impl Host {
                 learned,
                 served,
                 weak: weak.clone(),
+                plugin_host: plugin::handle(weak.clone()),
                 pinned,
             }
         });
@@ -196,7 +198,7 @@ impl Host {
                 continue;
             }
             plugin
-                .start(plugin::handle(self.handle()))
+                .start(self.plugin_host.clone())
                 .await
                 .map_err(|source| HostError::Start {
                     plugin: manifest.id.to_string(),
@@ -209,7 +211,7 @@ impl Host {
     /// What a session actor needs from the host: the command table and a
     /// weak way back.
     fn services(&self) -> session::Services {
-        let weak: Weak<dyn HostApi> = self.weak.clone();
+        let weak = Arc::downgrade(&self.plugin_host.0);
         session::Services {
             commands: self.registry.commands.clone(),
             command_sources: self.registry.sources.commands.clone(),
@@ -534,7 +536,7 @@ impl Host {
             },
             budget: self.config.budget,
             env: Arc::new(self.config.env.clone()),
-            host: plugin::handle(self.handle()),
+            host: self.plugin_host.clone(),
             tool_host: Arc::new(SessionToolHost {
                 mailbox: mailbox.clone(),
             }),

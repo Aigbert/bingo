@@ -2,17 +2,29 @@
 use async_trait::async_trait;
 use bingo_sdk::*;
 use serde_json::Value;
-use std::{any::Any, cell::Cell, sync::Arc};
+use std::{
+    any::Any,
+    cell::Cell,
+    sync::{Arc, Weak},
+};
 
 thread_local! { static ANSWERING: Cell<bool> = const { Cell::new(false) }; }
 pub(crate) fn answering() -> bool {
     ANSWERING.get()
 }
 
-pub(crate) fn handle(host: HostHandle) -> HostHandle {
+pub(crate) fn handle(host: Weak<super::Host>) -> HostHandle {
     HostHandle(Arc::new(PluginHost(host)))
 }
-struct PluginHost(HostHandle);
+struct PluginHost(Weak<super::Host>);
+impl PluginHost {
+    fn inner(&self) -> HostHandle {
+        match self.0.upgrade() {
+            Some(host) => HostHandle(host),
+            None => HostHandle(Arc::new(super::Unavailable)),
+        }
+    }
+}
 #[async_trait]
 impl HostApi for PluginHost {
     async fn render(
@@ -20,7 +32,7 @@ impl HostApi for PluginHost {
         _session: &SessionId,
         request: bingo_sdk::render::RenderRequest,
     ) -> Result<bingo_sdk::View, KernelError> {
-        self.0.render(_session, request).await
+        self.inner().render(_session, request).await
     }
 
     async fn invalidate(
@@ -28,7 +40,7 @@ impl HostApi for PluginHost {
         _session: &SessionId,
         _requests: Vec<String>,
     ) -> Result<(), KernelError> {
-        self.0.invalidate(_session, _requests).await
+        self.inner().invalidate(_session, _requests).await
     }
 
     async fn complete(
@@ -37,11 +49,11 @@ impl HostApi for PluginHost {
         _turn: Option<&TurnId>,
         _request: Completion,
     ) -> Result<Vec<bingo_sdk::ModelEvent>, KernelError> {
-        self.0.complete(_session, _turn, _request).await
+        self.inner().complete(_session, _turn, _request).await
     }
 
     async fn sessions(&self, filter: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        self.0.sessions(filter).await
+        self.inner().sessions(filter).await
     }
 
     async fn open(
@@ -50,17 +62,17 @@ impl HostApi for PluginHost {
         who: ClientIdentity,
         options: OpenOptions,
     ) -> Result<Attachment, KernelError> {
-        let mut attachment = self.0.open(selector, who, options).await?;
+        let mut attachment = self.inner().open(selector, who, options).await?;
         attachment.handle = SessionHandle(Arc::new(PluginPort(attachment.handle)));
         Ok(attachment)
     }
 
     async fn close(&self, session: &SessionId, reason: CloseReason) -> Result<(), KernelError> {
-        self.0.close(session, reason).await
+        self.inner().close(session, reason).await
     }
 
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
-        self.0.delete(session).await
+        self.inner().delete(session).await
     }
 
     async fn deliver(
@@ -70,7 +82,7 @@ impl HostApi for PluginHost {
         input: Input,
         delivery: Delivery,
     ) -> Result<(), KernelError> {
-        self.0.deliver(to, intent, input, delivery).await
+        self.inner().deliver(to, intent, input, delivery).await
     }
 
     async fn extend(
@@ -80,7 +92,7 @@ impl HostApi for PluginHost {
         kind: &str,
         payload: Value,
     ) -> Result<(), KernelError> {
-        self.0.extend(session, plugin, kind, payload).await
+        self.inner().extend(session, plugin, kind, payload).await
     }
 
     async fn signal(
@@ -90,7 +102,7 @@ impl HostApi for PluginHost {
         kind: &str,
         payload: Value,
     ) -> Result<(), KernelError> {
-        self.0.signal(session, plugin, kind, payload).await
+        self.inner().signal(session, plugin, kind, payload).await
     }
 
     async fn invoke(
@@ -98,7 +110,7 @@ impl HostApi for PluginHost {
         _session: &SessionId,
         _call: ToolCall,
     ) -> Result<ToolOutcome, KernelError> {
-        self.0.invoke(_session, _call).await
+        self.inner().invoke(_session, _call).await
     }
 
     async fn ask(
@@ -107,11 +119,11 @@ impl HostApi for PluginHost {
         _kind: InteractionKind,
         _answers: Vec<AnswerSpec>,
     ) -> Result<Answer, KernelError> {
-        self.0.ask(_session, _kind, _answers).await
+        self.inner().ask(_session, _kind, _answers).await
     }
 
     async fn rewind(&self, _session: &SessionId, _to_turn: &TurnId) -> Result<u32, KernelError> {
-        self.0.rewind(_session, _to_turn).await
+        self.inner().rewind(_session, _to_turn).await
     }
 
     async fn withdraw(
@@ -120,7 +132,7 @@ impl HostApi for PluginHost {
         _intent: &IntentId,
         _who: ClientIdentity,
     ) -> Result<Input, KernelError> {
-        self.0.withdraw(_session, _intent, _who).await
+        self.inner().withdraw(_session, _intent, _who).await
     }
 
     async fn reconfigure(
@@ -128,31 +140,31 @@ impl HostApi for PluginHost {
         _session: &SessionId,
         _change: SessionChange,
     ) -> Result<(), KernelError> {
-        self.0.reconfigure(_session, _change).await
+        self.inner().reconfigure(_session, _change).await
     }
 
     async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
-        self.0.catalog(kind).await
+        self.inner().catalog(kind).await
     }
 
     async fn notice(&self, _level: Level, _code: &str, _text: &str) -> Result<(), KernelError> {
-        self.0.notice(_level, _code, _text).await
+        self.inner().notice(_level, _code, _text).await
     }
 
     fn gateway_events(&self) -> GatewayStream {
-        self.0.gateway_events()
+        self.inner().gateway_events()
     }
 
     fn service_any(&self, key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
-        self.0.service_any(key)
+        self.inner().service_any(key)
     }
 
     fn service_wire(&self, _key: &str) -> Option<Arc<dyn WireService>> {
-        self.0.service_wire(_key)
+        self.inner().service_wire(_key)
     }
 
     fn open_service(&self, key: &str, _wire: Arc<dyn WireService>) -> Result<(), KernelError> {
-        self.0.open_service(key, _wire)
+        self.inner().open_service(key, _wire)
     }
 }
 

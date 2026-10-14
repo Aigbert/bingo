@@ -36,7 +36,7 @@ pub(super) fn catalogue_context(host: &Host, session: Option<&SessionId>) -> Hoo
         cwd,
         provider: None,
         model: None,
-        host: super::plugin::handle(host.handle()),
+        host: host.plugin_host.clone(),
     }
 }
 
