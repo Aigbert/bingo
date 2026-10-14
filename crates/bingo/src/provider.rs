@@ -81,7 +81,7 @@ pub async fn add(env: &Env, registered: BTreeSet<String>) -> Result<String, Kern
     insert(&mut document, protocol, &name, base_url)?;
     write(&path, &document)?;
     let auth = match key {
-        Some(key) => Some(store(env, &name, key)?),
+        Some(key) => Some(store(env, protocol, &name, key)?),
         None => None,
     };
     Ok(receipt(&name, protocol, &path, auth.as_deref()))
@@ -205,8 +205,8 @@ pub(crate) fn write(path: &Path, document: &Map<String, Value>) -> Result<(), Ke
     bingo_core::settings::write(path, document).map_err(|e| internal(e.to_string()))
 }
 
-fn store(env: &Env, name: &str, key: String) -> Result<PathBuf, KernelError> {
-    let store = CredentialStore::new(env.data_dir.clone());
+fn store(env: &Env, protocol: Protocol, name: &str, key: String) -> Result<PathBuf, KernelError> {
+    let store = CredentialStore::new(env.data_dir.clone()).owned_by(protocol.key());
     store
         .write(name, Entry::Api { key })
         .map_err(|e| internal(e.to_string()))?;

@@ -84,6 +84,7 @@ async fn an_added_provider_is_written_down_and_the_next_run_uses_it() {
         serde_json::json!({ "baseUrl": server.uri() })
     );
     assert_eq!(read(&auth_json(home.path()))["proxy1"]["key"], "sk-added");
+    assert_eq!(read(&auth_json(home.path()))["proxy1"]["owner"], "openai");
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

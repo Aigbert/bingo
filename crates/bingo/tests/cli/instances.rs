@@ -117,8 +117,8 @@ async fn two_codex_instances_hold_two_credentials_and_refresh_apart() {
     write_auth(
         home.path(),
         serde_json::json!({
-            "work": { "type": "oauth", "access": "at-work-stale", "refresh": "rt-work", "expires": 1 },
-            "personal": { "type": "oauth", "access": "at-personal-stale", "refresh": "rt-personal", "expires": 1 },
+            "work": { "type": "oauth", "owner": "codex", "access": "at-work-stale", "refresh": "rt-work", "expires": 1 },
+            "personal": { "type": "oauth", "owner": "codex", "access": "at-personal-stale", "refresh": "rt-personal", "expires": 1 },
         }),
     );
 
