@@ -71,7 +71,7 @@ pub async fn add(env: &Env, registered: BTreeSet<String>) -> Result<String, Kern
         .map_err(|_| invalid("could not read credential store"))?
         .is_some()
     {
-        return Err(invalid(&format!(
+        return Err(invalid(format!(
             "a stored credential already uses that name; remove it first with `/provider remove {name}`"
         )));
     }
