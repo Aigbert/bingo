@@ -94,7 +94,16 @@ async fn stdout_carries_json_rpc_lines_only_and_an_unknown_method_is_refused() {
         r#"{"jsonrpc":"2.0","id":9,"method":"shutdown","params":{}}"#,
     )
     .await;
-    assert!(next(99).await["result"].is_object());
+    // Events published after the turn completed may still be ahead of the reply.
+    let shutdown = loop {
+        n += 1;
+        let line = next(n).await;
+        if line.get("id") == Some(&serde_json::json!(9)) {
+            break line;
+        }
+        assert_eq!(line["method"], "event", "{line}");
+    };
+    assert!(shutdown["result"].is_object(), "{shutdown}");
     assert!(server.child.wait().await.unwrap().success());
 }
 
