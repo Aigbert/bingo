@@ -21,6 +21,7 @@ pub mod elicitation;
 pub mod guide;
 pub mod manager;
 pub mod rows;
+mod signin;
 pub mod source;
 pub mod tool;
 
@@ -94,7 +95,8 @@ impl Plugin for McpPlugin {
                 &settings.disabled_mcp_servers,
                 registrar.env().data_dir.clone(),
             )
-            .with_waiting(settings.waiting),
+            .with_waiting(settings.waiting)
+            .with_sources(registrar.sources()),
         );
         registrar.add(Contribution::Tools(
             Arc::new(McpSource::new(Arc::clone(&manager))) as Arc<dyn ToolSource>,

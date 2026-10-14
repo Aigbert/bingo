@@ -1,1 +1,45 @@
-{"method":"servers","params":null,"answer":{"servers":{"files":{"type":"stdio","command":"npx","args":["-y","files"],"env":{"TOKEN":"s3cret"},"cwd":null},"remote":{"type":"http","url":"https://mcp.example.com/mcp","headers":{}}}}}
+{
+  "method": "servers",
+  "params": null,
+  "answer": {
+    "servers": [
+      {
+        "name": "files",
+        "transport": {
+          "type": "stdio",
+          "command": "npx",
+          "args": [
+            "-y",
+            "files"
+          ],
+          "env": {
+            "TOKEN": "s3cret"
+          },
+          "cwd": null
+        },
+        "origin": null,
+        "status": {
+          "kind": "connecting"
+        },
+        "auth": null,
+        "latency": null,
+        "signInFrom": null
+      },
+      {
+        "name": "remote",
+        "transport": {
+          "type": "http",
+          "url": "https://mcp.example.com/mcp",
+          "headers": {}
+        },
+        "origin": null,
+        "status": {
+          "kind": "connecting"
+        },
+        "auth": null,
+        "latency": null,
+        "signInFrom": null
+      }
+    ]
+  }
+}

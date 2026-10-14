@@ -121,6 +121,12 @@ impl McpCommand {
             host: cx.host.clone(),
             session: cx.session.clone(),
         });
+        let _signing = self.manager.signing_in(server).await.ok_or_else(|| {
+            KernelError::new(
+                ErrorCode::InvalidInput,
+                "server is off or already signing in",
+            )
+        })?;
         let receipt = auth
             .login(prompter, None, true)
             .await
@@ -229,6 +235,7 @@ fn row(line: &Line) -> Vec<String> {
             ),
             String::new(),
         ),
+        Status::SigningIn => ("signing in".to_string(), String::new()),
         Status::Connecting => ("connecting".to_string(), String::new()),
         Status::Connected { tools } => ("connected".to_string(), tools.to_string()),
         Status::NeedsAuth { .. } => (NEEDS_AUTH.to_string(), String::new()),

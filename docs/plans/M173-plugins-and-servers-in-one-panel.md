@@ -84,3 +84,16 @@ panel; per-tool switches inside a server; the desktop's drawing.
   line, and the verbs table test lists each (row kind, key) pair.
 - A server list that changes while the panel is open (a handshake
   lands) moves rows: the cursor follows the row by name.
+
+## Decisions
+
+- The prototype's needed examples are illustrative. ADR-0057's existing store/surface rule
+  remains authoritative; permission and filesystem plugins remain switchable.
+- Add `/plugins trust <name> <tier>` and optional approval tier arguments: no command
+  currently writes trust. Both use the user-layer writer; the panel only dispatches lines.
+- Server rows retain typed transport configuration for ACP forwarding. Tool counts and
+  run/address text derive from status/transport instead of duplicating those facts.
+  Origins come from registrar sources, retained after approval; unknown latency stays absent.
+- Guides use the new crate's registered Page (ADR-0054). No docs/guide directory is added.
+- Add only workspace edges for the new mod and its test consumers. The normal dependency
+  count grows 414 → 415 because the budget counts workspace members.

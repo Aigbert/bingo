@@ -43,19 +43,10 @@ struct Slot {
     epoch: u64,
     state: State,
     waiting: Option<bingo_sdk::Waiting>,
+    signing: Arc<std::sync::atomic::AtomicBool>,
 }
 
-/// What `/mcp` says about a server: the state with the live connection left
-/// behind, so no view ever holds one.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Status {
-    Waiting { changed: bool },
-    Connecting,
-    Connected { tools: usize },
-    NeedsAuth { why: String },
-    Failed { why: String },
-    Disabled,
-}
+pub use bingo_services::mcp::Status;
 
 /// One line of the `/mcp` table: what a server is doing, and how it stands
 /// with the sign-in it may need. The two are different facts — a server can be
@@ -76,6 +67,7 @@ pub struct Manager {
     /// servers themselves are.
     auth: BTreeMap<String, Arc<McpAuth>>,
     data_dir: PathBuf,
+    origins: BTreeMap<String, String>,
     slots: RwLock<BTreeMap<String, Slot>>,
 }
 
@@ -110,6 +102,7 @@ impl Manager {
                         epoch: 0,
                         state,
                         waiting: None,
+                        signing: Default::default(),
                     },
                 )
             })
@@ -124,8 +117,29 @@ impl Manager {
             servers,
             auth,
             data_dir,
+            origins: BTreeMap::new(),
             slots: RwLock::new(slots),
         }
+    }
+
+    pub fn with_sources(mut self, sources: &bingo_sdk::plugin::ConfigSources) -> Self {
+        self.origins = self
+            .servers
+            .keys()
+            .filter_map(|name| {
+                sources.layer(&[crate::SETTING, name]).map(|layer| {
+                    let label = match layer.origin {
+                        bingo_sdk::plugin::ConfigOrigin::Repository => {
+                            format!("this project · {}", layer.source)
+                        }
+                        bingo_sdk::plugin::ConfigOrigin::User => "~/.bingo/settings.toml".into(),
+                        bingo_sdk::plugin::ConfigOrigin::Explicit => layer.source.clone(),
+                    };
+                    (name.clone(), label)
+                })
+            })
+            .collect();
+        self
     }
 
     pub fn with_waiting(mut self, waiting: Vec<bingo_sdk::Waiting>) -> Self {
@@ -188,6 +202,26 @@ impl Manager {
             .await
             .get(name)
             .is_some_and(|slot| slot.waiting.is_some())
+    }
+
+    pub(crate) fn changed(&self) {
+        if let Some(host) = self.host.get().and_then(std::sync::Weak::upgrade) {
+            host.catalog_changed(bingo_sdk::CatalogKind::Plugins);
+        }
+    }
+
+    pub async fn signing_in(self: &Arc<Self>, name: &str) -> Option<crate::signin::Signing> {
+        let slots = self.slots.read().await;
+        let slot = slots.get(name)?;
+        if off(slot) || slot.signing.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            return None;
+        }
+        let signing = crate::signin::Signing {
+            active: slot.signing.clone(),
+            manager: Arc::downgrade(self),
+        };
+        self.changed();
+        Some(signing)
     }
 
     pub fn bind(&self, host: &bingo_sdk::HostHandle) {
@@ -307,19 +341,26 @@ impl Manager {
         self.spawn_dial(name, claimed)
     }
 
-    /// The rows of every server a person has left switched on, keyed by name
-    /// and shaped the way they wrote them.
-    ///
-    /// Not the tools: whoever asks for these is going to dial the servers
-    /// itself, so what it needs is the row (ADR-0036 §4). A server that is
-    /// switched off is not a row anyone should be handed — bingo would not
-    /// dial it either.
-    pub async fn rows(&self) -> serde_json::Map<String, serde_json::Value> {
+    pub async fn rows(&self) -> Vec<bingo_services::mcp::ServerRow> {
         let slots = self.slots.read().await;
         self.servers
             .iter()
-            .filter(|(name, _)| !matches!(slots.get(*name).map(off), Some(true)))
-            .map(|(name, server)| (name.clone(), crate::config::row(server)))
+            .filter_map(|(name, server)| {
+                let slot = slots.get(name)?;
+                crate::rows::row(
+                    name,
+                    server,
+                    status_of(slot),
+                    self.auth.get(name).map(|auth| auth.status()),
+                    slot.waiting.as_ref(),
+                )
+                .map(|mut row| {
+                    if let Some(origin) = self.origins.get(name) {
+                        row.origin = Some(origin.clone());
+                    }
+                    row
+                })
+            })
             .collect()
     }
 
@@ -405,6 +446,8 @@ impl Manager {
         }
         slot.epoch += 1;
         slot.state = State::Disabled;
+        drop(slots);
+        self.changed();
         true
     }
 
@@ -423,6 +466,7 @@ impl Manager {
         let Some(epoch) = claimed else {
             return false;
         };
+        self.changed();
         let manager = Arc::clone(self);
         let name = name.to_string();
         tokio::spawn(async move { manager.dial_one(name, epoch).await });
@@ -503,6 +547,8 @@ impl Manager {
             Dialled::Unauthorized { why } => State::NeedsAuth { why },
             Dialled::Failed { why } => State::Failed { why },
         };
+        drop(slots);
+        self.changed();
     }
 }
 
@@ -566,7 +612,6 @@ fn first_line(description: &str) -> String {
         .to_string()
 }
 
-/// Whether a person has switched this server off.
 fn off(slot: &Slot) -> bool {
     slot.waiting.is_some() || matches!(slot.state, State::Disabled)
 }
@@ -576,6 +621,11 @@ fn status_of(slot: &Slot) -> Status {
         return Status::Waiting {
             changed: entry.changed,
         };
+    }
+    if !matches!(slot.state, State::Disabled)
+        && slot.signing.load(std::sync::atomic::Ordering::SeqCst)
+    {
+        return Status::SigningIn;
     }
     match &slot.state {
         State::Connecting => Status::Connecting,
@@ -835,7 +885,7 @@ mod approval_tests {
         assert!(!manager.waiting("repo").await);
         assert_eq!(manager.lines().await[0].status, Status::Disabled);
         assert!(manager.pending().await.is_empty());
-        assert!(manager.rows().await.is_empty());
+        assert!(manager.rows().await.iter().all(|row| !row.forwardable()));
         assert!(manager.connect("repo").await.is_err());
         assert!(!manager.reconnect("repo").await);
         manager.shutdown().await;
@@ -877,7 +927,7 @@ mod approval_tests {
             !manager.enable("repo").await,
             "disable/enable must not clear waiting"
         );
-        assert!(manager.rows().await.is_empty());
+        assert!(manager.rows().await.iter().all(|row| !row.forwardable()));
         assert!(manager.tools().await.is_empty());
         assert!(manager.pending().await.is_empty());
         assert_eq!(
@@ -901,7 +951,13 @@ mod approval_tests {
         });
         manager.approve("repo", &host.handle()).await.unwrap();
         assert!(!manager.waiting("repo").await);
-        assert!(manager.rows().await.contains_key("repo"));
+        assert!(
+            manager
+                .rows()
+                .await
+                .iter()
+                .any(|row| row.name == "repo" && row.forwardable())
+        );
         manager.shutdown().await;
     }
 }

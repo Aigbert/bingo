@@ -1,7 +1,9 @@
 //! The live configured MCP server rows.
 use async_trait::async_trait;
 use bingo_sdk::{HostHandle, ServiceKey, WireService};
-use serde_json::{Map, Value};
+use serde_json::Value;
+mod row;
+pub use row::{Auth, ServerRow, Status, Transport};
 use std::sync::Arc;
 
 pub static KEY: ServiceKey<dyn Servers> = ServiceKey::new("mcp.servers");
@@ -22,7 +24,7 @@ pub struct Connect {
 
 #[async_trait]
 pub trait Servers: Send + Sync {
-    async fn servers(&self) -> Map<String, Value>;
+    async fn rows(&self) -> Vec<ServerRow>;
     async fn call(&self, _input: Call) -> Result<bingo_sdk::ToolOutput, bingo_sdk::ServiceError> {
         Err(bingo_sdk::ServiceError("MCP calls are unavailable".into()))
     }
@@ -48,7 +50,7 @@ struct ToWire(Arc<dyn Servers>);
 
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 struct Answer {
-    servers: Map<String, Value>,
+    servers: Vec<ServerRow>,
 }
 
 #[async_trait]
@@ -80,7 +82,7 @@ impl WireService for ToWire {
                 KEY.name()
             )));
         }
-        Ok(serde_json::json!({ "servers": self.0.servers().await }))
+        Ok(serde_json::json!({ "servers": self.0.rows().await }))
     }
 }
 
@@ -101,11 +103,13 @@ impl Servers for FromWire {
             .await
             .map(|_| ())
     }
-    async fn servers(&self) -> Map<String, Value> {
+    async fn rows(&self) -> Vec<ServerRow> {
         let Ok(answer) = self.0.call("servers", Value::Null).await else {
-            return Map::new();
+            return Vec::new();
         };
-        answer["servers"].as_object().cloned().unwrap_or_default()
+        serde_json::from_value::<Answer>(answer)
+            .map(|answer| answer.servers)
+            .unwrap_or_default()
     }
 }
 
@@ -119,8 +123,8 @@ mod tests {
     }
     #[async_trait]
     impl Servers for Rows {
-        async fn servers(&self) -> Map<String, Value> {
-            fixture()["answer"]["servers"].as_object().unwrap().clone()
+        async fn rows(&self) -> Vec<ServerRow> {
+            serde_json::from_value(fixture()["answer"]["servers"].clone()).unwrap()
         }
     }
     #[test]
@@ -154,7 +158,7 @@ mod tests {
         let host = ServiceHost::handle();
         host.open_service(KEY.name(), face).unwrap();
         assert_eq!(
-            Value::Object(find(&host).unwrap().servers().await),
+            serde_json::to_value(find(&host).unwrap().rows().await).unwrap(),
             recorded["answer"]["servers"]
         );
     }

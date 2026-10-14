@@ -18,7 +18,7 @@ use std::sync::Arc;
 use agent_client_protocol_schema::v1::{AgentCapabilities, McpCapabilities, McpServer};
 use bingo_sdk::{HostHandle, Level, SessionId};
 use bingo_services::mcp;
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use crate::bridge::{Bridge, Token};
 use crate::config::Adapter;
@@ -107,7 +107,11 @@ async fn forwarded(
     }
     let mut crossed = Vec::new();
     let mut names = BTreeSet::new();
-    for (name, row) in rows(host).await {
+    for row in rows(host).await.into_iter().filter(|row| row.forwardable()) {
+        let name = row.name;
+        let Ok(row) = serde_json::to_value(row.transport) else {
+            continue;
+        };
         match servers::theirs(&name, &row, mcp) {
             Ok(server) => {
                 crossed.push(server);
@@ -129,10 +133,10 @@ async fn say(host: &HostHandle, line: Option<String>) {
 /// What `bingo-mcp` says is configured now. Nothing when it is not in this
 /// build, or has nothing to say: an ACP adapter with no MCP plugin beside it
 /// forwards no rows and serves everything itself.
-async fn rows(host: &HostHandle) -> Map<String, Value> {
+async fn rows(host: &HostHandle) -> Vec<mcp::ServerRow> {
     match mcp::find(host) {
-        Some(service) => service.servers().await,
-        None => Map::new(),
+        Some(service) => service.rows().await,
+        None => Vec::new(),
     }
 }
 
@@ -153,7 +157,9 @@ mod tests {
     #[async_trait]
     impl WireService for Configured {
         async fn call(&self, _method: &str, _params: Value) -> Result<Value, ServiceError> {
-            Ok(json!({ "servers": self.0 }))
+            Ok(
+                json!({ "servers": self.0.as_object().unwrap().iter().map(|(name, transport)| json!({"name":name,"transport":transport,"status":{"kind":"connecting"},"origin":null,"auth":null,"latency":null,"signInFrom":null})).collect::<Vec<_>>() }),
+            )
         }
     }
 
