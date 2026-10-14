@@ -192,7 +192,8 @@
             "enum": [
               "terminal",
               "desktop",
-              "text"
+              "text",
+              "chat"
             ]
           },
           "Viewport": {

@@ -196,3 +196,8 @@ Start from the repository's `examples/plugins/` and read the adjacent tests:
 - `examples/plugins/pane` — a tool ledger, commands, pane rendering, resize and Escape.
 - `examples/plugins/ts-status` — persistent call count, status and a permission hook.
 - `examples/plugins/wordcount` — the Python external-process example, with `plugin.json` and `main.py`.
+
+The `chat` surface asks `AssistantMessage`, `CommandOutput`, `InfoNotice`, and
+`ShellRun` with a zero-cell viewport. It draws Box, Text, Code, Link, Image,
+Button, Select, Input and Engine; other elements fold. Streaming stays native
+until the answer finishes. The `text` table remains folds only.

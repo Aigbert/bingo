@@ -137,6 +137,7 @@ pub const ELEMENTS: &[Element] = &[
 ];
 pub const TERMINAL: SurfaceName = SurfaceName::Terminal;
 pub const DESKTOP: SurfaceName = SurfaceName::Desktop;
+pub const CHAT: SurfaceName = SurfaceName::Chat;
 pub const TEXT: SurfaceName = SurfaceName::Text;
 pub fn elements(surface: SurfaceName) -> Vec<Element> {
     ELEMENTS
@@ -146,6 +147,18 @@ pub fn elements(surface: SurfaceName) -> Vec<Element> {
             SurfaceName::Terminal => element.kind != "Svg",
             SurfaceName::Desktop => element.kind != "Raster",
             SurfaceName::Text => false,
+            SurfaceName::Chat => matches!(
+                element.kind,
+                "Box"
+                    | "Text"
+                    | "Code"
+                    | "Link"
+                    | "Image"
+                    | "Button"
+                    | "Select"
+                    | "Input"
+                    | "Engine"
+            ),
         })
         .collect()
 }
@@ -187,6 +200,22 @@ pub fn kind(view: &View) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn chat_names_every_native_element_and_folds_the_rest() {
+        let native = [
+            "Box", "Text", "Code", "Link", "Image", "Button", "Select", "Input", "Engine",
+        ];
+        for element in ELEMENTS {
+            assert_eq!(
+                elements(CHAT).iter().any(|e| e.kind == element.kind),
+                native.contains(&element.kind),
+                "{}",
+                element.kind
+            );
+        }
+        assert!(elements(TEXT).is_empty());
+        assert_eq!(serde_json::to_value(CHAT).unwrap(), "chat");
+    }
     #[test]
     fn tables_pin_props_and_report_nested_folds() {
         let svg = View::Svg {

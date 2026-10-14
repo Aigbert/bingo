@@ -47,6 +47,7 @@ pub enum SurfaceName {
     Terminal,
     Desktop,
     Text,
+    Chat,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Viewport {
@@ -71,17 +72,20 @@ impl Component {
 
     pub const fn surfaces(self) -> &'static [SurfaceName] {
         match self {
+            Self::AssistantMessage | Self::CommandOutput | Self::InfoNotice | Self::ShellRun => &[
+                SurfaceName::Terminal,
+                SurfaceName::Desktop,
+                SurfaceName::Text,
+                SurfaceName::Chat,
+            ],
             Self::Question
             | Self::UserMessage
-            | Self::AssistantMessage
             | Self::ToolUse
             | Self::ToolResult
             | Self::ToolGroup
             | Self::ToolProgress
-            | Self::CommandOutput
             | Self::Spinner
             | Self::TurnDuration
-            | Self::InfoNotice
             | Self::SessionMode
             | Self::PromptHint
             | Self::AbovePrompt
@@ -95,7 +99,6 @@ impl Component {
             | Self::QuestionAnswer
             | Self::PermissionReceipt
             | Self::Asset
-            | Self::ShellRun
             | Self::Action
             | Self::TurnProgress
             | Self::SessionStatus
@@ -179,13 +182,18 @@ mod tests {
     #[test]
     fn every_component_names_its_surfaces() {
         for component in Component::ALL {
+            assert!(component.surfaces().contains(&SurfaceName::Terminal));
+            assert!(component.surfaces().contains(&SurfaceName::Desktop));
+            assert!(component.surfaces().contains(&SurfaceName::Text));
             assert_eq!(
-                component.surfaces(),
-                &[
-                    SurfaceName::Terminal,
-                    SurfaceName::Desktop,
-                    SurfaceName::Text
-                ]
+                component.surfaces().contains(&SurfaceName::Chat),
+                matches!(
+                    component,
+                    Component::AssistantMessage
+                        | Component::CommandOutput
+                        | Component::InfoNotice
+                        | Component::ShellRun
+                )
             );
         }
     }
