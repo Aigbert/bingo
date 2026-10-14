@@ -221,9 +221,11 @@ fn a_name_already_taken_is_refused_and_nothing_is_written() {
     assert!(stderr(&out).contains("`codex`"), "{}", stderr(&out));
     assert!(!settings_file(home.path()).exists());
 
-    let out = typed(&mut add(home.path()), &["two words", "openai", "", ""]);
-    assert_eq!(out.status.code(), Some(1));
-    assert!(stderr(&out).contains("one word"), "{}", stderr(&out));
+    for name in ["two words", "channels.telegram", "service:key"] {
+        let out = typed(&mut add(home.path()), &[name, "openai", "", ""]);
+        assert_eq!(out.status.code(), Some(1));
+        assert!(stderr(&out).contains("ASCII letters"), "{}", stderr(&out));
+    }
 
     // The same name twice: the second run reads what the first wrote.
     let out = typed(&mut add(home.path()), &["proxy1", "openai", "", ""]);
@@ -284,4 +286,21 @@ fn protocol_alias(protocol: &str) -> &str {
         "openai" => "proxy-openai",
         _ => "proxy-anthropic",
     }
+}
+
+#[test]
+fn a_stored_credential_blocks_the_cli_before_any_settings_write() {
+    let home = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(auth_json(home.path()).parent().unwrap()).unwrap();
+    let before = r#"{"occupied":{"type":"api","key":"foreign-secret"}}"#;
+    std::fs::write(auth_json(home.path()), before).unwrap();
+    let out = typed(&mut add(home.path()), &["occupied", "openai", "", ""]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(stderr(&out).contains("remove it first"));
+    assert!(!stderr(&out).contains("foreign-secret"));
+    assert!(!settings_file(home.path()).exists());
+    assert_eq!(
+        std::fs::read_to_string(auth_json(home.path())).unwrap(),
+        before
+    );
 }
