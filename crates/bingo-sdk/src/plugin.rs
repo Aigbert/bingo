@@ -1,6 +1,9 @@
 //! How a plugin enters the process: a static manifest, one synchronous
 //! `register` that only adds contributions, and `start`/`stop` for I/O.
 
+mod reload;
+pub use reload::PluginReload;
+
 use std::any::Any;
 use std::collections::BTreeSet;
 use std::fmt;
@@ -248,6 +251,10 @@ pub trait HookSource: Send + Sync {
 pub trait PluginSource: Send + Sync {
     fn id(&self) -> &str;
     async fn plugins(&self) -> Vec<PluginStatus>;
+    /// Rescan reloadable plugins; sources without live reload return no changes.
+    async fn reload(&self) -> Result<PluginReload, crate::KernelError> {
+        Ok(PluginReload::default())
+    }
     /// Claim pending generations once, before they may contribute links.
     async fn registrations(
         &self,

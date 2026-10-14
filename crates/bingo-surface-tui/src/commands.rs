@@ -222,6 +222,9 @@ fn after(
     if partial.contains(char::is_whitespace) || !values.iter().any(|value| value == word) {
         return Vec::new();
     }
+    if matches!(name, "plugins" | "modules") && word == "reload" {
+        return Vec::new();
+    }
     offered(&format!("/{name} {word}"), partial, then, catalogues)
 }
 
@@ -427,7 +430,7 @@ mod tests {
         vec![spec(
             "plugins",
             ArgSpec::Words {
-                values: vec!["enable".into(), "disable".into()],
+                values: vec!["enable".into(), "disable".into(), "reload".into()],
                 then: Some(Box::new(ArgSpec::Catalog {
                     source: "plugins".into(),
                 })),
@@ -573,5 +576,29 @@ mod tests {
         let specs = specs_from(&catalog);
         assert_eq!(specs.len(), 1);
         assert_eq!(specs[0].name, "model");
+    }
+}
+
+#[cfg(test)]
+mod reload_tests {
+    #[test]
+    fn reload_has_no_plugin_name_completion() {
+        let specs = [bingo_sdk::CommandSpec {
+            name: "plugins".into(),
+            args: bingo_sdk::ArgSpec::Words {
+                values: vec!["reload".into()],
+                then: Some(Box::new(bingo_sdk::ArgSpec::Catalog {
+                    source: "plugins".into(),
+                })),
+            },
+            ..bingo_sdk::CommandSpec::ui("test")
+        }];
+        let catalogues =
+            std::collections::BTreeMap::from([("plugins".into(), vec!["fixture".into()])]);
+        assert_eq!(
+            super::suggestions("/plugins rel", &specs, &catalogues)[0].value,
+            "/plugins reload"
+        );
+        assert!(super::suggestions("/plugins reload ", &specs, &catalogues).is_empty());
     }
 }

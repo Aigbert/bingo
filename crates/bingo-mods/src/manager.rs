@@ -13,11 +13,13 @@ use std::{
     sync::{Arc, Mutex, OnceLock, RwLock, Weak},
 };
 
+mod directories;
 mod reload;
+mod rescan;
 pub(crate) struct Manager {
     pub(crate) callbacks: Arc<bingo_plugin_host::callback::Registry>,
     env: Env,
-    directories: Vec<PathBuf>,
+    directories: directories::Directories,
     settings: BTreeMap<String, Value>,
     switched_off: BTreeSet<String>,
     limits: Limits,
@@ -43,7 +45,7 @@ impl Manager {
         Self {
             callbacks: Arc::default(),
             env,
-            directories,
+            directories: directories::Directories::new(directories),
             settings,
             switched_off,
             limits,
@@ -65,6 +67,7 @@ impl Manager {
         host: HostHandle,
         dollar: Arc<crate::dollar::Runtime>,
     ) {
+        let _ = self.directories.layers.set(discovery::dirs(&self.env, cwd));
         let _ = self.dollar.set(dollar);
         let _ = self.host.set(host.clone());
         let _ = self.this.set(Arc::downgrade(self));
@@ -76,11 +79,7 @@ impl Manager {
                 host.clone(),
                 self.stop.clone(),
             )));
-        let found = discovery::with_explicit(
-            &discovery::dirs(&self.env, cwd),
-            &self.directories,
-            &self.notices,
-        );
+        let found = self.directories.read(true, &self.notices);
         let mut modules = Vec::new();
         for found in found.into_iter().filter(|found| {
             bingo_plugin_host::runtime::runtime_of(&found.manifest, true)
@@ -196,6 +195,9 @@ impl Manager {
 impl PluginSource for Manager {
     fn id(&self) -> &str {
         "bingo.mods"
+    }
+    async fn reload(&self) -> Result<PluginReload, KernelError> {
+        self.rescan(true).await
     }
     async fn plugins(&self) -> Vec<PluginStatus> {
         self.modules()
