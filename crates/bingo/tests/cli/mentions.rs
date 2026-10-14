@@ -94,7 +94,14 @@ fn cards(out: &Output) -> Vec<Value> {
 }
 
 fn root_of(out: &Output) -> SessionId {
-    frames_of(out)[0].session.clone()
+    frames_of(out)
+        .into_iter()
+        .find_map(|frame| match frame.event {
+            Event::ItemCompleted { item }
+                if matches!(&item.body, ItemBody::User { origin, .. } if origin.surface == "print" && origin.principal.is_none()) => Some(frame.session),
+            _ => None,
+        })
+        .expect("the person's submitted input")
 }
 
 /// Every post in a room's journal, an hour older: what the process before this
