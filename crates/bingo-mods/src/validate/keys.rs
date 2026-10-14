@@ -7,7 +7,7 @@ pub(super) fn check(semantic: &Semantic<'_>, source: &mut Source<'_>) {
         let AstKind::CallExpression(call) = node.kind() else {
             continue;
         };
-        let name = super::dollar::chain(&call.callee).or_else(|| {
+        let name = super::dollar::chain(&call.callee, semantic).or_else(|| {
             matches!(&call.callee, Expression::Identifier(id) if id.name == "atom")
                 .then(|| "state.atom".into())
         });

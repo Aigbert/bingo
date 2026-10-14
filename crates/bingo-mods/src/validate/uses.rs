@@ -8,7 +8,7 @@ pub(super) fn call(name: &str, call: &CallExpression<'_>, source: &mut Source<'_
     let unsafe_call = crate::dollar::table::ROWS
         .iter()
         .any(|row| row.noun == noun && row.method == method && row.unsafe_call);
-    if unsafe_call && !source.output.uses.contains(noun) {
+    if (unsafe_call || name == "fs.write") && !source.output.uses.contains(noun) {
         source.finding(
             call.span.start,
             Rule::Uses,

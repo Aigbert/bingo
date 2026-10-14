@@ -40,6 +40,9 @@ mod tests {
 
 #[async_trait::async_trait]
 pub trait Driver: Send {
+    fn site(&self) -> Option<serde_json::Value> {
+        None
+    }
     async fn call(
         &mut self,
         method: &str,
@@ -78,6 +81,7 @@ impl Runner {
             .map_err(|e| e.to_string())?;
         let mut reports = Vec::new();
         for (index, case) in cases.into_iter().enumerate() {
+            site = driver.site().unwrap_or(site);
             site["testing"] = serde_json::json!(index);
             let outcome = match self.dispatch(driver, site.clone()).await {
                 Ok(value) => serde_json::from_value(value).map_err(|e| e.to_string())?,
@@ -106,7 +110,7 @@ impl Runner {
         loop {
             tokio::select! { biased;
                 Some(operation) = call.operations.recv() => {
-                    let result = driver.call(&operation.method, operation.params).await;
+                    let result = bounded(driver.call(&operation.method, operation.params)).await;
                     let _ = operation.reply.send(result);
                 }
                 result = &mut call.result => return result.map_err(|e| e.to_string())?.map_err(|e| e.to_string()),
@@ -120,3 +124,17 @@ impl Runner {
 
 mod environment;
 pub use environment::{Environment, Paused};
+
+async fn bounded<T>(
+    future: impl std::future::Future<Output = Result<T, String>>,
+) -> Result<T, String> {
+    let (complete, waiting) = std::sync::mpsc::channel::<()>();
+    let deadline =
+        tokio::task::spawn_blocking(move || waiting.recv_timeout(bingo_sdk::HOOK_DEADLINE));
+    let result = tokio::select! {
+        result = future => result,
+        _ = deadline => Err("test host operation exceeded its wall deadline".into()),
+    };
+    drop(complete);
+    result
+}

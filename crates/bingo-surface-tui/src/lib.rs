@@ -336,12 +336,45 @@ mod identity;
 mod crew_contract;
 
 /// Draw a mod test's terminal tree without exposing terminal-library types.
-pub fn drawn(_view: &bingo_sdk::View, _width: usize) -> Vec<String> { Vec::new() }
+pub fn drawn(view: &bingo_sdk::View, width: usize) -> Vec<String> {
+    views::render(&test_engine_nodes(view), width)
+        .into_iter()
+        .map(|line| line.to_string().trim_end().to_owned())
+        .collect()
+}
+fn test_engine_nodes(view: &bingo_sdk::View) -> bingo_sdk::View {
+    use bingo_sdk::{View, view::TextChild};
+    let mut view = view.clone();
+    match &mut view {
+        View::Engine { component, .. } => return View::text(format!("⟨{component:?}⟩")),
+        View::Box { children, .. } => {
+            for child in children {
+                *child = test_engine_nodes(child);
+            }
+        }
+        View::Panel { child, .. } => **child = test_engine_nodes(child),
+        View::Text { children, .. } | View::Button { children, .. } => {
+            for child in children {
+                if let TextChild::Node(child) = child {
+                    **child = test_engine_nodes(child);
+                }
+            }
+        }
+        _ => (),
+    }
+    view
+}
 #[cfg(test)]
 mod author_kit_tests {
     #[test]
     fn drawn_uses_terminal_layout_and_marks_nested_engine_nodes() {
-        let view = bingo_sdk::View::column(vec![bingo_sdk::View::text("header"), bingo_sdk::View::Engine { component: bingo_sdk::render::Component::AbovePrompt, props: serde_json::json!({}) }]);
-        assert_eq!(super::drawn(&view,80),["header","⟨AbovePrompt⟩"]);
+        let view = bingo_sdk::View::column(vec![
+            bingo_sdk::View::text("header"),
+            bingo_sdk::View::Engine {
+                component: bingo_sdk::render::Component::AbovePrompt,
+                props: serde_json::json!({}),
+            },
+        ]);
+        assert_eq!(super::drawn(&view, 80), ["header", "⟨AbovePrompt⟩"]);
     }
 }

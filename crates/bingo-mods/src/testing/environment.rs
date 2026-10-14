@@ -62,6 +62,7 @@ impl Default for Paused {
 }
 impl Drop for Paused {
     fn drop(&mut self) {
+        tokio::time::resume();
         let _ = self.0.send(());
     }
 }
