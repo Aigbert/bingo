@@ -266,18 +266,13 @@ pub fn server_card(s: &ServerRow, reviewing: bool) -> Vec<Fact> {
         rows.push(line(offered(&s.status)));
     }
     rows.push(line(""));
-    rows.push(fact(
-        "state",
-        match &s.status {
-            Status::Connected { .. } => "● connected",
-            Status::Disabled => "○ off",
-            Status::Failed { .. } => "✗ not running",
-            Status::NeedsAuth { .. } => "○ needs sign-in",
-            Status::Waiting { .. } => "◌ waiting for your yes",
-            Status::Connecting => "◌ connecting …",
-            Status::SigningIn => "◌ waiting for the browser",
-        },
-    ));
+    let glyph = match &s.status {
+        Status::Connected { .. } => "●",
+        Status::Failed { .. } => "✗",
+        Status::Disabled | Status::NeedsAuth { .. } => "○",
+        Status::Waiting { .. } | Status::Connecting | Status::SigningIn => "◌",
+    };
+    rows.push(fact("state", format!("{glyph} {}", s.status.said())));
     if !reviewing {
         rows.push(fact(
             if s.transport.name() == "http" {

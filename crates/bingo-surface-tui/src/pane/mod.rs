@@ -38,6 +38,9 @@ pub struct Pane {
     pub size: bingo_sdk::slot::PaneSize,
     pub view: Shown,
 }
+pub fn heading_rows(pane: &Pane) -> u16 {
+    u16::from(!pane.title.is_empty())
+}
 pub fn placed(state: &SessionState) -> Vec<Pane> {
     bingo_sdk::slot::placed(state)
         .into_iter()
@@ -308,6 +311,9 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
         ui.focus = Focus::Composer;
         return Vec::new();
     };
+    if key.code == KeyCode::Esc && state.busy() {
+        return vec![Effect::Interrupt];
+    }
     if key.code == KeyCode::Esc {
         ui.placed.panes.selection = None;
         if pane.close {
@@ -454,3 +460,7 @@ mod integration_tests;
 
 #[cfg(test)]
 mod focus_tests;
+
+#[cfg(test)]
+#[path = "tests/status.rs"]
+mod status_tests;

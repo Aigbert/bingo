@@ -36,7 +36,10 @@ impl Key {
             state,
             &request.on(SurfaceName::Terminal),
             pane.area.width,
-            pane.area.height.saturating_sub(1),
+            request.props["scroll"]["bodyRows"]
+                .as_u64()
+                .and_then(|n| u16::try_from(n).ok())
+                .unwrap_or_else(|| pane.area.height.saturating_sub(1)),
         );
         key.request.viewport.place = Some(pane.place);
         key
@@ -52,8 +55,10 @@ impl Key {
             && self.request.props == other.request.props
             && self.request.viewport.columns == other.request.viewport.columns
             && self.request.viewport.place == other.request.viewport.place
-            && (self.request.component != bingo_sdk::render::Component::Pane
-                || self.request.viewport.rows == other.request.viewport.rows)
+            && (!matches!(
+                self.request.component,
+                bingo_sdk::render::Component::Pane | bingo_sdk::render::Component::Status
+            ) || self.request.viewport.rows == other.request.viewport.rows)
     }
 }
 #[derive(Debug)]

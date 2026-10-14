@@ -1,0 +1,28 @@
+---
+source: crates/bingo-surface-tui/src/pane/tests/status.rs
+expression: screen
+---
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"█      ▀                                                                        "
+"█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█                                                   "
+"█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍                                                 "
+"                ▄▄▄▄▄█                                                          "
+"fake-1 · /tmp/project                                                           "
+"                                                                                "
+" status   live; ⏎ on a row goes there                      bingo 0.6.6 · up 42m "
+"   session    The release · ses_1 · /tmp/project                                "
+"   model      fake-1 · fake                                                     "
+"   context    ▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 42k of 200k · 21% · compacts at 180k         "
+"               about system 3k · tools 6k · chat 33k                            "
+"   spent      0 in · 0 out · cache read 0% · price unknown                      "
+"   permission default · 0 rules this session                                    "
+" ❯ plugins    0 on · 0 off · review from this repo waits for you     ⏎ /plugins "
+"   mcp        1 connected · 8 tools                                             "
+"                                                                                "
+"                                                                                "
+"╭──────────────────────────────────────────────────────────────────────────────╮"
+"│ > ask anything · / for commands · ! for shell                                │"
+"╰──────────────────────────────────────────────────────────────────────────────╯"
+"? for shortcuts                                           42k/200k · fake/fake-1"

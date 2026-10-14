@@ -717,6 +717,7 @@ fn plugins(
         Box::new(bingo_mod_browse::Browse),
         Box::new(bingo_mod_memory::MemoryPanel),
         Box::new(bingo_mod_plugins::Plugins),
+        Box::new(bingo_mod_status::Status::default().with_card(composition.status_card)),
         Box::new(ShellHooksPlugin),
         Box::new(JsonlStorePlugin::default()),
         Box::new(ContextPlugin),

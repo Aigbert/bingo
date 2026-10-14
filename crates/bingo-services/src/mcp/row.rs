@@ -15,6 +15,21 @@ pub enum Status {
     Disabled,
 }
 
+impl Status {
+    /// How a person is told the state, in every place that shows it.
+    pub fn said(&self) -> &'static str {
+        match self {
+            Self::Connected { .. } => "connected",
+            Self::Disabled => "off",
+            Self::Failed { .. } => "not running",
+            Self::NeedsAuth { .. } => "needs sign-in",
+            Self::Waiting { .. } => "waiting for your yes",
+            Self::Connecting => "connecting …",
+            Self::SigningIn => "waiting for the browser",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Auth {

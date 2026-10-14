@@ -18,16 +18,16 @@ the kernel's `/status` key-value view stays as the plain fallback.
 
 ## Bricks
 
-1. **What fills the context.** `ContextUsage.parts: Vec<ContextPart>`
+1. **What fills the context.** `ContextUsage.parts: Option<[ContextPart; 4]>`
    (additive; `system`, `tools`, `chat`, `pictures`, each tokens):
    `turn.rs::measure` already estimates the system blocks and the
    messages; it keeps the four sums. Fixture; a test that the parts
-   sum to `used` within one count's rounding.
+   sum to the local estimate exactly; server anchoring remains independent.
 2. **What it cost.** Pure `spent(usage, price) -> Spent { input, output,
    cache_share, usd: Option<f64> }`; `usd` is `None` where M164's
    catalogue has no price. Table test.
 3. **Forget a rule.** `/permission forget <rule>` in `bingo-permissions`
-   (`ArgSpec` values from this session's rules); answers the rule it
+   (a free rule argument; selectable session rules in the card); answers the rule it
    dropped. Test over a session with two rules.
 4. **Rows, pure.** `rows(&SessionState, plugins, servers) -> Vec<Row>`
    in the mod: label, value spans, tone (`ok`, `warn`, `bad`, `dim`),
@@ -52,7 +52,10 @@ the kernel's `/status` key-value view stays as the plain fallback.
   `sdk/typescript/`; `crates/bingo-core/src/{turn.rs,context/budget.rs}`.
 - `crates/bingo-permissions/src/command.rs` (`forget`).
 - New `crates/bingo-mod-status/src/{lib.rs,rows.rs,spent.rs,draw.rs,
-  keys.rs}`; listed in `crates/bingo/src/main.rs`.
+  keys.rs,dispatch.rs}`; listed in `crates/bingo/src/main.rs`.
+- Shared changes: sdk tokens/render/component contracts; MCP services/rows;
+  permissions/session; TUI pane drawing/viewport/mouse/tests; bin composition;
+  mechanical ContextUsage literal updates; existing generators and fixtures.
 - Reads `catalog(Plugins)` and `bingo_services::mcp::find` (no plugin
   import).
 
@@ -66,7 +69,45 @@ the kernel's `/status` key-value view stays as the plain fallback.
 - [ ] `enabledPlugins: {"bingo.mod.status": false}`: `/status` draws the
       kernel's key-value view.
 - [ ] tmux drive in a temp HOME against the fake provider, captured and
-      compared with the prototype; tui-smoke; gates as M167.
+      compared with the prototype; tui-smoke; native gates as M167.
+- [ ] Windows checks for every touched crate (record C-toolchain deferrals).
+
+## Decisions
+
+- The Status site lives in the existing focused, pulled pane above the composer,
+  capped at half the viewport. Its keys use the existing pane FIFO and escape
+  path. Empty pane titles omit surface chrome so the shared tree owns the
+  single header line. Pane props supply the body height to the pull cache.
+  No palette files or new action queue are needed.
+- A row command runs through the session handle; its terminal acknowledgement
+  returns as the original site key result. Otherwise the TUI ignores the view
+  on an intent it did not submit. The instant handler holds no actor queue,
+  so it can await that result while preserving the existing surface FIFO.
+- MCP `Servers::servers` returns connection configuration, not live status.
+  Add a default `status` service method and a typed projection of the manager's
+  lines in bingo-services/bingo-mcp; no credentials enter the status projection.
+- Parts sum to the local estimate, not the anchored server count. Scaling estimates
+  to a server count would invent accuracy; the drawing labels them `about`.
+- Cost is an estimate at the current model's catalogue rates, explicitly labelled;
+  a session may have changed models. Cache writes have no catalogue rate, so cost
+  is unknown when they occur, as it is for missing input/output/cache-read rates.
+- A Vec removed Copy and required edits in M172-owned mods. The four fixed
+  categories instead use an optional array and Copy ContextKind names. JSON
+  remains an additive array; absent means unknown. Consumers need only literal
+  updates. Shared token estimation owns the split.
+- Command::spec and catalog(Commands) are host-wide; command.describe receives
+  session "host", not the asking session. A dynamic rule ArgSpec would list no
+  rules or leak another session's rules. Keep a free rule argument; the card
+  supplies exact session rules. Session-aware completion belongs to a later
+  catalogue contract, outside M168's protected palette files.
+- Command hooks carry no asking surface. Binary composition keeps the plain
+  kernel command in print/channel-only runs; terminal and RPC runs install the
+  opener. This preserves existing text/NDJSON status behavior without a new
+  kernel door or a TUI command special case.
+- Guides live in bingo-mod-status/src/guide.md, registered by guide.rs.
+- Workspace edges: the new mod uses sdk/services and existing async-trait,
+  serde/serde_json/tokio; TUI dev-tests use the mod and existing insta.
+  No external dependency is added. Budget counts one new workspace member.
 
 ## Non-goals
 
@@ -77,6 +118,6 @@ a cost history across sessions; the desktop's drawing.
 
 - The context split is an estimate and can disagree with the server's
   count: the bar shows `used` from the server, the parts line says
-  `about`, and the sum test allows the rounding.
+  `about`, and the sum test checks the independent local estimate.
 - A summary row that names every failing thing can overflow at 80
   columns: the row truncates names after the first with `+N`.

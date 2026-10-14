@@ -36,11 +36,13 @@ fn draw_one(
     let area = seated.area;
     let focused = matches!(&ui.focus, Focus::Pane(key) if key == &pane.key);
     frame.render_widget(Clear, area);
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(&pane.title, theme::bold()))),
-        Rect::new(area.x, area.y, area.width, area.height.min(1)),
-    );
-    if focused {
+    if super::heading_rows(pane) > 0 {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(&pane.title, theme::bold()))),
+            Rect::new(area.x, area.y, area.width, area.height.min(1)),
+        );
+    }
+    if focused && super::heading_rows(pane) > 0 {
         let label = super::moved::label(seated.place);
         let width = (label.width() as u16).min(area.width);
         frame.render_widget(
@@ -58,12 +60,12 @@ fn draw_one(
     }
     let body = Rect::new(
         area.x,
-        area.y.saturating_add(1),
+        area.y.saturating_add(super::heading_rows(pane)),
         area.width,
-        area.height.saturating_sub(1),
+        area.height.saturating_sub(super::heading_rows(pane)),
     );
     let lines = lines(ui, state, pane, seated, now);
-    let top = offset(ui, seated, lines.len());
+    let top = offset(ui, seated, lines.len(), super::heading_rows(pane));
     frame.render_widget(
         Paragraph::new(lines.into_iter().skip(top).collect::<Vec<_>>()),
         body,
@@ -74,14 +76,14 @@ fn draw_one(
         crate::select::mark(frame, body, top, run);
     }
 }
-pub(super) fn offset(ui: &Ui, seat: &Seated, lines: usize) -> usize {
+pub(super) fn offset(ui: &Ui, seat: &Seated, lines: usize, heading: u16) -> usize {
     ui.placed
         .panes
         .scroll
         .get(&seat.key)
         .copied()
         .unwrap_or_default()
-        .min(lines.saturating_sub(usize::from(seat.area.height.saturating_sub(1))))
+        .min(lines.saturating_sub(usize::from(seat.area.height.saturating_sub(heading))))
 }
 pub(super) fn lines(
     ui: &Ui,
@@ -146,10 +148,19 @@ pub fn status(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect) -> 
         .collapsed
         .iter()
         .filter_map(|key| {
-            panes
-                .iter()
-                .find(|pane| &pane.key == key)
-                .map(|pane| (pane.key.clone(), format!("{} ▸", pane.title)))
+            panes.iter().find(|pane| &pane.key == key).map(|pane| {
+                (
+                    pane.key.clone(),
+                    format!(
+                        "{} ▸",
+                        if pane.title.is_empty() {
+                            &pane.id
+                        } else {
+                            &pane.title
+                        }
+                    ),
+                )
+            })
         })
         .collect::<Vec<_>>();
     let waiting = waiting(ui, state);

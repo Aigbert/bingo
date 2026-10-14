@@ -19,7 +19,11 @@ pub fn props(
         .into(),
         scroll: SiteScroll {
             offset,
-            body_rows: usize::from(seat.area.height.saturating_sub(1)),
+            body_rows: usize::from(
+                seat.area
+                    .height
+                    .saturating_sub(crate::pane::heading_rows(pane)),
+            ),
         },
         view: SiteView { agent_id: None },
     })

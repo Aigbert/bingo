@@ -8,6 +8,7 @@ use bingo_sdk::{ErrorCode, KernelError, Plugin};
 #[derive(Default)]
 pub(crate) struct Composition {
     pub demo: bool,
+    pub status_card: bool,
     pub mods: bingo_plugin_rpc::Settings,
     pub print: bingo_surface_print::Options,
     pub rpc: bingo_surface_rpc::Options,
@@ -18,6 +19,11 @@ impl Composition {
     pub fn for_cli(cli: &Cli, merged: &Merged) -> Self {
         Self {
             demo: demo(cli.demo_ui, merged),
+            status_card: !cli.print
+                && !matches!(
+                    crate::work_of(cli),
+                    crate::Work::Channels | crate::Work::Gateway
+                ),
             mods: serde_json::from_value(
                 merged
                     .plugins
