@@ -556,6 +556,7 @@ pub fn shell_note(command: &str, output: &str, exit: Option<i32>) -> String {
 #[serde(rename_all = "camelCase")]
 pub enum DecisionKind {
     AllowChanged,
+    AllowChangedSession,
     Allow,
     AllowSession,
     Deny,
@@ -1398,7 +1399,7 @@ mod tests {
             preview: None,
             session_scope: session_scope.map(str::to_string),
             caution: None,
-                input: Default::default(),
+            input: Default::default(),
         }
     }
 

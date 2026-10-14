@@ -862,7 +862,12 @@ impl Turn<'_> {
                 self.record(notice);
             }
             if let Some(receipt) = gated.receipt {
-                self.record(receipt);
+                let item = self.fresh(receipt, ItemStatus::Completed);
+                let Ok(item) = self.host.receipt(item).await else {
+                    self.cancel.cancel();
+                    return Vec::new();
+                };
+                self.transcript.apply(&Event::ItemCompleted { item });
             }
             if let Some(mut item) = self.transcript.get(item_id).cloned()
                 && (gated.gate == Gate::Allowed

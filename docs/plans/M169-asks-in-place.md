@@ -120,8 +120,8 @@ write's whole file in place.
 - Preserve the existing y/a/n permission aliases alongside numbers. They remain explicit answers; other
   printable keys set the ask aside.
 - Cancellation bypasses the stray-key guard. The actor records a denial before interruption can drop the
-  caller; the gate's later duplicate is suppressed from the existing transcript, while still refreshing
-  the policy view.
+  caller. Review: the turn now asks for and folds that canonical receipt instead of minting a second
+  unpublished item. `AllowChangedSession` preserves both the edit and the installed session rule.
 
 - RPC and ACP already deserialize the shared answer enum; their generic doors need no branch. Regenerated
   wire contracts and existing black-box suites cover the additive answer.

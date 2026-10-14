@@ -26,6 +26,9 @@ pub fn label(body: &ItemBody) -> Option<String> {
         } => Some(match decision {
             DecisionKind::Allow => "you: yes".into(),
             DecisionKind::AllowSession => "you: yes for this session".into(),
+            DecisionKind::AllowChangedSession => {
+                "you changed it first; yes for this session".into()
+            }
             DecisionKind::AllowChanged => "you changed it first".into(),
             DecisionKind::Deny => feedback
                 .as_ref()

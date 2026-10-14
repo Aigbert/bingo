@@ -218,6 +218,7 @@ impl Actor {
             } => self.open_interaction(item, kind, answers, reply).await?,
             Msg::Absorb { turn, reply } => drop(reply.send(self.absorb(&turn).await?)),
             Msg::TurnFinished { turn, outcome } => return self.turn_finished(turn, outcome).await,
+            Msg::Receipt { item, reply } => drop(reply.send(self.receipt(item).await?)),
             Msg::Record { body, reply } => drop(reply.send(self.record(body).await?)),
             Msg::Progress { item, tail } => self.progress(item, tail).await?,
             Msg::CommandFinished { intent, outcome } => {
@@ -660,10 +661,7 @@ impl Actor {
             &event,
             Event::ItemCompleted { item } if matches!(item.body, ItemBody::PermissionReceipt { .. })
         );
-        let duplicate = matches!(&event, Event::ItemCompleted { item } if self.recorded_denial(&item.body).is_some());
-        if !duplicate {
-            self.publish(event, None).await?;
-        }
+        self.publish(event, None).await?;
         if receipt {
             self.refresh_config().await?;
         }

@@ -14,6 +14,11 @@ pub trait TurnHost: Send + Sync {
         false
     }
     fn emit(&self, event: Event);
+    /// Return the canonical receipt, including one already recorded on resolution.
+    async fn receipt(&self, item: Item) -> Result<Item, KernelError> {
+        self.emit(Event::ItemCompleted { item: item.clone() });
+        Ok(item)
+    }
     /// The tools this turn resolved when it started (ADR-0009 §1): the offer
     /// every one of its requests carries. The session keeps them so that a
     /// call handed in from outside the turn is served by the very set the

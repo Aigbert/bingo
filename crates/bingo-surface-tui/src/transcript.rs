@@ -867,6 +867,7 @@ fn receipt(
     rows: &Rows<'_>,
 ) -> Vec<Line<'static>> {
     let verdict = match decision {
+        DecisionKind::AllowChangedSession => "you changed it first; yes for this session",
         DecisionKind::AllowChanged => "you changed it first",
         DecisionKind::Allow => "you: yes",
         DecisionKind::AllowSession => "you: yes for this session",

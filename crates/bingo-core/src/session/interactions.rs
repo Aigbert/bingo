@@ -25,6 +25,22 @@ pub(super) struct Pending {
 }
 
 impl Actor {
+    pub(super) async fn receipt(&mut self, item: Item) -> Result<Item, KernelError> {
+        let recorded = self
+            .recorded_denial(&item.body)
+            .and_then(|id| self.state.transcript.get(&id))
+            .cloned();
+        let canonical = if let Some(recorded) = recorded {
+            recorded
+        } else {
+            self.publish(Event::ItemCompleted { item: item.clone() }, None)
+                .await?;
+            item
+        };
+        self.refresh_config().await?;
+        Ok(canonical)
+    }
+
     pub(super) fn recorded_denial(&self, body: &ItemBody) -> Option<ItemId> {
         let ItemBody::PermissionReceipt {
             item: Some(source),
@@ -94,7 +110,10 @@ impl Actor {
             ));
         };
         if plugin && matches!(pending.interaction.kind, InteractionKind::Permission { .. }) {
-            return Some((ErrorCode::PermissionDenied, "plugins cannot answer permission interactions".into()));
+            return Some((
+                ErrorCode::PermissionDenied,
+                "plugins cannot answer permission interactions".into(),
+            ));
         }
         if !pending.interaction.answers.contains(&answer.spec()) {
             return Some((
@@ -136,7 +155,17 @@ impl Actor {
             Event::InteractionResolved {
                 id,
                 answer,
-                by: if plugin { ResolvedBy::Plugin { name: who.name, surface: who.surface } } else { ResolvedBy::Client { name: who.name, surface: who.surface } },
+                by: if plugin {
+                    ResolvedBy::Plugin {
+                        name: who.name,
+                        surface: who.surface,
+                    }
+                } else {
+                    ResolvedBy::Client {
+                        name: who.name,
+                        surface: who.surface,
+                    }
+                },
             },
             Some(intent.clone()),
         )

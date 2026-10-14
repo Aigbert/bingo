@@ -151,7 +151,7 @@ async fn recheck(mut input: GateInput<'_>, prompter: &dyn Prompter) -> Gated {
                     result.receipt = Some(receipt_for(
                         input.item,
                         &result.call,
-                        DecisionKind::AllowChanged,
+                        changed_decision(result.receipt.as_ref()),
                         None,
                     ));
                 }
@@ -163,6 +163,14 @@ async fn recheck(mut input: GateInput<'_>, prompter: &dyn Prompter) -> Gated {
                 changed = true;
             }
         }
+    }
+}
+
+fn changed_decision(receipt: Option<&ItemBody>) -> DecisionKind {
+    if matches!(receipt, Some(ItemBody::PermissionReceipt { decision: DecisionKind::AllowSession, .. })) {
+        DecisionKind::AllowChangedSession
+    } else {
+        DecisionKind::AllowChanged
     }
 }
 

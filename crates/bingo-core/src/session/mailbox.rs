@@ -117,6 +117,10 @@ pub(crate) enum Msg {
         turn: TurnId,
         outcome: super::running::Ended,
     },
+    Receipt {
+        item: Item,
+        reply: oneshot::Sender<Item>,
+    },
     Record {
         body: ItemBody,
         reply: oneshot::Sender<ItemId>,
@@ -516,6 +520,12 @@ pub(super) struct TurnMail {
 
 #[async_trait]
 impl TurnHost for TurnMail {
+    async fn receipt(&self, item: Item) -> Result<Item, KernelError> {
+        self.mailbox
+            .call(|reply| Msg::Receipt { item, reply })
+            .await
+    }
+
     fn stopped(&self) -> bool {
         self.stopped.load(std::sync::atomic::Ordering::Acquire)
     }

@@ -186,3 +186,19 @@ async fn destructive_input_has_caution_and_no_session_answer() {
     ));
     assert!(!asks[0].1.contains(&AnswerSpec::AllowSession));
 }
+
+#[tokio::test]
+async fn changed_session_approval_keeps_both_receipt_facts() {
+    let (result, _) = run(
+        "cargo build",
+        vec![
+            changed("cargo check"),
+            Answer::AllowSession {
+                scope: "Bash(cargo:*)".into(),
+            },
+        ],
+    )
+    .await;
+    let receipt = serde_json::to_value(result.receipt.unwrap()).unwrap();
+    assert_eq!(receipt["decision"], "allowChangedSession");
+}

@@ -40,6 +40,7 @@ impl PermissionPolicy for CountingPolicy {
 
 #[tokio::test]
 async fn the_policys_view_is_published_at_open_and_after_a_verdict() {
+    let receipts = Arc::new(std::sync::Mutex::new(Vec::<Item>::new()));
     let provider = ScriptedProvider::new(vec![
         Script::Events(tool_call("Echo", json!({ "v": 1 }))),
         Script::Events(text("done")),
@@ -52,9 +53,12 @@ async fn the_policys_view_is_published_at_open_and_after_a_verdict() {
         ),
         TestPlugin::boxed(
             &POLICY,
-            vec![Contribution::Policy(Arc::new(CountingPolicy {
-                verdicts: AtomicUsize::new(0),
-            }))],
+            vec![
+                Contribution::Policy(Arc::new(CountingPolicy {
+                    verdicts: AtomicUsize::new(0),
+                })),
+                Contribution::Hook(Arc::new(CaptureReceipts(receipts.clone()))),
+            ],
         ),
     ];
     let config = HostConfig::new(env()).with_layer("cli", json!({ "model": "m" }));
@@ -101,6 +105,19 @@ async fn the_policys_view_is_published_at_open_and_after_a_verdict() {
             _ => {}
         }
     }
+    let published: Vec<_> = attachment
+        .snapshot
+        .transcript
+        .items()
+        .iter()
+        .filter(|item| matches!(item.body, ItemBody::PermissionReceipt { .. }))
+        .map(|item| item.as_ref().clone())
+        .collect();
+    assert_eq!(
+        *receipts.lock().unwrap(),
+        published,
+        "the turn and stream must hold the same receipt"
+    );
     assert_eq!(
         order,
         vec!["receipt", "config"],
@@ -110,4 +127,27 @@ async fn the_policys_view_is_published_at_open_and_after_a_verdict() {
         attachment.snapshot.config.plugins["counting"],
         json!({ "verdicts": 1 })
     );
+}
+
+struct CaptureReceipts(Arc<std::sync::Mutex<Vec<Item>>>);
+#[async_trait]
+impl Hook for CaptureReceipts {
+    fn id(&self) -> &str {
+        "capture.receipts"
+    }
+    fn matcher(&self) -> HookMatcher {
+        HookMatcher {
+            points: vec![HookPoint::Turn],
+            tool: None,
+        }
+    }
+    async fn on_turn(&self, phase: Phase, _: &TurnId, items: &[Item], _: &HookContext) {
+        if phase == Phase::End {
+            *self.0.lock().unwrap() = items
+                .iter()
+                .filter(|item| matches!(item.body, ItemBody::PermissionReceipt { .. }))
+                .cloned()
+                .collect();
+        }
+    }
 }
