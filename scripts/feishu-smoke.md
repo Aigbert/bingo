@@ -22,6 +22,8 @@ ADR-0016 records.
    - `im:message.p2p_msg` — direct messages to the bot.
    - `im:message.group_at_msg` — group messages that @ the bot.
    - `im:message:send_as_bot` — sending.
+   - `application:app_slash_command:read` — inspect the app's command menu.
+   - `application:app_slash_command:write` — maintain bingo-owned menu entries.
    - `cardkit:card:write` — the streaming card.
    - `im:message.reactions:write_only` — the sign that says it is working.
    - `im:resource` — the pictures and files a message carried (ADR-0051 §2).
@@ -126,6 +128,33 @@ Tick each line, and paste what you saw.
 - [ ] **Rate limits.** Ask two long questions in one chat back to back. Both
       answer; neither stalls. A dropped frame is invisible — the next one
       carries the whole text anyway.
+
+### Chat sites and command menu (M162)
+
+Offline coverage: `cargo test -p bingo-channel-feishu` and
+`cargo test -p bingo --test channels`. The following checks are for the person
+with the app, never an automated credential test. Status: **pending**.
+
+- [ ] Type `/` in the bot chat; bingo's command descriptions appear. Allow
+      several minutes for Feishu clients to refresh the per-app menu.
+- [ ] Pick `/model`; it runs as a normal command. Record the received event
+      type and text: the expected `im.message.receive_v1` `/model` is unverified.
+- [ ] Keep a console-created command in the menu; bingo never changes it.
+- [ ] Install `crates/bingo/tests/fixtures/mods/chat` as a plugin directory named
+      `chat`, reload plugins, and send a prompt. The finished card says
+      `Chat count: 0` with an Increment button; pressing it updates that same
+      message to `Chat count: 1`. The model/token footer stays visible.
+- [ ] Reload the mod and press an old control; it answers with an earlier-drawing
+      notice. `/new` also retires the previous session's controls.
+- [ ] A turn longer than eight minutes still renews its stream, then ends with
+      the site's card, working controls and footer.
+
+The menu is per app, including session commands: another session may reply
+unknown-command to a selection it has not registered. Missing menu scopes
+produce one notice and disable menu synchronization until restart. Owned names
+and ids are kept in the app-keyed `slash-commands.json` under the channel data
+directory; names already owned by the person are skipped. Keep this file when
+restarting so bingo can update and remove only its own entries.
 
 ## 4. What to write down
 

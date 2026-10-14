@@ -59,6 +59,22 @@ byte-identical to today.
    checklist (menu appears, a picked command runs, a mod's button card
    works); `docs/design/delivery.md` one dated line.
 
+### Implementation refinements
+
+- A pure card renderer accepts uploaded image keys; I/O uploads relative to the
+  session cwd before drawing. Upload failure uses the image's alt text.
+- Each Input owns a submit form, because each has its own minted onSubmit;
+  onInput alone folds. No callback action is trusted until it matches the
+  retained host answer and session. Old controls use the runtime's notice.
+- The completed turn is the chat's AssistantMessage (its streaming delivery
+  already joins the turn's prose). Command input stays with its pending intent:
+  acknowledgements carry neither the command name nor its arguments.
+- ConfigChanged also wakes the shared menu publisher: session registrations
+  refresh config today without emitting CatalogChanged. Both streams coalesce.
+  Loopback menus opt in so existing fixtures stay byte-identical.
+- Ownership lives in an app-keyed subdirectory beside attachments, so two app
+  credentials cannot accidentally claim each other's names.
+
 ## Files
 
 - `crates/bingo-sdk/src/{render.rs,view/table.rs}`; `schema/`,
@@ -74,17 +90,17 @@ byte-identical to today.
 
 ## Exit criteria
 
-- [ ] `chat` table test per element; `surfaces()` test updated.
-- [ ] View → card snapshots for every element, a form, caps exceeded.
-- [ ] No existing Feishu or channels snapshot changes; a count test shows
+- [x] `chat` table test per element; `surfaces()` test updated.
+- [x] View → card snapshots for every element, a form, caps exceeded.
+- [x] No existing Feishu or channels snapshot changes; a count test shows
       no render request when no hook matches.
-- [ ] Black-box over loopback (`crates/bingo/tests/channels.rs` style):
+- [x] Black-box over loopback (`crates/bingo/tests/channels.rs` style):
       the fixture mod's answer arrives as its tree; pressing its button
       submits the minted action and the mod's state changes.
-- [ ] Menu: wiremock tests for create / patch / delete-owned-only /
+- [x] Menu: wiremock tests for create / patch / delete-owned-only /
       skip-foreign / scope-missing / 100 cap; loopback records entries;
       `CatalogChanged` re-publishes once within the debounce.
-- [ ] Gates: fmt, check, clippy -D warnings, test, check_discipline, budget,
+- [x] Gates: fmt, check, clippy -D warnings, test, check_discipline, budget,
       cargo deny, Windows check (or recorded deferral).
 - [ ] Live Feishu check by the person (Codex never runs it): menu shows
       bingo's commands, picking `/model` runs it, the fixture mod's button
@@ -106,3 +122,29 @@ menus; drawing reasoning or tool calls in Feishu; new dependencies.
   (`footer.rs`) or break the 8-minute stream renewal.
 - Menu writes count against the app's rate limits; never more than one
   sync in flight per app (the app lock already holds one process).
+
+## Verified — 2026-10-14
+
+Final command output summaries (offline only; no credentials or live Feishu):
+```text
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk: passed
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc: passed (1 ignored)
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc: passed
+cargo fmt --all -- --check: exit 0
+cargo check --workspace --all-targets --locked: Finished dev, 6.34s
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev, 7.05s
+cargo test --workspace --locked: 5483 passed; 0 failed; 5 ignored
+bash scripts/check_discipline.sh: discipline ok (advisory length warnings)
+bash scripts/budget.sh: budget ok; 411/411 dependencies; warm core 1s; relink 0
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok
+bash scripts/tui-smoke.sh: tui-smoke ok (isolated socket and temporary HOME)
+cargo check --workspace --all-targets --target x86_64-pc-windows-msvc: exit 101
+  Deferred: rquickjs-sys / aws-lc-sys C toolchain; Windows headers unavailable.
+cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc --locked: Finished dev, 6.41s
+```
+Targeted: adapter 34, channels 109, Feishu 132 tests passed; loopback black-box
+17 passed, including minted actions, forged callbacks, reload and reset. No
+existing snapshots changed. Initial runs exposed a transient gateway claim
+failure (isolated retry and final suite passed) and the guide's line cap (fixed).
+Budget reported 7 GB versus its 5 GB soft limit; final worktree cleanup follows.
+The person's live menu/event/button check remains **pending**, not verified.

@@ -106,7 +106,8 @@ supported element names (`Box`, `Text`, `Button`); text surfaces use folds. Hand
 Components: `Pane`, `AbovePrompt`, `Question`, `UserMessage`, `AssistantMessage`, `ToolUse`, `ToolResult`, `ToolGroup`, `ToolProgress`, `CommandOutput`, `Spinner`, `TurnDuration`,
 `InfoNotice`, `SessionMode`, `PromptHint`. Fact-only sites: `Reasoning`, `Compaction`, `Rewind`, `Interruption`, `QuestionAnswer`, `PermissionReceipt`, `Asset`, `ShellRun`, pending
 `Action`, `TurnProgress`, `SessionStatus`, `Toast`, `Welcome`. All list `terminal`, `desktop`, `text` in `Component::surfaces()`; validate warns about surfaces that never ask for a
-site.
+site. `chat` also asks `AssistantMessage`, `CommandOutput`, `InfoNotice`, `ShellRun` with a zero-cell viewport, once prose finishes streaming.
+Chat draws Box, Text, Code, Link, Image, Button, Select, Input and Engine; other elements fold. The `text` table remains folds only.
 
 Only `Permission` and `SignIn` are sealed, also on all three surfaces. Wrap `await next(e)` exactly once with unchanged props. Missing, duplicated or rewritten engine nodes yield
 the host drawing and a plugin-named notice. Permission props are `interactionId`, `tool`, full `input` and `answers`; sign-in props are `interactionId`, `provider` and `flow`
@@ -196,8 +197,3 @@ Start from the repository's `examples/plugins/` and read the adjacent tests:
 - `examples/plugins/pane` — a tool ledger, commands, pane rendering, resize and Escape.
 - `examples/plugins/ts-status` — persistent call count, status and a permission hook.
 - `examples/plugins/wordcount` — the Python external-process example, with `plugin.json` and `main.py`.
-
-The `chat` surface asks `AssistantMessage`, `CommandOutput`, `InfoNotice`, and
-`ShellRun` with a zero-cell viewport. It draws Box, Text, Code, Link, Image,
-Button, Select, Input and Engine; other elements fold. Streaming stays native
-until the answer finishes. The `text` table remains folds only.
