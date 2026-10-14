@@ -37,8 +37,8 @@ authority; refusing the read seam would make runtimes parse settings again.
 3. **The verb.** `HostApi::approve(Approval { what, root })` writes
    the user layer and answers the digest it recorded; `/plugins approve
    <name>`, `bingo plugins approve <name>` (headless twin) and the
-   owners' verbs (`/mcp approve <name>`) are its callers. Picking
-   `rewrite` or `full` in the panel also writes `pluginTrust`, as today.
+   owners' verbs (`/mcp approve <name>`, `/acp approve <name>`) are its callers.
+   Picking `rewrite` or `full` in the panel also writes `pluginTrust`, as today.
 4. **What a yes starts.** An approved JS mod loads now through the
    reload lifecycle (M157); a process plugin or one with tools at the
    next start (ADR-0088); an approved MCP entry is dialled now, as
@@ -76,8 +76,8 @@ IDs (`plugins:name`, `mcp:name`), distinct from a running user namesake.
 
 Review decisions (2026-10-15): approval and each spawn verdict refuse a process
 entry whose command or argument names a path outside the canonical plugin root
-(after `${PLUGIN_ROOT}` substitution). Unresolvable paths fail closed and name
-the entry. Bare PATH programs remain allowed. Digesting a runtime's own module
-lookup outside the root (PATH programs, global `node_modules`) is a non-goal.
+(after `${PLUGIN_ROOT}` substitution). A path contains either platform's separator
+or starts with `${PLUGIN_ROOT}`. Unresolvable paths fail closed and name the entry.
+Bare PATH programs remain allowed. Digesting a runtime's own module lookup outside the root (PATH programs, global `node_modules`) is a non-goal.
 RPC approval is person input: an RPC client is a person's surface by definition.
 The reverse plugin bridge has no approval verb, at any trust tier.

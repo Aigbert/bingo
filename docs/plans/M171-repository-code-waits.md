@@ -48,52 +48,45 @@ waits and how to approve it; nothing asks over the chat.
 
 ## Files
 
-- New `crates/bingo-core/src/approval.rs`; `settings.rs`,
-  `settings/merge.rs`, `host/` (verb), `commands/plugins.rs`.
-- `crates/bingo-sdk/src/{plugin.rs,host.rs}`; `schema/`,
-  `sdk/typescript/`; `crates/bingo-surface-rpc` method.
-- `crates/bingo-plugin-host/src/{discovery.rs,admission.rs}`;
-  `crates/bingo-plugin-rpc/src/source.rs`; `crates/bingo-mods/src/load.rs`.
-- `crates/bingo-mcp/src/{config.rs,manager.rs,command.rs,rows.rs}`.
-- `crates/bingo/src/` (subcommands); plugin-owned modules and MCP guides.
+- Core approval authority, settings/provenance, host verb and plugin commands.
+- SDK approval/status/source contracts; RPC methods; `schema/`, `sdk/typescript/`.
+- Plugin-host discovery/admission; process bridges; module discovery/reload.
+- MCP configuration, manager, commands and rows; ACP adapter registration.
+- Binary subcommands/notices and plugin-owned guides.
 
 ## Decisions during implementation
 
-- The SDK exposes a read-only `ApprovalReader` service alongside the write
-  verb. Discovery and reload need current kernel verdicts before selecting
-  a name; refusing that seam would duplicate settings parsing in runtimes.
-- `approved` is a nested object, merged by object key in the user layer;
-  `Merge::ByName` only handles arrays, so it is not used for this record.
-- Count directories and path bytes toward digest caps, reject non-UTF-8
-  paths and Unix literal backslashes, and refuse approval of escaping or
-  looping symlinks. Digesting alone still records link text without following.
-- Repository `pluginDirs` could reclassify repository code as explicit and
-  bypass discovery approval. Its claim now uses `PersonalAccumulate`: user
-  and explicit layers still work; repository contributions are ignored with
-  a notice. This generic merge rule keeps provenance in the kernel.
-- Waiting catalogue IDs use `plugins:<name>` or the owning command prefix,
-  so an unapproved namesake cannot borrow an active plugin's grant.
-- Repository modules do not generate author files at startup: that would
-  change the bytes just approved. Author generation stays on personal dirs.
-- A typed layer origin replaces the user boolean; repository roots are
-  canonicalized while loading, keeping the settings merge pure. A user
-  settings path is not reread as project settings when cwd is home.
-- Waiting MCP entries join the catalogue through their live owner, which
-  also refuses config export and all dial/login paths until approval.
-- Guide updates live in the plugin-owned guide pages; `docs/guide` does not
-  exist in this checkout.
-- Startup runtimes now receive the resolved `--cwd`: using process cwd
-  silently discovered a different repository in the black-box test.
-- Directory digest errors use `io::Result<String>`: refused paths and I/O
-  failures must fail closed alongside size limits, not become a partial hash.
-- Schema definitions and RPC methods are additive; the frozen plugin protocol
-  fixture remains compatible, so no protocol version changes. Approval is
-  person-input-only and absent from every reverse plugin bridge tier.
-- The advisory gate requires rustls 0.23.45 → 0.23.46 (RUSTSEC-2026-0346
-  through 0349); update that existing package only, without adding dependencies.
-- The only new dependency edge is core → bingo-digest, as planned; the
-  dependency discipline check names that pure-library exception. Ember
-  allowlists remain unchanged.
+- The SDK read-only `ApprovalReader` service gives discovery and reload current
+  kernel verdicts; runtimes must not duplicate settings parsing.
+- `approved` uses nested object-key merge, since `ByName` handles arrays.
+- Digest caps include directories and path bytes. Non-UTF-8 paths, Unix literal
+  backslashes, escaping/looping links are refused; hashes record link text.
+- `pluginDirs` uses `PersonalAccumulate`: repository values cannot reclassify
+  their code as explicit. Waiting IDs have command prefixes, distinct from
+  running personal namesakes. Repository modules generate no author files.
+- Origins are typed and repository roots canonicalized at load; home settings
+  are never reread as project settings. Startup runtimes receive resolved `--cwd`.
+- MCP's live owner supplies waiting catalogue entries and blocks every dial,
+  login and export path. Guides live in plugin-owned pages (`docs/guide` is absent).
+- Digest I/O failures fail closed. Schema/RPC additions preserve protocol 2;
+  approval is person-input-only and absent from every reverse bridge tier.
+- The rebase takes rustls 0.23.46 from dev; no separate TLS patch remains.
+- The sole new edge is core → bingo-digest, the planned pure-library exception;
+  Ember allowlists and external dependencies are unchanged.
+- Review: approval and spawn validate explicit command/argument paths inside
+  the canonical plugin root. Bare PATH programs stay allowed; unresolvable
+  paths fail closed. Runtime module lookup outside the root is not digested.
+- Runnable claims accept dotted paths: `acp.adapters` gates each adapter before
+  registration/probing. `/acp approve` records a yes for the next start.
+- Reload selects canonical roots, registration completes only pending entries,
+  and refused reloads release their attempt. `/plugins approve` uses discovery's
+  root, never the session directory; a source method avoids copying provenance.
+- MCP waiting metadata is independent of dial state; approval preserves Disabled.
+  Layer constructors and file readers require origin, including explicit callers.
+- RPC approval is person input; the reverse plugin bridge still has no verb.
+  The binary owns headless command hints; kernel hints stay generic.
+- Rebase exceeded structural limits: move HostConfig and resume-configuration
+  tests into their own modules; group presentation scripts in the SDK test host.
 
 ## Exit criteria
 
@@ -106,7 +99,7 @@ waits and how to approve it; nothing asks over the chat.
 - [x] Black-box: headless notice, `bingo plugins approve`, stdout
       purity, exit status 0.
 - [ ] All gates, including Windows checks of every touched crate;
-      see the verification results and deferrals below.
+      native gates passed; Windows C-toolchain deferrals remain below.
 
 ## Non-goals
 
@@ -120,30 +113,36 @@ in project settings are a later case, named in the guide).
   names `bingo plugins approve`, and the guide's upgrade note says so.
 - Digesting on every start costs bounded I/O; always hash. Mtime and size
   can be preserved across hostile edits and are not approval evidence.
+- Follow-up: namespace `pluginTrust` by repository/origin and name. Existing
+  grants remain name-keyed, so an approved project namesake can inherit personal
+  trust. This needs a persisted-key migration plus grant-writing surface and
+  registration-identity changes; changing only runtime lookup would orphan
+  existing grants. Approval does not imply a separate trust decision yet.
 
 ## Verified — 2026-10-15
 
-Sequential gates; command/output summaries (no live or credential tests):
+Review regressions were red before fixes and green afterwards: launch escape,
+ACP registration/provenance, refused reload, root selection, pending admission,
+discovery-root approval, disabled MCP, required origin, refusal notices and hints.
+No live or credential tests. Final sequential command/output summaries:
 
 ```text
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc -p bingo-surface-rpc --lib → 134 + 16 passed; schema/TypeScript regenerated, no diff
 cargo fmt --all -- --check → exit 0
 cargo check --workspace --all-targets --locked → Finished dev profile; exit 0
-cargo clippy --workspace --all-targets --locked -- -D warnings → exit 0
-cargo test --workspace --locked -- --test-threads=4 → 5507 passed; 0 failed; 5 ignored (163 summaries)
+cargo clippy --workspace --all-targets --locked -- -D warnings → Finished dev profile; exit 0
+cargo test --workspace --locked → 5559 passed; 0 failed; 5 ignored (166 summaries)
 bash scripts/check_discipline.sh → discipline ok (advisory warnings remain)
-bash scripts/budget.sh → 411/411 dependencies; warm core 1s; isolation 0; budget ok
+bash scripts/budget.sh → 412/412 dependencies; warm core 0s; isolation 0; budget ok (9 GB soft warning)
 cargo deny check → advisories ok, bans ok, licenses ok, sources ok
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc -p bingo-surface-rpc --lib → 131 + 16 passed
+bash scripts/tui-smoke.sh → tui-smoke ok (isolated socket and temporary HOME)
+cargo check -p EACH --all-targets --target x86_64-pc-windows-msvc --locked → 10 pass; 10 C-toolchain deferrals
 ```
 
-Default-thread runs intermittently failed the existing mentions resume assertion
-and gateway lock probe. Full serial and four-thread runs passed. Use a harness
-`--test-threads` argument: exporting `RUST_TEST_THREADS=1` breaks child readiness framing.
-The budget's 13 GB target-size warning is soft; final cleanup removes build outputs.
-
-`bash scripts/tui-smoke.sh` → `tui-smoke ok` before the TLS patch; final reruns exit 1:
-`timed out waiting for: ? for shortcuts` (last Escape case), then `Name: Ada` (counter input). This gate remains flaky and unticked.
-`cargo check -p EACH --all-targets --target x86_64-pc-windows-msvc --locked` → 10 pass, 10 C-toolchain deferrals across all 20 touched crates.
-Pass (`bingo-` prefix): core, demo-ui, experience, hooks-shell, persona, plugin-host, provider-acp, schedule, sdk, surface-rpc.
-Deferred: bingo; bingo-{channels,mcp,mods,permissions,plugin-rpc,provider-anthropic,provider-openai,surface-tui,tool-web}.
-Blockers: aws-lc-sys cannot find `stdlib.h`/`windows.h`; permissions' tree-sitter/tree-sitter-bash cannot find `stdio.h`/`stdlib.h`. The configured cross-toolchain lacks Windows C headers; no Rust source diagnostic was reported.
+Windows pass (`bingo-` prefix): core, demo-ui, experience, hooks-shell, persona,
+plugin-host, provider-acp, schedule, sdk, surface-rpc.
+Deferred: bingo; bingo-{channels,mcp,mods,permissions,plugin-rpc,provider-anthropic,
+provider-openai,surface-tui,tool-web}. aws-lc-sys lacks `stdlib.h`/`windows.h`;
+permissions' tree-sitter crates lack `stdio.h`/`stdlib.h`; bingo/mods also hit
+rquickjs-sys MSVC flags rejected by host clang (`/std:c11`, `/experimental:c11atomics`).
+No Rust source diagnostic appeared. The cross-platform criterion stays unticked.
