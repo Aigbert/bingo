@@ -114,3 +114,25 @@ fn passing_a_noun_or_method_cannot_hide_an_alias() {
         2
     );
 }
+
+#[test]
+fn noun_data_reads_are_values_but_noun_and_method_aliases_are_not() {
+    let values = checked(
+        "export const register = on => on('session.start', $ => { const name = $.plugin.name; const version = $.plugin.version; const root = $.plugin.root; helper($.plugin.name); $.plugin.name.toUpperCase(); const first = $.plugin.name[0]; });",
+        "",
+    );
+    assert!(values.valid(), "{:?}", values.findings);
+    assert!(values.calls.is_empty(), "{:?}", values.calls);
+    let aliases = checked(
+        "export const register = on => on('session.start', $ => { const api = $; const noun = $.plugin; const method = $.state.get; const unknown = $.plugin.unknown; });",
+        "",
+    );
+    assert_eq!(
+        aliases
+            .findings
+            .iter()
+            .filter(|f| f.rule == Rule::DollarStatic)
+            .count(),
+        4
+    );
+}
