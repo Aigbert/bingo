@@ -66,6 +66,15 @@ pub async fn add(env: &Env, registered: BTreeSet<String>) -> Result<String, Kern
     let mut document = read(&path)?;
     let taken = registered.union(&instances(&document)).cloned().collect();
     let name = ask_name(&taken).await?;
+    if CredentialStore::new(env.data_dir.clone())
+        .read(&name)
+        .map_err(|_| invalid("could not read credential store"))?
+        .is_some()
+    {
+        return Err(invalid(
+            "a stored credential already uses that name; remove it first",
+        ));
+    }
     let protocol = ask_protocol().await?;
     let base_url = ask_base_url(protocol).await?;
     let key = ask_key(&name).await?;
@@ -86,12 +95,7 @@ async fn ask_name(taken: &BTreeSet<String>) -> Result<String, KernelError> {
     if name.is_empty() {
         return Err(invalid("a name is what the rest of this is about"));
     }
-    if name.contains('/') || name.contains(char::is_whitespace) {
-        return Err(invalid(format!(
-            "`{name}`: a name is one word without `/`, \
-             because it is what `--provider` and `/model <name>/<model>` say"
-        )));
-    }
+    bingo_core::settings::instances::validate_name(&name)?;
     if taken.contains(&name) {
         return Err(invalid(format!("`{name}` is already a provider's name")));
     }

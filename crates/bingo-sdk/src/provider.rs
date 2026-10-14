@@ -56,6 +56,10 @@ pub trait ProviderShape: Send + Sync {
         name: &str,
         spec: &InstanceSpec,
     ) -> Result<Arc<dyn Provider>, crate::PluginError>;
+    /// Whether adding this name would adopt an existing stored credential.
+    fn credential_exists(&self, _name: &str) -> Result<bool, crate::PluginError> {
+        Ok(false)
+    }
     fn takes_key(&self) -> bool {
         false
     }

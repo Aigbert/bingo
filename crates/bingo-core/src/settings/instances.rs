@@ -5,10 +5,13 @@ use std::path::Path;
 
 pub fn validate_name(name: &str) -> Result<(), KernelError> {
     if name.is_empty()
-        || name.contains('/')
-        || name.chars().any(|c| c.is_whitespace() || c.is_control())
+        || !name
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-'))
     {
-        return Err(invalid("a provider name is one word without `/`"));
+        return Err(invalid(
+            "a provider name uses only ASCII letters, digits, `_` and `-`",
+        ));
     }
     if ["openai", "anthropic", "codex", "fake"].contains(&name) {
         return Err(invalid("that name belongs to a built-in provider"));
@@ -88,6 +91,14 @@ fn invalid(message: &str) -> KernelError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn names_cannot_address_other_credential_namespaces() {
+        for name in ["channels.telegram", "service:key", "é", "a/b", "a b", ""] {
+            assert!(validate_name(name).is_err(), "{name}");
+        }
+        assert!(validate_name("Work_2-local").is_ok());
+    }
+
     #[test]
     fn edits_keep_comments_and_neighbours_and_refuse_duplicates() {
         let dir = tempfile::tempdir().unwrap();

@@ -5,6 +5,12 @@ impl ProviderShape for Shape {
     fn id(&self) -> &str {
         "local"
     }
+    fn credential_exists(&self, name: &str) -> Result<bool, PluginError> {
+        Ok(name == "occupied")
+    }
+    fn takes_key(&self) -> bool {
+        false
+    }
     fn settings_key(&self) -> &str {
         "local"
     }
@@ -137,4 +143,17 @@ async fn a_removed_or_replaced_provider_cannot_publish_a_late_probe() {
     refresh::one(&host, old).await;
     assert_eq!(provider::provider_reach(&host, "work")["kind"], "unchecked");
     assert!(host.served.get("work").is_none());
+}
+
+#[tokio::test]
+async fn adding_cannot_adopt_an_existing_credential() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = build(dir.path(), 1).await.unwrap();
+    let error = provider::add_provider(&host, "occupied", "local", "http://up")
+        .await
+        .err()
+        .unwrap();
+    assert!(error.message.contains("remove it first"));
+    assert!(host.providers().await.is_empty());
+    assert!(!crate::settings::user_path(host.env()).exists());
 }

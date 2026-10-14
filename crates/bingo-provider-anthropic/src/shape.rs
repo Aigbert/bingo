@@ -25,6 +25,12 @@ impl ProviderShape for Shape {
     fn settings_key(&self) -> &str {
         self.id()
     }
+    fn credential_exists(&self, name: &str) -> Result<bool, PluginError> {
+        CredentialStore::new(self.env.data_dir.clone())
+            .read(name)
+            .map(|entry| entry.is_some())
+            .map_err(|_| PluginError::Config("could not read credential store".into()))
+    }
     fn takes_key(&self) -> bool {
         true
     }

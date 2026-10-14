@@ -131,6 +131,12 @@ async fn current(host: &Host, endpoint: &Endpoint) -> bool {
 }
 
 pub(super) async fn one(host: &Arc<Host>, provider: Arc<dyn Provider>) -> Refreshed {
+    if !super::auth::signed_in(provider.as_ref()) {
+        return Refreshed {
+            provider: provider.id().into(),
+            answer: Err("sign in before checking models".into()),
+        };
+    }
     ask(Arc::downgrade(host), Endpoint::Provider(provider)).await
 }
 

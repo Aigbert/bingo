@@ -27,6 +27,14 @@ pub(crate) async fn add_provider(
         {
             return Err(invalid("that provider name is already registered"));
         }
+        if shape
+            .credential_exists(name)
+            .map_err(|_| invalid("could not read credential store"))?
+        {
+            return Err(invalid(
+                "a stored credential already uses that name; remove it first",
+            ));
+        }
         let provider = shape.build(name, &spec).map_err(|_| invalid("could not build provider; use an http(s) URL without credentials, query or fragment"))?;
         instances::add(
             &settings::user_path(host.env()),
@@ -37,7 +45,14 @@ pub(crate) async fn add_provider(
         install_provider(host, name, Some(provider.clone()));
         provider
     };
-    let checked = refresh::one(host, provider.clone()).await;
+    let checked = if shape.takes_key() {
+        Refreshed {
+            provider: name.into(),
+            answer: Err("paste a key before checking models".into()),
+        }
+    } else {
+        refresh::one(host, provider.clone()).await
+    };
     Ok((provider, shape.takes_key(), checked))
 }
 
