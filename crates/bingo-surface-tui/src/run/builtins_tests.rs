@@ -581,3 +581,48 @@ async fn a_failed_owner_open_releases_the_pending_question_key() {
     assert!(session.submitted().is_empty());
     assert!(session.answers().is_empty());
 }
+
+#[tokio::test(start_paused = true)]
+async fn escape_discards_keys_waiting_for_the_asking_sessions_handle() {
+    let (host, root, child) = crate::doubles::TestHost::tree(Vec::new());
+    let now = still(scene().1);
+    let mut run = tests::idle_in(state(), root.clone(), now.instant);
+    run.host = host;
+    let (replies, mut waiting) = mpsc::channel(4);
+    run.replies = replies;
+    cross_session_question(&mut run, true);
+    pull_question(&mut run, 108, now);
+    run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Down)));
+    run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Enter)));
+    let pending = run.site_keys.keys().next().unwrap().clone();
+    assert_eq!(run.site_queue.len(), 1);
+    run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Esc)));
+    assert!(
+        run.site_keys.is_empty(),
+        "discard the key whose mailbox is still opening"
+    );
+    assert!(
+        run.site_queue.is_empty(),
+        "discard its queued follow-up key too"
+    );
+    for _ in 0..2 {
+        let reply = tokio::time::timeout(Duration::from_secs(1), waiting.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        run.reply(reply, &mut None);
+    }
+    run.ack(
+        &pending,
+        &IntentOutcome::Applied {
+            result: json!({"handled":false}),
+        },
+    );
+    assert!(
+        child.submitted().is_empty(),
+        "a late open must not revive the key"
+    );
+    assert_eq!(child.interrupts(), 1);
+    assert_eq!(child.answers().len(), 1);
+    assert!(root.answers().is_empty());
+}

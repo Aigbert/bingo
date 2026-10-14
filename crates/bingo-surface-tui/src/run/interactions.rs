@@ -33,6 +33,7 @@ pub(super) fn stop_interaction(
     interaction: bingo_sdk::InteractionId,
     answer: Option<bingo_sdk::Answer>,
 ) {
+    run.discard_actions(std::slice::from_ref(&session));
     let answer = answer.map(|answer| (run.mint(None), answer));
     let interrupt = run.mint(None);
     let stop = move |handle: &SessionHandle| {

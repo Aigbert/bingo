@@ -185,3 +185,49 @@ fn removing_a_session_releases_the_next_action_to_its_original_mailbox() {
         matches!(&second.submitted()[..], [Input::Action { action }] if action.args["value"] == "second")
     );
 }
+
+#[tokio::test]
+async fn escape_on_an_ask_discards_its_owners_waiting_actions_only() {
+    let now = still(scene().1);
+    let root = Arc::new(TestSession::default());
+    let child = Arc::new(TestSession::default());
+    let mut run = tests::idle_in(counter(""), root.clone(), now.instant);
+    let mut screen = Recorder::default();
+    run.paint(&mut screen, Wake::Frame, now).unwrap();
+    for letter in "Ada".chars() {
+        run.heard(Term::Key(typed(letter)));
+    }
+    let first = root.submissions()[0].0.clone();
+    run.session
+        .tree
+        .fold
+        .apply(&child_frame(1, announced("child")));
+    run.session
+        .handles
+        .insert(child_id(), SessionHandle(child.clone()));
+    run.session.tree.show(&child_id());
+    run.submit(Input::Action {
+        action: bingo_sdk::Action {
+            name: "counter:ui".into(),
+            args: json!({"value":"child edit"}),
+        },
+    });
+    run.frame(&frame(1, opened(permission(None, None))), &mut screen)
+        .unwrap();
+    run.heard(Term::Key(key(crossterm::event::KeyCode::Esc)));
+    assert_eq!(root.interrupts(), 1);
+    assert_eq!(child.interrupts(), 0);
+    assert_eq!(run.ui.actions.action().unwrap().args["value"], "child edit");
+    assert_eq!(child.submitted().len(), 1, "unrelated actions still run");
+    run.ack(&first, &IntentOutcome::Applied { result: json!({}) });
+    assert_eq!(
+        root.submitted().len(),
+        1,
+        "late ack must not replay discarded edits"
+    );
+    run.ack(
+        &child.submissions()[0].0,
+        &IntentOutcome::Applied { result: json!({}) },
+    );
+    assert!(run.ui.actions.action().is_none());
+}
