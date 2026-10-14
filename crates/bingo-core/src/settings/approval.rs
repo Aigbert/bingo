@@ -155,6 +155,7 @@ mod tests {
             keys: vec![("directories".into(), bingo_sdk::Merge::PersonalAccumulate)],
         };
         let user = Layer::new(
+            crate::settings::LayerOrigin::Explicit,
             "user",
             json!({"directories":["personal"]})
                 .as_object()
@@ -163,6 +164,7 @@ mod tests {
         )
         .user();
         let project = Layer::new(
+            crate::settings::LayerOrigin::Explicit,
             "project",
             json!({"directories":["malicious"]})
                 .as_object()
@@ -172,6 +174,7 @@ mod tests {
         .project(repo.path())
         .unwrap();
         let cli = Layer::new(
+            crate::settings::LayerOrigin::Explicit,
             "cli",
             json!({"directories":["explicit"]})
                 .as_object()
@@ -192,6 +195,26 @@ mod tests {
     }
 
     #[test]
+    fn reading_a_repository_layer_cannot_silently_trust_its_code() {
+        let repo = tempfile::tempdir().unwrap();
+        let path = repo.path().join("settings.json");
+        std::fs::write(&path, r#"{"mcpServers":{"p":{"command":"never"}}}"#).unwrap();
+        let layer = super::super::read_layer(
+            crate::settings::LayerOrigin::Repository(repo.path().canonicalize().unwrap()),
+            &path,
+        )
+        .unwrap()
+        .unwrap();
+        let claim = Claim {
+            plugin: "test".into(),
+            keys: vec![("mcpServers".into(), bingo_sdk::Merge::ByName)],
+            approve: vec!["mcpServers".into()],
+        };
+        let merged = super::super::merge(&[layer], &[claim]).unwrap();
+        assert_eq!(merged.plugins["test"]["waiting"][0]["name"], "p");
+    }
+
+    #[test]
     fn nested_runnable_entries_keep_each_adapters_provenance() {
         let repo = tempfile::tempdir().unwrap();
         let claim = Claim {
@@ -200,6 +223,7 @@ mod tests {
             approve: vec!["acp.adapters".into()],
         };
         let user = Layer::new(
+            crate::settings::LayerOrigin::Explicit,
             "user",
             serde_json::from_value(json!({
                 "acp":{"adapters":{"personal":{"command":"personal"}}}
@@ -208,6 +232,7 @@ mod tests {
         )
         .user();
         let project = Layer::new(
+            crate::settings::LayerOrigin::Explicit,
             "project",
             serde_json::from_value(json!({
                 "acp":{"adapters":{"repository":{"command":"never"}}}
@@ -235,6 +260,7 @@ mod tests {
             approve: vec!["mcpServers".into()],
         };
         let project = Layer::new(
+            crate::settings::LayerOrigin::Explicit,
             "project",
             json!({"mcpServers":{"p":server},"approved":approved,"waiting":[]})
                 .as_object()
@@ -255,6 +281,7 @@ mod tests {
                 .any(|(code, _)| code == "APPROVED_IGNORED")
         );
         let user = Layer::new(
+            crate::settings::LayerOrigin::Explicit,
             "user",
             json!({"approved":approved}).as_object().unwrap().clone(),
         )

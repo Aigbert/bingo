@@ -159,7 +159,7 @@ async fn pins_round_trip_in_order_without_touching_comments() {
     assert_eq!(crate::host::pins::pinned_models(&host), ["scripted/small"]);
     let saved = std::fs::read_to_string(&path).unwrap();
     assert!(saved.contains("# Keep this comment") && saved.contains("# chosen before"));
-    let layer = crate::settings::read_layer(&path);
+    let layer = crate::settings::read_layer(crate::settings::LayerOrigin::Explicit, &path);
     assert!(layer.is_ok());
     assert_eq!(
         crate::settings::read_document(&path).unwrap()["pinned"],

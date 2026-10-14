@@ -80,7 +80,11 @@ impl HostConfig {
     /// Add the highest-priority layer so far; a non-object is ignored.
     pub fn with_layer(mut self, source: &str, value: Value) -> Self {
         if let Value::Object(map) = value {
-            self.layers.push(Layer::new(source, map));
+            self.layers.push(Layer::new(
+                crate::settings::LayerOrigin::Explicit,
+                source,
+                map,
+            ));
         }
         self
     }

@@ -285,7 +285,10 @@ fn cache_days(merged: &Map<String, Value>, layers: &[Layer]) -> Result<Option<u6
         return Ok(None);
     };
     let source = last_source(layers, "pictures");
-    super::said(&Layer::new(source, Map::new()), pictures)
+    super::said(
+        &Layer::new(crate::settings::LayerOrigin::Explicit, source, Map::new()),
+        pictures,
+    )
 }
 
 fn user_value<T: serde::de::DeserializeOwned + Default>(
@@ -330,17 +333,19 @@ mod tests {
         let Value::Object(map) = value else {
             panic!("layers are objects")
         };
-        Layer::new(source, map)
+        Layer::new(crate::settings::LayerOrigin::Explicit, source, map)
     }
 
     #[test]
     fn pinned_replaces_the_lower_list_and_preserves_order() {
         let layers = [
             Layer::new(
+                crate::settings::LayerOrigin::Explicit,
                 "user",
                 serde_json::from_value(serde_json::json!({"pinned":["a/one","b/two"]})).unwrap(),
             ),
             Layer::new(
+                crate::settings::LayerOrigin::Explicit,
                 "local",
                 serde_json::from_value(serde_json::json!({"pinned":["b/two","a/one"]})).unwrap(),
             ),
@@ -719,7 +724,13 @@ mod key_tests {
     use serde_json::json;
     #[test]
     fn keys_replace_as_a_whole_and_reject_non_strings() {
-        let layer = |value| Layer::new("keys", serde_json::from_value(value).unwrap());
+        let layer = |value| {
+            Layer::new(
+                crate::settings::LayerOrigin::Explicit,
+                "keys",
+                serde_json::from_value(value).unwrap(),
+            )
+        };
         let result = merge(
             &[
                 layer(json!({"keys":{"ctrl+x":"/one"}})),

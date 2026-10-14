@@ -32,6 +32,7 @@ async fn build(contributions: Vec<Contribution>) -> (Arc<Host>, Attachment, Arc<
     let mut config = HostConfig::new(env()).with_layer("cli", json!({"model":"m"}));
     config.layers.push(
         crate::settings::Layer::new(
+            crate::settings::LayerOrigin::Explicit,
             "user",
             json!({
                 "pluginTrust":{"stub":{"tier":"rewrite","uses":["model"]}}

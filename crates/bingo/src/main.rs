@@ -532,7 +532,11 @@ async fn switched_plugins(
     }
     let mut layers = settings::load(env, cwd, cli.settings.as_deref())
         .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e.to_string()))?;
-    layers.push(settings::Layer::new("cli", cli_layer(cli)));
+    layers.push(settings::Layer::new(
+        settings::LayerOrigin::Explicit,
+        "cli",
+        cli_layer(cli),
+    ));
     let merged = composition::merged(&layers, platforms)?;
     let composed = plugins(Composition::for_cli(cli, &merged), platforms, cwd)?;
     plugins::run(action, env, cwd, &layers, composed)
@@ -759,9 +763,11 @@ fn host_config(
         bingo_channels::from_flags(&cli.channels, platforms)
             .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e))?,
     );
-    config
-        .layers
-        .push(settings::Layer::new("cli", cli_settings));
+    config.layers.push(settings::Layer::new(
+        settings::LayerOrigin::Explicit,
+        "cli",
+        cli_settings,
+    ));
     config.budget.max_rounds = cli.max_turns;
     Ok(config)
 }
@@ -798,7 +804,7 @@ fn selector(cli: &Cli, cwd: PathBuf) -> SessionSelector {
 /// above the settings files (Claude Code's flag; OpenClaw's `bundleMcp`).
 fn mcp_layer(path: &std::path::Path) -> Result<settings::Layer, KernelError> {
     let invalid = |message: String| KernelError::new(ErrorCode::InvalidInput, message);
-    let layer = settings::read_layer(path)
+    let layer = settings::read_layer(settings::LayerOrigin::Explicit, path)
         .map_err(|e| invalid(e.to_string()))?
         .ok_or_else(|| invalid(format!("--mcp-config: {} does not exist", path.display())))?;
     let servers = layer
@@ -813,7 +819,11 @@ fn mcp_layer(path: &std::path::Path) -> Result<settings::Layer, KernelError> {
         })?;
     let mut only = Map::new();
     only.insert(bingo_mcp::SETTING.into(), servers);
-    Ok(settings::Layer::new("mcp-config", only))
+    Ok(settings::Layer::new(
+        settings::LayerOrigin::Explicit,
+        "mcp-config",
+        only,
+    ))
 }
 
 /// The command line as the highest settings layer: only what was given.
@@ -852,6 +862,7 @@ mod tests {
 
     fn layer(source: &str, value: serde_json::Value) -> settings::Layer {
         settings::Layer::new(
+            settings::LayerOrigin::Explicit,
             source,
             value.as_object().expect("a settings object").clone(),
         )

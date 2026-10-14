@@ -56,7 +56,7 @@ pub struct Layer {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum LayerOrigin {
+pub enum LayerOrigin {
     User,
     Repository(PathBuf),
     Explicit,
@@ -88,9 +88,9 @@ impl Layer {
         self
     }
 
-    pub fn new(source: impl Into<String>, value: Map<String, Value>) -> Self {
+    pub fn new(origin: LayerOrigin, source: impl Into<String>, value: Map<String, Value>) -> Self {
         Self {
-            origin: LayerOrigin::Explicit,
+            origin,
             source: source.into(),
             value,
         }
@@ -409,16 +409,21 @@ pub fn load(env: &Env, cwd: &Path, extra: Option<&Path>) -> Result<Vec<Layer>, S
         if index > 0 && path == user_path(env) {
             continue;
         }
-        if let Some(layer) = standing_layer(&path)? {
+        let origin = if index == 0 {
+            LayerOrigin::User
+        } else {
+            LayerOrigin::Repository(cwd.into())
+        };
+        if let Some(layer) = standing_layer(origin, &path)? {
             layers.push(if index == 0 {
-                layer.user()
+                layer
             } else {
                 layer.project(cwd)?
             });
         }
     }
     if let Some(path) = extra
-        && let Some(layer) = read_layer(path)?
+        && let Some(layer) = read_layer(crate::settings::LayerOrigin::Explicit, path)?
     {
         layers.push(layer);
     }
@@ -428,22 +433,22 @@ pub fn load(env: &Env, cwd: &Path, extra: Option<&Path>) -> Result<Vec<Layer>, S
 /// One of the three layer paths: its TOML, else the JSON that stands where no
 /// TOML does (ADR-0058 §1). A `--settings` file has no sibling — it is the
 /// file the person named, in the format they named it in.
-fn standing_layer(path: &Path) -> Result<Option<Layer>, SettingsError> {
-    match read_layer(path)? {
+fn standing_layer(origin: LayerOrigin, path: &Path) -> Result<Option<Layer>, SettingsError> {
+    match read_layer(origin.clone(), path)? {
         Some(layer) => Ok(Some(layer)),
-        None => read_layer(&format::json_sibling(path)),
+        None => read_layer(origin, &format::json_sibling(path)),
     }
 }
 
 /// One file as a layer; `None` when it does not exist.
-pub fn read_layer(path: &Path) -> Result<Option<Layer>, SettingsError> {
+pub fn read_layer(origin: LayerOrigin, path: &Path) -> Result<Option<Layer>, SettingsError> {
     let Some(text) = read_text(path)? else {
         return Ok(None);
     };
     let value = format::parse(Format::of(path), path, &text)?;
     let source = path.display().to_string();
     match value {
-        Value::Object(map) => Ok(Some(Layer::new(source, map))),
+        Value::Object(map) => Ok(Some(Layer::new(origin, source, map))),
         Value::Null => Ok(None),
         _ => Err(SettingsError::NotAnObject { layer: source }),
     }
@@ -575,7 +580,10 @@ mod tests {
         )
         .unwrap();
 
-        let after = read_layer(&path).unwrap().unwrap().value;
+        let after = read_layer(crate::settings::LayerOrigin::Explicit, &path)
+            .unwrap()
+            .unwrap()
+            .value;
         assert_eq!(after["model"], json!("gpt-5"));
         assert_eq!(after["provider"], json!("openai"));
         assert_eq!(after["permissions"]["allow"], json!(["Read"]));
@@ -599,7 +607,10 @@ mod tests {
         let toml = dir.path().join("settings.toml");
         super::remember(&toml, &[("model", json!("new"))]).unwrap();
 
-        let after = read_layer(&toml).unwrap().unwrap().value;
+        let after = read_layer(crate::settings::LayerOrigin::Explicit, &toml)
+            .unwrap()
+            .unwrap()
+            .value;
         assert_eq!(after["model"], json!("new"));
         assert_eq!(
             after["maxTokens"],
@@ -652,7 +663,9 @@ mod tests {
         let path = dir.path().join("settings.json");
         write(&path, "// mine\n{ \"model\": \"m\" }");
         assert!(
-            read_layer(&path).unwrap().is_some(),
+            read_layer(crate::settings::LayerOrigin::Explicit, &path)
+                .unwrap()
+                .is_some(),
             "the layers read JSONC"
         );
 
@@ -670,7 +683,7 @@ mod tests {
         let Value::Object(map) = value else {
             panic!("a layer is an object")
         };
-        Layer::new(source, map)
+        Layer::new(crate::settings::LayerOrigin::Explicit, source, map)
     }
 
     /// The highest layer that names `pictures` decides, in either spelling,

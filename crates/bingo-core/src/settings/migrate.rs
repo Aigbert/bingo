@@ -89,7 +89,7 @@ pub fn migrate_one(toml: &Path) -> Result<Migration, SettingsError> {
         return Ok(Migration::Nothing);
     }
     let json = format::json_sibling(toml);
-    let Some(layer) = read_layer(&json)? else {
+    let Some(layer) = read_layer(crate::settings::LayerOrigin::Explicit, &json)? else {
         return Ok(Migration::Nothing);
     };
     match write_toml(toml, &layer.value) {
