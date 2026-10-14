@@ -1,13 +1,20 @@
 use bingo_sdk::*;
 use serde_json::{Value, json};
-pub struct Opening;
+pub struct Opening(pub &'static str);
 #[async_trait::async_trait]
 impl Interceptor for Opening {
     fn id(&self) -> &str {
-        "plugins.open"
+        if self.0 == "plugins" {
+            "plugins.open"
+        } else {
+            "mcp.open"
+        }
     }
     fn matcher(&self) -> LinkMatcher {
-        LinkMatcher::at(catalogue::COMMAND_RUN)
+        LinkMatcher {
+            prefilter: json!({"command":self.0,"args":""}),
+            ..LinkMatcher::at(catalogue::COMMAND_RUN)
+        }
     }
     async fn chain(
         &self,

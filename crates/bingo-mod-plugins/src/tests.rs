@@ -202,3 +202,19 @@ fn approval_keeps_the_project_rows_identity() {
         "demo-lint"
     );
 }
+
+#[test]
+fn opening_links_never_wrap_other_commands_or_subcommands() {
+    for name in ["plugins", "mcp"] {
+        let matcher = opening::Opening(name).matcher();
+        assert!(matcher.matches(catalogue::COMMAND_RUN, &json!({"command":name,"args":""})));
+        assert!(!matcher.matches(
+            catalogue::COMMAND_RUN,
+            &json!({"command":name,"args":"disable local"})
+        ));
+        assert!(!matcher.matches(
+            catalogue::COMMAND_RUN,
+            &json!({"command":"thinking","args":"maximum"})
+        ));
+    }
+}

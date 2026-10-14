@@ -40,7 +40,8 @@ impl Plugin for Plugins {
             state.clone(),
         ))));
         for link in [
-            Arc::new(opening::Opening) as Arc<dyn Interceptor>,
+            Arc::new(opening::Opening("plugins")) as Arc<dyn Interceptor>,
+            Arc::new(opening::Opening("mcp")),
             Arc::new(draw::Drawing(state)),
         ] {
             registrar.add(Contribution::Interceptor {

@@ -454,9 +454,11 @@ fn answered(ack: Value) -> Value {
 /// Whether `/mcp`'s table says this server is up. Its columns are the server,
 /// its state and how many tools it brought.
 fn connected(answered: &Value, server: &str) -> bool {
-    answered["view"]["rows"].as_array().is_some_and(|rows| {
-        rows.iter()
-            .any(|row| row[0] == json!(server) && row[1] == json!("connected"))
+    answered["message"].as_str().is_some_and(|table| {
+        table.lines().any(|line| {
+            let cells = line.split('|').map(str::trim).collect::<Vec<_>>();
+            cells.get(1) == Some(&server) && cells.get(2) == Some(&"connected")
+        })
     })
 }
 
