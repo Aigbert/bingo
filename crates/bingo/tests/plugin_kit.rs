@@ -293,6 +293,9 @@ mod reentry;
 #[path = "support/nouns.rs"]
 mod nouns;
 
+#[path = "support/startup.rs"]
+mod startup;
+
 fn world_output(root: &Path, plugin: &Path, url: Option<&str>) -> Vec<bingo_sdk::Frame> {
     let script = root.join("world-script.json");
     std::fs::write(&script,r#"{"responses":[{"steps":[{"toolCall":{"name":"Read","input":{"file_path":"world.txt"}}}]},{"steps":[{"text":"offline"}]}]}"#).unwrap();
@@ -326,7 +329,6 @@ fn world_nouns_give_the_same_answer_in_process_and_under_node() {
     if !node_available() {
         return;
     }
-    use std::io::{Read, Write};
     let root = tempfile::tempdir().unwrap();
     let plugin = fixture(root.path(), "ts-status");
     std::fs::write(
@@ -356,13 +358,8 @@ fn world_nouns_give_the_same_answer_in_process_and_under_node() {
         let server = std::thread::spawn(move || {
             while !stopped.load(std::sync::atomic::Ordering::Relaxed) {
                 match listener.accept() {
-                    Ok((mut socket, _)) => {
-                        socket
-                            .set_read_timeout(Some(std::time::Duration::from_secs(10)))
-                            .unwrap();
-                        let mut head = [0; 4096];
-                        let _ = socket.read(&mut head);
-                        let _ = socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\nhttp");
+                    Ok((socket, _)) => {
+                        respond_world_http(socket);
                         return;
                     }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
@@ -391,7 +388,7 @@ fn world_nouns_give_the_same_answer_in_process_and_under_node() {
                 },
                 _ => None,
             })
-            .expect("world result");
+            .unwrap_or_else(|| panic!("world result (node={node}): {frames:#?}"));
         answers.push(serde_json::from_str::<serde_json::Value>(&text).unwrap());
     }
     assert_eq!(
@@ -399,6 +396,27 @@ fn world_nouns_give_the_same_answer_in_process_and_under_node() {
         serde_json::json!({"fs":"filesystem","env":"environment","process":"child","http":"http","agent":0,"mcp":true})
     );
     assert_eq!(answers[0], answers[1]);
+}
+
+fn respond_world_http(mut socket: std::net::TcpStream) {
+    use std::io::{BufRead, BufReader, Write};
+    // Accepted sockets can inherit the listener's nonblocking mode.
+    socket.set_nonblocking(false).unwrap();
+    socket
+        .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+        .unwrap();
+    let mut request = BufReader::new(&mut socket);
+    let mut line = String::new();
+    loop {
+        line.clear();
+        assert_ne!(request.read_line(&mut line).unwrap(), 0);
+        if line == "\r\n" {
+            break;
+        }
+    }
+    socket
+        .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\nhttp")
+        .unwrap();
 }
 
 #[test]

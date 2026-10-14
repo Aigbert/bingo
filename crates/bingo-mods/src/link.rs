@@ -130,6 +130,13 @@ impl Interceptor for Link {
                 )
                 .await;
         }
+        if entry == catalogue::SESSION_START
+            && let Some(started) = self.0.started.get()
+        {
+            started.send_modify(|sessions| {
+                sessions.insert(cx.session.clone());
+            });
+        }
     }
 }
 pub(crate) async fn operation(

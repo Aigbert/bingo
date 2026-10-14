@@ -6,8 +6,6 @@ test('ledger draws two calls, survives reload and resize, then closes on Escape'
     {steps:[{toolCall:{name:'Read',input:{file_path:'plugin.json'}}}]},
     {steps:[{text:'Two files read.'}]},
   ]}});
-  // session.start opens tool-calls on its own; ledger must replace it, not race it.
-  await mock.session.waitForSlot($.plugin.name, 'tool-calls');
   await $.command.run({name:'ledger',args:{}});
   const pane = await $.ui.mount({pane:'ledger'});
   expect(await pane.drawn()).toBe('No calls yet');

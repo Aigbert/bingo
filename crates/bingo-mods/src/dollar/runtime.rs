@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 use std::{path::PathBuf, sync::Arc};
 
 pub struct Runtime {
-    testing: Option<Arc<crate::testing::Environment>>,
+    pub(crate) testing: Option<Arc<crate::testing::Environment>>,
     timers: super::clock::Timers,
     every_floor: std::time::Duration,
     pub(super) registered: super::register::Registrations,

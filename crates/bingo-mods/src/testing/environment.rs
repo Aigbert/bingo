@@ -1,18 +1,61 @@
 //! Test overrides are instance-owned and never read the process environment.
-use std::{collections::BTreeMap, sync::Mutex};
+#[cfg(test)]
+mod tests;
+use bingo_sdk::SessionId;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Mutex,
+};
+use tokio::sync::watch;
+
+pub(crate) type Started = watch::Sender<BTreeSet<SessionId>>;
+
 pub struct Environment {
     clock: Mutex<(jiff::Timestamp, tokio::time::Instant)>,
     env: Mutex<BTreeMap<String, String>>,
+    starts: Mutex<BTreeMap<String, watch::Receiver<BTreeSet<SessionId>>>>,
 }
 impl Default for Environment {
     fn default() -> Self {
         Self {
             clock: Mutex::new((jiff::Timestamp::UNIX_EPOCH, tokio::time::Instant::now())),
             env: Mutex::default(),
+            starts: Mutex::default(),
         }
     }
 }
 impl Environment {
+    /// A replacement host keeps the mocks, but owns a new set of module generations.
+    pub fn reset_starts(&self) {
+        self.starts
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
+    }
+    pub(crate) fn track_start(&self, name: &str, observes: bool) -> Option<Started> {
+        let mut starts = self.starts.lock().unwrap_or_else(|e| e.into_inner());
+        starts.remove(name);
+        observes.then(|| {
+            let (send, receive) = watch::channel(BTreeSet::new());
+            starts.insert(name.into(), receive);
+            send
+        })
+    }
+    /// Wait for every admitted observer, including completions before this call.
+    pub async fn wait_for_start(&self, session: &SessionId) -> Result<(), String> {
+        let starts = self
+            .starts
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        for (name, mut started) in starts {
+            started
+                .wait_for(|sessions| sessions.contains(session))
+                .await
+                .map_err(|_| format!("{name}: session.start observer closed"))?;
+        }
+        Ok(())
+    }
     pub fn now(&self) -> Result<i64, String> {
         let (base, start) = *self.clock.lock().unwrap_or_else(|e| e.into_inner());
         base.checked_add(tokio::time::Instant::now().duration_since(start))
