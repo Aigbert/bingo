@@ -3,6 +3,8 @@
 `/plugins` (alias `/modules`) lists each plugin's version, state, reason and
 source. `/plugins enable <name>` and `/plugins disable <name>` save
 `enabledPlugins` in user settings and say when the change takes effect.
+Project settings take precedence: if they override the saved wish, the reply
+names the project file and keeps its effective on/off value.
 
 A plugin contributing only commands, catalogue entries or non-request-shaping
 interceptors switches now. Its drawing falls back to the surface's drawing;
@@ -29,7 +31,8 @@ Enabling loads a new generation with admission and current repository approval.
 If the old generation still serves a turn after five seconds, enable replies
 that it is queued after the running turn. Other switches remain available;
 a later disable supersedes that queued enable.
-`$.state` and `$.store` survive; session-start hooks run again. A module holding declared or trust-granted
+`$.state` and `$.store` survive; session-start hooks run again.
+A module holding declared or trust-granted
 `tool` authority is conservatively held until next start because it can register
 tools after loading. An unloaded module's request-shaping hooks are checked
 before it can join the running chain.
