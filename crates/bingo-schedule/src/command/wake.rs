@@ -40,7 +40,7 @@ impl WakeCommand {
     /// a wake they did not set themselves.
     fn shown(&self, standing: Option<Wake>) -> View {
         let Some(wake) = standing else {
-            return View::Text { text: NONE.into() };
+            return View::text(NONE);
         };
         View::KeyValue {
             rows: vec![("when".into(), when(&wake)), ("note".into(), wake.note)],
@@ -72,6 +72,7 @@ fn applied(message: String) -> CommandOutcome {
 impl Command for WakeCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "wake".into(),
             aliases: Vec::new(),
             hint: "the wake the model set, and `off` to end it".into(),

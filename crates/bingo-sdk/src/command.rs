@@ -19,6 +19,8 @@ use crate::view::View;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandSpec {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hidden: bool,
     pub name: String,
     #[serde(default)]
     pub aliases: Vec<String>,
@@ -29,6 +31,20 @@ pub struct CommandSpec {
     #[serde(default)]
     pub instant: bool,
     pub family: String,
+}
+
+impl CommandSpec {
+    pub fn ui(plugin: &str) -> Self {
+        Self {
+            name: format!("{plugin}:ui"),
+            aliases: vec![],
+            hint: String::new(),
+            args: ArgSpec::None,
+            instant: true,
+            hidden: true,
+            family: "ui".into(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -144,5 +160,20 @@ mod tests {
         );
         let back: ArgSpec = serde_json::from_value(wire).expect("deserialises");
         assert_eq!(back, args);
+    }
+}
+
+#[cfg(test)]
+mod hidden_contract {
+    use super::*;
+    #[test]
+    fn hidden_defaults_false_and_survives_the_wire_when_true() {
+        let old = serde_json::json!({"name":"counter:ui","hint":"","args":{"kind":"none"},"family":"ui","instant":true});
+        let spec: CommandSpec = serde_json::from_value(old.clone()).unwrap();
+        assert!(serde_json::to_value(spec).unwrap().get("hidden").is_none());
+        let mut hidden = old;
+        hidden["hidden"] = serde_json::json!(true);
+        let spec: CommandSpec = serde_json::from_value(hidden).unwrap();
+        assert_eq!(serde_json::to_value(spec).unwrap()["hidden"], true);
     }
 }

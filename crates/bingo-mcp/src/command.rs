@@ -315,6 +315,7 @@ fn invalid(what: String) -> KernelError {
 impl Command for McpCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "mcp".into(),
             aliases: Vec::new(),
             hint: format!("[{} <server>]", Verb::ALL.map(Verb::as_str).join("|")),

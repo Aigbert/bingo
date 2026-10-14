@@ -88,7 +88,10 @@ async fn publish(cx: &ToolContext, step: u64, label: &str) -> Result<(), ToolErr
     let payload = serde_json::to_value(&view).map_err(|e| ToolError::Failed(e.to_string()))?;
     let payload = bingo_sdk::slot::with(
         payload,
-        [bingo_sdk::slot::Slot::Activity { verb: None, view }],
+        [bingo_sdk::slot::Slot::Activity {
+            verb: None,
+            view: view.into(),
+        }],
     );
     cx.host
         .signal(&cx.session, PLUGIN, PROGRESS, payload)
@@ -109,8 +112,8 @@ fn done() -> ToolOutput {
         ))],
         is_error: false,
         display: Some(View::Code {
-            lang: Some("rust".into()),
-            text: LOOP.into(),
+            language: Some("rust".into()),
+            source: LOOP.into(),
         }),
     }
 }

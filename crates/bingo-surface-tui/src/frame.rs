@@ -272,14 +272,14 @@ mod m148 {
                     json!({}),
                     [Slot::Rail {
                         title: "legacy".into(),
-                        view: View::text("unplaced"),
+                        view: View::text("unplaced").into(),
                     }],
                 ),
                 slot::with(
                     json!({}),
                     [Slot::Panel {
                         title: "legacy".into(),
-                        view: View::text("unplaced"),
+                        view: View::text("unplaced").into(),
                     }],
                 ),
             ] {

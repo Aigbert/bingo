@@ -391,7 +391,7 @@ async fn row(host: &HostHandle, session: &SessionId, item: ItemId) -> Result<(),
 async fn live(host: &HostHandle, session: &SessionId, step: u64) -> Result<(), KernelError> {
     let bar = View::Progress { value: step, total: Some(15), label: Some("cargo test".into()) };
     let payload = slot::with(serde_json::json!({}), [Slot::Activity {
-        verb: None, view: bar,
+        verb: None, view: bar.into(),
     }]);
     host.signal(session, "bingo.demo.ui", "progress", payload).await
 }

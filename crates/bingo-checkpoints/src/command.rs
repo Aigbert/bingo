@@ -81,6 +81,7 @@ impl RewindCommand {
 impl Command for RewindCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: NAME.into(),
             aliases: Vec::new(),
             hint: "go back to a turn: its files and the conversation".into(),

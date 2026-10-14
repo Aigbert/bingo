@@ -37,37 +37,35 @@ pub fn progress_view(value: u64, total: u64) -> Value {
 pub fn board_view() -> View {
     View::Panel {
         title: "Board".into(),
-        child: Box::new(View::Stack {
-            children: vec![
-                View::Table {
-                    headers: vec!["id".into(), "state".into()],
-                    rows: vec![
-                        vec!["1".into(), "ready".into()],
-                        vec!["2".into(), "held".into()],
-                    ],
-                },
-                View::Actions {
-                    items: vec![
-                        bingo_sdk::ActionItem {
-                            label: "Tick".into(),
-                            action: bingo_sdk::Action {
-                                name: "board.tick".into(),
-                                args: Value::Null,
-                            },
-                            key: None,
+        child: Box::new(View::column(vec![
+            View::Table {
+                headers: vec!["id".into(), "state".into()],
+                rows: vec![
+                    vec!["1".into(), "ready".into()],
+                    vec!["2".into(), "held".into()],
+                ],
+            },
+            View::Actions {
+                items: vec![
+                    bingo_sdk::ActionItem {
+                        label: "Tick".into(),
+                        action: bingo_sdk::Action {
+                            name: "board.tick".into(),
+                            args: Value::Null,
                         },
-                        bingo_sdk::ActionItem {
-                            label: "Reset".into(),
-                            action: bingo_sdk::Action {
-                                name: "board.reset".into(),
-                                args: Value::Null,
-                            },
-                            key: None,
+                        key: None,
+                    },
+                    bingo_sdk::ActionItem {
+                        label: "Reset".into(),
+                        action: bingo_sdk::Action {
+                            name: "board.reset".into(),
+                            args: Value::Null,
                         },
-                    ],
-                },
-            ],
-        }),
+                        key: None,
+                    },
+                ],
+            },
+        ])),
     }
 }
 
@@ -110,15 +108,16 @@ fn stranger_payload() -> Value {
                 view: View::Panel {
                     title: "stranger activity".into(),
                     child: Box::new(View::text("activity body")),
-                },
+                }
+                .into(),
             },
             Slot::Rail {
                 title: "stranger rail".into(),
-                view: View::text("rail body"),
+                view: View::text("rail body").into(),
             },
             Slot::Panel {
                 title: "stranger panel".into(),
-                view: View::text("panel body"),
+                view: View::text("panel body").into(),
             },
             Slot::Mode {
                 current: "awake".into(),
@@ -240,9 +239,7 @@ pub fn task_payload(records: Value) -> Value {
         if done > 0 {
             words.push(format!("{done} completed"));
         }
-        View::Stack {
-            children: vec![tree, View::text(format!("… {}", words.join(", ")))],
-        }
+        View::column(vec![tree, View::text(format!("… {}", words.join(", ")))])
     };
     let verb = tasks
         .iter()
@@ -262,7 +259,8 @@ pub fn task_payload(records: Value) -> Value {
             view: View::Panel {
                 title,
                 child: Box::new(child),
-            },
+            }
+            .into(),
         }]
     };
     slot::with(serde_json::json!({"tasks": records}), slots)

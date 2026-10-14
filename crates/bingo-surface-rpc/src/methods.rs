@@ -51,6 +51,7 @@ pub mod name {
     pub const SESSION_ANSWER: &str = "session/answer";
     pub const SESSION_DELIVER: &str = "session/deliver";
     pub const SESSION_EXTEND: &str = "session/extend";
+    pub const UI_RENDER: &str = "ui/render";
     pub const SESSION_SIGNAL: &str = "session/signal";
     pub const CATALOG_READ: &str = "catalog/read";
     pub const GATEWAY_SUBSCRIBE: &str = "gateway/subscribe";
@@ -495,7 +496,19 @@ pub struct EventRefParams {
 /// A notification: its name and its params.
 pub type Notification = (&'static str, Ref);
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct RenderParams {
+    pub session: SessionId,
+    #[serde(flatten)]
+    pub request: bingo_sdk::render::RenderRequest,
+}
+
 pub static METHODS: &[Method] = &[
+    (
+        name::UI_RENDER,
+        schema_of::<RenderParams>,
+        schema_of::<bingo_sdk::View>,
+    ),
     (
         name::INITIALIZE,
         schema_of::<InitializeParams>,
@@ -615,7 +628,7 @@ mod tests {
 
     #[test]
     fn the_wire_has_explicit_methods_and_notifications() {
-        assert_eq!(METHODS.len(), 21);
+        assert_eq!(METHODS.len(), 22);
         assert_eq!(NOTIFICATIONS.len(), 4);
     }
 

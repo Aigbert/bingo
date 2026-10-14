@@ -43,9 +43,7 @@ impl Command for RenameCommand {
 async fn report(host: &Arc<Host>, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
     let summary = host.session_summary(&cx.session).await?;
     Ok(CommandOutcome::View {
-        view: View::Text {
-            text: format!("{}\n{USAGE}", named(summary.title.as_deref())),
-        },
+        view: View::text(format!("{}\n{USAGE}", named(summary.title.as_deref()))),
     })
 }
 

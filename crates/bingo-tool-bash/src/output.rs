@@ -125,9 +125,7 @@ pub fn shape(command: &str, output: &str, ended: Ended) -> ToolOutput {
     } else {
         ToolOutput::error(text)
     };
-    result.display = Some(bingo_sdk::View::Text {
-        text: display(body, ended),
-    });
+    result.display = Some(bingo_sdk::View::text(display(body, ended)));
     result
 }
 
@@ -181,16 +179,12 @@ mod tests {
         ] {
             assert_eq!(
                 shape("echo hi", "hi\n", end).display,
-                Some(bingo_sdk::View::Text {
-                    text: expected.into()
-                })
+                Some(bingo_sdk::View::text(expected))
             );
         }
         assert_eq!(
             shape("true", "", Ended::Exited(0)).display,
-            Some(bingo_sdk::View::Text {
-                text: String::new()
-            })
+            Some(bingo_sdk::View::text(String::new()))
         );
     }
 

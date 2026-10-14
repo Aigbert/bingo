@@ -19,6 +19,7 @@ pub(super) const SKILL_PROMPT: &str = "/guide the wire format\n\n\
 /// tells a skill from any other command that answers with a prompt.
 pub(super) fn skills_in_the_catalogue() -> Vec<bingo_sdk::CommandSpec> {
     vec![bingo_sdk::CommandSpec {
+        hidden: false,
         name: "guide".into(),
         aliases: vec![],
         hint: "[topic]".into(),

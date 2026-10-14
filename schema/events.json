@@ -1,5 +1,1218 @@
 {
   "events": {
+    "ui.press": {
+      "kind": "chain",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "HandlerEvent",
+        "type": "object",
+        "properties": {
+          "handler": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "value": {
+            "default": null
+          }
+        },
+        "required": [
+          "handler",
+          "event"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "null",
+        "type": "null"
+      },
+      "matcher": [
+        "handler",
+        "event"
+      ],
+      "pinned": [
+        "/handler",
+        "/event"
+      ],
+      "acts": {
+        "deny": true,
+        "rewrite": true,
+        "answer": true
+      }
+    },
+    "ui.input": {
+      "kind": "chain",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "HandlerEvent",
+        "type": "object",
+        "properties": {
+          "handler": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "value": {
+            "default": null
+          }
+        },
+        "required": [
+          "handler",
+          "event"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "null",
+        "type": "null"
+      },
+      "matcher": [
+        "handler",
+        "event"
+      ],
+      "pinned": [
+        "/handler",
+        "/event"
+      ],
+      "acts": {
+        "deny": true,
+        "rewrite": true,
+        "answer": true
+      }
+    },
+    "ui.select": {
+      "kind": "chain",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "HandlerEvent",
+        "type": "object",
+        "properties": {
+          "handler": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "value": {
+            "default": null
+          }
+        },
+        "required": [
+          "handler",
+          "event"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "null",
+        "type": "null"
+      },
+      "matcher": [
+        "handler",
+        "event"
+      ],
+      "pinned": [
+        "/handler",
+        "/event"
+      ],
+      "acts": {
+        "deny": true,
+        "rewrite": true,
+        "answer": true
+      }
+    },
+    "ui.render": {
+      "kind": "chain",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "RenderRequest",
+        "type": "object",
+        "properties": {
+          "component": {
+            "$ref": "#/$defs/Component"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "surface": {
+            "$ref": "#/$defs/SurfaceName"
+          },
+          "props": true,
+          "viewport": {
+            "$ref": "#/$defs/Viewport"
+          }
+        },
+        "required": [
+          "component",
+          "requestId",
+          "surface",
+          "props",
+          "viewport"
+        ],
+        "$defs": {
+          "Component": {
+            "type": "string",
+            "enum": [
+              "Question",
+              "UserMessage",
+              "AssistantMessage",
+              "ToolUse",
+              "ToolResult",
+              "ToolGroup",
+              "ToolProgress",
+              "CommandOutput",
+              "Spinner",
+              "TurnDuration",
+              "InfoNotice",
+              "SessionMode",
+              "PromptHint",
+              "AbovePrompt",
+              "Pane"
+            ]
+          },
+          "SurfaceName": {
+            "type": "string",
+            "enum": [
+              "terminal",
+              "desktop",
+              "text"
+            ]
+          },
+          "Viewport": {
+            "type": "object",
+            "properties": {
+              "columns": {
+                "type": "integer",
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "rows": {
+                "type": "integer",
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              }
+            },
+            "required": [
+              "columns",
+              "rows"
+            ]
+          }
+        }
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "View",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "children": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/TextChild"
+                }
+              },
+              "color": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "dimColor": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "bold": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "italic": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "underline": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "strikethrough": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "inverse": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "wrap": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "const": "Text"
+              }
+            },
+            "required": [
+              "kind",
+              "children"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "dimColor": {
+                "type": "boolean"
+              },
+              "kind": {
+                "type": "string",
+                "const": "Markdown"
+              }
+            },
+            "required": [
+              "kind",
+              "text"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "language": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "const": "Code"
+              }
+            },
+            "required": [
+              "kind",
+              "source"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "unified": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "const": "diff"
+              }
+            },
+            "required": [
+              "kind",
+              "unified"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "const": "list"
+              }
+            },
+            "required": [
+              "kind",
+              "items"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "headers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "kind": {
+                "type": "string",
+                "const": "table"
+              }
+            },
+            "required": [
+              "kind",
+              "headers",
+              "rows"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              },
+              "kind": {
+                "type": "string",
+                "const": "keyValue"
+              }
+            },
+            "required": [
+              "kind",
+              "rows"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0
+              },
+              "total": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "const": "progress"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "tone": {
+                "$ref": "#/$defs/Tone",
+                "default": "neutral"
+              },
+              "kind": {
+                "type": "string",
+                "const": "badge"
+              }
+            },
+            "required": [
+              "kind",
+              "text"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "nodes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/TreeNode"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "const": "tree"
+              }
+            },
+            "required": [
+              "kind",
+              "nodes"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "children": {
+                "type": "array",
+                "items": {
+                  "$ref": "#"
+                }
+              },
+              "key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "flexDirection": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Direction"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "flexGrow": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "flexWrap": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Wrap"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "alignItems": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Align"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "justifyContent": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Justify"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "gap": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "width": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "height": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "margin": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "marginX": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "marginY": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "padding": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "paddingX": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "paddingY": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "borderStyle": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "borderColor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "display": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "const": "Box"
+              }
+            },
+            "required": [
+              "kind",
+              "children"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "child": {
+                "$ref": "#"
+              },
+              "kind": {
+                "type": "string",
+                "const": "panel"
+              }
+            },
+            "required": [
+              "kind",
+              "title",
+              "child"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ActionItem"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "const": "actions"
+              }
+            },
+            "required": [
+              "kind",
+              "items"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "children": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/TextChild"
+                }
+              },
+              "key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "hotkey": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 1
+              },
+              "dimColor": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "variant": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "onPress": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Action"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "const": "Button"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "placeholder": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "onInput": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Action"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "onSubmit": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Action"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "const": "Input"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "options": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "$ref": "#/$defs/SelectOption"
+                }
+              },
+              "onSelect": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Action"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "const": "Select"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "href": {
+                "type": "string"
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "const": "Link"
+              }
+            },
+            "required": [
+              "kind",
+              "href"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string"
+              },
+              "alt": {
+                "type": "string"
+              },
+              "columns": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "rows": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "kind": {
+                "type": "string",
+                "const": "Image"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "alt"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "columns": {
+                "type": "integer",
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "rows": {
+                "type": "integer",
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "cells": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "const": "Raster"
+              }
+            },
+            "required": [
+              "kind",
+              "columns",
+              "rows",
+              "cells"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string"
+              },
+              "alt": {
+                "type": "string"
+              },
+              "width": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "height": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "kind": {
+                "type": "string",
+                "const": "Svg"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "alt"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "component": {
+                "$ref": "#/$defs/Component"
+              },
+              "props": true,
+              "kind": {
+                "type": "string",
+                "const": "Engine"
+              }
+            },
+            "required": [
+              "kind",
+              "component",
+              "props"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "customKind": {
+                "type": "string"
+              },
+              "data": true,
+              "fold": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "const": "custom"
+              }
+            },
+            "required": [
+              "kind",
+              "customKind",
+              "data",
+              "fold"
+            ]
+          }
+        ],
+        "$defs": {
+          "TextChild": {
+            "description": "A text child preserves the style of its nested Text node.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#"
+              }
+            ]
+          },
+          "Tone": {
+            "description": "The one styling hook a plugin has; the surface owns the colour.",
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "neutral",
+                  "good",
+                  "bad"
+                ]
+              },
+              {
+                "description": "Wants a person: a surface makes it move.",
+                "type": "string",
+                "const": "attention"
+              }
+            ]
+          },
+          "TreeNode": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "badge": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tone": {
+                "$ref": "#/$defs/Tone",
+                "default": "neutral"
+              },
+              "children": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/TreeNode"
+                }
+              }
+            },
+            "required": [
+              "label"
+            ]
+          },
+          "Direction": {
+            "type": "string",
+            "enum": [
+              "row",
+              "column"
+            ]
+          },
+          "Wrap": {
+            "type": "string",
+            "enum": [
+              "wrap",
+              "nowrap"
+            ]
+          },
+          "Align": {
+            "type": "string",
+            "enum": [
+              "flex-start",
+              "center",
+              "flex-end",
+              "stretch"
+            ]
+          },
+          "Justify": {
+            "type": "string",
+            "enum": [
+              "flex-start",
+              "center",
+              "flex-end",
+              "space-between",
+              "space-around",
+              "space-evenly"
+            ]
+          },
+          "ActionItem": {
+            "description": "A button: the surface fires `Input::Action` with `action` (ADR-0008 §1).",
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "action": {
+                "$ref": "#/$defs/Action"
+              },
+              "key": {
+                "description": "A single-key hint; the surface may use another key.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 1
+              }
+            },
+            "required": [
+              "label",
+              "action"
+            ]
+          },
+          "Action": {
+            "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "args": {
+                "default": null
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "SelectOption": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "value"
+            ]
+          },
+          "Component": {
+            "type": "string",
+            "enum": [
+              "Question",
+              "UserMessage",
+              "AssistantMessage",
+              "ToolUse",
+              "ToolResult",
+              "ToolGroup",
+              "ToolProgress",
+              "CommandOutput",
+              "Spinner",
+              "TurnDuration",
+              "InfoNotice",
+              "SessionMode",
+              "PromptHint",
+              "AbovePrompt",
+              "Pane"
+            ]
+          }
+        }
+      },
+      "matcher": [
+        "component",
+        "requestId",
+        "surface"
+      ],
+      "pinned": [
+        "/component",
+        "/requestId",
+        "/surface",
+        "/viewport"
+      ],
+      "acts": {
+        "deny": true,
+        "rewrite": true,
+        "answer": true
+      }
+    },
     "plugin.register": {
       "kind": "chain",
       "input": {
@@ -1042,55 +2255,109 @@
               {
                 "type": "object",
                 "properties": {
-                  "text": {
-                    "type": "string"
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/TextChild"
+                    }
                   },
-                  "kind": {
-                    "type": "string",
-                    "const": "text"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "text"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "text": {
-                    "type": "string"
-                  },
-                  "kind": {
-                    "type": "string",
-                    "const": "markdown"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "text"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "lang": {
+                  "color": {
                     "type": [
                       "string",
                       "null"
                     ]
                   },
-                  "text": {
-                    "type": "string"
+                  "dimColor": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "bold": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "italic": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "underline": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "strikethrough": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "inverse": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "wrap": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "kind": {
                     "type": "string",
-                    "const": "code"
+                    "const": "Text"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "children"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "dimColor": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Markdown"
                   }
                 },
                 "required": [
                   "kind",
                   "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Code"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "source"
                 ]
               },
               {
@@ -1195,7 +2462,6 @@
                     "minimum": 0
                   },
                   "total": {
-                    "description": "Unbounded when absent: the surface shows activity, not a fraction.",
                     "type": [
                       "integer",
                       "null"
@@ -1267,28 +2533,163 @@
                       "$ref": "#/$defs/View"
                     }
                   },
-                  "kind": {
-                    "type": "string",
-                    "const": "stack"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "children"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "children": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/$defs/View"
-                    }
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "flexDirection": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Direction"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "flexGrow": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "flexWrap": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Wrap"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "alignItems": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Align"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "justifyContent": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Justify"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "gap": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "width": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "height": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "margin": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "marginX": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "marginY": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "padding": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "paddingX": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "paddingY": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "borderStyle": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "borderColor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "display": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "kind": {
                     "type": "string",
-                    "const": "columns"
+                    "const": "Box"
                   }
                 },
                 "required": [
@@ -1336,7 +2737,320 @@
                 ]
               },
               {
-                "description": "A word this sdk does not have (ADR-0038 §1): `kind` is the emitter's\nown name for the element, namespaced by its plugin (`demo.sparkline`),\n`data` is whatever shape that plugin documents, and `fold` is the text\nevery surface that has not learned the kind shows instead.\n\nIt is also where an unknown `kind` off the wire lands, and then `data`\nis the whole node as it arrived — nothing said is lost, whether or not\nthis sdk has the word for it.",
+                "type": "object",
+                "properties": {
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/TextChild"
+                    }
+                  },
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "hotkey": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 1
+                  },
+                  "dimColor": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "variant": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "onPress": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Button"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "placeholder": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "value": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "onInput": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "onSubmit": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Input"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "value": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "options": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/$defs/SelectOption"
+                    }
+                  },
+                  "onSelect": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Select"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Link"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "href"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "alt": {
+                    "type": "string"
+                  },
+                  "columns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "rows": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Image"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "source",
+                  "alt"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "columns": {
+                    "type": "integer",
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "rows": {
+                    "type": "integer",
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "cells": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Raster"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "columns",
+                  "rows",
+                  "cells"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "alt": {
+                    "type": "string"
+                  },
+                  "width": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "height": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Svg"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "source",
+                  "alt"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "component": {
+                    "$ref": "#/$defs/Component"
+                  },
+                  "props": true,
+                  "kind": {
+                    "type": "string",
+                    "const": "Engine"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "component",
+                  "props"
+                ]
+              },
+              {
                 "type": "object",
                 "properties": {
                   "customKind": {
@@ -1357,6 +3071,17 @@
                   "data",
                   "fold"
                 ]
+              }
+            ]
+          },
+          "TextChild": {
+            "description": "A text child preserves the style of its nested Text node.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/View"
               }
             ]
           },
@@ -1405,6 +3130,40 @@
               "label"
             ]
           },
+          "Direction": {
+            "type": "string",
+            "enum": [
+              "row",
+              "column"
+            ]
+          },
+          "Wrap": {
+            "type": "string",
+            "enum": [
+              "wrap",
+              "nowrap"
+            ]
+          },
+          "Align": {
+            "type": "string",
+            "enum": [
+              "flex-start",
+              "center",
+              "flex-end",
+              "stretch"
+            ]
+          },
+          "Justify": {
+            "type": "string",
+            "enum": [
+              "flex-start",
+              "center",
+              "flex-end",
+              "space-between",
+              "space-around",
+              "space-evenly"
+            ]
+          },
           "ActionItem": {
             "description": "A button: the surface fires `Input::Action` with `action` (ADR-0008 §1).",
             "type": "object",
@@ -1443,6 +3202,41 @@
             },
             "required": [
               "name"
+            ]
+          },
+          "SelectOption": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "value"
+            ]
+          },
+          "Component": {
+            "type": "string",
+            "enum": [
+              "Question",
+              "UserMessage",
+              "AssistantMessage",
+              "ToolUse",
+              "ToolResult",
+              "ToolGroup",
+              "ToolProgress",
+              "CommandOutput",
+              "Spinner",
+              "TurnDuration",
+              "InfoNotice",
+              "SessionMode",
+              "PromptHint",
+              "AbovePrompt",
+              "Pane"
             ]
           }
         }
@@ -4380,55 +6174,109 @@
               {
                 "type": "object",
                 "properties": {
-                  "text": {
-                    "type": "string"
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/TextChild"
+                    }
                   },
-                  "kind": {
-                    "type": "string",
-                    "const": "text"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "text"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "text": {
-                    "type": "string"
-                  },
-                  "kind": {
-                    "type": "string",
-                    "const": "markdown"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "text"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "lang": {
+                  "color": {
                     "type": [
                       "string",
                       "null"
                     ]
                   },
-                  "text": {
-                    "type": "string"
+                  "dimColor": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "bold": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "italic": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "underline": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "strikethrough": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "inverse": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "wrap": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "kind": {
                     "type": "string",
-                    "const": "code"
+                    "const": "Text"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "children"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "dimColor": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Markdown"
                   }
                 },
                 "required": [
                   "kind",
                   "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Code"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "source"
                 ]
               },
               {
@@ -4533,7 +6381,6 @@
                     "minimum": 0
                   },
                   "total": {
-                    "description": "Unbounded when absent: the surface shows activity, not a fraction.",
                     "type": [
                       "integer",
                       "null"
@@ -4605,28 +6452,163 @@
                       "$ref": "#/$defs/View"
                     }
                   },
-                  "kind": {
-                    "type": "string",
-                    "const": "stack"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "children"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "children": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/$defs/View"
-                    }
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "flexDirection": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Direction"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "flexGrow": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "flexWrap": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Wrap"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "alignItems": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Align"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "justifyContent": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Justify"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "gap": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "width": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "height": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "margin": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "marginX": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "marginY": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "padding": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "paddingX": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "paddingY": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "borderStyle": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "borderColor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "display": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "kind": {
                     "type": "string",
-                    "const": "columns"
+                    "const": "Box"
                   }
                 },
                 "required": [
@@ -4674,7 +6656,320 @@
                 ]
               },
               {
-                "description": "A word this sdk does not have (ADR-0038 §1): `kind` is the emitter's\nown name for the element, namespaced by its plugin (`demo.sparkline`),\n`data` is whatever shape that plugin documents, and `fold` is the text\nevery surface that has not learned the kind shows instead.\n\nIt is also where an unknown `kind` off the wire lands, and then `data`\nis the whole node as it arrived — nothing said is lost, whether or not\nthis sdk has the word for it.",
+                "type": "object",
+                "properties": {
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/TextChild"
+                    }
+                  },
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "hotkey": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 1
+                  },
+                  "dimColor": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "variant": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "onPress": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Button"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "placeholder": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "value": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "onInput": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "onSubmit": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Input"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "value": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "options": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/$defs/SelectOption"
+                    }
+                  },
+                  "onSelect": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Select"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Link"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "href"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "alt": {
+                    "type": "string"
+                  },
+                  "columns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "rows": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Image"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "source",
+                  "alt"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "columns": {
+                    "type": "integer",
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "rows": {
+                    "type": "integer",
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "cells": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Raster"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "columns",
+                  "rows",
+                  "cells"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "alt": {
+                    "type": "string"
+                  },
+                  "width": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "height": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Svg"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "source",
+                  "alt"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "component": {
+                    "$ref": "#/$defs/Component"
+                  },
+                  "props": true,
+                  "kind": {
+                    "type": "string",
+                    "const": "Engine"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "component",
+                  "props"
+                ]
+              },
+              {
                 "type": "object",
                 "properties": {
                   "customKind": {
@@ -4695,6 +6990,17 @@
                   "data",
                   "fold"
                 ]
+              }
+            ]
+          },
+          "TextChild": {
+            "description": "A text child preserves the style of its nested Text node.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/View"
               }
             ]
           },
@@ -4743,6 +7049,40 @@
               "label"
             ]
           },
+          "Direction": {
+            "type": "string",
+            "enum": [
+              "row",
+              "column"
+            ]
+          },
+          "Wrap": {
+            "type": "string",
+            "enum": [
+              "wrap",
+              "nowrap"
+            ]
+          },
+          "Align": {
+            "type": "string",
+            "enum": [
+              "flex-start",
+              "center",
+              "flex-end",
+              "stretch"
+            ]
+          },
+          "Justify": {
+            "type": "string",
+            "enum": [
+              "flex-start",
+              "center",
+              "flex-end",
+              "space-between",
+              "space-around",
+              "space-evenly"
+            ]
+          },
           "ActionItem": {
             "description": "A button: the surface fires `Input::Action` with `action` (ADR-0008 §1).",
             "type": "object",
@@ -4781,6 +7121,41 @@
             },
             "required": [
               "name"
+            ]
+          },
+          "SelectOption": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "value"
+            ]
+          },
+          "Component": {
+            "type": "string",
+            "enum": [
+              "Question",
+              "UserMessage",
+              "AssistantMessage",
+              "ToolUse",
+              "ToolResult",
+              "ToolGroup",
+              "ToolProgress",
+              "CommandOutput",
+              "Spinner",
+              "TurnDuration",
+              "InfoNotice",
+              "SessionMode",
+              "PromptHint",
+              "AbovePrompt",
+              "Pane"
             ]
           },
           "Level": {
@@ -6424,55 +8799,109 @@
               {
                 "type": "object",
                 "properties": {
-                  "text": {
-                    "type": "string"
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/TextChild"
+                    }
                   },
-                  "kind": {
-                    "type": "string",
-                    "const": "text"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "text"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "text": {
-                    "type": "string"
-                  },
-                  "kind": {
-                    "type": "string",
-                    "const": "markdown"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "text"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "lang": {
+                  "color": {
                     "type": [
                       "string",
                       "null"
                     ]
                   },
-                  "text": {
-                    "type": "string"
+                  "dimColor": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "bold": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "italic": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "underline": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "strikethrough": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "inverse": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "wrap": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "kind": {
                     "type": "string",
-                    "const": "code"
+                    "const": "Text"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "children"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "dimColor": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Markdown"
                   }
                 },
                 "required": [
                   "kind",
                   "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Code"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "source"
                 ]
               },
               {
@@ -6577,7 +9006,6 @@
                     "minimum": 0
                   },
                   "total": {
-                    "description": "Unbounded when absent: the surface shows activity, not a fraction.",
                     "type": [
                       "integer",
                       "null"
@@ -6649,28 +9077,163 @@
                       "$ref": "#/$defs/View"
                     }
                   },
-                  "kind": {
-                    "type": "string",
-                    "const": "stack"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "children"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "children": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/$defs/View"
-                    }
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "flexDirection": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Direction"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "flexGrow": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "flexWrap": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Wrap"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "alignItems": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Align"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "justifyContent": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Justify"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "gap": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "width": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "height": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "margin": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "marginX": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "marginY": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "padding": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "paddingX": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "paddingY": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "borderStyle": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "borderColor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "display": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "kind": {
                     "type": "string",
-                    "const": "columns"
+                    "const": "Box"
                   }
                 },
                 "required": [
@@ -6718,7 +9281,320 @@
                 ]
               },
               {
-                "description": "A word this sdk does not have (ADR-0038 §1): `kind` is the emitter's\nown name for the element, namespaced by its plugin (`demo.sparkline`),\n`data` is whatever shape that plugin documents, and `fold` is the text\nevery surface that has not learned the kind shows instead.\n\nIt is also where an unknown `kind` off the wire lands, and then `data`\nis the whole node as it arrived — nothing said is lost, whether or not\nthis sdk has the word for it.",
+                "type": "object",
+                "properties": {
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/TextChild"
+                    }
+                  },
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "hotkey": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 1
+                  },
+                  "dimColor": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "variant": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "onPress": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Button"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "placeholder": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "value": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "onInput": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "onSubmit": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Input"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "value": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "options": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/$defs/SelectOption"
+                    }
+                  },
+                  "onSelect": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Action"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Select"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Link"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "href"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "alt": {
+                    "type": "string"
+                  },
+                  "columns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "rows": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Image"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "source",
+                  "alt"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "columns": {
+                    "type": "integer",
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "rows": {
+                    "type": "integer",
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "cells": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Raster"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "columns",
+                  "rows",
+                  "cells"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "alt": {
+                    "type": "string"
+                  },
+                  "width": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "height": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint16",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "Svg"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "source",
+                  "alt"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "component": {
+                    "$ref": "#/$defs/Component"
+                  },
+                  "props": true,
+                  "kind": {
+                    "type": "string",
+                    "const": "Engine"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "component",
+                  "props"
+                ]
+              },
+              {
                 "type": "object",
                 "properties": {
                   "customKind": {
@@ -6739,6 +9615,17 @@
                   "data",
                   "fold"
                 ]
+              }
+            ]
+          },
+          "TextChild": {
+            "description": "A text child preserves the style of its nested Text node.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/View"
               }
             ]
           },
@@ -6787,6 +9674,40 @@
               "label"
             ]
           },
+          "Direction": {
+            "type": "string",
+            "enum": [
+              "row",
+              "column"
+            ]
+          },
+          "Wrap": {
+            "type": "string",
+            "enum": [
+              "wrap",
+              "nowrap"
+            ]
+          },
+          "Align": {
+            "type": "string",
+            "enum": [
+              "flex-start",
+              "center",
+              "flex-end",
+              "stretch"
+            ]
+          },
+          "Justify": {
+            "type": "string",
+            "enum": [
+              "flex-start",
+              "center",
+              "flex-end",
+              "space-between",
+              "space-around",
+              "space-evenly"
+            ]
+          },
           "ActionItem": {
             "description": "A button: the surface fires `Input::Action` with `action` (ADR-0008 §1).",
             "type": "object",
@@ -6825,6 +9746,41 @@
             },
             "required": [
               "name"
+            ]
+          },
+          "SelectOption": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "value"
+            ]
+          },
+          "Component": {
+            "type": "string",
+            "enum": [
+              "Question",
+              "UserMessage",
+              "AssistantMessage",
+              "ToolUse",
+              "ToolResult",
+              "ToolGroup",
+              "ToolProgress",
+              "CommandOutput",
+              "Spinner",
+              "TurnDuration",
+              "InfoNotice",
+              "SessionMode",
+              "PromptHint",
+              "AbovePrompt",
+              "Pane"
             ]
           },
           "ItemBody": {
@@ -7440,6 +10396,9 @@
         "title": "CommandSpec",
         "type": "object",
         "properties": {
+          "hidden": {
+            "type": "boolean"
+          },
           "name": {
             "type": "string"
           },
@@ -7569,6 +10528,9 @@
           "CommandSpec": {
             "type": "object",
             "properties": {
+              "hidden": {
+                "type": "boolean"
+              },
               "name": {
                 "type": "string"
               },

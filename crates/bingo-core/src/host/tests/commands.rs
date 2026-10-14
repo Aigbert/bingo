@@ -177,7 +177,9 @@ async fn model_and_think_change_the_next_turn_and_are_announced() {
 /// The text of a `View::Text` outcome.
 fn shown(outcome: &IntentOutcome) -> String {
     match outcome {
-        IntentOutcome::Applied { result } => result["view"]["text"].as_str().unwrap().to_string(),
+        IntentOutcome::Applied { result } => serde_json::from_value::<View>(result["view"].clone())
+            .unwrap()
+            .fold(),
         other => panic!("not a view: {other:?}"),
     }
 }

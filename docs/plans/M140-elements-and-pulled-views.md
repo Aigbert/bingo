@@ -1,150 +1,150 @@
 # M140 — Elements and pulled views
-
 ## Goal
-
 ADR-0079 §1–3, §5, §6 (components are M141). `View` grows nine elements
-in Claude Code's words, each with a fold; each surface publishes its
-table. A pulled pane is asked for at its drawn width (`HostApi::render`,
-`ui/render`) and again when its runtime calls `HostApi::invalidate`
-(`host/ui/invalidate`). Handlers return through `Input::Action` as
-`ui.press`/`input`/`select`. The TUI draws the terminal table, seats
-panes, stacks toasts. After M121, M123–M125, M137, M138.
-
+with folds and surface tables. Pulled panes render at drawn width and invalidate
+through HostApi::render/invalidate (ui/render, host/ui/invalidate). Handlers return
+via Input::Action as ui.press/input/select. TUI draws elements, panes and toasts.
+After M121, M123–M125, M137, M138.
 ## Bricks, in build order
 
-1. **Contract: the elements, tests first.** `view.rs` (699 lines, two
-   nouns) → `view/{mod,read,fold,table,tests}.rs`. Serde names are Claude
-   Code's, so the nodes M137's `h` builds arrive unmapped. Golden JSON per
-   node; "Every node once" gains the nine; `every_node_folds_to_text`
-   pins each fold (`Engine` folds to nothing). `Text` and `Button` hold
-   `children` as JSX gives them (strings and nested `Text`: styled spans);
-   old `Text { text }` reads as one child; `Code` writes `source`/
-   `language` and still reads `text`/`lang` (ADR-0065). All fail first.
-2. **The drawn subset, as data.** `table.rs` names per element the props
-   bingo draws; surface tests and M142's `validate` read this one list; a
-   surface ignores any other prop. `Box`: key, flexDirection (row|column),
-   flexGrow, flexWrap, alignItems, justifyContent, gap, width, height,
-   margin[X|Y], padding[X|Y], borderStyle, borderColor, display. `Text`:
-   color, dimColor, bold, italic, underline, strikethrough, inverse, wrap.
-   `Button`: key, label, hotkey, dimColor, variant, onPress. `Input`: key,
-   label, placeholder, value, onInput, onSubmit. `Select`: key, label,
-   options, value, onSelect. `Link`: href, label. `Image`: source, alt,
-   columns, rows. `Raster`: columns, rows, cells. `Svg`: source, alt,
-   width, height. `Code`: source, language. `Markdown`: text, dimColor.
-   Out: positions, hover, flexShrink, alignSelf, row/column gaps, minimum
-   sizes, per-side spacing, backgroundColor, overflow, reversed
-   directions, autoFocus, role, action, Code's path/startLine/format,
-   Markdown's link presses.
-3. **The old words read as `Box`.** `stack` is a column `Box`; `columns`
-   a wrapping row whose n children each take `flexGrow: 1, width:
-   NARROW / n`, so they stack below `NARROW` (moved here from the TUI) as
-   before. `View::Stack`/`Columns` are deleted; `KNOWN` = the schema's
-   kinds + `READ_ONLY = ["stack", "columns"]`. Writers move to `Box`:
-   `bingo-experience/command.rs`, `bingo-schedule/{render,tools/list}.rs`,
-   `bingo-demo-ui/board.rs`.
-4. **Tables and the structural check.** `TERMINAL`, `DESKTOP`, `TEXT` as
-   data; pure `outside(table, &View) -> Vec<Path>`, which a surface folds
-   (§2). `answer_ok(component, &View)` checks structure only: `Engine`
-   only as the asked component, every handler `<plugin>:ui` of the
-   answering mod, at most 4 096 nodes. `published_ok` refuses `Engine`.
-5. **Pulled places.** In `bingo_sdk::slot` a slot's view is `Shown::View`
-   or `Shown::Pull { request }`; old JSON reads as `View`. New:
-   `Slot::Pane { id, title, focus, close_on_escape, hold_toasts, asked,
-   rows, view }`, `Slot::Toast { text, until, alert }`; `Activity.view`
-   may pull. Golden fixtures; `published_ok` over each.
-6. **The render pair.** Sdk `render.rs`: `Component` (§4's fifteen, no
-   permission variant), `Viewport`, `SurfaceName`, `RenderRequest {
-   component, requestId, surface, props, viewport }`. `HostApi::render`
-   defaults to `Engine { component, props }`, `invalidate` to nothing.
-   Core's `chain/render.rs` raises `ui.render` through M131's runner (the
-   kernel link answers `Engine`; a failed hook or `answer_ok` answers
-   `Engine` plus one notice naming the plugin), off the actor's mailbox,
-   four in flight per session, a newer ask for one `(component,
-   requestId)` replacing a queued one. `invalidate` passes the pure
-   `host/throttle.rs` (30/s per request) and sends the ephemeral
-   `Event::Invalidated`, which `SessionState` folds into a generation per
-   request for the surface's memo. `UI_RENDER` is additive: `PROTOCOL` 1.
-7. **Who calls `invalidate`.** Pure `bingo-plugin-host/subscribed.rs`:
-   `subscribe(requestId, reads)` from M138's read log of the render
-   invocation, `changed(scope, key) -> requests`, `forget`. The answering
-   runtime keeps one and calls `invalidate` on a write M138's state face
-   reports, or on `$.ui.invalidate`; it binds "in render" on that face,
-   so `$.state.set` in a `ui.render` hook is refused in words. plugin-rpc
-   does the same for a process (the node SDK's `ui.ts` mints handlers;
-   `host/ui/invalidate` joins `schema/plugin.json`).
-8. **Handlers through the door.** `CommandSpec.hidden` (default `false`):
-   never listed, never completed. M137's runtime contributes
-   `<plugin>:ui`, `instant` and `hidden`. `handlers.rs` mints `Action {
-   name: "<plugin>:ui", args: { handler: "<generation>:<n>", event } }`,
-   keyed by request and replaced by each answer. A surface adds `value`
-   and fires `Input::Action`; the command raises `ui.press`, `ui.input`
-   or `ui.select` in that mod alone; an old generation answers a notice.
-   Escape on a `close_on_escape` pane fires `event: "close"`.
-9. **`$.ui`, the pulled half**, each an op event (M138), `ui.*` in M136's
-   catalogue: `status` → `Status`; `toast(text, ms = 4000)` and `notify`
-   (`alert`) → `Slot::Toast`; `open(…)` → `Slot::Pane` pulling its own
-   `id` as `requestId`, resolving `{}`, `asked` set when the opening hook
-   ran under the person's own input (a command, a key, a press); `close`,
-   `panes`, `invalidate`, `resolve`; `notice`/`ask` via `HostApi`.
-10. **The TUI draws the terminal table.** `views/flex.rs` lays out a
-    `Box` by hand, pure in tree and width; a wrapping row whose children
-    do not fit becomes a column; taffy only if a fixture needs it (budget
-    pasted either way). `views/{button,input,select,link,image,raster}.rs`;
-    `text.rs` draws spans; `Button` uses the `Actions` marks, `Input` the
-    composer's editor. Pure `pane.rs` (ADR-0081 §7): `asked` sits above
-    the composer at a third of the height at every width (M151 adds the
-    other places); unasked waits (`1 pane waiting` in `status`, a click opens). `toast.rs` stacks toasts above
-    the status line (`until` feeds `next_frame`; held while a `hold_toasts`
-    pane shows; a new `alert` notifies the unfocused terminal).
-    `pulled.rs` memoises on `(component, requestId, props, columns,
-    generation)`, drawing `…` until answered; `Focus::Pane(id)`.
-11. **The black box.** Fixture mod `counter` (a pane, a `Button`, an
-    `Input`); `tests/mods_ui.rs` over `bingo serve --stdio`, fake provider:
-    `ui/render`, a press by `session/input`, `Invalidated`, the new count.
-
+1. **Elements, tests first.** Split sdk `view.rs` into `view/{mod,read,fold,table,tests}.rs`. Add nine nodes and golden JSON/folds (Engine folds empty). Text/Button have children (strings or nested styled Text); legacy Text.text and Code.text/lang still read; Code writes source/language. Canonical JSX names reach serde unmapped.
+2. **Drawn props, one table.** Box: key, flexDirection(row|column), flexGrow, flexWrap, alignItems, justifyContent, gap, width, height, margin[X|Y], padding[X|Y], borderStyle, borderColor, display. Text: color, dimColor, bold, italic, underline, strikethrough, inverse, wrap. Button: key, label, hotkey, dimColor, variant, onPress. Input: key, label, placeholder, value, onInput, onSubmit. Select: key, label, options, value, onSelect. Link: href, label. Image: source, alt, columns, rows. Raster: columns, rows, cells. Svg: source, alt, width, height. Code: source, language. Markdown: text, dimColor. Props outside the table are ignored.
+3. **Legacy containers.** Stack reads as column Box; Columns as wrapping row Box, children with flexGrow 1 and widths sharing NARROW=60 including two-cell gutters. Delete Stack/Columns variants; schema kinds plus READ_ONLY pin KNOWN. Writers: experience/command, schedule/render and tools/list, demo-ui/board, tasks/journal.
+4. **Tables/validation.** TERMINAL, DESKTOP, TEXT and pure outside(table, view) paths. answer_ok checks only structure: Engine matches requested component, handlers name the answering mod's `<plugin>:ui`, at most 4096 nodes. published_ok refuses Engine.
+5. **Places.** Shown::View or Pull{request}; old JSON reads View. Pane{id,title,focus, close_on_escape,hold_toasts,asked,rows,view}; Toast{text,until,alert}; Activity can pull. Golden fixtures and published_ok cover each.
+6. **Render pair.** sdk Component (ADR-0079's fifteen, no permission), Viewport, SurfaceName, RenderRequest{component,requestId,surface,props,viewport}. HostApi::render defaults Engine; invalidate defaults no-op. Core raises ui.render through M131's runner off the mailbox, four in flight/session; latest queued ask replaces the same (component,requestId). Bad tree/hook: Engine plus one plugin notice. Pure throttle limits invalidations to 30/s/request; ephemeral Invalidated folds a generation per request. ui/render is additive to surface RPC PROTOCOL 1.
+7. **Subscriptions.** plugin-host/subscribed: subscribe(requestId,reads), changed(scope,key), forget. Both runtimes invalidate on writes to reads or $.ui.invalidate. Bind render scope to M138's state face: state.set while rendering is refused in words. Node ui.ts mints handlers; plugin schema adds host/ui/invalidate.
+8. **Handlers.** CommandSpec.hidden defaults false, excluded from listing/completion. Each runtime contributes instant hidden `<plugin>:ui`. Per-request generations mint Action args {handler:"<generation>:<n>",event}; surface adds value via Input::Action.
+   Raise ui.press/input/select in that mod alone; stale generation notices; Escape
+   fires event close for a close_on_escape pane.
+9. **$.ui.** All methods raise op events: status, toast(default 4000ms), notify(alert),
+   open(pulled Pane, id=requestId, resolves {}, asked only under person input), close,
+   panes, invalidate, resolve(table), notice/ask(existing HostApi). Components/log: M141.
+10. **TUI.** Pure flex layout handles the drawn Box props; wrapping rows stack when
+    they do not fit. Hand layout unless a fixture justifies taffy; paste budget either way.
+    Dedicated button/input/select/link/image/raster renderers; text draws styled spans;
+    Button uses Actions marks, Input the composer editor. Asked panes sit above composer
+    at one-third height at every width; unasked waits in status, click opens (M151
+    adds placements). Toast stack above status; until feeds next_frame, hold_toasts
+    pauses it, new alert notifies an unfocused terminal. Focus::Pane(id).
+    Pulled memo: (component,requestId,props,columns,generation), ellipsis until answer.
+11. **Black box.** Counter mod (pane, Button, Input); serve --stdio with fake provider:
+    ui/render, session/input press, Invalidated, incremented count. Isolated tmux drive.
 ## Files
 
 - `crates/bingo-sdk/src/view.rs` → `view/…`; `{render.rs (new),slot,host,event,state,command,catalogue…}`
 - `crates/bingo-core/src/{chain/render,host/throttle}.rs`, `crates/bingo-plugin-host/src/subscribed.rs`,
-  `crates/bingo-mods/src/handlers.rs` (new), `$.ui`; plugin-rpc's bridge; `sdk/typescript/src/ui.ts` (new)
+  `crates/bingo-mods/src/{handlers,ui}.rs`, runtime/chain/JS; plugin-host state/host and plugin-rpc bridge; `sdk/typescript/src/ui.ts` (new)
 - `crates/bingo-surface-rpc/src/methods.rs` + dispatch; `schema/{rpc,plugin,events}.json`; brick 3's writers
 - `crates/bingo-surface-tui/src/views/{flex,button,input,select,link,image,raster}.rs`, `{pane,toast,pulled}.rs`
   (new), `views/{stack,columns}.rs` (deleted), `views/{mod,text,tests}.rs`, `focus,layout,activity,status,terminal.rs`
 - `crates/bingo/tests/{mods_ui.rs,fixtures/mods/counter/}` (new); `scripts/tui-smoke.sh`
-
+- Module declarations, host/session wiring, TUI `ui,run,input,pointer,view,layout/deadline,transcript/output`,
+  command catalog filtering and TypeScript exports/transport wiring for these bricks.
+- Mechanical `Text`/`Code`/`Stack` and `CommandSpec.hidden` constructor updates in existing
+  producers, fixtures and generators; exclude M139 world nouns, grant.rs, MCP/agents service rows.
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-sdk view:: table:: slot:: render::`: each node
-      round-trips and folds (snapshot diff pasted); `stack`, `columns`,
-      old `Text` and `Code` read; each `answer_ok` refusal. `rg -n
-      'View::(Stack|Columns)' crates` prints nothing.
-- [ ] `cargo test -p bingo-core chain::render host::throttle`: the kernel
+- [x] `cargo test -p bingo-sdk`: each node round-trips/folds; legacy Stack/Columns/Text/Code read; every `answer_ok` refusal.
+      `rg -n 'View::(Stack|Columns)' crates` prints nothing.
+- [x] `cargo test -p bingo-core chain::render` and `cargo test -p bingo-core host::throttle`: the kernel
       link answers `Engine`; a throwing hook and a bad tree each answer
       `Engine` with one notice; 100 invalidations send ≤30 frames a second.
-- [ ] `cargo test -p bingo-plugin-host subscribed::`, `-p bingo-mods`,
+- [x] `cargo test -p bingo-plugin-host subscribed::`, `-p bingo-mods`,
       `-p bingo --test mods_ui`: a read subscribes, a write invalidates,
       `set` in a render is refused, brick 11 passes.
-- [ ] `cargo test -p bingo-surface-tui`: a `TestBackend` test per element;
+- [x] `cargo test -p bingo-surface-tui`: a `TestBackend` test per element;
       panes asked (inline at 200 and 80) and unasked (waiting at 200,
-      opened by a click); a toast held by `hold_toasts`, gone at `until`.
-- [ ] The `schedule`, `experience` and `demo-ui` narrow snapshots are
-      unchanged; any diff is pasted and driven in tmux.
-- [ ] `scripts/tui-smoke.sh` passes with `counter`, a tmux drive pasted;
+      clicked open); toasts held by `hold_toasts`, gone at `until`.
+- [x] Schedule/experience/demo-ui narrow snapshots unchanged; any diff pasted and driven in tmux.
+- [x] `scripts/tui-smoke.sh` passes with `counter`, a tmux drive pasted;
       every gate; the Windows check of `bingo-surface-tui` and
       `bingo-mods`; budget output pasted with the taffy decision.
-
 ## Non-goals
 
-- Components and `$.ui.log` (M141); the desktop table (ADR-0080); a pane
-  placed other than `above` (M151); `Client`, `blit`, styling beyond the subset; OSC 8
-  links; `isPlaced`, `$.ui.copy`/`scroll`/`focus`/`selection` (design §8).
-
+- Components/`$.ui.log` (M141), desktop rendering, non-above placement (M151),
+  Client/blit, extra styling, OSC 8, isPlaced, copy/scroll/focus/selection (design §8).
 ## Risks
 
-- **Spans in `Text`.** Every Rust writer of `Text` uses a constructor.
-  **`Input` traffic.** `onInput` per keystroke is a command, a hook, a
-  write and a render; if the drive feels slow, coalesce to one per frame.
-- Re-verify at start: `Slot`/`placed` (M121); `layout()`, `next_frame`
-  (M124); `Focus`/`Render` (M125); the runner (M131); the catalogue
-  (M136); `h`'s node shape, the loader (M137); the read log and state
-  face (M138); `view.rs`, `KNOWN`, `CommandSpec`; what `Image.source` names.
+- `onInput` per keystroke crosses command/hook/write/render; coalesce per frame if slow.
+- Re-verified at `5581b978`: M148 layout/canvas replaced rail/sheet; M131 runner/catalogue and M138 `Call.reads`/`ReadLog` existed, while the render guard and canonical JSX/direct Text writers needed migration.
+- 2026-10-14, person's delegate: authorize the scoped pre-release View/Shown/place/ui-render baseline amendment; protocol 2 freezes at its first release (ADR-0075).
+- 2026-10-14, person's delegate: authorize print Invalidated ignore arms and all mechanical Event/Shown/element sibling mappings; record files below, stop only for new out-of-scope behaviour.
+- 2026-10-14, person's delegate: authorize theme-test file additions only for fitting token roles, keep ember/accent lists and theme values unchanged; merge dev before regenerating and running final gates.
+- Pure flex layout adds no dependency; fixed-axis and legacy narrow fixtures pass. Budget: 411 dependencies, 1s warm core check, zero TUI-to-core recompiles; no taffy dependency.
+- 2026-10-14, person's delegate: rename the component to `Question` (wire `Question`), amend ADR-0079 and regenerate contracts; keep discipline 4c unchanged.
+- Windows: 15 touched crates pass; eight stop only at missing Windows SDK C headers in aws-lc-sys/rquickjs-sys/tree-sitter/tree-sitter-bash, left to Windows CI under protocol step 7.
+## Verified (2026-10-14)
+
+Theme allowlist additions: text → `toast.rs`, `views/{input,select}.rs`; dim → `views/{button,flex,input,link,mod,text}.rs`; bad → `views/button.rs`; no ember/accent additions.
+Mechanical match/fixture updates: `bingo-surface-print/src/{render,stream_json}.rs` (ignore Invalidated), `bingo-core/src/host/tests/commands.rs` (canonical View fold), `bingo-surface-rpc/tests/wire/main.rs` (ui/render params), `docs/design/tui.md` (Activity Shown constructor); existing View/CommandSpec constructors are the Files-authorized migration.
+
+| Command | Result lines |
+|---|---|
+| `cargo test -p bingo-sdk view::contract --locked` | test result: FAILED. 0 passed; 2 failed → test result: ok. 2 passed; 0 failed |
+| `cargo test -p bingo-sdk view::validate --locked` | test result: FAILED. 0 passed; 1 failed → answers_reject_wrong_engines_foreign_handlers_and_oversized_trees ... ok |
+| `cargo test -p bingo-sdk slot::pull_contract --locked` | test result: FAILED. 0 passed; 1 failed |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema:: --locked` | protocol 2 removed or retyped a frozen shape; test result: FAILED. 9 passed; 1 failed |
+| `cargo check --workspace --all-targets --locked` | error[E0164]: expected tuple struct or tuple variant, found associated function `View::text`; error[E0004]: `Event::Invalidated` not covered<br>Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.28s<br>Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.00s |
+| `cargo test -p bingo-surface-tui views::tests --locked` | test result: FAILED. 9 passed; 3 failed → test result: ok. 13 passed; 0 failed |
+| `cargo test -p bingo-surface-tui pulled:: --locked` | test result: FAILED. 0 passed; 1 failed |
+| `cargo test -p bingo-surface-tui pane:: --locked` | test result: FAILED. 0 passed; 1 failed |
+| `cargo test -p bingo-surface-tui toast:: --locked` | test result: FAILED. 0 passed; 1 failed<br>test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 1106 filtered out<br>test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1106 filtered out |
+| `node --test sdk/typescript/src/ui.test.ts` | fail 1: Escape raises close in the mod and removes only its current closable pane → pass 3; fail 0 |
+| `cargo test -p bingo-surface-tui --lib --locked` | every_token_is_spent_where_the_design_says: assertion failed: where `text` is spent; test result: FAILED. 1104 passed; 1 failed; 2 ignored → test result: ok. 1105 passed; 0 failed; 2 ignored<br>test result: ok. 1106 passed; 0 failed; 2 ignored |
+| `git merge --no-ff dev -m 'merge: dev into M140'` | da6bc325 merge: dev into M140 (dev 686ad289) |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods dollar::tests::schema_and_types_are_generated_from_the_same_rows --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema::tests::the_committed_schema_is_this_document --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 INSTA_UPDATE=always cargo test -p bingo-sdk --lib --locked` | test result: ok. 146 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --test record --locked` | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc schema::tests::the_committed_schema_is_this_document --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc wire_ts:: --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc events_ts:: --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out |
+| `cargo test -p bingo-core host::throttle --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 501 filtered out |
+| `cargo test -p bingo-plugin-rpc --test plugin --locked` | test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `cargo test -p bingo --test mods_ui --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `bash /tmp/m140-counter-drive.sh` | 80x24: Counter 0→1; Input Ada persisted; Escape closed<br>200x24: Counter 0→1; Input Ada persisted; Escape closed<br>tui-smoke ok |
+| `cargo fmt --all -- --check` | exit_code: 0 |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.54s<br>Finished `dev` profile [unoptimized + debuginfo] target(s) in 29.46s |
+| `cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed` | test result: FAILED. 41 passed; 1 failed; a_bound_port_is_a_real_one_and_a_range_lands_inside_itself: attempt to add with overflow |
+| `cargo test -p bingo-loopback --lib --locked server::tests::a_bound_port_is_a_real_one_and_a_range_lands_inside_itself -- --exact --test-threads=1` | test result: ok. 1 passed; 0 failed; 41 filtered out |
+| `cargo test --workspace --all-targets --locked --no-fail-fast -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed` | error: 2 targets failed: `-p bingo-surface-rpc --lib`, `-p bingo-surface-rpc --test wire` |
+| `node --test sdk/typescript/src/*.test.ts` | tests 20; pass 20; fail 0 |
+| `cargo test -p bingo-sdk -p bingo-core -p bingo-surface-tui -p bingo-surface-rpc --lib --locked` | test result: ok. 503 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 146 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 1106 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked` | test result: ok. 130 passed; 0 failed; 0 ignored<br>test result: FAILED. 128 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `cargo test -p bingo-surface-rpc --test wire --locked` | test result: ok. 41 passed; 0 failed; 1 ignored |
+| `scripts/check_discipline.sh` | a tool named in kernel/sdk code: `crates/bingo-sdk/src/render.rs:10: AskUserQuestion,`<br>cohesion ok<br>discipline FAILED<br>kernel names no tool<br>cohesion ok<br>discipline ok |
+| `cargo test -p bingo-sdk render::tests::question_is_named_for_its_drawing --locked` | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 146 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 INSTA_UPDATE=always cargo test -p bingo-sdk --locked` | test result: ok. 147 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `cargo test --workspace --locked --no-fail-fast -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed` | error: 1 target failed: `-p bingo-demo-ui --doc` (expected Shown, found View)<br>exit_code: 0 |
+| `cargo test -p bingo-demo-ui --doc --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out |
+| `cargo test -p bingo-provider-acp --test bridge --locked token -- --test-threads=1` | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out |
+| `scripts/budget.sh` | dependencies (unique, normal): 411 (max  411)<br>warm cargo check -p bingo-core: 1s (max  20s)<br>relink isolation: touching the TUI recompiled 0 crates for core (must be 0)<br>target/debug: 14 GB (soft max  5)<br>warn: target/debug exceeds the soft limit<br>test binaries: 159<br>budget ok |
+| `cargo deny check` | advisories ok, bans ok, licenses ok, sources ok |
+| `cargo check -p bingo --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo check -p bingo-agents --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-checkpoints --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-context --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-core --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-demo-ui --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-experience --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-mcp --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo check -p bingo-mods --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys, rquickjs-sys) |
+| `cargo check -p bingo-permissions --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (tree-sitter, tree-sitter-bash) |
+| `cargo check -p bingo-plugin-host --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-plugin-rpc --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo check -p bingo-provider-acp --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-rooms --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-schedule --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-sdk --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-skills --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-surface-print --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo check -p bingo-surface-rpc --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-surface-tui --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo check -p bingo-tasks --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-tool-bash --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-tool-fs --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo build -p bingo --locked` | Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.94s |
+| `scripts/tui-smoke.sh` | 80x24: Counter 0→1; Input Ada persisted; Escape closed<br>200x24: Counter 0→1; Input Ada persisted; Escape closed<br>tui-smoke ok |
+| `rg -n 'View::(Stack\|Columns)' crates` | exit_code: 1; no matches |

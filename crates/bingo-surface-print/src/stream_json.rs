@@ -188,6 +188,7 @@ impl Encoder {
             | Event::CatalogChanged { .. }
             | Event::Notice { .. }
             | Event::Extension { .. }
+            | Event::Invalidated { .. }
             | Event::Signal { .. }
             | Event::Lagged { .. }
             | Event::Unknown { .. } => None,

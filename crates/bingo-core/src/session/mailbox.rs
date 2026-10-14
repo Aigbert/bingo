@@ -58,6 +58,7 @@ pub(crate) enum Msg {
         payload: Value,
     },
     /// A plugin's live state onto the stream, never the journal (ADR-0013 §2).
+    Invalidated(Vec<String>),
     Signal {
         plugin: String,
         kind: String,
@@ -269,6 +270,10 @@ impl Mailbox {
             kind,
             payload,
         });
+    }
+
+    pub fn invalidate(&self, requests: Vec<String>) {
+        self.send(Msg::Invalidated(requests));
     }
 
     pub fn signal(&self, plugin: String, kind: String, payload: Value) {

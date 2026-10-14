@@ -107,9 +107,11 @@ impl Board {
     pub fn view(&self) -> View {
         View::Panel {
             title: "Board".into(),
-            child: Box::new(View::Stack {
-                children: vec![self.table(), self.sparkline(), buttons()],
-            }),
+            child: Box::new(View::column(vec![
+                self.table(),
+                self.sparkline(),
+                buttons(),
+            ])),
         }
     }
 
@@ -133,7 +135,7 @@ impl Board {
         let View::Panel { child, .. } = view else {
             return None;
         };
-        let View::Stack { children } = child.as_ref() else {
+        let View::Box { children, .. } = child.as_ref() else {
             return None;
         };
         let table = children.iter().find_map(|child| match child {
@@ -252,7 +254,7 @@ mod tests {
             panic!("a board is a panel");
         };
         assert_eq!(title, "Board");
-        let View::Stack { children } = *child else {
+        let View::Box { children, .. } = *child else {
             panic!("a table with its buttons under it");
         };
         assert_eq!(

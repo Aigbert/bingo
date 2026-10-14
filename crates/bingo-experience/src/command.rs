@@ -29,6 +29,7 @@ impl ExperienceCommand {
 impl Command for ExperienceCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "experience".into(),
             aliases: Vec::new(),
             hint: "what this project has taught the agent".into(),
@@ -50,7 +51,7 @@ impl Command for ExperienceCommand {
 fn view(shelf: &Shelf, now: Timestamp) -> View {
     let mut parts = Vec::new();
     if shelf.is_empty() {
-        parts.push(View::Text { text: NONE.into() });
+        parts.push(View::text(NONE));
     } else {
         parts.push(View::Table {
             headers: render::HEADERS.map(str::to_string).to_vec(),
@@ -63,7 +64,7 @@ fn view(shelf: &Shelf, now: Timestamp) -> View {
     parts.extend(unreadable(shelf));
     match parts.len() {
         1 => parts.remove(0),
-        _ => View::Stack { children: parts },
+        _ => View::column(parts),
     }
 }
 
@@ -79,12 +80,10 @@ fn unreadable(shelf: &Shelf) -> Option<View> {
         .map(|bad| format!("{}: {}", bad.file, bad.why))
         .collect::<Vec<_>>()
         .join("\n");
-    Some(View::Text {
-        text: format!(
-            "{} file(s) could not be read:\n{lines}",
-            shelf.unreadable.len()
-        ),
-    })
+    Some(View::text(format!(
+        "{} file(s) could not be read:\n{lines}",
+        shelf.unreadable.len()
+    )))
 }
 
 #[cfg(test)]
@@ -115,7 +114,7 @@ mod tests {
     #[tokio::test]
     async fn an_empty_library_is_one_line() {
         let fixture = Fixture::new();
-        assert_eq!(table(&fixture).await, View::Text { text: NONE.into() });
+        assert_eq!(table(&fixture).await, View::text(NONE));
     }
 
     #[tokio::test]
@@ -169,13 +168,17 @@ mod tests {
         shelved(&fixture, entry());
         std::fs::write(fixture.dir().join("broken.md"), "not an entry\n").expect("wrote");
 
-        let View::Stack { children } = table(&fixture).await else {
+        let View::Box { children, .. } = table(&fixture).await else {
             panic!("a shelf with a broken file is a table and a notice");
         };
         assert!(matches!(children[0], View::Table { .. }));
-        let View::Text { text } = &children[1] else {
+        let View::Text {
+            children: spans, ..
+        } = &children[1]
+        else {
             panic!("the notice is text");
         };
+        let text = bingo_sdk::view::text_children(spans);
         assert!(text.contains("broken.md"), "{text}");
         assert!(text.contains("frontmatter"), "{text}");
     }

@@ -48,7 +48,7 @@ pub(super) fn folded(output: &ToolOutput, fold: Fold, width: usize) -> Vec<Line<
     let (rows, limit) = match &output.display {
         // A diff is the one display a person reads by the dozen rows.
         Some(view @ View::Diff { .. }) => (views::render(view, width), DIFF_ROWS),
-        Some(View::Text { text }) => (plain(text), OUTPUT_ROWS),
+        Some(view @ View::Text { .. }) => (plain(&view.fold()), OUTPUT_ROWS),
         Some(view) => (views::render(view, width), OUTPUT_ROWS),
         None => (plain(&text_of(output)), OUTPUT_ROWS),
     };
@@ -136,9 +136,7 @@ mod tests {
     #[test]
     fn a_text_display_has_the_same_dim_style_as_plain_output() {
         let mut output = ToolOutput::text("model text");
-        output.display = Some(View::Text {
-            text: "display text".into(),
-        });
+        output.display = Some(View::text("display text"));
         assert_eq!(whole(&output, 80), plain("display text"));
     }
 

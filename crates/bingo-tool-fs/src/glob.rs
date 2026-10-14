@@ -136,9 +136,11 @@ impl Tool for GlobTool {
             .map(|(_, file)| path::display(file, &cx.cwd, &cx.env.home))
             .collect::<Vec<_>>();
         let mut result = ToolOutput::text(output::join(&paths, MAX_RESULTS, "files"));
-        result.display = Some(bingo_sdk::View::Text {
-            text: output::join(&display, MAX_RESULTS, "files"),
-        });
+        result.display = Some(bingo_sdk::View::text(output::join(
+            &display,
+            MAX_RESULTS,
+            "files",
+        )));
         Ok(result)
     }
 }
@@ -157,12 +159,7 @@ mod tests {
             out.parts[0].as_text(),
             Some(dir.path().join("a.rs").to_str().unwrap())
         );
-        assert_eq!(
-            out.display,
-            Some(bingo_sdk::View::Text {
-                text: "a.rs".into()
-            })
-        );
+        assert_eq!(out.display, Some(bingo_sdk::View::text("a.rs")));
     }
 
     use super::*;

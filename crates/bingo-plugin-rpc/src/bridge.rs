@@ -324,10 +324,18 @@ impl Bridge {
         let Some(live) = self.ready().await else {
             return Vec::new();
         };
-        live.connection
+        let commands: Vec<Arc<dyn SdkCommand>> = live
+            .connection
             .commands()
             .iter()
             .map(|spec| {
+                if spec.hidden
+                    && spec.name == format!("{}:ui", self.name)
+                    && live.connection.permits("callback/run")
+                {
+                    return Arc::new(crate::command::UiCommand(self.name.clone()))
+                        as Arc<dyn SdkCommand>;
+                }
                 Arc::new(PluginCommand::new(
                     &self.name,
                     spec.clone(),
@@ -340,7 +348,8 @@ impl Bridge {
                         .unwrap_or(deadline::COMMAND_RUN),
                 )) as Arc<dyn SdkCommand>
             })
-            .collect()
+            .collect();
+        commands
     }
 
     /// The contributors of a living process, and nothing when there is none.

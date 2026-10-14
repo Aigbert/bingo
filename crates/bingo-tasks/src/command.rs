@@ -20,6 +20,7 @@ pub struct TasksCommand;
 impl Command for TasksCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "tasks".into(),
             aliases: Vec::new(),
             hint: "the tasks of this session, or of a room's board".into(),
@@ -38,9 +39,7 @@ impl Command for TasksCommand {
         let tasks = journal::read(&cx.host, &board.session).await?;
         if tasks.is_empty() {
             return Ok(CommandOutcome::View {
-                view: View::Text {
-                    text: empty(&asked),
-                },
+                view: View::text(empty(&asked)),
             });
         }
         let here = board.present();
@@ -119,7 +118,7 @@ mod tests {
         assert_eq!(
             outcome,
             CommandOutcome::View {
-                view: View::Text { text: NONE.into() }
+                view: View::text(NONE)
             }
         );
     }
@@ -167,9 +166,7 @@ mod tests {
         assert_eq!(
             TasksCommand.run("in #design", &cx).await.expect("a line"),
             CommandOutcome::View {
-                view: View::Text {
-                    text: "no tasks on #design".into()
-                }
+                view: View::text("no tasks on #design")
             }
         );
         let error = TasksCommand

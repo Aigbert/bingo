@@ -51,6 +51,7 @@ impl PermissionCommand {
 impl Command for PermissionCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "permission".into(),
             aliases: vec!["permissions".into()],
             hint: "show or change the permission mode".into(),
@@ -69,9 +70,7 @@ impl Command for PermissionCommand {
         let asked = args.trim();
         if asked.is_empty() {
             return Ok(CommandOutcome::View {
-                view: View::Text {
-                    text: self.listing(&cx.session),
-                },
+                view: View::text(self.listing(&cx.session)),
             });
         }
         let mode: Mode = asked.parse().map_err(|unknown: crate::UnknownMode| {
@@ -236,11 +235,12 @@ mod tests {
         typed(&command, "plan", "ses_mine").await;
 
         let CommandOutcome::View {
-            view: View::Text { text },
+            view: View::Text { children, .. },
         } = typed(&command, "  ", "ses_mine").await
         else {
             panic!("a listing is a text view");
         };
+        let text = bingo_sdk::view::text_children(&children);
         assert!(
             text.starts_with("permission mode: plan\n"),
             "the session's own mode comes first: {text}"

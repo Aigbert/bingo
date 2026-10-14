@@ -9,9 +9,14 @@ mod catalog;
 mod choose;
 mod completion;
 mod interception;
+mod live;
+use live::Live;
 mod refresh;
 mod registry;
+mod render;
+mod render_queue;
 mod resume;
+mod throttle;
 mod tool_host;
 mod tree;
 mod unavailable;
@@ -111,28 +116,6 @@ pub struct Host {
     /// this one's own refresh (ADR-0026 §4).
     served: Arc<ServedModels>,
     weak: Weak<Host>,
-}
-
-#[derive(Clone)]
-struct Live {
-    mailbox: Mailbox,
-    changing: Arc<tokio::sync::Mutex<()>>,
-    created_at: Timestamp,
-    /// What the session was opened with, resolved: `/model` and `/think`
-    /// rewrite it (ADR-0008 §4, ADR-0047 §1), and it is the one holder of
-    /// the provider, the model and the level the next turn runs on.
-    spec: SessionSpec,
-}
-
-impl Live {
-    fn new(mailbox: Mailbox, summary: &SessionSummary, spec: SessionSpec) -> Self {
-        Self {
-            mailbox,
-            changing: Arc::new(tokio::sync::Mutex::new(())),
-            created_at: summary.created_at,
-            spec,
-        }
-    }
 }
 
 /// A knob moved, written into the spec that holds it.
@@ -828,6 +811,21 @@ impl HostApi for Host {
             .await?
             .extend(plugin.to_string(), kind.to_string(), payload);
         Ok(())
+    }
+
+    async fn render(
+        &self,
+        session: &SessionId,
+        request: bingo_sdk::render::RenderRequest,
+    ) -> Result<View, KernelError> {
+        render::render(self, session, request).await
+    }
+    async fn invalidate(
+        &self,
+        session: &SessionId,
+        requests: Vec<String>,
+    ) -> Result<(), KernelError> {
+        render::invalidate(self, session, requests).await
     }
 
     async fn signal(

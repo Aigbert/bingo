@@ -73,9 +73,22 @@ impl Interceptor for Link {
             cx: cx.clone(),
             tier: next.tier(),
             hooks,
+            reads: Default::default(),
+            generation: ItemId::mint().to_string(),
             kernel: Arc::new(Mutex::new(Some(next))),
         };
-        chain.at(0, input).await
+        let request = (entry == catalogue::UI_RENDER)
+            .then(|| input["requestId"].as_str().map(str::to_string))
+            .flatten();
+        let result = chain.at(0, input).await;
+        if let Some(request) = request {
+            self.0
+                .store
+                .subscribe(&cx.host, cx.session.clone(), request, chain.reads.entries())
+                .await
+                .map_err(|error| failed(error.message))?;
+        }
+        result
     }
     async fn observe(&self, entry: &catalogue::Entry, cx: &HookContext, input: &Value) {
         if let Err(error) = self

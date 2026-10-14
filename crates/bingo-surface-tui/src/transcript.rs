@@ -1065,6 +1065,7 @@ mod tests {
 
     fn catalogue() -> Vec<CommandSpec> {
         vec![CommandSpec {
+            hidden: false,
             name: "guide".into(),
             aliases: Vec::new(),
             hint: String::new(),

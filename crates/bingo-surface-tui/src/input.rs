@@ -53,6 +53,7 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
         return effects;
     }
     match owner {
+        crate::focus::Owner::Pane => crate::pane::key(ui, tree.viewed(), key),
         crate::focus::Owner::Select => selecting(ui, tree, key, now),
         crate::focus::Owner::Search => searching(ui, key, now),
         crate::focus::Owner::Layer => {
@@ -1037,6 +1038,7 @@ mod tests {
             // The spec `bingo-checkpoints` registers (ADR-0045 §3): a
             // surface offers what the catalogue says is there.
             vec![bingo_sdk::CommandSpec {
+                hidden: false,
                 name: "rewind".into(),
                 aliases: Vec::new(),
                 hint: "go back to a turn: its files and the conversation".into(),
@@ -3446,7 +3448,7 @@ mod tests {
     #[test]
     fn a_view_block_is_dismissed_by_the_next_key() {
         let (mut ui, now) = scene();
-        ui.block = Some(bingo_sdk::View::Text { text: "x".into() });
+        ui.block = Some(bingo_sdk::View::text("x"));
         press(&mut ui, &state(), key(KeyCode::Left), now);
         assert!(ui.block.is_none());
     }
@@ -3602,6 +3604,7 @@ mod tests {
     fn tab_completes_before_it_queues_and_queues_only_while_a_turn_runs() {
         let (mut ui, now) = scene();
         ui.catalogs.commands = vec![bingo_sdk::CommandSpec {
+            hidden: false,
             name: "compact".into(),
             aliases: vec![],
             hint: String::new(),

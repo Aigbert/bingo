@@ -72,6 +72,7 @@ pub struct Operations<'a> {
 impl Operations<'_> {
     pub async fn answer(&self, method: &str, params: Value) -> Result<Value, RpcError> {
         match method {
+            "host/ui/invalidate" => self.invalidate(parse(params)?).await,
             "host/place" => self.place(parse(params)?).await,
             "host/extend" => self.extend(parse(params)?).await,
             "host/deliver" => self.deliver(parse(params)?).await,
@@ -84,6 +85,14 @@ impl Operations<'_> {
             )),
         }
     }
+    async fn invalidate(&self, params: bingo_sdk::render::Invalidate) -> Result<Value, RpcError> {
+        self.host
+            .invalidate(&params.session, params.requests)
+            .await
+            .map_err(failed)?;
+        Ok(Value::Null)
+    }
+
     async fn complete(&self, params: Complete) -> Result<Value, RpcError> {
         let events = self
             .host
@@ -114,12 +123,19 @@ impl Operations<'_> {
         serde_json::to_value(value).map_err(failed)
     }
     async fn set(&self, params: StateSet) -> Result<Value, RpcError> {
-        serde_json::to_value(
-            self.state
-                .set(params.scope, params.key, params.value, params.if_version)
-                .await?,
-        )
-        .map_err(failed)
+        let value = self
+            .state
+            .set(
+                params.scope.clone(),
+                params.key.clone(),
+                params.value,
+                params.if_version,
+            )
+            .await?;
+        self.state
+            .changed(self.host, &params.scope, &params.key)
+            .await?;
+        serde_json::to_value(value).map_err(failed)
     }
 
     async fn place(&self, params: Place) -> Result<Value, RpcError> {
@@ -190,4 +206,53 @@ pub fn error_message(error: RpcError) -> String {
         }
         _ => error.message,
     }
+}
+
+/// Both runtime commands enter the callback registry's current generation.
+pub async fn handler(
+    plugin: &str,
+    args: &str,
+    cx: &bingo_sdk::CommandContext,
+) -> Result<bingo_sdk::CommandOutcome, bingo_sdk::KernelError> {
+    use bingo_sdk::*;
+    let input: Value = serde_json::from_str(args)
+        .map_err(|error| KernelError::new(ErrorCode::InvalidInput, error.to_string()))?;
+    let registry = cx
+        .host
+        .service(&crate::callback::KEY)
+        .ok_or_else(|| KernelError::new(ErrorCode::Internal, "callback registry is unavailable"))?;
+    let context = HookContext {
+        session: cx.session.clone(),
+        turn: None,
+        item: None,
+        cwd: cx.cwd.clone(),
+        provider: None,
+        model: None,
+        host: cx.host.clone(),
+    };
+    let result = tokio::select! {
+        biased;
+        _ = cx.cancel.cancelled() => return Ok(CommandOutcome::Applied {message:None}),
+        result = async {
+            let executor = registry.prepared(plugin).await?;
+            executor.call("__ui__", input, &context).await
+        } => result,
+    };
+    let notice = match result {
+        Ok(value) if value["stale"].as_bool() == Some(true) => {
+            Some("This control belongs to an earlier drawing; try the current one.".to_string())
+        }
+        Ok(_) => None,
+        Err(error) => Some(error),
+    };
+    Ok(match notice {
+        Some(text) => CommandOutcome::Record {
+            body: ItemBody::Notice {
+                level: Level::Warn,
+                code: "UI_HANDLER".into(),
+                text: format!("{plugin}: {text}"),
+            },
+        },
+        None => CommandOutcome::Applied { message: None },
+    })
 }

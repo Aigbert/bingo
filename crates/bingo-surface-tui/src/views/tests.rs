@@ -95,19 +95,17 @@ fn tree() -> View {
 }
 
 fn columns() -> View {
-    View::Columns {
-        children: vec![
-            View::KeyValue {
-                rows: vec![
-                    ("model".into(), "gpt-5.4".into()),
-                    ("rounds".into(), "12".into()),
-                ],
-            },
-            View::List {
-                items: vec!["one".into(), "two".into(), "three".into()],
-            },
-        ],
-    }
+    View::columns(vec![
+        View::KeyValue {
+            rows: vec![
+                ("model".into(), "gpt-5.4".into()),
+                ("rounds".into(), "12".into()),
+            ],
+        },
+        View::List {
+            items: vec!["one".into(), "two".into(), "three".into()],
+        },
+    ])
 }
 
 /// Every node, once. The match is exhaustive on purpose.
@@ -123,11 +121,23 @@ fn named(view: &View) -> &'static str {
         View::Progress { .. } => "progress",
         View::Badge { .. } => "badge",
         View::Tree { .. } => "tree",
-        View::Stack { .. } => "stack",
-        View::Columns { .. } => "columns",
+        View::Box { layout, .. }
+            if layout.flex_direction == Some(bingo_sdk::view::Direction::Row) =>
+        {
+            "columns"
+        }
+        View::Box { .. } => "stack",
         View::Panel { .. } => "panel",
         View::Actions { .. } => "actions",
         View::Custom { .. } => "custom",
+        View::Button { .. } => "button",
+        View::Input { .. } => "input",
+        View::Select { .. } => "select",
+        View::Link { .. } => "link",
+        View::Image { .. } => "image",
+        View::Raster { .. } => "raster",
+        View::Svg { .. } => "svg",
+        View::Engine { .. } => "engine",
     }
 }
 
@@ -146,10 +156,11 @@ fn every_node() -> Vec<View> {
         View::text("what a plugin wrote"),
         View::Markdown {
             text: "# Title\n\nbody with **weight** and a [link](https://x.dev)".into(),
+            dim_color: false,
         },
         View::Code {
-            lang: Some("rust".into()),
-            text: (1..=10)
+            language: Some("rust".into()),
+            source: (1..=10)
                 .map(|i| format!("let line_{i} = {i};\n"))
                 .collect::<String>(),
         },
@@ -177,9 +188,7 @@ fn every_node() -> Vec<View> {
             tone: Tone::Attention,
         },
         tree(),
-        View::Stack {
-            children: vec![View::text("above"), View::text(""), table()],
-        },
+        View::column(vec![View::text("above"), View::text(""), table()]),
         columns(),
         View::Panel {
             title: "Board".into(),
@@ -294,4 +303,110 @@ fn a_fired_button_wears_the_mark_until_the_answer_comes_back() {
 fn buttons_that_do_not_fit_the_width_go_on_the_next_row() {
     let drawn = render(&actions(), 24);
     assert_eq!(drawn.len(), 2, "{drawn:?}");
+}
+
+#[test]
+fn canonical_elements_have_terminal_screens() {
+    use serde_json::json;
+    let cases = [
+        (
+            json!({"kind":"Box","padding":1,"borderStyle":"single","children":[{"kind":"Text","children":["inside"]}]}),
+            "inside",
+        ),
+        (json!({"kind":"Text","children":["styled"]}), "styled"),
+        (
+            json!({"kind":"Button","hotkey":"g","label":"Go","onPress":{"name":"counter:ui","args":{}}}),
+            "g Go",
+        ),
+        (
+            json!({"kind":"Input","label":"Name","value":"Ada"}),
+            "Name: Ada",
+        ),
+        (
+            json!({"kind":"Select","label":"Mode","value":"fast","options":[{"value":"fast","label":"Fast"}]}),
+            "Fast",
+        ),
+        (
+            json!({"kind":"Link","href":"https://example.test","label":"Example"}),
+            "Example",
+        ),
+        (
+            json!({"kind":"Image","source":"blob:missing","alt":"A cat"}),
+            "A cat",
+        ),
+        (
+            json!({"kind":"Raster","columns":2,"rows":1,"cells":["ab"]}),
+            "ab",
+        ),
+        (
+            json!({"kind":"Svg","source":"<svg/>","alt":"A circle"}),
+            "A circle",
+        ),
+        (json!({"kind":"Engine","component":"Pane","props":{}}), ""),
+        (
+            json!({"kind":"Code","source":"let x = 1;","language":"rust"}),
+            "let x = 1;",
+        ),
+        (
+            json!({"kind":"Markdown","text":"**weight**","dimColor":true}),
+            "weight",
+        ),
+    ];
+    for (wire, words) in cases {
+        let view: View = serde_json::from_value(wire).unwrap();
+        assert!(
+            screen(&view, 80).contains(words),
+            "{}: {words}",
+            named(&view)
+        );
+    }
+}
+
+#[test]
+fn text_children_keep_their_own_weight_in_the_backend() {
+    let view: View = serde_json::from_value(serde_json::json!({"kind":"Text","children":["a",{"kind":"Text","bold":true,"children":["b"]},"c"]})).unwrap();
+    let mut terminal = Terminal::new(TestBackend::new(3, 1)).unwrap();
+    terminal
+        .draw(|frame| frame.render_widget(Paragraph::new(render(&view, 3)), frame.area()))
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    assert_eq!(
+        buffer[(1, 0)].style(),
+        theme::as_drawn(buffer[(0, 0)].style().patch(theme::bold()))
+    );
+    assert_eq!(buffer[(0, 0)].style(), buffer[(2, 0)].style());
+}
+
+#[test]
+fn box_padding_and_hidden_children_affect_drawn_geometry() {
+    let view: View = serde_json::from_value(serde_json::json!({"kind":"Box","width":8,"padding":1,"children":[
+        {"kind":"Text","children":["body"]},{"kind":"Box","display":"none","children":[{"kind":"Text","children":["hidden"]}]}]})).unwrap();
+    let drawn = render(&view, 80);
+    assert_eq!(drawn.len(), 3);
+    assert_eq!(drawn[1].to_string(), " body   ");
+}
+
+#[test]
+fn fixed_boxes_distribute_space_on_their_main_axis() {
+    for (wire, expected) in [
+        (
+            serde_json::json!({"kind":"Box","width":3,"height":5,"justifyContent":"space-between","children":[{"kind":"Text","children":["a"]},{"kind":"Text","children":["b"]}]}),
+            vec!["a  ", "   ", "   ", "   ", "b  "],
+        ),
+        (
+            serde_json::json!({"kind":"Box","width":3,"height":5,"children":[{"kind":"Box","flexGrow":1,"children":[{"kind":"Text","children":["a"]}]},{"kind":"Text","children":["b"]}]}),
+            vec!["a  ", "   ", "   ", "   ", "b  "],
+        ),
+        (
+            serde_json::json!({"kind":"Box","width":3,"height":3,"flexDirection":"row","alignItems":"flex-end","children":[{"kind":"Text","children":["a"]}]}),
+            vec!["   ", "   ", "a  "],
+        ),
+    ] {
+        let view: View = serde_json::from_value(wire).unwrap();
+        let actual: Vec<_> = render(&view, 3)
+            .into_iter()
+            .map(|line| line.to_string())
+            .collect();
+        assert_eq!(actual, expected);
+    }
 }

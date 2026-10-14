@@ -36,6 +36,7 @@ pub fn local_specs() -> Vec<CommandSpec> {
     LOCAL
         .iter()
         .map(|(name, hint)| CommandSpec {
+            hidden: false,
             name: (*name).to_string(),
             aliases: if *name == "exit" {
                 vec!["quit".into()]
@@ -268,6 +269,7 @@ mod tests {
 
     fn spec(name: &str, args: ArgSpec) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: name.into(),
             aliases: Vec::new(),
             hint: format!("the {name} command"),

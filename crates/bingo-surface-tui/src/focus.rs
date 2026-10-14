@@ -15,6 +15,7 @@ pub enum Focus {
     Search(Search),
     Layer(Layer),
     Row(ItemId),
+    Pane(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,6 +27,7 @@ pub enum Owner {
     Layer,
     Row,
     Interaction,
+    Pane,
     Menu,
 }
 
@@ -46,6 +48,7 @@ fn resolve(focus: &Focus, interaction: bool, menu: bool) -> Owner {
         Focus::Layer(layer) if layer.showing() => Owner::Layer,
         Focus::Row(_) => Owner::Row,
         _ if interaction => Owner::Interaction,
+        Focus::Pane(_) => Owner::Pane,
         _ if menu => Owner::Menu,
         _ => Owner::Composer,
     }

@@ -4,6 +4,10 @@ use bingo_sdk::{Event, ItemBody};
 
 fn fixture_name(value: &Event) -> (&'static str, &'static str) {
     match value {
+        Event::Invalidated { .. } => (
+            "invalidated",
+            include_str!("../fixtures/record/event/invalidated.json"),
+        ),
         Event::Unknown { .. } => panic!("known fixture became opaque"),
         Event::SessionUpdated { .. } => (
             "sessionUpdated",

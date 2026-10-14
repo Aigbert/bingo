@@ -313,17 +313,21 @@ impl Layer {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct Placed {
+    pub panes: crate::pane::State,
+    pub pulled: crate::pulled::Memo,
+    pub toasts: crate::toast::State,
+}
+
 #[derive(Debug)]
 pub struct Ui {
+    pub placed: Placed,
     controls: controls::Controls,
     pub scroll: Scroll,
     pub notices: Vec<Notice>,
     /// A command's `View`, shown until the next key.
     pub block: Option<View>,
-    /// `ctrl+t` took the task list off the band (M74). The verb row keeps
-    /// the task being done either way: hiding the list is about rows, not
-    /// about what the turn is doing.
-    pub activity_hidden: bool,
     pub embers: crate::embers::Embers,
     /// How much of each block a person opened or shut, with `ctrl+o` or a
     /// click (§7). A block that is not in it wears its kind's own start
@@ -369,13 +373,17 @@ struct Files {
 }
 
 impl Ui {
+    pub fn sync_panes(&mut self, state: &bingo_sdk::SessionState) {
+        self.placed.panes.sync(state, &mut self.controls.focus);
+    }
+
     pub fn new(history: Vec<String>, _now: Instant) -> Self {
         Self {
             controls: controls::Controls::new(history),
+            placed: Placed::default(),
             scroll: Scroll::default(),
             notices: Vec::new(),
             block: None,
-            activity_hidden: false,
             embers: crate::embers::Embers::default(),
             folds: Folds::new(),
             focused: true,

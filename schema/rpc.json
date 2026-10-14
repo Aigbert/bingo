@@ -51,6 +51,15 @@
         "programmatic"
       ]
     },
+    "Align": {
+      "type": "string",
+      "enum": [
+        "flex-start",
+        "center",
+        "flex-end",
+        "stretch"
+      ]
+    },
     "Answer": {
       "oneOf": [
         {
@@ -463,6 +472,26 @@
         }
       ]
     },
+    "Component": {
+      "type": "string",
+      "enum": [
+        "Question",
+        "UserMessage",
+        "AssistantMessage",
+        "ToolUse",
+        "ToolResult",
+        "ToolGroup",
+        "ToolProgress",
+        "CommandOutput",
+        "Spinner",
+        "TurnDuration",
+        "InfoNotice",
+        "SessionMode",
+        "PromptHint",
+        "AbovePrompt",
+        "Pane"
+      ]
+    },
     "ConfigView": {
       "type": "object",
       "properties": {
@@ -675,6 +704,13 @@
           "const": "tail",
           "description": "Replace the progress tail of a running tool call."
         }
+      ]
+    },
+    "Direction": {
+      "type": "string",
+      "enum": [
+        "row",
+        "column"
       ]
     },
     "Driver": {
@@ -1280,6 +1316,26 @@
         {
           "type": "object",
           "properties": {
+            "requests": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "invalidated"
+            }
+          },
+          "required": [
+            "type",
+            "requests"
+          ],
+          "description": "Ephemeral. A plugin's live state (ADR-0013 §2): the latest payload per\n`(plugin, kind)` is the whole of it; `Null` removes it; none survives a resume."
+        },
+        {
+          "type": "object",
+          "properties": {
             "plugin": {
               "type": "string"
             },
@@ -1297,8 +1353,7 @@
             "plugin",
             "kind",
             "payload"
-          ],
-          "description": "Ephemeral. A plugin's live state (ADR-0013 §2): the latest payload per\n`(plugin, kind)` is the whole of it; `Null` removes it; none survives a resume."
+          ]
         },
         {
           "type": "object",
@@ -2690,6 +2745,17 @@
         "interrupted"
       ]
     },
+    "Justify": {
+      "type": "string",
+      "enum": [
+        "flex-start",
+        "center",
+        "flex-end",
+        "space-between",
+        "space-around",
+        "space-evenly"
+      ]
+    },
     "KernelError": {
       "type": "object",
       "properties": {
@@ -3377,6 +3443,35 @@
       ],
       "description": "A ref-aware RPC client sees either a token backed by a real immutable pin\nor an explicit resource-limit reason. The strict variants make generated\nZod validators reject both a token and a reason in one value."
     },
+    "RenderParams": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "component": {
+          "$ref": "#/$defs/Component"
+        },
+        "requestId": {
+          "type": "string"
+        },
+        "surface": {
+          "$ref": "#/$defs/SurfaceName"
+        },
+        "props": true,
+        "viewport": {
+          "$ref": "#/$defs/Viewport"
+        }
+      },
+      "required": [
+        "session",
+        "component",
+        "requestId",
+        "surface",
+        "props",
+        "viewport"
+      ]
+    },
     "ResolvedBy": {
       "oneOf": [
         {
@@ -3444,6 +3539,21 @@
         "max"
       ],
       "description": "A stream attempt failed and the turn is waiting to try again."
+    },
+    "SelectOption": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "value"
+      ]
     },
     "Seq": {
       "type": "integer",
@@ -3761,13 +3871,21 @@
           },
           "description": "Plugin-owned state, by plugin then kind: the latest `Extension`\npayload is the whole of that kind (ADR-0011 §2)."
         },
+        "invalidated": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "description": "Plugin-owned live state, by plugin then kind: the latest `Signal`\npayload, gone on `Null` and after a resume (ADR-0013 §2)."
+        },
         "signals": {
           "type": "object",
           "additionalProperties": {
             "type": "object",
             "additionalProperties": true
-          },
-          "description": "Plugin-owned live state, by plugin then kind: the latest `Signal`\npayload, gone on `Null` and after a resume (ADR-0013 §2)."
+          }
         }
       },
       "required": [
@@ -4004,6 +4122,25 @@
       ],
       "description": "A safe, bounded summary projection for workspace ownership checks and\nsidebar discovery. A missing key is *not* a keyless session when an\nomission names `key`; callers must direct-open by trusted id to classify."
     },
+    "SurfaceName": {
+      "type": "string",
+      "enum": [
+        "terminal",
+        "desktop",
+        "text"
+      ]
+    },
+    "TextChild": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/View"
+        }
+      ],
+      "description": "A text child preserves the style of its nested Text node."
+    },
     "Tone": {
       "oneOf": [
         {
@@ -4222,55 +4359,109 @@
         {
           "type": "object",
           "properties": {
-            "text": {
-              "type": "string"
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TextChild"
+              }
             },
-            "kind": {
-              "type": "string",
-              "const": "text"
-            }
-          },
-          "required": [
-            "kind",
-            "text"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "text": {
-              "type": "string"
-            },
-            "kind": {
-              "type": "string",
-              "const": "markdown"
-            }
-          },
-          "required": [
-            "kind",
-            "text"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "lang": {
+            "color": {
               "type": [
                 "string",
                 "null"
               ]
             },
-            "text": {
-              "type": "string"
+            "dimColor": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "bold": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "italic": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "underline": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "strikethrough": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "inverse": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "wrap": {
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "kind": {
               "type": "string",
-              "const": "code"
+              "const": "Text"
+            }
+          },
+          "required": [
+            "kind",
+            "children"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "dimColor": {
+              "type": "boolean"
+            },
+            "kind": {
+              "type": "string",
+              "const": "Markdown"
             }
           },
           "required": [
             "kind",
             "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "language": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "Code"
+            }
+          },
+          "required": [
+            "kind",
+            "source"
           ]
         },
         {
@@ -4380,8 +4571,7 @@
                 "null"
               ],
               "format": "uint64",
-              "minimum": 0,
-              "description": "Unbounded when absent: the surface shows activity, not a fraction."
+              "minimum": 0
             },
             "label": {
               "type": [
@@ -4447,28 +4637,163 @@
                 "$ref": "#/$defs/View"
               }
             },
-            "kind": {
-              "type": "string",
-              "const": "stack"
-            }
-          },
-          "required": [
-            "kind",
-            "children"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "children": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/View"
-              }
+            "key": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "flexDirection": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Direction"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "flexGrow": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "flexWrap": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Wrap"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "alignItems": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Align"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "justifyContent": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Justify"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "gap": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "width": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "height": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "margin": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "marginX": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "marginY": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "padding": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "paddingX": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "paddingY": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "borderStyle": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "borderColor": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "display": {
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "kind": {
               "type": "string",
-              "const": "columns"
+              "const": "Box"
             }
           },
           "required": [
@@ -4518,6 +4843,320 @@
         {
           "type": "object",
           "properties": {
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TextChild"
+              }
+            },
+            "key": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hotkey": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1,
+              "maxLength": 1
+            },
+            "dimColor": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "variant": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "onPress": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Action"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "Button"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "placeholder": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "onInput": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Action"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "onSubmit": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Action"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "Input"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "options": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "$ref": "#/$defs/SelectOption"
+              }
+            },
+            "onSelect": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Action"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "Select"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "Link"
+            }
+          },
+          "required": [
+            "kind",
+            "href"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "alt": {
+              "type": "string"
+            },
+            "columns": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "rows": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "kind": {
+              "type": "string",
+              "const": "Image"
+            }
+          },
+          "required": [
+            "kind",
+            "source",
+            "alt"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "columns": {
+              "type": "integer",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "rows": {
+              "type": "integer",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "cells": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "Raster"
+            }
+          },
+          "required": [
+            "kind",
+            "columns",
+            "rows",
+            "cells"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "alt": {
+              "type": "string"
+            },
+            "width": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "height": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "kind": {
+              "type": "string",
+              "const": "Svg"
+            }
+          },
+          "required": [
+            "kind",
+            "source",
+            "alt"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "$ref": "#/$defs/Component"
+            },
+            "props": true,
+            "kind": {
+              "type": "string",
+              "const": "Engine"
+            }
+          },
+          "required": [
+            "kind",
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
             "customKind": {
               "type": "string"
             },
@@ -4535,9 +5174,29 @@
             "customKind",
             "data",
             "fold"
-          ],
-          "description": "A word this sdk does not have (ADR-0038 §1): `kind` is the emitter's\nown name for the element, namespaced by its plugin (`demo.sparkline`),\n`data` is whatever shape that plugin documents, and `fold` is the text\nevery surface that has not learned the kind shows instead.\n\nIt is also where an unknown `kind` off the wire lands, and then `data`\nis the whole node as it arrived — nothing said is lost, whether or not\nthis sdk has the word for it."
+          ]
         }
+      ]
+    },
+    "Viewport": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "rows": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      },
+      "required": [
+        "columns",
+        "rows"
       ]
     },
     "Voice": {
@@ -4574,9 +5233,24 @@
         "checksum",
         "availability"
       ]
+    },
+    "Wrap": {
+      "type": "string",
+      "enum": [
+        "wrap",
+        "nowrap"
+      ]
     }
   },
   "methods": {
+    "ui/render": {
+      "params": {
+        "$ref": "#/$defs/RenderParams"
+      },
+      "result": {
+        "$ref": "#/$defs/View"
+      }
+    },
     "initialize": {
       "params": {
         "$ref": "#/$defs/InitializeParams"

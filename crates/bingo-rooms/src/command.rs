@@ -34,6 +34,7 @@ pub struct RoomCommand;
 impl Command for RoomCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "room".into(),
             aliases: Vec::new(),
             hint: "the rooms under this session, or open one".into(),
@@ -89,7 +90,7 @@ async fn list(cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
     let rooms = room::under(&cx.host, &cx.session).await?;
     if rooms.is_empty() {
         return Ok(CommandOutcome::View {
-            view: View::Text { text: NONE.into() },
+            view: View::text(NONE),
         });
     }
     let now = Timestamp::now();
@@ -222,7 +223,7 @@ mod tests {
         assert_eq!(
             typed(&fleet, &root, "").await,
             CommandOutcome::View {
-                view: View::Text { text: NONE.into() }
+                view: View::text(NONE)
             },
             "an agent under this session is not a room"
         );

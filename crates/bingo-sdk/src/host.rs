@@ -426,6 +426,21 @@ pub struct Completion {
 
 #[async_trait]
 pub trait HostApi: Send + Sync {
+    async fn render(
+        &self,
+        _session: &SessionId,
+        request: crate::render::RenderRequest,
+    ) -> Result<crate::View, KernelError> {
+        Ok(request.engine())
+    }
+    async fn invalidate(
+        &self,
+        _session: &SessionId,
+        _requests: Vec<String>,
+    ) -> Result<(), KernelError> {
+        Ok(())
+    }
+
     /// One side call, charged to the named turn or the session alone.
     async fn complete(
         &self,

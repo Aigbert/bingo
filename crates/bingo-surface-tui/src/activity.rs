@@ -58,7 +58,7 @@ pub fn next_change(tree: &Tree, ui: &Ui, now: Now) -> Option<std::time::Instant>
     let slots = bingo_sdk::slot::placed(tree.viewed());
     let views = slots.iter().filter_map(|placed| match &placed.slot {
         bingo_sdk::slot::Slot::Activity { view, .. } if !ui.activity_hidden => {
-            views::next_change(view, now)
+            view.view().and_then(|view| views::next_change(view, now))
         }
         _ => None,
     });
@@ -109,6 +109,10 @@ fn band(
     if !ui.activity_hidden {
         for placed in slots {
             if let bingo_sdk::slot::Slot::Activity { view, .. } = &placed.slot {
+                let Some(view) = ui.placed.pulled.view(view, tree.viewed(), width as u16) else {
+                    out.push(Line::from(theme::ellipsis()));
+                    continue;
+                };
                 let view = match (running, view) {
                     (true, bingo_sdk::View::Panel { child, .. }) => child,
                     _ => view,
@@ -133,7 +137,7 @@ fn activity_view(view: &bingo_sdk::View, width: usize, now: Now) -> Vec<Line<'st
             out.extend(activity_view(child, width, now));
             out
         }
-        View::Stack { children } => children
+        View::Box { children, .. } => children
             .iter()
             .flat_map(|v| activity_view(v, width, now))
             .collect(),
@@ -141,7 +145,10 @@ fn activity_view(view: &bingo_sdk::View, width: usize, now: Now) -> Vec<Line<'st
             .iter()
             .map(|node| activity_node(node, width))
             .collect(),
-        View::Text { text } => vec![Line::from(Span::styled(text.clone(), theme::dim()))],
+        View::Text { children, .. } => vec![Line::from(Span::styled(
+            bingo_sdk::view::text_children(children),
+            theme::dim(),
+        ))],
         _ => views::marked(view, width, &views::Marks::at(now)),
     }
 }

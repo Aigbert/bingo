@@ -8,6 +8,32 @@ use serde_json::Value;
 use crate::{ActionItem, ItemId, SessionState, Tone, View};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum Shown {
+    Pull {
+        request: crate::render::RenderRequest,
+    },
+    View(View),
+}
+impl From<View> for Shown {
+    fn from(view: View) -> Self {
+        Self::View(view)
+    }
+}
+impl Shown {
+    pub fn view(&self) -> Option<&View> {
+        match self {
+            Self::View(view) => Some(view),
+            Self::Pull { .. } => None,
+        }
+    }
+    pub fn published_ok(&self) -> bool {
+        self.view()
+            .is_none_or(|view| crate::view::published_ok(view).is_ok())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Slot {
     Status {
@@ -18,15 +44,33 @@ pub enum Slot {
     },
     Activity {
         verb: Option<String>,
-        view: View,
+        view: Shown,
     },
     Rail {
         title: String,
-        view: View,
+        view: Shown,
     },
     Panel {
         title: String,
-        view: View,
+        view: Shown,
+    },
+    Pane {
+        id: String,
+        title: String,
+        focus: bool,
+        #[serde(rename = "closeOnEscape")]
+        close_on_escape: bool,
+        #[serde(rename = "holdToasts")]
+        hold_toasts: bool,
+        asked: bool,
+        rows: u16,
+        view: Shown,
+    },
+    Toast {
+        text: String,
+        #[schemars(with = "String")]
+        until: Timestamp,
+        alert: bool,
     },
     Mode {
         current: String,
@@ -45,6 +89,21 @@ pub enum Slot {
     },
 }
 
+impl Slot {
+    pub fn published_ok(&self) -> bool {
+        match self {
+            Self::Activity { view, .. }
+            | Self::Rail { view, .. }
+            | Self::Panel { view, .. }
+            | Self::Pane { view, .. } => view.published_ok(),
+            Self::Row { body, .. } => body
+                .as_ref()
+                .is_none_or(|view| crate::view::published_ok(view).is_ok()),
+            _ => true,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Placed {
     pub plugin: String,
@@ -58,6 +117,7 @@ pub fn with(mut payload: Value, slots: impl IntoIterator<Item = Slot>) -> Value 
     if let Some(object) = payload.as_object_mut() {
         let slots = slots
             .into_iter()
+            .filter(Slot::published_ok)
             .filter_map(|slot| serde_json::to_value(slot).ok())
             .collect();
         object.insert("slots".into(), Value::Array(slots));
@@ -95,8 +155,9 @@ pub fn placed(state: &SessionState) -> Vec<Placed> {
                 .into_iter()
                 .flatten()
                 .filter_map(move |value| {
-                    serde_json::from_value(value.clone())
+                    serde_json::from_value::<Slot>(value.clone())
                         .ok()
+                        .filter(Slot::published_ok)
                         .map(|slot| Placed {
                             plugin: plugin.into(),
                             kind: kind.into(),
@@ -130,7 +191,16 @@ mod tests {
     #[test]
     fn slot_variants_round_trip_the_golden_json() {
         let json: Value = serde_json::from_str(include_str!("../fixtures/slots/all.json")).unwrap();
-        assert_eq!(serde_json::to_value(slots()).unwrap(), json);
+        let generated = serde_json::to_value(slots()).unwrap();
+        if std::env::var_os("BINGO_UPDATE_SCHEMA").is_some() {
+            std::fs::write(
+                concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/slots/all.json"),
+                format!("{}\n", serde_json::to_string_pretty(&generated).unwrap()),
+            )
+            .unwrap();
+        } else {
+            assert_eq!(generated, json);
+        }
         assert_eq!(slots().len(), 7);
     }
 
@@ -210,5 +280,23 @@ mod tests {
             [("a", ""), ("a", "b"), ("a", "z"), ("z", "a")]
                 .map(|(p, k)| (p.to_owned(), k.to_owned()))
         );
+    }
+}
+
+#[cfg(test)]
+mod pull_contract {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn pulled_panes_and_toasts_round_trip() {
+        for wire in [
+            json!({"kind":"pane","id":"counter","title":"Count","focus":true,"closeOnEscape":true,
+                "holdToasts":true,"asked":true,"rows":8,"view":{"request":{"component":"Pane",
+                "requestId":"counter","surface":"terminal","props":{},"viewport":{"columns":80,"rows":8}}}}),
+            json!({"kind":"toast","text":"Saved","until":"2026-10-14T12:00:00Z","alert":false}),
+        ] {
+            let slot: Slot = serde_json::from_value(wire.clone()).unwrap();
+            assert_eq!(serde_json::to_value(slot).unwrap(), wire);
+        }
     }
 }

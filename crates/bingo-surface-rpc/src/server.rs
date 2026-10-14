@@ -246,6 +246,7 @@ impl Server {
             name::SESSION_DELETE => self.delete(params).await,
             name::SESSION_DELIVER => self.deliver(params).await,
             name::SESSION_EXTEND => self.extend(params).await,
+            name::UI_RENDER => self.render(params).await,
             name::SESSION_SIGNAL => self.signal(params).await,
             name::SESSION_HISTORY => self.history(params, id).await,
             name::SESSION_ITEM_PART => self.item_part(params, id),
@@ -395,6 +396,16 @@ impl Server {
             .await
             .map_err(crate::codec::from_kernel)?;
         Reply::empty()
+    }
+
+    async fn render(&self, params: Value) -> Result<Reply, RpcError> {
+        let params: crate::methods::RenderParams = parse(params)?;
+        let view = self
+            .host
+            .render(&params.session, params.request)
+            .await
+            .map_err(crate::codec::from_kernel)?;
+        Reply::of(&view)
     }
 
     async fn signal(&mut self, params: Value) -> Result<Reply, RpcError> {

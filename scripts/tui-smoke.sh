@@ -382,4 +382,28 @@ for size in '80 24' '120 40' '200 50'; do
   step "${width}x${height}: board Tick/Reset and Activity ok; ctrl+p unbound"
 done
 
+mkdir -p "$WORK/home/.bingo/plugins/counter"
+cp "$ROOT/crates/bingo/tests/fixtures/mods/counter/"{plugin.json,main.ts} "$WORK/home/.bingo/plugins/counter/"
+for width in 80 200; do
+  tmux -L "$SOCKET" resize-window -t "$SESSION" -x "$width" -y 24
+  step "pulled counter at ${width}x24"
+  start '{"responses":[{"steps":[{"text":"Ready."}]}]}' 'BINGO_MOTION=off'
+  keys '/counter' Enter
+  await 'Count: 0'
+  keys 'i'
+  await 'Count: 1'
+  keys Tab
+  keys 'Ada'
+  await 'Name: Ada'
+  keys Escape
+  vanish 'Count: 1'
+  keys '/counter' Enter
+  await 'Count: 1'
+  await 'Name: Ada'
+  keys Escape
+  vanish 'Count: 1'
+  finish
+  step "${width}x24: Counter 0→1; Input Ada persisted; Escape closed"
+done
+
 echo 'tui-smoke ok'

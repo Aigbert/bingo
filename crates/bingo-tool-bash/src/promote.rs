@@ -139,6 +139,7 @@ impl PromoteCommand {
 impl Command for PromoteCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: ACTION.into(),
             aliases: Vec::new(),
             hint: "background the running shell command".into(),

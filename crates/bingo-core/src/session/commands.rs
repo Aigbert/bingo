@@ -62,6 +62,14 @@ pub(super) fn may_run_shell(input: &Input) -> bool {
     }
 }
 
+pub(super) fn asked(input: &Input) -> bool {
+    invocation::current().is_empty()
+        && match input {
+            Input::Text { origin, .. } => crate::context::the_persons_own(origin),
+            Input::Action { .. } => true,
+        }
+}
+
 /// What a name nothing answers to is refused with. A `!` that found nothing
 /// is not a misspelling: the shell a bang line runs in is a plugin's, and a
 /// host that registered none has no shell at all rather than a typo.
@@ -188,6 +196,7 @@ pub(super) struct Run {
     pub args: String,
     /// A non-instant run, which the queue waits behind.
     pub holds: bool,
+    pub asked: bool,
 }
 
 /// The table and the runs in flight.
@@ -278,6 +287,7 @@ impl Commands {
             command,
             args,
             holds,
+            asked,
         } = run;
         self.inflight.insert(
             intent.clone(),
@@ -294,7 +304,8 @@ impl Commands {
             let report = crate::chain::Report::default();
             let work =
                 crate::chain::command::run(command, args, &cx, &hooks, &hook_cx, report.clone());
-            let future = AssertUnwindSafe(work).catch_unwind();
+            let future =
+                AssertUnwindSafe(bingo_sdk::render::under_input(asked, work)).catch_unwind();
             let returned = super::running::supervised(future, &cancel).await;
             let outcome = match returned {
                 _ if cancel.is_cancelled() => Err(interrupted()),

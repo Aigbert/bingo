@@ -21,6 +21,7 @@ pub struct AgentsCommand;
 impl Command for AgentsCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            hidden: false,
             name: "agents".into(),
             aliases: Vec::new(),
             hint: "the sub-agents this session started, or stop or dismiss one".into(),

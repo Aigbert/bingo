@@ -131,6 +131,7 @@ mod tests {
         assert_eq!(schema["protocol"], 2);
         for method in [
             "host/place",
+            "host/ui/invalidate",
             "host/extend",
             "host/deliver",
             "host/state/get",
@@ -244,19 +245,13 @@ mod tests {
                 std::fs::create_dir_all(parent).expect("the schema directory");
             }
             std::fs::write(&path, rendered()).expect("the schema is writable");
-            // M137's authorized pre-release amendment changes only the manifest.
             let mut baseline = frozen();
-            if baseline["$defs"]["Manifest"]["required"]
-                .as_array()
-                .is_some_and(|fields| fields.contains(&json!("entry")))
-            {
-                baseline["$defs"]["Manifest"] = document()["$defs"]["Manifest"].clone();
-                std::fs::write(
-                    path.with_file_name("plugin-2.json"),
-                    format!("{}\n", serde_json::to_string_pretty(&baseline).unwrap()),
-                )
-                .expect("the unreleased baseline is writable");
-            }
+            amend_elements(&mut baseline, &document());
+            std::fs::write(
+                path.with_file_name("plugin-2.json"),
+                format!("{}\n", serde_json::to_string_pretty(&baseline).unwrap()),
+            )
+            .expect("the authorized pre-release baseline is writable");
             return;
         }
         let committed = std::fs::read_to_string(&path).unwrap_or_default();
@@ -265,6 +260,32 @@ mod tests {
             rendered(),
             "schema/plugin.json is out of date: run BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc"
         );
+    }
+
+    // The person's M140 amendment is restricted to these roots and new referenced types.
+    fn amend_elements(baseline: &mut Value, current: &Value) {
+        for name in ["View", "Slot", "Component"] {
+            baseline["$defs"][name] = current["$defs"][name].clone();
+        }
+        if let Some(method) = current["methods"].get("host/ui/invalidate") {
+            baseline["methods"]["host/ui/invalidate"] = method.clone();
+        }
+        loop {
+            let mut refs = Vec::new();
+            references(baseline, &mut refs);
+            let missing: Vec<_> = refs
+                .into_iter()
+                .filter_map(|name| name.strip_prefix("#/$defs/").map(str::to_owned))
+                .filter(|name| baseline["$defs"].get(name).is_none())
+                .collect();
+            if missing.is_empty() {
+                break;
+            }
+            for name in missing {
+                assert!(current["$defs"].get(&name).is_some(), "missing {name}");
+                baseline["$defs"][&name] = current["$defs"][&name].clone();
+            }
+        }
     }
 
     fn keys(table: &Value) -> Vec<String> {

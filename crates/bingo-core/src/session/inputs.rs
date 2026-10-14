@@ -55,7 +55,8 @@ impl Actor {
             return self.enqueue(intent, input).await;
         }
         let invocation = commands::Invocation::of(&input, &parsed);
-        self.run_command(intent, invocation, command, parsed.args, !instant)
+        let asked = commands::asked(&input);
+        self.run_command(intent, invocation, command, parsed.args, !instant, asked)
             .await?;
         Ok(())
     }
@@ -67,6 +68,7 @@ impl Actor {
         command: Arc<dyn Command>,
         args: String,
         holds: bool,
+        asked: bool,
     ) -> Result<(), KernelError> {
         let hook_cx = self.hook_context();
         let spawned = self.commands.spawn(
@@ -76,6 +78,7 @@ impl Actor {
                 command,
                 args,
                 holds,
+                asked,
             },
             self.config.hooks.clone(),
             hook_cx,

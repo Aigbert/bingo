@@ -78,6 +78,20 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn ui_render_is_an_additive_protocol_one_method() {
+        let schema = document();
+        assert_eq!(schema["protocol"], 1);
+        assert_eq!(
+            schema["methods"]["ui/render"]["params"]["$ref"],
+            "#/$defs/RenderParams"
+        );
+        assert_eq!(
+            schema["methods"]["ui/render"]["result"]["$ref"],
+            "#/$defs/View"
+        );
+    }
+
     fn committed() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schema/rpc.json")
     }

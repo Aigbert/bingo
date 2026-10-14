@@ -178,6 +178,9 @@ pub enum Event {
     },
     /// Ephemeral. A plugin's live state (ADR-0013 §2): the latest payload per
     /// `(plugin, kind)` is the whole of it; `Null` removes it; none survives a resume.
+    Invalidated {
+        requests: Vec<String>,
+    },
     Signal {
         plugin: String,
         kind: String,
@@ -205,6 +208,7 @@ impl Event {
             self,
             Event::ItemDelta { .. }
                 | Event::Notice { .. }
+                | Event::Invalidated { .. }
                 | Event::Signal { .. }
                 | Event::Lagged { .. }
         )

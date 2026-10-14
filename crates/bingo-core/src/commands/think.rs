@@ -39,9 +39,7 @@ impl Command for ThinkCommand {
 fn report(host: &Host, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
     let level = host.session_thinking(&cx.session)?;
     Ok(CommandOutcome::View {
-        view: View::Text {
-            text: format!("{}\nusage: /think {}", said(level), levels()),
-        },
+        view: View::text(format!("{}\nusage: /think {}", said(level), levels())),
     })
 }
 

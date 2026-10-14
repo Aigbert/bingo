@@ -70,6 +70,13 @@ pub(super) async fn catalogue_answer(
     {
         protect_grants(host, catalog).await;
     }
+    if kind == CatalogKind::Commands
+        && let Ok(catalog) = &mut result
+    {
+        catalog
+            .entries
+            .retain(|entry| entry.meta["hidden"].as_bool() != Some(true));
+    }
     for notice in report.take() {
         if let ItemBody::Notice { level, code, text } = notice {
             let _ = host.notice(level, &code, &text).await;
