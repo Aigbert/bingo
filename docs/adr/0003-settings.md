@@ -33,3 +33,7 @@ Users edit settings by hand and hosts generate them; the format is consumed inde
 ADR-0058 (2026-09-15), in part: §1's file names and format, and §5's refusal of a commented file for writing.
 
 Amended 2026-10-14 by ADR-0069 §5–6 (M126): §2 resolves picture cache days in `KernelSettings` through the deep merge, including both accepted spellings. Under §4 the bin uses static manifest claims and that same merge for composition; plugins read their claimed slices at registration, and surfaces receive their own typed options.
+
+*2026-10-15, M164: ADR-0085 §§1–4 amend choice persistence and model
+facts. `/model` and `/think` are session-only unless `--keep` is given;
+the snapshot also retains prices and output modalities.*

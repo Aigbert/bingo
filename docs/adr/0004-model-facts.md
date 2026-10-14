@@ -26,3 +26,7 @@ A turn needs six facts about the model it talks to: context window, output budge
 —
 
 *2026-10-13, M109: removed the stale key count in §4; ADR-0003 §2 owns the list.*
+
+*2026-10-15, M164: ADR-0085 §§1–4 amend choice persistence and model
+facts. `/model` and `/think` are session-only unless `--keep` is given;
+the snapshot also retains prices and output modalities.*

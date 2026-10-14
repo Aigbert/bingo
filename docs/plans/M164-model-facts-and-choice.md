@@ -55,17 +55,14 @@ settings key.
 ## Decisions
 
 - The SDK cannot read kernel-owned reasoning metadata. `Provider::efforts`
-  defaults to all levels; the catalogue applies the reasoning gate and omits
-  efforts for unknown facts. This preserves ADR-0004's ownership boundary.
-- Anthropic currently maps five distinct values, including `xhigh`, rather
-  than the ADR's four. List the existing five; do not alter request encoding
-  or cache behavior to fit a stale count.
+  defaults to all levels; the catalogue gates known reasoning facts (ADR-0004).
+- Anthropic maps five distinct values, including `xhigh`, rather than the
+  ADR's four. List those five without altering request encoding or caching.
 - Invocation-specific `Command::is_instant` defaults to the static spec.
   Model choice resolves its target against the supplied session state before
   admission; the actor rechecks queued commands when dispatching them.
 - `--keep` persists only the command's own keys (model/provider or thinking),
   as the exit criteria require; it never overwrites an unrelated choice.
-
 - Pin order is represented by stable catalogue ordering (pins first). Unknown
   snapshot ids omit unavailable facts, but an explicitly pinned offered id
   still reports its known pin state. Stale pins can always be removed.
@@ -77,11 +74,11 @@ settings key.
   not rerun contributors: snapshot refresh and cached baselines stay lazy.
 - A compaction that cannot get below the target trigger refuses the switch;
   a same-model choice never compacts solely because of this command.
-- The workspace gate exposed an existing CLI helper that assumed the first
-  multiplexed frame was the root. Select the print prompt's session instead;
-  a resumed child's reminder may arrive first. Keep this test fix separate.
+- The CLI helper must find the print prompt's session: a resumed child can
+  emit the first multiplexed frame. Keep this gate-exposed test fix separate.
+- `cargo deny` exposed RUSTSEC-2026-0346 through 0349 in rustls 0.23.45.
+  Update only that existing lockfile package to 0.23.46; add no dependency.
 - `docs/guide/` did not exist; add `docs/guide/models.md` as the model page.
-
 - Full upstream regeneration also changed existing request capabilities and
   dropped ids. Use `models_dev.sh --preserve-capabilities` to enrich this
   snapshot while retaining every old limit, reasoning flag and input modality.
@@ -90,8 +87,7 @@ settings key.
 ## Files
 
 - `scripts/models_dev.sh`, `crates/bingo-core/models.dev.json`,
-  `crates/bingo-core/src/models/{catalog.rs,mod.rs}`, new
-  `models/alias.rs`.
+  `crates/bingo-core/src/models.rs`, `models/{catalog,resolve,alias}.rs`.
 - `crates/bingo-sdk/src/{provider,command}.rs`; `crates/bingo-provider-anthropic/
   src/request.rs`, `crates/bingo-provider-openai/src/` request mapping.
 - `crates/bingo-core/src/host/{catalog,model_switch,pins}.rs`, `settings.rs`,
@@ -101,17 +97,18 @@ settings key.
 
 ## Exit criteria
 
-- [ ] Snapshot parse, alias table, efforts per provider, meta key-set
+- [x] Snapshot parse, alias table, efforts per provider, meta key-set
       tests pass.
-- [ ] `/model x` leaves the user settings file byte-identical;
+- [x] `/model x` leaves the user settings file byte-identical;
       `/model x --keep` writes exactly `provider` and `model`
       (black-box, temp HOME).
-- [ ] Pin / unpin round-trip in a TOML layer with comments preserved.
-- [ ] Compact-before-switch and pictures line tested with the fake
+- [x] Pin / unpin round-trip in a TOML layer with comments preserved.
+- [x] Compact-before-switch and pictures line tested with the fake
       provider; the instant path stays instant.
-- [ ] `scripts/budget.sh` run after the snapshot grows; size recorded.
-- [ ] Gates: fmt, check, clippy -D warnings, test, check_discipline,
-      budget, cargo deny, Windows check of the touched crates.
+- [x] `scripts/budget.sh` run after the snapshot grows; size recorded.
+- [x] Native gates: fmt, check, clippy -D warnings, test, discipline, budget, deny.
+- [ ] TUI smoke: both runs stop at counter input `Name: Ad`, expected `Name: Ada`.
+- [ ] Windows: three crates pass; four have permitted C-toolchain deferrals below.
 
 ## Non-goals
 
@@ -120,11 +117,33 @@ endpoint; per-session pins; aliases across providers.
 
 ## Risks
 
-- models.dev may lack `cost` for some ids: absent means unknown, never
-  zero.
-- The embedding rule must not hide a chat model; prefer showing a
-  non-chat id over hiding a chat one, and test the snapshot's
+- models.dev may lack `cost`: absent means unknown, never zero.
+- Prefer showing a non-chat id over hiding a chat model; test the snapshot's
   embedding ids by name.
 - Compacting before a switch spends a model call on the current
   provider; if that provider is down, refuse the switch with the reason
   rather than switch into an overflow.
+
+## Verified — 2026-10-15
+
+Sequential gates; offline model fixtures. Snapshot: 12 providers, 287 models, 119135 bytes (+50937); every previous limit/reasoning/input capability retained.
+
+```text
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked => 185 passed
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-mods --locked => 332 passed, 2 ignored
+cargo fmt --all -- --check => exit 0
+cargo check --workspace --all-targets --locked => exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings => exit 0
+cargo test --workspace --locked => 5509 passed; 5 ignored; 163 groups
+bash scripts/check_discipline.sh => discipline ok (advisory warnings)
+bash scripts/budget.sh => dependencies 411; warm core 0s; isolation 0; budget ok
+cargo deny check => advisories ok, bans ok, licenses ok, sources ok
+bash scripts/tui-smoke.sh => exit 1 twice: timed out waiting for: Name: Ada
+cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc:
+  bingo-sdk, bingo-core, bingo-surface-rpc => exit 0
+  bingo-provider-anthropic, bingo-provider-openai, bingo-surface-tui => exit 101: aws-lc-sys
+  bingo => exit 101: rquickjs-sys and aws-lc-sys; Windows C headers/toolchain absent
+```
+Budget's 12 GB build-directory soft warning is addressed by final `cargo clean`.
+The smoke's counter input failure reproduced in fresh isolated sockets/homes;
+that path is unchanged by M164. The milestone is not fully gate-verified.
