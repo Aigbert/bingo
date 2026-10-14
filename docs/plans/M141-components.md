@@ -85,22 +85,7 @@ pulls, prompt.edit, M142's kit/mount/example tests and M151's pane placement.
 Props must drive their own drawing; memo generations must account for changed
 height without scroll jumps. Only visible rows ask, through the bounded queue.
 
-**STOP — 2026-10-14, protocol step 6.** The TestBackend draws the AbovePrompt
-Button, but clicking it and pressing Enter returns `effects: []`. The failing
-`above_prompt_button_dispatches_its_handler_from_the_drawn_band` test pins this.
-`pointer.rs::pressed` routes pane clicks, then transcript clicks; `input.rs`
-routes controls only for `Focus::Pane`. The band has no focus/input route.
-The required behavioural edits to input/pointer/focus/layout are outside Files;
-this is not a mechanical exhaustive-match arm. Pointer work overlaps M151.
-Options: authorize M141's generic component-control routing in those modules
-with M151 coordination; or assign that routing to M151/a prerequisite and
-resume M141 afterward. Do not disguise an Activity band as a Pane to bypass
-scope. No ADR decision was changed; no out-of-scope input fix was attempted.
-
-Partial implementation: typed contracts/schemas, matcher publication, Engine
-substitution, transcript and AbovePrompt pulls. Remaining: other component
-sites, permission/completion tests, ui.log, helpers, examples, acceptance and
-all final gates. The branch deliberately retains the failing band contract.
+2026-10-14 delegate decision: M141 owns additive band Action hit-testing in `pointer.rs` and unclaimed hotkeys in `input.rs`; composer keeps focus (no new Focus variant), and M151 owns pane placement and hit-testing.
 
 ## Re-verified (2026-10-14, ba70fdf6)
 
@@ -121,7 +106,7 @@ all final gates. The branch deliberately retains the failing band contract.
 - Protocol 2 is unreleased (v0.6.5): scoped amendments are authorized with a
   dated ADR-0075 note and `BINGO_UPDATE_SCHEMA=1`. Discipline 4c is unchanged.
 
-## Verified (2026-10-14, partial; stopped)
+## Verified (2026-10-14, in progress)
 
 - `cargo test -p bingo-surface-rpc component_props_are_published_for_wire_clients --locked`: expected FAIL, missing QuestionProps, before schema registration.
 - `cargo test -p bingo-sdk component:: --locked`: PASS, 2 tests.
@@ -134,13 +119,14 @@ all final gates. The branch deliberately retains the failing band contract.
 - `cargo test -p bingo-surface-tui component:: --locked`: expected FAIL, 2 tests before substitution; PASS, 2 tests after implementation, before band contract.
 - `cargo test -p bingo-surface-tui above_prompt_button_dispatches_its_handler_from_the_drawn_band --locked`: FAIL, 0 passed/1 failed; button drawn, effects: [].
 - `cargo fmt --all`: PASS.
-- `cargo fmt --all -- --check`: NOT RUN, protocol stop before final gates.
-- `cargo check --workspace --all-targets --locked`: NOT RUN, protocol stop.
-- `cargo clippy --workspace --all-targets --locked -- -D warnings`: NOT RUN, protocol stop.
-- `cargo test --workspace --locked`: NOT RUN, protocol stop.
-- `scripts/check_discipline.sh`: NOT RUN, protocol stop.
-- `scripts/budget.sh`: NOT RUN, protocol stop.
-- `cargo deny check`: NOT RUN, protocol stop.
-- `cargo check -p bingo-sdk -p bingo-core -p bingo-mods -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-surface-tui -p bingo --all-targets --target x86_64-pc-windows-msvc`: NOT RUN, protocol stop.
-- `scripts/tui-smoke.sh`: NOT RUN, protocol stop; no tmux or live/credential run.
+- `cargo fmt --all -- --check`: PENDING.
+- `cargo check --workspace --all-targets --locked`: PENDING.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: PENDING.
+- `cargo test --workspace --locked`: PENDING.
+- `scripts/check_discipline.sh`: PENDING.
+- `scripts/budget.sh`: PENDING.
+- `cargo deny check`: PENDING.
+- `cargo check -p bingo-sdk -p bingo-core -p bingo-mods -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-surface-tui -p bingo --all-targets --target x86_64-pc-windows-msvc`: PENDING.
+- `scripts/tui-smoke.sh`: PENDING; no live/credential run.
 - `git diff --name-only ba70fdf6 -- crates/bingo/tests/catalogue.rs`: mechanical LinkMatcher constructor only (render: None); no new exhaustive variant arms.
+- `git diff --name-only ba70fdf6 -- crates/bingo-surface-tui/src/{pointer,input}.rs`: authorized additive band routes; pane routing unchanged.
