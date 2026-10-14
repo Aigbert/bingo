@@ -311,6 +311,7 @@ mod contracts {
             &links,
             &cx(),
             catalogue::CommandRun {
+                surface: None,
                 name: "test".into(),
                 args: "".into(),
             },

@@ -10,18 +10,14 @@ pub(crate) struct Ran {
 
 pub(crate) async fn run(
     command: Arc<dyn Command>,
-    args: String,
+    input: catalogue::CommandRun,
     cx: &CommandContext,
     hooks: &crate::turn::HookSet,
     hook_cx: &HookContext,
     report: Report,
 ) -> Result<Ran, KernelError> {
-    let spec = command.spec();
-    let entry = point(&spec, &args);
-    let input = catalogue::CommandRun {
-        name: spec.name,
-        args: args.clone(),
-    };
+    let args = input.args.clone();
+    let entry = point(&command.spec(), &args);
     // A link may rewrite the line, but the rewrite is the link's, not the
     // person's, and not a key the built-in's own drawing handed out.
     let asked = bingo_sdk::render::asked();

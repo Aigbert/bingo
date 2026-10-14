@@ -85,6 +85,8 @@ the kernel's `/status` key-value view stays as the plain fallback.
   existing surface FIFO.
 - Pane/status pulls stay live while commands are queued. Queued dispatch returns immediately;
   stale callback binding is M174's responsibility, not a global redraw guard.
+- CommandRun carries the invoking surface; only terminal/desktop invocations open the card.
+  Print, channel and non-interactive RPC invocations retain the kernel text command on a shared host.
 - StatusProps carry summary/config/context from the asking surface's existing fold. Render
   and arrow handlers never open a session or subscribe; key arguments carry only row targets.
 - MCP `Servers::servers` returns connection configuration, not live status.

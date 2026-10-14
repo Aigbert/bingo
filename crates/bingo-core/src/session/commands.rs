@@ -167,6 +167,7 @@ pub(super) fn is_command(input: &Input) -> bool {
 /// with.
 #[derive(Clone, Debug)]
 pub(super) struct Invocation {
+    pub surface: Option<String>,
     pub line: String,
     pub origin: Origin,
 }
@@ -182,6 +183,7 @@ impl Invocation {
             Input::Action { .. } => Origin::default(),
         };
         Self {
+            surface: match input { Input::Text { origin, .. } => Some(origin.surface.clone()), Input::Action { .. } => None },
             line: bingo_sdk::command::recorded_line(&parsed.typed()).into(),
             origin: Origin {
                 voice: Some(bingo_sdk::Voice::Quiet),
@@ -328,6 +330,9 @@ impl Commands {
         } = run;
         let pressed = vouched.is_some();
         let own = Arc::new(AtomicBool::new(false));
+        let input = bingo_sdk::catalogue::CommandRun {
+            name: command.spec().name, args, surface: invocation.surface.clone(),
+        };
         self.inflight.insert(
             intent.clone(),
             InFlight {
@@ -344,7 +349,7 @@ impl Commands {
         self.tracker.spawn(bingo_sdk::invocation::carry(async move {
             let report = crate::chain::Report::default();
             let work =
-                crate::chain::command::run(command, args, &cx, &hooks, &hook_cx, report.clone());
+                crate::chain::command::run(command, input, &cx, &hooks, &hook_cx, report.clone());
             let work = bingo_sdk::render::under_press(pressed, work);
             let future =
                 AssertUnwindSafe(bingo_sdk::render::under_input(asked, work)).catch_unwind();

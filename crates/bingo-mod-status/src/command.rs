@@ -19,9 +19,13 @@ impl Interceptor for Open {
         &self,
         _: &catalogue::Entry,
         cx: &HookContext,
-        _: Value,
-        _: Next<'_, Value, Value>,
+        input: Value,
+        next: Next<'_, Value, Value>,
     ) -> Result<Value, KernelError> {
+        let command: catalogue::CommandRun = serde_json::from_value(input.clone()).map_err(error)?;
+        if !matches!(command.surface.as_deref(), Some("tui" | "terminal" | "desktop")) {
+            return next.run(input).await;
+        }
         self.0
             .lock()
             .map_err(error)?

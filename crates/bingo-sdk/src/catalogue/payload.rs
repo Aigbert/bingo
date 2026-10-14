@@ -78,6 +78,8 @@ pub struct Append {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct CommandRun {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surface: Option<String>,
     #[serde(rename = "command", alias = "name")]
     pub name: String,
     pub args: String,

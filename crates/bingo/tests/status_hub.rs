@@ -23,7 +23,7 @@ async fn command(attachment: &mut Attachment, text: &str) -> IntentOutcome {
     let intent = IntentId::mint();
     attachment
         .handle
-        .submit(intent.clone(), Input::text(text, Origin::surface("test")));
+        .submit(intent.clone(), Input::text(text, Origin::surface("tui")));
     ack_for(attachment, &intent).await
 }
 async fn key(attachment: &mut Attachment, tree: &View, key: &str) -> IntentOutcome {
@@ -185,4 +185,21 @@ async fn an_outside_mod_can_wrap_or_replace_the_status_tree() {
         assert!(tree.fold().starts_with(expected), "{tree:?}");
         host.shutdown().await;
     }
+}
+
+#[tokio::test]
+async fn noninteractive_callers_keep_text_status_on_a_shared_host() {
+    let mut server = Server::spawn(r#"{"responses":[]}"#);
+    let host = ready(&mut server).await;
+    let mut attachment = host.open(create(server.cwd()), who(), OpenOptions::default()).await.unwrap();
+    for surface in ["channels", "print", "rpc"] {
+        let intent = IntentId::mint();
+        attachment.handle.submit(intent.clone(), Input::text("/status", Origin::surface(surface)));
+        let outcome = ack_for(&mut attachment, &intent).await;
+        let value = serde_json::to_value(outcome).unwrap();
+        assert_eq!(value["result"]["view"]["kind"], "keyValue", "{surface}: {value}");
+        assert!(!slot::placed(&attachment.snapshot).iter().any(|p| p.plugin == "bingo.mod.status"));
+    }
+    host.shutdown().await.unwrap();
+    assert!(server.child.wait().await.unwrap().success());
 }
