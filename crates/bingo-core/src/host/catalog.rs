@@ -719,7 +719,7 @@ mod current_values {
             AuthStatus::Missing {
                 hint: "test".into(),
             },
-            AuthStatus::Ready,
+            AuthStatus::Ready { from: None },
             AuthStatus::Expired {
                 hint: "test".into(),
             },
