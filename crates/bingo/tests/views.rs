@@ -166,21 +166,27 @@ async fn a_signal_is_on_the_live_stream_and_never_in_the_journal() {
         "and the latest frame is what a client shows"
     );
 
-    let journal = replayed(&attachment).await;
+    kernel.shutdown().await.unwrap();
+    assert!(server.child.wait().await.unwrap().success());
+    // events_since also tails live signals, even after TurnCompleted.
+    let dir = server.sessions_dir().join(attachment.session.as_str());
+    let journal = bingo_store_jsonl::journal::replay(&dir, Seq::ZERO).unwrap();
+    assert!(
+        journal.contains(live.last().unwrap()),
+        "the journal contains the completed turn"
+    );
     assert!(
         !journal
             .iter()
-            .any(|event| matches!(event, Event::Signal { .. })),
+            .any(|frame| matches!(frame.event, Event::Signal { .. })),
         "a signal is never journaled"
     );
     assert!(
         journal.iter().any(
-            |event| matches!(event, Event::Extension { plugin, .. } if plugin == "bingo.demo.ui")
+            |frame| matches!(&frame.event, Event::Extension { plugin, .. } if plugin == "bingo.demo.ui")
         ),
         "and the panel beside it is"
     );
-
-    kernel.shutdown().await.unwrap();
 }
 
 /// What `--continue` finds: the board the last run left, and no trace of the
@@ -236,21 +242,6 @@ async fn a_second_run_reads_the_board_back_and_not_the_bar() {
 
     kernel.shutdown().await.unwrap();
 }
-
-/// What a client that reconnects is replayed: every frame the journal holds,
-/// and then the live tail, which goes quiet. The replay is read until it
-/// does, because `events_since` never ends on its own.
-async fn replayed(attachment: &Attachment) -> Vec<Event> {
-    let mut stream = attachment.handle.events_since(Seq::ZERO).await.unwrap();
-    let mut out = Vec::new();
-    while let Ok(Some(frame)) = tokio::time::timeout(QUIET, stream.next()).await {
-        out.push(frame.event);
-    }
-    out
-}
-
-/// How long a replayed stream must say nothing before it is called done.
-const QUIET: Duration = Duration::from_millis(500);
 
 /// Fold frames until the turn completes; the frames seen. The demo's bar runs
 /// for three seconds, so this waits longer than a text turn would.
