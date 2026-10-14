@@ -100,7 +100,7 @@ async fn the_real_mcp_wire_face_raises_its_declared_event() {
     let face = host.service_wire(bingo_services::mcp::KEY.name()).unwrap();
     assert_eq!(
         face.call("servers", serde_json::Value::Null).await.unwrap(),
-        json!({"servers":{}})
+        json!({"servers":[]})
     );
     assert_eq!(*seen.lock().unwrap(), ["mcp.servers"]);
     assert!(

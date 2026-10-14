@@ -26,6 +26,12 @@ pub(in crate::host) async fn details(host: &Host, catalog: &mut Catalog) {
         let mut contents = plugin::PluginContents::default();
         for source in &host.registry.sources.plugins {
             let found = source.contents(&entry.id).await;
+            if let Some(origin) = found.origin {
+                entry.meta["origin"] = json!(origin);
+            }
+            if let Some(runtime) = found.runtime {
+                entry.meta["runtime"] = json!(runtime);
+            }
             contents.commands.extend(found.commands);
             contents.tools.extend(found.tools);
         }

@@ -366,6 +366,10 @@ async fn approval_with_a_tier_admits_the_first_generation_with_that_grant() {
     let mut run = Running::new().await;
     fixture(&run.project(), "grant", "export function register(on) {} ");
     run.reload().await;
+    let waiting = run.listed("plugins:grant").await.unwrap();
+    assert_eq!(waiting["origin"], "project");
+    assert_eq!(waiting["runtime"], "module");
+    assert!(waiting.get("tier").is_none());
     let result = run.command("/plugins approve grant full").await;
     assert!(result.contains("approved grant"), "{result}");
     let meta = run.listed("grant").await.unwrap();

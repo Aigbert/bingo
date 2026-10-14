@@ -185,24 +185,36 @@ impl Manager {
     }
 
     pub async fn contents(&self, name: &str) -> bingo_sdk::plugin::PluginContents {
-        let Some(bridge) = self.active_bridges().find(|bridge| bridge.name() == name) else {
+        let Some(installed) = self
+            .discovered()
+            .iter()
+            .find(|installed| installed.registration.status(ID).id == name)
+        else {
             return Default::default();
         };
-        bingo_sdk::plugin::PluginContents {
-            commands: bridge
+        let mut contents = bingo_sdk::plugin::PluginContents {
+            origin: Some(installed.registration.origin),
+            runtime: Some(bingo_sdk::PluginRuntime::Process),
+            ..Default::default()
+        };
+        if installed.registration.admission.allowed()
+            && let Some(bridge) = &installed.bridge
+        {
+            contents.commands = bridge
                 .commands()
                 .await
                 .iter()
                 .map(|command| command.spec())
                 .filter(|spec| !spec.hidden)
-                .collect(),
-            tools: bridge
+                .collect();
+            contents.tools = bridge
                 .tools()
                 .await
                 .iter()
                 .map(|tool| tool.spec().name)
-                .collect(),
+                .collect();
         }
+        contents
     }
     pub async fn commands(&self) -> Vec<Arc<dyn Command>> {
         let mut commands = Vec::new();
