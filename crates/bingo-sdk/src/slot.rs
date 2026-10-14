@@ -300,3 +300,6 @@ mod pull_contract {
         }
     }
 }
+
+#[cfg(test)]
+mod pane_tests;

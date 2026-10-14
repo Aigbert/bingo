@@ -70,6 +70,13 @@ pub struct HandlerEvent {
 mod tests {
     use super::*;
     #[test]
+    fn pane_viewport_keeps_its_seated_place() {
+        let wire = serde_json::json!({"columns":64,"rows":24,"place":"side"});
+        let viewport: Viewport = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(serde_json::to_value(viewport).unwrap(), wire);
+    }
+
+    #[test]
     fn question_is_named_for_its_drawing() {
         let wire = serde_json::json!("Question");
         let component: Component = serde_json::from_value(wire.clone()).unwrap();
