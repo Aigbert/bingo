@@ -89,8 +89,9 @@ write's whole file in place.
   preserves the kernel's authoritative answer list.
 - A denied replacement is asked again with only Change and No. Approval never overrides a deny rule. Every
   replacement repeats hooks and policy checks.
-- Fold `AllowChanged` into the referenced call before the next ask. The answer event is the fact; no
-  duplicate input is added to the interaction record.
+- Review: each permission interaction carries the gate’s current input after hooks/interceptors.
+  The sealed card and editor read that input. Only `ItemUpdated` changes the transcript call;
+  resolving an edit merely proposes a replacement, which has not passed the gate yet.
 - `PermissionPolicy::caution` is a defaulted, synchronous policy hook: shell analysis stays in
   permissions, while the gate also reads destructive traits. A default-false `allows_replacement` hook
   keeps tool names out of the kernel.

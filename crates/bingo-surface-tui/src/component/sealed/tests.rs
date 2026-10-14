@@ -24,6 +24,7 @@ fn state_with_card(login: bool) -> SessionState {
                 preview: None,
                 session_scope: Some("sample".into()),
                 caution: None,
+                input: Default::default(),
             },
             vec![
                 AnswerSpec::AllowOnce,

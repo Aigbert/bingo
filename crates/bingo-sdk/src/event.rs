@@ -773,6 +773,7 @@ mod tests {
                 }),
                 session_scope: Some("Edit(src/)".into()),
                 caution: None,
+                input: Default::default(),
             },
             answers: vec![
                 AnswerSpec::AllowOnce,
@@ -1397,6 +1398,7 @@ mod tests {
             preview: None,
             session_scope: session_scope.map(str::to_string),
             caution: None,
+                input: Default::default(),
         }
     }
 

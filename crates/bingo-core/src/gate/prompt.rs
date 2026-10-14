@@ -27,6 +27,7 @@ pub(super) async fn ask_person(
     );
     let kind = InteractionKind::Permission {
         tool: input.call.name.clone(),
+        input: input.call.input.clone(),
         summary: blocked
             .clone()
             .or_else(|| input.confirm.map(str::to_owned))

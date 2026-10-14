@@ -588,6 +588,7 @@ fn sealed_site(component: Component) -> bingo_sdk::SessionState {
                 preview: None,
                 session_scope: None,
                 caution: None,
+                input: Default::default(),
             },
             vec![
                 bingo_sdk::AnswerSpec::AllowOnce,

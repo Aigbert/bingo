@@ -14,6 +14,8 @@ fn scene_for(mut open: Interaction, command: bool) -> (crate::tree::Tree, Ui, cr
     } else {
         json!({"file_path":"src/main.rs","old_string":"old","new_string":"new"})
     };
+    if let InteractionKind::Permission { input: current, .. } = &mut open.kind
+        && current.is_null() { *current = input.clone(); }
     let mut state = folded(vec![
         frame(1, started("trn_1")),
         started_tool(
@@ -212,4 +214,19 @@ fn the_whole_preview_comes_from_the_child_that_asked() {
     crate::input::on_key(&mut ui, &tree, key(KeyCode::End), now);
     let screen = draw_tree(80, 24, &tree, &mut ui, now);
     assert!(screen.contains("child line 39"), "{screen}");
+}
+
+#[test]
+fn change_and_sealed_props_use_the_gates_rewritten_input() {
+    let open = permission(None, None);
+    let mut wire = serde_json::to_value(open).unwrap();
+    wire["kind"]["input"] = json!({"command":"echo rewritten"});
+    let (tree, mut ui, now) = scene_for(serde_json::from_value(wire).unwrap(), true);
+    let (owner, open) = tree.open_interaction().unwrap();
+    let Some(Props::Permission(props)) = crate::component::sealed::props(owner, open) else {
+        panic!("permission")
+    };
+    assert_eq!(props.input, json!({"command":"echo rewritten"}));
+    crate::input::on_key(&mut ui, &tree, typed('3'), now);
+    assert_eq!(ui.dialog.words.as_ref().unwrap().text(), "echo rewritten");
 }

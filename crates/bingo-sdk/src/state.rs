@@ -193,7 +193,7 @@ impl SessionState {
             | Event::ItemDelta { .. } => applied,
             Event::QueueChanged { entries, .. } => self.queue_changed(entries),
             Event::InteractionOpened { interaction } => self.interaction_opened(interaction),
-            Event::InteractionResolved { id, answer, .. } => self.interaction_resolved(id, answer),
+            Event::InteractionResolved { id, .. } => self.interaction_closed(id),
             Event::InteractionCancelled { id, .. } => self.interaction_closed(id),
             Event::IntentAck { intent, .. } => Applied::Intent(intent.clone()),
             Event::Compacted { .. } | Event::Rewound { .. } => applied,
@@ -357,31 +357,6 @@ impl SessionState {
         self.interactions.retain(|i| i.id != interaction.id);
         self.interactions.push(interaction.clone());
         Applied::Interaction(interaction.id.clone())
-    }
-
-    fn interaction_resolved(&mut self, id: &InteractionId, answer: &Answer) -> Applied {
-        self.changed_input(id, answer);
-        self.interaction_closed(id)
-    }
-
-    fn changed_input(&mut self, id: &InteractionId, answer: &crate::Answer) {
-        let crate::Answer::AllowChanged { input } = answer else {
-            return;
-        };
-        let Some(open) = self.interactions.iter().find(|open| &open.id == id) else {
-            return;
-        };
-        let Some(item) = open.item.as_ref().and_then(|id| self.transcript.get(id)) else {
-            return;
-        };
-        let mut item = item.clone();
-        if let ItemBody::ToolCall {
-            input: previous, ..
-        } = &mut item.body
-        {
-            *previous = input.clone();
-            self.transcript.apply(&Event::ItemUpdated { item });
-        }
     }
 
     fn interaction_closed(&mut self, id: &InteractionId) -> Applied {
@@ -823,7 +798,7 @@ mod tests {
     }
 
     #[test]
-    fn a_changed_answer_updates_the_referenced_call_before_the_next_ask() {
+    fn a_changed_answer_waits_for_item_updated_to_change_the_call() {
         let mut state = SessionState::new(summary());
         state.apply(&frame(
             1,
@@ -838,6 +813,11 @@ mod tests {
         }))
         .unwrap();
         state.apply(&frame(2, Event::InteractionOpened { interaction }));
+        let original = state
+            .transcript
+            .get(&ItemId::from_raw("call"))
+            .unwrap()
+            .clone();
         let replacement = serde_json::json!({"path":"new"});
         state.apply(&frame(
             3,
@@ -851,8 +831,20 @@ mod tests {
         ));
         assert!(state.interactions.is_empty());
         assert!(
-            matches!(&state.transcript.get(&ItemId::from_raw("call")).unwrap().body, ItemBody::ToolCall { input, .. } if input == &replacement)
+            matches!(&state.transcript.get(&ItemId::from_raw("call")).unwrap().body, ItemBody::ToolCall { input, .. } if input != &replacement)
         );
+        assert_eq!(state.transcript.get(&original.id), Some(&original));
+        let mut changed = original;
+        if let ItemBody::ToolCall { input, .. } = &mut changed.body {
+            *input = replacement;
+        }
+        state.apply(&frame(
+            4,
+            Event::ItemUpdated {
+                item: changed.clone(),
+            },
+        ));
+        assert_eq!(state.transcript.get(&changed.id), Some(&changed));
     }
 
     #[test]

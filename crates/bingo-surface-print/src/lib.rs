@@ -757,6 +757,7 @@ pub(crate) mod tests {
                 preview: None,
                 session_scope: session_scope.map(str::to_owned),
                 caution: None,
+                input: Default::default(),
             },
             answers: vec![
                 AnswerSpec::AllowOnce,

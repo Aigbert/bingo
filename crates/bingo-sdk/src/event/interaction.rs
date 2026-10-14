@@ -126,6 +126,9 @@ impl Interaction {
 pub enum InteractionKind {
     Permission {
         tool: String,
+        /// The call after hooks and interceptors, before this decision.
+        #[serde(default, skip_serializing_if = "serde_json::Value::is_null")]
+        input: serde_json::Value,
         summary: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         preview: Option<Preview>,

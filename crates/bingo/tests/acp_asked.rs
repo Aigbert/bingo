@@ -328,6 +328,7 @@ async fn a_session_allow_answers_twice_with_once_and_asks_the_person_once() {
     let InteractionKind::Permission {
         session_scope: Some(scope),
         caution: None,
+                input: Default::default(),
         ..
     } = asked.kind
     else {

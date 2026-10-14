@@ -358,6 +358,7 @@ mod tests {
                 }),
                 session_scope: scope.map(str::to_owned),
                 caution: None,
+                input: Default::default(),
             },
             vec![
                 AnswerSpec::AllowOnce,

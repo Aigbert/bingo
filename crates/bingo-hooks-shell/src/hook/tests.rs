@@ -118,6 +118,7 @@ fn permission(tool: &str, summary: &str) -> Frame {
                 preview: None,
                 session_scope: None,
                 caution: None,
+                input: Default::default(),
             },
             answers: vec![AnswerSpec::Deny],
         },

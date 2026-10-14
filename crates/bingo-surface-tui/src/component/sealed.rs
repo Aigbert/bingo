@@ -1,24 +1,13 @@
 //! Sealed cards use facts and gestures from the open interaction alone.
 use crate::{dialog, views, wrap};
-use bingo_sdk::{Interaction, InteractionKind, ItemBody, SessionState, View, component::*};
+use bingo_sdk::{Interaction, InteractionKind, SessionState, View, component::*};
 use ratatui::{layout::Rect, text::Line};
 
 type Rows = Vec<(Line<'static>, Option<usize>)>;
 
-pub fn props(state: &SessionState, interaction: &Interaction) -> Option<Props> {
+pub fn props(_state: &SessionState, interaction: &Interaction) -> Option<Props> {
     match &interaction.kind {
-        InteractionKind::Permission { tool, .. } => {
-            let item = state
-                .transcript
-                .items()
-                .iter()
-                .find(|item| Some(&item.id) == interaction.item.as_ref())?;
-            let ItemBody::ToolCall { name, input, .. } = &item.body else {
-                return None;
-            };
-            if name != tool {
-                return None;
-            }
+        InteractionKind::Permission { tool, input, .. } => {
             Some(Props::Permission(PermissionProps {
                 interaction_id: interaction.id.clone(),
                 tool: tool.clone(),
