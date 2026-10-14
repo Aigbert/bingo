@@ -86,3 +86,43 @@ props!(PaneProps {
     scroll: SiteScroll,
     view: SiteView,
 });
+props!(ReasoningProps {
+    text: String,
+    status: crate::ItemStatus
+});
+props!(CompactionProps {
+    summary: String,
+    replaced: u32,
+    before: u64,
+    after: u64,
+    duration_ms: u64
+});
+props!(RewindProps {
+    to_turn: crate::TurnId,
+    dropped: u32
+});
+props!(InterruptionProps { marker: String });
+props!(QuestionAnswerProps {
+    interaction: crate::InteractionId,
+    question: String,
+    answer: String
+});
+props!(PermissionReceiptProps { interaction: crate::InteractionId, tool: String, decision: crate::DecisionKind, feedback: Option<String> });
+props!(AssetProps { asset: String, label: Option<String> });
+props!(ShellRunProps { command: String, output: String, exit: Option<i32>, cwd: std::path::PathBuf, status: crate::ItemStatus });
+props!(ActionProps { name: String, args: Value, result: Option<Value>, status: crate::ItemStatus });
+props!(TurnProgressProps {
+    elapsed_ms: u64,
+    tokens_out: u64,
+    interruptible: bool,
+    stopping: bool
+});
+props!(SessionStatusProps {
+    title: Option<String>, cwd: String, provider: Option<String>, model: Option<String>, effort: Option<crate::Effort>, context: Option<crate::ContextUsage>, usage: crate::Usage });
+props!(ToastProps {
+    text: String,
+    #[schemars(with = "String")]
+    until: jiff::Timestamp,
+    alert: bool
+});
+props!(WelcomeProps { session: crate::SessionSummary, effort: Option<crate::Effort>, modes: Vec<String>, update: Option<String>, resume: Option<crate::SessionSummary> });

@@ -80,6 +80,24 @@
       ],
       "description": "A button: the surface fires `Input::Action` with `action` (ADR-0008 §1)."
     },
+    "ActionProps": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "args": true,
+        "result": true,
+        "status": {
+          "$ref": "#/$defs/ItemStatus"
+        }
+      },
+      "required": [
+        "name",
+        "args",
+        "status"
+      ]
+    },
     "Activation": {
       "type": "string",
       "enum": [
@@ -296,6 +314,23 @@
         "confirm",
         "cancel",
         "form"
+      ]
+    },
+    "AssetProps": {
+      "type": "object",
+      "properties": {
+        "asset": {
+          "type": "string"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "asset"
       ]
     },
     "AssistantMessageProps": {
@@ -558,6 +593,41 @@
         "isErrored"
       ]
     },
+    "CompactionProps": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "replaced": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "before": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "after": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "durationMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "summary",
+        "replaced",
+        "before",
+        "after",
+        "durationMs"
+      ]
+    },
     "Component": {
       "type": "string",
       "enum": [
@@ -577,7 +647,20 @@
         "AbovePrompt",
         "Pane",
         "Permission",
-        "SignIn"
+        "SignIn",
+        "Reasoning",
+        "Compaction",
+        "Rewind",
+        "Interruption",
+        "QuestionAnswer",
+        "PermissionReceipt",
+        "Asset",
+        "ShellRun",
+        "Action",
+        "TurnProgress",
+        "SessionStatus",
+        "Toast",
+        "Welcome"
       ]
     },
     "ConfigView": {
@@ -2388,6 +2471,17 @@
         }
       ]
     },
+    "InterruptionProps": {
+      "type": "object",
+      "properties": {
+        "marker": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "marker"
+      ]
+    },
     "Item": {
       "type": "object",
       "properties": {
@@ -3412,6 +3506,31 @@
         "answers"
       ]
     },
+    "PermissionReceiptProps": {
+      "type": "object",
+      "properties": {
+        "interaction": {
+          "$ref": "#/$defs/InteractionId"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/$defs/DecisionKind"
+        },
+        "feedback": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "interaction",
+        "tool",
+        "decision"
+      ]
+    },
     "PinnedPartParams": {
       "type": "object",
       "properties": {
@@ -3794,6 +3913,214 @@
             "component",
             "props"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Reasoning"
+            },
+            "props": {
+              "$ref": "#/$defs/ReasoningProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Compaction"
+            },
+            "props": {
+              "$ref": "#/$defs/CompactionProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Rewind"
+            },
+            "props": {
+              "$ref": "#/$defs/RewindProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Interruption"
+            },
+            "props": {
+              "$ref": "#/$defs/InterruptionProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "QuestionAnswer"
+            },
+            "props": {
+              "$ref": "#/$defs/QuestionAnswerProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "PermissionReceipt"
+            },
+            "props": {
+              "$ref": "#/$defs/PermissionReceiptProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Asset"
+            },
+            "props": {
+              "$ref": "#/$defs/AssetProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "ShellRun"
+            },
+            "props": {
+              "$ref": "#/$defs/ShellRunProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Action"
+            },
+            "props": {
+              "$ref": "#/$defs/ActionProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "TurnProgress"
+            },
+            "props": {
+              "$ref": "#/$defs/TurnProgressProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "SessionStatus"
+            },
+            "props": {
+              "$ref": "#/$defs/SessionStatusProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Toast"
+            },
+            "props": {
+              "$ref": "#/$defs/ToastProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Welcome"
+            },
+            "props": {
+              "$ref": "#/$defs/WelcomeProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
         }
       ]
     },
@@ -3830,6 +4157,25 @@
         "options"
       ],
       "description": "One question put to a person: what is asked, what may be picked, and\nwhether words of one's own or more than one option count. A lone question\nand one of a form are the same thing (M53)."
+    },
+    "QuestionAnswerProps": {
+      "type": "object",
+      "properties": {
+        "interaction": {
+          "$ref": "#/$defs/InteractionId"
+        },
+        "question": {
+          "type": "string"
+        },
+        "answer": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "interaction",
+        "question",
+        "answer"
+      ]
     },
     "QuestionOption": {
       "type": "object",
@@ -3921,6 +4267,21 @@
         "preview",
         "steerable",
         "origin"
+      ]
+    },
+    "ReasoningProps": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ItemStatus"
+        }
+      },
+      "required": [
+        "text",
+        "status"
       ]
     },
     "Rect": {
@@ -4082,6 +4443,23 @@
         "max"
       ],
       "description": "A stream attempt failed and the turn is waiting to try again."
+    },
+    "RewindProps": {
+      "type": "object",
+      "properties": {
+        "toTurn": {
+          "$ref": "#/$defs/TurnId"
+        },
+        "dropped": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "toTurn",
+        "dropped"
+      ]
     },
     "SelectOption": {
       "type": "object",
@@ -4451,6 +4829,59 @@
         "items"
       ]
     },
+    "SessionStatusProps": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Effort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContextUsage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        }
+      },
+      "required": [
+        "cwd",
+        "usage"
+      ]
+    },
     "SessionSummary": {
       "type": "object",
       "properties": {
@@ -4555,6 +4986,36 @@
         "cwd",
         "createdAt",
         "updatedAt"
+      ]
+    },
+    "ShellRunProps": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "output": {
+          "type": "string"
+        },
+        "exit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ItemStatus"
+        }
+      },
+      "required": [
+        "command",
+        "output",
+        "cwd",
+        "status"
       ]
     },
     "SignInProps": {
@@ -4771,6 +5232,25 @@
         }
       ],
       "description": "A text child preserves the style of its nested Text node."
+    },
+    "ToastProps": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "until": {
+          "type": "string"
+        },
+        "alert": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text",
+        "until",
+        "alert"
+      ]
     },
     "Tone": {
       "oneOf": [
@@ -5006,6 +5486,33 @@
           "const": "auto",
           "description": "The kernel or a plugin opened the turn with no prose."
         }
+      ]
+    },
+    "TurnProgressProps": {
+      "type": "object",
+      "properties": {
+        "elapsedMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "tokensOut": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "interruptible": {
+          "type": "boolean"
+        },
+        "stopping": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "elapsedMs",
+        "tokensOut",
+        "interruptible",
+        "stopping"
       ]
     },
     "TurnStatus": {
@@ -5977,6 +6484,50 @@
         "aside"
       ],
       "description": "How a producer intends an utterance to be drawn."
+    },
+    "WelcomeProps": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionSummary"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Effort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "update": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resume": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "modes"
+      ]
     },
     "WireOversizedItem": {
       "type": "object",

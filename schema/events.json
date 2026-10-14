@@ -171,7 +171,20 @@
               "AbovePrompt",
               "Pane",
               "Permission",
-              "SignIn"
+              "SignIn",
+              "Reasoning",
+              "Compaction",
+              "Rewind",
+              "Interruption",
+              "QuestionAnswer",
+              "PermissionReceipt",
+              "Asset",
+              "ShellRun",
+              "Action",
+              "TurnProgress",
+              "SessionStatus",
+              "Toast",
+              "Welcome"
             ]
           },
           "SurfaceName": {
@@ -1276,7 +1289,20 @@
               "AbovePrompt",
               "Pane",
               "Permission",
-              "SignIn"
+              "SignIn",
+              "Reasoning",
+              "Compaction",
+              "Rewind",
+              "Interruption",
+              "QuestionAnswer",
+              "PermissionReceipt",
+              "Asset",
+              "ShellRun",
+              "Action",
+              "TurnProgress",
+              "SessionStatus",
+              "Toast",
+              "Welcome"
             ]
           }
         }
@@ -3342,7 +3368,20 @@
               "AbovePrompt",
               "Pane",
               "Permission",
-              "SignIn"
+              "SignIn",
+              "Reasoning",
+              "Compaction",
+              "Rewind",
+              "Interruption",
+              "QuestionAnswer",
+              "PermissionReceipt",
+              "Asset",
+              "ShellRun",
+              "Action",
+              "TurnProgress",
+              "SessionStatus",
+              "Toast",
+              "Welcome"
             ]
           }
         }
@@ -7263,7 +7302,20 @@
               "AbovePrompt",
               "Pane",
               "Permission",
-              "SignIn"
+              "SignIn",
+              "Reasoning",
+              "Compaction",
+              "Rewind",
+              "Interruption",
+              "QuestionAnswer",
+              "PermissionReceipt",
+              "Asset",
+              "ShellRun",
+              "Action",
+              "TurnProgress",
+              "SessionStatus",
+              "Toast",
+              "Welcome"
             ]
           },
           "Level": {
@@ -9910,7 +9962,20 @@
               "AbovePrompt",
               "Pane",
               "Permission",
-              "SignIn"
+              "SignIn",
+              "Reasoning",
+              "Compaction",
+              "Rewind",
+              "Interruption",
+              "QuestionAnswer",
+              "PermissionReceipt",
+              "Asset",
+              "ShellRun",
+              "Action",
+              "TurnProgress",
+              "SessionStatus",
+              "Toast",
+              "Welcome"
             ]
           },
           "ItemBody": {

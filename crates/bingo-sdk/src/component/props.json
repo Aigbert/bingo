@@ -73,7 +73,7 @@
     "props": {
       "word": "Kindling",
       "message": null,
-      "suffix": "…",
+      "suffix": "\u2026",
       "mode": "requesting"
     }
   },
@@ -131,6 +131,142 @@
         "bodyRows": 8
       },
       "view": {}
+    }
+  },
+  {
+    "component": "Reasoning",
+    "props": {
+      "text": "thinking",
+      "status": "completed"
+    }
+  },
+  {
+    "component": "Compaction",
+    "props": {
+      "summary": "summary",
+      "replaced": 3,
+      "before": 100,
+      "after": 20,
+      "durationMs": 500
+    }
+  },
+  {
+    "component": "Rewind",
+    "props": {
+      "toTurn": "trn_1",
+      "dropped": 2
+    }
+  },
+  {
+    "component": "Interruption",
+    "props": {
+      "marker": "Interrupted"
+    }
+  },
+  {
+    "component": "QuestionAnswer",
+    "props": {
+      "interaction": "int_1",
+      "question": "Which?",
+      "answer": "First"
+    }
+  },
+  {
+    "component": "PermissionReceipt",
+    "props": {
+      "interaction": "int_1",
+      "tool": "sample",
+      "decision": "deny",
+      "feedback": null
+    }
+  },
+  {
+    "component": "Asset",
+    "props": {
+      "asset": "asset_1",
+      "label": null
+    }
+  },
+  {
+    "component": "ShellRun",
+    "props": {
+      "command": "echo hello",
+      "output": "hello",
+      "exit": 0,
+      "cwd": ".",
+      "status": "completed"
+    }
+  },
+  {
+    "component": "Action",
+    "props": {
+      "name": "sample",
+      "args": {},
+      "result": null,
+      "status": "running"
+    }
+  },
+  {
+    "component": "TurnProgress",
+    "props": {
+      "elapsedMs": 3000,
+      "tokensOut": 12,
+      "interruptible": true,
+      "stopping": false
+    }
+  },
+  {
+    "component": "SessionStatus",
+    "props": {
+      "provider": "fake",
+      "model": "fake-1",
+      "effort": null,
+      "context": null,
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 12,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "reasoningTokens": 0
+      },
+      "title": null,
+      "cwd": "."
+    }
+  },
+  {
+    "component": "Toast",
+    "props": {
+      "text": "Saved",
+      "until": "2026-10-14T00:00:00Z",
+      "alert": false
+    }
+  },
+  {
+    "component": "Welcome",
+    "props": {
+      "session": {
+        "id": "ses_1",
+        "title": "hello",
+        "cwd": "/tmp/p",
+        "driver": "model",
+        "model": "fake-1",
+        "provider": "fake",
+        "createdAt": "2023-11-14T22:13:20Z",
+        "updatedAt": "2023-11-14T22:13:20Z",
+        "usage": {
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "reasoningTokens": 0
+        },
+        "busy": false,
+        "asking": false
+      },
+      "effort": null,
+      "modes": [],
+      "update": null,
+      "resume": null
     }
   }
 ]

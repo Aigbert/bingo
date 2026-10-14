@@ -85,24 +85,9 @@ mod tests {
     #[test]
     fn component_props_are_published_for_wire_clients() {
         let schema = document();
-        for name in [
-            "QuestionProps",
-            "UserMessageProps",
-            "AssistantMessageProps",
-            "ToolUseProps",
-            "ToolResultProps",
-            "ToolGroupProps",
-            "ToolProgressProps",
-            "CommandOutputProps",
-            "SpinnerProps",
-            "TurnDurationProps",
-            "InfoNoticeProps",
-            "SessionModeProps",
-            "PromptHintProps",
-            "AbovePromptProps",
-            "PaneProps",
-        ] {
-            assert!(schema["$defs"].get(name).is_some(), "missing {name}");
+        for component in bingo_sdk::render::Component::ALL {
+            let name = format!("{component:?}Props");
+            assert!(schema["$defs"].get(&name).is_some(), "missing {name}");
         }
     }
 

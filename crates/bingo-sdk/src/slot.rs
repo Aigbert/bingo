@@ -14,9 +14,7 @@ use crate::{ActionItem, ItemId, SessionState, Tone, View};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum Shown {
-    Pull {
-        request: crate::render::RenderRequest,
-    },
+    Pull { request: crate::render::PullRequest },
     View(View),
 }
 impl From<View> for Shown {
@@ -305,7 +303,7 @@ mod pull_contract {
         for wire in [
             json!({"kind":"pane","id":"counter","title":"Count","focus":true,"closeOnEscape":true,
                 "holdToasts":true,"asked":true,"place":["above"],"size":PaneSize::default(),"view":{"request":{"component":"Pane",
-                "requestId":"counter","surface":"terminal","props":{},"viewport":{"columns":80,"rows":8}}}}),
+                "requestId":"counter","props":{},"viewport":{"columns":80,"rows":8}}}}),
             json!({"kind":"toast","text":"Saved","until":"2026-10-14T12:00:00Z","alert":false}),
         ] {
             let slot: Slot = serde_json::from_value(wire.clone()).unwrap();
