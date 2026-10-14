@@ -688,7 +688,7 @@ pub(crate) mod tests {
     #[test]
     fn retired_endpoints_cannot_compose_retry_headers() {
         let provider = OpenAiProvider::with_endpoint(
-            reqwest::Client::new(),
+            bingo_http::client(bingo_http::Bounds::STREAMED).unwrap(),
             Some("old".into()),
             "http://localhost:1",
         );
