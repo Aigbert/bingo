@@ -139,6 +139,12 @@ fn remove_settings(host: &Host, key: &str, name: &str) -> Result<Vec<String>, Ke
     let cleared = instances::change(&settings::user_path(host.env()), key, name, None)?;
     let prefix = format!("{name}/");
     pinned.retain(|id| !id.starts_with(&prefix));
+    if host.settings.kernel.provider.as_deref() == Some(name) {
+        host.registry
+            .provider_state
+            .default_cleared
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
     Ok(cleared)
 }
 

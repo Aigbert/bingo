@@ -29,15 +29,9 @@ impl Host {
     /// neither, the first that can actually answer.
     pub async fn provider(&self, id: Option<&str>) -> Result<Arc<dyn Provider>, KernelError> {
         let providers = self.providers().await;
-        let named = id.map(str::to_string).or_else(|| {
-            self.settings
-                .kernel
-                .provider
-                .clone()
-                .filter(|name| !self.registry.provider_state.instances.removed(name))
-        });
+        let named = id.or_else(|| configured_provider(self));
         match named {
-            Some(wanted) => by_id(&providers, &wanted),
+            Some(wanted) => by_id(&providers, wanted),
             None => default_provider(&providers),
         }
     }
@@ -83,12 +77,10 @@ impl Host {
         &self,
         spec: &SessionSpec,
     ) -> Result<ModelChoice, KernelError> {
-        let named = spec.provider.as_ref().or(self
-            .settings
-            .kernel
+        let named = spec
             .provider
-            .as_ref()
-            .filter(|name| !self.registry.provider_state.instances.removed(name)));
+            .as_deref()
+            .or_else(|| configured_provider(self));
         let agent = self
             .registry
             .agents
@@ -193,6 +185,19 @@ fn by_id(providers: &[Arc<dyn Provider>], wanted: &str) -> Result<Arc<dyn Provid
 /// whose credentials are in place. Registration order alone would hand a
 /// person the provider they have never signed in to while another is ready
 /// and waiting, and [`auth::check`] would then refuse the run outright.
+fn configured_provider(host: &Host) -> Option<&str> {
+    if host
+        .registry
+        .provider_state
+        .default_cleared
+        .load(std::sync::atomic::Ordering::Relaxed)
+    {
+        None
+    } else {
+        host.settings.kernel.provider.as_deref()
+    }
+}
+
 fn default_provider(providers: &[Arc<dyn Provider>]) -> Result<Arc<dyn Provider>, KernelError> {
     if providers.is_empty() {
         return Err(KernelError::new(

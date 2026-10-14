@@ -226,3 +226,35 @@ async fn removal_clears_live_pins_before_another_pin_write() {
     let document = crate::settings::read_document(&crate::settings::user_path(host.env())).unwrap();
     assert_eq!(document["pinned"], json!(["other/m", "third/m"]));
 }
+
+#[tokio::test]
+async fn readding_a_name_does_not_restore_its_cleared_default() {
+    let dir = tempfile::tempdir().unwrap();
+    let env = Env::rooted(dir.path());
+    crate::settings::remember(
+        &crate::settings::user_path(&env),
+        &[("provider", json!("work"))],
+    )
+    .unwrap();
+    let host = Host::build(
+        vec![TestPlugin::boxed(
+            &PROVIDER,
+            vec![Contribution::ProviderShape(Arc::new(Shape))],
+        )],
+        HostConfig::new(env).with_layer("user", json!({"provider":"work"})),
+    )
+    .await
+    .unwrap();
+    provider::add_provider(&host, "work", "local", "http://up")
+        .await
+        .unwrap();
+    provider::add_provider(&host, "other", "local", "http://up")
+        .await
+        .unwrap();
+    provider::remove_provider(&host, "work").await.unwrap();
+    assert_eq!(host.provider(None).await.unwrap().id(), "other");
+    provider::add_provider(&host, "work", "local", "http://up")
+        .await
+        .unwrap();
+    assert_eq!(host.provider(None).await.unwrap().id(), "other");
+}
