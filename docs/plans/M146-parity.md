@@ -2,160 +2,149 @@
 
 ## Goal
 
-The Phase 7 acceptance test. Claude Code's three example mods (the
-tool-call guard, the band above the prompt, the tool-calls pane) run in
-process (QuickJS, M137) in the TUI. A port changes
-only its import specifier, plus the tool names and inputs it matches
-where bingo's differ (ADR-0079 §1), and each port's import-only diff is checked.
-`bingo plugins test` passes a test for each. `docs/design/mods-parity-2026-10.md`
-gains a Status column, and every row names its evidence: a test, a
-drive, or the non-goal that owns the gap. Every gap in its §8 is written
-down as a non-goal with its reason. After M139, M141 and M142. The
-desktop half was dropped on 2026-10-13 with M143–M145 (ADR-0080).
+The Phase 7 acceptance test: Claude Code 2.1.296's tool-call, band and
+pane mods run in process in the TUI with only import-specifier and tool
+name/input changes. Committed examples remain bingo's independent rewrites.
+Every parity matrix row has evidence or an owned gap. ADRs: 0078, 0079, rejected 0080, and 0081 §7. No desktop work (M143–M145).
 
 ## Bricks, in build order
 
-1. **The committed examples are rewrites, not copies.** The examples ship
-   in Claude Code's authoring skill with no licence of their own, and
-   Claude Code is proprietary.
-   - `examples/plugins/{tool-call,band,pane}` (M141, with M142's tests)
-     must be bingo's own modules, written from the behaviour in brick 2.
-     Any file there that is a copy is replaced first, and its tests are
-     kept. No second set is written.
-   - If the person obtains terms that allow it, the originals replace
-     the rewrites, with attribution, in their own commit.
-2. **The behaviour, as tests.** M142's `*.test.ts` for each example,
-   using `bingo/testing`, must cover the list below. Missing cases are
-   added and seen failing first.
-   - **tool-call:**
-     - an Edit of `.env` or `config/.env.local` is denied, naming the
-       plugin;
-     - `.envrc` passes;
-     - Bash arrives trimmed;
-     - a failed run sets the status, and a success clears it;
-     - a throwing hook's `.catch` denies only if `next` was not called.
-   - **band:**
-     - tool calls are counted per turn;
-     - moving `mock.clock` past 120 s toasts once;
-     - `$.ui.mount` draws `AbovePrompt`;
-     - the button hides the summary; the next prompt resets the count.
-   - **pane:**
-     - `session.start` registers `tool-calls` and opens the pane;
-     - each call is listed, and the done ones are dim;
-     - `viewport.rows` bounds the list.
-3. **The port of the originals, run locally, never committed.**
-   `scripts/port_examples.sh <dir> <out>` lays each original out as a
-   mod:
-   - `plugin.json`;
-   - `hooks/<file>`, so that `'../types'` resolves;
-   - `types/index.d.ts`, built from its `*-state.d.ts`.
-
-   It rewrites the specifier `'claude-code'` to `'bingo'` in both files.
-   Where bingo's tools differ, it applies the tool name and input map;
-   none is believed to differ (`Edit`/`file_path`, `Bash`/`command`).
-   Then it runs `validate`, and `test` against the committed tests. A
-   name the original reaches for and bingo lacks is a failing port. It
-   is reported to its owner (ADR-0078 §1 and §8, ADR-0079 §1, §4 and
-   §5), and neither the original nor a decision is edited to make it
-   pass.
-4. **In the TUI.** A drive in a detached tmux session that the drive
-   owns, never a terminal app and never a foreign process, runs
-   `bingo --plugin-dir <mod>` with a `BINGO_FAKE_SCRIPT` that edits
-   `.env`, runs Bash with padded whitespace, and fails once. The window
-   is set to 160 and then 100 columns; the pane sits inline at both
-   (ADR-0081 §7). Each step's `capture-pane` output is pasted.
-5. **Two transports.** `tool-call` also runs out of process, under node
-   through the SDK (M133), and its test gives the same results. `band`
-   and `pane` are `.tsx`, and node's type stripping does no JSX.
-6. **The matrix.**
-   - §2 and §3 gain a Status column. Each cell reads
-     `done — <test or drive>`, `gap — non-goal in M<n>`, or `n/a`.
-   - §4–§6 each end with an evidence line.
-   - Each §8 gap is checked against its owner's Non-goals. A gap that is
-     missing there is added in a `docs(plans)` commit.
+1. Check the committed examples are rewrites, not proprietary copies.
+   Retain their existing tests; never commit original source without terms.
+2. Add missing `bingo/testing` behavior cases, seen failing before code:
+   - tool-call: deny Edit of `.env` and `config/.env.local`, naming the
+     plugin; allow `.envrc`; trim Bash; failure status clears on success;
+     a throwing hook's catch denies only before next was called.
+   - band: count per turn; mock.clock past 120 s toasts once; mount
+     AbovePrompt; button hides the summary, next prompt resets the count.
+   - pane: session.start registers/opens tool-calls; list every call,
+     dim completed calls, and bound the list by viewport.rows.
+3. `scripts/port_examples.sh <originals> <temporary-output>` creates
+   plugin.json, hooks/<original>, and types/index.d.ts from *-state.d.ts.
+   Only claude-code → bingo is replaced; Edit/file_path and Bash/command
+   already agree. Run validate and the committed tests for all three ports.
+   Report failures to their owners (0078 §1/8, 0079 §1/4/5); never patch
+   the originals or a Decision. Paste source-free diff evidence.
+4. Drive a detached tmux session on an owned `-L` socket with isolated
+   home/cwd and BINGO_FAKE_SCRIPT: protected edit, padded Bash, one failure.
+   Open the waiting pane by the person's command, then capture denial,
+   status, band, tool row and the pane inline at 160 and 100 columns (0081 §7).
+5. Run tool-call under Node through the SDK with equivalent results.
+   plugins test requires a module manifest; use binary black-box coverage
+   for the process transport. Node type stripping does not run JSX ports.
+6. Add Status to parity §2/3 (`done — evidence`, `gap — non-goal in M<n>`,
+   or `n/a`), evidence lines to §4–6, and missing §8 owner Non-goals in a
+   docs(plans) commit. Run the sequential protocol gates and record results.
 
 ## Files
 
-- `examples/plugins/{tool-call,band,pane}/` (rewrites checked, missing
-  test cases added)
-- `scripts/port_examples.sh` (new)
-- `crates/bingo/tests/mods_parity.rs` (new): `bingo plugins test` on
-  each example, and equivalent black-box calls on `tool-call` under node
-- `docs/design/mods-parity-2026-10.md` (Status)
+- `examples/plugins/{tool-call,band,pane}/`: rewrites and behavior tests.
+- `scripts/port_examples.sh`: temporary layout and validation/test runner.
+- `crates/bingo/tests/mods_parity.rs`: CLI and Node parity coverage.
+- `docs/design/mods-parity-2026-10.md`: matrix evidence.
+- Owner plans, only to record missing §8 Non-goals (brick 6).
 
 ## Exit criteria
 
-- [ ] `bingo plugins validate` and `bingo plugins test` exit 0 on each
-      `examples/plugins/{tool-call,band,pane}` (pasted).
-- [ ] `scripts/port_examples.sh <Claude Code 2.1.296 examples> "$TMP"`
-      passes. `diff` evidence for each original against its port is pasted
-      without source text, proving only specifier/tool-map changes.
-- [ ] `cargo test -p bingo --test mods_parity` passes, and the node run
-      is not skipped on CI's Linux job.
-- [ ] The tmux drive's `capture-pane` output is pasted: the denial, the
-      status, the band, the pane inline at both widths, and the tool row.
-- [ ] Every row in §2 and §3 has a Status cell. An `awk` count of the
-      rows without one prints 0 (pasted).
-- [ ] `rg` finds each §8 gap in its owner's Non-goals (pasted). All
-      gates of the protocol pass.
+- [x] Each committed example's validate and test commands exit 0 (below).
+- [ ] Original ports validate/test; diff evidence proves import/tool-map only.
+- [ ] mods_parity passes including Node, required on Linux CI. Two current
+      tests pass; missing behavior and Node parity coverage remain unfinished.
+- [ ] tmux captures: denial, status, band, tool row, inline pane at both widths.
+- [ ] Every §2/3 row has Status; awk prints 0 rows without it.
+- [ ] rg locates each §8 gap in its owner's Non-goals; all gates pass.
 
 ## Non-goals
 
-Each gap in parity §8, with its owner and its reason:
-- `Client` modules and `$.ui.blit` (M140, M141). Code on a surface's
-  drawing thread needs a runtime on each surface, each holding a copy
-  of the mod's state.
-- `prompt.edit` on each keystroke (M136). The composer is the surface's,
-  and a round trip per key breaks IME composition.
-- `prompt.attachment` and `prompt.mention` (M136). Surfaces resolve `@`,
-  and a hook sees the result in `prompt.submit`.
-- `$.ui.scroll`, `focus`, `selection` and `copy`, and `open`'s
-  `isPlaced` (M140, M141). These belong to the surface
-  (ADR-0013 §4), and the host has no verb toward a surface.
-- `$.tool.check` without a run, `$.prompt.compose` as a read, and
-  `$.session.repo` (M138). Each would need a kernel door of its own.
-- `audio` (M139). No surface plays sound, and the tree has no audio
-  stack.
-- `classic.*` (M136). Shell hooks stay with hooks-shell, behind the
-  `Hook` adapter.
-- The desktop, vscode and mobile surfaces. None is in this tree; the
-  GUI stays in its own repository (ADR-0080, rejected).
-- A pane docked by the engine's width rule: a bingo pane goes where it
-  declares, when asked (ADR-0081 §7, M151).
-- `telemetry.*` and `attribution.text`: not applicable.
-
-Also out: committing the originals without terms that allow it; running
-JSX mods out of process; and type-checking a port against props that
-only Claude Code has, such as `AbovePrompt`'s `hasSurvey`, which reads
-`undefined` here, so the band draws as it would without a survey.
+- Client modules and ui.blit (M140/M141): no surface runtime/state copy.
+- prompt.edit per keystroke (M136): surface composer/IME ownership.
+- prompt.attachment/mention (M136): surfaces resolve @ before prompt.submit.
+- ui.scroll/focus/selection/copy and open.isPlaced (M140/M141): surface
+  ownership, no host verb toward a surface (ADR-0013 §4).
+- tool.check without running, prompt.compose as a read, session.repo
+  (M138): each needs a new kernel door.
+- audio (M139): no player or audio stack; classic.* (M136): hooks-shell.
+- Desktop/vscode/mobile surfaces: outside this tree (ADR-0080 rejected).
+- Unasked/width-rule pane docking: person's opening and declared placement
+  govern it (ADR-0081 §7, M151). telemetry/attribution.text: not applicable.
+- Committing originals, JSX under Node, or type-checking Claude-only props
+  such as AbovePrompt.hasSurvey (undefined means no survey here).
 
 ## Re-verified (2026-10-14, `3b10b522`)
 
-- Landed dependencies: M136 (`3dd2c95a`), M137 (`c1d95e8c`), M138
-  (`5581b978`), M139 (`686ad289`), M140 (`ba70fdf6`), M141 (`a88a5363`),
-  M142 (`3b10b522`); M147 (`6e3b1b03`), M148 (`fddb62f3`), M149
-  (`b2bee6f4`), M150 (`a2f77d96`), M151 (`6fad64ce`). M143–M145 dropped.
-- Read all five 2.1.296 originals from the supplied temporary directory.
-  Existing examples are independent rewrites; retain their coverage. The
-  original band hides (does not reset); pane command/id is `tool-calls`.
-- Edit/file_path and Bash/command agree; no tool mapping is needed.
-  Catalogue pins tool/tool_use_id and uses isError; turn.complete exists.
-  Register/helpers, JSX stripping, bingo/testing/mount and plugin metadata
-  exist. `plugins test` requires a module: Node parity uses the SDK and
-  the binary, not a process manifest passed to that command. CI already
-  pins Node 24 and BINGO_REQUIRE_NODE=1 on Linux.
-- ADR-0081 §7 requires opening the waiting pane by the person's command
-  before captures at 160/100 columns. No unasked docking is expected.
+- Landed: M136 `3dd2c95a`, M137 `c1d95e8c`, M138 `5581b978`, M139
+  `686ad289`, M140 `ba70fdf6`, M141 `a88a5363`, M142 `3b10b522`;
+  M147 `6e3b1b03`, M148 `fddb62f3`, M149 `b2bee6f4`, M150 `a2f77d96`,
+  M151 `6fad64ce`. M143–M145 dropped. Clean branch m146-parity at start.
+- Read all five originals at the supplied scratchpad cc-examples-2.1.296
+  directory. Current examples are independent rewrites with different
+  behavior. Original band hides rather than resets; pane uses tool-calls.
+- Catalogue tool.call/turn.complete, plugin metadata, Register/helpers,
+  JSX stripping and bingo/testing/mount exist. Edit/Bash inputs agree.
+  Linux CI already pins Node 24.17.0 and BINGO_REQUIRE_NODE=1.
+- No new dependencies, kernel nouns/doors, theme allowlists or schema
+  changes. Scoped pre-release schema edits would require a dated ADR-0075
+  line and BINGO_UPDATE_SCHEMA=1. No outside-Files mechanical arms changed.
 
-## Risks
+## Risks — STOP (2026-10-14, protocol step 6)
 
-- Candidate port gaps: object-form atom keys (M142), numeric clock.now
-  (M138), synchronous ui.resolve (M140), command registration without a
-  callback (M138), and tool.call deny answers (M136). Reproduce through
-  the unmodified temporary ports; report to owners, never alter originals.
-- Runtime/SDK files are outside Files. A failing gate requiring them stops
-  under protocol §6; a new door/noun or changed Decision also stops.
-- Protocol 2 is unreleased (latest v0.6.5); only scoped amendments with a
-  dated ADR-0075 line are authorized. Generated files use BINGO_UPDATE_SCHEMA=1.
-- Original source, captures and logs stay outside the repository. Every
-  process/home/journal in a drive is isolated; no live/credential tests.
+- M142 owner: validate rejects direct $.plugin.name reads as dollar-static
+  aliases (`crates/bingo-mods/src/validate/dollar.rs`). It also traverses
+  the originals' type-only ../types import as a file, then reads a directory
+  (`validate/source.rs`). Both fixes are outside Files; no fix attempted.
+- Options: owner follow-up fixes first, then resume M146; or explicitly
+  expand M146 Files to those validator paths and their contract tests.
+- Still only source-inspected candidates: object-form atom keys (M142),
+  numeric clock.now and callback-free command.register (M138), synchronous
+  ui.resolve (M140), tool.call deny answers (M136). After validator fixes,
+  test these; a new door/noun or changed Decision requires another stop.
+- Existing rewrite tests expect protected.txt, an initial banner and ledger.
+  Their port failures do not alone prove runtime defects. Missing behavior
+  cases, Node parity, TUI drive, matrix and owner Non-goals remain pending.
+
+## Verified (2026-10-14, incomplete; stopped)
+
+`cargo build -p bingo --locked`: exit 0, Finished dev profile in 1m 02s.
+All plugin commands used disposable homes; no live/credential tests.
+`cargo test -p bingo --test mods_parity port_layout_changes_only_the_package_specifier --locked`
+failed first: `scripts/port_examples.sh: No such file or directory`;
+`test result: FAILED. 0 passed; 1 failed` (contract committed before runner).
+`cargo test -p bingo --test mods_parity --locked -- --nocapture`: exit 0:
+```
+tool-call validate: exit 0     tool-call test: exit 0
+band validate: exit 0          band test: exit 0
+pane validate: exit 0          pane test: exit 0
+test result: ok. 2 passed; 0 failed; 0 ignored
+```
+`SOURCE` was the supplied absolute `.../980b9fc1-a2b6-4a4e-a594-9bd988be2aca/scratchpad/cc-examples-2.1.296/`.
+`scripts/port_examples.sh "$SOURCE" "$M146_PORTS"`: exit 1; output under
+`/private/tmp/bingo-m146-ports.*/`, never the repository. Source-free diffs:
+```
+tool-call.ts: diff -U0: -1/+1 lines; package specifier only; source unchanged
+band.tsx: diff -U0: -2/+2 lines; package specifier only; source unchanged
+band-state.d.ts: diff -U0: -1/+1 lines; package specifier only; source unchanged
+pane.tsx: diff -U0: -2/+2 lines; package specifier only; source unchanged
+pane-state.d.ts: diff -U0: -1/+1 lines; package specifier only; source unchanged
+hooks/tool-call.ts:8:20 dollar-static $ members cannot be aliased or stored
+hooks/tool-call.ts:11:40 dollar-static $ members cannot be aliased or stored
+band/pane validate: Is a directory (os error 21)
+tool-call/band/pane validate: exit 1; tool-call/band/pane test: exit 1
+```
+Test result excerpts: `test requires an unanswered interaction` (tool-call),
+`expected "⟨AbovePrompt⟩" to match "A small band above your prompt"` (band),
+`unknown command: /ledger` (pane). These are old rewrite expectations.
+The runner's first attempt had mismatched manifest/directory names for
+band/pane; corrected and its contract rerun, then the above results obtained.
+Gate commands/results (remaining gates not run after the protocol stop):
+- `cargo fmt --all -- --check`: exit 0 before final port-directory correction;
+  `cargo fmt --all` applied after that correction.
+- `cargo check --workspace --all-targets --locked`: not run.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: not run.
+- `cargo test --workspace --locked`: not run (targeted result above).
+- `scripts/check_discipline.sh`: not run.
+- `scripts/budget.sh`: not run.
+- `cargo deny check`: not run.
+- `scripts/tui-smoke.sh`: not run; no tmux or terminal app launched.
+- `cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc`: not run.
+Temporary ports were cleaned; originals kept. No captures/logs committed.
+No matrix awk/rg counts or TUI evidence claimed.
