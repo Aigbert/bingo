@@ -120,3 +120,5 @@ drawing thread, and `$.ui.blit`. A mod drawing the permission prompt.
 Styling beyond the table.
 
 2026-10-14, person's delegate: pre-release, M140: the AskUserQuestion component is Question; the kernel names no tool (check_discipline 4c).
+
+2026-10-14, M151 (ADR-0081 §7): §3 pane declarations carry place/size; legacy rows normalize on read. §5 pane memo keys include seated place and content rows as well as columns; collapsed panes are not asked. Other components retain height-independent memo keys.
