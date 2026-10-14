@@ -404,12 +404,13 @@ fn react(
             ..
         } => rejected(error, err, console.human()).map(Next::Exit),
         // The one submit was an instant command and this is its receipt (the
-        // renderer already printed it): there is no turn to wait for. An
+        // renderer already printed it, or ignored a client-only action): there
+        // is no turn to wait for. An
         // answer's own ack carries no receipt keys and holds the run.
         Event::IntentAck {
             outcome: IntentOutcome::Applied { result },
             ..
-        } if ["message", "view", "item"]
+        } if ["message", "view", "item", "surface"]
             .iter()
             .any(|k| result.get(k).is_some()) =>
         {

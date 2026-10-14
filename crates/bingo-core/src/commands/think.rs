@@ -13,6 +13,13 @@ pub(super) struct ThinkCommand {
 
 #[async_trait]
 impl Command for ThinkCommand {
+    fn now(&self, view: &command::SessionView<'_>) -> Option<String> {
+        let state = view.state;
+        let effort: Option<Effort> =
+            serde_json::from_value(state.config.kernel["thinking"].clone()).unwrap_or_default();
+        Some(Effort::word(effort).into())
+    }
+
     fn spec(&self) -> CommandSpec {
         super::spec(
             "think",

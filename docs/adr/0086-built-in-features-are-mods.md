@@ -81,4 +81,11 @@ existing supervised action mailbox; ready render answers need no channel hop.
 - M169 adds the compiled-in `bingo-mod-ask` member without external
   dependencies; the normal-tree budget counts it, so 412 → 413.
 
+- M168 adds `bingo-mod-palette`; the member budget grows 413 → 414 without
+  external dependencies. `CommandOutcome::Surface` carries a client action in
+  the existing intent acknowledgement. The host never dispatches that action.
+- The global command catalogue has no session. `CommandCatalog`, a typed service,
+  overlays `Command::now` using a borrowed `SessionView` supplied by its caller;
+  current values do not trigger I/O or select a hidden active session.
+
 Refs: ADR-0057, ADR-0074, ADR-0079, ADR-0082, ADR-0084, ADR-0085.

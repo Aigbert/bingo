@@ -268,5 +268,43 @@
       "update": null,
       "resume": null
     }
+  },
+  {
+    "component": "Palette",
+    "props": {
+      "query": "",
+      "open": "commands",
+      "commands": [],
+      "bindings": {},
+      "sessions": [],
+      "summary": {
+        "id": "s",
+        "cwd": "/work",
+        "driver": "model",
+        "createdAt": "2026-10-15T00:00:00Z",
+        "updatedAt": "2026-10-15T00:00:00Z",
+        "usage": {
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "reasoningTokens": 0
+        },
+        "busy": false,
+        "asking": false
+      },
+      "config": {
+        "kernel": null,
+        "plugins": {}
+      },
+      "context": null,
+      "action": {
+        "name": "client",
+        "args": null
+      },
+      "catalogs": {},
+      "keyHints": {},
+      "signals": {}
+    }
   }
 ]

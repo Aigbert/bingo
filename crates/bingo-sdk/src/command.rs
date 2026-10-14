@@ -104,6 +104,10 @@ impl std::fmt::Debug for CommandContext {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum CommandOutcome {
+    /// A client interprets only actions it supports; the host does not dispatch them.
+    Surface {
+        action: crate::Action,
+    },
     /// A site key chose an answer; the surface decides whether to send it.
     Answer {
         answer: crate::Answer,
@@ -132,6 +136,11 @@ pub enum CommandOutcome {
 #[async_trait]
 pub trait Command: Send + Sync {
     fn spec(&self) -> CommandSpec;
+
+    /// A cheap projection of the supplied session, without I/O.
+    fn now(&self, _view: &SessionView<'_>) -> Option<String> {
+        None
+    }
 
     /// Whether this invocation may run beside the current turn. Implementations
     /// inspect the supplied state without calling back into its session actor.
@@ -276,4 +285,29 @@ pub fn recorded_line(line: &str) -> &str {
     } else {
         line
     }
+}
+
+/// Session-scoped metadata over the existing global command catalogue.
+#[async_trait]
+pub trait CommandCatalog: Send + Sync {
+    fn catalog(&self, catalog: crate::Catalog, view: &SessionView<'_>) -> crate::Catalog;
+}
+pub const COMMAND_CATALOG: crate::ServiceKey<dyn CommandCatalog> =
+    crate::ServiceKey::new("bingo.commandCatalog");
+
+#[cfg(test)]
+mod surface_contract {
+    use super::*;
+    #[test]
+    fn a_client_action_round_trips_without_host_dispatch() {
+        let wire = serde_json::json!({"kind":"surface","action":{"name":"client","args":{"handler":"one"}}});
+        let outcome: CommandOutcome = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(serde_json::to_value(outcome).unwrap(), wire);
+    }
+}
+
+/// Read-only facts needed by command metadata; no host handle or I/O capability.
+pub struct SessionView<'a> {
+    pub state: &'a crate::SessionState,
+    pub providers: &'a [crate::AuthStatus],
 }

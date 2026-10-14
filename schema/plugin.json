@@ -1474,6 +1474,23 @@
         {
           "type": "object",
           "properties": {
+            "action": {
+              "$ref": "#/$defs/Action"
+            },
+            "kind": {
+              "type": "string",
+              "const": "surface"
+            }
+          },
+          "required": [
+            "kind",
+            "action"
+          ],
+          "description": "A client interprets only actions it supports; the host does not dispatch them."
+        },
+        {
+          "type": "object",
+          "properties": {
             "answer": {
               "$ref": "#/$defs/Answer"
             },
@@ -2068,6 +2085,7 @@
     "Component": {
       "type": "string",
       "enum": [
+        "Palette",
         "Question",
         "UserMessage",
         "AssistantMessage",
@@ -5755,6 +5773,97 @@
       ],
       "description": "The actor's factual observation; only the RPC server can add a\nconnection-scoped availability token after pinning an immutable Item."
     },
+    "PaletteOpen": {
+      "type": "string",
+      "enum": [
+        "commands",
+        "keys",
+        "sessions"
+      ]
+    },
+    "PaletteProps": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "open": {
+          "$ref": "#/$defs/PaletteOpen"
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CatalogEntry"
+          }
+        },
+        "keyHints": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionSummary"
+          }
+        },
+        "summary": {
+          "$ref": "#/$defs/SessionSummary"
+        },
+        "config": {
+          "$ref": "#/$defs/ConfigView"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContextUsage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "signals": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "action": {
+          "$ref": "#/$defs/Action"
+        },
+        "catalogs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/CatalogEntry"
+            }
+          }
+        }
+      },
+      "required": [
+        "query",
+        "open",
+        "commands",
+        "keyHints",
+        "bindings",
+        "sessions",
+        "summary",
+        "config",
+        "signals",
+        "action",
+        "catalogs"
+      ]
+    },
     "PanePlace": {
       "oneOf": [
         {
@@ -6808,6 +6917,22 @@
     },
     "Props": {
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Palette"
+            },
+            "props": {
+              "$ref": "#/$defs/PaletteProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
         {
           "type": "object",
           "properties": {

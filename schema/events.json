@@ -176,6 +176,7 @@
           "Component": {
             "type": "string",
             "enum": [
+              "Palette",
               "Question",
               "UserMessage",
               "AssistantMessage",
@@ -1305,6 +1306,7 @@
           "Component": {
             "type": "string",
             "enum": [
+              "Palette",
               "Question",
               "UserMessage",
               "AssistantMessage",
@@ -3394,6 +3396,7 @@
           "Component": {
             "type": "string",
             "enum": [
+              "Palette",
               "Question",
               "UserMessage",
               "AssistantMessage",
@@ -7358,6 +7361,7 @@
           "Component": {
             "type": "string",
             "enum": [
+              "Palette",
               "Question",
               "UserMessage",
               "AssistantMessage",
@@ -8979,6 +8983,23 @@
           "CommandOutcome": {
             "oneOf": [
               {
+                "description": "A client interprets only actions it supports; the host does not dispatch them.",
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "$ref": "#/$defs/Action"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "surface"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "action"
+                ]
+              },
+              {
                 "description": "A site key chose an answer; the surface decides whether to send it.",
                 "type": "object",
                 "properties": {
@@ -9079,6 +9100,21 @@
                   "body"
                 ]
               }
+            ]
+          },
+          "Action": {
+            "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "args": {
+                "default": null
+              }
+            },
+            "required": [
+              "name"
             ]
           },
           "Answer": {
@@ -10121,21 +10157,6 @@
               "label"
             ]
           },
-          "Action": {
-            "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "args": {
-                "default": null
-              }
-            },
-            "required": [
-              "name"
-            ]
-          },
           "Direction": {
             "type": "string",
             "enum": [
@@ -10213,6 +10234,7 @@
           "Component": {
             "type": "string",
             "enum": [
+              "Palette",
               "Question",
               "UserMessage",
               "AssistantMessage",

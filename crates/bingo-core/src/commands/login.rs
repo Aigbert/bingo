@@ -19,6 +19,20 @@ pub(super) struct LoginCommand {
 
 #[async_trait]
 impl Command for LoginCommand {
+    fn now(&self, view: &command::SessionView<'_>) -> Option<String> {
+        let missing = view
+            .providers
+            .iter()
+            .filter(|auth| {
+                matches!(
+                    auth,
+                    AuthStatus::Missing { .. } | AuthStatus::Expired { .. }
+                )
+            })
+            .count();
+        (missing > 0).then(|| format!("{missing} signed out"))
+    }
+
     fn spec(&self) -> CommandSpec {
         super::spec(
             "login",

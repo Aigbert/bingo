@@ -4,7 +4,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+mod palette;
 mod props;
+pub use palette::*;
 mod sealed;
 pub use props::*;
 pub use sealed::*;
@@ -25,6 +27,7 @@ macro_rules! components {
     };
 }
 components! {
+    Palette(Box<PaletteProps>),
     Question(QuestionProps), UserMessage(UserMessageProps),
     AssistantMessage(AssistantMessageProps), ToolUse(ToolUseProps),
     ToolResult(ToolResultProps), ToolGroup(ToolGroupProps),

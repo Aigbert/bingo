@@ -733,6 +733,23 @@
         {
           "type": "object",
           "properties": {
+            "action": {
+              "$ref": "#/$defs/Action"
+            },
+            "kind": {
+              "type": "string",
+              "const": "surface"
+            }
+          },
+          "required": [
+            "kind",
+            "action"
+          ],
+          "description": "A client interprets only actions it supports; the host does not dispatch them."
+        },
+        {
+          "type": "object",
+          "properties": {
             "answer": {
               "$ref": "#/$defs/Answer"
             },
@@ -7169,6 +7186,7 @@
     "Component": {
       "type": "string",
       "enum": [
+        "Palette",
         "Question",
         "UserMessage",
         "AssistantMessage",

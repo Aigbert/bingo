@@ -104,6 +104,10 @@ impl Actor {
             self.cancel_command_interactions().await?;
         }
         match outcome {
+            Ok(CommandOutcome::Surface { action }) => {
+                self.applied(intent, json!({"handled": true, "surface": action}))
+                    .await?;
+            }
             Ok(CommandOutcome::Answer { answer }) => {
                 self.applied(intent, json!({"handled": true, "answer": answer}))
                     .await?;

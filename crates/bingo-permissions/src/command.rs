@@ -49,6 +49,16 @@ impl PermissionCommand {
 
 #[async_trait]
 impl Command for PermissionCommand {
+    fn now(&self, view: &bingo_sdk::command::SessionView<'_>) -> Option<String> {
+        let state = view.state;
+        bingo_sdk::slot::placed(state)
+            .iter()
+            .find_map(|placed| match &placed.slot {
+                bingo_sdk::slot::Slot::Mode { current, .. } => Some(current.clone()),
+                _ => None,
+            })
+    }
+
     fn spec(&self) -> CommandSpec {
         CommandSpec {
             keys: vec![],
@@ -99,6 +109,35 @@ mod tests {
     use serde_json::{Value, json};
 
     use crate::Settings;
+
+    #[test]
+    fn now_reads_the_supplied_sessions_mode_signal() {
+        let summary = serde_json::from_value(json!({"id":"ses_view","cwd":"/work","driver":"model","createdAt":"2026-10-15T00:00:00Z","updatedAt":"2026-10-15T00:00:00Z","usage":bingo_sdk::Usage::default(),"busy":false,"asking":false})).unwrap();
+        let mut state = bingo_sdk::SessionState::new(summary);
+        state
+            .signals
+            .entry("permissions".into())
+            .or_default()
+            .insert(
+                "mode".into(),
+                bingo_sdk::slot::with(
+                    json!({}),
+                    [bingo_sdk::slot::Slot::Mode {
+                        current: "plan".into(),
+                        modes: vec![],
+                    }],
+                ),
+            );
+        let policy = Arc::new(PermissionsPolicy::new(crate::Permissions::default(), None).unwrap());
+        let command = PermissionCommand::new(policy);
+        assert_eq!(
+            command.now(&bingo_sdk::command::SessionView {
+                state: &state,
+                providers: &[]
+            }),
+            Some("plan".into())
+        );
+    }
 
     /// A command context reads its session, its directory and a host;
     /// `/permission` asks the host nothing, so every answer here would be a bug.

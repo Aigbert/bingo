@@ -960,6 +960,11 @@ impl HostApi for Host {
     }
 
     fn service_any(&self, key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
+        if key == command::COMMAND_CATALOG.name() {
+            let reader: Arc<dyn command::CommandCatalog> =
+                Arc::new(catalog::Scoped(self.weak.clone()));
+            return Some(Arc::new(reader));
+        }
         if key == APPROVALS.name() {
             let authority: Arc<dyn ApprovalReader> = self.approvals.clone();
             return Some(Arc::new(authority));

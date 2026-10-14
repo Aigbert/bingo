@@ -17,6 +17,18 @@ pub(super) struct ModelCommand {
 
 #[async_trait]
 impl Command for ModelCommand {
+    fn now(&self, view: &command::SessionView<'_>) -> Option<String> {
+        let state = view.state;
+        state.summary.model.as_ref().map(|model| {
+            state
+                .summary
+                .provider
+                .as_ref()
+                .map(|provider| format!("{provider}/{model}"))
+                .unwrap_or_else(|| model.clone())
+        })
+    }
+
     fn spec(&self) -> CommandSpec {
         super::spec(
             "model",

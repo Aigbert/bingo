@@ -19,6 +19,11 @@ pub(super) struct RenameCommand {
 
 #[async_trait]
 impl Command for RenameCommand {
+    fn now(&self, view: &command::SessionView<'_>) -> Option<String> {
+        let state = view.state;
+        state.summary.title.clone()
+    }
+
     fn spec(&self) -> CommandSpec {
         super::spec(
             "rename",

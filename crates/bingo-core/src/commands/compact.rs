@@ -15,6 +15,14 @@ pub(super) struct CompactCommand {
 
 #[async_trait]
 impl Command for CompactCommand {
+    fn now(&self, view: &command::SessionView<'_>) -> Option<String> {
+        let state = view.state;
+        state
+            .context
+            .as_ref()
+            .map(|usage| format!("{} used", usage.used))
+    }
+
     fn spec(&self) -> CommandSpec {
         super::spec(
             "compact",

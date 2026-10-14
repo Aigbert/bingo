@@ -632,3 +632,108 @@ mod event_contract {
         host.shutdown().await;
     }
 }
+
+pub(super) struct Scoped(pub std::sync::Weak<super::Host>);
+impl command::CommandCatalog for Scoped {
+    fn catalog(&self, mut catalog: Catalog, view: &command::SessionView<'_>) -> Catalog {
+        let Some(host) = self.0.upgrade() else {
+            return catalog;
+        };
+        for entry in &mut catalog.entries {
+            if let Some(command) = host
+                .registry
+                .commands
+                .iter()
+                .find(|command| command.spec().name == entry.id)
+            {
+                entry.meta["now"] = json!(command.now(view));
+            }
+        }
+        catalog
+    }
+}
+
+#[cfg(test)]
+mod current_values {
+    use super::*;
+    #[tokio::test]
+    async fn current_values_use_the_supplied_session_without_host_calls() {
+        let home = tempfile::tempdir().unwrap();
+        let host = crate::Host::build(vec![], crate::HostConfig::new(Env::rooted(home.path())))
+            .await
+            .unwrap();
+        let attachment = host
+            .open(
+                SessionSelector::Create {
+                    spec: SessionSpec {
+                        cwd: home.path().into(),
+                        driver: Driver::Log,
+                        ..Default::default()
+                    },
+                },
+                ClientIdentity {
+                    name: "fixture".into(),
+                    surface: "terminal".into(),
+                },
+                OpenOptions::default(),
+            )
+            .await
+            .unwrap();
+        let mut state = attachment.snapshot;
+        state.summary.title = Some("A title".into());
+        state.summary.provider = Some("fake".into());
+        state.summary.model = Some("large".into());
+        state.config.kernel["thinking"] = json!("xHigh");
+        state.context = Some(ContextUsage {
+            used: 123,
+            window: 1000,
+            trigger: 900,
+        });
+        let base = host.catalog(CatalogKind::Commands).await.unwrap();
+        let reader = HostHandle(host.clone())
+            .service(&command::COMMAND_CATALOG)
+            .unwrap();
+        let catalog = reader.catalog(
+            base,
+            &command::SessionView {
+                state: &state,
+                providers: &[],
+            },
+        );
+        for (name, want) in [
+            ("model", json!("fake/large")),
+            ("think", json!("xhigh")),
+            ("rename", json!("A title")),
+            ("compact", json!("123 used")),
+            ("login", Value::Null),
+        ] {
+            let entry = catalog
+                .entries
+                .iter()
+                .find(|entry| entry.id == name)
+                .unwrap();
+            assert_eq!(entry.meta["now"], want, "{name}");
+            assert!(entry.meta.as_object().unwrap().contains_key("now"));
+        }
+        let providers = [
+            AuthStatus::Missing {
+                hint: "test".into(),
+            },
+            AuthStatus::Ready,
+            AuthStatus::Expired {
+                hint: "test".into(),
+            },
+        ];
+        let view = command::SessionView {
+            state: &state,
+            providers: &providers,
+        };
+        for command in &host.registry.commands {
+            let value = command.now(&view);
+            if command.spec().name == "login" {
+                assert_eq!(value.as_deref(), Some("2 signed out"));
+            }
+        }
+        host.shutdown().await;
+    }
+}
