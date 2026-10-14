@@ -56,7 +56,9 @@ async fn serve(
     if ready.send(Ok(patterns)).is_err() {
         return;
     }
-    let drive = tokio::spawn(runtime.drive());
+    // All runtime polling shares this task's waker, including nested hook completions.
+    let drive = runtime.drive();
+    tokio::pin!(drive);
     let mut jobs = FuturesUnordered::new();
     loop {
         tokio::select! {
@@ -64,11 +66,10 @@ async fn serve(
             _ = stop.cancelled() => break,
             Some(request) = requests.recv() => jobs.push(execute(context.clone(), active.clone(), request)),
             _ = jobs.next(), if !jobs.is_empty() => (),
+            _ = &mut drive => break,
             else => break,
         }
     }
-    drive.abort();
-    let _ = drive.await;
     drop(jobs);
     drop(context);
     runtime.run_gc().await;
