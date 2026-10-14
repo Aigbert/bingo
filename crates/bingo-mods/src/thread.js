@@ -8,17 +8,24 @@ export async function run(event, input, site, ask, cancelled, remaining) {
     return answer.value;
   };
   const location = JSON.parse(site);
+  const apis = [];
+  const scoped = port => {
+    const api = dollar(port, location, location.plugin, callbacks);
+    apis.push(api);
+    return api;
+  };
+  try {
   if (location.testing !== undefined && testing) {
     if (location.testing === 'list') return JSON.stringify(testing.list());
     const api = new Proxy({}, {get: (_, noun) => {
-      const value = dollar({request},location,location.plugin,callbacks)[noun];
+      const value = scoped({request})[noun];
       return noun === 'ui' ? {...value,mount:testing.mount} : value;
     }});
     return JSON.stringify(await testing.run(location.testing,api,request,location));
   }
   if (location.callback !== undefined) {
     const port = {request:(method, params) => request(method, params, 4294967295)};
-    const api = dollar(port, location, location.plugin, callbacks);
+    const api = scoped(port);
     const inputValue = JSON.parse(input);
     if (location.callback === '__ui__') {
       const dispatch = (event, value, next) => hooks.dispatch(hooks.entries.filter(entry => patternMatches(entry.pattern, event)),
@@ -30,7 +37,7 @@ export async function run(event, input, site, ask, cancelled, remaining) {
   if (location.hook !== undefined) {
     const entry = hooks.entries[location.hook];
     const port = {request:(method, params) => request(method, params, location.hook)};
-    const api = dollar(port, location, location.plugin, callbacks);
+    const api = scoped(port);
     let called = !!location.called;
     let continuation;
     const next = Object.assign(async value => {
@@ -47,12 +54,13 @@ export async function run(event, input, site, ask, cancelled, remaining) {
       ? await next(inputValue) : await invoke(api, inputValue, next);
     let result = answer === undefined && continuation ? await continuation : answer;
     if (event === 'ui.render' && result !== undefined) {
-      result = handlers.mint(location.plugin.name, location.session, inputValue.requestId, location.generation, result, port);
+      result = handlers.mint(location.plugin.name, location.session, inputValue.requestId, location.generation, await resolveElements(result), port);
     }
     return JSON.stringify({answered:result !== undefined, value:result ?? null});
   }
   const entries = hooks.entries.filter((entry, index) => patternMatches(entry.pattern, event) && !(location.skip ?? []).includes(index));
-  const result = await hooks.dispatch(entries, 0, JSON.parse(input), dollar({ request }, location, location.plugin, callbacks),
-    location.origin, controller.signal, value => request('next', value), entry => dollar({request: (method, params) => request(method, params, hooks.entries.indexOf(entry))}, location, location.plugin, callbacks));
+  const result = await hooks.dispatch(entries, 0, JSON.parse(input), scoped({request}),
+    location.origin, controller.signal, value => request('next', value), entry => scoped({request: (method, params) => request(method, params, hooks.entries.indexOf(entry))}));
   return JSON.stringify(result ?? null);
+  } finally { await Promise.all(apis.map(settleDollar)); }
 }

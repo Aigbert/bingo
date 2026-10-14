@@ -524,7 +524,7 @@ fn clock_and_environment_mocks_keep_grants_and_hook_budgets() {
       test('clock and env', async $ => {
         await mock.clock.set('2026-01-01T00:00:00Z');
         await mock.clock.advance(86400000);
-        expect(await $.clock.now()).toBe('2026-01-02T00:00:00Z');
+        expect(await $.clock.now()).toBe(1767312000000);
         await mock.env({BINGO_TEST:'isolated'});
         expect(await $.env.get({name:'BINGO_TEST'})).toBe('isolated');
         expect(await $.env.get({name:'PATH'})).toBe(null);
@@ -587,7 +587,7 @@ fn sdk_helpers_run_without_a_mod_manifest() {
             .lines()
             .filter(|line| line.starts_with("PASS "))
             .count(),
-        3,
+        4,
         "{output}"
     );
     assert!(output.contains("SKIP src/on.test.ts"), "{output}");

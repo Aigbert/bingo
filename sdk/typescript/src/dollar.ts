@@ -1,11 +1,25 @@
 import type { Callbacks, Callback } from './callbacks.ts';
 import { ui } from './ui.ts';
 import { dollarRoutes } from './dollar-types.ts';
-import type { ProcessOutput, DollarInputs, DollarResults } from './dollar-types.ts';
+import type { ProcessOutput, DollarInputs, DollarResults, DollarData } from './dollar-types.ts';
 import type { Rpc } from './rpc.ts';
 import type { HookSite, StateValue, ModelRequest, Completed, Input, ToolSpec, CommandSpec } from './wire.ts';
 
-export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root: string } = { name: '', root: '' }, callbacks?: Callbacks): Dollar {
+const flights = new WeakMap<object, Set<Promise<unknown>>>();
+export async function settleDollar(api: object): Promise<void> {
+  const pending = flights.get(api);
+  while (pending?.size) await Promise.allSettled([...pending]);
+}
+
+export function dollar(rpc: Rpc, site: HookSite, identity: DollarData['plugin'] = { name: '', root: '' }, callbacks?: Callbacks): Dollar {
+  const pending = new Set<Promise<unknown>>();
+  const transport = rpc;
+  rpc = {...transport, request: <T>(method: string, params: unknown): Promise<T> => {
+    const operation = transport.request<T>(method, params);
+    pending.add(operation);
+    void operation.then(() => pending.delete(operation), () => pending.delete(operation));
+    return operation;
+  }};
   const store = (scope: string) => ({
     get: (key: string) => rpc.request<StateValue | null>('host/state/get', { scope, key }),
     set: (key: string, value: unknown, ifVersion?: number) =>
@@ -48,13 +62,18 @@ export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root:
   hostApi.clock.sleep = (ms: number) => sleep({ms});
   const deleteKey = hostApi.store.delete;
   hostApi.store.delete = (key: string) => deleteKey({scope:'global',key});
-  for (const noun of ['tool', 'command']) {
-    const register = hostApi[noun].register;
-    hostApi[noun].register = (spec: { name: string }, handler: Callback) => {
-      if (!callbacks) throw new Error('callback runtime is unavailable');
-      return register({ spec, callback: callbacks.put(noun, handler, spec.name) });
-    };
-  }
+  const registerTool = hostApi.tool.register;
+  hostApi.tool.register = (spec: ToolSpec, handler: Callback) => {
+    if (!callbacks) throw new Error('callback runtime is unavailable');
+    return registerTool({spec, callback:callbacks.put('tool', handler, spec.name)});
+  };
+  const registerCommand = hostApi.command.register;
+  hostApi.command.register = (description: CommandRegistration, handler: Callback = () => ({kind:'applied'})) => {
+    if (!callbacks) throw new Error('callback runtime is unavailable');
+    const {description: hint, ...options} = description;
+    const spec: CommandSpec = {aliases:[],hint:hint ?? '',args:{kind:'none'},instant:false,family:'plugin',...options};
+    return registerCommand({spec, callback:callbacks.put('command', handler, spec.name)});
+  };
   const spawn = hostApi.process.spawn;
   hostApi.process.spawn = async (input: any) => {
     const id = await spawn(input);
@@ -67,7 +86,7 @@ export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root:
     });
   };
   Object.defineProperty(hostApi, 'plugin', { value: Object.freeze({ ...identity }), enumerable: true });
-  return new Proxy(hostApi, {
+  const result = new Proxy(hostApi, {
     get(target, noun: string) {
       if (Object.hasOwn(target, noun)) return target[noun as keyof typeof target];
       if (noun === 'then' || typeof noun !== 'string') return undefined;
@@ -75,6 +94,8 @@ export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root:
         rpc.request<{ result: unknown }>('service/call', { key: noun, method, params }).then(reply => reply.result) });
     },
   }) as Dollar;
+  flights.set(result, pending);
+  return result;
 }
 
 type Operation = keyof DollarInputs;
@@ -97,16 +118,17 @@ export type ProcessHandle = {
   write(body: string | null): Promise<null>;
   kill(): Promise<null>;
 };
+export type CommandRegistration = Pick<CommandSpec, 'name'> & Partial<Omit<CommandSpec, 'name'>> & {description?: string};
 export type Dollar = Replace<HostNouns, {
   process: Replace<HostNouns['process'], {spawn(input: AtSite<DollarInputs['process.spawn']>): Promise<ProcessHandle>}>;
-  readonly plugin: Readonly<{name: string; root: string}>;
+  readonly plugin: Readonly<DollarData['plugin']>;
   state: State;
   store: State & {keys(): Promise<string[]>; delete(key: string): Promise<boolean>};
   model: Replace<HostNouns['model'], {complete(request: ModelRequest): Promise<Completed>}>;
   tool: Replace<HostNouns['tool'], {register(spec: ToolSpec, handler: Callback): Promise<string>}>;
-  command: Replace<HostNouns['command'], {register(spec: CommandSpec, handler: Callback): Promise<string>}>;
+  command: Replace<HostNouns['command'], {register(spec: CommandRegistration, handler?: Callback): Promise<string>}>;
   clock: {
-    now(): Promise<string>;
+    now(): Promise<number>;
     sleep(ms: number): Promise<null>;
     after(ms: number, handler: Callback): Promise<string>;
     every(ms: number, handler: Callback): Promise<string>;

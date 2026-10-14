@@ -46,6 +46,13 @@ impl Module {
             engine,
         })
     }
+    pub fn identity(&self) -> crate::dollar::table::PluginData {
+        crate::dollar::table::PluginData {
+            name: self.found.name.clone(),
+            root: self.found.root.clone(),
+            version: Some(self.found.manifest.version.clone()),
+        }
+    }
     pub async fn close(&self) {
         if let Some(engine) = &self.engine {
             engine.close().await;

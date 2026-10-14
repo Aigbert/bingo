@@ -63,7 +63,8 @@ After M121, M123–M125, M137, M138.
 ## Non-goals
 
 - Components/`$.ui.log` (M141), desktop rendering, non-above placement (M151),
-  Client/blit, extra styling, OSC 8, isPlaced, copy/scroll/focus/selection (design §8).
+  Client/blit (no surface runtime), extra styling, OSC 8, isPlaced, copy/scroll/focus/selection (surface ownership; design §8).
+- Vscode/mobile/desktop surfaces live outside this repository (ADR-0080 rejected).
 ## Risks
 
 - `onInput` per keystroke crosses command/hook/write/render; coalesce per frame if slow.

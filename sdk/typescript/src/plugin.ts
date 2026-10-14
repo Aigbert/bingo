@@ -3,8 +3,8 @@ import { Hooks } from './cross.ts';
 import type { Register, Entry } from './on.ts';
 import { patternMatches, renderMatcher } from './on.ts';
 import { Callbacks } from './callbacks.ts';
-import { dollar } from './dollar.ts';
-import { Handlers } from './ui.ts';
+import { dollar, settleDollar } from './dollar.ts';
+import { Handlers, resolveElements } from './ui.ts';
 import { dollarRoutes } from './dollar-types.ts';
 import { Peer, stdio } from './rpc.ts';
 import type { InitializeParams, InitializeResult, ToolSpec } from './wire.ts';
@@ -21,14 +21,16 @@ export function runtime(peer: Peer, register: Register) {
   const handlers = new Handlers();
   const renderSites = new WeakMap<object, {request: any; port: any}>();
   const wrap = (hook: any) => async (api: any, input: any, next: any) => {
+    try {
     const answer = await hook(api, input, next);
     const site = renderSites.get(api);
     return site && answer !== undefined ? handlers.mint(identity.name, site.request.site.session,
-      site.request.input.requestId, site.request.chain, answer, site.port) : answer;
+      site.request.input.requestId, site.request.chain, await resolveElements(answer), site.port) : answer;
+    } finally { await settleDollar(api); }
   };
   let negotiated = new Set<string>();
   let pluginName = "";
-  let identity = Object.freeze({ name: "", root: "" });
+  let identity: import('./dollar-types.ts').PluginData = Object.freeze({ name: "", root: "" });
   const rpc = {
     request: <T>(method: string, params: unknown): Promise<T> => {
       if (!negotiated.has(method)) return Promise.reject(new Error(`capability unavailable: ${method}`));
@@ -61,7 +63,7 @@ export function runtime(peer: Peer, register: Register) {
   peer.handlers.set('initialize', async (params: InitializeParams): Promise<InitializeResult> => {
     if (params.protocol !== 2) throw new Error(`plugin protocol 2 required; host speaks ${params.protocol}`);
     pluginName = params.pluginName;
-    identity = Object.freeze({ name: params.pluginName, root: params.pluginRoot });
+    identity = Object.freeze({ name: params.pluginName, root: params.pluginRoot, ...(params.pluginVersion === undefined ? {} : {version:params.pluginVersion}) });
     await register(hooks.on, params.config);
     for (const entry of hooks.entries) {
       entry.hook = wrap(entry.hook);
@@ -101,17 +103,19 @@ export function runtime(peer: Peer, register: Register) {
     await hooks.observe('session.start', {session:site.session}, undefined, dollarFor, skip);
     return null;
   });
-  peer.handlers.set('callback/run', request => {
+  peer.handlers.set('callback/run', async request => {
     const context = {parent:request.chain, callers:peer.context()?.callers ?? []};
     const port = {...rpc, request:<T>(method:string, params:unknown) =>
       peer.withContext(context, () => rpc.request<T>(method, params))};
     const api = dollar(port, request.site, identity, callbacks);
+    try {
     if (request.callback === '__ui__') {
-      return handlers.fire(request.site.session, request.input, port, (event, input, next) =>
+      return await handlers.fire(request.site.session, request.input, port, (event, input, next) =>
         hooks.dispatch(hooks.entries.filter(entry => patternMatches(entry.pattern, event)),
           0, input, api, request.site, new AbortController().signal, next));
     }
-    return callbacks.run(request.callback, api, request.input);
+    return await callbacks.run(request.callback, api, request.input);
+    } finally { await settleDollar(api); }
   });
   peer.handlers.set('intercept/cancel', params => hooks.cancel(params.chain));
   return {

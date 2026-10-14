@@ -56,7 +56,9 @@ async fn serve(
     if ready.send(Ok(patterns)).is_err() {
         return;
     }
-    let drive = tokio::spawn(runtime.drive());
+    // All runtime polling shares this task's waker, including nested hook completions.
+    let drive = runtime.drive();
+    tokio::pin!(drive);
     let mut jobs = FuturesUnordered::new();
     loop {
         tokio::select! {
@@ -64,11 +66,10 @@ async fn serve(
             _ = stop.cancelled() => break,
             Some(request) = requests.recv() => jobs.push(execute(context.clone(), active.clone(), request)),
             _ = jobs.next(), if !jobs.is_empty() => (),
+            _ = &mut drive => break,
             else => break,
         }
     }
-    drive.abort();
-    let _ = drive.await;
     drop(jobs);
     drop(context);
     runtime.run_gc().await;
@@ -266,7 +267,7 @@ fn bootstrap(entry: &Entry, config: &Value) -> String {
         format!("await register(hooks.on, {config});")
     };
     format!(
-        "import {{ Hooks, dollar, Callbacks, Handlers, patternMatches, matches, frozen, renderMatcher }} from 'bingo';\n{import}\nconst hooks = new Hooks();\nconst callbacks = new Callbacks();\nconst handlers = new Handlers();\n{register}\n{}",
+        "import {{ Hooks, dollar, settleDollar, Callbacks, Handlers, resolveElements, patternMatches, matches, frozen, renderMatcher }} from 'bingo';\n{import}\nconst hooks = new Hooks();\nconst callbacks = new Callbacks();\nconst handlers = new Handlers();\n{register}\n{}",
         include_str!("thread.js")
     )
 }

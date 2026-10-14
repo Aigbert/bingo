@@ -58,7 +58,7 @@ share QuickJS and Node semantics. Reuse M127's HTTP client and M128's process tr
 
 ## Non-goals
 
-npm, sockets, PTYs, streamed fetch, host environment mutation, unconfigured MCP servers, audio, telemetry.
+npm, sockets, PTYs, streamed fetch, host environment mutation, unconfigured MCP servers, audio (no player or audio stack), telemetry.
 
 ## Risks
 

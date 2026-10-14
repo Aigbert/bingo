@@ -18,6 +18,14 @@ pub fn strip(path: &Path, source: &str) -> Result<String, StripError> {
 }
 
 pub(crate) fn compile(path: &Path, source: &str, testing: bool) -> Result<String, StripError> {
+    if crate::imports::declaration(path) {
+        return Err(at(
+            path,
+            source,
+            0,
+            "a declaration file is not a runtime module",
+        ));
+    }
     let allocator = Allocator::default();
     let source_type =
         SourceType::from_path(path).map_err(|why| at(path, source, 0, &why.to_string()))?;
@@ -75,17 +83,14 @@ pub(crate) fn compile(path: &Path, source: &str, testing: bool) -> Result<String
 
 fn check(path: &Path, source: &str, kind: AstKind<'_>, testing: bool) -> Result<(), StripError> {
     let denied = |why: &str| at(path, source, kind.span().start as usize, why);
-    let specifier = match kind {
-        AstKind::ImportDeclaration(import) => Some(import.source.value.as_str()),
-        AstKind::ExportAllDeclaration(export) => Some(export.source.value.as_str()),
-        AstKind::ExportFromDeclaration(export) => Some(export.source.value.as_str()),
+    match kind {
         AstKind::ImportExpression(_) => return Err(denied("dynamic import() is not available")),
         AstKind::IdentifierReference(id) if id.name == "require" => {
             return Err(denied("require is not available"));
         }
-        _ => None,
-    };
-    if let Some(specifier) = specifier {
+        _ => (),
+    }
+    if let Some(specifier) = crate::imports::runtime_specifier(kind) {
         if testing && specifier == "bingo/testing" {
             return Ok(());
         }

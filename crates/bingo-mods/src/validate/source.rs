@@ -53,10 +53,11 @@ pub(super) fn graph(
         if !seen.insert(file.clone()) {
             continue;
         }
-        let path = root.join(&file).canonicalize().map_err(|e| e.to_string())?;
-        if !path.starts_with(&root) {
-            return Err(format!("{}: module escapes the mod root", file.display()));
-        }
+        let path = crate::imports::module_path(&root, &file)?;
+        let file = path
+            .strip_prefix(&root)
+            .map_err(|e| e.to_string())?
+            .to_path_buf();
         let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
         let name = file.to_string_lossy().replace('\\', "/");
         let mut source = Source {
@@ -90,7 +91,7 @@ fn scan(file: &Path, source: &mut Source<'_>) -> Vec<PathBuf> {
     let mut imports = Vec::new();
     for node in semantic.nodes().iter() {
         let kind = node.kind();
-        if let Some(specifier) = specifier(kind) {
+        if let Some(specifier) = crate::imports::runtime_specifier(kind) {
             match crate::strip::resolve(file, specifier) {
                 Ok(path) if specifier != "bingo" => imports.push(path),
                 Ok(_) => (),
@@ -113,12 +114,4 @@ fn scan(file: &Path, source: &mut Source<'_>) -> Vec<PathBuf> {
     super::keys::check(&semantic, source);
     super::props::check(&semantic, source);
     imports
-}
-fn specifier(kind: AstKind<'_>) -> Option<&str> {
-    match kind {
-        AstKind::ImportDeclaration(import) => Some(import.source.value.as_str()),
-        AstKind::ExportAllDeclaration(export) => Some(export.source.value.as_str()),
-        AstKind::ExportFromDeclaration(export) => Some(export.source.value.as_str()),
-        _ => None,
-    }
 }

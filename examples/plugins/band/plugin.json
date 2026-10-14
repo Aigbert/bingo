@@ -1,1 +1,1 @@
-{"name":"band","version":"1","module":"register.ts","uses":["state","ui"]}
+{"name":"band","version":"1","module":"register.ts","uses":["state","ui","clock"]}

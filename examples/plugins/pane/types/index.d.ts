@@ -1,1 +1,1 @@
-export interface PluginState { 'pane': { calls: {id: string; tool: string}[] } }
+export interface PluginState { 'pane': { calls: {id: string; tool: string; isDone: boolean}[] } }

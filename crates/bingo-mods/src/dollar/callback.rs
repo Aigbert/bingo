@@ -36,7 +36,7 @@ impl Executor for Native {
         }
         let engine = self.module.engine.as_ref().ok_or("module is unavailable")?;
         let site = json!({"callback":id,"session":cx.session,"turn":cx.turn,"cwd":cx.cwd,
-            "plugin":{"name":self.module.found.name,"root":self.module.found.root}});
+            "plugin":self.module.identity()});
         let mut call = engine
             .call("callback", input, site)
             .map_err(|error| error.to_string())?;

@@ -154,6 +154,32 @@ mod tests {
         }
     }
 
+    #[test]
+    fn tool_call_wire_answers_include_deny_only_results() {
+        let schema = document();
+        let mut pending = Vec::new();
+        references(
+            &schema["methods"]["intercept/tool.call"]["result"],
+            &mut pending,
+        );
+        let mut seen = std::collections::BTreeSet::new();
+        while let Some(reference) = pending.pop() {
+            if seen.insert(reference.clone()) {
+                references(schema.pointer(&reference[1..]).unwrap(), &mut pending);
+            }
+        }
+        assert!(
+            seen.iter().any(|reference| {
+                schema
+                    .pointer(&reference[1..])
+                    .unwrap()
+                    .to_string()
+                    .contains("\"deny\"")
+            }),
+            "a deny-only answer must be in the wire contract"
+        );
+    }
+
     fn frozen() -> Value {
         let path = committed().with_file_name("plugin-2.json");
         serde_json::from_str(&std::fs::read_to_string(path).expect("protocol 2 is frozen")).unwrap()
@@ -247,6 +273,7 @@ mod tests {
             }
             std::fs::write(&path, rendered()).expect("the schema is writable");
             let mut baseline = frozen();
+            amend_interception(&mut baseline, &document());
             amend_elements(&mut baseline, &document());
             // M142: the authorized pre-release events catalogue kind.
             baseline["$defs"]["CatalogKind"] = document()["$defs"]["CatalogKind"].clone();
@@ -265,7 +292,30 @@ mod tests {
         );
     }
 
-    // The person's M140 amendment is restricted to these roots and new referenced types.
+    // The M146 pre-release amendment is restricted to these interception roots.
+    fn amend_interception(baseline: &mut Value, current: &Value) {
+        let mut pending = Vec::new();
+        for method in [
+            "intercept/command.run",
+            "intercept/command.run/after",
+            "intercept/tool.call",
+            "intercept/tool.call/after",
+        ] {
+            baseline["methods"][method] = current["methods"][method].clone();
+            references(&current["methods"][method], &mut pending);
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        while let Some(reference) = pending.pop() {
+            let Some(name) = reference.strip_prefix("#/$defs/") else {
+                continue;
+            };
+            if seen.insert(name.to_owned()) {
+                baseline["$defs"][name] = current["$defs"][name].clone();
+                references(&current["$defs"][name], &mut pending);
+            }
+        }
+    }
+
     fn amend_elements(baseline: &mut Value, current: &Value) {
         for name in ["View", "Slot", "Component"] {
             baseline["$defs"][name] = current["$defs"][name].clone();

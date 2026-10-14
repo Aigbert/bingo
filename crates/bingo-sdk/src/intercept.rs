@@ -223,7 +223,7 @@ pub trait Interceptor: Send + Sync {
         input: ToolCall,
         next: Next<'_, ToolCall, ToolOutput>,
     ) -> Result<ToolOutput, KernelError> {
-        json::tool(self, catalogue::TOOL_CALL, cx, input, next).await
+        json::call(self, cx, input, next).await
     }
     async fn turn_step(
         &self,

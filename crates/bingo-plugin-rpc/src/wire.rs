@@ -145,6 +145,8 @@ pub struct InitializeParams {
     /// The directory the manifest was read from, already resolved.
     pub plugin_root: PathBuf,
     pub plugin_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin_version: Option<String>,
     pub capabilities: BTreeSet<Cap>,
     /// This plugin's settings slice (`plugins.<name>`); `null` when unset.
     #[serde(default)]
@@ -622,12 +624,17 @@ pub static METHODS: &[Method] = &[
     (
         "intercept/tool.call",
         schema_of::<crate::intercept::Before<crate::intercept::ToolEvent>>,
-        schema_of::<crate::intercept::Proceed<crate::intercept::ToolEvent, ToolOutput>>,
+        schema_of::<
+            crate::intercept::Proceed<
+                crate::intercept::ToolEvent,
+                bingo_sdk::catalogue::ToolCallResult,
+            >,
+        >,
     ),
     (
         "intercept/tool.call/after",
-        schema_of::<crate::intercept::After<ToolOutput>>,
-        schema_of::<crate::intercept::ResultValue<ToolOutput>>,
+        schema_of::<crate::intercept::After<bingo_sdk::catalogue::ToolCallResult>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::catalogue::ToolCallResult>>,
     ),
     (
         "intercept/turn.step",
@@ -809,12 +816,17 @@ pub static METHODS: &[Method] = &[
     (
         "intercept/command.run",
         schema_of::<crate::intercept::Before<bingo_sdk::catalogue::CommandRun>>,
-        schema_of::<crate::intercept::Proceed<bingo_sdk::catalogue::CommandRun, CommandOutcome>>,
+        schema_of::<
+            crate::intercept::Proceed<
+                bingo_sdk::catalogue::CommandRun,
+                bingo_sdk::catalogue::CommandReply,
+            >,
+        >,
     ),
     (
         "intercept/command.run/after",
-        schema_of::<crate::intercept::After<CommandOutcome>>,
-        schema_of::<crate::intercept::ResultValue<CommandOutcome>>,
+        schema_of::<crate::intercept::After<bingo_sdk::catalogue::CommandReply>>,
+        schema_of::<crate::intercept::ResultValue<bingo_sdk::catalogue::CommandReply>>,
     ),
     (
         "intercept/command.describe",
@@ -923,11 +935,13 @@ mod tests {
             protocol: PROTOCOL,
             plugin_root: PathBuf::from("/plugins/wordcount"),
             plugin_name: "wordcount".into(),
+            plugin_version: Some("1.2.3".into()),
             capabilities: super::capabilities(),
             config: json!({ "limit": 10 }),
             env: HostEnv::from(&Env::rooted("/home/u")),
         };
         let wire = serde_json::to_value(&params).expect("the handshake serialises");
+        assert_eq!(wire["pluginVersion"], json!("1.2.3"));
         assert_eq!(wire["pluginRoot"], json!("/plugins/wordcount"));
         assert_eq!(wire["env"]["dataDir"], json!("/home/u/.bingo/data"));
         assert_eq!(

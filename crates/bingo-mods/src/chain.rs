@@ -108,7 +108,7 @@ impl Chain<'_> {
             self.engine.hook_time().as_millis()
         };
         let site = json!({"session":self.cx.session, "turn":self.cx.turn, "item":self.cx.item, "cwd":self.cx.cwd,
-            "plugin":{"name":self.module.found.name,"root":self.module.found.root},
+            "plugin":self.module.identity(),
             "generation":self.generation, "hook":hook, "recover":error.is_some(), "called":pending.is_some(), "budget":{"ms":ms,"remainingMs":ms},
             "error":error.map(|error| json!({"kind":error.kind,"message":error.message})),
             "origin":{"plugin":self.module.found.name,"tier":self.tier}});

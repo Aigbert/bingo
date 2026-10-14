@@ -12,13 +12,21 @@ export function register(on: On) {
     }
     return checked;
   });
+  on('tool.call', {tool:'Edit'}, ($, event, next) => {
+    const name = String(event.file_path).replaceAll('\\','/').split('/').pop() ?? '';
+    if (name === '.env' || name.startsWith('.env.')) return {deny:`${$.plugin.name}: protected environment file`};
+    return next(event);
+  }).catch(($, event, next) => next.called ? undefined : {deny:`${$.plugin.name}: guard stopped before execution`});
   on('tool.call', async ($, event, next) => {
     if (counted(event.tool)) {
       await update($, calls, count => count + 1);
       await $.ui.status(`Example calls: ${await read($, calls)}`);
     }
-    if (event.tool === 'Bash' && event.command === 'echo before') {
-      return next({...event, command: 'echo after'});
+    if (event.tool === 'Bash') {
+      const command = event.command.trim();
+      const result = await next({...event, command: command === 'echo before' ? 'echo after' : command});
+      await $.ui.status(result.isError ? `failed: ${command}` : null, {key:'failure'});
+      return result;
     }
     return next(event);
   });

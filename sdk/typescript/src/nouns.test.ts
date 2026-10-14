@@ -33,3 +33,16 @@ test('registered callbacks receive a fresh dollar and frozen plugin identity', a
       {plugin:{name:'fixture',root:'/fixture'},input:{v:1},frozen:true});
   } finally {running.close(); plugin.close(); host.close();}
 });
+
+test('a command descriptor can register without a callback', async () => {
+  const {dollar} = await import('./dollar.ts');
+  const {Callbacks} = await import('./callbacks.ts');
+  const callbacks = new Callbacks();
+  const calls: any[] = [];
+  const rpc = {request: async (_: string, params: any) => {calls.push(params);return {result:'inspect'};}} as any;
+  const api = dollar(rpc, {session:'s'} as any, {name:'fixture',root:'.'}, callbacks);
+  await api.command.register({name:'inspect',description:'Inspect activity'});
+  assert.deepEqual(calls[0].params.spec, {name:'inspect',aliases:[],hint:'Inspect activity',args:{kind:'none'},instant:false,family:'plugin'});
+  assert.deepEqual(await callbacks.run(calls[0].params.callback, api, ''), {kind:'applied'});
+  assert.throws(() => (api.tool.register as any)({name:'missing'}), /callback/);
+});

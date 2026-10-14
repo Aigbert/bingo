@@ -20,10 +20,13 @@ pub(super) fn check(semantic: &Semantic<'_>, source: &mut Source<'_>) {
         if !matches!(noun, "state" | "store" | "env") || method == "keys" {
             continue;
         }
-        let key = call
-            .arguments
-            .first()
-            .and_then(|argument| key(argument, noun));
+        let key = call.arguments.first().and_then(|argument| {
+            if name == "state.atom" {
+                atom_key(argument, source.plugin)
+            } else {
+                key(argument, noun)
+            }
+        });
         if let Some(value) = key {
             if noun == "state" && source.declared.is_some_and(|keys| !keys.contains(value)) {
                 source.finding(
@@ -75,4 +78,36 @@ fn key<'a>(argument: &'a Argument<'a>, noun: &str) -> Option<&'a str> {
         });
     }
     None
+}
+
+fn atom_key<'a>(argument: &'a Argument<'a>, plugin: &str) -> Option<&'a str> {
+    if let Some(key) = key(argument, "state") {
+        return Some(key);
+    }
+    let Expression::ObjectExpression(object) = argument.as_expression()?.get_inner_expression()
+    else {
+        return None;
+    };
+    if object.properties.len() != 2 {
+        return None;
+    }
+    let mut owner = None;
+    let mut key = None;
+    for property in &object.properties {
+        let ObjectPropertyKind::ObjectProperty(property) = property else {
+            return None;
+        };
+        if property.computed || property.shorthand {
+            return None;
+        }
+        let Expression::StringLiteral(value) = &property.value else {
+            return None;
+        };
+        match property.key.static_name().as_deref() {
+            Some("plugin") if owner.is_none() => owner = Some(value.value.as_str()),
+            Some("key") if key.is_none() => key = Some(value.value.as_str()),
+            _ => return None,
+        }
+    }
+    (owner == Some(plugin)).then_some(key).flatten()
 }

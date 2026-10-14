@@ -114,3 +114,196 @@ fn passing_a_noun_or_method_cannot_hide_an_alias() {
         2
     );
 }
+
+#[test]
+fn noun_data_reads_are_values_but_noun_and_method_aliases_are_not() {
+    let values = checked(
+        "export const register = on => on('session.start', $ => { const name = $.plugin.name; const version = $.plugin.version; const root = $.plugin.root; helper($.plugin.name); $.plugin.name.toUpperCase(); const first = $.plugin.name[0]; });",
+        "",
+    );
+    assert!(values.valid(), "{:?}", values.findings);
+    assert!(values.calls.is_empty(), "{:?}", values.calls);
+    let aliases = checked(
+        "export const register = on => on('session.start', $ => { const api = $; const noun = $.plugin; const method = $.state.get; const unknown = $.plugin.unknown; });",
+        "",
+    );
+    assert_eq!(
+        aliases
+            .findings
+            .iter()
+            .filter(|f| f.rule == Rule::DollarStatic)
+            .count(),
+        4
+    );
+}
+
+#[tokio::test]
+async fn erased_type_imports_validate_and_load_with_the_same_boundary() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(root.path().join("hooks")).unwrap();
+    std::fs::create_dir(root.path().join("types")).unwrap();
+    std::fs::write(
+        root.path().join("types/index.d.ts"),
+        "export interface Shape { label: string }\nexport interface Other {}\n",
+    )
+    .unwrap();
+    for import in [
+        "import type { Shape } from '../types';",
+        "import { type Shape, type Other } from '../types';",
+        "import type { Shape } from '../types/index.d.ts';",
+        "import type { Shape } from 'unavailable-types';",
+    ] {
+        let source =
+            format!("{import}\nexport const register = on => on('session.start', () => 'loaded');");
+        std::fs::write(root.path().join("hooks/main.ts"), &source).unwrap();
+        let manifest = serde_json::from_value(
+            serde_json::json!({"name":"fixture","version":"1","module":"hooks/main.ts"}),
+        )
+        .unwrap();
+        assert!(
+            validate(root.path(), &manifest).unwrap().valid(),
+            "{import}"
+        );
+        let stripped = crate::strip::strip(Path::new("hooks/main.ts"), &source).unwrap();
+        assert!(!stripped.contains("import"), "{stripped}");
+        let engine = crate::engine::Engine::start(
+            root.path(),
+            "hooks/main.ts",
+            serde_json::json!({}),
+            Default::default(),
+        )
+        .await
+        .unwrap();
+        let mut call = engine
+            .call(
+                "session.start",
+                serde_json::json!({}),
+                serde_json::json!({"session":"s"}),
+            )
+            .unwrap();
+        assert_eq!((&mut call.result).await.unwrap().unwrap(), "loaded");
+        engine.close().await;
+    }
+}
+
+#[tokio::test]
+async fn directory_value_imports_resolve_but_declarations_never_execute() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir(root.path().join("helper")).unwrap();
+    std::fs::write(
+        root.path().join("helper/index.ts"),
+        "export const label = 'directory';",
+    )
+    .unwrap();
+    std::fs::write(root.path().join("main.ts"), "import { label } from './helper'; export const register = on => on('session.start', () => label);").unwrap();
+    let manifest = serde_json::from_value(
+        serde_json::json!({"name":"fixture","version":"1","module":"main.ts"}),
+    )
+    .unwrap();
+    assert!(validate(root.path(), &manifest).unwrap().valid());
+    let engine = crate::engine::Engine::start(
+        root.path(),
+        "main.ts",
+        serde_json::json!({}),
+        Default::default(),
+    )
+    .await
+    .unwrap();
+    let mut call = engine
+        .call(
+            "session.start",
+            serde_json::json!({}),
+            serde_json::json!({"session":"s"}),
+        )
+        .unwrap();
+    assert_eq!((&mut call.result).await.unwrap().unwrap(), "directory");
+    engine.close().await;
+    std::fs::rename(
+        root.path().join("helper/index.ts"),
+        root.path().join("helper/index.d.ts"),
+    )
+    .unwrap();
+    for specifier in ["./helper", "./helper/index.d.ts"] {
+        std::fs::write(root.path().join("main.ts"), format!("import {{ label }} from '{specifier}'; export const register = on => on('session.start', () => label);")).unwrap();
+        assert!(
+            validate(root.path(), &manifest)
+                .unwrap_err()
+                .contains("declaration")
+        );
+        assert!(
+            crate::load::Root::new(root.path(), 4096)
+                .unwrap()
+                .source("helper/index.d.ts")
+                .unwrap_err()
+                .contains("declaration")
+        );
+        assert!(
+            crate::engine::Engine::start(
+                root.path(),
+                "main.ts",
+                serde_json::json!({}),
+                Default::default()
+            )
+            .await
+            .is_err()
+        );
+    }
+}
+
+#[test]
+fn module_constant_matchers_are_static_but_computed_matchers_are_not() {
+    for source in [
+        "const pane = 'activity'; export const register = on => on('ui.render', {component:'Pane',requestId:pane}, () => {});",
+        "const match = {component:'Pane',requestId:'activity'}; export const register = on => on('ui.render', match, () => {});",
+    ] {
+        let result = checked(source, "");
+        assert!(
+            !result.findings.iter().any(|f| f.rule == Rule::OnLiteral),
+            "{:?}",
+            result.findings
+        );
+    }
+    for source in [
+        "const match = {component:'Pane'}; match.component = compute(); export const register = on => on('ui.render', match, () => {});",
+        "let match = {component:'Pane'}; export const register = on => on('ui.render', match, () => {});",
+        "const match = compute(); export const register = on => on('ui.render', match, () => {});",
+        "const match = {requestId: compute()}; export const register = on => on('ui.render', match, () => {});",
+        "const key = 'component'; const match = {[key]:'Pane'}; export const register = on => on('ui.render', match, () => {});",
+        "const base = {component:'Pane'}; const match = {...base}; export const register = on => on('ui.render', match, () => {});",
+        "const match = {component:'Pane'}; export const register = on => { const match = compute(); on('ui.render', match, () => {}); };",
+    ] {
+        assert!(
+            checked(source, "")
+                .findings
+                .iter()
+                .any(|f| f.rule == Rule::OnLiteral),
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn object_atom_keys_use_the_same_declared_key_and_owner() {
+    let result = checked(
+        "import {atom} from 'bingo'; const value = atom({plugin:'fixture',key:'count'} as const, 0);",
+        "",
+    );
+    assert!(result.keys.contains("state:count"), "{:?}", result.findings);
+    assert!(!result.findings.iter().any(|f| f.rule == Rule::StateKey));
+    for key in [
+        "{plugin:'other',key:'count'}",
+        "{plugin:owner,key:'count'}",
+        "{plugin:'fixture',key:name}",
+        "{plugin:'fixture',key:'count',extra:true}",
+        "{...key}",
+    ] {
+        let result = checked(
+            &format!("import {{atom}} from 'bingo'; const value = atom({key}, 0);"),
+            "",
+        );
+        assert!(
+            result.findings.iter().any(|f| f.rule == Rule::StateKey),
+            "{key}"
+        );
+    }
+}
