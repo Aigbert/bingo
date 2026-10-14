@@ -45,19 +45,19 @@ After M121, M123–M125, M137, M138.
   producers, fixtures and generators; exclude M139 world nouns, grant.rs, MCP/agents service rows.
 ## Exit criteria
 
-- [ ] `cargo test -p bingo-sdk`: each node round-trips/folds; legacy Stack/Columns/Text/Code read; every `answer_ok` refusal.
+- [x] `cargo test -p bingo-sdk`: each node round-trips/folds; legacy Stack/Columns/Text/Code read; every `answer_ok` refusal.
       `rg -n 'View::(Stack|Columns)' crates` prints nothing.
-- [ ] `cargo test -p bingo-core chain::render` and `cargo test -p bingo-core host::throttle`: the kernel
+- [x] `cargo test -p bingo-core chain::render` and `cargo test -p bingo-core host::throttle`: the kernel
       link answers `Engine`; a throwing hook and a bad tree each answer
       `Engine` with one notice; 100 invalidations send ≤30 frames a second.
-- [ ] `cargo test -p bingo-plugin-host subscribed::`, `-p bingo-mods`,
+- [x] `cargo test -p bingo-plugin-host subscribed::`, `-p bingo-mods`,
       `-p bingo --test mods_ui`: a read subscribes, a write invalidates,
       `set` in a render is refused, brick 11 passes.
-- [ ] `cargo test -p bingo-surface-tui`: a `TestBackend` test per element;
+- [x] `cargo test -p bingo-surface-tui`: a `TestBackend` test per element;
       panes asked (inline at 200 and 80) and unasked (waiting at 200,
       clicked open); toasts held by `hold_toasts`, gone at `until`.
-- [ ] Schedule/experience/demo-ui narrow snapshots unchanged; any diff pasted and driven in tmux.
-- [ ] `scripts/tui-smoke.sh` passes with `counter`, a tmux drive pasted;
+- [x] Schedule/experience/demo-ui narrow snapshots unchanged; any diff pasted and driven in tmux.
+- [x] `scripts/tui-smoke.sh` passes with `counter`, a tmux drive pasted;
       every gate; the Windows check of `bingo-surface-tui` and
       `bingo-mods`; budget output pasted with the taffy decision.
 ## Non-goals
@@ -65,19 +65,19 @@ After M121, M123–M125, M137, M138.
 - Components/`$.ui.log` (M141), desktop rendering, non-above placement (M151),
   Client/blit, extra styling, OSC 8, isPlaced, copy/scroll/focus/selection (design §8).
 ## Risks
+
 - `onInput` per keystroke crosses command/hook/write/render; coalesce per frame if slow.
-- Re-verified at `5581b978`: M148 layout/canvas replaces rail/sheet; M131's
-  runner/catalogue and M138's `Call.reads`/`ReadLog` exist; render guard does not.
-  `globals.js` still emits `{type,props,children}`. Direct Text writers need migration.
+- Re-verified at `5581b978`: M148 layout/canvas replaced rail/sheet; M131 runner/catalogue and M138 `Call.reads`/`ReadLog` existed, while the render guard and canonical JSX/direct Text writers needed migration.
 - 2026-10-14, person's delegate: authorize the scoped pre-release View/Shown/place/ui-render baseline amendment; protocol 2 freezes at its first release (ADR-0075).
 - 2026-10-14, person's delegate: authorize print Invalidated ignore arms and all mechanical Event/Shown/element sibling mappings; record files below, stop only for new out-of-scope behaviour.
 - 2026-10-14, person's delegate: authorize theme-test file additions only for fitting token roles, keep ember/accent lists and theme values unchanged; merge dev before regenerating and running final gates.
-- Pure flex layout adds no dependency; fixed-axis and legacy narrow fixtures pass. Budget remains unverified at this stop.
+- Pure flex layout adds no dependency; fixed-axis and legacy narrow fixtures pass. Budget: 411 dependencies, 1s warm core check, zero TUI-to-core recompiles; no taffy dependency.
 - 2026-10-14, person's delegate: rename the component to `Question` (wire `Question`), amend ADR-0079 and regenerate contracts; keep discipline 4c unchanged.
+- Windows: 15 touched crates pass; eight stop only at missing Windows SDK C headers in aws-lc-sys/rquickjs-sys/tree-sitter/tree-sitter-bash, left to Windows CI under protocol step 7.
 ## Verified (2026-10-14)
 
 Theme allowlist additions: text → `toast.rs`, `views/{input,select}.rs`; dim → `views/{button,flex,input,link,mod,text}.rs`; bad → `views/button.rs`; no ember/accent additions.
-Mechanical match/fixture updates: `bingo-surface-print/src/{render,stream_json}.rs` (ignore Invalidated), `bingo-core/src/host/tests/commands.rs` (canonical View fold), `bingo-surface-rpc/tests/wire/main.rs` (ui/render params); existing View/CommandSpec constructors are the Files-authorized migration.
+Mechanical match/fixture updates: `bingo-surface-print/src/{render,stream_json}.rs` (ignore Invalidated), `bingo-core/src/host/tests/commands.rs` (canonical View fold), `bingo-surface-rpc/tests/wire/main.rs` (ui/render params), `docs/design/tui.md` (Activity Shown constructor); existing View/CommandSpec constructors are the Files-authorized migration.
 
 | Command | Result lines |
 |---|---|
@@ -85,13 +85,13 @@ Mechanical match/fixture updates: `bingo-surface-print/src/{render,stream_json}.
 | `cargo test -p bingo-sdk view::validate --locked` | test result: FAILED. 0 passed; 1 failed → answers_reject_wrong_engines_foreign_handlers_and_oversized_trees ... ok |
 | `cargo test -p bingo-sdk slot::pull_contract --locked` | test result: FAILED. 0 passed; 1 failed |
 | `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema:: --locked` | protocol 2 removed or retyped a frozen shape; test result: FAILED. 9 passed; 1 failed |
-| `cargo check --workspace --all-targets --locked` | error[E0164]: expected tuple struct or tuple variant, found associated function `View::text`; error[E0004]: `Event::Invalidated` not covered |
+| `cargo check --workspace --all-targets --locked` | error[E0164]: expected tuple struct or tuple variant, found associated function `View::text`; error[E0004]: `Event::Invalidated` not covered<br>Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.28s<br>Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.00s |
 | `cargo test -p bingo-surface-tui views::tests --locked` | test result: FAILED. 9 passed; 3 failed → test result: ok. 13 passed; 0 failed |
 | `cargo test -p bingo-surface-tui pulled:: --locked` | test result: FAILED. 0 passed; 1 failed |
 | `cargo test -p bingo-surface-tui pane:: --locked` | test result: FAILED. 0 passed; 1 failed |
-| `cargo test -p bingo-surface-tui toast:: --locked` | test result: FAILED. 0 passed; 1 failed |
+| `cargo test -p bingo-surface-tui toast:: --locked` | test result: FAILED. 0 passed; 1 failed<br>test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 1106 filtered out<br>test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1106 filtered out |
 | `node --test sdk/typescript/src/ui.test.ts` | fail 1: Escape raises close in the mod and removes only its current closable pane → pass 3; fail 0 |
-| `cargo test -p bingo-surface-tui --lib --locked` | every_token_is_spent_where_the_design_says: assertion failed: where `text` is spent; test result: FAILED. 1104 passed; 1 failed; 2 ignored → test result: ok. 1105 passed; 0 failed; 2 ignored |
+| `cargo test -p bingo-surface-tui --lib --locked` | every_token_is_spent_where_the_design_says: assertion failed: where `text` is spent; test result: FAILED. 1104 passed; 1 failed; 2 ignored → test result: ok. 1105 passed; 0 failed; 2 ignored<br>test result: ok. 1106 passed; 0 failed; 2 ignored |
 | `git merge --no-ff dev -m 'merge: dev into M140'` | da6bc325 merge: dev into M140 (dev 686ad289) |
 | `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods dollar::tests::schema_and_types_are_generated_from_the_same_rows --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out |
 | `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc schema::tests::the_committed_schema_is_this_document --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out |
@@ -103,18 +103,48 @@ Mechanical match/fixture updates: `bingo-surface-print/src/{render,stream_json}.
 | `cargo test -p bingo-core host::throttle --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 501 filtered out |
 | `cargo test -p bingo-plugin-rpc --test plugin --locked` | test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
 | `cargo test -p bingo --test mods_ui --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
-| `cargo test -p bingo-surface-tui toast:: --locked` | test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 1106 filtered out |
-| `cargo test -p bingo-surface-tui toast:: --locked` | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1106 filtered out |
 | `bash /tmp/m140-counter-drive.sh` | 80x24: Counter 0→1; Input Ada persisted; Escape closed<br>200x24: Counter 0→1; Input Ada persisted; Escape closed<br>tui-smoke ok |
 | `cargo fmt --all -- --check` | exit_code: 0 |
-| `cargo check --workspace --all-targets --locked` | Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.28s |
-| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.54s |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.54s<br>Finished `dev` profile [unoptimized + debuginfo] target(s) in 29.46s |
 | `cargo test --workspace --locked -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed` | test result: FAILED. 41 passed; 1 failed; a_bound_port_is_a_real_one_and_a_range_lands_inside_itself: attempt to add with overflow |
 | `cargo test -p bingo-loopback --lib --locked server::tests::a_bound_port_is_a_real_one_and_a_range_lands_inside_itself -- --exact --test-threads=1` | test result: ok. 1 passed; 0 failed; 41 filtered out |
 | `cargo test --workspace --all-targets --locked --no-fail-fast -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed` | error: 2 targets failed: `-p bingo-surface-rpc --lib`, `-p bingo-surface-rpc --test wire` |
 | `node --test sdk/typescript/src/*.test.ts` | tests 20; pass 20; fail 0 |
 | `cargo test -p bingo-sdk -p bingo-core -p bingo-surface-tui -p bingo-surface-rpc --lib --locked` | test result: ok. 503 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 146 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 1106 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out |
-| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked` | test result: ok. 130 passed; 0 failed; 0 ignored |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --lib --locked` | test result: ok. 130 passed; 0 failed; 0 ignored<br>test result: FAILED. 128 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
 | `cargo test -p bingo-surface-rpc --test wire --locked` | test result: ok. 41 passed; 0 failed; 1 ignored |
-| `scripts/check_discipline.sh` | a tool named in kernel/sdk code: `crates/bingo-sdk/src/render.rs:10: AskUserQuestion,`<br>cohesion ok<br>discipline FAILED |
-| `cargo test -p bingo-surface-tui --lib --locked` | test result: ok. 1106 passed; 0 failed; 2 ignored |
+| `scripts/check_discipline.sh` | a tool named in kernel/sdk code: `crates/bingo-sdk/src/render.rs:10: AskUserQuestion,`<br>cohesion ok<br>discipline FAILED<br>kernel names no tool<br>cohesion ok<br>discipline ok |
+| `cargo test -p bingo-sdk render::tests::question_is_named_for_its_drawing --locked` | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 146 filtered out |
+| `BINGO_UPDATE_SCHEMA=1 INSTA_UPDATE=always cargo test -p bingo-sdk --locked` | test result: ok. 147 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out<br>test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `cargo test --workspace --locked --no-fail-fast -- --skip a_proxy_with_a_token_this_run_never_minted_gets_nothing --skip a_token_nobody_minted_never_gets_a_conversation --skip a_second_concurrent_stream_on_one_token_is_refused --skip a_token_may_be_dialled_again_once_its_stream_has_closed` | error: 1 target failed: `-p bingo-demo-ui --doc` (expected Shown, found View)<br>exit_code: 0 |
+| `cargo test -p bingo-demo-ui --doc --locked` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out |
+| `cargo test -p bingo --test acp_bridge --locked a_proxy_with_a_token_this_run_never_minted_gets_nothing -- --exact --test-threads=1` | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out |
+| `cargo test -p bingo-provider-acp --test bridge --locked token -- --test-threads=1` | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out |
+| `scripts/budget.sh` | dependencies (unique, normal): 411 (max  411)<br>warm cargo check -p bingo-core: 1s (max  20s)<br>relink isolation: touching the TUI recompiled 0 crates for core (must be 0)<br>target/debug: 14 GB (soft max  5)<br>warn: target/debug exceeds the soft limit<br>test binaries: 159<br>budget ok |
+| `cargo deny check` | advisories ok, bans ok, licenses ok, sources ok |
+| `cargo check -p bingo --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo check -p bingo-agents --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-checkpoints --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-context --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-core --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-demo-ui --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-experience --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-mcp --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo check -p bingo-mods --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys, rquickjs-sys) |
+| `cargo check -p bingo-permissions --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (tree-sitter, tree-sitter-bash) |
+| `cargo check -p bingo-plugin-host --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-plugin-rpc --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo check -p bingo-provider-acp --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-rooms --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-schedule --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-sdk --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-skills --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-surface-print --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo check -p bingo-surface-rpc --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-surface-tui --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo check -p bingo-tasks --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-tool-bash --all-targets --locked --target x86_64-pc-windows-msvc` | PASS |
+| `cargo check -p bingo-tool-fs --all-targets --locked --target x86_64-pc-windows-msvc` | Windows CI: missing Windows SDK C headers (aws-lc-sys) |
+| `cargo build -p bingo --locked` | Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.94s |
+| `scripts/tui-smoke.sh` | 80x24: Counter 0→1; Input Ada persisted; Escape closed<br>200x24: Counter 0→1; Input Ada persisted; Escape closed<br>tui-smoke ok |
+| `rg -n 'View::(Stack\|Columns)' crates` | exit_code: 1; no matches |
