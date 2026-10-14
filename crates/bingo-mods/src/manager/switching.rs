@@ -29,18 +29,24 @@ fn classify(manager: &Manager, module: &Arc<Module>) -> PluginSwitch {
         .get()
         .is_some_and(|dollar| dollar.has_tools(&module.found.name))
         || module.found.manifest.uses.iter().any(|name| name == "tool")
+        || module
+            .admission
+            .decision()
+            .ok()
+            .flatten()
+            .is_some_and(|grant| grant.uses.contains("tool"))
     {
         return next("tools");
     }
     let matcher = crate::link::Link(module.clone()).matcher();
-    if catalogue::ALL.iter().any(|entry| {
+    if let Some(entry) = catalogue::ALL.iter().find(|entry| {
         entry.shapes_request
             && matcher
                 .patterns
                 .iter()
                 .any(|pattern| pattern.matches(&entry.name))
     }) {
-        return next("prompt.compose");
+        return next(&entry.name);
     }
     PluginSwitch::Now
 }
@@ -180,3 +186,6 @@ pub(super) async fn reap(manager: &Manager) {
 fn next(why: &str) -> PluginSwitch {
     PluginSwitch::NextStart { why: why.into() }
 }
+
+#[cfg(test)]
+mod tests;
