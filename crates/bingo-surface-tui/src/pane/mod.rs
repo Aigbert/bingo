@@ -1,4 +1,5 @@
-//! Pane placement and the editor belonging to the focused element.
+pub mod seat;
+// Pane placement and the editor belonging to the focused element.
 use crate::{
     clock::Now, composer::Composer, effect::Effect, focus::Focus, layout::Layout, theme, ui::Ui,
     views,
@@ -33,7 +34,8 @@ pub struct Pane {
     pub close: bool,
     pub hold: bool,
     pub asked: bool,
-    pub rows: u16,
+    pub place: Vec<bingo_sdk::slot::Place>,
+    pub size: bingo_sdk::slot::PaneSize,
     pub view: Shown,
 }
 pub fn placed(state: &SessionState) -> Vec<Pane> {
@@ -47,7 +49,8 @@ pub fn placed(state: &SessionState) -> Vec<Pane> {
                 close_on_escape,
                 hold_toasts,
                 asked,
-                rows,
+                place,
+                size,
                 view,
             } = placed.slot
             {
@@ -60,7 +63,8 @@ pub fn placed(state: &SessionState) -> Vec<Pane> {
                     close: close_on_escape,
                     hold: hold_toasts,
                     asked,
-                    rows,
+                    place,
+                size,
                     view,
                 })
             } else {
@@ -103,7 +107,7 @@ pub fn height(ui: &Ui, state: &SessionState, screen: u16) -> u16 {
     placed(state)
         .iter()
         .filter(|pane| ui.placed.panes.visible(pane))
-        .map(|pane| pane.rows.max(2))
+        .map(|pane| pane.size.rows.ideal.cells(screen).max(2))
         .fold(0, u16::saturating_add)
         .min(screen / 3)
 }
@@ -116,7 +120,7 @@ pub fn draw(ui: &Ui, state: &SessionState, frame: &mut Layout, area: Rect, now: 
     let count = panes.len().max(1) as u16;
     for pane in panes {
         let height = pane
-            .rows
+            .size.rows.ideal.cells(area.height)
             .max(2)
             .min(area.height / count)
             .min(area.bottom().saturating_sub(y));
@@ -445,7 +449,8 @@ mod tests {
             close_on_escape: true,
             hold_toasts: false,
             asked,
-            rows: 20,
+            place: bingo_sdk::slot::above(),
+            size: bingo_sdk::slot::PaneSize::from_rows(20),
             view: Shown::View(View::text("Count: 0")),
         }
     }
