@@ -88,3 +88,75 @@ async fn check(conflict: bool) {
     assert_eq!(started.load(Ordering::SeqCst), usize::from(!conflict));
     assert_eq!(stopped.load(Ordering::SeqCst), usize::from(!conflict));
 }
+
+struct Ordered {
+    manifest: &'static PluginManifest,
+    seen: Arc<std::sync::Mutex<Vec<&'static str>>>,
+}
+struct OrderedLink(&'static str);
+#[async_trait]
+impl Interceptor for OrderedLink {
+    fn id(&self) -> &str {
+        self.0
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher::at(bingo_sdk::catalogue::SESSION_START)
+    }
+}
+#[async_trait]
+impl Plugin for Ordered {
+    fn manifest(&self) -> &'static PluginManifest {
+        self.manifest
+    }
+    fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+        self.seen.lock().unwrap().push(self.manifest.id);
+        registrar.add(command(self.manifest.id));
+        registrar.add(Contribution::Interceptor {
+            placement: Default::default(),
+            external: None,
+            link: Arc::new(OrderedLink(self.manifest.id)),
+        });
+        Ok(())
+    }
+}
+#[tokio::test]
+async fn booting_off_keeps_declared_registration_and_dispatch_order() {
+    let home = tempfile::tempdir().unwrap();
+    let seen = Arc::new(std::sync::Mutex::new(vec![]));
+    let plugins: Vec<Box<dyn Plugin>> = vec![
+        Box::new(Ordered {
+            manifest: &BROKEN,
+            seen: seen.clone(),
+        }),
+        Box::new(Ordered {
+            manifest: &PROVIDER,
+            seen: seen.clone(),
+        }),
+    ];
+    let host = Host::build(
+        plugins,
+        HostConfig::new(env_in(home.path()))
+            .with_layer("cli", json!({"enabledPlugins":{"test.broken":false}})),
+    )
+    .await
+    .unwrap();
+    assert_eq!(*seen.lock().unwrap(), vec![BROKEN.id, PROVIDER.id]);
+    assert_eq!(
+        host.registry
+            .links
+            .iter()
+            .map(|link| link.plugin.as_str())
+            .collect::<Vec<_>>(),
+        vec![BROKEN.id, PROVIDER.id]
+    );
+    assert_eq!(
+        host.registry
+            .commands
+            .iter()
+            .filter(|command| !command.plugin.is_empty())
+            .map(|command| command.plugin.as_str())
+            .collect::<Vec<_>>(),
+        vec![BROKEN.id, PROVIDER.id]
+    );
+    host.shutdown().await;
+}

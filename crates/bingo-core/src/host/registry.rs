@@ -170,6 +170,9 @@ impl Registry {
                 registry
                     .plugins
                     .push(PluginStatus::disabled(manifest, reason));
+                if switched_off.contains(manifest.id) && needed(manifest).is_none() {
+                    registry.register_off(plugin.as_ref(), slices, env, switched_off, layers, &reserved);
+                }
                 continue;
             }
             registry.register(
@@ -182,24 +185,33 @@ impl Registry {
             )?;
             registry.plugins.push(PluginStatus::loaded(manifest));
         }
-        for plugin in plugins
-            .iter()
-            .filter(|p| switched_off.contains(p.manifest().id) && needed(p.manifest()).is_none())
-        {
-            let id = plugin.manifest().id;
-            registry
-                .switches
-                .running
-                .write()
-                .unwrap_or_else(|e| e.into_inner())
-                .insert(id.into());
-            if let Err(error) = registry.register(plugin.as_ref(), slices, env, switched_off, layers, &reserved) {
-                registry.commands.retain(|entry| entry.plugin != id);
-                registry.links.retain(|link| link.plugin != id);
-                registry.unavailable(id, error.to_string());
-            }
-        }
         Ok(registry)
+    }
+
+    fn exclude(&mut self, id: &str, why: String) {
+        self.commands.retain(|entry| entry.plugin != id);
+        self.links.retain(|link| link.plugin != id);
+        self.unavailable(id, why);
+    }
+
+    fn register_off(
+        &mut self,
+        plugin: &dyn Plugin,
+        slices: &BTreeMap<String, Value>,
+        env: &Env,
+        switched_off: &BTreeSet<String>,
+        layers: &[crate::settings::Layer],
+        reserved: &BTreeSet<String>,
+    ) {
+        let id = plugin.manifest().id;
+        self.switches
+            .running
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(id.into());
+        if let Err(error) = self.register(plugin, slices, env, switched_off, layers, reserved) {
+            self.exclude(id, error.to_string());
+        }
     }
 
     /// Take one plugin's contributions, with the settings slice it claimed.
@@ -494,8 +506,23 @@ impl Registry {
 
     fn add_command(&mut self, plugin: &str, command: Arc<dyn Command>) -> Result<(), String> {
         let name = command.spec().name;
-        if self.commands.iter().any(|c| c.spec().name == name) {
-            return Err(format!("command {name} is already registered"));
+        if let Some(owner) = self
+            .commands
+            .iter()
+            .find(|c| c.spec().name == name)
+            .map(|entry| entry.plugin.clone())
+        {
+            let off = self
+                .switches
+                .running
+                .read()
+                .unwrap_or_else(|e| e.into_inner());
+            if off.contains(plugin) || !off.contains(&owner) {
+                return Err(format!("command {name} is already registered"));
+            }
+            drop(off);
+            // An off resident must never prevent an active owner from starting.
+            self.exclude(&owner, format!("command {name} conflicts with {plugin}"));
         }
         self.commands.push(super::registry_commands::OwnedCommand {
             plugin: plugin.into(),
