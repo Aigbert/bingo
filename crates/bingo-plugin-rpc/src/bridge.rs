@@ -165,7 +165,7 @@ impl Bridge {
         }
     }
 
-    pub(crate) fn with_registration(
+    pub fn with_registration(
         mut self,
         registration: Arc<bingo_plugin_host::registration::Registration>,
     ) -> Self {
@@ -224,6 +224,7 @@ impl Bridge {
             return;
         }
         if !self.approved() {
+            self.state.lock().await.starting = false;
             return;
         }
         let outcome = self.handshake().await;
@@ -264,6 +265,12 @@ impl Bridge {
         if !state.is_on() {
             registration.admission.stop(state);
             return false;
+        }
+        if matches!(
+            registration.admission.state(),
+            bingo_sdk::PluginState::Waiting { .. }
+        ) {
+            registration.admission.reset();
         }
         true
     }
@@ -508,6 +515,7 @@ impl Bridge {
         *self.launch.write().unwrap_or_else(|e| e.into_inner()) =
             (entry.rooted(&self.root), manifest.call_timeout);
         if !self.approved() {
+            self.state.lock().await.starting = false;
             return;
         }
         let outcome = self.handshake().await;

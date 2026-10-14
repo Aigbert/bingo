@@ -150,3 +150,71 @@ async fn reload_fails_a_held_link_and_reports_changed_services() {
     bridge.stop().await;
     started.manager.shutdown().await;
 }
+
+struct ApprovalSwitch(std::sync::atomic::AtomicBool);
+impl bingo_sdk::ApprovalReader for ApprovalSwitch {
+    fn state(
+        &self,
+        _: &bingo_sdk::Approval,
+    ) -> Result<bingo_sdk::PluginState, bingo_sdk::KernelError> {
+        Ok(if self.0.load(std::sync::atomic::Ordering::SeqCst) {
+            bingo_sdk::PluginState::On
+        } else {
+            bingo_sdk::PluginState::Waiting { changed: true }
+        })
+    }
+}
+
+#[tokio::test]
+async fn approval_after_a_refused_reload_revives_the_bridge() {
+    let repo = installed(&[("stub", &[])]);
+    let root = repo.path().join(".bingo/plugins/stub");
+    let notices = Arc::new(bingo_plugin_rpc::notice::Notices::default());
+    let mut found = bingo_plugin_rpc::discovery::read(&root, &notices).unwrap();
+    found.origin = bingo_sdk::PluginOrigin::Project;
+    let registration = Arc::new(bingo_plugin_host::registration::Registration::new(
+        &found,
+        bingo_sdk::PluginRuntime::Process,
+    ));
+    let switch = Arc::new(ApprovalSwitch(std::sync::atomic::AtomicBool::new(true)));
+    let reader: Arc<dyn bingo_sdk::ApprovalReader> = switch.clone();
+    let host = bingo_sdk::testing::TestHost::default();
+    host.on_service_any(move |key| {
+        (key == bingo_sdk::APPROVALS.name())
+            .then(|| Arc::new(reader.clone()) as Arc<dyn std::any::Any + Send + Sync>)
+    });
+    let bridge = Arc::new(
+        bingo_plugin_rpc::Bridge::new(
+            "stub",
+            root.clone(),
+            found.manifest.entry().unwrap().rooted(&root),
+            Value::Null,
+            None,
+            bingo_plugin_rpc::Setting {
+                env: (&bingo_sdk::Env::rooted(repo.path())).into(),
+                data_dir: repo.path().into(),
+                notices: notices.clone(),
+                doors: bingo_plugin_rpc::Doors::new(notices),
+                host: host.handle(),
+            },
+        )
+        .with_registration(registration.clone()),
+    );
+    bridge.connect().await;
+    assert!(bridge.standing().await.0);
+    switch.0.store(false, std::sync::atomic::Ordering::SeqCst);
+    bridge.reload(found.manifest.clone()).await;
+    assert!(matches!(
+        registration.admission.state(),
+        bingo_sdk::PluginState::Waiting { .. }
+    ));
+    switch.0.store(true, std::sync::atomic::Ordering::SeqCst);
+    bridge.connect().await;
+    let revived = bridge.standing().await;
+    bridge.stop().await;
+    assert!(revived.0, "{revived:?}");
+    assert_eq!(
+        registration.admission.state(),
+        bingo_sdk::PluginState::Pending
+    );
+}
