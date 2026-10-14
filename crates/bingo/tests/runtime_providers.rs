@@ -345,6 +345,18 @@ async fn adding_refuses_foreign_credentials_and_invalid_secret_arguments() {
         std::fs::read_to_string(data.join("auth.json")).unwrap(),
         original
     );
+    applied(&mut session, "/provider remove occupied").await;
+    let stored: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(data.join("auth.json")).unwrap()).unwrap();
+    assert!(stored.get("occupied").is_none());
+    assert_eq!(stored["channels.telegram"]["key"], KEY);
+    login_command(
+        &mut session,
+        &format!("/provider add occupied openai {}", endpoint.uri()),
+        &endpoint,
+        None,
+    )
+    .await;
     kernel.shutdown().await.unwrap();
     assert!(
         tokio::time::timeout(LIMIT, server.child.wait())

@@ -40,6 +40,11 @@ impl ProviderShape for Shape {
             .map(|entry| entry.is_some())
             .map_err(|_| PluginError::Config("could not read credential store".into()))
     }
+    fn forget_credential(&self, name: &str) -> Result<(), PluginError> {
+        CredentialStore::new(self.env.data_dir.clone())
+            .remove(name)
+            .map_err(|_| PluginError::Config("could not remove stored credential".into()))
+    }
     fn takes_key(&self) -> bool {
         !self.codex
     }

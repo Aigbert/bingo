@@ -68,6 +68,12 @@ pub trait ProviderShape: Send + Sync {
     fn credential_exists(&self, _name: &str) -> Result<bool, crate::PluginError> {
         Ok(false)
     }
+    /// Delete an orphan after the host has ruled out an active provider.
+    fn forget_credential(&self, _name: &str) -> Result<(), crate::PluginError> {
+        Err(crate::PluginError::Config(
+            "credential removal is not supported".into(),
+        ))
+    }
     fn takes_key(&self) -> bool {
         false
     }

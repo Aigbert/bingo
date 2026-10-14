@@ -71,9 +71,9 @@ pub async fn add(env: &Env, registered: BTreeSet<String>) -> Result<String, Kern
         .map_err(|_| invalid("could not read credential store"))?
         .is_some()
     {
-        return Err(invalid(
-            "a stored credential already uses that name; remove it first",
-        ));
+        return Err(invalid(&format!(
+            "a stored credential already uses that name; remove it first with `/provider remove {name}`"
+        )));
     }
     let protocol = ask_protocol().await?;
     let base_url = ask_base_url(protocol).await?;
