@@ -34,6 +34,23 @@ impl Executor for Native {
         if !self.module.admission.allowed() {
             return Err("module is not admitted".into());
         }
+        if id == "__ui__" && input["event"] == "open" {
+            let ui = cx
+                .host
+                .service_wire("bingo.plugin.ui")
+                .ok_or("ui is unavailable")?;
+            return bingo_plugin_host::ops::scope(
+                &cx.host,
+                &self.module.found.name,
+                &self.module.store,
+                ui.call(
+                    "choose",
+                    json!({"session":cx.session,"id":input["handler"]}),
+                ),
+            )
+            .await
+            .map_err(|error| error.to_string());
+        }
         let engine = self.module.engine.as_ref().ok_or("module is unavailable")?;
         let site = json!({"callback":id,"session":cx.session,"turn":cx.turn,"cwd":cx.cwd,
             "plugin":self.module.identity()});

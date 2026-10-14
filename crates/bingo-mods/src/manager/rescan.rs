@@ -1,0 +1,166 @@
+//! Reconcile discovery through the same admission and restart path as an edit.
+use super::*;
+use bingo_plugin_host::{discovery::Found, stamps::stamps};
+
+impl Manager {
+    pub(super) async fn rescan(&self, project: bool) -> Result<PluginReload, KernelError> {
+        let _guard = self.reloading.lock().await;
+        let old = self.modules();
+        let (found, mut report) = self.discovered(project, &old);
+        for module in &old {
+            if !found.iter().any(|found| found.name == module.found.name) {
+                self.remove_module(module).await;
+                report.removed.push(module.found.name.clone());
+            }
+        }
+        for found in found {
+            let previous = old.iter().find(|module| module.found.name == found.name);
+            if !project && found.origin == PluginOrigin::Project {
+                continue;
+            }
+            if previous.is_some_and(|module| module.found == found && !self.changed(&found.root)) {
+                continue;
+            }
+            let name = found.name.clone();
+            match self.install_generation(found, previous).await {
+                Ok(()) => {
+                    if previous.is_some() {
+                        report.reloaded.push(name);
+                    } else {
+                        report.added.push(name);
+                    }
+                }
+                Err(error) => {
+                    let text = format!("{name}: {}", error.message);
+                    self.notices.push(Notice::warn("PLUGIN_RELOAD", &text));
+                    report.errors.push(text);
+                }
+            }
+        }
+        if let Some(host) = self.host.get() {
+            self.write_types(host).await;
+        }
+        self.baseline(project);
+        self.report_changes(&report);
+        Ok(report)
+    }
+    fn discovered(&self, project: bool, old: &[Arc<Module>]) -> (Vec<Found>, PluginReload) {
+        let notices = Notices::default();
+        let mut found = self.directories.read(project, &notices);
+        let mut report = PluginReload::default();
+        for notice in notices.drain() {
+            report.errors.push(notice.text.clone());
+            self.notices.push(notice);
+        }
+        if !project {
+            found.retain(|found| found.origin != PluginOrigin::Project);
+            for module in old
+                .iter()
+                .filter(|module| module.found.origin == PluginOrigin::Project)
+            {
+                if found.iter().any(|found| {
+                    found.name == module.found.name && found.origin == PluginOrigin::Explicit
+                }) {
+                    continue;
+                }
+                found.retain(|found| found.name != module.found.name);
+                found.push(module.found.clone());
+            }
+        }
+        found.retain(|found| {
+            bingo_plugin_host::runtime::runtime_of(&found.manifest, true)
+                == Ok(PluginRuntime::Module)
+        });
+        (found, report)
+    }
+    fn report_changes(&self, report: &PluginReload) {
+        for name in report.added.iter().chain(&report.reloaded) {
+            self.notices.push(Notice::warn(
+                "PLUGIN_RELOADED",
+                format!("the {name} plugin reloaded"),
+            ));
+        }
+        for name in &report.removed {
+            self.notices.push(Notice::warn(
+                "PLUGIN_UNLOADED",
+                format!("the {name} plugin unloaded"),
+            ));
+        }
+    }
+    fn changed(&self, root: &Path) -> bool {
+        let after = stamps(root).unwrap_or_default();
+        self.watches
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .get(root)
+            .is_none_or(|watch| watch.before != after)
+    }
+    async fn remove_module(&self, module: &Arc<Module>) {
+        module.close().await;
+        if let Some(dollar) = self.dollar.get() {
+            dollar.reload(&module.found.name).await;
+        }
+        self.modules
+            .write()
+            .unwrap_or_else(|error| error.into_inner())
+            .retain(|entry| !Arc::ptr_eq(entry, module));
+        if let Some(host) = self.host.get() {
+            for session in host
+                .sessions(SessionFilter::default())
+                .await
+                .unwrap_or_default()
+            {
+                if let Some(dollar) = self.dollar.get()
+                    && let Ok(state) = dollar.snapshot(host, &session.id).await
+                {
+                    for kind in state
+                        .signals
+                        .get(&module.found.name)
+                        .into_iter()
+                        .flat_map(|values| values.keys())
+                    {
+                        let _ = host
+                            .signal(&session.id, &module.found.name, kind, Value::Null)
+                            .await;
+                    }
+                }
+            }
+        }
+    }
+    pub(super) async fn install_generation(
+        &self,
+        found: Found,
+        old: Option<&Arc<Module>>,
+    ) -> Result<(), KernelError> {
+        if let Some(old) = old {
+            old.close().await;
+            if let Some(dollar) = self.dollar.get() {
+                dollar.reload(&old.found.name).await;
+            }
+        }
+        let config = self
+            .settings
+            .get(&found.name)
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
+        let off = self.switched_off.contains(&found.name);
+        let module = Module::load(found, config, self.limits.clone(), &self.env, off).await;
+        if let Some(old) = old {
+            self.replace(old, module.clone());
+        } else {
+            self.modules
+                .write()
+                .unwrap_or_else(|error| error.into_inner())
+                .push(module.clone());
+        }
+        self.publish_callbacks(module.clone());
+        let host = self
+            .host
+            .get()
+            .ok_or_else(|| reload::failed("module host is unavailable"))?;
+        host.catalog(CatalogKind::Plugins).await?;
+        module.admission.decision().map_err(reload::failed)?;
+        self.restart_sessions(&module, host).await?;
+        Ok(())
+    }
+}

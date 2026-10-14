@@ -370,12 +370,12 @@ export type Payload = (CommandOutcome | { "text": string; [key: string]: unknown
 export type CommandRun = CommandRunInput.Payload;
 export namespace CommandDescribeInput {
 // Generated from JSON Schema. Do not edit.
-export type ArgSpec = ({ "kind": "none"; [key: string]: unknown; } | { "hint": string; "kind": "free"; [key: string]: unknown; } | { "kind": "catalog"; "source": string; [key: string]: unknown; } | { "kind": "words"; "then"?: (ArgSpec | null); "values": Array<string>; [key: string]: unknown; });
+export type ArgSpec = ({ "kind": "none"; [key: string]: unknown; } | { "hint": string; "kind": "free"; [key: string]: unknown; } | { "kind": "catalog"; "source": string; [key: string]: unknown; } | { "alone"?: Array<string>; "kind": "words"; "then"?: (ArgSpec | null); "values": Array<string>; [key: string]: unknown; });
 export type Payload = { "aliases"?: Array<string>; "args": ArgSpec; "family": string; "hidden"?: boolean; "hint": string; "instant"?: boolean; "name": string; [key: string]: unknown; };
 }
 export namespace CommandDescribeResult {
 // Generated from JSON Schema. Do not edit.
-export type ArgSpec = ({ "kind": "none"; [key: string]: unknown; } | { "hint": string; "kind": "free"; [key: string]: unknown; } | { "kind": "catalog"; "source": string; [key: string]: unknown; } | { "kind": "words"; "then"?: (ArgSpec | null); "values": Array<string>; [key: string]: unknown; });
+export type ArgSpec = ({ "kind": "none"; [key: string]: unknown; } | { "hint": string; "kind": "free"; [key: string]: unknown; } | { "kind": "catalog"; "source": string; [key: string]: unknown; } | { "alone"?: Array<string>; "kind": "words"; "then"?: (ArgSpec | null); "values": Array<string>; [key: string]: unknown; });
 export type CommandSpec = { "aliases"?: Array<string>; "args": ArgSpec; "family": string; "hidden"?: boolean; "hint": string; "instant"?: boolean; "name": string; [key: string]: unknown; };
 export type Payload = (CommandSpec | null);
 }

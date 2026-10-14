@@ -19,6 +19,7 @@ impl Command for ThinkCommand {
             "think",
             "set the reasoning effort",
             ArgSpec::Words {
+                alone: vec![],
                 values: Effort::words().map(str::to_string).collect(),
                 then: None,
             },

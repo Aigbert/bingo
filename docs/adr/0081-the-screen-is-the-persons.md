@@ -85,3 +85,10 @@ No kernel door opens here: one sdk reducer rule changes (§5).
 ADR-0013 §2's panel and live lanes as drawn surfaces and §4's rail and
 pins; ADR-0070 §1's `Rail` and `Panel` as places the TUI draws; ADR-0079
 §3's docking of a pane, by the engine's rule rather than the pane's.
+
+Amended 2026-10-14 (M157): a person's pane open/close choice is kept by
+(plugin name, pane id) in the user's data directory, across projects and starts.
+Only person input writes it. At host publication, an unasked pane remembered
+open is seated; closed or unknown panes wait. Clicks submit host actions so all
+surfaces read the same decision. The input task-local remains unspoofable.
+Missing or corrupt choice data means waiting and never prevents startup.

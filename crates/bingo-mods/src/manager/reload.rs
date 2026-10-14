@@ -5,7 +5,7 @@ use serde_json::json;
 use std::time::Duration;
 
 pub(super) struct Watch {
-    before: Stamps,
+    pub(super) before: Stamps,
     stale: bool,
 }
 impl Manager {
@@ -14,27 +14,7 @@ impl Manager {
         self.reload_stale().await;
     }
     pub(super) fn watch(self: &Arc<Self>) {
-        let watches = self
-            .modules()
-            .iter()
-            .filter(|module| module.found.origin == PluginOrigin::Explicit)
-            .filter_map(|module| {
-                let root = module.found.root.canonicalize().ok()?;
-                stamps(&root).ok().map(|before| {
-                    (
-                        root,
-                        Watch {
-                            before,
-                            stale: false,
-                        },
-                    )
-                })
-            })
-            .collect();
-        *self
-            .watches
-            .lock()
-            .unwrap_or_else(|error| error.into_inner()) = watches;
+        self.baseline(true);
         let weak = Arc::downgrade(self);
         let stop = self.stop.clone();
         self.tasks.lock().unwrap_or_else(|error| error.into_inner()).push(tokio::spawn(async move {
@@ -44,60 +24,114 @@ impl Manager {
                 tokio::select! {
                     biased;
                     _ = stop.cancelled() => break,
-                    _ = clock.tick() => if let Some(manager) = weak.upgrade() { manager.poll().await; } else { break; },
+                    _ = clock.tick() => if let Some(manager) = weak.upgrade() { manager.poll().await; manager.reload_if_idle().await; } else { break; },
                 }
             }
         }));
     }
     async fn poll(&self) {
-        let roots: Vec<_> = self
-            .watches
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .keys()
-            .cloned()
+        let mut roots: Vec<_> = self
+            .modules()
+            .iter()
+            .filter(|module| module.found.origin != PluginOrigin::Project)
+            .map(|module| module.found.root.clone())
             .collect();
+        roots.extend(self.directories.explicit.iter().cloned());
+        roots.push(self.env.config_dir.join("plugins"));
+        roots.sort();
+        roots.dedup();
         for root in roots {
             let scan = root.clone();
-            let Ok(Ok(after)) = tokio::task::spawn_blocking(move || stamps(&scan)).await else {
-                continue;
-            };
+            let after = tokio::task::spawn_blocking(move || stamps(&scan).unwrap_or_default())
+                .await
+                .unwrap_or_default();
             let mut watches = self
                 .watches
                 .lock()
                 .unwrap_or_else(|error| error.into_inner());
             if let Some(watch) = watches.get_mut(&root)
                 && watch.before != after
+                && !watch.stale
             {
-                watch.before = after;
-                if !watch.stale {
-                    watch.stale = true;
-                    self.notices.push(Notice::warn(
-                        "PLUGIN_STALE",
-                        format!(
-                            "{}: module changed; reload waits for turn.complete",
-                            root.display()
-                        ),
-                    ));
-                }
+                watch.stale = true;
+                self.notices.push(Notice::warn(
+                    "PLUGIN_STALE",
+                    format!(
+                        "{}: module changed; reload waits for turn.complete",
+                        root.display()
+                    ),
+                ));
             }
         }
     }
     async fn reload_stale(&self) {
-        let roots: Vec<_> = self
+        let stale = self
             .watches
             .lock()
             .unwrap_or_else(|error| error.into_inner())
+            .values()
+            .any(|watch| watch.stale);
+        if stale && let Err(error) = self.rescan(false).await {
+            self.notices
+                .push(Notice::warn("PLUGIN_RELOAD", error.message));
+        }
+    }
+    async fn reload_if_idle(&self) {
+        if let Some(host) = self.host.get()
+            && let Ok(sessions) = host.sessions(SessionFilter::default()).await
+            && sessions.iter().all(|session| !session.busy)
+        {
+            self.reload_stale().await;
+        }
+    }
+    pub(super) fn baseline(&self, project: bool) {
+        let mut roots: Vec<_> = self
+            .modules()
             .iter()
-            .filter(|(_, watch)| watch.stale)
-            .map(|(root, _)| root.clone())
+            .map(|module| module.found.root.clone())
             .collect();
-        for root in roots {
-            if let Err(error) = self.reload_root(&root).await {
-                self.notices
-                    .push(Notice::warn("PLUGIN_RELOAD", error.message));
+        roots.extend(self.directories.explicit.iter().cloned());
+        roots.push(self.env.config_dir.join("plugins"));
+        roots.sort();
+        roots.dedup();
+        let mut watches: BTreeMap<_, _> = roots
+            .into_iter()
+            .map(|root| {
+                let before = stamps(&root).unwrap_or_default();
+                (
+                    root,
+                    Watch {
+                        before,
+                        stale: false,
+                    },
+                )
+            })
+            .collect();
+        if !project {
+            let previous = self
+                .watches
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            for module in self
+                .modules()
+                .iter()
+                .filter(|module| module.found.origin == PluginOrigin::Project)
+            {
+                if let Some(watch) = previous.get(&module.found.root) {
+                    watches.insert(
+                        module.found.root.clone(),
+                        Watch {
+                            before: watch.before.clone(),
+                            stale: watch.stale,
+                        },
+                    );
+                }
             }
         }
+        *self
+            .watches
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = watches;
     }
     pub async fn reload_root(&self, root: &Path) -> Result<(), KernelError> {
         let _guard = self.reloading.lock().await;
@@ -118,54 +152,18 @@ impl Manager {
             )));
         }
         found.origin = old.found.origin;
-        old.close().await;
-        if let Some(dollar) = self.dollar.get() {
-            dollar.reload(&old.found.name).await;
+        self.install_generation(found, Some(&old)).await?;
+        if let Some(host) = self.host.get() {
+            self.write_types(host).await;
         }
-        let config = self
-            .settings
-            .get(&found.name)
-            .cloned()
-            .unwrap_or_else(|| serde_json::json!({}));
-        let module = Module::load(
-            found,
-            config,
-            self.limits.clone(),
-            &self.env,
-            self.switched_off.contains(&old.found.name),
-        )
-        .await;
-        self.replace(&old, module.clone());
-        self.publish_callbacks(module.clone());
-        let host = self
-            .host
-            .get()
-            .ok_or_else(|| failed("module host is unavailable"))?;
-        host.catalog(CatalogKind::Plugins).await?;
-        if let Err(reason) = module.admission.decision() {
-            return Err(failed(reason));
-        }
-        self.restart_sessions(&module, host).await?;
+        self.baseline(false);
         self.notices.push(Notice::warn(
             "PLUGIN_RELOADED",
-            format!("the {} plugin reloaded", module.found.name),
+            format!("the {} plugin reloaded", old.found.name),
         ));
-        self.write_types(host).await;
-        self.mark_reloaded(&root)
-    }
-    fn mark_reloaded(&self, root: &Path) -> Result<(), KernelError> {
-        if let Some(watch) = self
-            .watches
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .get_mut(root)
-        {
-            watch.before = stamps(root).map_err(failed)?;
-            watch.stale = false;
-        }
         Ok(())
     }
-    fn replace(&self, old: &Arc<Module>, module: Arc<Module>) {
+    pub(super) fn replace(&self, old: &Arc<Module>, module: Arc<Module>) {
         if let Some(slot) = self
             .modules
             .write()
@@ -176,7 +174,7 @@ impl Manager {
             *slot = module;
         }
     }
-    async fn restart_sessions(
+    pub(super) async fn restart_sessions(
         &self,
         module: &Arc<Module>,
         host: &HostHandle,
@@ -202,18 +200,20 @@ impl Manager {
                 model: None,
                 host: host.clone(),
             };
-            crate::link::Link(module.clone())
-                .observe(
+            render::under_input(
+                false,
+                crate::link::Link(module.clone()).observe(
                     catalogue::SESSION_START,
                     &cx,
                     &json!({"session":session.id}),
-                )
-                .await;
+                ),
+            )
+            .await;
         }
         Ok(())
     }
 }
-fn failed(error: impl std::fmt::Display) -> KernelError {
+pub(super) fn failed(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::InvalidInput, error.to_string())
 }
 

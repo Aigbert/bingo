@@ -31,6 +31,7 @@ impl McpCommand {
     /// without a catalogue kind of its own (ADR-0008 §6a).
     fn servers(&self) -> ArgSpec {
         ArgSpec::Words {
+            alone: vec![],
             values: self.manager.names().map(str::to_string).collect(),
             then: None,
         }
@@ -320,6 +321,7 @@ impl Command for McpCommand {
             aliases: Vec::new(),
             hint: format!("[{} <server>]", Verb::ALL.map(Verb::as_str).join("|")),
             args: ArgSpec::Words {
+                alone: vec![],
                 values: Verb::ALL.map(|verb| verb.as_str().to_string()).to_vec(),
                 then: Some(Box::new(self.servers())),
             },
@@ -489,13 +491,14 @@ mod tests {
         assert_eq!(spec.name, "mcp");
         assert!(!spec.instant, "a sign-in asks a person and takes minutes");
         assert_eq!(spec.family, "mcp");
-        let ArgSpec::Words { values, then } = spec.args else {
+        let ArgSpec::Words { values, then, .. } = spec.args else {
             panic!("a verb is one of the words");
         };
         assert_eq!(values, Verb::ALL.map(|verb| verb.as_str().to_string()));
         assert_eq!(
             then.as_deref(),
             Some(&ArgSpec::Words {
+                alone: vec![],
                 values: Vec::new(),
                 then: None
             }),
@@ -554,6 +557,7 @@ mod tests {
         assert_eq!(
             then.as_deref(),
             Some(&ArgSpec::Words {
+                alone: vec![],
                 values: vec!["files".into()],
                 then: None
             })

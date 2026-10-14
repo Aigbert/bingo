@@ -78,7 +78,7 @@ impl Runtime {
                 }),
             )?;
         }
-        crate::ui::install(host, runtime.clone())?;
+        crate::ui::install(host, runtime.clone(), env)?;
         Ok(runtime)
     }
     pub(crate) async fn snapshot(

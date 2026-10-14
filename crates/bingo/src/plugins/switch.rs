@@ -1,5 +1,5 @@
 // `bingo plugins list | enable | disable <name>`: the headless twin of
-// `/plugins` (ADR-0057 §6).
+// `/plugins` (ADR-0057 §6). Live `/plugins reload` belongs to a running host.
 //
 // It runs before a kernel exists, as `bingo mcp` does: what `enable` and
 // `disable` write is what the *next* run reads, and `list` says what the next
@@ -32,7 +32,7 @@ pub enum Action {
         #[arg(long)]
         json: bool,
     },
-    /// Every plugin the next start will consider, and whether it will run.
+    /// List plugins for the next start; use /plugins reload in a running session.
     List,
     /// Turn one on in the user settings layer.
     Enable {

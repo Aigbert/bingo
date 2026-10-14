@@ -34,9 +34,10 @@ impl Command for PluginsCommand {
             aliases: vec!["modules".into()],
             ..super::spec(
                 "plugins",
-                "list, enable or disable plugins",
+                "list, reload, enable or disable plugins",
                 ArgSpec::Words {
-                    values: vec![ENABLE.into(), DISABLE.into()],
+                    alone: vec!["reload".into()],
+                    values: vec![ENABLE.into(), DISABLE.into(), "reload".into()],
                     then: Some(Box::new(ArgSpec::Catalog {
                         source: PLUGINS.into(),
                     })),
@@ -48,6 +49,18 @@ impl Command for PluginsCommand {
 
     async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
         let host = super::host(&self.host)?;
+        if args.trim() == "reload" {
+            if !render::asked() {
+                return Err(invalid("plugin reload requires person input".into()));
+            }
+            let mut report = PluginReload::default();
+            for source in &host.registry().sources.plugins {
+                report.append(source.reload().await?);
+            }
+            return Ok(CommandOutcome::Applied {
+                message: Some(report.message()),
+            });
+        }
         let listed = listing(host.registry()).await;
         match parse(args)? {
             None => Ok(CommandOutcome::View {
@@ -68,7 +81,7 @@ fn parse(args: &str) -> Result<Option<(&str, bool)>, KernelError> {
         ENABLE => true,
         DISABLE => false,
         other => {
-            let usage = format!("usage: /plugins [{ENABLE}|{DISABLE} <name>]");
+            let usage = format!("usage: /plugins [reload|{ENABLE}|{DISABLE} <name>]");
             return Err(invalid(format!("unknown argument `{other}`; {usage}")));
         }
     };
@@ -160,10 +173,16 @@ mod tests {
         let spec = PluginsCommand { host: Weak::new() }.spec();
         assert_eq!(spec.name, "plugins");
         assert_eq!(spec.aliases, ["modules"]);
-        let ArgSpec::Words { values, then } = spec.args else {
+        let ArgSpec::Words {
+            values,
+            then,
+            alone,
+        } = spec.args
+        else {
             panic!("a verb is one of the words");
         };
-        assert_eq!(values, [ENABLE, DISABLE]);
+        assert_eq!(values, [ENABLE, DISABLE, "reload"]);
+        assert_eq!(alone, ["reload"]);
         assert_eq!(
             then.as_deref(),
             Some(&ArgSpec::Catalog {

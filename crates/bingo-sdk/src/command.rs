@@ -66,6 +66,9 @@ pub enum ArgSpec {
     /// absent for a command whose argument ends at the first word, so every
     /// spec written before it reads the same (ADR-0008 §6a).
     Words {
+        /// Words among `values` that end the argument; `then` does not apply.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        alone: Vec<String>,
         values: Vec<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         then: Option<Box<ArgSpec>>,
@@ -123,6 +126,39 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[test]
+    fn a_frame_without_alone_keeps_its_following_argument() {
+        let wire = json!({
+            "name": "plugins", "hint": "plugins", "family": "session",
+            "args": {
+                "kind": "words", "values": ["enable"],
+                "then": { "kind": "catalog", "source": "plugins" }
+            }
+        });
+        let spec: CommandSpec = serde_json::from_value(wire).expect("old frame");
+        let ArgSpec::Words { alone, then, .. } = spec.args else {
+            panic!("word arguments");
+        };
+        assert!(alone.is_empty());
+        assert_eq!(
+            then.as_deref(),
+            Some(&ArgSpec::Catalog {
+                source: "plugins".into()
+            })
+        );
+    }
+
+    #[test]
+    fn words_that_end_the_argument_survive_the_wire() {
+        let wire = json!({
+            "kind": "words", "values": ["enable", "reload"],
+            "alone": ["reload"],
+            "then": { "kind": "catalog", "source": "plugins" }
+        });
+        let args: ArgSpec = serde_json::from_value(wire.clone()).expect("word arguments");
+        assert_eq!(serde_json::to_value(args).expect("serialises"), wire);
+    }
+
     /// The shape a surface and a plugin both read: the variant is its `kind`,
     /// the words are `values`, in the command's own order. A word list that
     /// says nothing about the word after it writes nothing down, so a spec
@@ -130,6 +166,7 @@ mod tests {
     #[test]
     fn a_word_list_crosses_the_wire_as_its_kind_and_its_values() {
         let args = ArgSpec::Words {
+            alone: vec![],
             values: vec!["off".into(), "low".into()],
             then: None,
         };
@@ -144,6 +181,7 @@ mod tests {
     #[test]
     fn a_verb_carries_the_spec_of_the_word_after_it() {
         let args = ArgSpec::Words {
+            alone: vec![],
             values: vec!["enable".into()],
             then: Some(Box::new(ArgSpec::Catalog {
                 source: "plugins".into(),
