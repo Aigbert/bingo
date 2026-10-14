@@ -338,3 +338,80 @@ async fn aside_uses_surface_reception_instead_of_the_kernel_clock() {
         "the fixture's remote opened_at is long before the local keystroke"
     );
 }
+
+#[tokio::test]
+async fn a_question_key_can_finish_the_pane_action_waiting_for_its_answer() {
+    let now = still(scene().1);
+    let session = Arc::new(TestSession::default());
+    let mut state = pane(drawing().await);
+    state.config.kernel["render"] = json!({"Question":[{}]});
+    let mut run = tests::idle_in(state, session.clone(), now.instant);
+    let mut screen = Recorder::default();
+    run.paint(&mut screen, Wake::Frame, now).unwrap();
+    run.terminal_event(Term::Key(typed('x')));
+    let pane_intent = session.submissions()[0].0.clone();
+    assert!(run.ui.actions.action().is_some());
+
+    // The pane command asks and cannot acknowledge until the person answers.
+    let open = question(false, true);
+    run.frame(&frame(1, opened(open.clone())), &mut screen)
+        .unwrap();
+    if run.ui.dialog.aside {
+        run.terminal_event(Term::Key(ctrl('g')));
+    }
+    pull_question(&mut run, 108, now);
+    run.paint(&mut screen, Wake::Frame, now).unwrap();
+    assert!(
+        screen.last().contains("Which provider?"),
+        "{}",
+        screen.last()
+    );
+    pull_question(&mut run, 108, now);
+    run.terminal_event(Term::Key(typed('2')));
+    let submissions = session.submissions();
+    assert_eq!(
+        submissions.len(),
+        2,
+        "the question must bypass its waiting caller"
+    );
+    assert!(
+        run.site_keys.contains_key(&pane_intent),
+        "caller still awaits its answer"
+    );
+    answer_key(&mut run, &submissions[1], &open);
+    assert!(
+        matches!(&session.answers()[0].1, bingo_sdk::Answer::Choice { ids, .. } if ids == &["o"])
+    );
+    assert!(
+        run.ui.actions.action().is_some(),
+        "answer ack cannot release the caller"
+    );
+    run.ack(
+        &pane_intent,
+        &IntentOutcome::Applied {
+            result: json!({"handled":true}),
+        },
+    );
+    assert!(run.ui.actions.action().is_none());
+    assert!(run.site_keys.is_empty());
+}
+
+fn answer_key(run: &mut Run, submission: &(IntentId, Input), open: &bingo_sdk::Interaction) {
+    let Input::Action { action } = &submission.1 else {
+        panic!("key action")
+    };
+    let bingo_sdk::InteractionKind::Question(question) = open.kind.clone() else {
+        panic!("question")
+    };
+    let (handled, answer) = bingo_mod_ask::state::State::default().key(
+        &[question],
+        false,
+        action.args["value"]["key"].as_str().unwrap(),
+    );
+    run.ack(
+        &submission.0,
+        &IntentOutcome::Applied {
+            result: json!({"handled":handled,"answer":answer}),
+        },
+    );
+}

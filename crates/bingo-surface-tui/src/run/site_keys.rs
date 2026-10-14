@@ -8,15 +8,15 @@ pub(super) struct Pending {
 }
 
 pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
-    let focus = if let Some((_, open)) = run
+    let (focus, asked) = if let Some((_, open)) = run
         .session
         .tree
         .open_interaction()
         .filter(|_| !run.ui.dialog.aside)
     {
-        open.id.to_string()
+        (open.id.to_string(), true)
     } else if let crate::focus::Focus::Pane(focus) = &run.ui.focus {
-        focus.clone()
+        (focus.clone(), false)
     } else {
         return;
     };
@@ -32,12 +32,18 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
             key,
         },
     );
-    run.ui.actions.push(
-        run.session.tree.viewed().summary.id.clone(),
-        handle,
-        intent,
-        action,
-    );
+    if asked {
+        // The action asking this question may still hold the shared queue.
+        // Interaction keys already wait for their own site's acknowledgement.
+        handle.submit(intent, Input::Action { action });
+    } else {
+        run.ui.actions.push(
+            run.session.tree.viewed().summary.id.clone(),
+            handle,
+            intent,
+            action,
+        );
+    }
 }
 
 pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome) {
