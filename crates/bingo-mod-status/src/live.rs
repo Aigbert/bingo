@@ -47,10 +47,48 @@ pub fn start(host: HostHandle, selections: Selections, stop: CancellationToken) 
             tokio::select! {
                 _ = stop.cancelled() => break,
                 _ = ticks.tick() => {
-                    let sessions = selections.lock().map(|s| s.keys().cloned().collect::<Vec<_>>()).unwrap_or_default();
-                    for session in sessions { let _ = host.invalidate(&session, vec![REQUEST.into()]).await; }
+                    tick(&host, &selections, std::time::Instant::now()).await;
                 }
             }
         }
     });
+}
+
+async fn tick(host: &HostHandle, selections: &Selections, now: std::time::Instant) {
+    let sessions = selections.lock().map(|mut selections| {
+        selections.retain(|_, selection| now.saturating_duration_since(selection.seen) < std::time::Duration::from_secs(5));
+        selections.keys().cloned().collect::<Vec<_>>()
+    }).unwrap_or_default();
+    for session in sessions { let _ = host.invalidate(&session, vec![REQUEST.into()]).await; }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn a_viewed_card_keeps_its_cursor_and_gets_a_tick() {
+        let host = testing::TestHost::default();
+        let selections = Selections::default();
+        let now = std::time::Instant::now();
+        let id = SessionId::from_raw("viewed");
+        let mut selection: crate::Selection = "plugins".into();
+        selection.seen = now;
+        selections.lock().unwrap().insert(id.clone(), selection);
+        tick(&host.handle(), &selections, now).await;
+        assert!(matches!(host.calls().as_slice(), [testing::HostCall::Invalidate { session, .. }] if session == &id));
+        assert_eq!(selections.lock().unwrap()[&id].label, "plugins");
+    }
+    #[tokio::test]
+    async fn unviewed_cards_stop_ticking_and_drop_their_cursor() {
+        let host = testing::TestHost::default();
+        let selections = Selections::default();
+        let now = std::time::Instant::now();
+        let mut selection: crate::Selection = "plugins".into();
+        selection.seen = now;
+        let id = SessionId::from_raw("unviewed");
+        selections.lock().unwrap().insert(id.clone(), selection);
+        tick(&host.handle(), &selections, now + std::time::Duration::from_secs(10)).await;
+        assert!(host.calls().is_empty());
+        assert!(!selections.lock().unwrap().contains_key(&id));
+    }
 }

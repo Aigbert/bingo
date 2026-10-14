@@ -109,7 +109,7 @@ async fn config_frames_invalidate_an_open_card_without_changing_selection() {
     assert!(host.calls().iter().any(|call| matches!(call,
         testing::HostCall::Invalidate { session, requests } if session == &state.summary.id && requests == &[REQUEST.to_string()]
     )));
-    assert_eq!(selections.lock().unwrap()[&state.summary.id], "plugins");
+    assert_eq!(selections.lock().unwrap()[&state.summary.id].label, "plugins");
 }
 #[test]
 fn a_server_row_reads_the_state_the_plugins_panel_reads() {

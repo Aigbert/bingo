@@ -32,13 +32,12 @@ impl Interceptor for Drawing {
         let request: render::RenderRequest = serde_json::from_value(input).map_err(error)?;
         let facts = serde_json::from_value(request.props).map_err(error)?;
         let rows = read(&cx.host, &facts).await?;
-        let selected = self
-            .selections
-            .lock()
-            .map_err(error)?
-            .get(&cx.session)
-            .cloned()
-            .unwrap_or_else(|| "session".into());
+        let selected = {
+            let mut selections = self.selections.lock().map_err(error)?;
+            let selection = selections.entry(cx.session.clone()).or_insert_with(|| "session".into());
+            selection.seen = Instant::now();
+            selection.label.clone()
+        };
         let tree = tree(
             &rows,
             &selected,

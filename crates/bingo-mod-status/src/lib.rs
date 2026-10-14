@@ -16,7 +16,18 @@ use std::{
 
 const ID: &str = "bingo.mod.status";
 const REQUEST: &str = "status";
-type Selections = Arc<Mutex<BTreeMap<SessionId, String>>>;
+type Selections = Arc<Mutex<BTreeMap<SessionId, Selection>>>;
+#[derive(Clone)]
+struct Selection {
+    label: String,
+    seen: Instant,
+}
+impl From<String> for Selection {
+    fn from(label: String) -> Self { Self { label, seen: Instant::now() } }
+}
+impl From<&str> for Selection {
+    fn from(label: &str) -> Self { label.to_string().into() }
+}
 
 pub struct Status {
     card: bool,

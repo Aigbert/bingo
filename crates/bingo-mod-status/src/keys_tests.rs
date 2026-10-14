@@ -87,7 +87,7 @@ async fn enter_submits_each_rows_command_after_removing_the_card() {
         selections
             .lock()
             .unwrap()
-            .insert(cx.session.clone(), row.label);
+            .insert(cx.session.clone(), row.label.into());
         let outcome = handler
             .run(
                 &json!({"handler":"status","event":"press","value":{"key":"enter"},"rows":rows::rows(&(&state).into(), &[], &[], None)}).to_string(),

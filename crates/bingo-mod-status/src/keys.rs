@@ -39,7 +39,7 @@ impl Command for Handler {
         if args["event"] != "press" || !["up", "down", "enter"].contains(&key) {
             return Ok(CommandOutcome::Handled { handled: false });
         }
-        let Some(label) = self.0.lock().map_err(error)?.get(&cx.session).cloned() else {
+        let Some(label) = self.0.lock().map_err(error)?.get(&cx.session).map(|selection| selection.label.clone()) else {
             return Ok(CommandOutcome::Handled { handled: false });
         };
         let rows: Vec<Row> = serde_json::from_value(args["rows"].clone()).map_err(error)?;
@@ -49,7 +49,7 @@ impl Command for Handler {
         self.0
             .lock()
             .map_err(error)?
-            .insert(cx.session.clone(), moved(&rows, &label, key == "down"));
+            .insert(cx.session.clone(), moved(&rows, &label, key == "down").into());
         cx.host
             .invalidate(&cx.session, vec![REQUEST.into()])
             .await?;

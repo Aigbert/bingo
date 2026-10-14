@@ -91,6 +91,11 @@ the kernel's `/status` key-value view stays as the plain fallback.
   Print, channel and non-interactive RPC invocations retain the kernel text command on a shared host.
 - StatusProps carry summary/config/context from the asking surface's existing fold. Render
   and arrow handlers never open a session or subscribe; key arguments carry only row targets.
+- Open cards have a five-second render/key lease; idle invalidation and cursor state stop
+  after disconnect or loss of viewing. A subsequent render renews the lease. The contract
+  has no viewer ID, so simultaneous viewers still share selection within a session.
+- CommandOutcome::Acknowledged forwards an existing result unchanged, including item IDs,
+  surface actions and answers, without repeating a recorded operation.
 - MCP `Servers::servers` returns connection configuration, not live status.
   Add a default `status` service method and a typed projection of the manager's
   lines in bingo-services/bingo-mcp; no credentials enter the status projection.
