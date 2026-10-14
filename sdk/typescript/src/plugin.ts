@@ -28,7 +28,7 @@ export function runtime(peer: Peer, register: Register) {
   };
   let negotiated = new Set<string>();
   let pluginName = "";
-  let identity = Object.freeze({ name: "", root: "" });
+  let identity: import('./dollar-types.ts').PluginData = Object.freeze({ name: "", root: "" });
   const rpc = {
     request: <T>(method: string, params: unknown): Promise<T> => {
       if (!negotiated.has(method)) return Promise.reject(new Error(`capability unavailable: ${method}`));
@@ -61,7 +61,7 @@ export function runtime(peer: Peer, register: Register) {
   peer.handlers.set('initialize', async (params: InitializeParams): Promise<InitializeResult> => {
     if (params.protocol !== 2) throw new Error(`plugin protocol 2 required; host speaks ${params.protocol}`);
     pluginName = params.pluginName;
-    identity = Object.freeze({ name: params.pluginName, root: params.pluginRoot });
+    identity = Object.freeze({ name: params.pluginName, root: params.pluginRoot, version: params.pluginVersion });
     await register(hooks.on, params.config);
     for (const entry of hooks.entries) {
       entry.hook = wrap(entry.hook);

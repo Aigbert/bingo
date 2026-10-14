@@ -646,6 +646,10 @@ impl Bridge {
             protocol: PROTOCOL,
             plugin_root: self.root.clone(),
             plugin_name: self.name.clone(),
+            plugin_version: self
+                .registration
+                .as_ref()
+                .map(|registration| registration.status("").version),
             capabilities: crate::wire::capabilities(),
             config: self.config.clone(),
             env: self.env.clone(),

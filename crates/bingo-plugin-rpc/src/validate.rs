@@ -155,6 +155,7 @@ async fn initialize(
         protocol: PROTOCOL,
         plugin_root: root.into(),
         plugin_name: manifest.name.clone(),
+        plugin_version: Some(manifest.version.clone()),
         capabilities: crate::wire::capabilities(),
         config: serde_json::json!({}),
         env: HostEnv::from(env),

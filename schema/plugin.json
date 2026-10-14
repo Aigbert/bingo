@@ -2313,6 +2313,17 @@
         "column"
       ]
     },
+    "DollarData": {
+      "type": "object",
+      "properties": {
+        "plugin": {
+          "$ref": "#/$defs/PluginData"
+        }
+      },
+      "required": [
+        "plugin"
+      ]
+    },
     "Driver": {
       "oneOf": [
         {
@@ -3770,6 +3781,12 @@
         },
         "pluginName": {
           "type": "string"
+        },
+        "pluginVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "capabilities": {
           "type": "array",
@@ -5683,6 +5700,27 @@
         }
       ],
       "description": "When a contributor speaks. Serializable because a contributor may live in\nanother process: it declares its placement once, over the bridge."
+    },
+    "PluginData": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "root"
+      ]
     },
     "Preview": {
       "oneOf": [

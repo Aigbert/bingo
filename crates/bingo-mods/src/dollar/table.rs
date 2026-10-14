@@ -8,6 +8,33 @@ use bingo_sdk::{
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde_json::{Value, json};
 
+#[derive(serde::Serialize, JsonSchema)]
+pub struct PluginData {
+    pub name: String,
+    pub root: std::path::PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+}
+#[derive(JsonSchema)]
+pub struct DollarData {
+    pub plugin: PluginData,
+}
+
+pub fn data_member(name: &str) -> bool {
+    static SCHEMA: std::sync::LazyLock<Value> =
+        std::sync::LazyLock::new(|| schemars::schema_for!(DollarData).to_value());
+    let mut parts = name.split('.');
+    let (Some(noun), Some(field)) = (parts.next(), parts.next()) else {
+        return false;
+    };
+    let noun = &SCHEMA["properties"][noun];
+    let schema = noun["$ref"]
+        .as_str()
+        .and_then(|reference| SCHEMA.pointer(&reference[1..]))
+        .unwrap_or(noun);
+    schema["properties"].get(field).is_some()
+}
+
 type Shape = fn(&mut SchemaGenerator) -> Schema;
 #[derive(Clone, Copy)]
 pub enum Door {
@@ -105,6 +132,7 @@ impl Row {
 
 pub fn document() -> Value {
     let mut generator = SchemaGenerator::default();
+    let data = generator.subschema_for::<DollarData>();
     let methods: serde_json::Map<String, Value> = ROWS.iter().map(|row| {
         let name = format!("{}.{}", row.noun, row.method);
         let door = match row.door {
@@ -115,5 +143,5 @@ pub fn document() -> Value {
         (name, json!({"noun":row.noun, "method":row.method, "door":door,
             "unsafe":row.unsafe_call, "input":(row.input)(&mut generator), "result":(row.result)(&mut generator)}))
     }).collect();
-    json!({"$schema":"https://json-schema.org/draft/2020-12/schema", "$defs":generator.take_definitions(true), "methods":methods})
+    json!({"$schema":"https://json-schema.org/draft/2020-12/schema", "$defs":generator.take_definitions(true), "methods":methods, "data":data})
 }

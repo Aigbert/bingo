@@ -22,7 +22,8 @@ pub(super) fn check(semantic: &Semantic<'_>, source: &mut Source<'_>) {
     for node in semantic.nodes().iter() {
         match node.kind() {
             AstKind::ComputedMemberExpression(member)
-                if chain(&member.object, semantic).is_some() =>
+                if chain(&member.object, semantic)
+                    .is_some_and(|name| !crate::dollar::table::data_member(&name)) =>
             {
                 source.finding(
                     member.span.start,
@@ -33,8 +34,10 @@ pub(super) fn check(semantic: &Semantic<'_>, source: &mut Source<'_>) {
             }
             AstKind::CallExpression(call) => {
                 if let Some(name) = chain(&call.callee, semantic) {
-                    source.output.calls.insert(name.clone());
-                    super::uses::call(&name, call, source);
+                    if !crate::dollar::table::data_member(&name) {
+                        source.output.calls.insert(name.clone());
+                        super::uses::call(&name, call, source);
+                    }
                 } else {
                     super::helpers::calls(call, semantic, source);
                 }
@@ -64,7 +67,10 @@ pub(super) fn check(semantic: &Semantic<'_>, source: &mut Source<'_>) {
                     AstKind::StaticMemberExpression(_) | AstKind::ComputedMemberExpression(_)
                 );
                 let is_called = matches!(parent, AstKind::CallExpression(call) if call.callee.span() == member.span());
-                if !is_chain && !is_called {
+                let data = chain(&member.object, semantic).is_some_and(|prefix| {
+                    crate::dollar::table::data_member(&format!("{prefix}.{}", member.property.name))
+                });
+                if !is_chain && !is_called && !data {
                     source.finding(
                         member.span().start,
                         Rule::DollarStatic,

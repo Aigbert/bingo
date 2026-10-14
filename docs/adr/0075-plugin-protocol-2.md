@@ -139,3 +139,5 @@ Verified 2026-10-14 (M139, ADR-0078): QuickJS and Node world fixtures agree thro
 2026-10-14, person's delegate: pre-release, M141: add component props and optional render matcher metadata to the protocol-2 schemas; regenerate with `BINGO_UPDATE_SCHEMA=1`, retaining all existing shapes.
 
 2026-10-14, person’s delegate: pre-release, M151: amend pane place/size and render viewport placement, normalizing legacy rows; regenerate the scoped protocol-2 baseline (latest released tag v0.6.5).
+
+2026-10-14, delegate, M146: add optional initialize.pluginVersion for schema-declared plugin data reads in both transports; protocol 2 remains unreleased (latest tag v0.6.5).

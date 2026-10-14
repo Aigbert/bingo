@@ -145,6 +145,8 @@ pub struct InitializeParams {
     /// The directory the manifest was read from, already resolved.
     pub plugin_root: PathBuf,
     pub plugin_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin_version: Option<String>,
     pub capabilities: BTreeSet<Cap>,
     /// This plugin's settings slice (`plugins.<name>`); `null` when unset.
     #[serde(default)]
@@ -923,11 +925,13 @@ mod tests {
             protocol: PROTOCOL,
             plugin_root: PathBuf::from("/plugins/wordcount"),
             plugin_name: "wordcount".into(),
+            plugin_version: Some("1.2.3".into()),
             capabilities: super::capabilities(),
             config: json!({ "limit": 10 }),
             env: HostEnv::from(&Env::rooted("/home/u")),
         };
         let wire = serde_json::to_value(&params).expect("the handshake serialises");
+        assert_eq!(wire["pluginVersion"], json!("1.2.3"));
         assert_eq!(wire["pluginRoot"], json!("/plugins/wordcount"));
         assert_eq!(wire["env"]["dataDir"], json!("/home/u/.bingo/data"));
         assert_eq!(

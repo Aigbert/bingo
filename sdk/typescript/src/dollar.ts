@@ -1,11 +1,11 @@
 import type { Callbacks, Callback } from './callbacks.ts';
 import { ui } from './ui.ts';
 import { dollarRoutes } from './dollar-types.ts';
-import type { ProcessOutput, DollarInputs, DollarResults } from './dollar-types.ts';
+import type { ProcessOutput, DollarInputs, DollarResults, DollarData } from './dollar-types.ts';
 import type { Rpc } from './rpc.ts';
 import type { HookSite, StateValue, ModelRequest, Completed, Input, ToolSpec, CommandSpec } from './wire.ts';
 
-export function dollar(rpc: Rpc, site: HookSite, identity: { name: string; root: string } = { name: '', root: '' }, callbacks?: Callbacks): Dollar {
+export function dollar(rpc: Rpc, site: HookSite, identity: DollarData['plugin'] = { name: '', root: '' }, callbacks?: Callbacks): Dollar {
   const store = (scope: string) => ({
     get: (key: string) => rpc.request<StateValue | null>('host/state/get', { scope, key }),
     set: (key: string, value: unknown, ifVersion?: number) =>
@@ -99,7 +99,7 @@ export type ProcessHandle = {
 };
 export type Dollar = Replace<HostNouns, {
   process: Replace<HostNouns['process'], {spawn(input: AtSite<DollarInputs['process.spawn']>): Promise<ProcessHandle>}>;
-  readonly plugin: Readonly<{name: string; root: string}>;
+  readonly plugin: Readonly<DollarData['plugin']>;
   state: State;
   store: State & {keys(): Promise<string[]>; delete(key: string): Promise<boolean>};
   model: Replace<HostNouns['model'], {complete(request: ModelRequest): Promise<Completed>}>;

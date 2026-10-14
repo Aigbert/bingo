@@ -1,6 +1,38 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
+    "DollarData": {
+      "type": "object",
+      "properties": {
+        "plugin": {
+          "$ref": "#/$defs/PluginData"
+        }
+      },
+      "required": [
+        "plugin"
+      ]
+    },
+    "PluginData": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "root"
+      ]
+    },
     "ToolOutput": {
       "type": "object",
       "properties": {
@@ -5351,5 +5383,8 @@
         "type": "string"
       }
     }
+  },
+  "data": {
+    "$ref": "#/$defs/DollarData"
   }
 }

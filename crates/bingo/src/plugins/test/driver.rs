@@ -41,7 +41,7 @@ impl Driver {
         self.host.shutdown().await;
     }
     fn site_value(&self) -> Value {
-        json!({"session":self.session.snapshot.summary.id,"cwd":self.session.snapshot.summary.cwd,"plugin":{"name":self.name,"root":self.root}})
+        json!({"session":self.session.snapshot.summary.id,"cwd":self.session.snapshot.summary.cwd,"plugin":{"name":self.name,"root":self.root,"version":bingo_plugin_rpc::validate::read(&self.root).ok().map(|manifest|manifest.version)}})
     }
     pub fn fold(&mut self, frame: &Frame) {
         if let Event::Invalidated { requests } = &frame.event {
