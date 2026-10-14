@@ -5,6 +5,10 @@
 //! so a credential minted by either tool reads in the other; the path is
 //! ours, and neither reads the other's file.
 
+mod binding;
+use binding::Binding;
+pub use binding::Metadata;
+
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -65,10 +69,12 @@ pub fn mcp_key(server: &str) -> String {
 /// Read-modify-write over the whole file. bingo is one process per user, so
 /// an in-process lock is the only lock; the rename is what makes a concurrent
 /// reader see either the old file or the new one and never half of either.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CredentialStore {
     path: PathBuf,
     owner: Option<String>,
+    binding: Option<Binding>,
+    resource: Option<Binding>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -77,6 +83,14 @@ struct Stored {
     entry: Entry,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     owner: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    origin: Option<String>,
+    #[serde(
+        default,
+        rename = "resourceOrigin",
+        skip_serializing_if = "Option::is_none"
+    )]
+    resource_origin: Option<String>,
 }
 
 impl CredentialStore {
@@ -84,14 +98,16 @@ impl CredentialStore {
         Self {
             path: data_dir.join(AUTH_FILE),
             owner: None,
+            binding: None,
+            resource: None,
         }
     }
 
     /// A named provider must own an entry before reading or deleting it.
     pub fn owned_by(&self, owner: &str) -> Self {
         Self {
-            path: self.path.clone(),
             owner: Some(owner.into()),
+            ..self.clone()
         }
     }
 
@@ -114,6 +130,7 @@ impl CredentialStore {
             .remove(provider)
             .map(|stored| {
                 self.check_owner(&stored)?;
+                self.check_binding(provider, &stored)?;
                 Ok(stored.entry)
             })
             .transpose()
@@ -130,6 +147,8 @@ impl CredentialStore {
             Stored {
                 entry,
                 owner: self.owner.clone(),
+                origin: self.origin(),
+                resource_origin: self.resource_origin(),
             },
         );
         self.save(&entries)
@@ -159,10 +178,20 @@ impl CredentialStore {
     /// A missing file is an empty store; a corrupt one is an error, never
     /// silently emptied — emptying it would delete a credential to hide a bug.
     fn load(&self) -> Result<BTreeMap<String, Stored>, AuthError> {
-        let Ok(raw) = std::fs::read_to_string(&self.path) else {
-            return Ok(BTreeMap::new());
+        let raw = match std::fs::read_to_string(&self.path) {
+            Ok(raw) => raw,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(BTreeMap::new());
+            }
+            Err(_) => {
+                return Err(AuthError::Store(format!(
+                    "could not read {}",
+                    self.display()
+                )));
+            }
         };
-        serde_json::from_str(&raw).map_err(|e| AuthError::Store(format!("{}: {e}", self.display())))
+        serde_json::from_str(&raw)
+            .map_err(|_| AuthError::Store(format!("could not read {}", self.display())))
     }
 
     fn save(&self, entries: &BTreeMap<String, Stored>) -> Result<(), AuthError> {

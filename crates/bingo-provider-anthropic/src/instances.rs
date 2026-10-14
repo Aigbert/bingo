@@ -30,13 +30,15 @@ pub fn providers(
     let store = Arc::new(CredentialStore::new(env.data_dir.clone()));
     let file = env.user_settings();
     let mut named = BTreeSet::new();
+    let default_store = bound(registrar, &store, "anthropic", "anthropic");
     let mut providers: Vec<Arc<dyn Provider>> = vec![Arc::new(default_anthropic(
         http.clone(),
         settings.anthropic.endpoint.clone(),
         &file,
-        &store,
+        &default_store,
     ))];
     for (name, endpoint) in settings.anthropic.instances {
+        let store = bound(registrar, &store, "anthropic", &name);
         if !allowed(&mut named, &name, "anthropic", &store, registrar) {
             continue;
         }
@@ -63,12 +65,15 @@ fn default_anthropic(
     store: &Arc<CredentialStore>,
 ) -> AnthropicProvider {
     let places = default_places(Some(file.to_path_buf()));
+    let base_url = first([std::env::var(BASE_URL_ENV).ok(), endpoint.base_url.clone()])
+        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
     let key = ApiKey::new(
         PROVIDER_ID,
         places.clone(),
         store.clone(),
         configured(&places, endpoint.api_key),
-    );
+    )
+    .at_origin("anthropic", &base_url, &file.display().to_string());
     AnthropicProvider::keyed(
         http,
         PROVIDER_ID,
@@ -94,12 +99,14 @@ pub(crate) fn keyed(
         setting: format!("anthropic.instances.{name}.apiKey"),
         file: Some(file.to_path_buf()),
     };
+    let base_url = blank(endpoint.base_url.clone()).unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
     let key = ApiKey::new(
         name.clone(),
         places.clone(),
         Arc::new(store.owned_by("anthropic")),
         configured(&places, endpoint.api_key),
-    );
+    )
+    .at_origin("anthropic", &base_url, &file.display().to_string());
     AnthropicProvider::keyed(
         http,
         name,
@@ -127,6 +134,22 @@ fn configured(places: &Places, from_settings: Option<String>) -> Option<Configur
     })
 }
 
+fn bound(
+    registrar: &mut Registrar,
+    store: &CredentialStore,
+    family: &str,
+    name: &str,
+) -> Arc<CredentialStore> {
+    let endpoint = bingo_auth_oauth::boot::Endpoint {
+        family,
+        name,
+        field: "baseUrl",
+        default: DEFAULT_BASE_URL,
+        resource: None,
+    };
+    Arc::new(endpoint.store(registrar, store))
+}
+
 fn allowed(
     named: &mut BTreeSet<String>,
     name: &str,
@@ -146,7 +169,7 @@ fn allowed(
         );
         return false;
     }
-    if store.read(name).is_err() {
+    if store.metadata(name).is_err() {
         registrar.notice(
             "provider.credentials",
             format!(
@@ -156,7 +179,12 @@ fn allowed(
         );
         return true;
     }
-    if store.owned_by(owner).read(name).is_err() {
+    if store
+        .metadata(name)
+        .ok()
+        .flatten()
+        .is_some_and(|entry| entry.owner.as_deref() != Some(owner))
+    {
         registrar.notice("provider.instance", format!(
             "Skipped instance `{name}`: its stored credential has a different or unknown owner; remove it with `/provider remove {name}` and sign in again."
         ));

@@ -80,11 +80,27 @@ impl TokenSource {
         }
     }
 
+    pub fn at_resource(&self, address: &str) -> Self {
+        Self::new(
+            &self.provider,
+            self.issuer.clone(),
+            Arc::new(self.store.at_resource(address, "user settings")),
+            self.http.clone(),
+        )
+    }
+
     pub fn provider(&self) -> &str {
         &self.provider
     }
 
     /// Synchronous by contract, so a refusal and a dialog cannot disagree.
+    pub fn credential_hint(&self) -> Option<String> {
+        self.store
+            .read(&self.provider)
+            .err()
+            .map(|error| error.to_string())
+    }
+
     pub fn status(&self) -> Status {
         match self.cached().0 {
             None => Status::SignedOut,
@@ -99,6 +115,7 @@ impl TokenSource {
     /// The bearer for the next request: the cached token while it is fresh,
     /// a renewed one otherwise.
     pub async fn access_token(&self) -> Result<String, AuthError> {
+        self.store.read(&self.provider)?;
         let (entry, seen) = self.cached();
         match entry {
             Some(Cached::Tokens(tokens)) if !tokens.is_fresh(unix_now()) => {
@@ -244,6 +261,7 @@ impl TokenSource {
     /// different one now means somebody else already renewed.
     async fn refresh(&self, seen: u64) -> Result<String, AuthError> {
         let _guard = self.refreshing.lock().await;
+        self.store.read(&self.provider)?;
         let (entry, generation) = self.cached();
         if generation != seen {
             return Self::usable(entry);
@@ -312,6 +330,13 @@ impl TokenSource {
             .cache
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
+        if !matches!(self.store.read(&self.provider), Ok(Some(_))) {
+            let expired = cache
+                .entry
+                .clone()
+                .filter(|entry| matches!(entry, Cached::Expired(_)));
+            return (expired, cache.generation);
+        }
         if cache.entry.is_none() {
             cache.entry = self.stored();
         }
@@ -381,6 +406,51 @@ mod tests {
 
     /// A prompter that records what it was asked and answers as told. `None`
     /// never answers, which is a person who has walked away — the flow wins.
+    #[tokio::test]
+    async fn cached_tokens_cannot_outlive_their_stored_origin() {
+        let fixture = fixture().await;
+        let scoped = Arc::new(
+            fixture
+                .store
+                .owned_by("family")
+                .at_origin(&fixture.server.uri(), "user.toml"),
+        );
+        let source = TokenSource::new(
+            PROVIDER,
+            issuer(&fixture.server.uri()),
+            scoped.clone(),
+            bingo_http::client(bingo_http::Bounds::CALL).unwrap(),
+        );
+        scoped
+            .write(
+                PROVIDER,
+                Entry::Api {
+                    key: "first".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(source.access_token().await.unwrap(), "first");
+        scoped
+            .at_origin("https://other.example", "user.toml")
+            .write(
+                PROVIDER,
+                Entry::Api {
+                    key: "second".into(),
+                },
+            )
+            .unwrap();
+        assert!(matches!(source.status(), Status::SignedOut));
+        assert!(matches!(
+            source.access_token().await,
+            Err(AuthError::Binding(_))
+        ));
+        assert!(matches!(
+            source.refreshed().await,
+            Err(AuthError::Binding(_))
+        ));
+        assert!(fixture.server.received_requests().await.unwrap().is_empty());
+    }
+
     #[derive(Debug, Default)]
     struct Person {
         seen: Mutex<Vec<InteractionKind>>,

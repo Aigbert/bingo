@@ -271,7 +271,8 @@ async fn a_401_is_followed_by_one_refresh_and_the_turn_completes() {
     std::fs::write(
         auth_json(home.path()),
         serde_json::json!({ "codex": {
-            "type": "oauth", "access": stale, "refresh": "r_0",
+            "type": "oauth", "owner": "codex", "origin": server.uri(), "resourceOrigin": server.uri(),
+            "access": stale, "refresh": "r_0",
             "expires": 4_102_444_800i64, "accountId": "acc_42"
         }})
         .to_string(),

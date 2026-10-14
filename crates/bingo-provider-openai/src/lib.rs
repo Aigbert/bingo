@@ -120,15 +120,17 @@ impl OpenAiProvider {
         store: Arc<CredentialStore>,
     ) -> Self {
         let id = id.into();
-        let store = if id == Variant::Codex.provider_id() {
-            store
-        } else {
-            Arc::new(store.owned_by("codex"))
-        };
-        let source = TokenSource::new(&id, codex_issuer(endpoint.issuer), store, oauth);
+        let issuer = codex_issuer(endpoint.issuer);
         let base_url = endpoint
             .base_url
             .unwrap_or_else(|| CODEX_BASE_URL.to_string());
+        let store = Arc::new(
+            store
+                .owned_by("codex")
+                .at_origin(&issuer.base, store.origin_file().unwrap_or("user settings"))
+                .at_resource(&base_url, store.resource_file().unwrap_or("user settings")),
+        );
+        let source = TokenSource::new(&id, issuer, store, oauth);
         Self::with_credential(http, id, Credential::Tokens(Arc::new(source)), base_url)
             .with_variant(Variant::Codex)
     }
@@ -357,8 +359,14 @@ impl Provider for OpenAiProvider {
         }
         if provider.credential_origin() != self.credential_origin() {
             provider.credential = match &self.credential {
-                Credential::Key(key) => Credential::Key(key.without_configured()),
-                Credential::Tokens(source) => Credential::Tokens(source.clone()),
+                Credential::Key(key) => Credential::Key(key.without_configured().at_origin(
+                    "openai",
+                    &provider.base_url,
+                    "user settings",
+                )),
+                Credential::Tokens(source) => {
+                    Credential::Tokens(Arc::new(source.at_resource(&provider.base_url)))
+                }
             };
             provider.lifetime = Default::default();
         }
@@ -635,7 +643,12 @@ pub(crate) mod tests {
     ) -> OpenAiProvider {
         let store = Arc::new(CredentialStore::new(directory.path().to_path_buf()));
         if let Some(entry) = entry {
-            store.write("codex", entry).expect("a write");
+            store
+                .owned_by("codex")
+                .at_origin(issuer.as_deref().unwrap_or(CODEX_ISSUER), "user settings")
+                .at_resource(CODEX_BASE_URL, "user settings")
+                .write("codex", entry)
+                .expect("a write");
         }
         OpenAiProvider::subscription(
             bingo_http::client(bingo_http::Bounds::STREAMED).expect("a client"),
@@ -852,6 +865,7 @@ pub(crate) mod tests {
         let store = CredentialStore::new(directory.path().join(".bingo/data"));
         store
             .owned_by("openai")
+            .at_origin(DEFAULT_BASE_URL, "user settings")
             .write(
                 "proxy2",
                 Entry::Api {

@@ -57,6 +57,19 @@ impl ApiKey {
         }
     }
 
+    pub fn at_origin(&self, owner: &str, address: &str, file: &str) -> Self {
+        Self {
+            store: self.store.as_ref().map(|store| {
+                Arc::new(
+                    store
+                        .owned_by(owner)
+                        .at_origin(address, store.origin_file().unwrap_or(file)),
+                )
+            }),
+            ..self.clone()
+        }
+    }
+
     pub fn new(
         provider: impl Into<String>,
         places: Places,
@@ -178,7 +191,7 @@ impl ApiKey {
             Ok(None) => self.configured_key().ok_or_else(|| self.hint()),
             // An unreadable store is not a key; a configured one still is,
             // and when there is none the store's error is what to fix.
-            Err(unreadable) => self.configured_key().ok_or(unreadable),
+            Err(unreadable) => Err(unreadable),
         }
     }
 

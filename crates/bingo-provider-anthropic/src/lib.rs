@@ -186,7 +186,11 @@ impl Provider for AnthropicProvider {
             provider.base_url = url.trim_end_matches('/').into();
         }
         if provider.credential_origin() != self.credential_origin() {
-            provider.key = self.key.without_configured();
+            provider.key = self.key.without_configured().at_origin(
+                "anthropic",
+                &provider.base_url,
+                "user settings",
+            );
             provider.lifetime = Default::default();
         }
         if let Some(images) = spec.images {
@@ -555,6 +559,7 @@ pub(crate) mod tests {
         let store = bingo_auth_oauth::CredentialStore::new(directory.path().join(".bingo/data"));
         store
             .owned_by("anthropic")
+            .at_origin(DEFAULT_BASE_URL, "user settings")
             .write(
                 "proxy2",
                 bingo_auth_oauth::Entry::Api {

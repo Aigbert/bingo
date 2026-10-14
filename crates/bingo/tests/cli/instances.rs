@@ -114,11 +114,13 @@ async fn two_codex_instances_hold_two_credentials_and_refresh_apart() {
             "personal": { "baseUrl": personal.uri(), "issuer": personal.uri() },
         }}}),
     );
+    std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
+    std::fs::copy(&file, home.path().join(".bingo/settings.json")).unwrap();
     write_auth(
         home.path(),
         serde_json::json!({
-            "work": { "type": "oauth", "owner": "codex", "access": "at-work-stale", "refresh": "rt-work", "expires": 1 },
-            "personal": { "type": "oauth", "owner": "codex", "access": "at-personal-stale", "refresh": "rt-personal", "expires": 1 },
+            "work": { "type": "oauth", "access": "at-work-stale", "refresh": "rt-work", "expires": 1 },
+            "personal": { "type": "oauth", "access": "at-personal-stale", "refresh": "rt-personal", "expires": 1 },
         }),
     );
 
@@ -373,3 +375,5 @@ fn corrupt_credentials_report_once_without_skipping_instances() {
     );
     assert!(notice.contains("AUTH_REQUIRED"), "{notice}");
 }
+
+mod binding;

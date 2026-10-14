@@ -48,6 +48,9 @@ fn request() -> ModelRequest {
 fn signed_in(server: &MockServer, directory: &TempDir, access: &str) -> OpenAiProvider {
     let store = Arc::new(CredentialStore::new(directory.path().to_path_buf()));
     store
+        .owned_by("codex")
+        .at_origin(&server.uri(), "user settings")
+        .at_resource(&server.uri(), "user settings")
         .write(
             "codex",
             Entry::OAuth {

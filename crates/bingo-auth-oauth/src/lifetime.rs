@@ -23,7 +23,14 @@ impl Lifetime {
 }
 
 pub fn origin(address: &str) -> Option<String> {
-    reqwest::Url::parse(address)
-        .ok()
-        .map(|url| url.origin().ascii_serialization())
+    let url = reqwest::Url::parse(address).ok()?;
+    if !matches!(url.scheme(), "http" | "https") {
+        return None;
+    }
+    Some(format!(
+        "{}://{}:{}",
+        url.scheme(),
+        url.host()?,
+        url.port_or_known_default()?
+    ))
 }

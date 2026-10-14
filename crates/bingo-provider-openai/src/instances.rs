@@ -32,22 +32,25 @@ pub fn providers(
     let store = Arc::new(CredentialStore::new(env.data_dir.clone()));
     let file = env.user_settings();
     let mut named = BTreeSet::new();
+    let default_store = bound(registrar, &store, "openai", "openai");
+    let codex_store = bound(registrar, &store, "codex", "codex");
     let mut providers = vec![
         registered(default_openai(
             http.clone(),
             settings.openai.endpoint.clone(),
             &file,
-            &store,
+            &default_store,
         )),
         registered(OpenAiProvider::subscription(
             http.clone(),
             oauth.clone(),
             Variant::Codex.provider_id(),
             settings.codex.endpoint.clone(),
-            store.clone(),
+            codex_store,
         )),
     ];
     for (name, endpoint) in settings.openai.instances {
+        let store = bound(registrar, &store, "openai", &name);
         if !allowed(&mut named, &name, "openai", &store, registrar) {
             continue;
         }
@@ -60,6 +63,7 @@ pub fn providers(
         )));
     }
     for (name, endpoint) in settings.codex.instances {
+        let store = bound(registrar, &store, "codex", &name);
         if !allowed(&mut named, &name, "codex", &store, registrar) {
             continue;
         }
@@ -96,12 +100,15 @@ fn default_openai(
     store: &Arc<CredentialStore>,
 ) -> OpenAiProvider {
     let places = default_places(Some(file.to_path_buf()));
+    let base_url = first([std::env::var(BASE_URL_ENV).ok(), endpoint.base_url.clone()])
+        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
     let key = ApiKey::new(
         Variant::Default.provider_id(),
         places.clone(),
         store.clone(),
         configured(&places, endpoint.api_key),
-    );
+    )
+    .at_origin("openai", &base_url, &file.display().to_string());
     OpenAiProvider::keyed(
         http,
         Variant::Default.provider_id(),
@@ -127,12 +134,14 @@ pub(crate) fn keyed(
         setting: format!("openai.instances.{name}.apiKey"),
         file: Some(file.to_path_buf()),
     };
+    let base_url = blank(endpoint.base_url.clone()).unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
     let key = ApiKey::new(
         name.clone(),
         places.clone(),
         Arc::new(store.owned_by("openai")),
         configured(&places, endpoint.api_key),
-    );
+    )
+    .at_origin("openai", &base_url, &file.display().to_string());
     OpenAiProvider::keyed(
         http,
         name,
@@ -160,6 +169,30 @@ fn configured(places: &Places, from_settings: Option<String>) -> Option<Configur
     })
 }
 
+fn bound(
+    registrar: &mut Registrar,
+    store: &CredentialStore,
+    family: &str,
+    name: &str,
+) -> Arc<CredentialStore> {
+    let endpoint = bingo_auth_oauth::boot::Endpoint {
+        family,
+        name,
+        field: if family == "codex" {
+            "issuer"
+        } else {
+            "baseUrl"
+        },
+        default: if family == "codex" {
+            crate::CODEX_ISSUER
+        } else {
+            DEFAULT_BASE_URL
+        },
+        resource: (family == "codex").then_some(crate::CODEX_BASE_URL),
+    };
+    Arc::new(endpoint.store(registrar, store))
+}
+
 fn allowed(
     named: &mut BTreeSet<String>,
     name: &str,
@@ -179,7 +212,7 @@ fn allowed(
         );
         return false;
     }
-    if store.read(name).is_err() {
+    if store.metadata(name).is_err() {
         registrar.notice(
             "provider.credentials",
             format!(
@@ -189,7 +222,12 @@ fn allowed(
         );
         return true;
     }
-    if store.owned_by(owner).read(name).is_err() {
+    if store
+        .metadata(name)
+        .ok()
+        .flatten()
+        .is_some_and(|entry| entry.owner.as_deref() != Some(owner))
+    {
         registrar.notice("provider.instance", format!(
             "Skipped instance `{name}`: its stored credential has a different or unknown owner; remove it with `/provider remove {name}` and sign in again."
         ));

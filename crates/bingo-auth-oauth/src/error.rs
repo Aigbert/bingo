@@ -19,6 +19,8 @@ pub enum AuthError {
     Transport(String),
     #[error("credential store: {0}")]
     Store(String),
+    #[error("{0}")]
+    Binding(String),
     #[error("invalid: {0}")]
     Invalid(String),
 }
