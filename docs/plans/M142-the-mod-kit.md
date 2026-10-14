@@ -5,8 +5,8 @@ and live author types on module load. Replace M133 scenarios with tests.
 Re-verified at `ba70fdf6` (2026-10-14). Landed dependencies: M137
 (`c1d95e8c`), M138 (`5581b978`), M139 (`686ad289`), M140 (`ba70fdf6`),
 M147 (`6e3b1b03`), M148 (`fddb62f3`), M149 (`b2bee6f4`), M150
-(`a2f77d96`); M133/M136 are present. M141 helpers/examples are absent:
-finish independent work first, then stop pending the person's merge instruction.
+(`a2f77d96`); M133/M136 are present. Resumed after the authorized merge
+of dev `a88a5363` (M141 and M151) in `2b422229` on 2026-10-14.
 ## Bricks, in build order
 1. **Contracts first.** `Finding { file, line, column, rule, severity, text }`;
    rules: `on-literal`, `dollar-static`, `state-key`, `env-name`, `uses`,
@@ -68,9 +68,10 @@ finish independent work first, then stop pending the person's merge instruction.
 - `crates/bingo-plugin-rpc/src/schema.rs`: regenerate the scoped baseline.
 - Generated `schema/{rpc,plugin,plugin-2,events,dollar}.json` and
   `sdk/typescript/src/{wire,events,dollar-types}.ts`; ADR-0075 dated note.
-- `sdk/typescript/src/state.test.ts` (new)
+- `sdk/typescript/src/state.test.ts`, `package.json`, `test/testing.ts`: run
+  the same helper cases with bingo/testing in QuickJS and a Node assertion adapter.
 - `examples/plugins/ts-status/` (`hooks/register.test.ts` new, `scenarios/` deleted);
-  `examples/plugins/{tool-call,band,pane}/` (one `*.test.ts` each)
+  `examples/plugins/{tool-call,band,pane}/` (one `*.test.ts` each; named state contracts)
 - `crates/bingo/tests/plugin_kit.rs`; `tests/fixtures/mods/counter/types/index.d.ts`
   adds the state contract required for the existing counter to validate cleanly.
 ## Exit criteria
@@ -99,10 +100,11 @@ finish independent work first, then stop pending the person's merge instruction.
   No SDK/kernel tool names, discipline 4c changes, live or credential tests.
 - Live type schemas need enumeration: additive `CatalogKind::Events` on
   HostApi::catalog reads kernel entries and registered faces, without a new verb.
-- **Stopped 2026-10-14:** dev `6fad64ce` has no `merge: M141`. Independent
-  work is verified. Wait for the person's instruction to merge dev, then add
-  the three example tests and helper tests, reconcile shared generated files,
-  and rerun affected verification. No merge, push or PR performed; ADR §8 stays pending.
+- Resumed 2026-10-14 after M141/M151 merge. SDK is a library, not a mod:
+  a manifestless package runs files importing bingo/testing against a disposable
+  empty mod; Node-only tests are reported as skipped and retain their npm runner.
+- Mount uses component request identities, follows resize invalidation, and sends
+  the same pane Escape close action as the TUI; examples need no behavior changes.
 
 ## Verified (2026-10-14)
 - `cargo test -p bingo-mods fixtures_pin_each_rule_and_its_source_location --locked` → red before implementation: empty findings, expected on-literal finding.
