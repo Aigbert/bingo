@@ -3,6 +3,7 @@ use super::*;
 
 pub(super) fn hook_set(host: &Host) -> HookSet {
     HookSet {
+        running: host.registry.running.clone(),
         links: host.registry.links.clone(),
         interceptors: host
             .registry
@@ -144,7 +145,19 @@ pub(super) async fn register_pending(host: &Host) {
 }
 
 async fn registration_links(host: &Host) -> Vec<crate::chain::Link> {
-    let mut links = host.registry.links.clone();
+    let off = host
+        .registry
+        .running
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let mut links: Vec<_> = host
+        .registry
+        .links
+        .iter()
+        .filter(|link| !off.contains(&link.plugin))
+        .cloned()
+        .collect();
     let statuses = crate::plugins::listing(&host.registry).await;
     for source in &host.registry.sources.interceptors {
         for external in source.interceptors().await {
@@ -164,6 +177,7 @@ async fn registration_links(host: &Host) -> Vec<crate::chain::Link> {
                 })
                 .unwrap_or(Tier::Tighten);
             links.push(crate::chain::Link {
+                plugin: external.plugin.clone(),
                 placement: bingo_sdk::plugin::Placement::Outer,
                 external: Some(external.plugin),
                 interceptor: external.link,

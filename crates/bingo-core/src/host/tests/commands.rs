@@ -482,7 +482,10 @@ async fn disable_writes_the_user_layer_and_the_next_start_opens_on_it() {
     let mut client = Client::open(&host).await;
 
     let (ack, _) = client.ack("/plugins disable test.provider").await;
-    assert_eq!(message(&ack), "test.provider is off at the next start.");
+    assert_eq!(
+        message(&ack),
+        "test.provider is off at next start (providers)."
+    );
     let written = std::fs::read_to_string(settings::user_path(&env_in(home.path())))
         .expect("the user settings were written");
     let document: Value = toml_edit::de::from_str(&written).expect("a settings layer");
@@ -584,4 +587,34 @@ async fn plugin_approval_uses_discovery_root_instead_of_session_cwd() {
     let saved = settings::read_document(&env_in(home.path()).user_settings()).unwrap();
     let root = crate::approval::root_key(repo.path()).unwrap();
     assert!(saved["approved"][root]["plugin:p"].is_string());
+}
+
+#[tokio::test]
+async fn a_tool_switch_explains_pending_and_keeps_the_running_tools() {
+    let home = tempfile::tempdir().unwrap();
+    let host = host_in(home.path(), None).await;
+    let mut client = Client::open(&host).await;
+    let before = host.catalog(CatalogKind::Tools).await.unwrap();
+    let (ack, _) = client.ack("/plugins disable test.tools").await;
+    assert_eq!(message(&ack), "test.tools is off at next start (tools).");
+    assert_eq!(host.catalog(CatalogKind::Tools).await.unwrap(), before);
+    let (ack, _) = client.ack("/plugins").await;
+    let row = rows(&ack)
+        .into_iter()
+        .find(|row| row[0] == "test.tools")
+        .unwrap();
+    assert_eq!(
+        (&row[2], &row[3]),
+        (&"pending".to_string(), &"off at next start".to_string())
+    );
+    client.ack("/plugins enable test.tools").await;
+    let (ack, _) = client.ack("/plugins").await;
+    assert_eq!(
+        rows(&ack)
+            .into_iter()
+            .find(|row| row[0] == "test.tools")
+            .unwrap()[2],
+        "on"
+    );
+    host.shutdown().await;
 }

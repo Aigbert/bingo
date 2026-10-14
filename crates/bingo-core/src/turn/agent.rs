@@ -14,7 +14,7 @@ impl Turn<'_> {
             name: agent.id().into(),
             cwd: self.cfg.cwd.clone(),
             policy: self.cfg.policy.clone(),
-            hooks: self.cfg.hooks.clone(),
+            hooks: self.hooks.clone(),
             cx: self.hook_cx.clone(),
             cancel,
             events,
@@ -136,9 +136,8 @@ impl Turn<'_> {
             }
             AgentEvent::Done { call, output } => {
                 let item = self.external(call.clone(), None, calls);
-                let hooks = self.cfg.hooks.gather().await;
+                let hooks = self.hooks.gather().await;
                 let links: Vec<_> = self
-                    .cfg
                     .hooks
                     .links()
                     .await

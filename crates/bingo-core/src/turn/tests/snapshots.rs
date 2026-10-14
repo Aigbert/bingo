@@ -38,6 +38,7 @@ async fn run_and_journal(cfg: &TurnConfig, frames: &mut Vec<Frame>, kind: TurnKi
     let outcome = run_turn(
         cfg,
         TurnRun {
+            hooks: Default::default(),
             turn: TurnId::mint(),
             transcript: transcript(&frames.clone()),
             cancel: CancellationToken::new(),

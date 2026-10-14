@@ -338,6 +338,7 @@ async fn interrupt_drops_a_hung_tool_check_link() {
     let hung = Hung::at(HookPoint::BeforeTool);
     let mut cfg = tool_config();
     cfg.hooks.links.push(crate::chain::Link {
+        plugin: "fixture".into(),
         placement: bingo_sdk::plugin::Placement::Outer,
         external: None,
         tier: Tier::Full,

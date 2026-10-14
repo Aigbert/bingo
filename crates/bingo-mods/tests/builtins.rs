@@ -323,3 +323,59 @@ async fn disabled_palette_has_no_commands_or_render_override() {
     );
     host.shutdown().await;
 }
+
+#[tokio::test]
+async fn live_switch_restores_commands_bindings_and_drawing_even_when_booted_off() {
+    for disabled in [false, true] {
+        let home = tempfile::tempdir().unwrap();
+        let (host, mut attachment) = start(home.path(), None, disabled).await;
+        for enabled in [true, false, true] {
+            let verb = if enabled { "enable" } else { "disable" };
+            let ack = command(
+                &mut attachment,
+                Input::text(format!("/plugins {verb} hello"), Origin::surface("test")),
+            )
+            .await;
+            assert!(matches!(ack, IntentOutcome::Applied { .. }), "{ack:?}");
+            let commands = host.catalog(CatalogKind::Commands).await.unwrap();
+            let specs: Vec<CommandSpec> = commands
+                .entries
+                .into_iter()
+                .map(|e| serde_json::from_value(e.meta).unwrap())
+                .collect();
+            let bindings = bingo_sdk::keys::bindings(&specs, &Default::default(), &[]);
+            assert_eq!(bindings.commands.contains_key("ctrl+x"), enabled);
+            let tree = host.render(&attachment.session, request()).await.unwrap();
+            assert_eq!(tree.fold().contains("Hello from a built-in mod"), enabled);
+            let ack = command(
+                &mut attachment,
+                Input::text("/hello", Origin::surface("test")),
+            )
+            .await;
+            assert_eq!(
+                matches!(ack, IntentOutcome::Applied { .. }),
+                enabled,
+                "{ack:?}"
+            );
+            let plugins = host.catalog(CatalogKind::Plugins).await.unwrap();
+            assert_eq!(
+                plugins
+                    .entries
+                    .iter()
+                    .find(|e| e.id == "hello")
+                    .unwrap()
+                    .meta["state"]["kind"],
+                if enabled { "on" } else { "off" }
+            );
+        }
+        for link in &host.registry().links {
+            assert!(
+                host.registry()
+                    .plugins
+                    .iter()
+                    .any(|plugin| plugin.id == link.plugin)
+            );
+        }
+        host.shutdown().await;
+    }
+}

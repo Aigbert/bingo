@@ -102,6 +102,7 @@ async fn a_turn_that_mixes_tells_the_model_which_line_is_the_persons() {
     run_turn(
         &cfg,
         TurnRun {
+            hooks: Default::default(),
             turn: TurnId::from_raw("trn_1"),
             transcript: transcript(&a_nudge_then_a_line()),
             cancel: CancellationToken::new(),

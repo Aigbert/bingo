@@ -40,6 +40,7 @@ pub(super) struct Serving {
     pub(super) stopped: Arc<std::sync::atomic::AtomicBool>,
     pub(super) door: Door,
     pub(super) config: Arc<TurnConfig>,
+    pub(super) hooks: crate::turn::HookSet,
     pub(super) tool: Arc<dyn Tool>,
 }
 
@@ -48,6 +49,7 @@ pub(super) struct Bridged {
     /// The running turn's own, not the session's next: a call is judged by
     /// the policy and the hooks the turn started under.
     pub(super) config: Arc<TurnConfig>,
+    pub(super) hooks: crate::turn::HookSet,
     pub(super) mailbox: Mailbox,
     pub(super) turn: TurnId,
     /// A child of the turn's: one `esc` ends the turn and drops this call
@@ -99,7 +101,7 @@ impl Bridged {
             ..self.hook_context()
         };
         let dispatch = executor::Dispatch {
-            links: &self.config.hooks.links().await,
+            links: &self.hooks.links().await,
             cx: &cx,
             report: report.clone(),
         };
@@ -108,7 +110,7 @@ impl Bridged {
         for notice in report.take() {
             let _ = self.mailbox.record(notice).await;
         }
-        let hooks = self.config.hooks.gather().await;
+        let hooks = self.hooks.gather().await;
         if crate::chain::tool::after(&call, &outcome.output, &hooks, &cx).await {
             self.stopped
                 .store(true, std::sync::atomic::Ordering::Release);
@@ -120,7 +122,7 @@ impl Bridged {
     /// to ask — under this call's own item, so a question about it is asked
     /// where a question about any call is.
     async fn gated(&self) -> PendingCall {
-        let hooks = self.config.hooks.gather().await;
+        let hooks = self.hooks.gather().await;
         let hook_cx = self.hook_context();
         let prompter = AskVia {
             mailbox: self.mailbox.clone(),
@@ -128,7 +130,7 @@ impl Bridged {
         };
         let gated = gate_call(
             GateInput {
-                links: &self.config.hooks.links().await,
+                links: &self.hooks.links().await,
                 session: &self.config.session.id,
                 cwd: &self.config.cwd,
                 item: &self.item,

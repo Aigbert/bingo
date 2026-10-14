@@ -4,6 +4,7 @@ use futures::FutureExt;
 use serde_json::Value;
 
 pub(crate) enum Work {
+    Snapshot(Box<crate::turn::HookSet>, Box<Work>),
     Calling(Vec<invocation::CallingHook>, Box<Work>),
     Frame(Box<Frame>, HookContext),
     Named(LinkPoint, Value, HookContext),
@@ -54,11 +55,16 @@ pub(crate) async fn work(work: Work, hooks: &crate::turn::HookSet) {
         Work::Calling(calling, work) => (calling, *work),
         work => (Vec::new(), work),
     };
-    invocation::scope(calling, dispatch(work, hooks)).await;
+    match work {
+        Work::Snapshot(snapshot, work) => {
+            invocation::scope(calling, dispatch(*work, &snapshot)).await
+        }
+        work => invocation::scope(calling, dispatch(work, hooks)).await,
+    }
 }
 async fn dispatch(work: Work, hooks: &crate::turn::HookSet) {
     let (entry, value, cx) = match work {
-        Work::Calling(_, _) => return,
+        Work::Calling(_, _) | Work::Snapshot(_, _) => return,
         Work::Frame(frame, cx) => {
             for hook in hooks.at(HookPoint::Event, None).await {
                 hook.on_event(&frame, &cx).await;
@@ -122,5 +128,54 @@ mod tests {
         let (entry, value) = observed(&event).unwrap();
         assert_eq!(entry, catalogue::SESSION_MEASURE);
         assert_eq!(value["turn"], "t");
+    }
+}
+
+#[cfg(test)]
+mod snapshot_tests {
+    use super::*;
+    struct Observed(std::sync::atomic::AtomicUsize);
+    #[async_trait::async_trait]
+    impl Interceptor for Observed {
+        fn id(&self) -> &str {
+            "counter"
+        }
+        fn matcher(&self) -> LinkMatcher {
+            LinkMatcher::at(catalogue::SESSION_MEASURE)
+        }
+        async fn observe(&self, _: &catalogue::Entry, _: &HookContext, _: &Value) {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+    #[tokio::test]
+    async fn a_queued_turn_observation_keeps_its_snapshot() {
+        let observer = Arc::new(Observed(0.into()));
+        let mut hooks = crate::turn::HookSet::default();
+        hooks.links.push(Link {
+            plugin: "counter".into(),
+            external: None,
+            placement: plugin::Placement::Outer,
+            tier: Tier::Full,
+            interceptor: observer.clone(),
+        });
+        let snapshot = hooks.snapshot().await;
+        hooks.running.write().unwrap().insert("counter".into());
+        let cx = HookContext {
+            item: None,
+            session: SessionId::from_raw("test"),
+            turn: Some(TurnId::from_raw("turn")),
+            cwd: Default::default(),
+            provider: None,
+            model: None,
+            host: testing::NoHost::handle(),
+        };
+        let queued = Work::Named(catalogue::SESSION_MEASURE, Value::Null, cx.clone());
+        work(Work::Snapshot(Box::new(snapshot), Box::new(queued)), &hooks).await;
+        work(
+            Work::Named(catalogue::SESSION_MEASURE, Value::Null, cx),
+            &hooks,
+        )
+        .await;
+        assert_eq!(observer.0.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 }

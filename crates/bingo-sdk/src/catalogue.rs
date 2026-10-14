@@ -23,6 +23,7 @@ pub struct Acts {
 pub struct Entry {
     pub name: std::borrow::Cow<'static, str>,
     pub kind: Kind,
+    pub shapes_request: bool,
     pub input: Shape,
     pub result: Shape,
     pub matcher: &'static [&'static str],
@@ -51,6 +52,7 @@ impl Entry {
         Self {
             name: name.into(),
             kind: Kind::Chain,
+            shapes_request: false,
             input: Shape::Declared(input),
             result: Shape::Declared(result),
             matcher: &[],
@@ -95,11 +97,12 @@ impl JsonSchema for Entry {
 
 macro_rules! catalogue {
     ($($id:ident: $name:literal, $kind:ident, $input:ty => $result:ty,
-       $matcher:expr, $pinned:expr, $acts:expr;)+) => {
+        $matcher:expr, $pinned:expr, $acts:expr $(, $shapes:literal)?;)+) => {
         $(pub const $id: &Entry = &Entry {
             name: std::borrow::Cow::Borrowed($name), kind: Kind::$kind,
             input: Shape::Rust(|| schemars::schema_for!($input)), result: Shape::Rust(|| schemars::schema_for!($result)),
             matcher: $matcher, pinned: $pinned, acts: $acts,
+            shapes_request: false $(|| $shapes)?,
             valid_input: |value| serde_json::from_value::<$input>(value.clone()).is_ok(),
             valid_result: |value| serde_json::from_value::<$result>(value.clone()).is_ok(),
         };)+
@@ -134,7 +137,7 @@ catalogue! {
     TOOL_CALL: "tool.call", Chain, ToolCall => ToolCallResult, &["tool"], &["/tool", "/tool_use_id"], WRAP;
     MODEL_COMPLETE: "model.complete", Chain, Complete => Vec<crate::ModelEvent>, &["plugin"], &["/plugin"], WRAP;
     TURN_STEP: "turn.step", Chain, crate::ModelRequest => Result<Vec<crate::ModelEvent>, crate::ProviderError>, &[], &[], WRAP;
-    PROMPT_COMPOSE: "prompt.compose", Chain, crate::ModelRequest => crate::ModelRequest, &[], &[], WRAP;
+    PROMPT_COMPOSE: "prompt.compose", Chain, crate::ModelRequest => crate::ModelRequest, &[], &[], WRAP, true;
     SESSION_COMPACT: "session.compact", Chain, crate::CompactInput => Result<crate::Compaction, crate::CompactError>, &[], &[], WRAP;
     TURN_STOP: "turn.stop", Chain, () => crate::StopResult, &[], &[], PASS;
     TOOL_DESCRIBE: "tool.describe", Chain, crate::ToolSpec => Option<crate::ToolSpec>, &["name"], &["/name"], WRAP;
@@ -178,6 +181,7 @@ pub fn document() -> Value {
                 serde_json::json!({
                     "kind":entry.kind, "input":entry.input.schema(), "result":entry.result.schema(),
                     "matcher":entry.matcher, "pinned":entry.pinned, "acts":entry.acts,
+                    "shapesRequest":entry.shapes_request,
                 }),
             )
         })

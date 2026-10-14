@@ -28,7 +28,7 @@ impl Turn<'_> {
         // carries only reaches the stream that does not exist yet.
         let provider = self.model.endpoint.clone();
         let cancel = self.cancel.child_token();
-        let links = self.cfg.hooks.links().await;
+        let links = self.hooks.links.clone();
         let kernel = Next::new(|request| {
             Box::pin(async move { Ok(provider.stream(request, cancel).await.map(StepStream::new)) })
         });

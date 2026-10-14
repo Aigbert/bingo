@@ -111,6 +111,7 @@ impl ContributorSet {
 /// looked up by name.
 #[derive(Clone, Default)]
 pub struct HookSet {
+    pub running: Arc<std::sync::RwLock<std::collections::BTreeSet<String>>>,
     pub interceptors: Vec<Arc<dyn InterceptorSource>>,
     pub grants: std::collections::BTreeMap<String, PluginTrust>,
     pub links: Vec<crate::chain::Link>,
@@ -119,20 +120,41 @@ pub struct HookSet {
 }
 
 impl HookSet {
+    pub(crate) async fn snapshot(&self) -> Self {
+        Self {
+            links: self.links().await,
+            fixed: self.gather().await,
+            ..Self::default()
+        }
+    }
     pub fn has_links(&self) -> bool {
         !self.links.is_empty() || !self.interceptors.is_empty()
     }
 
     pub async fn links(&self) -> Vec<crate::chain::Link> {
-        let mut links = self.links.clone();
+        let off = self
+            .running
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        let mut links: Vec<_> = self
+            .links
+            .iter()
+            .filter(|link| !off.contains(&link.plugin))
+            .cloned()
+            .collect();
         for source in &self.interceptors {
             for external in source.interceptors().await {
+                if off.contains(&external.plugin) {
+                    continue;
+                }
                 let fallback = self
                     .grants
                     .get(&external.plugin)
                     .map_or(Tier::Tighten, |grant| grant.tier);
                 let tier = source.tier(&external.plugin).await.unwrap_or(fallback);
                 links.push(crate::chain::Link {
+                    plugin: external.plugin.clone(),
                     placement: bingo_sdk::plugin::Placement::Outer,
                     external: Some(external.plugin),
                     interceptor: external.link,
@@ -145,6 +167,7 @@ impl HookSet {
 
     pub fn fixed(hooks: Vec<Arc<dyn Hook>>) -> Self {
         Self {
+            running: Default::default(),
             links: Vec::new(),
             interceptors: Vec::new(),
             grants: Default::default(),
@@ -410,6 +433,7 @@ mod tests {
     #[tokio::test]
     async fn a_source_s_hooks_join_the_registered_ones_in_order() {
         let set = HookSet {
+            running: Default::default(),
             links: Vec::new(),
             interceptors: Vec::new(),
             grants: Default::default(),

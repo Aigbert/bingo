@@ -1,11 +1,7 @@
 //! `/plugins`, alias `/modules`: which plugins are on, which are off and why,
 //! and the two words that change one (ADR-0057 §6).
 //!
-//! Bare it is one table of what this build registered and what every source
-//! knows of its own, so a person reads the built-in ones and the external ones
-//! in one place. `enable` and `disable` write the user settings layer and say
-//! *at the next start*: a plugin registers at boot, and a switch that pretended
-//! to take a running plugin's tools away would be a lie.
+//! Switches preserve the running request and report when each wish takes effect.
 
 use std::sync::Weak;
 
@@ -162,9 +158,33 @@ async fn switched(
     enabled: bool,
 ) -> Result<CommandOutcome, KernelError> {
     refuse(host, listed, name)?;
-    crate::plugins::switch_in(host, session, name, enabled).await?;
+    let (enabled, kind) = crate::plugins::switch_in(host, session, name, enabled).await?;
+    let target = name;
+    let name = name.strip_prefix("plugins:").unwrap_or(name);
+    let when = match kind {
+        plugin::PluginSwitch::Now => "now".into(),
+        plugin::PluginSwitch::NextStart { why } => format!("at next start ({why})"),
+    };
+    let listed = listing(host.registry()).await;
+    let status = listed
+        .iter()
+        .find(|status| status.id == target)
+        .or_else(|| {
+            listed
+                .iter()
+                .find(|status| status.id == format!("plugins:{name}"))
+        });
+    let waiting = status.as_ref().and_then(|status| match &status.state {
+        PluginState::Waiting { .. } | PluginState::Failed { .. } | PluginState::Registering => {
+            status.state.reason()
+        }
+        _ => None,
+    });
     Ok(CommandOutcome::Applied {
-        message: Some(format!("{name} is {} at the next start.", state(enabled))),
+        message: Some(match waiting {
+            Some(why) => format!("{name}: switch saved; {why}."),
+            None => format!("{name} is {} {when}.", state(enabled)),
+        }),
     })
 }
 

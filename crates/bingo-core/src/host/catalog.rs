@@ -217,8 +217,8 @@ fn tool_entry(tool: &dyn Tool) -> CatalogEntry {
 /// directory; a session working elsewhere still dispatches by its own.
 async fn commands(registry: &Registry) -> Vec<CatalogEntry> {
     let here = std::env::current_dir().unwrap_or_default();
-    let mut all = registry.commands.clone();
-    for source in &registry.sources.commands {
+    let mut all = Vec::new();
+    for source in registry.command_sources() {
         all.extend(source.commands(&here).await);
     }
     all.iter()
@@ -548,6 +548,7 @@ mod tests {
     async fn the_plugins_catalogue_lists_the_sources_after_the_registry() {
         let registry = Registry {
             plugins: vec![registered("bingo.tools.web")],
+            wishes: std::sync::RwLock::new(["wordcount".into()].into()),
             sources: Sources {
                 plugins: vec![Arc::new(Found)],
                 ..Default::default()

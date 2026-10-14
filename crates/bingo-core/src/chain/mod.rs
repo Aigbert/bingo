@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Link {
+    pub plugin: String,
     pub placement: bingo_sdk::plugin::Placement,
     pub external: Option<String>,
     pub interceptor: Arc<dyn Interceptor>,

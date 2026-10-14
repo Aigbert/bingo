@@ -137,6 +137,7 @@ async fn a_picture_at_the_top_of_what_the_person_said_ages_the_same_way() {
     let out = run_turn(
         &cfg,
         TurnRun {
+            hooks: Default::default(),
             turn: TurnId::from_raw("trn_1"),
             transcript: transcript(&frames),
             cancel: CancellationToken::new(),

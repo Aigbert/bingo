@@ -72,7 +72,12 @@ pub(super) fn complete(actor: &Actor, turn: TurnId, status: TurnStatus, items: V
         usage,
         answer,
     };
-    let hooks = actor.config.hooks.clone();
+    let hooks = actor
+        .running
+        .as_ref()
+        .and_then(|run| run.hooks.get())
+        .cloned()
+        .unwrap_or_default();
     let mut cx = actor.hook_context();
     cx.turn = Some(turn.clone());
     let mailbox = actor.mailbox.clone();

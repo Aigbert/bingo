@@ -242,7 +242,7 @@ impl PluginSource for Manager {
     }
     async fn registered(&self, name: &str, result: Result<PluginGrant, String>) {
         if let Some(module) = self.modules().iter().find(|module| {
-            module.found.name == name && matches!(module.admission.state(), PluginState::Pending)
+            module.found.name == name && matches!(module.admission.state(), PluginState::Registering)
         }) {
             let denied = result.is_err();
             module.admission.finish(result);

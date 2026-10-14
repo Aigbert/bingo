@@ -45,6 +45,7 @@ fn run_on(
     run_turn(
         cfg,
         TurnRun {
+            hooks: Default::default(),
             turn: TurnId::from_raw("trn_2"),
             transcript: transcript(&history),
             cancel: CancellationToken::new(),
@@ -184,6 +185,7 @@ async fn failed_and_cancelled_summary_usage_is_billed_once_without_cutting() {
         let out = run_turn(
             &cfg,
             TurnRun {
+                hooks: Default::default(),
                 turn: TurnId::mint(),
                 transcript: transcript(&frames),
                 cancel,
@@ -273,6 +275,7 @@ async fn manual_threshold_and_overflow_receive_the_assembled_parent_request() {
         let outcome = run_turn(
             &cfg,
             TurnRun {
+                hooks: Default::default(),
                 turn: TurnId::mint(),
                 transcript: transcript(&frames),
                 cancel: CancellationToken::new(),

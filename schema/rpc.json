@@ -3271,6 +3271,12 @@
         }
       ]
     },
+    "NextStart": {
+      "type": "string",
+      "enum": [
+        "nextStart"
+      ]
+    },
     "OmittedField": {
       "type": "object",
       "properties": {
@@ -3806,13 +3812,34 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "pending"
+              "const": "registering"
             }
           },
           "required": [
             "kind"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "now": {
+              "type": "boolean"
+            },
+            "at": {
+              "$ref": "#/$defs/NextStart"
+            },
+            "kind": {
+              "type": "string",
+              "const": "pending"
+            }
+          },
+          "required": [
+            "kind",
+            "now",
+            "at"
+          ]
         }
       ]
     },

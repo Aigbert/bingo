@@ -2,7 +2,7 @@
 //! single holder — the policy, the store, the compactor — refuses a second.
 
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -11,7 +11,7 @@ use bingo_sdk::*;
 use serde_json::{Map, Value};
 
 use super::HostError;
-use crate::plugins::{self, needed};
+use crate::plugins::{self, ContributionKind, needed};
 
 /// Everything that arrives after I/O (ADR-0009 §1), one list per kind, each
 /// read where that kind is resolved.
@@ -49,7 +49,13 @@ pub struct Registry {
     pub hooks: Vec<Arc<dyn Hook>>,
     pub links: Vec<crate::chain::Link>,
     pub contributors: Vec<Arc<dyn ContextContributor>>,
-    pub commands: Vec<Arc<dyn Command>>,
+    pub commands: Vec<super::registry_commands::OwnedCommand>,
+    /// Resident owners excluded from future dispatch snapshots.
+    pub running: Arc<RwLock<BTreeSet<String>>>,
+    pub switching: tokio::sync::Mutex<()>,
+    /// The resolved enabledPlugins wish, represented by its disabled names.
+    pub wishes: RwLock<BTreeSet<String>>,
+    pub kinds: BTreeMap<String, plugin::PluginSwitch>,
     pub surfaces: Vec<Arc<dyn Surface>>,
     pub store: Option<Arc<dyn SessionStore>>,
     pub compactor: Option<Arc<dyn Compactor>>,
@@ -65,6 +71,39 @@ pub struct Registry {
     /// What loading found worth telling a person, as `(code, text)`; the host
     /// says them beside the settings' own (ADR-0057 §3).
     pub notices: Vec<(String, String)>,
+}
+
+fn contribution_kind(contribution: &Contribution) -> ContributionKind {
+    match contribution {
+        Contribution::Command(_) => ContributionKind::Commands,
+        Contribution::Interceptor { link, external, .. } => {
+            if external.is_some() {
+                return ContributionKind::Process;
+            }
+            let matcher = link.matcher();
+            ContributionKind::Interceptor {
+                shapes_request: catalogue::ALL.iter().any(|entry| {
+                    entry.shapes_request
+                        && (matcher.patterns.is_empty()
+                            || matcher.patterns.iter().any(|p| p.matches(&entry.name)))
+                }),
+            }
+        }
+        Contribution::Tool(_) | Contribution::Tools(_) => ContributionKind::Tools,
+        Contribution::Provider(_) | Contribution::Providers(_) | Contribution::Agent(_) => {
+            ContributionKind::Providers
+        }
+        Contribution::Store(_) => ContributionKind::Store,
+        Contribution::Surface(_) => ContributionKind::Surface,
+        Contribution::Service { .. } => ContributionKind::Service,
+        Contribution::Context(_) | Contribution::Contexts(_) => ContributionKind::Context,
+        Contribution::Policy(_) => ContributionKind::Policy,
+        Contribution::Hook(_) | Contribution::Hooks(_) => ContributionKind::Hooks,
+        Contribution::Compactor(_) | Contribution::Compactors(_) => ContributionKind::Compactor,
+        Contribution::Interceptors(_) | Contribution::Commands(_) | Contribution::Plugins(_) => {
+            ContributionKind::Source
+        }
+    }
 }
 
 fn declared_service(
@@ -111,11 +150,20 @@ impl Registry {
             .collect();
         let mut registry = Registry {
             notices: ignored_switches(plugins, switched_off),
+            wishes: RwLock::new(switched_off.clone()),
             ..Registry::default()
         };
         for (plugin, reason) in plugins.iter().zip(standing(plugins, switched_off)) {
             let manifest = plugin.manifest();
             if let Some(reason) = reason {
+                if reason == SWITCHED_OFF {
+                    registry.register(plugin.as_ref(), slices, env, switched_off, layers, &reserved)?;
+                    registry
+                        .running
+                        .write()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .insert(manifest.id.into());
+                }
                 tracing::warn!(plugin = manifest.id, %reason, "plugin disabled");
                 registry
                     .plugins
@@ -131,6 +179,13 @@ impl Registry {
                 &reserved,
             )?;
             registry.plugins.push(PluginStatus::loaded(manifest));
+        }
+        for plugin in plugins.iter().filter(|p| needed(p.manifest()).is_some()) {
+            registry
+                .wishes
+                .get_mut()
+                .unwrap_or_else(|e| e.into_inner())
+                .remove(plugin.manifest().id);
         }
         Ok(registry)
     }
@@ -154,18 +209,44 @@ impl Registry {
             .with_sources(crate::settings::sources::for_plugin(
                 layers, manifest, reserved,
             ));
-        plugin
-            .register(&mut registrar)
-            .map_err(|source| HostError::Register {
-                plugin: manifest.id.to_string(),
+        if let Err(source) = plugin.register(&mut registrar) {
+            if switched_off.contains(manifest.id) {
+                self.kinds.insert(
+                    manifest.id.into(),
+                    plugin::PluginSwitch::NextStart {
+                        why: "registration unavailable".into(),
+                    },
+                );
+                return Ok(());
+            }
+            return Err(HostError::Register {
+                plugin: manifest.id.into(),
                 source,
-            })?;
+            });
+        }
         for notice in registrar.take_notices() {
             if !self.notices.contains(&notice) {
                 self.notices.push(notice);
             }
         }
-        for contribution in registrar.into_contributions() {
+        let contributions = registrar.into_contributions();
+        let kinds: Vec<_> = contributions.iter().map(contribution_kind).collect();
+        let classified = plugins::switch_kind(&kinds);
+        let kind = if manifest.requires.is_empty() || classified != plugin::PluginSwitch::Now {
+            classified
+        } else {
+            plugin::PluginSwitch::NextStart {
+                why: "plugin requirements".into(),
+            }
+        };
+        let retain = kind == plugin::PluginSwitch::Now
+            || !switched_off.contains(manifest.id)
+            || needed(manifest).is_some();
+        self.kinds.insert(manifest.id.into(), kind);
+        if !retain {
+            return Ok(());
+        }
+        for contribution in contributions {
             declared_service(manifest, &contribution)?;
             self.add(manifest.id, contribution, layers)?;
         }
@@ -219,6 +300,7 @@ impl Registry {
                     Tier::Full
                 };
                 self.links.push(crate::chain::Link {
+                    plugin: plugin.into(),
                     placement,
                     external,
                     interceptor: link,
@@ -246,7 +328,7 @@ impl Registry {
                 self.sources.contexts.push(source);
                 Ok(())
             }
-            Contribution::Command(command) => self.add_command(command),
+            Contribution::Command(command) => self.add_command(plugin, command),
             Contribution::Commands(source) => {
                 self.sources.commands.push(source);
                 Ok(())
@@ -395,19 +477,23 @@ impl Registry {
     /// The kernel's own commands, added last: a plugin that took a name
     /// first keeps it.
     pub(super) fn add_builtins(&mut self, commands: Vec<Arc<dyn Command>>) {
-        for command in commands {
-            if let Err(taken) = self.add_command(command) {
-                tracing::debug!(%taken, "a plugin's command shadows the kernel's");
+        self.commands.extend(commands.into_iter().map(|command| {
+            super::registry_commands::OwnedCommand {
+                plugin: String::new(),
+                command,
             }
-        }
+        }));
     }
 
-    fn add_command(&mut self, command: Arc<dyn Command>) -> Result<(), String> {
+    fn add_command(&mut self, plugin: &str, command: Arc<dyn Command>) -> Result<(), String> {
         let name = command.spec().name;
         if self.commands.iter().any(|c| c.spec().name == name) {
             return Err(format!("command {name} is already registered"));
         }
-        self.commands.push(command);
+        self.commands.push(super::registry_commands::OwnedCommand {
+            plugin: plugin.into(),
+            command,
+        });
         Ok(())
     }
 
@@ -435,7 +521,20 @@ impl Registry {
         Ok(())
     }
 
+    pub(super) fn command_sources(&self) -> Vec<Arc<dyn CommandSource>> {
+        let mut sources: Vec<Arc<dyn CommandSource>> =
+            vec![Arc::new(super::registry_commands::Commands {
+                table: self.commands.clone(),
+                running: self.running.clone(),
+            })];
+        sources.extend(self.sources.commands.clone());
+        sources
+    }
+
     pub(super) fn enabled(&self, plugin: &str) -> bool {
+        if self.kinds.get(plugin) == Some(&plugin::PluginSwitch::Now) {
+            return true;
+        }
         self.plugins
             .iter()
             .any(|p| p.id == plugin && p.state.is_on())

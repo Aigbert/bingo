@@ -50,6 +50,35 @@ and says why. The listing tells the wish from what runs.
       and keeps its tool in the running session.
 - [ ] Gates as M167.
 
+## Decisions
+
+- Admission's old unit `Pending` becomes `Registering`; `Pending { now, at }`
+  exclusively describes a wish differing from the running state. This avoids
+  conflating M171 admission with a restart and keeps pending derived.
+- Retain registered native contributions for eligible plugins switched off at
+  boot. Initialize these resident plugins once; dispatch controls visibility.
+  Plugins with requirements remain next-start: their dependency fixpoint cannot
+  safely change during a session. Unknown late sources fail closed.
+- The runtime consumes the merged switches and owns the resolved wish beside
+  its running set; accepted switches
+  update it only after the user-layer write succeeds. No pending flag is saved.
+- Extend the file list to the existing host/turn dispatch seams and tests, the
+  plugin-source switching contract and module reload helpers, admission readers,
+  and crate-owned guides. These are necessary consumers of the changed contracts.
+- Freeze a turn's hooks once, sharing that snapshot with bridged calls and the
+  completion chain. Live native dispatch filters a single owner set; core
+  command fallbacks remain registered beneath switchable commands.
+- Module retirement keeps old generations alive while a captured chain or
+  callback holds them, including their admitted grant scoped to each operation.
+  Catalogue rereads would otherwise revoke a running turn at its next `$` call.
+  Enable waits for retirement before reusing resources.
+  Dynamic `tool` authority is conservatively next-start even before registration;
+  otherwise an unloaded module could add tools while being enabled.
+- The sole new dependency edge is TUI → core in dev-dependencies, to drive
+  the real `/plugins` command in TestBackend coverage; no external dependency.
+- Switching documentation belongs in the existing mods Page; add a second Page
+  if full, and correct the product guide's existing `/plugins` summary.
+
 ## Non-goals
 
 Live switching of tools or providers; unloading a process plugin

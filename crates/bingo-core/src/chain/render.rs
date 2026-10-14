@@ -92,6 +92,7 @@ pub(crate) async fn dispatch(
     let owned: Vec<_> = links
         .iter()
         .map(|link| Link {
+            plugin: "fixture".into(),
             placement: link.placement,
             external: link.external.clone(),
             tier: link.tier,
@@ -156,6 +157,7 @@ mod tests {
     #[test]
     fn only_ui_render_links_publish_components() {
         let link = Link {
+            plugin: "fixture".into(),
             placement: bingo_sdk::plugin::Placement::Outer,
             external: None,
             interceptor: Arc::new(Answer(false)),
@@ -212,6 +214,7 @@ mod tests {
         for throws in [true, false] {
             let report = Report::default();
             let links = [Link {
+                plugin: "fixture".into(),
                 placement: bingo_sdk::plugin::Placement::Outer,
                 external: Some("counter".into()),
                 interceptor: Arc::new(Answer(throws)),
@@ -283,6 +286,7 @@ mod tests {
             host: testing::NoHost::handle(),
         };
         let link = |id: &str, interceptor: Arc<dyn Interceptor>| Link {
+            plugin: "fixture".into(),
             placement: bingo_sdk::plugin::Placement::Outer,
             external: Some(id.into()),
             interceptor,

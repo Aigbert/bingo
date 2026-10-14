@@ -316,6 +316,7 @@ impl Actor {
             .await?;
         let bridged = invoke::Bridged {
             config: serving.config,
+            hooks: serving.hooks,
             mailbox: self.mailbox.clone(),
             turn: serving.turn,
             cancel: serving.cancel,
@@ -360,6 +361,7 @@ impl Actor {
             stopped: running.stopped.clone(),
             door: running.door.clone(),
             config: Arc::clone(&running.config),
+            hooks: running.hooks.get().cloned().unwrap_or_default(),
             tool,
         })
     }

@@ -215,6 +215,6 @@ async fn approval_after_a_refused_reload_revives_the_bridge() {
     assert!(revived.0, "{revived:?}");
     assert_eq!(
         registration.admission.state(),
-        bingo_sdk::PluginState::Pending
+        bingo_sdk::PluginState::Registering
     );
 }

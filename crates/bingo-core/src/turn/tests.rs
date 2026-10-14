@@ -178,6 +178,7 @@ fn run(
     run_turn(
         cfg,
         TurnRun {
+            hooks: Default::default(),
             turn: TurnId::from_raw("trn_1"),
             transcript: transcript(&history("hello")),
             cancel,
@@ -634,6 +635,7 @@ async fn a_model_without_vision_gets_a_note_where_the_image_was() {
     let out = run_turn(
         &cfg,
         TurnRun {
+            hooks: Default::default(),
             turn: TurnId::from_raw("trn_1"),
             transcript: transcript(&frames),
             cancel: CancellationToken::new(),
@@ -797,6 +799,7 @@ async fn a_source_strategy_compacts_when_nothing_in_process_holds_the_slot() {
     run_turn(
         &cfg,
         TurnRun {
+            hooks: Default::default(),
             turn: TurnId::from_raw("trn_1"),
             transcript: transcript(&history("hello")),
             cancel: CancellationToken::new(),
@@ -895,6 +898,7 @@ async fn a_source_s_hook_composes_where_a_second_registered_hook_would() {
 
     let mixed = Arc::new(Mutex::new(Vec::new()));
     gate_one_call(HookSet {
+        running: Default::default(),
         links: Vec::new(),
         interceptors: Vec::new(),
         grants: Default::default(),
@@ -930,6 +934,7 @@ async fn compaction_hooks_bracket_the_cut() {
     run_turn(
         &cfg,
         TurnRun {
+            hooks: Default::default(),
             turn: TurnId::from_raw("trn_1"),
             transcript: transcript(&history("hello")),
             cancel: CancellationToken::new(),

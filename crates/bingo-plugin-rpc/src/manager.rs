@@ -402,7 +402,7 @@ impl Manager {
             installed.registration.name == name
                 && matches!(
                     installed.registration.admission.state(),
-                    bingo_sdk::PluginState::Pending
+                    bingo_sdk::PluginState::Registering
                 )
         }) {
             let denied = result.is_err();

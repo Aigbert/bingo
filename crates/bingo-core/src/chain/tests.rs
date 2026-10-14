@@ -72,6 +72,7 @@ fn call() -> ToolCall {
 }
 fn link(name: &'static str, tier: Tier) -> Link {
     Link {
+        plugin: "fixture".into(),
         placement: bingo_sdk::plugin::Placement::Outer,
         external: Some("process".into()),
         interceptor: Arc::new(Wrap(name)),
@@ -282,6 +283,7 @@ async fn a_json_deny_only_answer_never_runs_the_tool() {
         });
         let result = run::<tool::Call>(
             &[Link {
+                plugin: "fixture".into(),
                 placement: bingo_sdk::plugin::Placement::Outer,
                 external: Some("guard".into()),
                 interceptor: Arc::new(Deny),

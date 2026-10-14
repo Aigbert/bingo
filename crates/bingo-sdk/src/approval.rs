@@ -53,7 +53,21 @@ mod tests {
                 PluginState::Waiting { changed: true },
                 json!({"kind":"waiting","changed":true}),
             ),
-            (PluginState::Pending, json!({"kind":"pending"})),
+            (PluginState::Registering, json!({"kind":"registering"})),
+            (
+                PluginState::Pending {
+                    now: true,
+                    at: crate::plugin::NextStart::NextStart,
+                },
+                json!({"kind":"pending","now":true,"at":"nextStart"}),
+            ),
+            (
+                PluginState::Pending {
+                    now: false,
+                    at: crate::plugin::NextStart::NextStart,
+                },
+                json!({"kind":"pending","now":false,"at":"nextStart"}),
+            ),
         ] {
             assert_eq!(serde_json::to_value(&state).unwrap(), value);
             assert_eq!(serde_json::from_value::<PluginState>(value).unwrap(), state);

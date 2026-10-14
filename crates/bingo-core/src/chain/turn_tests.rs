@@ -33,6 +33,7 @@ impl Interceptor for AnswerPoints {
 }
 fn full(interceptor: Arc<dyn Interceptor>) -> crate::chain::Link {
     crate::chain::Link {
+        plugin: "fixture".into(),
         placement: bingo_sdk::plugin::Placement::Outer,
         interceptor,
         external: None,
@@ -119,6 +120,7 @@ async fn a_tighten_link_at_turn_step_observes_only() {
     let provider = ScriptedProvider::new(vec![Script::Events(text("from provider"))]);
     let mut cfg = config(provider.clone(), vec![]);
     cfg.hooks.links.push(crate::chain::Link {
+        plugin: "fixture".into(),
         placement: bingo_sdk::plugin::Placement::Outer,
         interceptor: Arc::new(AnswerPoints),
         external: Some("untrusted".into()),
@@ -129,4 +131,54 @@ async fn a_tighten_link_at_turn_step_observes_only() {
     assert_eq!(result.status, TurnStatus::Completed);
     assert_eq!(provider.requests().len(), 1);
     assert!(host.events().iter().any(|event| matches!(event, Event::ItemCompleted { item } if matches!(&item.body, ItemBody::Notice { code, .. } if code == "INTERCEPTOR_SKIPPED"))));
+}
+
+struct SwitchDuringStep {
+    off: Arc<std::sync::RwLock<std::collections::BTreeSet<String>>>,
+    stops: Arc<std::sync::atomic::AtomicUsize>,
+}
+#[async_trait]
+impl Interceptor for SwitchDuringStep {
+    fn id(&self) -> &str {
+        "switch"
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher::default()
+    }
+    async fn turn_step(
+        &self,
+        _: &HookContext,
+        input: ModelRequest,
+        next: Next<'_, ModelRequest, Result<StepStream, ProviderError>>,
+    ) -> Result<Result<StepStream, ProviderError>, KernelError> {
+        self.off.write().unwrap().insert("fixture".into());
+        next.run(input).await
+    }
+    async fn turn_stop(
+        &self,
+        _: &HookContext,
+        input: (),
+        next: Next<'_, (), StopResult>,
+    ) -> Result<StopResult, KernelError> {
+        self.stops.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        next.run(input).await
+    }
+}
+#[tokio::test]
+async fn a_switch_during_a_turn_keeps_its_stop_link_until_the_next_turn() {
+    let provider = ScriptedProvider::new(vec![
+        Script::Events(text("one")),
+        Script::Events(text("two")),
+    ]);
+    let mut cfg = config(provider, vec![]);
+    let stops = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    cfg.hooks.links.push(full(Arc::new(SwitchDuringStep {
+        off: cfg.hooks.running.clone(),
+        stops: stops.clone(),
+    })));
+    for _ in 0..2 {
+        let result = run(&cfg, &RecordingHost::new(), CancellationToken::new()).await;
+        assert_eq!(result.status, TurnStatus::Completed);
+        assert_eq!(stops.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
 }

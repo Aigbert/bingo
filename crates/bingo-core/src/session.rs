@@ -717,9 +717,15 @@ impl Actor {
         if let Some(observed) = &self.observed
             && !matches!(frame.event, Event::ItemDelta { .. })
         {
-            let _ = observed.events.send(crate::chain::observe::capture(
-                crate::chain::observe::Work::Frame(Box::new(frame.clone()), self.hook_context()),
-            ));
+            let work =
+                crate::chain::observe::Work::Frame(Box::new(frame.clone()), self.hook_context());
+            let work = match self.running.as_ref().and_then(|run| run.hooks.get()) {
+                Some(hooks) => {
+                    crate::chain::observe::Work::Snapshot(Box::new(hooks.clone()), Box::new(work))
+                }
+                None => work,
+            };
+            let _ = observed.events.send(crate::chain::observe::capture(work));
         }
         self.state.apply(&frame);
         self.subscribers.fanout(&frame);

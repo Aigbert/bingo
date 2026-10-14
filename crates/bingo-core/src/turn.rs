@@ -44,8 +44,8 @@ pub const CONTINUE_PROMPT: &str = "Continue from where you left off.";
 pub const MAX_LENGTH_RECOVERIES: u32 = 3;
 const MAX_THRESHOLD_COMPACTIONS: u32 = 2;
 
-#[derive(Debug)]
 pub struct TurnRun {
+    pub(crate) hooks: Arc<tokio::sync::OnceCell<HookSet>>,
     pub turn: TurnId,
     /// The actor's folded transcript; item bodies are shared with its snapshot.
     pub transcript: Transcript,
@@ -63,6 +63,7 @@ impl TurnRun {
         Self {
             turn,
             transcript: transcript.clone(),
+            hooks: Default::default(),
             cancel,
             kind,
         }
@@ -85,6 +86,7 @@ pub struct TurnOutcome {
 
 struct Turn<'a> {
     cfg: &'a TurnConfig,
+    hooks: HookSet,
     /// The model this turn runs on, resolved once.
     model: ModelChoice,
     host: &'a dyn TurnHost,
@@ -167,6 +169,11 @@ fn unanswered(items: Vec<Item>) -> TurnOutcome {
 
 pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> TurnOutcome {
     let mut transcript = run.transcript;
+    let Some(hooks) = racing(&run.cancel, run.hooks.get_or_init(|| cfg.hooks.snapshot())).await
+    else {
+        return stopped_early(host, &run.turn, transcript);
+    };
+    let hooks = hooks.clone();
     let Some(model) = cfg.model.clone() else {
         return unanswered(transcript.model_items().cloned().collect());
     };
@@ -196,6 +203,7 @@ pub async fn run_turn(cfg: &TurnConfig, run: TurnRun, host: &dyn TurnHost) -> Tu
     }
     let mut turn = Turn {
         cfg,
+        hooks,
         ruler: Ruler::new(
             model.capabilities.context_window,
             model.max_tokens,
@@ -256,7 +264,7 @@ impl Turn<'_> {
 
     /// The hooks that claim this point, asked of the one set the config holds.
     async fn hooks(&self, point: HookPoint) -> Vec<Arc<dyn Hook>> {
-        self.cfg.hooks.at(point, None).await
+        self.hooks.at(point, None).await
     }
 
     /// The `Turn` hooks at the start. A hook that is still thinking when a
@@ -456,7 +464,7 @@ impl Turn<'_> {
             session: Some(self.cfg.session.id.clone()),
             provider_options: ProviderMetadata::new(),
         };
-        let links = self.cfg.hooks.links().await;
+        let links = self.hooks.links.clone();
         let cx = self.hook_cx.clone();
         let report = crate::chain::Report::default();
         request.tools = crate::chain::describe::tools(request.tools, &links, &cx, report.clone())
@@ -651,7 +659,7 @@ impl Turn<'_> {
         let report = crate::chain::Report::default();
         let result = self
             .racing(crate::chain::stop::dispatch(
-                &self.cfg.hooks,
+                &self.hooks,
                 &self.hook_cx,
                 report.clone(),
             ))
@@ -760,7 +768,7 @@ impl Turn<'_> {
         };
         let report = crate::chain::Report::default();
         let outcome = crate::chain::compact::dispatch(
-            &self.cfg.hooks.links().await,
+            &self.hooks.links.clone(),
             &self.hook_cx,
             input,
             compactor,
@@ -844,7 +852,7 @@ impl Turn<'_> {
         let mut calls = Vec::with_capacity(finished.tool_calls.len());
         // Asked once for the round: the gate does the per-tool matching, and
         // a source is read no more often than the hooks it answers with.
-        let hooks = self.cfg.hooks.gather().await;
+        let hooks = self.hooks.gather().await;
         for (item_id, call) in &finished.tool_calls {
             let tool = self
                 .late
@@ -858,7 +866,7 @@ impl Turn<'_> {
             };
             let gated = gate_call(
                 GateInput {
-                    links: &self.cfg.hooks.links().await,
+                    links: &self.hooks.links.clone(),
                     session: &self.cfg.session.id,
                     cwd: &self.cfg.cwd,
                     item: item_id,
@@ -915,7 +923,7 @@ impl Turn<'_> {
 
         let report = crate::chain::Report::default();
         let dispatch = executor::Dispatch {
-            links: &cfg.hooks.links().await,
+            links: &self.hooks.links,
             cx: &self.hook_cx.clone(),
             report: report.clone(),
         };
@@ -969,7 +977,7 @@ impl Turn<'_> {
         self.racing(crate::chain::tool::after_outcomes(
             outcomes,
             &self.transcript,
-            &self.cfg.hooks,
+            &self.hooks,
             &self.hook_cx,
         ))
         .await

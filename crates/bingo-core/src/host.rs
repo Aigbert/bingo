@@ -22,6 +22,7 @@ use live::Live;
 mod reach;
 mod refresh;
 mod registry;
+mod registry_commands;
 mod render;
 mod render_queue;
 mod resume;
@@ -224,8 +225,8 @@ impl Host {
     fn services(&self) -> session::Services {
         let weak = Arc::downgrade(&self.plugin_host.0);
         session::Services {
-            commands: self.registry.commands.clone(),
-            command_sources: self.registry.sources.commands.clone(),
+            commands: Vec::new(),
+            command_sources: self.registry.command_sources(),
             host: weak,
         }
     }
@@ -236,6 +237,12 @@ impl Host {
         match self.weak.upgrade() {
             Some(host) => HostHandle(host),
             None => HostHandle(Arc::new(Unavailable)),
+        }
+    }
+
+    pub(crate) fn plugins_changed(&self) {
+        for kind in [CatalogKind::Plugins, CatalogKind::Commands] {
+            let _ = self.gateway.send(GatewayEvent::CatalogChanged { kind });
         }
     }
 

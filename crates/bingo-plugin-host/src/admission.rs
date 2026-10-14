@@ -20,7 +20,7 @@ impl Admission {
     }
     pub fn state(&self) -> PluginState {
         match &*self.0.lock().unwrap_or_else(|e| e.into_inner()) {
-            State::Pending | State::Checking(_) => PluginState::Pending,
+            State::Pending | State::Checking(_) => PluginState::Registering,
             State::Allowed(_) => PluginState::On,
             State::Refused(_, why) => PluginState::Failed { why: why.clone() },
             State::Stopped(state) => state.clone(),

@@ -76,6 +76,7 @@ impl Door {
 }
 
 pub(super) struct Running {
+    pub(super) hooks: Arc<tokio::sync::OnceCell<crate::turn::HookSet>>,
     pub(super) turn: TurnId,
     pub(super) cancel: CancellationToken,
     pub(super) stopped: Arc<std::sync::atomic::AtomicBool>,
@@ -100,6 +101,7 @@ impl Running {
         kind: TurnKind,
     ) -> Self {
         let run = TurnRun::new(turn.clone(), &actor.state.transcript, cancel.clone(), kind);
+        let hooks = run.hooks.clone();
         let cfg = Arc::clone(&actor.config);
         let mailbox = actor.mailbox.clone();
         let stopped = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -125,6 +127,7 @@ impl Running {
             });
         });
         Self {
+            hooks,
             stopped,
             door,
             turn,

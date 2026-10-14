@@ -60,7 +60,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "ui.input": {
       "kind": "chain",
@@ -101,7 +102,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "ui.select": {
       "kind": "chain",
@@ -142,7 +144,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "ui.render": {
       "kind": "chain",
@@ -1356,7 +1359,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "plugin.register": {
       "kind": "chain",
@@ -1488,7 +1492,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "prompt.submit": {
       "kind": "chain",
@@ -1961,7 +1966,8 @@
         "deny": true,
         "rewrite": true,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "tool.check": {
       "kind": "chain",
@@ -2198,7 +2204,8 @@
         "deny": true,
         "rewrite": true,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "tool.call": {
       "kind": "chain",
@@ -3442,7 +3449,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "model.complete": {
       "kind": "chain",
@@ -4159,7 +4167,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "turn.step": {
       "kind": "chain",
@@ -5051,7 +5060,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "prompt.compose": {
       "kind": "chain",
@@ -5665,7 +5675,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": true
     },
     "session.compact": {
       "kind": "chain",
@@ -7864,7 +7875,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "turn.stop": {
       "kind": "chain",
@@ -7915,7 +7927,8 @@
         "deny": true,
         "rewrite": true,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "tool.describe": {
       "kind": "chain",
@@ -7991,7 +8004,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "prompt.autocomplete": {
       "kind": "chain",
@@ -8107,7 +8121,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "session.send": {
       "kind": "chain",
@@ -8317,7 +8332,8 @@
         "deny": true,
         "rewrite": true,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "session.receive": {
       "kind": "chain",
@@ -8669,7 +8685,8 @@
         "deny": true,
         "rewrite": true,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "session.append": {
       "kind": "chain",
@@ -8723,7 +8740,8 @@
         "deny": true,
         "rewrite": true,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "turn.complete": {
       "kind": "chain",
@@ -8939,7 +8957,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "command.run": {
       "kind": "chain",
@@ -10903,7 +10922,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "command.describe": {
       "kind": "chain",
@@ -11245,7 +11265,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "config.set": {
       "kind": "chain",
@@ -11289,7 +11310,8 @@
         "deny": true,
         "rewrite": true,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "config.describe": {
       "kind": "chain",
@@ -11331,7 +11353,8 @@
         "deny": true,
         "rewrite": true,
         "answer": true
-      }
+      },
+      "shapesRequest": false
     },
     "turn.start": {
       "kind": "observation",
@@ -11404,7 +11427,8 @@
         "deny": false,
         "rewrite": false,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "session.measure": {
       "kind": "observation",
@@ -11513,7 +11537,8 @@
         "deny": false,
         "rewrite": false,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "session.start": {
       "kind": "observation",
@@ -11547,7 +11572,8 @@
         "deny": false,
         "rewrite": false,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "session.end": {
       "kind": "observation",
@@ -11581,7 +11607,8 @@
         "deny": false,
         "rewrite": false,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "session.attach": {
       "kind": "observation",
@@ -11636,7 +11663,8 @@
         "deny": false,
         "rewrite": false,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     },
     "session.detach": {
       "kind": "observation",
@@ -11691,7 +11719,8 @@
         "deny": false,
         "rewrite": false,
         "answer": false
-      }
+      },
+      "shapesRequest": false
     }
   }
 }

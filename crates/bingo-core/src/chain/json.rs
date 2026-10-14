@@ -163,6 +163,7 @@ mod tests {
     #[tokio::test]
     async fn completion_wraps_the_text_from_beneath() {
         let links = [Link {
+            plugin: "fixture".into(),
             placement: bingo_sdk::plugin::Placement::Outer,
             external: None,
             interceptor: Arc::new(Answer),
@@ -228,6 +229,7 @@ mod contracts {
     }
     fn link(key: &'static str, value: Value, tier: Tier) -> Vec<Link> {
         vec![Link {
+            plugin: "fixture".into(),
             placement: bingo_sdk::plugin::Placement::Outer,
             interceptor: Arc::new(Rewrite(key, value)),
             external: None,

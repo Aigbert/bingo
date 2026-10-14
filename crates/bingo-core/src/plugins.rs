@@ -6,6 +6,9 @@
 //! `/plugins` command and the `bingo plugins` subcommand all read it here, so
 //! there is one rule, and both writers write the same file the same way.
 
+mod kind;
+pub use kind::{ContributionKind, switch_kind};
+
 use std::path::Path;
 
 use bingo_sdk::{Env, PluginManifest, PluginStatus};
@@ -61,7 +64,43 @@ pub async fn listing(registry: &Registry) -> Vec<PluginStatus> {
     for source in &registry.sources.plugins {
         listed.extend(source.plugins().await);
     }
+    let wishes = registry.wishes.read().unwrap_or_else(|e| e.into_inner());
+    for status in &mut listed {
+        let now = if registry.kinds.get(&status.id) == Some(&bingo_sdk::plugin::PluginSwitch::Now) {
+            !registry
+                .running
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .contains(&status.id)
+        } else {
+            status.state.is_on()
+        };
+        let wish = !wishes.contains(status.id.strip_prefix("plugins:").unwrap_or(&status.id));
+        status.state = derived(&status.state, wish, now);
+    }
     listed
+}
+
+/// Admission failures and repository approval take precedence over a switch.
+pub fn derived(state: &bingo_sdk::PluginState, wish: bool, now: bool) -> bingo_sdk::PluginState {
+    use bingo_sdk::{PluginState, plugin::NextStart};
+    match state {
+        PluginState::On => {}
+        PluginState::Off { why } if why == bingo_sdk::SWITCHED_OFF => {}
+        _ => return state.clone(),
+    }
+    if wish != now {
+        PluginState::Pending {
+            now,
+            at: NextStart::NextStart,
+        }
+    } else if now {
+        PluginState::On
+    } else {
+        PluginState::Off {
+            why: bingo_sdk::SWITCHED_OFF.into(),
+        }
+    }
 }
 
 /// The one word a listing writes a plugin's state as, in the terminal and in
@@ -88,7 +127,10 @@ pub(crate) async fn switch_in(
     session: &bingo_sdk::SessionId,
     name: &str,
     enabled: bool,
-) -> Result<(), bingo_sdk::KernelError> {
+) -> Result<(bool, bingo_sdk::plugin::PluginSwitch), bingo_sdk::KernelError> {
+    let _guard = host.registry().switching.lock().await;
+    let target = name;
+    let name = name.strip_prefix("plugins:").unwrap_or(name);
     let path = settings::user_path(host.env());
     let failed = |error: SettingsError| {
         bingo_sdk::KernelError::new(bingo_sdk::ErrorCode::Internal, error.to_string())
@@ -102,7 +144,64 @@ pub(crate) async fn switch_in(
             "enabledPlugins must be an object",
         ));
     }
-    settings::remember(&path, &[(KEY, value)]).map_err(failed)
+    let enabled = value.get(name).and_then(Value::as_bool).ok_or_else(|| {
+        bingo_sdk::KernelError::new(
+            bingo_sdk::ErrorCode::InvalidInput,
+            "plugin switch must be a boolean",
+        )
+    })?;
+    settings::remember(&path, &[(KEY, value)]).map_err(failed)?;
+    {
+        let mut wishes = host
+            .registry()
+            .wishes
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
+        if enabled {
+            wishes.remove(name);
+        } else {
+            wishes.insert(name.into());
+        }
+    }
+    let result = apply(host.registry(), target, enabled).await;
+    host.plugins_changed();
+    result.map(|kind| (enabled, kind))
+}
+
+async fn apply(
+    registry: &Registry,
+    name: &str,
+    enabled: bool,
+) -> Result<bingo_sdk::plugin::PluginSwitch, bingo_sdk::KernelError> {
+    use bingo_sdk::plugin::PluginSwitch;
+    if let Some(kind) = registry.kinds.get(name) {
+        if kind == &PluginSwitch::Now {
+            let mut off = registry.running.write().unwrap_or_else(|e| e.into_inner());
+            if enabled {
+                off.remove(name);
+            } else {
+                off.insert(name.into());
+            }
+        }
+        return Ok(kind.clone());
+    }
+    for source in &registry.sources.plugins {
+        if source
+            .plugins()
+            .await
+            .iter()
+            .any(|status| status.id == name || status.id == format!("plugins:{name}"))
+        {
+            let kind = source.switch_kind(name).await;
+            if kind == PluginSwitch::Now {
+                return source.switch(name, enabled).await;
+            }
+            return Ok(kind);
+        }
+    }
+    Ok(PluginSwitch::NextStart {
+        why: "plugin unavailable".into(),
+    })
 }
 
 /// What the user layer already says about the plugins, read to be written

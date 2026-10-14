@@ -139,12 +139,13 @@ pub enum PluginState {
     Off { why: String },
     Failed { why: String },
     Waiting { changed: bool },
-    Pending,
+    Registering,
+    Pending { now: bool, at: NextStart },
 }
 
 impl PluginState {
     pub fn is_on(&self) -> bool {
-        matches!(self, Self::On)
+        matches!(self, Self::On | Self::Pending { now: true, .. })
     }
     pub fn label(&self) -> &'static str {
         match self {
@@ -152,7 +153,8 @@ impl PluginState {
             Self::Off { .. } => "off",
             Self::Failed { .. } => "failed",
             Self::Waiting { .. } => "waiting",
-            Self::Pending => "pending",
+            Self::Registering => "registering",
+            Self::Pending { .. } => "pending",
         }
     }
     pub fn reason(&self) -> Option<&str> {
@@ -161,9 +163,26 @@ impl PluginState {
             Self::Off { why } | Self::Failed { why } => Some(why),
             Self::Waiting { changed: true } => Some("changed since your yes"),
             Self::Waiting { changed: false } => Some("waits for your yes"),
-            Self::Pending => Some("registration pending"),
+            Self::Registering => Some("registration pending"),
+            Self::Pending { now: true, .. } => Some("off at next start"),
+            Self::Pending { now: false, .. } => Some("on at next start"),
         }
     }
+}
+
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum NextStart {
+    NextStart,
+}
+
+/// When a contribution set can honor a switch.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PluginSwitch {
+    Now,
+    NextStart { why: String },
 }
 
 /// What one plugin is, for a listing: what it is called, whether it will run,
@@ -295,6 +314,16 @@ pub trait PluginSource: Send + Sync {
     /// Rescan reloadable plugins; sources without live reload return no changes.
     async fn reload(&self) -> Result<PluginReload, crate::KernelError> {
         Ok(PluginReload::default())
+    }
+    /// Classify a discovered plugin without changing its admission or generation.
+    async fn switch_kind(&self, _name: &str) -> PluginSwitch {
+        PluginSwitch::NextStart {
+            why: "process plugin".into(),
+        }
+    }
+    /// Apply a live switch through the owner's admission and reload lifecycle.
+    async fn switch(&self, name: &str, _enabled: bool) -> Result<PluginSwitch, crate::KernelError> {
+        Ok(self.switch_kind(name).await)
     }
     /// Claim pending generations once, before they may contribute links.
     async fn registrations(
