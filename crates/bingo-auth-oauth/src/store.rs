@@ -16,6 +16,9 @@ use crate::error::AuthError;
 
 const AUTH_FILE: &str = "auth.json";
 
+// Plugins and runtime instances can construct independent handles to the same file.
+static STORE_LOCK: Mutex<()> = Mutex::new(());
+
 /// One provider's credential. An OAuth entry is refreshed in place; an API
 /// entry is a key minted elsewhere and used as the bearer as it is.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,14 +68,12 @@ pub fn mcp_key(server: &str) -> String {
 #[derive(Debug)]
 pub struct CredentialStore {
     path: PathBuf,
-    lock: Mutex<()>,
 }
 
 impl CredentialStore {
     pub fn new(data_dir: PathBuf) -> Self {
         Self {
             path: data_dir.join(AUTH_FILE),
-            lock: Mutex::new(()),
         }
     }
 
@@ -105,7 +106,7 @@ impl CredentialStore {
     /// A poisoned lock still guards a consistent file: every write is a whole
     /// file, so a panic mid-write left nothing half-applied to protect.
     fn locked(&self) -> std::sync::MutexGuard<'_, ()> {
-        self.lock
+        STORE_LOCK
             .lock()
             .unwrap_or_else(|poison| poison.into_inner())
     }
@@ -175,6 +176,39 @@ mod tests {
             refresh: "refresh-1".into(),
             expires: 1_786_000_000,
             account_id: Some("acc_1".into()),
+        }
+    }
+
+    #[test]
+    fn independent_handles_do_not_overwrite_concurrent_entries() {
+        let directory = tempfile::tempdir().unwrap();
+        let barrier = std::sync::Barrier::new(8);
+        std::thread::scope(|threads| {
+            for n in 0..8 {
+                let path = directory.path().to_path_buf();
+                let barrier = &barrier;
+                threads.spawn(move || {
+                    let store = CredentialStore::new(path);
+                    barrier.wait();
+                    store
+                        .write(
+                            &format!("provider-{n}"),
+                            Entry::Api {
+                                key: format!("key-{n}"),
+                            },
+                        )
+                        .unwrap();
+                });
+            }
+        });
+        let store = CredentialStore::new(directory.path().to_path_buf());
+        for n in 0..8 {
+            assert_eq!(
+                store.read(&format!("provider-{n}")).unwrap(),
+                Some(Entry::Api {
+                    key: format!("key-{n}")
+                })
+            );
         }
     }
 

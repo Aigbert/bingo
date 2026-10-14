@@ -132,13 +132,15 @@ impl TokenSource {
     /// Revocation is best effort: a person who signed out is signed out here
     /// whatever the issuer answers.
     pub async fn logout(&self) -> Result<(), AuthError> {
-        if let Some(Cached::Tokens(tokens)) = self.cached().0
+        let cached = self.cached().0;
+        // Local removal must survive cancellation while the issuer is unreachable.
+        self.store.remove(&self.provider)?;
+        self.forget();
+        if let Some(Cached::Tokens(tokens)) = cached
             && let Some(refresh) = tokens.refresh
         {
             let _ = exchange::revoke(&self.http, &self.issuer, &refresh).await;
         }
-        self.store.remove(&self.provider)?;
-        self.forget();
         Ok(())
     }
 
@@ -913,6 +915,23 @@ mod tests {
             fixture.source.refreshed().await.expect("a token"),
             "at-forced"
         );
+    }
+
+    #[tokio::test]
+    async fn cancelling_revocation_does_not_restore_local_credentials() {
+        use std::future::Future;
+        let fixture = fixture().await;
+        fixture.store.write(PROVIDER, stale("rt-old")).unwrap();
+        assert!(matches!(fixture.source.status(), Status::SignedIn { .. }));
+        let mut logout = Box::pin(fixture.source.logout());
+        std::future::poll_fn(|cx| {
+            let _ = logout.as_mut().poll(cx);
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(logout);
+        assert_eq!(fixture.store.read(PROVIDER).unwrap(), None);
+        assert_eq!(fixture.source.status(), Status::SignedOut);
     }
 
     #[tokio::test]
