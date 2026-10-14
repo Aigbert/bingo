@@ -1,5 +1,5 @@
 //! Facts supplied by the client; selection and argument navigation belong to the mod.
-use crate::{Action, CatalogEntry, ConfigView, ContextUsage, SessionSummary};
+use crate::{Action, CatalogEntry, SessionId};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -21,11 +21,19 @@ pub struct PaletteProps {
     pub commands: Vec<CatalogEntry>,
     pub key_hints: BTreeMap<String, String>,
     pub bindings: BTreeMap<String, String>,
-    pub sessions: Vec<SessionSummary>,
-    pub summary: SessionSummary,
-    pub config: ConfigView,
-    pub context: Option<ContextUsage>,
-    pub signals: BTreeMap<String, BTreeMap<String, serde_json::Value>>,
+    pub session: SessionId,
+    pub conversation: Vec<PaletteSession>,
+    pub sessions: Vec<PaletteSession>,
     pub action: Action,
     pub catalogs: BTreeMap<String, Vec<CatalogEntry>>,
+}
+
+/// A compact row, projected by the client from live or stored facts.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PaletteSession {
+    pub id: SessionId,
+    pub label: String,
+    pub detail: String,
+    pub attention: Option<String>,
 }

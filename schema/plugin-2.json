@@ -736,6 +736,12 @@
             "action": {
               "$ref": "#/$defs/Action"
             },
+            "fallback": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "kind": {
               "type": "string",
               "const": "surface"

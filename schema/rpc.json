@@ -3511,33 +3511,19 @@
             "type": "string"
           }
         },
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "conversation": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PaletteSession"
+          }
+        },
         "sessions": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/SessionSummary"
-          }
-        },
-        "summary": {
-          "$ref": "#/$defs/SessionSummary"
-        },
-        "config": {
-          "$ref": "#/$defs/ConfigView"
-        },
-        "context": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ContextUsage"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "signals": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": true
+            "$ref": "#/$defs/PaletteSession"
           }
         },
         "action": {
@@ -3559,13 +3545,38 @@
         "commands",
         "keyHints",
         "bindings",
+        "session",
+        "conversation",
         "sessions",
-        "summary",
-        "config",
-        "signals",
         "action",
         "catalogs"
       ]
+    },
+    "PaletteSession": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "label": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "attention": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "detail"
+      ],
+      "description": "A compact row, projected by the client from live or stored facts."
     },
     "PanePlace": {
       "oneOf": [
