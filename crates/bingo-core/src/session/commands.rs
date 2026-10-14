@@ -171,7 +171,7 @@ impl Invocation {
             Input::Action { .. } => Origin::default(),
         };
         Self {
-            line: parsed.typed(),
+            line: bingo_sdk::command::recorded_line(&parsed.typed()).into(),
             origin: Origin {
                 voice: Some(bingo_sdk::Voice::Quiet),
                 surface: SURFACE.into(),

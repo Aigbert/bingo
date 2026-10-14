@@ -267,3 +267,13 @@ mod key_contract {
         );
     }
 }
+
+/// Provider arguments can contain credentials even when dispatch will reject them.
+/// Use this only for display and persistence; dispatch keeps the original line.
+pub fn recorded_line(line: &str) -> &str {
+    if line.split_whitespace().next() == Some("/provider") {
+        "/provider [redacted]"
+    } else {
+        line
+    }
+}

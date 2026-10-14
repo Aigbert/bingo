@@ -142,12 +142,27 @@ fn preview(input: &Input) -> String {
         Input::Text { text, .. } => text.as_str(),
         Input::Action { action } => action.name.as_str(),
     };
-    text.chars().take(PREVIEW_CHARS).collect()
+    bingo_sdk::command::recorded_line(text)
+        .chars()
+        .take(PREVIEW_CHARS)
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provider_command_arguments_never_enter_queue_events() {
+        let mut queue = Queue::default();
+        let (id, input) = text("/provider add x openai https://u:SECRET@host EXTRA_SECRET");
+        queue.push(id, input);
+        assert!(
+            !serde_json::to_string(&queue.changed())
+                .unwrap()
+                .contains("SECRET")
+        );
+    }
 
     fn text(t: &str) -> (IntentId, Input) {
         (IntentId::mint(), Input::text(t, Origin::surface("test")))

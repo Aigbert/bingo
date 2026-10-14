@@ -34,7 +34,7 @@ pub fn append(data_dir: &Path, line: &str) {
 fn write(data_dir: &Path, line: &str) -> std::io::Result<()> {
     use std::io::Write;
     std::fs::create_dir_all(data_dir)?;
-    let record = serde_json::to_string(line)?;
+    let record = serde_json::to_string(bingo_sdk::command::recorded_line(line))?;
     let mut file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -91,6 +91,7 @@ impl PromptHistory {
     /// A submitted prompt joins the history and ends the walk. Repeating the
     /// last line does not add a second copy.
     pub fn remember(&mut self, line: &str) {
+        let line = bingo_sdk::command::recorded_line(line);
         self.reset();
         if line.trim().is_empty() || self.entries.last().is_some_and(|last| last == line) {
             return;
@@ -108,6 +109,25 @@ impl PromptHistory {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provider_command_arguments_never_enter_history() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut history = PromptHistory::default();
+        for line in [
+            "/provider add x openai https://u:SECRET@host",
+            "/provider add x openai https://host SECRET",
+        ] {
+            append(dir.path(), line);
+            history.remember(line);
+        }
+        assert!(
+            !std::fs::read_to_string(path(dir.path()))
+                .unwrap()
+                .contains("SECRET")
+        );
+        assert!(!history.older("").unwrap().contains("SECRET"));
+    }
 
     #[test]
     fn walking_back_and_forth_returns_to_the_draft() {
