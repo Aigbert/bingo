@@ -50,6 +50,8 @@ same way. The ratchet question does not arise.
    and tells the person how to confirm. The first time a process sees a
    given refusal, it also posts a `schedule.refused` warning notice.
    The turn still runs, in the session's own mode, with prose as in §3.
+   A refused or failed line has spent its occurrence: it is said, never
+   retried (ADR-0019 amendment 2026-10-16).
 
 ## Consequences
 

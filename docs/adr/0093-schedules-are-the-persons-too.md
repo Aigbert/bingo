@@ -52,7 +52,8 @@ Refs: ADR-0011, ADR-0019, ADR-0071, ADR-0082, ADR-0086, ADR-0088.
 `/schedule add <spec> [as <mode>] -- <text>`, an asked line only. The
 entry stores the explicit mode or none; it does not copy the session's.
 
-A fire moves `last_fired` only after delivery is acknowledged. Each entry
-has one independent in-flight attempt, bounded at 30 seconds; failures wait
-for a rescan before retrying. A rejected signed line remains unspent. Before
-stamping, the owner rereads the entry and skips it if it changed or is gone.
+A fire moves `last_fired` once its session is open, before the line is
+submitted; a refused line is spent and said (ADR-0094 §5). Each entry has
+one independent attempt in flight; a session that does not open within 30
+seconds leaves it unspent until a rescan. The stamp lands on the entry as
+reread then, and is skipped if the entry is gone, paused or fired already.

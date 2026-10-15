@@ -49,9 +49,9 @@ A pending wake appears in Status, counts down, and prefills `/wake off`.
   The built-in's vouched press returns the line; the client submits it as asked. A plugin cannot
   invoke the service or fabricate a button to grant consent. d uses the same stale-row check.
 - Run and automatic fire share dev's signing and refusal notice/trouble. Each automatic entry has
-  one independent in-flight attempt, bounded at 30 seconds. Failed delivery remains unspent and
-  retries after a rescan, so one stalled entry cannot block the rest or spin. A rejected signed line
-  remains unspent. Before stamping, reread the entry and skip it if changed/deleted.
+  one independent attempt in flight. It is spent once its session opens, on the entry reread then;
+  only an open failing within 30 s stays unspent, retried after a rescan. The answer is awaited,
+  bounded, only to report: refusals badge, a slow command is not re-fired (review fix 2026-10-16).
 - Generic pane replies require the pressed owner's drawnBy for run, view and message alike.
   Existing destination sessions outside the current tree are opened by id.
 - RFC3339 at/next_fire stay on the wire; row_of needs no now. Full row equality pins confirmation;
@@ -66,7 +66,7 @@ A pending wake appears in Status, counts down, and prefills `/wake off`.
 - [x] Panel/Table agreement, by column, ownership confirmation with stale-mode rejection, and forget.
 - [x] Fake Wake(4m), Status countdown, Composer prefill and cancellation; original RPC/tmux coverage retained.
 - [x] Two-process dormant panel can run once; original run/navigation and disabled-mod fallback remain covered.
-- [x] Failed acknowledgement stays unspent; stalled entry does not block another; refusal notice is shared.
+- [x] Failed open stays unspent; late ack/refusal/unwritten stamp fire once; stalls isolated; notice shared.
 - [x] Foreign/unvouched pane messages and session jumps have no effect.
 - [x] New isolated tmux drive: add, confirm, pause, resume, forget at 108×30 and 80×24.
 - [x] Final sequential native gates pass; output recorded below.
@@ -76,8 +76,9 @@ A pending wake appears in Status, counts down, and prefills `/wake off`.
 ## Non-goals and risks
 
 No cron, in-place editing, daemon, or wakes in the schedule panel. Manual and automatic fire can race
-and add one extra turn; the reply says so. Wakes are visible on demand. A delivery timeout is an
-unknown acceptance result, so a later retry can duplicate a turn whose acknowledgement was lost.
+and add one extra turn; the reply says so. Wakes are visible on demand. A stamp the disk refused is
+kept only in memory and badged, so a restart may fire that occurrence once more.
+`/schedule run` typed in the entry's own session cannot deadlock: the command runs in its own task.
 
 ## Verified — 2026-10-15
 
@@ -140,3 +141,8 @@ Windows bingo-surface-tui: aws-lc-sys build failed; stdlib.h/windows.h missing; 
 Windows bingo: aws-lc-sys and rquickjs-sys build failed; headers/MSVC C flags unavailable; exit 101
 Windows bingo-gateway: aws-lc-sys build failed; stdlib.h/windows.h missing; exit 101
 ```
+
+Review fixes (2026-10-16, later): spend on open, refusals badged, unwritten stamp remembered,
+panic frees entry, whole text in panel and listing, ids checked. fmt/check/Clippy ok; tests 6218
+passed, 0 failed, 6 ignored; discipline ok; budget 422/422, core 0s, relink 0; deny ok; tui-smoke
+ok; Windows bingo-schedule + bingo-mod-schedule Finished. No tmux drive of the new confirm view.
