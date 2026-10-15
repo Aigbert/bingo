@@ -20,6 +20,9 @@ pub struct Cursor {
     pub selected: String,
     pub expanded: bool,
     pub trust: Option<trust::Choice>,
+    /// A waiting server's first `⏎` was pressed: its card shows what would
+    /// run and the next `⏎` approves it.
+    pub reviewing: bool,
 }
 type Shared = Arc<Mutex<BTreeMap<(SessionId, String), Cursor>>>;
 static MANIFEST: PluginManifest = PluginManifest {

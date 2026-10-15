@@ -305,7 +305,15 @@ async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
         (Status::Disabled, "enable"),
         (Status::Waiting { changed: false }, "approve"),
     ] {
+        let waiting = matches!(status, Status::Waiting { .. });
         row.lock().unwrap().status = status;
+        if waiting {
+            for key_name in ["space", "r", "enter"] {
+                let reviewed = key(&host, &mut attachment, key_name).await;
+                assert!(reviewed.get("run").is_none(), "{key_name}: {reviewed}");
+            }
+            assert!(backend(panel(&host, &attachment).await).contains("⏎ again: approve local"));
+        }
         assert_eq!(
             key(&host, &mut attachment, "enter").await["run"],
             format!("/mcp {verb} local")

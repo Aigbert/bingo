@@ -56,7 +56,7 @@ pub fn tree(
         Some(Kind::Plugin(i)) => {
             crate::cards::plugin_card(&props.plugins[*i], &props.plugins, cursor.trust.as_ref())
         }
-        Some(Kind::Server(i)) => crate::cards::server_card(&servers[*i]),
+        Some(Kind::Server(i)) => crate::cards::server_card(&servers[*i], cursor.reviewing),
         _ => crate::cards::builtins_card(cursor.expanded),
     };
     if width < 100
@@ -154,68 +154,29 @@ fn hints(
             }
         );
     }
-    match kind {
-        Some(Kind::Builtins) => format!(
-            " ↑↓ pick · ⏎ {} · esc close",
-            if cursor.expanded { "fold" } else { "show them" }
-        ),
-        Some(Kind::Plugin(i))
-            if matches!(
-                groups::state(&props.plugins[*i]),
-                PluginState::Waiting { .. }
-            ) =>
-        {
-            " ↑↓ pick · ⏎ trust it? · esc close".into()
-        }
-        Some(Kind::Plugin(i)) => {
-            let plugin = &props.plugins[*i];
-            let enabled = match groups::state(plugin) {
-                PluginState::Pending { now, .. } => !now,
-                state => state.is_on(),
-            };
-            format!(
-                " ↑↓ pick · space turn {}{} · esc close",
-                if enabled { "off" } else { "on" },
-                if groups::builtin(plugin) {
-                    ""
-                } else {
-                    " · r reload · t trust"
-                }
-            )
-        }
-        Some(Kind::Server(i)) => server_hints(&servers[*i]),
-        None => " esc close".into(),
-    }
-}
-fn server_hints(server: &ServerRow) -> String {
-    use bingo_services::mcp::{Auth, Status};
-    let primary = match server.status {
-        Status::Connected { .. } => "its tools",
-        Status::NeedsAuth { .. } => "sign in",
-        Status::Disabled => "turn on",
-        Status::Failed { .. } => "try again",
-        Status::Waiting { .. } => "approve",
-        _ => "wait",
+    let bindings = match kind {
+        Some(Kind::Builtins) => crate::verbs::builtins(cursor.expanded),
+        Some(Kind::Plugin(i)) => crate::verbs::plugin_keys(&props.plugins[*i]),
+        Some(Kind::Server(i)) => crate::verbs::server_keys(&servers[*i], cursor.reviewing),
+        None => return " esc close".into(),
     };
-    let mut parts = vec!["↑↓ pick".to_string(), format!("⏎ {primary}")];
-    parts.push(format!(
-        "space turn {}",
-        if matches!(server.status, Status::Disabled) {
-            "on"
+    footer(&bindings, if cursor.reviewing { "cancel" } else { "close" })
+}
+/// The footer says what the table binds, in its order, and nothing else.
+pub fn footer(bindings: &[crate::verbs::Binding], esc: &str) -> String {
+    let keys = bindings.iter().filter_map(|binding| {
+        let hint = binding.hint.as_ref()?;
+        let key = if binding.key == "enter" {
+            "⏎"
         } else {
-            "off"
-        }
-    ));
-    if matches!(
-        server.status,
-        Status::Connected { .. } | Status::Failed { .. }
-    ) {
-        parts.push("r reconnect".into());
-    }
-    if server.auth == Some(Auth::SignedIn) {
-        parts.push("o sign out".into());
-    }
-    parts.push("esc close".into());
+            binding.key
+        };
+        Some(format!("{key} {hint}"))
+    });
+    let parts = std::iter::once("↑↓ pick".to_string())
+        .chain(keys)
+        .chain(std::iter::once(format!("esc {esc}")))
+        .collect::<Vec<_>>();
     format!(" {}", parts.join(" · "))
 }
 fn column(children: Vec<View>, height: Option<u16>) -> View {

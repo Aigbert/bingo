@@ -99,8 +99,31 @@ fn prototype_scenarios_at_both_terminal_sizes() {
                 selected: selected.into(),
                 expanded,
                 trust: trust.then(trust::Choice::default),
+                reviewing: false,
             };
             let output = painted(&props, &servers, &mut cursor, width, height);
+            insta::assert_snapshot!(format!("plugins_{scene}_{width}x{height}"), output);
+        }
+    }
+}
+/// A repository's server under review shows what approving would run, and
+/// its footer names no key that would start it in one press.
+#[test]
+fn a_server_under_review_shows_what_it_would_run() {
+    for (width, height) in [(108, 30), (80, 24)] {
+        for reviewing in [false, true] {
+            let (mut props, mut servers) = fixture();
+            props.open = PluginsOpen::Mcp;
+            servers[0].status = bingo_services::mcp::Status::Waiting { changed: false };
+            let mut cursor = Cursor {
+                selected: "m:github".into(),
+                expanded: false,
+                trust: None,
+                reviewing,
+            };
+            let output = painted(&props, &servers, &mut cursor, width, height);
+            assert!(!output.contains("space turn"), "{output}");
+            let scene = if reviewing { "review" } else { "unreviewed" };
             insta::assert_snapshot!(format!("plugins_{scene}_{width}x{height}"), output);
         }
     }

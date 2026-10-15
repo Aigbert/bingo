@@ -44,11 +44,10 @@ fn every_server_primary_action_is_a_command_and_reconnect_is_guarded() {
         (Status::NeedsAuth { why: "401".into() }, "login"),
         (Status::Failed { why: "exit".into() }, "reconnect"),
         (Status::Disabled, "enable"),
-        (Status::Waiting { changed: false }, "approve"),
     ] {
         server.status = status;
         assert_eq!(
-            verbs::server(server, "enter"),
+            verbs::server(server, false, "enter"),
             verbs::Verb::Line(format!("/mcp {verb} github"))
         );
     }
@@ -60,13 +59,13 @@ fn every_server_primary_action_is_a_command_and_reconnect_is_guarded() {
     ] {
         server.status = status;
         assert!(matches!(
-            verbs::server(server, "r"),
+            verbs::server(server, false, "r"),
             verbs::Verb::Message(_)
         ));
     }
     server.auth = Some(Auth::SignedIn);
     assert_eq!(
-        verbs::server(server, "o"),
+        verbs::server(server, false, "o"),
         verbs::Verb::Line("/mcp logout github".into())
     );
 }
@@ -128,7 +127,7 @@ fn cards_preserve_errors_and_name_trust_storage() {
         card.iter()
             .any(|line| line.text.contains("~/.bingo/settings.toml, never the repo"))
     );
-    assert!(cards::server_card(&servers[0]).iter().any(|line| {
+    assert!(cards::server_card(&servers[0], false).iter().any(|line| {
         line.text
             .contains("always ask; an MCP tool is never trusted")
     }));
@@ -217,4 +216,94 @@ fn opening_links_never_wrap_other_commands_or_subcommands() {
             &json!({"command":"thinking","args":"maximum"})
         ));
     }
+}
+
+/// The footer is read off the same table the keys are: a key it names does
+/// what it says, and a key it leaves out only explains itself.
+#[test]
+fn the_footer_names_exactly_the_keys_that_act() {
+    let (plugins, mut servers) = fixture();
+    let mut tables = plugins.iter().map(verbs::plugin_keys).collect::<Vec<_>>();
+    for status in [
+        Status::Connected { tools: 3 },
+        Status::NeedsAuth { why: "401".into() },
+        Status::Failed { why: "exit".into() },
+        Status::Disabled,
+        Status::Connecting,
+        Status::Waiting { changed: false },
+    ] {
+        servers[0].status = status;
+        tables.push(verbs::server_keys(&servers[0], false));
+        tables.push(verbs::server_keys(&servers[0], true));
+    }
+    for table in tables {
+        let footer = draw::footer(&table, "close");
+        for binding in &table {
+            let named = binding.hint.is_some();
+            let quiet = matches!(binding.verb, verbs::Verb::Message(_) | verbs::Verb::None);
+            assert_eq!(named, !quiet, "{binding:?} in {footer}");
+        }
+    }
+}
+
+#[test]
+fn a_waiting_server_starts_nothing_until_a_second_enter() {
+    let (_, mut servers) = fixture();
+    servers[0].status = Status::Waiting { changed: false };
+    let footer = draw::footer(&verbs::server_keys(&servers[0], false), "close");
+    assert_eq!(footer, " ↑↓ pick · ⏎ review · esc close");
+    for key in ["space", " ", "r"] {
+        assert!(matches!(
+            verbs::server(&servers[0], false, key),
+            verbs::Verb::Message(_)
+        ));
+    }
+    assert_eq!(
+        verbs::server(&servers[0], false, "enter"),
+        verbs::Verb::Review
+    );
+    assert_eq!(
+        verbs::server(&servers[0], true, "enter"),
+        verbs::Verb::Line("/mcp approve github".into())
+    );
+    assert!(matches!(
+        verbs::server(&servers[0], true, "space"),
+        verbs::Verb::Message(_)
+    ));
+}
+
+#[test]
+fn approving_a_server_shows_what_it_runs_and_moving_forgets_it() {
+    let (plugins, mut servers) = fixture();
+    servers[0].status = Status::Waiting { changed: false };
+    let props = component::PluginsProps {
+        open: component::PluginsOpen::Mcp,
+        session: SessionId::from_raw("s"),
+        plugins,
+        action: Action {
+            name: "surface:plugins".into(),
+            args: json!({"handler":"a"}),
+        },
+    };
+    let handler = keys::Handler(Shared::default());
+    let press = |key| handler.press("a", key, &props, &servers).unwrap();
+    assert!(press("space")["message"].is_string());
+    assert_eq!(press("enter"), json!({}));
+    let card = cards::server_card(&servers[0], true);
+    assert!(card.iter().any(|fact| fact.text.contains("local-fixture")));
+    assert!(
+        card.iter()
+            .any(|fact| fact.error && fact.text.contains("⏎ again"))
+    );
+    assert_eq!(press("down"), json!({}));
+    assert_eq!(press("up"), json!({}));
+    assert_eq!(press("enter"), json!({}), "moving away forgot the review");
+    assert_eq!(press("enter"), json!({"run":"/mcp approve github"}));
+    assert_eq!(press("enter"), json!({}), "a yes starts a new review");
+    assert_eq!(
+        press("esc"),
+        json!({}),
+        "esc ends the review, not the panel"
+    );
+    assert_eq!(press("esc"), json!({"close":true}));
 }

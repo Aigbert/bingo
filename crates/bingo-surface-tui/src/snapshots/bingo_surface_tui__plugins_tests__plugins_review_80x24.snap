@@ -1,0 +1,28 @@
+---
+source: crates/bingo-surface-tui/src/plugins_tests.rs
+expression: output
+---
+"                                                                                "
+" MCP servers   7 plugins · 4 MCP servers · one list                             "
+" ● on   ○ off   ✗ failed   ◌ waiting                                            "
+"   MCP servers  their tools always ask                                          "
+" ❯ ◌ github               stdio · waits for your yes                            "
+"   ○ linear               http · sign in                                        "
+"   ✗ postgres             stdio · failed                                        "
+"   ○ figma                http · off                                            "
+"────────────────────────────────────────────────────────────────────────────────"
+" github                                                              MCP · stdio"
+" approving lets bingo run: local-fixture                                        "
+" ⏎ again: approve github for this checkout                                      "
+"                                                                                "
+" state    ◌ waiting for your yes                                                "
+" runs     local-fixture                                                         "
+" from     ~/.bingo/settings.toml                                                "
+" sign-in  none needed                                                           "
+" calls    always ask; an MCP tool is never trusted                              "
+"                                                                                "
+" ↑↓ pick · ⏎ approve · esc cancel                                               "
+"╭──────────────────────────────────────────────────────────────────────────────╮"
+"│ > ask anything · / for commands · ! for shell                                │"
+"╰──────────────────────────────────────────────────────────────────────────────╯"
+"1 from this repo waits for you                                       fake/fake-1"

@@ -197,14 +197,13 @@ fn trust_card(p: &CatalogEntry, choice: &crate::trust::Choice) -> Vec<Fact> {
     });
     rows
 }
-pub fn server_card(s: &ServerRow) -> Vec<Fact> {
+pub fn server_card(s: &ServerRow, reviewing: bool) -> Vec<Fact> {
     let mut rows = vec![title(&s.name, &format!("MCP · {}", s.transport.name()))];
-    rows.push(line(match s.status {
-        Status::Connected { tools } => format!(" {tools} tools for the model"),
-        Status::NeedsAuth { .. } => " its tools appear once you sign in".into(),
-        Status::Disabled => " its tools are not offered".into(),
-        _ => " no tools until it runs".into(),
-    }));
+    if reviewing {
+        rows.extend(review(s));
+    } else {
+        rows.push(line(offered(&s.status)));
+    }
     rows.push(line(""));
     rows.push(fact(
         "state",
@@ -252,6 +251,34 @@ pub fn server_card(s: &ServerRow) -> Vec<Fact> {
         });
     }
     rows
+}
+fn offered(status: &Status) -> String {
+    match status {
+        Status::Connected { tools } => format!(" {tools} tools for the model"),
+        Status::NeedsAuth { .. } => " its tools appear once you sign in".into(),
+        Status::Disabled => " its tools are not offered".into(),
+        _ => " no tools until it runs".into(),
+    }
+}
+/// What a yes would start, said first on the card so it fits any height,
+/// before the second `⏎` gives it.
+fn review(s: &ServerRow) -> Vec<Fact> {
+    let what = if s.transport.name() == "http" {
+        "dial"
+    } else {
+        "run"
+    };
+    vec![
+        line(format!(
+            " approving lets bingo {what}: {}",
+            s.transport.runs()
+        )),
+        Fact {
+            text: format!(" ⏎ again: approve {} for this checkout", s.name),
+            error: true,
+            aside: None,
+        },
+    ]
 }
 pub fn builtins_card(expanded: bool) -> Vec<Fact> {
     [

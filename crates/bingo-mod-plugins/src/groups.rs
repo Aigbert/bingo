@@ -156,6 +156,7 @@ pub fn selected<'a>(groups: &'a [Group], cursor: &mut crate::Cursor) -> Option<&
         .or_else(|| groups.iter().flat_map(|group| &group.rows).next())?;
     if cursor.selected != row.key {
         cursor.trust = None;
+        cursor.reviewing = false;
         cursor.selected = row.key.clone();
     }
     Some(row)

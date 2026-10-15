@@ -48,9 +48,13 @@ impl Handler {
         let cursor = state.entry(identity.clone()).or_default();
         let groups = groups::groups(props.open, &props.plugins, servers, cursor.expanded);
         let selected = groups::selected(&groups, cursor).cloned();
-        if key == "ctrl+c" || key == "esc" && cursor.trust.is_none() {
+        if key == "ctrl+c" || key == "esc" && cursor.trust.is_none() && !cursor.reviewing {
             state.remove(&identity);
             return Ok(json!({"close":true}));
+        }
+        if key == "esc" && cursor.reviewing {
+            cursor.reviewing = false;
+            return Ok(json!({}));
         }
         let Some(row) = selected else {
             return Ok(json!({}));
@@ -72,13 +76,17 @@ impl Handler {
         }
         let verb = match row.kind {
             Kind::Plugin(i) => crate::verbs::plugin(&props.plugins[i], key),
-            Kind::Server(i) => crate::verbs::server(&servers[i], key),
-            Kind::Builtins if key == "enter" => Verb::Fold,
-            _ => Verb::None,
+            Kind::Server(i) => crate::verbs::server(&servers[i], cursor.reviewing, key),
+            Kind::Builtins => crate::verbs::pressed(crate::verbs::builtins(cursor.expanded), key),
         };
+        cursor.reviewing = false;
         match verb {
             Verb::Trust => {
                 cursor.trust = Some(Default::default());
+                Ok(json!({}))
+            }
+            Verb::Review => {
+                cursor.reviewing = true;
                 Ok(json!({}))
             }
             Verb::Fold => {
@@ -117,6 +125,7 @@ fn navigate(cursor: &mut crate::Cursor, groups: &[groups::Group], key: &str) {
     if let Some(row) = rows.get(at) {
         cursor.selected = row.key.clone();
     }
+    cursor.reviewing = false;
 }
 
 fn fold(cursor: &mut crate::Cursor, props: &PluginsProps) {
