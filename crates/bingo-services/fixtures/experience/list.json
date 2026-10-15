@@ -1,1 +1,1 @@
-{"method":"list","params":{"cwd":"/work"},"answer":{"Ok":[{"id":"abc","status":"active","summary":"Use fixtures","outcomes":"3 ok","tokens":12}]}}
+{"method":"list","params":{"cwd":"/work"},"answer":{"Ok":[{"id":"abc","status":"active","summary":"Use fixtures","outcomes":["helpful","helpful","helpful"],"tokens":12,"error":null},{"id":"broken","status":"unreadable","summary":"","outcomes":[],"tokens":0,"error":"missing frontmatter"}]}}

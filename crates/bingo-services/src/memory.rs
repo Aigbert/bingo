@@ -19,11 +19,31 @@ impl Scope {
         }
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Kind {
+    User,
+    Feedback,
+    Project,
+    Reference,
+    Malformed,
+}
+impl Kind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::User => "user",
+            Self::Feedback => "feedback",
+            Self::Project => "project",
+            Self::Reference => "reference",
+            Self::Malformed => "malformed",
+        }
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct MemoryRow {
     pub scope: Scope,
     pub name: String,
-    pub kind: String,
+    pub kind: Kind,
     pub description: String,
     pub path: PathBuf,
     pub tokens: u64,
@@ -125,6 +145,12 @@ impl Service for FromWire {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn unknown_row_values_fail_closed() {
+        let mut row = fixture("list")["answer"]["Ok"]["memories"][0].clone();
+        row["kind"] = json!("invented");
+        assert!(serde_json::from_value::<MemoryRow>(row).is_err());
+    }
     struct Owner;
     fn fixture(method: &str) -> Value {
         serde_json::from_str(match method {

@@ -5,12 +5,35 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{path::PathBuf, sync::Arc};
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Status {
+    Active,
+    Retired,
+    Unreadable,
+}
+impl Status {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Retired => "retired",
+            Self::Unreadable => "unreadable",
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Outcome {
+    Helpful,
+    Harmful,
+}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct EntryRow {
     pub id: String,
-    pub status: String,
+    pub status: Status,
     pub summary: String,
-    pub outcomes: String,
+    pub outcomes: Vec<Outcome>,
+    pub error: Option<String>,
     pub tokens: u64,
 }
 pub type Listing = Vec<EntryRow>;
@@ -99,6 +122,12 @@ impl Service for FromWire {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn unknown_row_values_fail_closed() {
+        let mut row = fixture("list")["answer"]["Ok"][0].clone();
+        row["status"] = json!("invented");
+        assert!(serde_json::from_value::<EntryRow>(row).is_err());
+    }
     struct Owner;
     fn fixture(method: &str) -> Value {
         serde_json::from_str(match method {
