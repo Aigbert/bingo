@@ -304,3 +304,72 @@ async fn escape_cancels_confirmation_then_closes_the_panel() {
     fixture.press(key(KeyCode::Esc)).await;
     assert!(crate::pane::placed(fixture.run.session.tree.viewed()).is_empty());
 }
+
+impl MemoryFixture {
+    async fn forged(&self, target: serde_json::Value, confirming: serde_json::Value, key: &str) {
+        let cx = self.cx();
+        self.handler.run(
+            &json!({"handler":"memory","event":"press","target":target,"confirming":confirming,"value":{"key":key}}).to_string(),
+            &CommandContext { session: cx.session, cwd: cx.cwd, host: cx.host, cancel: Default::default() },
+        ).await.unwrap();
+    }
+}
+#[tokio::test]
+async fn closed_and_mismatched_drawings_cannot_forget_a_listed_file() {
+    for open in [false, true] {
+        let mut fixture = MemoryFixture::new();
+        let dir = fixture.seed();
+        let second = dir.join("second.md");
+        std::fs::write(&second, "malformed").unwrap();
+        if open {
+            fixture.open().await;
+            fixture.paint(80, 24).await;
+        }
+        let target = json!(bingo_mod_memory::rows::Target::Memory {
+            scope: bingo_services::memory::Scope::User,
+            name: "second".into(),
+            path: second.clone(),
+        });
+        fixture
+            .forged(target.clone(), serde_json::Value::Null, "d")
+            .await;
+        fixture.forged(target.clone(), target, "enter").await;
+        assert!(second.exists());
+        assert!(dir.join("rule.md").exists());
+    }
+}
+#[tokio::test]
+async fn listings_stay_cached_until_forgetting_refreshes_them() {
+    for (width, height) in [(80, 24), (108, 30)] {
+        let mut fixture = MemoryFixture::new();
+        let dir = fixture.seed();
+        fixture.open().await;
+        fixture.paint(width, height).await;
+        std::fs::write(dir.join("second.md"), "malformed").unwrap();
+        assert!(!fixture.paint(width, height).await.contains("second"));
+        fixture.press(typed('d')).await;
+        assert!(!fixture.paint(width, height).await.contains("second"));
+        fixture.press(key(KeyCode::Enter)).await;
+        let screen = fixture.paint(width, height).await;
+        assert!(screen.contains("second"));
+        assert!(screen.contains("Forgotten. Prompt refreshes later; say not to relearn it."));
+    }
+}
+#[tokio::test]
+async fn instruction_pager_uses_a_relative_title() {
+    let mut fixture = MemoryFixture::new();
+    fixture.seed();
+    fixture.open().await;
+    fixture.paint(80, 24).await;
+    fixture.press(key(KeyCode::Down)).await;
+    fixture.paint(80, 24).await;
+    fixture.press(key(KeyCode::Enter)).await;
+    let Open::Pager(pager) = fixture.run.ui.focus.open() else {
+        panic!("pager");
+    };
+    let crate::pager::Source::Text { title, .. } = &pager.source else {
+        panic!("text");
+    };
+    assert!(title.starts_with("./"));
+    assert!(title.ends_with("AGENTS.md"));
+}

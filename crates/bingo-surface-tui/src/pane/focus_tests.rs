@@ -174,3 +174,33 @@ fn escape_keeps_close_or_release_semantics_for_text_only_focus() {
         }
     }
 }
+
+#[test]
+fn escape_reaches_a_root_callback_without_synthesizing_a_close() {
+    let mut state = fixture(true, true, false);
+    let pane = &mut state
+        .signals
+        .get_mut("test")
+        .unwrap()
+        .get_mut("pane")
+        .unwrap()["slots"][0];
+    pane["closeOnEscape"] = json!(false);
+    pane["view"]["onKey"] =
+        json!({"name":"test:ui","args":{"handler":"root-token","event":"press"}});
+    let tree = solo(&state);
+    let (mut ui, now) = scene();
+    draw_tree(80, 24, &tree, &mut ui, now);
+    let focused = ui.shown.seating.panes[0].key.clone();
+    ui.focus = Focus::Pane(focused.clone());
+    let effects = crate::input::on_key(
+        &mut ui,
+        &tree,
+        KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+        now,
+    );
+    assert!(
+        matches!(&effects[..], [crate::effect::Effect::SiteKey { action, .. }] if action.args["event"] == "press" && action.args["value"]["key"] == "esc")
+    );
+    assert!(matches!(&ui.focus, Focus::Pane(key) if key == &focused));
+    assert_eq!(super::placed(tree.viewed()).len(), 1);
+}

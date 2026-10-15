@@ -3,7 +3,7 @@ use bingo_mod_memory::{
     rows::{self, Target},
 };
 use bingo_services::{
-    experience::EntryRow,
+    experience::{EntryRow, Outcome, Status},
     memory::{Listing, Loaded, MemoryRow, Scope},
 };
 use ratatui::{Terminal, backend::TestBackend, widgets::Paragraph};
@@ -56,7 +56,7 @@ fn memory(scope: Scope, name: &str, kind: &str, description: &str, tokens: u64) 
     MemoryRow {
         scope,
         name: name.into(),
-        kind: kind.into(),
+        kind: serde_json::from_value(serde_json::json!(kind)).unwrap(),
         description: description.into(),
         path: format!("memory/{name}.md").into(),
         tokens,
@@ -68,9 +68,10 @@ fn entries() -> Vec<EntryRow> {
         .into_iter()
         .map(|id| EntryRow {
             id: id.into(),
-            status: "active".into(),
+            status: Status::Active,
             summary: "fixture before impl for wire formats".into(),
-            outcomes: "3 ok".into(),
+            outcomes: vec![Outcome::Helpful; 3],
+            error: None,
             tokens: 80,
         })
         .collect()
@@ -83,11 +84,11 @@ fn snapshot(width: u16, height: u16, scene: &str) -> String {
     };
     if scene == "malformed" {
         listed.memories[0].error = Some("missing frontmatter: description".into());
-        listed.memories[0].kind = "malformed".into();
+        listed.memories[0].kind = bingo_services::memory::Kind::Malformed;
     }
     let groups = rows::rows(listed, if scene == "empty" { vec![] } else { entries() });
     let confirming: Option<&Target> = (scene == "confirming").then(|| &groups[0].rows[0].target);
-    let view = draw::tree(&groups, 0, confirming, height);
+    let view = draw::tree(&groups, 0, confirming, height, width);
     let lines = crate::views::render(&view, usize::from(width));
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     terminal
@@ -117,4 +118,64 @@ fn memory_panel_sketch_at_both_sizes() {
             );
         }
     }
+}
+
+#[test]
+fn memory_and_experience_frontmatter_stays_verbatim_in_the_pager() {
+    use crate::{pager::Pager, test_support::*, ui::Open};
+    for (width, height) in [(80, 24), (108, 30)] {
+        for (text, fields) in [
+            (
+                "---\nname: rule\ntype: feedback\ndescription: Use fixtures\n---\n\n**Body stays markdown.**",
+                vec!["name: rule", "type: feedback", "description: Use fixtures"],
+            ),
+            (
+                "---\nstatus: active\ntrigger:\n  - wire\nsteps:\n  - write fixture\ncreated: 2026-10-15\n---\n\n**Body stays markdown.**",
+                vec![
+                    "status: active",
+                    "trigger:",
+                    "  - wire",
+                    "steps:",
+                    "  - write fixture",
+                    "created: 2026-10-15",
+                ],
+            ),
+        ] {
+            let tree = solo(&state());
+            let (mut ui, now) = scene();
+            let now = still(now);
+            ui.focus.show(
+                Open::Pager(Pager::text("file.md".into(), text.into(), None)),
+                now.instant,
+            );
+            let screen = draw_tree(width, height, &tree, &mut ui, now);
+            for field in fields {
+                assert!(
+                    screen
+                        .lines()
+                        .any(|line| line.trim_end_matches('"').trim_end().ends_with(field)),
+                    "{field}: {screen}"
+                );
+            }
+            assert!(screen.contains("Body stays markdown."));
+            assert!(!screen.contains("**Body"));
+        }
+    }
+}
+#[test]
+fn a_pager_does_not_return_focus_to_a_removed_pane() {
+    use crate::{pager::Pager, test_support::*, ui::Open};
+    let tree = solo(&state());
+    let (mut ui, now) = scene();
+    ui.focus.show(
+        Open::Pager(Pager::text(
+            "file".into(),
+            "text".into(),
+            Some(crate::pager::Return::Pane("removed".into())),
+        )),
+        now.instant,
+    );
+    crate::pager::keys(&mut ui, &tree, key(crossterm::event::KeyCode::Esc), now);
+    assert!(!matches!(ui.focus, crate::focus::Focus::Pane(_)));
+    assert!(!ui.focus.showing());
 }

@@ -18,6 +18,26 @@ impl Memories {
             Scope::Project => project_dir(&self.data, cwd).await,
         }
     }
+    async fn can_read(&self, cwd: &Path, path: &Path) -> bool {
+        for scope in [Scope::User, Scope::Project] {
+            if path.parent() == Some(self.scope(cwd, &scope).await.as_path()) {
+                let valid = path.extension().is_some_and(|extension| extension == "md")
+                    && path
+                        .file_stem()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| forget::valid_name(name).is_ok());
+                return valid
+                    && tokio::fs::symlink_metadata(path)
+                        .await
+                        .is_ok_and(|metadata| metadata.is_file());
+            }
+        }
+        crate::InstructionsContributor::new(self.config.clone())
+            .loaded(cwd)
+            .await
+            .iter()
+            .any(|row| row.path == path)
+    }
     async fn resolve(&self, input: &Forget) -> Result<Scope, KernelError> {
         forget::valid_name(&input.name)?;
         if let Some(scope) = &input.scope {
@@ -83,13 +103,7 @@ impl Service for Memories {
         ))
     }
     async fn read(&self, input: Read) -> Result<String, KernelError> {
-        let listing = self.list(List { cwd: input.cwd }).await?;
-        if !listing.memories.iter().any(|row| row.path == input.path)
-            && !listing
-                .instructions
-                .iter()
-                .any(|row| row.path == input.path)
-        {
+        if !self.can_read(&input.cwd, &input.path).await {
             return Err(KernelError::new(
                 ErrorCode::NotFound,
                 "that file is no longer listed",

@@ -15,6 +15,7 @@ pub struct MemoryPanel;
 #[derive(Default)]
 struct Cursor {
     selected: usize,
+    groups: Vec<rows::Group>,
     confirming: Option<rows::Target>,
 }
 type Shared = Arc<Mutex<BTreeMap<SessionId, Cursor>>>;
@@ -39,10 +40,12 @@ impl Plugin for MemoryPanel {
         let shared = Shared::default();
         registrar.add(Contribution::Command(Arc::new(keys::Handler(
             shared.clone(),
+            registrar.env().home.clone(),
         ))));
         for link in [
-            Arc::new(panel::Open(shared.clone())) as Arc<dyn Interceptor>,
-            Arc::new(draw::Drawing(shared.clone(), registrar.env().home.clone())),
+            Arc::new(panel::Open(shared.clone(), registrar.env().home.clone()))
+                as Arc<dyn Interceptor>,
+            Arc::new(draw::Drawing(shared.clone())),
             Arc::new(lifecycle::Lifecycle(shared.clone())),
             Arc::new(lifecycle::Disable(shared)),
         ] {

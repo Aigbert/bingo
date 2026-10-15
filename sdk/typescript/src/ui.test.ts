@@ -130,3 +130,20 @@ test('root onKey mints an owned press handler and preserves unhandled', async ()
       {stale:false,handled:key === 'x'});
   }
 });
+
+test('a root Escape callback cannot synthesize close for a nonclosable pane', async () => {
+  const handlers = new Handlers();
+  const calls: any[] = [];
+  const port = {request:async (_:string, params:any) => {
+    calls.push(params);
+    return {result:params.method === 'panes' ? [{kind:'pane',id:'locked',closeOnEscape:false}] : null};
+  }} as any;
+  const dispatch = async (_:string, __:any, next:()=>Promise<unknown>) => next();
+  const tree = handlers.mint('fixture','session','locked','one',{
+    kind:'Box', onKey: async ({key}:any) => {
+      if (key === 'esc') return handlers.fire('session',{handler:'locked',event:'close'},port,dispatch);
+    },
+  },port);
+  await handlers.fire('session',{...tree.onKey.args,value:{key:'esc'}},port,dispatch);
+  assert.deepEqual(calls.map(call => call.method), ['panes']);
+});

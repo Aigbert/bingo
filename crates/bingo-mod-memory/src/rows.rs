@@ -1,5 +1,5 @@
 use bingo_services::{
-    experience::EntryRow,
+    experience::{EntryRow, Outcome},
     memory::{Listing, Scope},
 };
 use serde::{Deserialize, Serialize};
@@ -35,6 +35,12 @@ pub struct Group {
     pub rows: Vec<Row>,
 }
 pub fn rows(listing: Listing, entries: Vec<EntryRow>) -> Vec<Group> {
+    let name_width = listing
+        .memories
+        .iter()
+        .map(|row| row.name.chars().count())
+        .max()
+        .unwrap_or(0);
     vec![
         Group {
             name: "memories",
@@ -43,9 +49,9 @@ pub fn rows(listing: Listing, entries: Vec<EntryRow>) -> Vec<Group> {
                 .into_iter()
                 .map(|row| Row {
                     label: format!(
-                        "{:<7}  {:<9}  {}   {}",
+                        "{:<7}  {:<9}  {:name_width$}   {}",
                         row.scope.as_str(),
-                        row.kind,
+                        row.kind.as_str(),
                         row.name,
                         row.error.unwrap_or(row.description)
                     ),
@@ -76,8 +82,18 @@ pub fn rows(listing: Listing, entries: Vec<EntryRow>) -> Vec<Group> {
                 .into_iter()
                 .map(|row| Row {
                     label: format!(
-                        "{}  {}  {}  {}",
-                        row.id, row.status, row.summary, row.outcomes
+                        "{}  {}  {}  {} ok · {} harmful",
+                        row.id,
+                        row.status.as_str(),
+                        row.error.unwrap_or(row.summary),
+                        row.outcomes
+                            .iter()
+                            .filter(|outcome| **outcome == Outcome::Helpful)
+                            .count(),
+                        row.outcomes
+                            .iter()
+                            .filter(|outcome| **outcome == Outcome::Harmful)
+                            .count()
                     ),
                     tokens: row.tokens,
                     target: Target::Experience(row.id),
@@ -126,7 +142,7 @@ mod tests {
         let row = bingo_services::memory::MemoryRow {
             scope: Scope::User,
             name: "broken".into(),
-            kind: "malformed".into(),
+            kind: bingo_services::memory::Kind::Malformed,
             description: String::new(),
             path: "broken.md".into(),
             tokens: 8,

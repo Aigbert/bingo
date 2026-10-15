@@ -5,7 +5,7 @@ use crate::{
 use bingo_sdk::*;
 use serde_json::{Value, json};
 
-pub(crate) struct Drawing(pub Shared, pub std::path::PathBuf);
+pub(crate) struct Drawing(pub Shared);
 #[async_trait::async_trait]
 impl Interceptor for Drawing {
     fn id(&self) -> &str {
@@ -29,34 +29,27 @@ impl Interceptor for Drawing {
         if request.props["owner"] != crate::ID {
             return next.run(value).await;
         }
-        let mut groups = crate::panel::groups(&cx.host, &cx.cwd).await?;
-        for row in groups.iter_mut().flat_map(|group| &mut group.rows) {
-            if let Target::Instruction(path) = &row.target {
-                row.label = crate::rows::path_label(path, &self.1, &cx.cwd);
-            }
-        }
-        let mut shared = self.0.lock().map_err(crate::error)?;
-        let cursor = shared.entry(cx.session.clone()).or_default();
-        let count = groups.iter().map(|g| g.rows.len()).sum::<usize>();
-        cursor.selected = cursor.selected.min(count.saturating_sub(1));
-        if cursor.confirming.as_ref().is_some_and(|target| {
-            !groups
-                .iter()
-                .flat_map(|g| &g.rows)
-                .any(|r| &r.target == target)
-        }) {
-            cursor.confirming = None;
-        }
+        let shared = self.0.lock().map_err(crate::error)?;
+        let Some(cursor) = shared.get(&cx.session) else {
+            return serde_json::to_value(dim("")).map_err(crate::error);
+        };
         serde_json::to_value(tree(
-            &groups,
+            &cursor.groups,
             cursor.selected,
             cursor.confirming.as_ref(),
             request.viewport.rows,
+            request.viewport.columns,
         ))
         .map_err(crate::error)
     }
 }
-pub fn tree(groups: &[Group], selected: usize, confirming: Option<&Target>, height: u16) -> View {
+pub fn tree(
+    groups: &[Group],
+    selected: usize,
+    confirming: Option<&Target>,
+    height: u16,
+    width: u16,
+) -> View {
     let (lines, at) = group_lines(groups, selected);
     let room = usize::from(height).saturating_sub(4).max(1);
     let start = at
@@ -70,9 +63,10 @@ pub fn tree(groups: &[Group], selected: usize, confirming: Option<&Target>, heig
         "⏎ read  d forget".into(),
     )];
     children.extend(lines.into_iter().skip(start).take(room));
-    children.push(dim(
-        " ──────────────────────────────────────────────────────────────────────",
-    ));
+    children.push(dim(format!(
+        " {}",
+        "─".repeat(usize::from(width).saturating_sub(1))
+    )));
     children.push(dim(match confirming {
         Some(Target::Memory { name, .. }) => {
             format!(" forget \"{name}\"? the file and its index line go.  ⏎ yes  esc")

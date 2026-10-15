@@ -3,7 +3,7 @@ use bingo_sdk::*;
 use bingo_services::{experience, memory};
 use serde_json::{Value, json};
 
-pub struct Open(pub Shared);
+pub struct Open(pub Shared, pub std::path::PathBuf);
 #[async_trait::async_trait]
 impl Interceptor for Open {
     fn id(&self) -> &str {
@@ -30,10 +30,7 @@ impl Interceptor for Open {
         {
             return next.run(value).await;
         }
-        self.0
-            .lock()
-            .map_err(crate::error)?
-            .insert(cx.session.clone(), Default::default());
+        let groups = groups(&cx.host, &cx.cwd, &self.1).await?;
         let fallback: catalogue::CommandReply =
             serde_json::from_value(next.run(value).await?).map_err(crate::error)?;
         let fallback = match CommandOutcome::from(fallback) {
@@ -42,6 +39,13 @@ impl Interceptor for Open {
             _ => None,
         };
         open(cx).await?;
+        self.0.lock().map_err(crate::error)?.insert(
+            cx.session.clone(),
+            crate::Cursor {
+                groups,
+                ..Default::default()
+            },
+        );
         serde_json::to_value(CommandOutcome::Surface {
             action: Action {
                 name: "Pane".into(),
@@ -52,7 +56,11 @@ impl Interceptor for Open {
         .map_err(crate::error)
     }
 }
-pub async fn groups(host: &HostHandle, cwd: &std::path::Path) -> Result<Vec<Group>, KernelError> {
+pub async fn groups(
+    host: &HostHandle,
+    cwd: &std::path::Path,
+    home: &std::path::Path,
+) -> Result<Vec<Group>, KernelError> {
     let listing = memory::find(host)
         .ok_or_else(crate::unavailable)?
         .list(memory::List { cwd: cwd.into() })
@@ -61,7 +69,13 @@ pub async fn groups(host: &HostHandle, cwd: &std::path::Path) -> Result<Vec<Grou
         Some(service) => service.list(experience::List { cwd: cwd.into() }).await?,
         None => vec![],
     };
-    Ok(crate::rows::rows(listing, entries))
+    let mut groups = crate::rows::rows(listing, entries);
+    for row in groups.iter_mut().flat_map(|group| &mut group.rows) {
+        if let crate::rows::Target::Instruction(path) = &row.target {
+            row.label = crate::rows::path_label(path, home, cwd);
+        }
+    }
+    Ok(groups)
 }
 async fn open(cx: &HookContext) -> Result<(), KernelError> {
     let mut size = slot::PaneSize::from_rows(20);
@@ -99,7 +113,7 @@ mod tests {
     use super::*;
     #[test]
     fn only_the_bare_command_is_wrapped() {
-        let matcher = Open(Shared::default()).matcher();
+        let matcher = Open(Shared::default(), Default::default()).matcher();
         for (command, args, expected) in [
             ("memory", "", true),
             ("memory", "forget rule", false),

@@ -9,6 +9,8 @@
 //! from the item every frame, so a block that is still arriving grows under the
 //! sheet rather than being copied into it.
 
+mod text;
+
 use bingo_sdk::{Item, ItemBody, ItemId, SessionState};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::text::{Line, Span};
@@ -79,7 +81,10 @@ impl Pager {
             Source::Item(id) => source(tree, id)
                 .map(|(state, item)| (title(item, state), content(state, item, width, self)))
                 .unwrap_or_default(),
-            Source::Text { title, text } => (title.clone(), markdown::render(text, width)),
+            Source::Text { title, text } => (
+                title.clone(),
+                markdown::render(&self::text::document(text), width),
+            ),
         }
     }
 
@@ -351,7 +356,7 @@ pub fn keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         return searched(ui, tree, key);
     }
     if key.code == KeyCode::Esc {
-        closed(ui, now);
+        closed(ui, tree, now);
         return Vec::new();
     }
     let window = window_of(ui, tree);
@@ -384,7 +389,7 @@ fn moved(open: &mut Pager, key: KeyEvent, window: Window) {
 /// up and the `esc` down are a round trip rather than a state a person is left
 /// in. Forgetting the entry *is* the fold: the start is written in one place
 /// ([`crate::fold`]) and never copied here.
-fn closed(ui: &mut Ui, now: Now) {
+fn closed(ui: &mut Ui, tree: &Tree, now: Now) {
     let Open::Pager(open) = ui.focus.open() else {
         return ui.focus.close(now.instant);
     };
@@ -396,9 +401,16 @@ fn closed(ui: &mut Ui, now: Now) {
         ui.folds.remove(&item);
     }
     match return_to {
-        Some(Return::Pane(key)) => ui.focus = crate::focus::Focus::Pane(key),
+        Some(Return::Pane(key)) if placed(tree, &key) => ui.focus = crate::focus::Focus::Pane(key),
         _ => ui.focus.close(now.instant),
     }
+}
+
+/// Whether the pane a sheet was opened over is still on the screen.
+fn placed(tree: &Tree, key: &str) -> bool {
+    crate::pane::placed(tree.viewed())
+        .iter()
+        .any(|pane| pane.key == key)
 }
 
 /// `/` inside the sheet: the same query row as `ctrl+f`, over this block alone.

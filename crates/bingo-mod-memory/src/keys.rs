@@ -51,7 +51,7 @@ fn press(
     }
     Operation::Handled(true)
 }
-pub struct Handler(pub Shared);
+pub struct Handler(pub Shared, pub std::path::PathBuf);
 #[async_trait::async_trait]
 impl Command for Handler {
     fn spec(&self) -> CommandSpec {
@@ -62,27 +62,34 @@ impl Command for Handler {
         if args["event"] != "press" || args["handler"] != crate::REQUEST {
             return Ok(CommandOutcome::Handled { handled: false });
         }
-        let groups = crate::panel::groups(&cx.host, &cx.cwd).await?;
-        let targets = groups
-            .iter()
-            .flat_map(|g| &g.rows)
-            .map(|r| &r.target)
-            .collect::<Vec<_>>();
         let target: Option<Target> =
             serde_json::from_value(args["target"].clone()).map_err(crate::error)?;
         let confirming: Option<Target> =
             serde_json::from_value(args["confirming"].clone()).map_err(crate::error)?;
         let operation = {
             let mut shared = self.0.lock().map_err(crate::error)?;
-            let cursor = shared.entry(cx.session.clone()).or_default();
-            if confirming.as_ref().is_some_and(|t| !targets.contains(&t)) {
-                cursor.confirming = None;
+            let Some(cursor) = shared.get_mut(&cx.session) else {
+                return Ok(CommandOutcome::Handled { handled: true });
+            };
+            let targets = cursor
+                .groups
+                .iter()
+                .flat_map(|group| &group.rows)
+                .map(|row| row.target.clone())
+                .collect::<Vec<_>>();
+            let selected = targets.get(cursor.selected).cloned();
+            if target != selected
+                || confirming
+                    .as_ref()
+                    .is_some_and(|target| Some(target) != selected.as_ref())
+            {
+                return Ok(CommandOutcome::Handled { handled: true });
             }
             press(
                 cursor,
                 targets.len(),
-                target.filter(|t| targets.contains(&t)),
-                confirming.filter(|t| targets.contains(&t)),
+                selected,
+                confirming,
                 args["value"]["key"].as_str().unwrap_or_default(),
             )
         };
@@ -94,6 +101,39 @@ impl Command for Handler {
     }
 }
 impl Handler {
+    fn title(&self, target: &Target, cx: &CommandContext) -> String {
+        match target {
+            Target::Instruction(path) => crate::rows::path_label(path, &self.1, &cx.cwd),
+            _ => target.name(),
+        }
+    }
+    async fn forget(
+        &self,
+        target: Target,
+        cx: &CommandContext,
+    ) -> Result<CommandOutcome, KernelError> {
+        let result = forget(target, cx).await;
+        let groups = crate::panel::groups(&cx.host, &cx.cwd, &self.1).await?;
+        if let Some(cursor) = self.0.lock().map_err(crate::error)?.get_mut(&cx.session) {
+            cursor.groups = groups;
+            let count = cursor
+                .groups
+                .iter()
+                .map(|group| group.rows.len())
+                .sum::<usize>();
+            cursor.selected = cursor.selected.min(count.saturating_sub(1));
+            cursor.confirming = None;
+        }
+        Ok(CommandOutcome::Applied {
+            message: Some(match result {
+                Ok(_) => "Forgotten. Prompt refreshes later; say not to relearn it.".into(),
+                Err(error) if error.code == ErrorCode::NotFound => {
+                    "Already gone; nothing forgotten.".into()
+                }
+                Err(error) => return Err(error),
+            }),
+        })
+    }
     async fn apply(
         &self,
         operation: Operation,
@@ -116,14 +156,12 @@ impl Handler {
                 Ok(CommandOutcome::Surface {
                     action: Action {
                         name: "Pager".into(),
-                        args: json!({"title":target.name(),"text":text}),
+                        args: json!({"title":self.title(&target, cx),"text":text}),
                     },
                     fallback: Some(text),
                 })
             }
-            Operation::Forget(target) => Ok(CommandOutcome::Applied {
-                message: Some(forget(target, cx).await?),
-            }),
+            Operation::Forget(target) => self.forget(target, cx).await,
         }
     }
 }
