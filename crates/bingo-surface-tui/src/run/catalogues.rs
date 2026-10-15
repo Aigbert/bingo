@@ -10,8 +10,22 @@ const CATALOGUES: &[(&str, CatalogKind)] = &[
 
 /// The catalogues are read at start and again whenever the host says one
 /// of them was rebuilt: the dropdown follows, it does not poll.
-pub(super) fn fetch_all(run: &mut Run) {
-    fetch_commands(run);
+// 200 ms lets the usual local catalogue bind the first key without making
+// first paint depend on a plugin's multi-second handshake.
+const INITIAL_WAIT: Duration = Duration::from_millis(200);
+
+pub(super) async fn fetch_all(run: &mut Run) {
+    run.typeahead.catalogue_pending = true;
+    let host = run.host.clone();
+    let mut request = Box::pin(async move {
+        host.catalog(CatalogKind::Commands)
+            .await
+            .map(|c| commands::specs_from(&c))
+    });
+    match tokio::time::timeout(INITIAL_WAIT, &mut request).await {
+        Ok(result) => received(run, result),
+        Err(_) => run.spawn(async move { Ok(Reply::Commands(request.await)) }),
+    }
     for (source, kind) in CATALOGUES {
         fetch(run, source, *kind);
     }
@@ -20,10 +34,38 @@ pub(super) fn fetch_all(run: &mut Run) {
 pub(super) fn fetch_commands(run: &mut Run) {
     let host = run.host.clone();
     run.spawn(async move {
-        host.catalog(CatalogKind::Commands)
-            .await
-            .map(|c| Reply::Commands(commands::specs_from(&c)))
+        Ok(Reply::Commands(
+            host.catalog(CatalogKind::Commands)
+                .await
+                .map(|c| commands::specs_from(&c)),
+        ))
     });
+}
+
+pub(super) fn received(run: &mut Run, result: Result<Vec<CommandSpec>, KernelError>) {
+    run.typeahead.catalogue_pending = false;
+    match result {
+        Ok(specs) => {
+            run.ui.catalogs.commands = specs;
+            site_keys::notices(run);
+        }
+        Err(error) => run.ui.notify(
+            Level::Warn,
+            format!("Command catalogue unavailable: {}", error.message),
+            Instant::now(),
+        ),
+    }
+    typeahead::drain(run);
+}
+
+pub(super) fn waiting(run: &Run, key: crossterm::event::KeyEvent) -> bool {
+    use crossterm::event::{KeyCode, KeyModifiers};
+    run.typeahead.catalogue_pending
+        && key != crossterm::event::KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL)
+        && (key
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+            || matches!(key.code, KeyCode::F(_)))
 }
 
 /// One catalogue's ids, on the loop's own host-call lane.
@@ -52,3 +94,7 @@ pub(super) fn changed(run: &mut Run, kind: CatalogKind) {
     };
     fetch(run, source, kind);
 }
+
+#[cfg(test)]
+#[path = "catalogues_tests.rs"]
+mod tests;

@@ -23,6 +23,7 @@ pub(super) fn kept_out_notice(count: usize) -> String {
 
 #[derive(Default)]
 pub(super) struct Typeahead {
+    pub(super) catalogue_pending: bool,
     inputs: std::collections::VecDeque<Queued>,
     opening: Option<Opening>,
 }
@@ -197,6 +198,9 @@ pub(super) fn drain(run: &mut Run) {
     }
     let mut kept_out = 0;
     while let Some(front) = run.typeahead.inputs.front() {
+        if matches!(&front.input, Held::Key(key) if catalogues::waiting(run, *key)) {
+            break;
+        }
         let site = front.site.clone();
         let now = focus(run);
         if matches!(front.input, Held::Paste(_)) && dialog(run, now.as_deref()) {

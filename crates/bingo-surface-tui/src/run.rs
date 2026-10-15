@@ -84,7 +84,7 @@ enum Reply {
     Resume(SessionId, Option<Box<SessionSummary>>),
     /// What the store holds, for the switcher's stored rows.
     Stored(String, Vec<SessionSummary>),
-    Commands(Vec<CommandSpec>),
+    Commands(Result<Vec<CommandSpec>, KernelError>),
     /// One catalogue's ids, by the source name a command's argument gives.
     Catalogue(String, Vec<bingo_sdk::CatalogEntry>),
     /// A line whose pictures have been read in (ADR-0041): the loop asked for
@@ -347,7 +347,7 @@ async fn attach(
         .service(&bingo_sdk::command::COMMAND_CATALOG)
         .map(crate::palette::Current);
     run.ui.measure = surface.settings.measure();
-    catalogues::fetch_all(&mut run);
+    catalogues::fetch_all(&mut run).await;
     run.ask_for_updates(surface.settings.update.check);
     if let Some(prompt) = opts.prompt {
         run.effect(Effect::Submit(bingo_sdk::Input::text(
@@ -689,7 +689,7 @@ impl Run {
                         return;
                     }
                 }
-                if !interrupt && typeahead::blocked(self) {
+                if !interrupt && (catalogues::waiting(self, key) || typeahead::blocked(self)) {
                     typeahead::queue(self, key);
                     return;
                 }
@@ -877,10 +877,7 @@ impl Run {
                 }
             }
             Reply::Stored(request, sessions) => palette::fill_palette(self, &request, sessions),
-            Reply::Commands(specs) => {
-                self.ui.catalogs.commands = specs;
-                site_keys::notices(self);
-            }
+            Reply::Commands(result) => catalogues::received(self, result),
             Reply::Catalogue(source, ids) => {
                 if source == "plugins" {
                     self.ui.catalogs.plugins = ids;
