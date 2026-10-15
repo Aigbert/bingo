@@ -15,7 +15,7 @@ expression: output
 " ❯ ◌ github               stdio · waits for your yes    │ no tools until it runs                            "
 "   ○ linear               http · sign in                │                                                   "
 "   ✗ postgres             stdio · failed                │ state    ◌ waiting for your yes                   "
-"   ○ figma                http · off                    │ runs     local-fixture                            "
+"   ○ figma                http · off                    │ runs     npx -y @acme/github-mcp --repo=.         "
 "   plugins · yours  ~/.bingo/plugins                    │ from     ~/.bingo/settings.toml                   "
 "   ● my-picker            tighten                       │ sign-in  none needed                              "
 "   ✗ weather              failed to load                │ calls    always ask; an MCP tool is never trusted "

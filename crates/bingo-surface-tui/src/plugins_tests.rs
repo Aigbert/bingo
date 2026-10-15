@@ -115,6 +115,14 @@ fn a_server_under_review_shows_what_it_would_run() {
             let (mut props, mut servers) = fixture();
             props.open = PluginsOpen::Mcp;
             servers[0].status = bingo_services::mcp::Status::Waiting { changed: false };
+            // What bingo-mcp hands a waiting row: the whole line, secret
+            // values already cut to their names.
+            servers[0].transport = bingo_services::mcp::Transport::Stdio {
+                command: "npx".into(),
+                args: vec!["-y".into(), "@acme/github-mcp".into(), "--repo=.".into()],
+                env: [("GITHUB_TOKEN".to_string(), "…".to_string())].into(),
+                cwd: None,
+            };
             let mut cursor = Cursor {
                 selected: "m:github".into(),
                 expanded: false,

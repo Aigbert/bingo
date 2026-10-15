@@ -15,7 +15,7 @@ expression: output
 " no tools until it runs                                                         "
 "                                                                                "
 " state    ◌ waiting for your yes                                                "
-" runs     local-fixture                                                         "
+" runs     npx -y @acme/github-mcp --repo=.                                      "
 " from     ~/.bingo/settings.toml                                                "
 " sign-in  none needed                                                           "
 " calls    always ask; an MCP tool is never trusted                              "
