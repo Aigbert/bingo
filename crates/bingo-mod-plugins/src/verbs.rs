@@ -55,7 +55,12 @@ pub fn builtins(expanded: bool) -> Vec<Binding> {
 }
 pub fn plugin_keys(p: &CatalogEntry) -> Vec<Binding> {
     use crate::groups::{builtin, state};
-    let status = state(p);
+    let Some(status) = state(p) else {
+        return vec![quiet(
+            "enter",
+            Verb::Message(format!("{} is in a state this bingo cannot read", p.id)),
+        )];
+    };
     if matches!(status, PluginState::Waiting { .. }) {
         return vec![
             bind("enter", "trust it?", Verb::Trust),

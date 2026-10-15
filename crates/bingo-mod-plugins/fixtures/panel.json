@@ -132,7 +132,8 @@
       "auth": null,
       "origin": "~/.bingo/settings.toml",
       "latency": null,
-      "signInFrom": null
+      "signInFrom": null,
+      "stderr": null
     },
     {
       "name": "linear",
@@ -150,7 +151,8 @@
       },
       "origin": "~/.bingo/settings.toml",
       "latency": null,
-      "signInFrom": null
+      "signInFrom": null,
+      "stderr": null
     },
     {
       "name": "postgres",
@@ -168,7 +170,8 @@
       "auth": null,
       "origin": "~/.bingo/settings.toml",
       "latency": null,
-      "signInFrom": null
+      "signInFrom": null,
+      "stderr": "psql: could not connect to server: Connection refused"
     },
     {
       "name": "figma",
@@ -183,7 +186,8 @@
       "auth": null,
       "origin": "~/.bingo/settings.toml",
       "latency": null,
-      "signInFrom": null
+      "signInFrom": null,
+      "stderr": null
     }
   ]
 }

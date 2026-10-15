@@ -121,7 +121,18 @@ fn cards_preserve_errors_and_name_trust_storage() {
         .into_iter()
         .find(|line| line.error)
         .unwrap();
-    assert_eq!(error.text, plugins[1].meta["state"]["why"]);
+    assert_eq!(
+        error.text,
+        format!(
+            " {}",
+            plugins[1].meta["state"]["why"]
+                .as_str()
+                .unwrap()
+                .lines()
+                .next()
+                .unwrap()
+        )
+    );
     let card = cards::plugin_card(&plugins[3], &plugins, Some(&trust::Choice::default()));
     assert!(
         card.iter()
@@ -397,5 +408,216 @@ fn a_key_from_a_stale_drawing_acts_on_nothing() {
     assert_eq!(
         press(&state, "a", "space", &props, &servers),
         json!({"run":"/mcp disable github"})
+    );
+}
+
+/// Every text line a drawing holds, with its colour.
+fn lines(view: &View) -> Vec<(String, Option<String>)> {
+    fn walk(value: &serde_json::Value, out: &mut Vec<(String, Option<String>)>) {
+        match value {
+            serde_json::Value::Object(map) => {
+                let children = map.get("children").and_then(|c| c.as_array());
+                let strings = children
+                    .map(|c| c.iter().filter_map(|c| c.as_str()).collect::<String>())
+                    .filter(|text| !text.is_empty());
+                if let Some(text) = strings {
+                    let color = map.get("color").and_then(|c| c.as_str()).map(String::from);
+                    out.push((text, color));
+                }
+                map.values().for_each(|v| walk(v, out));
+            }
+            serde_json::Value::Array(items) => items.iter().for_each(|v| walk(v, out)),
+            _ => {}
+        }
+    }
+    let mut out = vec![];
+    walk(&serde_json::to_value(view).unwrap(), &mut out);
+    out
+}
+fn props_of(plugins: Vec<CatalogEntry>) -> component::PluginsProps {
+    component::PluginsProps {
+        open: component::PluginsOpen::Plugins,
+        session: SessionId::from_raw("s"),
+        plugins,
+        action: Action {
+            name: "surface:plugins".into(),
+            args: json!({"handler":"a"}),
+        },
+    }
+}
+fn drawn_at(
+    props: &component::PluginsProps,
+    servers: &[ServerRow],
+    row: &str,
+    width: u16,
+    height: u16,
+) -> Vec<(String, Option<String>)> {
+    let mut cursor = Cursor {
+        selected: row.into(),
+        ..Default::default()
+    };
+    lines(&draw::tree(props, servers, &mut cursor, "a", width, height))
+}
+
+#[test]
+fn error_lines_stay_inside_the_card_and_are_cut_at_its_edge() {
+    let (mut plugins, servers) = fixture();
+    plugins[1].meta["state"]["why"] = json!(format!("{}\n  second line", "x".repeat(200)));
+    for (width, height) in [(80, 24), (108, 30)] {
+        let drawn = drawn_at(
+            &props_of(plugins.clone()),
+            &servers,
+            "p:weather",
+            width,
+            height,
+        );
+        let red = drawn
+            .iter()
+            .filter(|(text, color)| color.as_deref() == Some("red") && !text.contains('✗'))
+            .map(|(text, _)| text)
+            .collect::<Vec<_>>();
+        assert_eq!(red.len(), 2, "{red:?}");
+        assert!(red.iter().all(|text| text.starts_with(' ')));
+        assert!(red[0].ends_with('…'));
+        let card = if width < 100 {
+            width
+        } else {
+            width - width * 56 / 108 - 1
+        };
+        assert_eq!(red[0].chars().count(), usize::from(card));
+        assert_eq!(red[1], "   second line");
+    }
+}
+
+#[test]
+fn a_long_list_says_how_many_rows_it_hides() {
+    let (plugins, servers) = fixture();
+    let props = props_of(plugins);
+    let drawn = drawn_at(&props, &servers, "p:my-picker", 80, 24);
+    assert!(
+        drawn
+            .iter()
+            .any(|(text, _)| text.trim_start().starts_with('↓') && text.ends_with("more")),
+        "{drawn:?}"
+    );
+    let drawn = drawn_at(&props, &servers, "m:figma", 80, 24);
+    assert!(
+        drawn
+            .iter()
+            .any(|(text, _)| text.trim_start().starts_with('↑') && text.ends_with("above")),
+        "{drawn:?}"
+    );
+}
+
+#[test]
+fn a_long_origin_keeps_its_start_and_end() {
+    let path = "this project · /Users/someone/work/a-very-long-checkout-name/.mcp.json";
+    let cut = cards::middle(path, 38);
+    assert_eq!(cut.chars().count(), 38);
+    assert!(cut.starts_with("this project · /"));
+    assert!(cut.ends_with("/.mcp.json"));
+    assert!(cut.contains('…'));
+    assert_eq!(cards::middle("short", 38), "short");
+    let (_, mut servers) = fixture();
+    servers[0].origin = Some(path.into());
+    let card = cards::server_card(&servers[0], false);
+    assert!(card.iter().any(|fact| fact.text.ends_with(&cut)));
+}
+
+#[test]
+fn a_failed_server_card_says_its_last_stderr_line() {
+    let (_, servers) = fixture();
+    let postgres = servers.iter().find(|s| s.name == "postgres").unwrap();
+    let card = cards::server_card(postgres, false);
+    assert!(card.iter().any(|fact| fact.error
+        && fact.text == " its stderr: psql: could not connect to server: Connection refused"));
+}
+
+#[test]
+fn the_built_ins_card_counts_the_ones_that_stay_on() {
+    let (plugins, _) = fixture();
+    let card = cards::builtins_card(&plugins, false);
+    let text = card
+        .iter()
+        .map(|fact| fact.text.as_str())
+        .collect::<Vec<_>>();
+    assert!(text.contains(&" 1 are needed and stay on"), "{text:?}");
+    assert!(text.contains(&" ⏎ show all 3"), "{text:?}");
+    let folded = cards::builtins_card(&plugins, true);
+    assert!(folded.iter().any(|fact| fact.text == " ⏎ fold them"));
+}
+
+#[test]
+fn an_http_server_that_never_asked_names_no_oauth() {
+    let (_, mut servers) = fixture();
+    let server = &mut servers[0];
+    server.transport = bingo_services::mcp::Transport::Http {
+        url: "https://mcp.example.com/mcp".into(),
+        headers: Default::default(),
+    };
+    server.auth = Some(Auth::SignedOut);
+    server.status = Status::Connected { tools: 2 };
+    let oauth = |s: &ServerRow| {
+        cards::server_card(s, false)
+            .iter()
+            .any(|f| f.text.contains("OAuth"))
+    };
+    assert!(!oauth(server));
+    server.status = Status::NeedsAuth { why: "401".into() };
+    assert!(oauth(server));
+}
+
+#[test]
+fn a_pending_switch_says_the_states_own_reason() {
+    let (mut plugins, servers) = fixture();
+    plugins[6].meta["state"] = json!({"kind":"pending","now":true,"at":"afterTurn"});
+    let groups = groups::groups(component::PluginsOpen::Plugins, &plugins, &servers, true);
+    let row = groups
+        .iter()
+        .flat_map(|g| &g.rows)
+        .find(|r| r.label == "bingo.tools.bash")
+        .unwrap();
+    assert_eq!(row.tag, "off after the running turn");
+    let card = cards::plugin_card(&plugins[6], &plugins, None);
+    assert!(
+        card.iter()
+            .any(|f| f.text.ends_with("● on → off after the running turn"))
+    );
+}
+
+#[test]
+fn a_state_this_build_cannot_read_is_unknown() {
+    let (mut plugins, servers) = fixture();
+    plugins[0].meta["state"] = json!({"kind":"hibernating"});
+    let groups = groups::groups(component::PluginsOpen::Plugins, &plugins, &servers, false);
+    let row = &groups[0].rows[0];
+    assert_eq!((row.glyph, row.tag.as_str()), ("?", "unknown"));
+    let card = cards::plugin_card(&plugins[0], &plugins, None);
+    assert!(card.iter().any(|f| f.text.ends_with("? unknown")));
+    assert!(!card.iter().any(|f| f.text.contains("loading")));
+    assert!(matches!(
+        verbs::plugin(&plugins[0], "space"),
+        verbs::Verb::None
+    ));
+}
+
+#[test]
+fn only_a_built_in_that_draws_a_site_falls_back_to_the_plain_drawing() {
+    let (mut plugins, _) = fixture();
+    let plain = |p: &CatalogEntry, all: &[CatalogEntry]| {
+        cards::plugin_card(p, all, None)
+            .iter()
+            .any(|f| f.text.contains("the plain drawing is used"))
+    };
+    assert!(!plain(&plugins[4], &plugins), "draws nothing yet");
+    plugins[4].meta["links"] = json!([{"order":5,"matcher":LinkMatcher {
+        prefilter: json!({"component":"Palette"}),
+        ..LinkMatcher::at(catalogue::UI_RENDER)
+    }}]);
+    assert!(plain(&plugins[4], &plugins));
+    plugins[0].meta["links"] = plugins[4].meta["links"].clone();
+    assert!(
+        !plain(&plugins[0], &plugins),
+        "an outside mod is not built in"
     );
 }

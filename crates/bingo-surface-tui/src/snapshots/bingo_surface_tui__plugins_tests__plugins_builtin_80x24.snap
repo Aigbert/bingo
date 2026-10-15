@@ -9,7 +9,7 @@ expression: output
 "   plugins · built in  compiled into bingo                                      "
 " ❯ ● bingo.mod.palette    under my-picker                                       "
 "   ● bingo.store.jsonl    needed                                                "
-"   ● bingo.tools.bash     off at next start                                     "
+"   ↓ 7 more                                                                     "
 "────────────────────────────────────────────────────────────────────────────────"
 " bingo.mod.palette                                                   compiled in"
 "                                                                                "

@@ -9,7 +9,7 @@ expression: output
 " ❯ ◌ github               stdio · waits for your yes                            "
 "   ○ linear               http · sign in                                        "
 "   ✗ postgres             stdio · failed                                        "
-"   ○ figma                http · off                                            "
+"   ↓ 9 more                                                                     "
 "────────────────────────────────────────────────────────────────────────────────"
 " github                                                              MCP · stdio"
 " approving lets bingo run: local-fixture                                        "

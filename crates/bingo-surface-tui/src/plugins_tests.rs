@@ -182,7 +182,7 @@ fn an_engine_fallback_does_not_block_escape_and_the_draft_returns() {
 }
 
 #[test]
-fn a_long_load_error_wraps_without_losing_its_end() {
+fn a_long_load_error_is_cut_inside_the_card() {
     let (mut props, servers) = fixture();
     props.plugins[1].meta["state"]["why"] =
         json!(format!("{} END-OF-ERROR", "load failed: ".repeat(8)));
@@ -192,7 +192,15 @@ fn a_long_load_error_wraps_without_losing_its_end() {
             ..Default::default()
         };
         let output = painted(&props, &servers, &mut cursor, width, height);
-        assert!(output.contains("END-OF-ERROR"), "{output}");
+        let error = output
+            .lines()
+            .find(|line| line.contains("load failed:"))
+            .unwrap_or_else(|| panic!("{output}"));
+        let error = error.trim_end().trim_matches('"');
+        assert!(error.trim_end().ends_with('…'), "{output}");
+        assert!(!output.contains("END-OF-ERROR"), "{output}");
+        let card = error.split('│').next_back().unwrap_or(error);
+        assert!(card.starts_with(" load failed:"), "{output}");
     }
 }
 

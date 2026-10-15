@@ -23,18 +23,51 @@ fn title(name: &str, aside: &str) -> Fact {
 fn fact(key: &str, value: impl std::fmt::Display) -> Fact {
     line(format!(" {key:8} {value}"))
 }
+/// An error line: indented inside the card, and cut at its edge by the
+/// drawing rather than wrapped under the card's left margin.
+fn error(text: &str) -> Fact {
+    Fact {
+        text: format!(" {text}"),
+        error: true,
+        aside: None,
+    }
+}
+/// A failure's words after a blank line, one card line per line it has.
+fn errors(why: &str) -> Vec<Fact> {
+    std::iter::once(line(""))
+        .chain(why.lines().map(error))
+        .collect()
+}
+/// Where a path came from fits beside its key: its start and its end say
+/// which one it is, so the middle goes.
+const FROM: usize = 38;
+pub fn middle(text: &str, width: usize) -> String {
+    let count = text.chars().count();
+    if count <= width {
+        return text.into();
+    }
+    let keep = width.saturating_sub(1);
+    let head = keep.div_ceil(2);
+    let tail = keep - head;
+    let start = text.chars().take(head);
+    let end = text.chars().skip(count - tail);
+    start.chain(std::iter::once('…')).chain(end).collect()
+}
 pub fn plugin_card(
     p: &CatalogEntry,
     all: &[CatalogEntry],
     trust: Option<&crate::trust::Choice>,
 ) -> Vec<Fact> {
     let mut rows = vec![title(crate::groups::name(p), kind(p)), line(""), line("")];
-    rows.push(fact("state", plugin_state(&crate::groups::state(p))));
+    rows.push(fact(
+        "state",
+        crate::groups::state(p).map_or("? unknown".into(), |state| plugin_state(&state)),
+    ));
     rows.push(fact(
         "version",
         p.meta["version"].as_str().unwrap_or("unknown"),
     ));
-    rows.push(fact("from", origin(p)));
+    rows.push(fact("from", middle(&origin(p), FROM)));
     rows.extend(contributions(p));
     for site in crate::chain::sites(p) {
         rows.push(fact("draws", &site));
@@ -76,22 +109,16 @@ fn origin(p: &CatalogEntry) -> String {
     }
 }
 fn plugin_state(state: &PluginState) -> String {
+    let reason = state.reason().unwrap_or_default();
     match state {
         PluginState::On => "● on".into(),
         PluginState::Off { .. } => "○ off".into(),
         PluginState::Failed { .. } => "✗ failed to load".into(),
-        PluginState::Waiting { changed: true } => "◌ changed since your yes".into(),
-        PluginState::Waiting { .. } => "◌ waiting for your yes".into(),
+        PluginState::Waiting { .. } => format!("◌ {reason}"),
         PluginState::Registering => "◌ loading …".into(),
-        PluginState::Pending { now, at } => format!(
-            "{} → {} {}",
-            if *now { "● on" } else { "○ off" },
-            if *now { "off" } else { "on" },
-            match at {
-                bingo_sdk::plugin::NextStart::AfterTurn => "after this turn",
-                _ => "at next start",
-            }
-        ),
+        PluginState::Pending { now, .. } => {
+            format!("{} → {reason}", if *now { "● on" } else { "○ off" })
+        }
     }
 }
 fn contributions(p: &CatalogEntry) -> Vec<Fact> {
@@ -133,7 +160,7 @@ fn contributions(p: &CatalogEntry) -> Vec<Fact> {
     rows
 }
 fn granted(p: &CatalogEntry) -> String {
-    if matches!(crate::groups::state(p), PluginState::Waiting { .. }) {
+    if matches!(crate::groups::state(p), Some(PluginState::Waiting { .. })) {
         return "none yet".into();
     }
     if crate::groups::builtin(p) {
@@ -150,17 +177,14 @@ fn granted(p: &CatalogEntry) -> String {
     format!("{tier} · {words}")
 }
 fn plugin_footer(p: &CatalogEntry) -> Vec<Fact> {
-    let mut rows = vec![line("")];
-    if let PluginState::Failed { why } = crate::groups::state(p) {
-        rows.push(Fact {
-            text: why,
-            error: true,
-            aside: None,
-        });
-    }
+    let mut rows = match crate::groups::state(p) {
+        Some(PluginState::Failed { why }) => errors(&why),
+        _ => vec![],
+    };
+    rows.push(line(""));
     if let Some(why) = p.meta["needed"].as_str() {
         rows.push(line(format!(" needed: {why}")));
-    } else if p.id.starts_with("bingo.mod.") {
+    } else if crate::groups::builtin(p) && !crate::chain::sites(p).is_empty() {
         rows.push(line(" off: the plain drawing is used"));
     }
     rows
@@ -173,7 +197,7 @@ fn trust_card(p: &CatalogEntry, choice: &crate::trust::Choice) -> Vec<Fact> {
     for (i, (tier, words)) in crate::trust::TIERS
         .iter()
         .chain(
-            matches!(crate::groups::state(p), PluginState::Waiting { .. })
+            matches!(crate::groups::state(p), Some(PluginState::Waiting { .. }))
                 .then_some(&("not now", "leave it off")),
         )
         .enumerate()
@@ -227,30 +251,32 @@ pub fn server_card(s: &ServerRow, reviewing: bool) -> Vec<Fact> {
     ));
     rows.push(fact(
         "from",
-        s.origin.as_deref().unwrap_or("configured settings"),
+        middle(s.origin.as_deref().unwrap_or("configured settings"), FROM),
     ));
-    rows.push(fact(
-        "sign-in",
-        match &s.auth {
-            Some(Auth::SignedIn) => "OAuth · signed in",
-            Some(Auth::SignedOut) => "OAuth · not signed in",
-            Some(Auth::Expired { .. }) => "OAuth · expired",
-            None => s.sign_in_from.as_deref().unwrap_or("none needed"),
-        },
-    ));
+    rows.push(fact("sign-in", sign_in(s)));
     if let Some(ms) = s.latency {
         rows.push(fact("latency", format!("{ms} ms")));
     }
     rows.push(fact("calls", "always ask; an MCP tool is never trusted"));
     if let Status::Failed { why } = &s.status {
-        rows.push(line(""));
-        rows.push(Fact {
-            text: why.clone(),
-            error: true,
-            aside: None,
-        });
+        rows.extend(errors(why));
+        if let Some(stderr) = &s.stderr {
+            rows.push(error(&format!("its stderr: {stderr}")));
+        }
     }
     rows
+}
+/// OAuth is named only where it is in play: a server that asked for a
+/// sign-in or holds one. An HTTP server that never asked needs none, as the
+/// `/mcp` table's dash says.
+fn sign_in(s: &ServerRow) -> &str {
+    let asked = matches!(s.status, Status::NeedsAuth { .. } | Status::SigningIn);
+    match &s.auth {
+        Some(Auth::SignedIn) => "OAuth · signed in",
+        Some(Auth::Expired { .. }) => "OAuth · expired",
+        Some(Auth::SignedOut) if asked => "OAuth · not signed in",
+        _ => s.sign_in_from.as_deref().unwrap_or("none needed"),
+    }
 }
 fn offered(status: &Status) -> String {
     match status {
@@ -280,7 +306,20 @@ fn review(s: &ServerRow) -> Vec<Fact> {
         },
     ]
 }
-pub fn builtins_card(expanded: bool) -> Vec<Fact> {
+pub fn builtins_card(plugins: &[CatalogEntry], expanded: bool) -> Vec<Fact> {
+    let builtins = plugins
+        .iter()
+        .filter(|p| crate::groups::builtin(p))
+        .collect::<Vec<_>>();
+    let needed = builtins
+        .iter()
+        .filter(|p| p.meta["needed"].is_string())
+        .count();
+    let fold = if expanded {
+        " ⏎ fold them".to_string()
+    } else {
+        format!(" ⏎ show all {}", builtins.len())
+    };
     [
         " built in",
         " compiled into bingo, each one a mod",
@@ -290,13 +329,13 @@ pub fn builtins_card(expanded: bool) -> Vec<Fact> {
         " is asked first and may call next",
         "",
         " turn one off and the plain drawing is used",
-        if expanded {
-            " ⏎ fold them"
-        } else {
-            " ⏎ show them"
-        },
     ]
     .into_iter()
     .map(line)
+    .chain([
+        line(format!(" {needed} are needed and stay on")),
+        line(""),
+        line(fold),
+    ])
     .collect()
 }

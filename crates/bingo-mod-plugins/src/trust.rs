@@ -10,7 +10,7 @@ pub struct Choice {
     pub confirm: bool,
 }
 pub fn press(choice: &mut Choice, p: &CatalogEntry, key: &str) -> Option<crate::verbs::Verb> {
-    let waiting = matches!(crate::groups::state(p), PluginState::Waiting { .. });
+    let waiting = matches!(crate::groups::state(p), Some(PluginState::Waiting { .. }));
     match key {
         "up" => {
             choice.selected = choice.selected.saturating_sub(1);

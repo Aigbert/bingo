@@ -14,7 +14,7 @@ expression: output
 "   plugins · yours  ~/.bingo/plugins                    │ demo-lint                                  process"
 "   ● my-picker            tighten                       │                                                   "
 "   ✗ weather              failed to load                │                                                   "
-"   ○ translate            off                           │ state    ◌ waiting for your yes                   "
+"   ○ translate            off                           │ state    ◌ waits for your yes                     "
 "   plugins · this project  .bingo/plugins               │ version  0.3.1                                    "
 " ❯ ◌ demo-lint            waits for your yes            │ from     .bingo/plugins/demo-lint                 "
 "   plugins · built in  compiled into bingo              │ trust    none yet                                 "

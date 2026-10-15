@@ -20,8 +20,10 @@ pub struct Group {
     pub hint: &'static str,
     pub rows: Vec<Row>,
 }
-pub fn state(plugin: &CatalogEntry) -> PluginState {
-    serde_json::from_value(plugin.meta["state"].clone()).unwrap_or(PluginState::Registering)
+/// A plugin's state, or nothing when this build cannot read what the kernel
+/// said: an unknown state is shown as unknown, never as one it is not.
+pub fn state(plugin: &CatalogEntry) -> Option<PluginState> {
+    serde_json::from_value(plugin.meta["state"].clone()).ok()
 }
 pub fn builtin(plugin: &CatalogEntry) -> bool {
     plugin.meta["from"] == BUILT_IN
@@ -68,37 +70,9 @@ pub fn groups(
     groups
 }
 fn plugin_row(index: usize, p: &CatalogEntry, plugins: &[CatalogEntry]) -> Row {
-    let state = state(p);
-    let glyph = match state {
-        PluginState::Failed { .. } => "✗",
-        PluginState::Waiting { .. } | PluginState::Registering => "◌",
-        _ if state.is_on() => "●",
-        _ => "○",
-    };
-    let tag = match &state {
-        PluginState::Waiting { changed: true } => "changed since your yes".into(),
-        PluginState::Waiting { .. } => "waits for your yes".into(),
-        PluginState::Failed { .. } => "failed to load".into(),
-        PluginState::Registering => "loading …".into(),
-        PluginState::Off { .. } => "off".into(),
-        PluginState::Pending { now, at } => format!(
-            "{} {}",
-            if *now { "off" } else { "on" },
-            match at {
-                bingo_sdk::plugin::NextStart::NextStart => "at next start",
-                bingo_sdk::plugin::NextStart::AfterTurn => "after this turn",
-            }
-        ),
-        PluginState::On if builtin(p) => crate::chain::drawn_over(p, plugins)
-            .map(|owner| format!("under {owner}"))
-            .unwrap_or_else(|| {
-                if p.meta["needed"].is_string() {
-                    "needed".into()
-                } else {
-                    String::new()
-                }
-            }),
-        PluginState::On => p.meta["tier"].as_str().unwrap_or("on").into(),
+    let (glyph, tag) = match state(p) {
+        Some(state) => (glyph(&state), tag(&state, p, plugins)),
+        None => ("?", "unknown".into()),
     };
     Row {
         key: if p.meta["origin"] == "project" {
@@ -110,6 +84,36 @@ fn plugin_row(index: usize, p: &CatalogEntry, plugins: &[CatalogEntry]) -> Row {
         glyph,
         tag,
         kind: Kind::Plugin(index),
+    }
+}
+fn glyph(state: &PluginState) -> &'static str {
+    match state {
+        PluginState::Failed { .. } => "✗",
+        PluginState::Waiting { .. } | PluginState::Registering => "◌",
+        _ if state.is_on() => "●",
+        _ => "○",
+    }
+}
+/// The row's words: the state's own reason where it has one worth a row.
+fn tag(state: &PluginState, p: &CatalogEntry, plugins: &[CatalogEntry]) -> String {
+    match state {
+        PluginState::Waiting { .. } | PluginState::Pending { .. } => {
+            state.reason().unwrap_or_default().into()
+        }
+        PluginState::Failed { .. } => "failed to load".into(),
+        PluginState::Registering => "loading …".into(),
+        PluginState::Off { .. } => "off".into(),
+        PluginState::On if builtin(p) => builtin_tag(p, plugins),
+        PluginState::On => p.meta["tier"].as_str().unwrap_or("on").into(),
+    }
+}
+fn builtin_tag(p: &CatalogEntry, plugins: &[CatalogEntry]) -> String {
+    if let Some(owner) = crate::chain::drawn_over(p, plugins) {
+        format!("under {owner}")
+    } else if p.meta["needed"].is_string() {
+        "needed".into()
+    } else {
+        String::new()
     }
 }
 fn server_group(servers: &[ServerRow]) -> Group {
@@ -180,7 +184,7 @@ fn builtin_group(plugins: &[CatalogEntry], expanded: bool) -> Group {
         .collect::<Vec<_>>();
     let off = builtins
         .iter()
-        .filter(|(_, p)| !matches!(state(p), PluginState::On))
+        .filter(|(_, p)| !matches!(state(p), Some(PluginState::On)))
         .count();
     let under = builtins
         .iter()

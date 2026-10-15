@@ -57,7 +57,7 @@ pub fn tree(
             crate::cards::plugin_card(&props.plugins[*i], &props.plugins, cursor.trust.as_ref())
         }
         Some(Kind::Server(i)) => crate::cards::server_card(&servers[*i], cursor.reviewing),
-        _ => crate::cards::builtins_card(cursor.expanded),
+        _ => crate::cards::builtins_card(&props.plugins, cursor.expanded),
     };
     if width < 100
         && cursor.trust.is_some()
@@ -125,18 +125,34 @@ fn list(groups: &[Group], selected: &str, height: u16) -> View {
             ));
         }
     }
-    let room = usize::from(height);
-    let start = at
-        .saturating_sub(room / 2)
-        .min(rows.len().saturating_sub(room));
     column(
-        rows.into_iter()
-            .skip(start)
-            .take(room)
+        window(rows, at, usize::from(height))
+            .into_iter()
             .map(|row| column(vec![row], Some(1)))
             .collect(),
         Some(height),
     )
+}
+/// The rows that fit around the cursor's; when some do not, the last line
+/// says how many are below, or, at the bottom, how many above.
+fn window(rows: Vec<View>, at: usize, room: usize) -> Vec<View> {
+    let count = rows.len();
+    if count <= room {
+        return rows;
+    }
+    let shown = room.saturating_sub(1);
+    let start = at.saturating_sub(shown / 2).min(count - shown);
+    let below = count - start - shown;
+    let more = if below > 0 {
+        format!("   ↓ {below} more")
+    } else {
+        format!("   ↑ {start} above")
+    };
+    rows.into_iter()
+        .skip(start)
+        .take(shown)
+        .chain(std::iter::once(text(more, None, true)))
+        .collect()
 }
 fn hints(
     kind: Option<&Kind>,
@@ -178,6 +194,16 @@ pub fn footer(bindings: &[crate::verbs::Binding], esc: &str) -> String {
         .chain(std::iter::once(format!("esc {esc}")))
         .collect::<Vec<_>>();
     format!(" {}", parts.join(" · "))
+}
+/// A line no wider than the card, its end replaced by `…` when it was.
+pub fn cut(line: &str, width: usize) -> String {
+    if line.chars().count() <= width {
+        return line.into();
+    }
+    line.chars()
+        .take(width.saturating_sub(1))
+        .chain(std::iter::once('…'))
+        .collect()
 }
 fn column(children: Vec<View>, height: Option<u16>) -> View {
     View::Box {
@@ -239,7 +265,17 @@ fn body(
         room
     };
     let list = list(groups, &cursor.selected, list_height);
-    let card = column(card.into_iter().map(fact_view).collect(), None);
+    let card_width = if width < 100 {
+        width
+    } else {
+        width - width * 56 / 108 - 1
+    };
+    let card = column(
+        card.into_iter()
+            .map(|fact| fact_view(fact, card_width))
+            .collect(),
+        None,
+    );
     if width < 100 {
         column(
             vec![list, text("─".repeat(usize::from(width)), None, true), card],
@@ -250,7 +286,7 @@ fn body(
             children: vec![
                 sized(list, width * 56 / 108),
                 sized(text(vec!["│"; usize::from(room)].join("\n"), None, true), 1),
-                sized(card, width - width * 56 / 108 - 1),
+                sized(card, card_width),
             ],
             layout: Box::new(view::BoxStyle {
                 flex_direction: Some(view::Direction::Row),
@@ -278,13 +314,12 @@ fn header(props: &PluginsProps, servers: usize) -> String {
     )
 }
 
-fn fact_view(fact: crate::cards::Fact) -> View {
+fn fact_view(fact: crate::cards::Fact, width: u16) -> View {
     let Some(aside) = fact.aside else {
-        let mut view = text(
-            fact.text,
-            if fact.error { Some("red") } else { None },
-            false,
-        );
+        if fact.error {
+            return text(cut(&fact.text, usize::from(width)), Some("red"), false);
+        }
+        let mut view = text(fact.text, None, false);
         if let View::Text { style, .. } = &mut view {
             style.wrap = Some("wrap".into());
         }

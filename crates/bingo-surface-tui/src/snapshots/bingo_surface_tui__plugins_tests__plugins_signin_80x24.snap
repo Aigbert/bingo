@@ -9,7 +9,7 @@ expression: output
 "   ● github               stdio · 26 tools                                      "
 " ❯ ○ linear               http · sign in                                        "
 "   ✗ postgres             stdio · failed                                        "
-"   ○ figma                http · off                                            "
+"   ↓ 9 more                                                                     "
 "────────────────────────────────────────────────────────────────────────────────"
 " linear                                                               MCP · http"
 " its tools appear once you sign in                                              "
