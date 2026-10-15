@@ -232,13 +232,13 @@ impl SessionState {
             Event::ItemStarted { .. }
             | Event::ItemUpdated { .. }
             | Event::ItemCompleted { .. }
-            | Event::ItemDelta { .. } => applied,
+            | Event::ItemDelta { .. }
+            | Event::Compacted { .. } => applied,
             Event::QueueChanged { entries, .. } => self.queue_changed(entries),
             Event::InteractionOpened { interaction } => self.interaction_opened(interaction),
             Event::InteractionResolved { id, .. } => self.interaction_closed(id),
             Event::InteractionCancelled { id, .. } => self.interaction_closed(id),
             Event::IntentAck { intent, .. } => Applied::Intent(intent.clone()),
-            Event::Compacted { .. } => applied,
             Event::Rewound { .. } => self.rewound(applied),
             Event::ConfigChanged { config } => self.config_changed(config),
             Event::CatalogChanged { .. } | Event::Unknown { .. } => Applied::Nothing,
