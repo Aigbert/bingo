@@ -8,13 +8,15 @@ this panel can still run an enabled schedule now.
 - ↑/↓ selects a row; space pauses or enables it.
 - r runs it now; a disabled schedule must be resumed first.
 - c confirms a `model` or `unconfirmed` entry as yours after showing its
-  explicit mode; Enter accepts, Escape cancels.
+  whole text and explicit mode; Enter accepts, Escape cancels. A changed text
+  or mode is refused. Hidden control and bidi characters appear as escapes;
+  those entries require a typed `/schedule confirm <id>` instead.
 - d opens a confirmation; Enter forgets it, Escape cancels.
 - → visits its session, or says it has not fired yet.
 - Escape closes the panel.
 
-Forgetting leaves the session and its transcript intact. A concurrent runner
-fire can add one extra turn when you run now.
+Forgetting leaves the session and its transcript intact. A fire in another
+process can add one extra turn when you run now.
 
 With `bingo.mod.schedule` disabled, `/schedule` shows the plain table and
 all command lines still work. The wake row belongs to `/status` independently.

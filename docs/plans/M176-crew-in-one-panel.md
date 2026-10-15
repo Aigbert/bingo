@@ -44,6 +44,7 @@ The three plain tables remain available. Focus comes from the opener receipt.
 - [x] Review regressions: signed action, non-person Pick refusal, confirmed
   dismissal, event-only refresh, render/key interleaving, bounded startup/error
   handling, held shortcuts, Escape cancellation and own-receipt focus.
+- [x] Follow-ups: fetch deadline/order, plain keys/ctrl+d behind held shortcuts, unasked close/cancel refusal.
 - [x] Isolated fake-provider tmux drive of model picker, dismissal and first ctrl+n.
 - [x] Sequential fmt/check/Clippy/workspace tests, discipline, budget, deny,
   TypeScript tests and PTY smoke.
@@ -87,3 +88,36 @@ Round 3 (2026-10-16): sequential fmt/check/Clippy exited 0; `RUST_TEST_THREADS=4
 ## Verified — 2026-10-16
 
 Ran `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash dev` onto 7a759d8a; all five fixups folded, no merge commits. Sequential `cargo fmt/check/clippy`: exit 0; `RUST_TEST_THREADS=4 cargo test --workspace --locked`: 6180 passed, 0 failed, 6 ignored; `discipline ok`; `budget ok` (421 dependencies, core 0s, relink 0 crates, 9 GB advisory); deny: `advisories ok, bans ok, licenses ok, sources ok`; TypeScript: 33 passed; `tui-smoke ok`. `BINGO_UPDATE_SCHEMA=1` generator tests: exit 0, no drift. Windows all-targets checks: sdk/services/collab/core/agents/rooms/tasks/crew/status finished; TUI/bin exit 101, known aws-lc-sys missing stdlib.h/windows.h and rquickjs-sys MSVC flags rejected by clang. Isolated fake-provider tmux at 108×30 showed a working reviewer and its latest line; Escape cancelled stop and kept the list/work active; Enter confirmed stop and the followed card changed to stopped. Owned tmux/home/data removed; no push or merge.
+
+## Verified — 2026-10-16 (follow-ups)
+
+On `followups-lows` from dev d9e065ac. No external dependencies or allowlist changes.
+Every command unsets OPENAI_API_KEY/BASE_URL and ANTHROPIC_API_KEY/BASE_URL; fake/local only.
+Final gates ran sequentially. The Windows criterion stays unticked for the permitted C-toolchain deferral.
+Generators ran with `BINGO_UPDATE_SCHEMA=1`: sdk/plugin-rpc/surface-rpc `--lib --locked` (359 passed),
+then sdk `--test record --locked` (3 passed); schema/ and sdk/typescript have no generated diff.
+
+```text
+cargo fmt --all -- --check: exit 0
+cargo check --workspace --all-targets --locked: Finished dev profile (6.81s)
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev profile (8.61s)
+cargo test --workspace --locked: 6230 passed; 0 failed; 6 ignored
+bash scripts/check_discipline.sh: discipline ok; existing advisory warnings
+bash scripts/budget.sh: dependencies 422/422; core 1s; relink 0; budget ok
+  target/debug 8 GB exceeds soft max 5; cargo clean is the final operation
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok
+bash scripts/tui-smoke.sh: tui-smoke ok
+cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked:
+  bingo-services: Finished dev profile (6.94s); exit 0
+  bingo-schedule: Finished dev profile (6.63s); exit 0
+  bingo-mod-schedule: Finished dev profile (0.37s); exit 0
+  bingo-mod-crew: Finished dev profile (0.72s); exit 0
+  bingo-surface-tui: aws-lc-sys missing stdlib.h/windows.h; exit 101
+  bingo: aws-lc-sys headers and rquickjs-sys MSVC C-toolchain failure; exit 101
+```
+
+The real RPC regression changes the file after the panel emits its digest-bound line and observes refusal.
+TestBackend covers visible escapes and disarmed Enter at 108×30/80×24. The additional isolated tmux
+schedule drive passed: two lines confirmed, U+202E escaped and Enter left provenance unchanged.
+Captures are in M179's dated follow-up note; both owned sockets and disposable homes/data were removed.
+Prior verification history is retained. No push, merge or PR; final cleanup is `cargo clean`.

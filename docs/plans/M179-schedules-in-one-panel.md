@@ -56,15 +56,14 @@ A pending wake appears in Status, counts down, and prefills `/wake off`.
   Existing destination sessions outside the current tree are opened by id.
 - RFC3339 at/next_fire stay on the wire; row_of needs no now. Full row equality pins confirmation;
   live ticks cover other processes/hand edits. Disabling the mod clears its panes.
-- Shared escaping lives in services; services → bingo-digest binds text/mode without a new external
-  dependency. Controls except LF/tab and bidi marks escape; such text cannot arm panel Enter.
+- Services → bingo-digest binds text/mode without external dependencies; shared escaping disarms Enter for controls except LF/tab and for bidi marks.
 - TestBackend controls the clock/styles; real RPC covers fake Wake, delivery/navigation and confirmation.
   This replaces timing-sensitive UI waits in the original combined test. Guides never use docs/guide/.
 
 ## Exit criteria
 
 - [x] Fixtures, byte-for-byte wake payload, row/key tables, all verbs and unasked/disabled/ambiguous refusals.
-- [x] Panel/Table agreement, by column, ownership confirmation with stale-mode rejection, and forget.
+- [x] Panel/Table agreement, escaped controls/bidi, digest-bound text/mode confirmation, and forget.
 - [x] Fake Wake(4m), Status countdown, Composer prefill and cancellation; original RPC/tmux coverage retained.
 - [x] Two-process dormant panel can run once; original run/navigation and disabled-mod fallback remain covered.
 - [x] Failed open stays unspent; late ack/refusal/unwritten stamp fire once; stalls isolated; notice shared.
@@ -147,3 +146,5 @@ Review fixes (2026-10-16, later): spend on open, refusals badged, unwritten stam
 panic frees entry, whole text in panel and listing, ids checked. fmt/check/Clippy ok; tests 6218
 passed, 0 failed, 6 ignored; discipline ok; budget 422/422, core 0s, relink 0; deny ok; tui-smoke
 ok; Windows bingo-schedule + bingo-mod-schedule Finished. No tmux drive of the new confirm view.
+
+Follow-ups — 2026-10-16: own `tmux -L followups-bingo-followups-tqx9tlku -f /dev/null`, fake provider, temp HOME/data. Pane excerpts: `❯ aaaa  every 2h  in 1h  on  model  first visible line  (+1 line)`; c showed `first visible line` / `second visible line` and `⏎ yes`; Enter changed `on  model` to `on  you`. U+202E showed `visible\u{202e}ending` and `cannot confirm here:` with `/schedule confirm bbbb`, without `⏎ yes`; Enter kept `by=tool`. Pane at 108×30; escaped view also at 80×24; owned server/home/data removed. Final native gates passed (6230 tests); Windows C-toolchain deferrals and pasted command summaries are in [M176's follow-up verification](M176-crew-in-one-panel.md).
