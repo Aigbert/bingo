@@ -143,3 +143,89 @@ async fn fork_refuses_a_running_turn() {
     );
     host.shutdown().await;
 }
+
+/// A store that refuses one step for every session but the source.
+struct Refusing {
+    inner: crate::journal::MemoryStore,
+    source: std::sync::Mutex<Option<SessionId>>,
+    step: &'static str,
+}
+
+impl Refusing {
+    fn refuses(&self, id: &SessionId, step: &str) -> Result<(), KernelError> {
+        let source = self.source.lock().unwrap();
+        if step == self.step && source.as_ref().is_some_and(|source| source != id) {
+            return Err(KernelError::new(ErrorCode::Internal, step));
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl SessionStore for Refusing {
+    async fn create(&self, summary: &SessionSummary) -> Result<(), KernelError> {
+        self.inner.create(summary).await
+    }
+    async fn append(&self, id: &SessionId, frame: &Frame) -> Result<(), KernelError> {
+        self.refuses(id, "append")?;
+        self.inner.append(id, frame).await
+    }
+    async fn replay(&self, id: &SessionId, since: Seq) -> Result<Vec<Frame>, KernelError> {
+        self.inner.replay(id, since).await
+    }
+    async fn list(&self, filter: &SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
+        self.inner.list(filter).await
+    }
+    async fn summary(&self, id: &SessionId) -> Result<SessionSummary, KernelError> {
+        self.inner.summary(id).await
+    }
+    async fn delete(&self, id: &SessionId) -> Result<(), KernelError> {
+        self.inner.delete(id).await
+    }
+    async fn release(&self, id: &SessionId) -> Result<(), KernelError> {
+        self.refuses(id, "release")?;
+        self.inner.release(id).await
+    }
+}
+
+/// Forks a one-turn session over a store that refuses `step` for the copy,
+/// and answers the fork's outcome with the sessions left in the store.
+async fn fork_refusing(step: &'static str) -> (Result<SessionId, KernelError>, usize) {
+    let store = Arc::new(Refusing {
+        inner: crate::journal::MemoryStore::new(),
+        source: std::sync::Mutex::new(None),
+        step,
+    });
+    let provider = ScriptedProvider::new(vec![Script::Events(text("one"))]);
+    let host = host_on(store.clone(), provider).await;
+    let mut source = host
+        .open(
+            SessionSelector::Create {
+                spec: spec("/work"),
+            },
+            who(),
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap();
+    one_turn(&mut source, "first").await;
+    *store.source.lock().unwrap() = Some(source.session.clone());
+    let forked = host.fork(&source.session, None).await;
+    let left = store.list(&SessionFilter::default()).await.unwrap().len();
+    host.shutdown().await;
+    (forked, left)
+}
+
+#[tokio::test]
+async fn a_finished_fork_survives_a_failed_release() {
+    let (forked, left) = fork_refusing("release").await;
+    assert!(forked.is_ok(), "{forked:?}");
+    assert_eq!(left, 2, "the copy is complete and stays");
+}
+
+#[tokio::test]
+async fn an_unfinished_fork_is_gone_before_the_error_returns() {
+    let (forked, left) = fork_refusing("append").await;
+    assert_eq!(forked.unwrap_err().message, "append");
+    assert_eq!(left, 1, "only the source remains");
+}

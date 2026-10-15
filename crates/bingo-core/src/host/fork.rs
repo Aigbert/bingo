@@ -26,20 +26,35 @@ pub(super) async fn fork_session(
     crate::fork::root(&mut summary, &id, &link);
     summary.created_at = Timestamp::now();
     summary.updated_at = summary.created_at;
+    // The copy runs to its end even if the caller stops waiting, so a
+    // cancelled fork never strands half a journal.
+    tokio::spawn(write_fork(store, id, frames, summary))
+        .await
+        .map_err(|error| KernelError::new(ErrorCode::Internal, error.to_string()))?
+}
+
+/// A fork is complete once its last frame lands: a failure before that
+/// removes the copy here, and a failure after it never does.
+async fn write_fork(
+    store: Arc<dyn SessionStore>,
+    id: SessionId,
+    frames: Vec<Frame>,
+    summary: SessionSummary,
+) -> Result<SessionId, KernelError> {
     store.create(&summary).await?;
-    let mut journal = ForkJournal {
-        store: store.clone(),
-        id: id.clone(),
-        committed: false,
+    let copied = match store.acquire(&id).await {
+        Ok(()) => append_fork(store.as_ref(), &id, frames, summary).await,
+        Err(error) => Err(error),
     };
-    store.acquire(&id).await?;
-    if let Err(error) = append_fork(store.as_ref(), &id, frames, summary).await {
-        let _ = store.delete(&id).await;
-        journal.committed = true;
+    if let Err(error) = copied {
+        if let Err(cleanup) = store.delete(&id).await {
+            tracing::warn!(%cleanup, session = %id, "an incomplete fork was left behind");
+        }
         return Err(error);
     }
-    store.release(&id).await?;
-    journal.committed = true;
+    if let Err(error) = store.release(&id).await {
+        tracing::warn!(%error, session = %id, "a finished fork kept its claim");
+    }
     Ok(id)
 }
 
@@ -65,25 +80,6 @@ async fn append_fork(
             },
         )
         .await
-}
-
-/// Cancellation drops the unfinished copy as well as the caller's future.
-struct ForkJournal {
-    store: Arc<dyn SessionStore>,
-    id: SessionId,
-    committed: bool,
-}
-impl Drop for ForkJournal {
-    fn drop(&mut self) {
-        if self.committed {
-            return;
-        }
-        let store = self.store.clone();
-        let id = self.id.clone();
-        tokio::spawn(async move {
-            let _ = store.delete(&id).await;
-        });
-    }
 }
 
 fn forkable(state: &SessionState) -> Result<(), KernelError> {
