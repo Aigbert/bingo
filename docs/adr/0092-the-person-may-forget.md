@@ -23,7 +23,7 @@ store's write side. No kernel door; the ratchet does not arise.
    store call `ExperienceForget` makes. Instant; the panel's `d` asks
    once and runs the line.
 4. **A write side for forget alone**: a pure `unlink(index, file)` and a
-   temp-then-rename swap of the index. No slug maker, no index parser.
+   temp-then-rename swap of the index before unlinking. No slug maker, no index parser.
 5. **Two typed services**, `bingo_services::{memory, experience}`: list
    (instruction files with estimated tokens), read and forget; the commands
    call the same functions.
@@ -39,3 +39,5 @@ Refs: ADR-0014, ADR-0044, ADR-0048, ADR-0049, ADR-0082, ADR-0086, ADR-0088.
 
 M178 clarification of ADR-0088: native, wire-free static `Pages` are catalogue
 content, not a running service. Registering a guide does not defer a mod switch.
+
+The wire caller supplying cwd is trusted like the CLI.
