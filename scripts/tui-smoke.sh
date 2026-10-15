@@ -169,7 +169,7 @@ step 'the model picker opens and gives the composer back'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '/model' Enter
 await '↑↓ pick'
-await 'rect ▾'
+await 'own place ▾'
 keys Escape
 vanish '↑↓ pick'
 finish

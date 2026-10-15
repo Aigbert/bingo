@@ -3,12 +3,13 @@ use super::{seat, wanted};
 use crate::ui::Ui;
 use bingo_sdk::{SessionState, slot::Place};
 
+/// The focused title's words for a seat; a person never reads the layout's own names.
 pub fn label(place: Place) -> &'static str {
     match place {
         Place::Above => "above ▾",
         Place::Side => "side ▾",
         Place::Overlay => "overlay ▾",
-        Place::Rect(_) => "rect ▾",
+        Place::Rect(_) => "own place ▾",
     }
 }
 pub fn cycle(ui: &mut Ui, state: &SessionState, key: &str) {
@@ -48,5 +49,18 @@ pub fn cycle(ui: &mut Ui, state: &SessionState, key: &str) {
             ui.placed.panes.moved.insert(key.into(), choice);
             return;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn a_pane_that_chose_its_place_says_so_in_words() {
+        let place: Place = serde_json::from_value(
+            serde_json::json!({"rect":{"anchor":"bottomRight","width":"40%","height":"30%"}}),
+        )
+        .unwrap();
+        assert_eq!(label(place), "own place ▾");
     }
 }
