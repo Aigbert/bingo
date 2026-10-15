@@ -367,3 +367,29 @@ async fn a_key_outrunning_the_redraw_acts_on_nothing() {
     );
     host.shutdown().await;
 }
+/// The cursor a key moves is the one the kernel's session names, never a
+/// session written into the drawing's props.
+#[tokio::test]
+async fn a_key_moves_the_cursor_of_the_session_it_came_from() {
+    let home = tempfile::tempdir().unwrap();
+    let row = Arc::new(std::sync::Mutex::new(
+        serde_json::from_value(json!({
+            "name":"local", "transport":{"type":"stdio","command":"fixture"},
+            "status":{"kind":"disabled"}
+        }))
+        .unwrap(),
+    ));
+    let (host, mut attachment) = facts_scene(home.path(), row).await;
+    let View::Box { mut layout, .. } = panel(&host, &attachment).await else {
+        panic!("panel")
+    };
+    let mut action = layout.on_key.take().unwrap();
+    action.args["props"]["session"] = json!("ses_elsewhere");
+    action.args["value"] = json!({"key":"down"});
+    let IntentOutcome::Applied { .. } = submit(&mut attachment, Input::Action { action }).await
+    else {
+        panic!("handled")
+    };
+    assert!(backend(panel(&host, &attachment).await).contains("❯  ▸ 2 built in"));
+    host.shutdown().await;
+}
