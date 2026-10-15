@@ -144,52 +144,87 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
     if crate::palette::active(&run.ui)
         && crate::palette::request(&run.ui) == Some(pending.focus.as_str())
     {
-        if let IntentOutcome::Applied { result } = outcome {
-            let now = run.detection.now();
-            let effects = if let Ok(action) =
-                serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
-            {
-                crate::palette::result(&mut run.ui, &run.session.tree, &action, now)
-            } else if result["handled"] == false {
-                input::palette_edit(&mut run.ui, &run.session.tree, pending.key, now)
-            } else {
-                Vec::new()
-            };
-            run.apply(effects);
-        }
+        palette_answer(run, &pending, outcome);
         return;
     }
-    if let Some((_, open)) = run.session.tree.open_interaction()
-        && open.id.as_str() == pending.focus
-        && matches!(
+    if interaction_answer(run, &pending, outcome) || interaction_unhandled(run, &pending, outcome) {
+        return;
+    }
+    pane_unhandled(run, &pending, outcome);
+}
+
+/// The palette's site either picked an action or handed the key back to
+/// the palette's own editing.
+fn palette_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
+    let IntentOutcome::Applied { result } = outcome else {
+        return;
+    };
+    let now = run.detection.now();
+    let effects = if let Ok(action) =
+        serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
+    {
+        crate::palette::result(&mut run.ui, &run.session.tree, &action, now)
+    } else if result["handled"] == false {
+        input::palette_edit(&mut run.ui, &run.session.tree, pending.key, now)
+    } else {
+        Vec::new()
+    };
+    run.apply(effects);
+}
+
+/// A key the open question's site turned into one of the offered answers.
+fn interaction_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) -> bool {
+    let Some((_, open)) = run.session.tree.open_interaction() else {
+        return false;
+    };
+    if open.id.as_str() != pending.focus
+        || !matches!(
             open.kind,
             bingo_sdk::InteractionKind::Question(_) | bingo_sdk::InteractionKind::Form { .. }
         )
-        && let IntentOutcome::Applied { result } = outcome
-        && let Ok(answer) = serde_json::from_value::<bingo_sdk::Answer>(result["answer"].clone())
-        && open.answers.contains(&answer.spec())
     {
-        let interaction = open.id.clone();
-        run.ui.dialog.answered = true;
-        run.site_queue.retain(|(site, _)| site != &pending.focus);
-        super::interactions::answer(run, interaction, answer, bingo_sdk::Activation::Keyboard);
-        return;
+        return false;
     }
-    if let Some((_, open)) = run.session.tree.open_interaction()
-        && open.id.as_str() == pending.focus
-        && !run.ui.dialog.aside
-        && matches!(outcome, IntentOutcome::Applied { result } if result["handled"] == false)
-    {
-        let effects = input::interaction_unhandled(
-            &mut run.ui,
-            &run.session.tree,
-            pending.key,
-            run.detection.now(),
-        );
-        run.apply(effects);
-        return;
+    let IntentOutcome::Applied { result } = outcome else {
+        return false;
+    };
+    let Ok(answer) = serde_json::from_value::<bingo_sdk::Answer>(result["answer"].clone()) else {
+        return false;
+    };
+    if !open.answers.contains(&answer.spec()) {
+        return false;
     }
-    if matches!(outcome, IntentOutcome::Applied { result } if result["handled"] == false)
+    let interaction = open.id.clone();
+    run.ui.dialog.answered = true;
+    run.site_queue.retain(|(site, _)| site != &pending.focus);
+    super::interactions::answer(run, interaction, answer, bingo_sdk::Activation::Keyboard);
+    true
+}
+
+/// A key the open interaction's site left alone goes to the dialog itself.
+fn interaction_unhandled(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) -> bool {
+    let focused = run
+        .session
+        .tree
+        .open_interaction()
+        .is_some_and(|(_, open)| open.id.as_str() == pending.focus);
+    if !focused || run.ui.dialog.aside || !unhandled(outcome) {
+        return false;
+    }
+    let effects = input::interaction_unhandled(
+        &mut run.ui,
+        &run.session.tree,
+        pending.key,
+        run.detection.now(),
+    );
+    run.apply(effects);
+    true
+}
+
+/// A key a pane's site left alone goes to the pane's own keys, while that
+/// pane is still the one in focus.
+fn pane_unhandled(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
+    if unhandled(outcome)
         && pending.session == run.session.tree.viewed().summary.id
         && matches!(&run.ui.focus, crate::focus::Focus::Pane(key) if key == &pending.focus)
     {
@@ -201,6 +236,10 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
         );
         run.apply(effects);
     }
+}
+
+fn unhandled(outcome: &IntentOutcome) -> bool {
+    matches!(outcome, IntentOutcome::Applied { result } if result["handled"] == false)
 }
 
 pub(super) fn notices(run: &mut Run) {
