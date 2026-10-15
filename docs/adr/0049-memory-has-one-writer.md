@@ -68,3 +68,7 @@ No kernel door is asked for; two are closed.
 
 Amends ADR-0044 §5 and §6, ADR-0006 §7 (the hook and its switch), and the
 word "extractor" in ADR-0014 §1.
+
+M178 amendment (ADR-0092): the person may read and forget through typed services
+and a built-in panel. Forget removes the file and atomically replaces its index;
+it adds no authoring path and the model remains the only author.

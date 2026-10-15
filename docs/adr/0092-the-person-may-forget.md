@@ -1,6 +1,6 @@
 # ADR-0092 — The person may read and forget
 
-Status: proposed · 2026-10-15 · Plan: M178 · Amends: ADR-0049 §1, §5; ADR-0014
+Status: accepted · 2026-10-15 · Plan: M178 · Amends: ADR-0049 §1, §5; ADR-0014; ADR-0088 §1
 
 ## Context
 
@@ -25,7 +25,7 @@ store's write side. No kernel door; the ratchet does not arise.
 4. **A write side for forget alone**: a pure `unlink(index, file)` and a
    temp-then-rename swap of the index. No slug maker, no index parser.
 5. **Two typed services**, `bingo_services::{memory, experience}`: list
-   (instruction files with estimated tokens) and forget; the commands
+   (instruction files with estimated tokens), read and forget; the commands
    call the same functions.
 
 ## Consequences
@@ -36,3 +36,6 @@ store's write side. No kernel door; the ratchet does not arise.
 - Token sizes are estimates, labelled `about`.
 
 Refs: ADR-0014, ADR-0044, ADR-0048, ADR-0049, ADR-0082, ADR-0086, ADR-0088.
+
+M178 clarification of ADR-0088: native, wire-free static `Pages` are catalogue
+content, not a running service. Registering a guide does not defer a mod switch.
