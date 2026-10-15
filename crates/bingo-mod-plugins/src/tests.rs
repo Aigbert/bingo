@@ -524,6 +524,30 @@ fn a_long_origin_keeps_its_start_and_end() {
     assert!(card.iter().any(|fact| fact.text.ends_with(&cut)));
 }
 
+/// A long command line would wrap under the card's keys; it keeps the
+/// program and its end, as a long origin does.
+#[test]
+fn a_long_command_keeps_its_program_and_its_end() {
+    let (_, mut servers) = fixture();
+    servers[0].transport = bingo_services::mcp::Transport::Stdio {
+        command: "/bin/sh".into(),
+        args: vec![
+            "-c".into(),
+            "touch /a/very/long/path/that/would/wrap/under/the/card/MARKER; sleep 30".into(),
+        ],
+        env: Default::default(),
+        cwd: None,
+    };
+    let card = cards::server_card(&servers[0], false);
+    let runs = card
+        .iter()
+        .find(|fact| fact.text.starts_with(" runs "))
+        .expect("a runs row");
+    let value = runs.text.trim_start_matches(" runs").trim_start();
+    assert_eq!(value.chars().count(), 38, "{value}");
+    assert!(value.starts_with("/bin/sh -c") && value.ends_with("sleep 30"));
+}
+
 #[test]
 fn a_failed_server_card_says_its_last_stderr_line() {
     let (_, servers) = fixture();
@@ -620,4 +644,11 @@ fn only_a_built_in_that_draws_a_site_falls_back_to_the_plain_drawing() {
         !plain(&plugins[0], &plugins),
         "an outside mod is not built in"
     );
+}
+
+#[test]
+fn one_server_is_counted_as_one() {
+    assert_eq!(crate::draw::counted(1, "MCP server"), "1 MCP server");
+    assert_eq!(crate::draw::counted(2, "plugin"), "2 plugins");
+    assert_eq!(crate::draw::counted(0, "plugin"), "0 plugins");
 }

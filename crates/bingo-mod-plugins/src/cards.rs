@@ -38,9 +38,9 @@ fn errors(why: &str) -> Vec<Fact> {
         .chain(why.lines().map(error))
         .collect()
 }
-/// Where a path came from fits beside its key: its start and its end say
+/// A path or a command line fits beside its key: its start and its end say
 /// which one it is, so the middle goes.
-const FROM: usize = 38;
+const BESIDE: usize = 38;
 pub fn middle(text: &str, width: usize) -> String {
     let count = text.chars().count();
     if count <= width {
@@ -67,7 +67,7 @@ pub fn plugin_card(
         "version",
         p.meta["version"].as_str().unwrap_or("unknown"),
     ));
-    rows.push(fact("from", middle(&origin(p), FROM)));
+    rows.push(fact("from", middle(&origin(p), BESIDE)));
     rows.extend(contributions(p));
     for site in crate::chain::sites(p) {
         rows.push(fact("draws", &site));
@@ -247,11 +247,11 @@ pub fn server_card(s: &ServerRow, reviewing: bool) -> Vec<Fact> {
         } else {
             "runs"
         },
-        s.transport.runs(),
+        middle(&s.transport.runs(), BESIDE),
     ));
     rows.push(fact(
         "from",
-        middle(s.origin.as_deref().unwrap_or("configured settings"), FROM),
+        middle(s.origin.as_deref().unwrap_or("configured settings"), BESIDE),
     ));
     rows.push(fact("sign-in", sign_in(s)));
     if let Some(ms) = s.latency {

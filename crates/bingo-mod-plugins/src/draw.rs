@@ -303,15 +303,24 @@ fn header(props: &PluginsProps, servers: usize) -> String {
     } else {
         "plugins"
     };
+    let plugins = props
+        .plugins
+        .iter()
+        .filter(|p| !p.id.starts_with("mcp:"))
+        .count();
     format!(
-        " {title}   {} plugins · {} MCP servers · one list",
-        props
-            .plugins
-            .iter()
-            .filter(|p| !p.id.starts_with("mcp:"))
-            .count(),
-        servers
+        " {title}   {} · {} · one list",
+        counted(plugins, "plugin"),
+        counted(servers, "MCP server")
     )
+}
+
+pub(crate) fn counted(n: usize, noun: &str) -> String {
+    if n == 1 {
+        format!("1 {noun}")
+    } else {
+        format!("{n} {noun}s")
+    }
 }
 
 fn fact_view(fact: crate::cards::Fact, width: u16) -> View {
