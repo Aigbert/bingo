@@ -26,7 +26,8 @@ impl Hook for Refresh {
                 | Event::SessionUpdated { .. }
                 | Event::TurnUsage { .. }
                 | Event::UsageCharged { .. }
-        ) {
+        ) && !matches!(&frame.event, Event::Extension { plugin, .. } if plugin == "bingo.schedule")
+        {
             return;
         }
         let open = self.0.lock().is_ok_and(|s| s.contains_key(&frame.session));

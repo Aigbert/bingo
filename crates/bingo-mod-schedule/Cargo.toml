@@ -1,0 +1,25 @@
+[package]
+name = "bingo-mod-schedule"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Manage schedules in one panel"
+
+[lints]
+workspace = true
+
+[dependencies]
+tokio.workspace = true
+jiff.workspace = true
+bingo-services.workspace = true
+bingo-sdk.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+bingo-sdk = { workspace = true, features = ["testing"] }
+tempfile.workspace = true

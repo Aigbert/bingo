@@ -271,6 +271,7 @@ dependencies = [
  "bingo-mod-models",
  "bingo-mod-palette",
  "bingo-mod-plugins",
+ "bingo-mod-schedule",
  "bingo-mod-sessions",
  "bingo-mod-status",
  "bingo-mods",
@@ -727,6 +728,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "bingo-mod-schedule"
+version = "0.6.6"
+dependencies = [
+ "async-trait",
+ "bingo-sdk",
+ "bingo-services",
+ "jiff",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "bingo-mod-sessions"
 version = "0.6.6"
 dependencies = [
@@ -747,6 +762,7 @@ dependencies = [
  "async-trait",
  "bingo-sdk",
  "bingo-services",
+ "jiff",
  "serde",
  "serde_json",
  "tokio",
@@ -1149,10 +1165,12 @@ dependencies = [
  "bingo-mod-models",
  "bingo-mod-palette",
  "bingo-mod-plugins",
+ "bingo-mod-schedule",
  "bingo-mod-sessions",
  "bingo-mod-status",
  "bingo-pictures",
  "bingo-provider-fake",
+ "bingo-schedule",
  "bingo-sdk",
  "bingo-services",
  "bingo-tasks",

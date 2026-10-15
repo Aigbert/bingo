@@ -747,7 +747,7 @@ fn plugins(
     Ok(all)
 }
 
-fn builtin_mods() -> [Box<dyn Plugin>; 9] {
+fn builtin_mods() -> [Box<dyn Plugin>; 10] {
     [
         Box::new(bingo_mod_ask::Ask),
         Box::new(bingo_mod_palette::Palette),
@@ -758,6 +758,7 @@ fn builtin_mods() -> [Box<dyn Plugin>; 9] {
         Box::new(bingo_mod_status::Status::default()),
         Box::new(bingo_mod_models::Models),
         Box::new(bingo_mod_crew::Crew::default()),
+        Box::new(bingo_mod_schedule::SchedulePanel::default()),
     ]
 }
 

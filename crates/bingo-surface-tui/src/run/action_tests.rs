@@ -340,7 +340,7 @@ async fn a_surface_action_prefills_the_composer_without_submitting() {
     let now = still(scene().1);
     let session = Arc::new(TestSession::default());
     let mut run = tests::idle_in(state(), session.clone(), now.instant);
-    for text in ["/rename ", "/permission "] {
+    for text in ["/rename ", "/permission ", "/wake off"] {
         run.ui.composer.set("");
         surface::receipt(
             &mut run,
@@ -355,7 +355,7 @@ async fn a_surface_action_prefills_the_composer_without_submitting() {
 async fn a_composer_action_preserves_an_existing_draft_and_explains_why() {
     let now = still(scene().1);
     let session = Arc::new(TestSession::default());
-    for text in ["/rename ", "/permission "] {
+    for text in ["/rename ", "/permission ", "/wake off"] {
         let mut run = tests::idle_in(state(), session.clone(), now.instant);
         run.ui.composer.set("my unfinished draft");
         surface::receipt(

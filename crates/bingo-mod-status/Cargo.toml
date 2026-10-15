@@ -12,6 +12,7 @@ description = "The live session status hub"
 workspace = true
 
 [dependencies]
+jiff.workspace = true
 bingo-sdk.workspace = true
 bingo-services.workspace = true
 serde.workspace = true

@@ -238,3 +238,45 @@ fn server_row(servers: &[ServerRow]) -> Row {
     }
     result
 }
+
+pub fn wake(
+    pending: Option<&bingo_services::schedule::Pending>,
+    now: jiff::Timestamp,
+) -> Option<Row> {
+    let pending = pending?;
+    let at: jiff::Timestamp = pending.at.parse().ok()?;
+    let seconds = (at.as_second() - now.as_second()).max(0);
+    let remaining = if (60..3600).contains(&seconds) && seconds % 60 != 0 {
+        format!("in {}m {}s", seconds / 60, seconds % 60)
+    } else {
+        bingo_sdk::until(now, at)
+    };
+    Some(Row {
+        label: "wake".into(),
+        value: vec![Span {
+            text: format!("{remaining} · {}", pending.note),
+            tone: Tone::Warn,
+        }],
+        detail: None,
+        command: Some("wake off".into()),
+    })
+}
+#[cfg(test)]
+mod wake_tests {
+    use super::*;
+    #[test]
+    fn none_future_and_past_due() {
+        let now = jiff::Timestamp::UNIX_EPOCH;
+        assert!(wake(None, now).is_none());
+        for (at, expected) in [(240, "in 4m"), (220, "in 3m 40s"), (-1, "due now")] {
+            let pending = bingo_services::schedule::Pending {
+                at: jiff::Timestamp::from_second(at).unwrap().to_string(),
+                note: "check".into(),
+            };
+            let row = wake(Some(&pending), now).unwrap();
+            assert_eq!(row.value[0].text, format!("{expected} · check"));
+            assert_eq!(row.value[0].tone, Tone::Warn);
+            assert_eq!(row.command.as_deref(), Some("wake off"));
+        }
+    }
+}

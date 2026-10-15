@@ -52,7 +52,10 @@ impl Default for Status {
 static MANIFEST: PluginManifest = PluginManifest {
     id: ID,
     version: env!("CARGO_PKG_VERSION"),
-    uses: &[bingo_services::mcp::CAPABILITY],
+    uses: &[
+        bingo_services::mcp::CAPABILITY,
+        bingo_services::schedule::CAPABILITY,
+    ],
     requires: &[],
     provides: &[
         "command:bingo.mod.status:ui",

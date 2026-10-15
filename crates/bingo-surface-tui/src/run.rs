@@ -2844,3 +2844,10 @@ mod memory_tests;
 
 #[cfg(test)]
 mod pane_focus_tests;
+
+#[cfg(test)]
+mod schedule_scene_tests;
+
+#[cfg(test)]
+#[path = "run/tests/schedule.rs"]
+mod schedule_tests;

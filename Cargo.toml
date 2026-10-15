@@ -19,6 +19,7 @@ bingo-mod-browse = { path = "crates/bingo-mod-browse" }
 bingo-mod-crew = { path = "crates/bingo-mod-crew" }
 bingo-mod-status = { path = "crates/bingo-mod-status" }
 bingo-mod-models = { path = "crates/bingo-mod-models" }
+bingo-mod-schedule = { path = "crates/bingo-mod-schedule" }
 bingo-mod-ask = { path = "crates/bingo-mod-ask" }
 bingo-mod-hello = { path = "crates/bingo-mod-hello" }
 bingo-mods = { path = "crates/bingo-mods" }

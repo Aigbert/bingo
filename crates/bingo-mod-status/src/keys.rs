@@ -73,8 +73,12 @@ async fn enter(
         .and_then(|r| r.command.as_ref());
     if let Some(command) = command {
         crate::command::close(&cx.host, &cx.session, selections).await?;
-        if matches!(command.as_str(), "rename" | "permission") {
-            let text = format!("/{command} ");
+        if matches!(command.as_str(), "rename" | "permission" | "wake off") {
+            let text = if command == "wake off" {
+                "/wake off".into()
+            } else {
+                format!("/{command} ")
+            };
             return Ok(CommandOutcome::Surface {
                 action: Action {
                     name: "Composer".into(),

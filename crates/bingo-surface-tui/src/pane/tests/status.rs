@@ -177,3 +177,37 @@ fn bingo_mod_status_slot() -> serde_json::Value {
         }],
     )
 }
+
+#[test]
+fn wake_row_counts_down_in_the_status_card_and_disappears() {
+    for (width, height) in [(108, 30), (80, 24)] {
+        let (mut state, plugins) = scenario("overview");
+        let (mut ui, mut now) = scene();
+        ui.focus =
+            crate::focus::Focus::Pane(format!("{}/bingo.mod.status/status", state.summary.id));
+        let pending = bingo_services::schedule::Pending {
+            at: (now.wall + jiff::SignedDuration::from_mins(4)).to_string(),
+            note: "check CI".into(),
+        };
+        for (seconds, expected) in [(0, "in 4m"), (20, "in 3m 40s")] {
+            now.wall += jiff::SignedDuration::from_secs(seconds);
+            let mut rows = rows::rows(&(&state).into(), &plugins, &[], None);
+            rows.insert(3, rows::wake(Some(&pending), now.wall).unwrap());
+            put(
+                &mut state,
+                draw::tree(&rows, "wake", width, (height - 4) / 2, 0),
+                height,
+            );
+            let screen = draw_tree(width, height, &solo(&state), &mut ui, now);
+            assert!(screen.contains(expected), "{screen}");
+            assert!(screen.contains("/wake off"), "{screen}");
+        }
+        let rows = rows::rows(&(&state).into(), &plugins, &[], None);
+        put(
+            &mut state,
+            draw::tree(&rows, "wake", width, (height - 4) / 2, 0),
+            height,
+        );
+        assert!(!draw_tree(width, height, &solo(&state), &mut ui, now).contains("check CI"));
+    }
+}

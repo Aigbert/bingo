@@ -74,7 +74,15 @@ pub(crate) async fn read(
         Some(service) => service.rows().await,
         None => vec![],
     };
-    Ok(crate::rows::rows(state, &plugins.entries, &servers, price))
+    let mut rows = crate::rows::rows(state, &plugins.entries, &servers, price);
+    let pending = match bingo_services::schedule::find(host) {
+        Some(service) => service.pending(state.summary.id.clone()).await?,
+        None => None,
+    };
+    if let Some(wake) = crate::rows::wake(pending.as_ref(), jiff::Timestamp::now()) {
+        rows.insert(3, wake);
+    }
+    Ok(rows)
 }
 pub fn tree(rows: &[Row], selected: &str, columns: u16, height: u16, uptime: u64) -> View {
     let selected = crate::keys::selected(rows, selected);
@@ -124,6 +132,7 @@ fn hint(row: &Row) -> &str {
         "permission" => "change mode",
         "plugins" => "/plugins",
         "mcp" => "/mcp",
+        "wake" => "/wake off",
         _ => "revoke",
     }
 }
