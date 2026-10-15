@@ -267,6 +267,9 @@ pub enum Voice {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Origin {
+    /// Drawing family of the caller, independent of its attribution identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub render_surface: Option<crate::render::SurfaceName>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voice: Option<Voice>,
     pub surface: String,
@@ -277,6 +280,11 @@ pub struct Origin {
 }
 
 impl Origin {
+    pub fn on(mut self, surface: crate::render::SurfaceName) -> Self {
+        self.render_surface = Some(surface);
+        self
+    }
+
     pub fn voiced(mut self, voice: Voice) -> Self {
         self.voice = Some(voice);
         self
@@ -289,6 +297,7 @@ impl Origin {
 
     pub fn surface(name: impl Into<String>) -> Self {
         Self {
+            render_surface: None,
             voice: None,
             surface: name.into(),
             principal: None,

@@ -14,6 +14,7 @@ async fn a_peer_at_the_barrier_preserves_the_previous_request_prefix() {
     );
     let host = RecordingHost::new();
     let origin = Origin {
+        render_surface: None,
         voice: None,
         surface: "peer".into(),
         principal: Some("reviewer".into()),
@@ -75,6 +76,7 @@ fn a_nudge_then_a_line() -> Vec<Frame> {
             1,
             "itm_nudge",
             Origin {
+                render_surface: None,
                 voice: None,
                 surface: "peer".into(),
                 principal: None,

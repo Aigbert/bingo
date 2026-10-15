@@ -327,6 +327,7 @@ pub fn delivered(id: &str, surface: &str, principal: Option<&str>, text: &str) -
         ItemBody::User {
             parts: vec![ContentPart::text(text)],
             origin: Origin {
+                render_surface: None,
                 voice: None,
                 surface: surface.into(),
                 principal: principal.map(str::to_owned),
@@ -353,6 +354,7 @@ pub fn post(id: &str, principal: &str, text: &str) -> Item {
         ItemBody::User {
             parts: vec![ContentPart::text(text)],
             origin: Origin {
+                render_surface: None,
                 voice: None,
                 surface: "room".into(),
                 principal: Some(principal.into()),

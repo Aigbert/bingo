@@ -16,7 +16,7 @@ use bingo_sdk::{Delivery, Image, Input, Level, Origin, SessionHandle};
 
 use super::{Reply, Run};
 use crate::pictures::Held;
-use crate::{SURFACE_ID, complete, history};
+use crate::{complete, history};
 
 /// A submitted line waiting on the pictures it named. It carries the mailbox
 /// it was typed at, so a person who switches session while a picture is in
@@ -180,7 +180,7 @@ impl Run {
         let Some(handle) = self.session.writer() else {
             return self.not_yet();
         };
-        self.send_line(handle, Input::text(text, Origin::surface(SURFACE_ID)));
+        self.send_line(handle, Input::text(text, crate::origin()));
     }
 
     /// A refused line comes back named by its words.

@@ -30,6 +30,11 @@ pub struct ClientIdentity {
     pub name: String,
     pub surface: String,
 }
+impl ClientIdentity {
+    pub fn render_surface(&self) -> Option<crate::render::SurfaceName> {
+        serde_json::from_value(serde_json::Value::String(self.surface.clone())).ok()
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

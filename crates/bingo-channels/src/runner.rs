@@ -807,6 +807,7 @@ mod tests {
 
 fn incoming_origin(principal: &str, conversation: &str) -> Origin {
     Origin {
+        render_surface: None,
         voice: Some(bingo_sdk::Voice::Said),
         surface: SURFACE_ID.into(),
         principal: Some(principal.into()),

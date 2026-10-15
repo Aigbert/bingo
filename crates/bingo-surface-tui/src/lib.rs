@@ -406,3 +406,20 @@ mod plugins_tests;
 
 #[cfg(test)]
 mod plugins_keys_tests;
+
+pub(crate) fn origin() -> bingo_sdk::Origin {
+    bingo_sdk::Origin::surface(SURFACE_ID).on(bingo_sdk::render::SurfaceName::Terminal)
+}
+
+#[cfg(test)]
+mod caller_tests {
+    #[test]
+    fn a_terminal_origin_keeps_its_kind_when_its_id_changes() {
+        let mut origin = super::origin();
+        origin.surface = "renamed-surface-id".into();
+        assert_eq!(
+            origin.render_surface,
+            Some(bingo_sdk::render::SurfaceName::Terminal)
+        );
+    }
+}

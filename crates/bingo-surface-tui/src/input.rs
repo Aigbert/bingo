@@ -7,9 +7,7 @@
 
 use std::path::PathBuf;
 
-use bingo_sdk::{
-    Delivery, Input, IntentId, Level, Origin, SessionSelector, SessionSpec, SessionState,
-};
+use bingo_sdk::{Delivery, Input, IntentId, Level, SessionSelector, SessionSpec, SessionState};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::SURFACE_ID;
@@ -499,12 +497,7 @@ fn rewind_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect>
             }
             ui.focus.close(now.instant);
             return chosen
-                .map(|line| {
-                    vec![Effect::Submit(Input::text(
-                        line,
-                        Origin::surface(SURFACE_ID),
-                    ))]
-                })
+                .map(|line| vec![Effect::Submit(Input::text(line, crate::origin()))])
                 .unwrap_or_default();
         }
         _ => {}
@@ -832,7 +825,7 @@ fn own_line(text: String, delivery: Delivery) -> Effect {
     Effect::Submit(Input::Text {
         images: Vec::new(),
         text,
-        origin: Origin::surface(SURFACE_ID),
+        origin: crate::origin(),
         delivery,
     })
 }
@@ -1023,7 +1016,7 @@ mod tests {
             vec![Effect::Submit(Input::Text {
                 text: "look at @shot.png".into(),
                 images: Vec::new(),
-                origin: Origin::surface(SURFACE_ID),
+                origin: crate::origin(),
                 delivery: Delivery::Wake,
             })],
         );
@@ -1056,7 +1049,7 @@ mod tests {
             vec![Effect::Submit(Input::Text {
                 text: "see [image 1]".into(),
                 images: Vec::new(),
-                origin: Origin::surface(SURFACE_ID),
+                origin: crate::origin(),
                 delivery: Delivery::Wake,
             })],
         );
@@ -1117,7 +1110,7 @@ mod tests {
             effects,
             vec![Effect::Submit(Input::text(
                 "/rewind trn_1",
-                Origin::surface(SURFACE_ID),
+                crate::origin(),
             ))],
             "the second row is the older turn"
         );
@@ -1199,7 +1192,7 @@ mod tests {
             let (mut ui, now) = scene();
             assert_eq!(
                 line(&mut ui, &state(), text, now),
-                vec![Effect::Submit(Input::text(text, Origin::surface("tui")))],
+                vec![Effect::Submit(Input::text(text, crate::origin()))],
                 "{text}"
             );
         }
@@ -2694,7 +2687,7 @@ mod tests {
                             bingo_sdk::ContentPart::text("what is this? [image 1]"),
                             bingo_sdk::ContentPart::Image(bingo_pictures::testing::png(100, 200)),
                         ],
-                        origin: bingo_sdk::Origin::surface("tui"),
+                        origin: crate::origin(),
                     },
                 ),
             },
@@ -2876,7 +2869,7 @@ mod tests {
         let (mut ui, now) = scene();
         assert_eq!(
             line(&mut ui, &state, "again", now),
-            vec![Effect::Submit(Input::text("again", Origin::surface("tui")))]
+            vec![Effect::Submit(Input::text("again", crate::origin()))]
         );
     }
 
@@ -3003,7 +2996,7 @@ mod tests {
                             position: i as u32 + 1,
                             preview: (*preview).to_string(),
                             steerable: true,
-                            origin: Origin::surface(*surface),
+                            origin: bingo_sdk::Origin::surface(*surface),
                         })
                         .collect(),
                 },

@@ -207,7 +207,7 @@ struct Run {
 pub(crate) fn identity() -> ClientIdentity {
     ClientIdentity {
         name: SURFACE_ID.into(),
-        surface: SURFACE_ID.into(),
+        surface: "terminal".into(),
     }
 }
 
@@ -351,7 +351,7 @@ async fn attach(
     if let Some(prompt) = opts.prompt {
         run.effect(Effect::Submit(bingo_sdk::Input::text(
             prompt,
-            bingo_sdk::Origin::surface(SURFACE_ID),
+            crate::origin(),
         )));
     }
     Ok((run, Some(attachment.events)))
@@ -1049,7 +1049,7 @@ mod tests {
         let (_, session) = harness.go(vec![closed(1)], vec![], Some("hello")).await;
         assert_eq!(
             session.submitted(),
-            vec![Input::text("hello", bingo_sdk::Origin::surface("tui"))]
+            vec![Input::text("hello", crate::origin())]
         );
     }
 
@@ -1061,7 +1061,7 @@ mod tests {
         assert_eq!(exit, Exit { code: 0 });
         assert_eq!(
             session.submitted(),
-            vec![Input::text("hi", bingo_sdk::Origin::surface("tui"))]
+            vec![Input::text("hi", crate::origin())]
         );
     }
 
@@ -1816,7 +1816,7 @@ mod tests {
     }
 
     fn prose(text: &str) -> Input {
-        Input::text(text, bingo_sdk::Origin::surface(SURFACE_ID))
+        Input::text(text, crate::origin())
     }
 
     /// The one picture a submitted line carried, whatever brought it.
@@ -2641,10 +2641,7 @@ mod tests {
         .await
         .expect("the loop ran");
         assert_eq!(ended.exit, Exit { code: 0 });
-        assert_eq!(
-            child.submitted(),
-            vec![Input::text("hi", bingo_sdk::Origin::surface("tui"))]
-        );
+        assert_eq!(child.submitted(), vec![Input::text("hi", crate::origin())]);
         assert!(root.submitted().is_empty(), "the root was not written to");
     }
 

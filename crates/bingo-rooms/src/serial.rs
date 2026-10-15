@@ -206,6 +206,7 @@ mod tests {
         let mut item = item(ItemBody::User {
             parts: vec![ContentPart::text(text)],
             origin: Origin {
+                render_surface: None,
                 voice: None,
                 surface: "room".into(),
                 principal: who.map(str::to_string),

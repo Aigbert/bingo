@@ -604,7 +604,10 @@ impl Server {
     }
 
     fn submit(&mut self, params: Value) -> Result<Reply, RpcError> {
-        let params: SubmitParams = parse(params)?;
+        let mut params: SubmitParams = parse(params)?;
+        if let bingo_sdk::Input::Text { origin, .. } = &mut params.input {
+            origin.render_surface = origin.render_surface.or(self.who()?.render_surface());
+        }
         self.port(&params.session)?
             .submit(params.intent, signed(params.input));
         Reply::empty()

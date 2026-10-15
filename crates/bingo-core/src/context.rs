@@ -395,6 +395,7 @@ mod tests {
 
     fn peer(who: &str) -> Origin {
         Origin {
+            render_surface: None,
             voice: None,
             surface: "peer".into(),
             principal: Some(who.into()),
@@ -405,6 +406,7 @@ mod tests {
     /// A delivery from a conversation and nobody in it — a nudge.
     fn posted(place: &str) -> Origin {
         Origin {
+            render_surface: None,
             voice: None,
             surface: "peer".into(),
             principal: None,

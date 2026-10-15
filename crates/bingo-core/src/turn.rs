@@ -304,6 +304,7 @@ impl Turn<'_> {
         self.record(ItemBody::User {
             parts,
             origin: Origin {
+                render_surface: None,
                 voice: Some(bingo_sdk::Voice::Quiet),
                 surface,
                 principal: None,

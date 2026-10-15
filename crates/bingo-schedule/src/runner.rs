@@ -240,6 +240,7 @@ fn who() -> ClientIdentity {
 /// transcript says so.
 fn origin() -> Origin {
     Origin {
+        render_surface: None,
         voice: Some(bingo_sdk::Voice::Quiet),
         surface: SURFACE.into(),
         principal: None,

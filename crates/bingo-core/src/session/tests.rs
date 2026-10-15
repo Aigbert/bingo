@@ -60,6 +60,7 @@ fn peer(text: &str, from: &str) -> Input {
     Input::text(
         text,
         Origin {
+            render_surface: None,
             voice: None,
             surface: "agent".into(),
             principal: Some(from.into()),

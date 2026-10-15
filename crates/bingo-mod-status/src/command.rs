@@ -25,8 +25,8 @@ impl Interceptor for Open {
         let command: catalogue::CommandRun =
             serde_json::from_value(input.clone()).map_err(error)?;
         if !matches!(
-            command.surface.as_deref(),
-            Some("tui" | "terminal" | "desktop")
+            command.surface,
+            Some(render::SurfaceName::Terminal | render::SurfaceName::Desktop)
         ) {
             return next.run(input).await;
         }

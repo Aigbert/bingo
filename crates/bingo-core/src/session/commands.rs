@@ -167,7 +167,7 @@ pub(super) fn is_command(input: &Input) -> bool {
 /// with.
 #[derive(Clone, Debug)]
 pub(super) struct Invocation {
-    pub surface: Option<String>,
+    pub surface: Option<bingo_sdk::render::SurfaceName>,
     pub line: String,
     pub origin: Origin,
 }
@@ -184,7 +184,7 @@ impl Invocation {
         };
         Self {
             surface: match input {
-                Input::Text { origin, .. } => Some(origin.surface.clone()),
+                Input::Text { origin, .. } => origin.render_surface,
                 Input::Action { .. } => None,
             },
             line: bingo_sdk::command::recorded_line(&parsed.typed()).into(),
@@ -567,6 +567,7 @@ mod tests {
         let input = Input::text(
             "/guide do the thing",
             Origin {
+                render_surface: None,
                 voice: None,
                 surface: "channels".into(),
                 principal: Some("ou_person".into()),
@@ -579,6 +580,7 @@ mod tests {
         assert_eq!(
             invocation.origin,
             Origin {
+                render_surface: None,
                 voice: Some(bingo_sdk::Voice::Quiet),
                 surface: SURFACE.into(),
                 principal: Some("ou_person".into()),
@@ -608,12 +610,14 @@ mod tests {
         assert!(from(Origin::surface("tui")));
         assert!(from(Origin::surface("print")));
         assert!(!from(Origin {
+            render_surface: None,
             voice: None,
             surface: "agent".into(),
             principal: Some("scout".into()),
             conversation: None,
         }));
         assert!(!from(Origin {
+            render_surface: None,
             voice: None,
             surface: "channels".into(),
             principal: Some("ou_person".into()),
@@ -621,6 +625,7 @@ mod tests {
         }));
         assert!(
             !from(Origin {
+                render_surface: None,
                 voice: None,
                 surface: "peer".into(),
                 principal: None,

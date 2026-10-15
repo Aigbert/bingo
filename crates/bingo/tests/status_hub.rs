@@ -21,9 +21,13 @@ fn request(state: &SessionState) -> RenderRequest {
 }
 async fn command(attachment: &mut Attachment, text: &str) -> IntentOutcome {
     let intent = IntentId::mint();
-    attachment
-        .handle
-        .submit(intent.clone(), Input::text(text, Origin::surface("tui")));
+    attachment.handle.submit(
+        intent.clone(),
+        Input::text(
+            text,
+            Origin::surface("renamed-terminal").on(SurfaceName::Terminal),
+        ),
+    );
     ack_for(attachment, &intent).await
 }
 async fn key(attachment: &mut Attachment, tree: &View, key: &str) -> IntentOutcome {
@@ -193,7 +197,7 @@ async fn noninteractive_callers_keep_text_status_on_a_shared_host() {
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    for surface in ["channels", "print", "rpc"] {
+    for surface in ["channels", "print", "rpc", "tui", "terminal"] {
         let intent = IntentId::mint();
         attachment.handle.submit(
             intent.clone(),
@@ -211,6 +215,51 @@ async fn noninteractive_callers_keep_text_status_on_a_shared_host() {
                 .any(|p| p.plugin == "bingo.mod.status")
         );
     }
+    host.shutdown().await.unwrap();
+    assert!(server.child.wait().await.unwrap().success());
+}
+
+#[tokio::test]
+async fn a_declared_desktop_rpc_client_gets_a_card_with_unmodified_props() {
+    let mut server = Server::spawn(r#"{"responses":[]}"#);
+    let host = server.kernel();
+    host.initialize(ClientIdentity {
+        name: "desktop-fixture".into(),
+        surface: "desktop".into(),
+    })
+    .await
+    .unwrap();
+    let mut attachment = host
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    let intent = IntentId::mint();
+    attachment.handle.submit(
+        intent.clone(),
+        Input::text("/status", Origin::surface("rpc")),
+    );
+    assert!(matches!(
+        ack_for(&mut attachment, &intent).await,
+        IntentOutcome::Applied { .. }
+    ));
+    let placed = slot::placed(&attachment.snapshot);
+    let pane = placed
+        .iter()
+        .find(|p| p.plugin == "bingo.mod.status")
+        .unwrap();
+    let slot::Slot::Pane {
+        view: slot::Shown::Pull { request },
+        ..
+    } = &pane.slot
+    else {
+        panic!("status pull")
+    };
+    assert_eq!(request.props, json!({}));
+    let mut request = request.on(SurfaceName::Desktop);
+    request.viewport.columns = 80;
+    request.viewport.rows = 12;
+    let tree = host.render(&attachment.session, request).await.unwrap();
+    assert!(tree.fold().contains("❯ session"));
     host.shutdown().await.unwrap();
     assert!(server.child.wait().await.unwrap().success());
 }

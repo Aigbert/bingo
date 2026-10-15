@@ -32,6 +32,7 @@ pub const SEND_MESSAGE: &str = "SendMessage";
 /// text itself.
 pub fn origin(principal: Option<String>) -> Origin {
     Origin {
+        render_surface: None,
         voice: Some(bingo_sdk::Voice::Quiet),
         surface: SURFACE.into(),
         principal,
