@@ -38,7 +38,16 @@ fn a_temp_collision_leaves_the_file_and_index_intact() {
     let collision = home.path().join("occupied.tmp");
     std::fs::write(&collision, "owned by someone else").unwrap();
     let index = std::fs::read_to_string(home.path().join("MEMORY.md")).unwrap();
-    assert!(forget_with(home.path(), "rule", |_| collision.clone(), |_| {}).is_err());
+    assert!(
+        forget_with(
+            home.path(),
+            "rule",
+            |_| collision.clone(),
+            |_| {},
+            sync_directory
+        )
+        .is_err()
+    );
     assert!(home.path().join("rule.md").exists());
     assert_eq!(
         std::fs::read_to_string(home.path().join("MEMORY.md")).unwrap(),
@@ -52,11 +61,18 @@ fn a_temp_collision_leaves_the_file_and_index_intact() {
 #[test]
 fn one_concurrent_edit_is_retried_without_losing_it() {
     let home = fixture();
-    forget_with(home.path(), "rule", temporary, |attempt| {
-        if attempt == 0 {
-            std::fs::write(home.path().join("MEMORY.md"), "[rule](rule.md)\nnew fact\n").unwrap();
-        }
-    })
+    forget_with(
+        home.path(),
+        "rule",
+        temporary,
+        |attempt| {
+            if attempt == 0 {
+                std::fs::write(home.path().join("MEMORY.md"), "[rule](rule.md)\nnew fact\n")
+                    .unwrap();
+            }
+        },
+        sync_directory,
+    )
     .unwrap();
     assert_eq!(
         std::fs::read_to_string(home.path().join("MEMORY.md")).unwrap(),
@@ -66,13 +82,19 @@ fn one_concurrent_edit_is_retried_without_losing_it() {
 #[test]
 fn two_concurrent_edits_refuse_to_forget() {
     let home = fixture();
-    let error = forget_with(home.path(), "rule", temporary, |attempt| {
-        std::fs::write(
-            home.path().join("MEMORY.md"),
-            format!("[rule](rule.md)\nedit {attempt}\n"),
-        )
-        .unwrap();
-    })
+    let error = forget_with(
+        home.path(),
+        "rule",
+        temporary,
+        |attempt| {
+            std::fs::write(
+                home.path().join("MEMORY.md"),
+                format!("[rule](rule.md)\nedit {attempt}\n"),
+            )
+            .unwrap();
+        },
+        sync_directory,
+    )
     .unwrap_err();
     assert!(error.message.contains("changed twice"));
     assert!(home.path().join("rule.md").exists());
@@ -100,4 +122,21 @@ fn invalid_names_do_not_touch_the_store() {
         );
     }
     assert!(home.path().join("rule.md").exists());
+}
+#[test]
+fn a_failed_directory_sync_still_removes_the_file() {
+    let home = fixture();
+    forget_with(
+        home.path(),
+        "rule",
+        temporary,
+        |_| {},
+        |_| Err(std::io::Error::other("sync refused")),
+    )
+    .unwrap();
+    assert!(!home.path().join("rule.md").exists());
+    assert_eq!(
+        std::fs::read_to_string(home.path().join("MEMORY.md")).unwrap(),
+        "# Memory\r\n\r\nkeep\n"
+    );
 }

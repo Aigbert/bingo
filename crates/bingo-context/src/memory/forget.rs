@@ -35,7 +35,7 @@ pub fn io(error: std::io::Error) -> KernelError {
 }
 
 pub fn forget(scope: &Path, name: &str) -> Result<(), KernelError> {
-    forget_with(scope, name, temporary, |_| {})
+    forget_with(scope, name, temporary, |_| {}, sync_directory)
 }
 
 fn temporary(scope: &Path) -> std::path::PathBuf {
@@ -52,6 +52,7 @@ fn forget_with(
     name: &str,
     mut temporary: impl FnMut(&Path) -> std::path::PathBuf,
     mut before_swap: impl FnMut(usize),
+    sync: impl Fn(&Path) -> std::io::Result<()>,
 ) -> Result<(), KernelError> {
     valid_name(name)?;
     let file = scope.join(format!("{name}.md"));
@@ -69,6 +70,7 @@ fn forget_with(
         })
         .map_err(io)?
         {
+            sync_after_rename(scope, sync);
             return std::fs::remove_file(file).map_err(io);
         }
     }
@@ -106,16 +108,20 @@ fn replace(
             return Ok(false);
         }
         std::fs::rename(temp, path)?;
-        sync_directory(
-            path.parent()
-                .ok_or_else(|| std::io::Error::other("index has no directory"))?,
-        )?;
         Ok(true)
     })();
     if !matches!(result, Ok(true)) {
         let _ = std::fs::remove_file(temp);
     }
     result
+}
+
+/// The rename has already happened; a failed sync only weakens durability, so the
+/// forget goes on to remove the file the index no longer points at.
+fn sync_after_rename(scope: &Path, sync: impl Fn(&Path) -> std::io::Result<()>) {
+    if let Err(error) = sync(scope) {
+        tracing::warn!(%error, "memory: the index directory was not synced");
+    }
 }
 
 #[cfg(unix)]
