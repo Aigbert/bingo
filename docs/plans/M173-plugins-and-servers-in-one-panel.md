@@ -19,9 +19,8 @@ the plain fallback.
 
 ## Bricks
 
-1. **Typed server rows.** `Servers::rows() -> Vec<ServerRow { name, transport, origin,
-   status, auth, latency, sign_in_from }>` replaces the untyped map (wire face and
-   fixture updated; the ACP crossing reads the same rows).
+1. **Typed server rows.** `Servers::rows() -> Vec<ServerRow>` replaces the untyped map
+   (wire face, fixture and the ACP crossing read the same rows).
 2. **Draw chain, pure.** `chain_of(site, links) -> Vec<String>` from
    the catalogue's `ui.render` links in dispatch order, ending in
    `plain` (`my-picker ▸ bingo-mod-models ▸ plain`). Table test.
@@ -74,13 +73,11 @@ the plain fallback.
 
 ## Non-goals
 
-Installing plugins from a registry; editing a server's entry in the
-panel; per-tool switches inside a server; the desktop's drawing.
+Installing from a registry; editing a server's entry; per-tool switches; the desktop.
 
 ## Risks
 
-Verbs drift between owners: every key is a command line in the verbs table. A handshake
-landing while the panel is open moves rows: the cursor follows the name.
+Verbs drift: every key is a verbs-table line. A handshake moves rows: the cursor follows.
 
 ## Decisions
 
@@ -101,50 +98,53 @@ landing while the panel is open moves rows: the cursor follows the name.
 
 ### Review round (2026-10-15)
 
-- A repo server waiting for approval runs nothing on one key: `space`/`r` explain, the
-  first `⏎` reviews, the second approves (the review's content: third round below).
-- Privileged panel lines (`/plugins approve|trust`, `/mcp approve`) run only when the kernel
-  vouches: `Drawings` records the compiled-in mod that drew the site; the ack carries
-  `drawnBy` only for its own answer to unrewritten args. A mod drawing over a built-in site
-  disables them (fail closed). Panel keys answer only the drawing pressed on, in this session.
-- An approval writes its trust only once it stands; a reenable that fails says
-  `/plugins enable <name>`; an unreadable trust file is named once. Bare-name trust keys
-  stay as ADR-0087 §5 left them: a residual risk.
-- Errors are cut inside the card, not wrapped; `runs`/`from` are cut in the middle at 38
-  columns. A failed server keeps its last stderr line (4 KiB tail, ANSI stripped, redacted,
-  240 chars). OAuth shows only when in play. The plain-drawing note derives from sites.
-- Lines a panel or key runs are `Effect::Run`: sent, never written to either history.
-  Lines composed in the palette are the person's own and stay in history.
-- A placement is said once, in its status. A switch asked mid-turn lands after it.
+- A waiting repo server runs nothing on one key: `space`/`r` explain, `⏎` reviews, a second
+  `⏎` approves. Privileged lines (`/plugins approve|trust`, `/mcp approve`) run only when the
+  kernel vouches: `Drawings` records the compiled-in mod that drew the site, the ack carries
+  `drawnBy` only for its own answer to unrewritten args; a mod drawing over a built-in site
+  disables them (fail closed). Panel keys answer only the drawing pressed on.
+- An approval writes trust only once it stands; a failed reenable says `/plugins enable
+  <name>`; an unreadable trust file is named once. Bare-name trust keys: residual risk.
+- Errors are cut inside the card; `runs`/`from` cut in the middle at 38 columns. A failed
+  server keeps its last stderr line (4 KiB tail, stripped, redacted, 240 chars). Lines a
+  panel runs are `Effect::Run`, never in history; palette-composed lines stay in history.
+  A placement is said once; a switch asked mid-turn lands after it.
 
 ### Third round (2026-10-15)
 
-- What the person typed is what the person asked: `command.run` binds person input only to
-  the arguments typed. `ArgSpec::Words.person` names the verbs only the person may run
-  (`/plugins approve|trust`, `/mcp approve`, ACP `approve`); their lines pin `/args`, and no
-  description or completion may drop those words. The TUI refuses them, `!` lines and
-  unknown commands from a view nothing vouches for.
+- `command.run` binds person input only to typed arguments. `ArgSpec::Words.person` names
+  person-only verbs (`/plugins approve|trust`, `/mcp approve`, ACP `approve`); their lines
+  pin `/args`. The TUI refuses them, `!` lines and unknown commands from unvouched views.
 - A waiting server's review shows the line a yes runs, args, url and cwd verbatim; env and
-  header values are hidden, names kept. Other rows nobody may dial stay program-only. An
-  approval still holds only for the entry reviewed (digest of the whole merged entry).
-- On a palette level of person-only lines a row's label is the id it runs, the catalogue's
-  label only its hint; enter refuses a person-only line whose last argument the row hides.
-- Vouching names the row and the site: the press must carry the row the drawing showed, and
-  `drawnBy` counts only when it names the site's owner (`plugins`, `palette`).
-- `render::vouched()` is bound for a vouched press whose arguments reach the command
-  unchanged; the plugin panel ignores any other press (no cursor, review or line).
+  header names kept. Approval holds only for the entry reviewed (digest of the merged entry).
+- Person-only palette rows are labelled by the id they run. Vouching names the row and the
+  site (`drawnBy` must be the site's owner); `render::vouched()` binds only for unchanged
+  arguments, and the panel ignores any other press.
+
+### Fourth round (2026-10-15)
+
+- `mcp::LOADS_CODE` (row.rs, owned by `Transport::reviewed`) lists the env names that change
+  what code a process loads or where it finds programs; the review shows their values marked
+  `(loads code)`, other values and every header stay hidden. A stdio server's env is `env`,
+  `sign-in` is a remote server's auth. Wrapped card values hang under the value column; a
+  relative cwd reads `in ./sub, from where bingo started` (the child's dir is bingo's cwd).
+- `CommandSpec::person_verb` is the one reader of person-only verbs (sdk, plugins command,
+  ACP approval, palette); a palette row must show every untyped argument, contiguously.
+- `Input::Action` carries an optional `origin`; it is asked only when signed by a surface in
+  core's `PERSON_SURFACES` (tui, print, rpc, acp, channels), else fail closed. RPC signs a
+  client's unsigned action `rpc`; a mod's `$.command.run` is `plugin:<name>`, so a pane it
+  opens waits for room (pane example updated). M177's sdk `PERSON_SURFACES` replaces core's
+  at merge. Decided: `/plugins reload|enable` stay not person-only (neither raises trust);
+  follow-up: `enable` can undo a person's `off`.
 
 ## Verified — 2026-10-15
 
-First round: fmt, check, clippy, test (5,737), discipline, budget, deny, tui-smoke passed;
-schema/TypeScript regenerated, `node --test` 31 passed; tmux drive 13 captures PASS.
+Rounds 1–3: all gates, test 5,811 passed (5 ignored), tui-smoke ×3; Windows PASS for sdk,
+services, mod-plugins, mod-palette, DEFER bingo-mcp/core/TUI (aws-lc-sys). Own tmux at
+108×30 and 80×24: a project server ran only on the second `⏎`; no secret value shown.
 
-Review round: the same gates (5,797 passed; 5 ignored), tui-smoke three runs, Windows
-checks PASS for bingo-mod-plugins, bingo-sdk, bingo-services, DEFER bingo-mcp (aws-lc-sys).
-Own tmux at 108×30 and 80×24: a project server ran only on the second `⏎`.
-
-Third round: fmt, clippy, test (5,811 passed; 5 ignored), discipline ok, budget ok, deny
-ok, `node --test` 31 passed, tui-smoke three runs ok; Windows PASS for bingo-sdk,
-bingo-services, bingo-mod-plugins, bingo-mod-palette, DEFER bingo-core/TUI (aws-lc-sys). Own
-tmux at 108×30 and 80×24: the review showed the full line with `--flag=visible`, `env
-SECRET_TOKEN (values hidden)`, no value; nothing ran until the second `⏎`.
+Fourth round: fmt, clippy, test (5,821 passed; 5 ignored), `node --test` 31, discipline
+ok, budget ok, deny ok, tui-smoke ×3 ok; Windows PASS for sdk, services, mod-plugins,
+mod-palette, surface-rpc. Own tmux at 108×30 and 80×24 with the NODE_OPTIONS repro: the
+review shows `env NODE_OPTIONS=--require ./evil.js  (loads code)`, `env TOKEN (values
+hidden)`, no secret; the unreviewed card says `env`, not `sign-in`.
