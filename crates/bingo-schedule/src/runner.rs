@@ -7,34 +7,17 @@
 //! produces, including everything that goes wrong inside the turn, lands in
 //! that session's transcript, which is the record `--resume` reads.
 //!
-//! Two rules keep it from spinning. A fire moves the entry's clock *before*
-//! the turn is asked for, so a session that cannot be opened is one line in
-//! the log and one missed occurrence, not a retry every pass. And a pass
-//! that fired something recomputes at once rather than trusting a schedule
-//! it has just changed.
+//! Each entry has at most one in-flight delivery. Success moves its clock;
+//! failure waits for a rescan before retrying, without holding up other entries.
 
-use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-
-use bingo_sdk::{
-    Action, Attachment, CancellationToken, ClientIdentity, Delivery, ErrorCode, HostHandle, Input,
-    IntentId, KernelError, Level, OpenOptions, Origin, SessionSelector, SessionSpec,
-};
+use crate::{entry::Entry, store::Store};
+use bingo_sdk::{CancellationToken, ErrorCode, KernelError};
 use jiff::Zoned;
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Notify;
-
-use crate::entry::Entry;
-use crate::render;
-use crate::signed::{self, asked_origin};
-use crate::store::Store;
-
-/// The surface a scheduled turn comes from; a person's says `tui` or
-/// `print`.
 pub const SURFACE: &str = "schedule";
-
-/// The code a refused mode or command line is noticed under.
-const REFUSED: &str = "schedule.refused";
 
 /// How long the loop will sleep without looking at the store again. The
 /// tools ring the bell when they change it; a person editing a file by hand
@@ -82,52 +65,57 @@ pub fn delay(next: Option<&Zoned>, now: &Zoned) -> Duration {
 /// The one runner this process has, if it took the store's claim.
 pub struct Runner {
     store: Arc<Store>,
-    host: HostHandle,
-    /// Rung by the tools when they write to the store, so a schedule made
-    /// now is not waited for.
     changed: Arc<Notify>,
-    /// Where a fire that never became a turn is left for a person to find.
-    trouble: Arc<Mutex<Option<String>>>,
-    /// Every refusal already said to the person in this process: an entry
-    /// that fires every minute is told once, not once a minute.
-    said: Mutex<HashSet<String>>,
+    dispatch: crate::delivery::Dispatch,
     cancel: CancellationToken,
 }
-
 impl Runner {
-    pub fn new(
+    pub(crate) fn new(
         store: Arc<Store>,
-        host: HostHandle,
         changed: Arc<Notify>,
-        trouble: Arc<Mutex<Option<String>>>,
+        dispatch: crate::delivery::Dispatch,
         cancel: CancellationToken,
     ) -> Self {
         Self {
             store,
-            host,
             changed,
-            trouble,
-            said: Mutex::default(),
+            dispatch,
             cancel,
         }
     }
-
-    /// Fire what is due, sleep to the next one, and start again — until the
-    /// plugin stops.
     pub async fn run(self) {
-        while !self.cancel.is_cancelled() {
-            let waited = self.tick().await;
+        let runner = Arc::new(self);
+        let mut flying = tokio::task::JoinSet::new();
+        let mut held = HashSet::new();
+        let mut retry = std::collections::HashMap::new();
+        loop {
+            let waited = runner.launch(&mut flying, &mut held, &mut retry);
             tokio::select! {
                 biased;
-                _ = self.cancel.cancelled() => return,
-                _ = tokio::time::sleep(waited) => {}
-                _ = self.changed.notified() => {}
+                _ = runner.cancel.cancelled() => {
+                    while flying.join_next().await.is_some() {}
+                    return;
+                }
+                Some(result) = flying.join_next(), if !flying.is_empty() => {
+                    if let Ok((id, ok)) = result {
+                        held.remove(&id);
+                        if !ok { retry.insert(id, tokio::time::Instant::now() + RESCAN); }
+                    }
+                }
+                _ = runner.changed.notified() => {},
+                _ = tokio::time::sleep(waited) => {},
             }
         }
     }
-
-    /// One pass over the store, and how long until the next.
-    async fn tick(&self) -> Duration {
+    fn launch(
+        self: &Arc<Self>,
+        flying: &mut tokio::task::JoinSet<(String, bool)>,
+        held: &mut HashSet<String>,
+        retry: &mut std::collections::HashMap<String, tokio::time::Instant>,
+    ) -> Duration {
+        if self.cancel.is_cancelled() {
+            return Duration::ZERO;
+        }
         let shelf = self.store.load();
         for bad in &shelf.unreadable {
             tracing::warn!(
@@ -136,171 +124,55 @@ impl Runner {
                 bad.why
             );
         }
+        retry.retain(|_, until| *until > tokio::time::Instant::now());
         let now = Zoned::now();
         let pass = pass(&shelf.entries, &now);
-        for entry in &pass.due {
-            if self.cancel.is_cancelled() {
-                return Duration::ZERO;
+        for entry in pass.due {
+            if held.contains(&entry.id) || retry.contains_key(&entry.id) {
+                continue;
             }
-            self.fire(entry, &now).await;
+            held.insert(entry.id.clone());
+            let runner = self.clone();
+            let entry = entry.clone();
+            flying.spawn(async move {
+                let ok = runner.fire(&entry).await;
+                (entry.id, ok)
+            });
         }
-        match pass.due.is_empty() {
-            // A pass that changed the store reckons again before it sleeps.
-            false => Duration::ZERO,
-            true => delay(pass.next.as_ref(), &now),
-        }
+        delay(pass.next.as_ref(), &now)
     }
-
-    /// One occurrence: the clock first, then the turn.
-    async fn fire(&self, entry: &Entry, now: &Zoned) {
-        self.spend(entry, now);
-        if let Err(e) = self.turn(entry).await {
+    async fn fire(&self, entry: &Entry) -> bool {
+        let result = match self.dispatch.deliver(entry).await {
+            Ok(()) => spend(&self.store, entry),
+            Err(error) => Err(error),
+        };
+        if let Err(error) = result {
             let said = format!(
-                "{} fired at {} and opened no turn on {}: {}",
+                "{} opened no turn on {}: {}",
                 entry.id,
-                render::when(Some(now)),
                 entry.key(),
-                e.message
-            );
-            tracing::warn!("{said}");
-            *self.trouble.lock().unwrap_or_else(|held| held.into_inner()) = Some(said);
-        }
-    }
-
-    /// This occurrence, spent before anything is asked of a host, by having
-    /// its fire written down. Only a store that has already moved keeps a
-    /// fire nobody could deliver from being tried again on the very next
-    /// pass.
-    fn spend(&self, entry: &Entry, now: &Zoned) {
-        if let Err(e) = self.store.save(&entry.fired(now.timestamp())) {
-            tracing::warn!(schedule = entry.id, "the fire was not written down: {e}");
-        }
-    }
-
-    /// The entry's own session, opened or continued, told what to do.
-    async fn turn(&self, entry: &Entry) -> Result<(), KernelError> {
-        let mut attachment = self.session(entry).await?;
-        self.choose_mode(entry, &mut attachment).await;
-        self.say(entry, &mut attachment).await
-    }
-
-    /// The session keyed `schedule/<id>`: the one this entry has been
-    /// firing on all along, else a new one at the entry's directory.
-    async fn session(&self, entry: &Entry) -> Result<Attachment, KernelError> {
-        let selector = SessionSelector::ByKey { key: entry.key() };
-        match self
-            .host
-            .open(selector, who(), OpenOptions::default())
-            .await
-        {
-            Err(e) if e.code == ErrorCode::SessionNotFound => {
-                let spec = SessionSelector::Create { spec: spec(entry) };
-                self.host.open(spec, who(), OpenOptions::default()).await
-            }
-            other => other,
-        }
-    }
-
-    /// The entry's mode, set before its text (ADR-0094 §2). The person's own
-    /// entry asks for it as they would have typed it, so it may widen; any
-    /// other entry's is the schedule's word and may only keep or tighten.
-    /// A refusal leaves the session's mode and is said where a person looks.
-    async fn choose_mode(&self, entry: &Entry, attachment: &mut Attachment) {
-        let Some(mode) = &entry.permission_mode else {
-            return;
-        };
-        let input = match entry.asked() {
-            true => Input::text(format!("/permission {mode}"), asked_origin()),
-            false => Input::action(
-                Action {
-                    name: "permission".into(),
-                    args: serde_json::Value::String(mode.clone()),
-                },
-                origin(),
-            ),
-        };
-        if let Err(error) = signed::submitted(attachment, input, &self.cancel).await {
-            let why = format!(
-                "its mode {mode} was refused ({}); the turn runs in the session's own mode",
                 error.message
             );
-            self.refused(entry, &why).await;
+            tracing::warn!("{said}");
+            *self
+                .dispatch
+                .trouble
+                .lock()
+                .unwrap_or_else(|held| held.into_inner()) = Some(said);
+            return false;
         }
-    }
-
-    /// The entry's text: the person's own command line runs as the command
-    /// it names; everything else is prose to the model, delivered as a wake.
-    async fn say(&self, entry: &Entry, attachment: &mut Attachment) -> Result<(), KernelError> {
-        let command = bingo_sdk::command::command_line(&entry.text).is_some();
-        if command && entry.asked() {
-            let line = Input::text(entry.text.clone(), asked_origin());
-            if let Err(error) = signed::submitted(attachment, line, &self.cancel).await {
-                let why = format!("its command line was refused: {}", error.message);
-                self.refused(entry, &why).await;
-            }
-            return Ok(());
-        }
-        if command {
-            let why = format!(
-                "no ask of the person's is on record for it, so its command line went to \
-                 the model as prose; `/schedule confirm {}` makes it theirs",
-                entry.id
-            );
-            self.refused(entry, &why).await;
-        }
-        self.host
-            .deliver(
-                &attachment.session,
-                IntentId::mint(),
-                Input::text(entry.text.clone(), origin()),
-                Delivery::Wake,
-            )
-            .await
-    }
-
-    /// A refusal, where a person finds it: the `/schedule` badge every time,
-    /// and a transcript notice the first time this process sees it.
-    async fn refused(&self, entry: &Entry, why: &str) {
-        let said = format!("schedule {}: {why}", entry.id);
-        tracing::warn!("{said}");
-        *self.trouble.lock().unwrap_or_else(|held| held.into_inner()) = Some(said.clone());
-        let first = self
-            .said
-            .lock()
-            .unwrap_or_else(|held| held.into_inner())
-            .insert(said.clone());
-        if first && let Err(error) = self.host.notice(Level::Warn, REFUSED, &said).await {
-            tracing::debug!(%error, "a schedule refusal reached no transcript");
-        }
+        true
     }
 }
 
-fn spec(entry: &Entry) -> SessionSpec {
-    SessionSpec {
-        cwd: entry.cwd.clone(),
-        key: Some(entry.key()),
-        title: Some(render::head(&entry.text, 40)),
-        ..SessionSpec::default()
+pub(crate) fn spend(store: &Store, entry: &Entry) -> Result<(), KernelError> {
+    // A concurrent pause, confirmation or deletion must not be overwritten by an old fire.
+    if store.load().entries.iter().any(|current| current == entry) {
+        store
+            .save(&entry.fired(jiff::Timestamp::now()))
+            .map_err(|error| KernelError::new(ErrorCode::Storage, error.to_string()))?;
     }
-}
-
-fn who() -> ClientIdentity {
-    ClientIdentity {
-        name: SURFACE.into(),
-        surface: SURFACE.into(),
-    }
-}
-
-/// Who a scheduled turn is from. Nobody is at the keyboard, and the
-/// transcript says so.
-fn origin() -> Origin {
-    Origin {
-        render_surface: None,
-        voice: Some(bingo_sdk::Voice::Quiet),
-        surface: SURFACE.into(),
-        principal: None,
-        conversation: None,
-    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -314,11 +186,12 @@ mod tests {
 
     /// The runner this process would have, over the fixture's own store.
     fn runner(fixture: &Fixture, trouble: &Arc<Mutex<Option<String>>>) -> Runner {
+        let mut dispatch = fixture.schedules.dispatcher(fixture.handle());
+        dispatch.trouble = trouble.clone();
         Runner::new(
             fixture.store(),
-            fixture.handle(),
             Arc::new(Notify::new()),
-            Arc::clone(trouble),
+            dispatch,
             CancellationToken::new(),
         )
     }
@@ -413,10 +286,13 @@ mod tests {
             .expect("a schedule");
 
         let trouble = Arc::new(Mutex::new(None));
-        runner(&fixture, &trouble).tick().await;
+        runner(&fixture, &trouble).fire(&entry()).await;
         let shelf = fixture.shelf();
         assert_eq!(shelf.entries.len(), 1, "the file stays");
-        assert!(shelf.entries[0].last_fired.is_some(), "and its clock moved");
+        assert!(
+            shelf.entries[0].last_fired.is_none(),
+            "failed delivery does not move its clock"
+        );
         assert!(
             fixture.host.delivered().is_empty(),
             "a session of its own is opened first, and there is none"
@@ -431,7 +307,7 @@ mod tests {
 
     #[test]
     fn a_fire_opens_the_entry_s_own_session_at_the_entry_s_directory() {
-        let spec = spec(&entry());
+        let spec = crate::delivery::spec(&entry());
         assert_eq!(spec.key.as_deref(), Some("schedule/abcd1234"));
         assert_eq!(spec.cwd, std::path::PathBuf::from("/work/project"));
         assert_eq!(
@@ -440,8 +316,12 @@ mod tests {
             "a session list says what the schedule does"
         );
         assert_eq!(spec.provider, None, "a schedule runs on the host's model");
-        assert_eq!(origin().surface, "schedule");
-        assert_eq!(origin().principal, None, "nobody is at the keyboard");
+        assert_eq!(crate::delivery::origin().surface, "schedule");
+        assert_eq!(
+            crate::delivery::origin().principal,
+            None,
+            "nobody is at the keyboard"
+        );
     }
 }
 
@@ -449,6 +329,9 @@ mod tests {
 mod voice_tests {
     #[test]
     fn producer_stamps_its_voice() {
-        assert_eq!(super::origin().voice, Some(bingo_sdk::Voice::Quiet));
+        assert_eq!(
+            crate::delivery::origin().voice,
+            Some(bingo_sdk::Voice::Quiet)
+        );
     }
 }

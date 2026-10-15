@@ -26,6 +26,7 @@
 
 mod command;
 use bingo_shelf::diff;
+mod delivery;
 pub mod entry;
 pub mod guide;
 mod hook;
@@ -33,8 +34,8 @@ pub mod lock;
 mod render;
 pub mod runner;
 pub mod schedules;
-mod signed;
 mod service;
+mod signed;
 pub mod spec;
 pub mod store;
 mod supervisor;

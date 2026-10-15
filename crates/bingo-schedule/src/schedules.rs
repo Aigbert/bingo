@@ -24,6 +24,7 @@ pub struct Schedules {
     store: Arc<Store>,
     changed: Arc<Notify>,
     trouble: Arc<Mutex<Option<String>>>,
+    said: Arc<Mutex<std::collections::HashSet<String>>>,
     /// The running task owns the claim; this reference cannot prolong it.
     claim: Arc<Mutex<Weak<Claim>>>,
     running: Mutex<Option<JoinHandle<()>>>,
@@ -39,6 +40,7 @@ impl Schedules {
             store: Arc::new(Store::new(data_dir)),
             changed: Arc::new(Notify::new()),
             trouble: Arc::new(Mutex::new(None)),
+            said: Arc::default(),
             claim: Arc::new(Mutex::new(Weak::new())),
             running: Mutex::new(None),
             wakes: Arc::default(),
@@ -104,6 +106,15 @@ impl Schedules {
         }));
     }
 
+    pub(crate) fn dispatcher(&self, host: HostHandle) -> crate::delivery::Dispatch {
+        crate::delivery::Dispatch {
+            host,
+            trouble: self.trouble.clone(),
+            said: self.said.clone(),
+            cancel: self.cancel.clone(),
+        }
+    }
+
     fn supervisor(&self, host: HostHandle) -> Supervisor {
         Supervisor {
             dir: self.store.dir().to_path_buf(),
@@ -113,9 +124,8 @@ impl Schedules {
             cancel: self.cancel.clone(),
             runner: Runner::new(
                 Arc::clone(&self.store),
-                host,
                 Arc::clone(&self.changed),
-                Arc::clone(&self.trouble),
+                self.dispatcher(host),
                 self.cancel.clone(),
             ),
         }

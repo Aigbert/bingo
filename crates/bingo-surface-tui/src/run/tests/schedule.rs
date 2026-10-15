@@ -50,18 +50,46 @@ async fn owner(env: &Env) -> (bingo_schedule::SchedulePlugin, TestHost, Arc<dyn 
     let host = TestHost::default();
     host.on_service_any(move |key| services.get(&key).cloned());
     host.on_sessions(|_| async { Ok(vec![]) });
-    host.on_open(|_, _, _| async {
-        Ok(Attachment {
-            session: SessionId::from_raw("ses_fired"),
-            snapshot: state(),
-            history: None,
-            events: Box::pin(futures::stream::empty()),
-            handle: SessionHandle(Arc::new(TestSession::default())),
-        })
-    });
-    host.on_deliver(|_, _, _, _| async { Ok(()) });
+    delivery(&host);
     plugin.start(host.handle()).await.unwrap();
     (plugin, host, command)
+}
+fn delivery(host: &TestHost) {
+    let sender = Arc::new(Mutex::new(
+        None::<tokio::sync::mpsc::UnboundedSender<bingo_sdk::Frame>>,
+    ));
+    let opening = sender.clone();
+    host.on_open(move |_, _, _| {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        *opening.lock().unwrap() = Some(tx);
+        async move {
+            Ok(Attachment {
+                session: SessionId::from_raw("ses_fired"),
+                snapshot: state(),
+                history: None,
+                events: Box::pin(futures::stream::once(
+                    async move { rx.recv().await.unwrap() },
+                )),
+                handle: SessionHandle(Arc::new(TestSession::default())),
+            })
+        }
+    });
+    host.on_deliver(move |_, intent, _, _| {
+        sender
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .send(frame(
+                1,
+                Event::IntentAck {
+                    intent,
+                    outcome: IntentOutcome::Queued { position: 1 },
+                },
+            ))
+            .unwrap();
+        async { Ok(()) }
+    });
 }
 impl ScheduleFixture {
     async fn new() -> Self {

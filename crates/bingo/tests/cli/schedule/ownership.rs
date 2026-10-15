@@ -220,3 +220,49 @@ fn a_live_legacy_pid_is_not_replaced_or_treated_as_a_modern_lease() {
 fn an_empty_legacy_file_is_preserved_during_its_possible_pid_write_window() {
     legacy_is_preserved("");
 }
+
+#[test]
+fn dormant_process_runs_a_persons_line_once() {
+    let home = tempfile::tempdir().unwrap();
+    write_entry(
+        home.path(),
+        "manual179",
+        "every 2h",
+        "manual fire",
+        Timestamp::now(),
+        None,
+    );
+    let owner_script = script(r#"{"responses":[]}"#);
+    let owner = Running::start(home.path(), &owner_script);
+    wait_within(PATIENCE, async {
+        while runner_is_locked(home.path()).is_none() {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .unwrap();
+    let manual = script(r#"{"responses":[{"steps":[{"text":"manual completed"}]}]}"#);
+    let out = run_within(
+        bingo()
+            .env("BINGO_FAKE_SCRIPT", manual.path())
+            .envs(home_env(home.path()))
+            .args(["--print", "--cwd"])
+            .arg(home.path())
+            .arg("/schedule run manual179"),
+        PATIENCE,
+    );
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(stdout(&out).contains("ran manual179"));
+    assert!(entry_of(home.path(), "manual179")["lastFired"].is_string());
+    // The accepted turn is recorded even if the print process exits before completion.
+    let journal = transcript(home.path(), "schedule/manual179").unwrap();
+    assert_eq!(
+        journal
+            .lines()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .filter(|frame| frame["event"]["type"] == "turnStarted")
+            .count(),
+        1,
+        "{journal}"
+    );
+    owner.stop();
+}

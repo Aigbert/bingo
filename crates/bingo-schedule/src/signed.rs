@@ -34,6 +34,14 @@ pub async fn submitted(
 ) -> Result<(), KernelError> {
     let intent = IntentId::mint();
     attachment.handle.submit(intent.clone(), input);
+    acknowledged(attachment, &intent, cancel).await
+}
+
+pub(crate) async fn acknowledged(
+    attachment: &mut Attachment,
+    intent: &IntentId,
+    cancel: &CancellationToken,
+) -> Result<(), KernelError> {
     loop {
         let frame = tokio::select! {
             _ = cancel.cancelled() => {
@@ -51,7 +59,7 @@ pub async fn submitted(
             intent: answered,
             outcome,
         } = frame.event
-            && answered == intent
+            && &answered == intent
         {
             return taken(outcome);
         }
