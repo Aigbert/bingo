@@ -836,12 +836,22 @@ impl Actor {
     }
 
     async fn record(&mut self, body: ItemBody) -> Result<ItemId, KernelError> {
+        self.record_for(None, body).await
+    }
+
+    /// An item a command recorded carries that command's intent: it is the
+    /// command's receipt, which its ack also names.
+    async fn record_for(
+        &mut self,
+        intent: Option<IntentId>,
+        body: ItemBody,
+    ) -> Result<ItemId, KernelError> {
         if let Some(id) = self.recorded_denial(&body) {
             self.refresh_config().await?;
             return Ok(id);
         }
         let turn = self.running.as_ref().map(|r| r.turn.clone());
-        let item = self.fresh(turn, None, body);
+        let item = self.fresh(turn, intent, body);
         let id = item.id.clone();
         self.publish(Event::ItemCompleted { item }, None).await?;
         Ok(id)

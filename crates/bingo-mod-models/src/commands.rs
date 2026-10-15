@@ -24,7 +24,7 @@ impl Interceptor for Commands {
         let name = value["command"].as_str().unwrap_or_default();
         let args = value["args"].as_str().unwrap_or_default().trim();
         if !opens(name, args, &cx.host).await? {
-            return outcome(next.run(value).await?);
+            return next.run(value).await;
         }
         let fallback = fallback(args, &value, next).await;
         let (picker, providers) = opening(name, args, cx).await?;
@@ -144,29 +144,6 @@ async fn opening(
     Ok((picker, providers))
 }
 
-fn outcome(value: Value) -> Result<Value, KernelError> {
-    if value["kind"] != "applied" {
-        return Ok(value);
-    }
-    let Some(message) = value["message"].as_str() else {
-        return Ok(value);
-    };
-    let text = if message.starts_with('⇄') {
-        message.to_owned()
-    } else if let Some(effort) = message.strip_prefix("thinking: ") {
-        format!("⇄ thinking {effort}")
-    } else {
-        return Ok(value);
-    };
-    serde_json::to_value(CommandOutcome::Record {
-        body: ItemBody::Notice {
-            level: Level::Info,
-            code: "model.choice".into(),
-            text,
-        },
-    })
-    .map_err(crate::error)
-}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,14 +153,5 @@ mod tests {
         assert!(!filters("fake/unlisted"));
         assert!(!filters("next"));
         assert!(!filters("pin fake/a"));
-    }
-    #[test]
-    fn choice_receipts_are_recorded_and_other_outcomes_are_unchanged() {
-        let value = outcome(json!({"kind":"applied","message":"⇄ small · here"})).unwrap();
-        assert!(
-            matches!(serde_json::from_value::<CommandOutcome>(value).unwrap(), CommandOutcome::Record { body: ItemBody::Notice {text, ..}} if text == "⇄ small · here")
-        );
-        let other = json!({"kind":"applied","message":"pinned"});
-        assert_eq!(outcome(other.clone()).unwrap(), other);
     }
 }

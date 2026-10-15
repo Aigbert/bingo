@@ -505,3 +505,42 @@ apiKey = "dummy-local-only"
     let view = kernel.render(&session.session, req).await.unwrap().fold();
     assert!(view.contains("openai  ◌ not checked"), "{view}");
 }
+#[tokio::test(flavor = "multi_thread")]
+async fn a_switch_from_any_client_is_a_line_in_the_transcript() {
+    let mut server = Server::spawn(SCRIPT);
+    let kernel = ready(&mut server).await;
+    let mut session = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    for surface in ["print", "rpc", "tui"] {
+        let intent = IntentId::mint();
+        let origin = Origin {
+            surface: surface.into(),
+            ..Origin::default()
+        };
+        session
+            .handle
+            .submit(intent.clone(), Input::text("/model fake/other", origin));
+        let IntentOutcome::Applied { result } = ack_for(&mut session, &intent).await else {
+            panic!("{surface}: the switch is applied");
+        };
+        let message = result["message"].as_str().unwrap_or_default();
+        assert!(message.starts_with("⇄ other · fake"), "{surface}: {result}");
+        let item = result["item"].as_str().expect("the receipt is recorded");
+        session = reopen(&kernel, &session).await;
+        let recorded = session
+            .snapshot
+            .transcript
+            .items()
+            .iter()
+            .find(|i| i.id.to_string() == item)
+            .cloned()
+            .expect("the receipt is in the transcript");
+        assert_eq!(recorded.intent.as_ref(), Some(&intent));
+        assert!(matches!(
+            recorded.body,
+            ItemBody::Notice { ref text, .. } if text == message
+        ));
+    }
+}

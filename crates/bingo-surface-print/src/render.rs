@@ -285,6 +285,8 @@ impl Renderer {
                 exit,
                 ..
             } => self.shell(command, output, *exit, err)?,
+            // A command's receipt is printed from its ack.
+            ItemBody::Notice { .. } if item.intent.is_some() => {}
             ItemBody::Notice { code, text, .. } => {
                 self.diagnostic(&format!("[notice] {code} {text}"), err)?;
             }

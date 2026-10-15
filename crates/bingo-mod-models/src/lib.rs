@@ -8,6 +8,7 @@ mod guide;
 mod keys;
 pub mod label;
 mod lifecycle;
+mod receipts;
 pub mod rows;
 pub mod sheet;
 mod sheet_actions;
@@ -45,6 +46,7 @@ impl Plugin for Models {
         ))));
         for link in [
             Arc::new(commands::Commands(state.clone())) as Arc<dyn Interceptor>,
+            Arc::new(receipts::Receipts),
             Arc::new(draw::Drawing(state.clone(), render::Component::ModelPicker)),
             Arc::new(draw::Drawing(state, render::Component::InfoNotice)),
         ] {

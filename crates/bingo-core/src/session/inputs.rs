@@ -126,10 +126,7 @@ impl Actor {
             Ok(CommandOutcome::View { view }) => {
                 self.applied(intent, json!({ "view": view })).await?
             }
-            Ok(CommandOutcome::Record { body }) => {
-                let item = self.record(body).await?;
-                self.applied(intent, json!({ "item": item })).await?;
-            }
+            Ok(CommandOutcome::Record { body }) => self.recorded(intent, body).await?,
             Ok(CommandOutcome::Prompt { text }) => {
                 let text = invocation.prompt(&text);
                 gate::gate_input(
@@ -144,6 +141,21 @@ impl Actor {
         self.refresh_config().await?;
         self.drain_queue().await?;
         Ok(())
+    }
+
+    /// A recorded receipt: the item in the transcript, and its words on the
+    /// ack for a client that draws no transcript.
+    async fn recorded(&mut self, intent: IntentId, body: ItemBody) -> Result<(), KernelError> {
+        let message = match &body {
+            ItemBody::Notice { text, .. } => Some(text.clone()),
+            _ => None,
+        };
+        let item = self.record_for(Some(intent.clone()), body).await?;
+        let mut result = json!({ "item": item });
+        if let Some(message) = message {
+            result["message"] = json!(message);
+        }
+        self.applied(intent, result).await
     }
 
     pub(super) async fn submit_prose(

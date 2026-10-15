@@ -632,7 +632,9 @@ impl Run {
         }
         // Acknowledgements refresh the palette alongside asynchronous changes.
         catalogues::fetch(self, "plugins", CatalogKind::Plugins);
+        // A recorded receipt is already a line in the transcript.
         if result.get("surface").is_none()
+            && result.get("item").is_none()
             && let Some(message) = result.get("message").and_then(Value::as_str)
         {
             self.ui

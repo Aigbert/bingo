@@ -260,7 +260,7 @@ fn thinking_on_an_unknown_model_is_effective_and_remembered() {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), THINKING_SETTINGS);
     assert_eq!(
         thinking_text(home.path(), "/think high --keep"),
-        "thinking: high · kept for new sessions\n"
+        "⇄ thinking high · kept for new sessions\n"
     );
     assert_eq!(
         std::fs::read_to_string(&path).unwrap(),
@@ -298,7 +298,7 @@ fn thinking_ignores_false_capability_metadata_without_rewriting_it() {
     });
     assert_eq!(
         applied.expect("the command is applied")["message"],
-        "thinking: xhigh · kept for new sessions"
+        "⇄ thinking xhigh · kept for new sessions"
     );
     let path = home.path().join(".bingo/settings.toml");
     assert_eq!(
@@ -333,7 +333,7 @@ fn thinking_off_and_invalid_levels_preserve_model_overrides() {
         assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
         assert_eq!(
             thinking_text(home.path(), "/think off --keep"),
-            "thinking: off · kept for new sessions\n"
+            "⇄ thinking off · kept for new sessions\n"
         );
         assert_eq!(
             std::fs::read_to_string(&path).unwrap(),
@@ -362,7 +362,7 @@ fn model_and_thinking_are_session_only_unless_kept() {
             "/model fake/another",
             "⇄ another · fake · thinking low · this session\n",
         ),
-        ("/think high", "thinking: high · this session\n"),
+        ("/think high", "⇄ thinking high · this session\n"),
     ] {
         assert_eq!(thinking_text(home.path(), command), expected);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), THINKING_SETTINGS);
