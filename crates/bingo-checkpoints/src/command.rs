@@ -17,7 +17,7 @@ use bingo_sdk::{
 
 use crate::restore::{self, Plan};
 use crate::store::{Checkpoints, MOST};
-use crate::turns::{self, Turn};
+use bingo_sdk::transcript::{self as turns, Turn};
 
 /// The name the TUI's `esc esc` picker looks for in the catalogue, and the
 /// line it submits.
@@ -35,7 +35,7 @@ impl RewindCommand {
 
     /// The turns, and what each one changed on disk.
     fn listing(&self, session: &SessionId, state: &SessionState, cwd: &Path) -> View {
-        let rows = turns::of(state)
+        let rows = turns::turns(&state.transcript)
             .iter()
             .rev()
             .map(|turn| {
@@ -57,18 +57,37 @@ impl RewindCommand {
     async fn go_back(
         &self,
         wanted: &TurnId,
+        mode: &str,
         state: &SessionState,
         cx: &CommandContext,
     ) -> Result<CommandOutcome, KernelError> {
-        let listed = turns::of(state);
+        let listed = turns::turns(&state.transcript);
         let undone = turns::from(&listed, wanted).ok_or_else(|| {
             KernelError::new(
                 ErrorCode::InvalidInput,
                 format!("this session has no turn {wanted}"),
             )
         })?;
+        if mode == "conversation" {
+            let dropped = cx.host.rewind(&cx.session, wanted).await?;
+            return Ok(CommandOutcome::Applied {
+                message: Some(format!("{} dropped; files were kept", items(dropped))),
+            });
+        }
         let plan = restore::plan(&self.store, &cx.session, &undone)?;
         restore::apply(&plan)?;
+        if mode == "files" {
+            return Ok(CommandOutcome::Applied {
+                message: Some(format!(
+                    "files restored; conversation was kept\n{}",
+                    report(None, 0, &plan, &cx.cwd)
+                        .lines()
+                        .skip(1)
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )),
+            });
+        }
         let dropped = cx.host.rewind(&cx.session, wanted).await?;
         let to = listed.iter().find(|turn| &turn.id == wanted);
         Ok(CommandOutcome::Applied {
@@ -87,7 +106,7 @@ impl Command for RewindCommand {
             aliases: Vec::new(),
             hint: "go back to a turn: its files and the conversation".into(),
             args: ArgSpec::Free {
-                hint: "<turn>".into(),
+                hint: "<turn> [both|conversation|files]".into(),
             },
             // The kernel refuses a rewind under a running turn, so this waits
             // in the queue for one rather than being refused for asking.
@@ -102,9 +121,25 @@ impl Command for RewindCommand {
             "" => Ok(CommandOutcome::View {
                 view: self.listing(&cx.session, &state, &cx.cwd),
             }),
-            wanted => self.go_back(&TurnId::from_raw(wanted), &state, cx).await,
+            args => {
+                let (wanted, mode) = arguments(args)?;
+                self.go_back(&wanted, mode, &state, cx).await
+            }
         }
     }
+}
+
+fn arguments(args: &str) -> Result<(TurnId, &str), KernelError> {
+    let mut words = args.split_whitespace();
+    let wanted = words.next().unwrap_or_default();
+    let mode = words.next().unwrap_or("both");
+    if !matches!(mode, "both" | "conversation" | "files") || words.next().is_some() {
+        return Err(KernelError::new(
+            ErrorCode::InvalidInput,
+            "use /rewind <turn> [both|conversation|files]",
+        ));
+    }
+    Ok((TurnId::from_raw(wanted), mode))
 }
 
 /// The session's own fold, as the kernel already has it.
@@ -291,12 +326,43 @@ mod tests {
         assert_eq!(
             spec.args,
             ArgSpec::Free {
-                hint: "<turn>".into()
+                hint: "<turn> [both|conversation|files]".into()
             }
         );
         assert!(
             !spec.instant,
             "a rewind waits for the turn it would have cut the ground from under"
+        );
+    }
+
+    #[tokio::test]
+    async fn each_mode_changes_only_what_it_names() {
+        for mode in ["both", "conversation", "files"] {
+            let fixture = Fixture::new();
+            let (note, made) = two_edited_turns(&fixture);
+            let message = applied(run(&fixture, &format!("trn_1 {mode}")).await.unwrap());
+            assert_eq!(fixture.journal.rewound().is_empty(), mode == "files");
+            assert_eq!(
+                std::fs::read(&note).unwrap(),
+                if mode == "conversation" {
+                    b"second".as_slice()
+                } else {
+                    b"original".as_slice()
+                }
+            );
+            assert_eq!(made.exists(), mode == "conversation");
+            if mode != "both" {
+                assert!(message.contains("kept"));
+            }
+        }
+        let fixture = Fixture::new();
+        assert_eq!(
+            run(&fixture, "trn_1 wrong").await.unwrap_err().code,
+            ErrorCode::InvalidInput
+        );
+        assert_eq!(
+            run(&fixture, "trn_1 both extra").await.unwrap_err().code,
+            ErrorCode::InvalidInput
         );
     }
 
@@ -312,6 +378,8 @@ mod tests {
         Turn {
             id: TurnId::from_raw("trn_1"),
             asked: Some("write the note".into()),
+            first: 0,
+            last: 1,
         }
     }
 

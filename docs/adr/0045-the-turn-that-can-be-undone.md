@@ -84,3 +84,8 @@ file I/O for a turn, and a snapshot is a plugin's business (ADR-0001).
   the card and `bingo-checkpoints/src/turns.rs` for the table. The cure is one
   brick in the sdk; it is not taken here because this milestone's sdk change is
   one verb.
+
+M177 / ADR-0091 pays the recorded turn-walk debt with `bingo_sdk::transcript::turns`.
+The read-only checkpoints service previews that same restore plan; `/rewind`
+accepts `both` (the existing default), `conversation`, and `files`. Screens ask
+with a preview sheet; a typed command still applies without confirmation.

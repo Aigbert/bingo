@@ -142,3 +142,43 @@ fn a_file_a_turn_created_is_removed_and_the_snapshots_outlive_nothing() {
         "the checkpoints of a session that is gone go with it"
     );
 }
+
+#[test]
+fn explicit_modes_keep_the_other_half_and_json_stdout_stays_pure() {
+    for mode in ["both", "conversation", "files"] {
+        let home = tempfile::tempdir().unwrap();
+        let note = home.path().join("note.md");
+        std::fs::write(&note, "original").unwrap();
+        let first = print_in(
+            home.path(),
+            &writes("one"),
+            &["--allowed-tools", "Write"],
+            "write one",
+        );
+        assert!(first.status.success(), "{}", stderr(&first));
+        let table = print_in(home.path(), &idle(), &["--continue"], "/rewind");
+        let turn = listed(&table).pop().unwrap();
+        let back = print_in(
+            home.path(),
+            &idle(),
+            &["--continue", "--output-format", "json"],
+            &format!("/rewind {turn} {mode}"),
+        );
+        assert!(back.status.success(), "{}", stderr(&back));
+        let lines = stdout(&back);
+        assert!(!lines.trim().is_empty());
+        for line in lines.lines() {
+            serde_json::from_str::<serde_json::Value>(line).expect("pure NDJSON");
+        }
+        assert_eq!(
+            std::fs::read_to_string(&note).unwrap(),
+            if mode == "conversation" {
+                "one"
+            } else {
+                "original"
+            }
+        );
+        let after = print_in(home.path(), &idle(), &["--continue"], "/rewind");
+        assert_eq!(listed(&after).len(), usize::from(mode == "files"));
+    }
+}

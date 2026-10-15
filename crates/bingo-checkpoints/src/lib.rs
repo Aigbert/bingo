@@ -7,7 +7,6 @@
 //!   file, the bytes beside it.
 //! - [`hook`] — the map from a tool to the field naming the file it writes,
 //!   and the `BeforeTool` hook that keeps it.
-//! - [`turns`] — the turns of a transcript, pure.
 //! - [`restore`] — what going back to a turn does to the files, planned
 //!   before a byte moves.
 //! - [`command`] — `/rewind`, which is the whole of what a person touches.
@@ -19,9 +18,9 @@
 pub mod command;
 pub mod guide;
 pub mod hook;
+mod preview;
 pub mod restore;
 pub mod store;
-pub mod turns;
 
 use std::sync::{Arc, OnceLock};
 
@@ -43,6 +42,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "hook:checkpoints",
         "command:rewind",
         "service:bingo.checkpoints.pages",
+        bingo_services::checkpoints::CAPABILITY,
     ],
     requires: &[],
     // Where the snapshots live follows the data directory; how many a turn
@@ -52,11 +52,12 @@ static MANIFEST: PluginManifest = PluginManifest {
 
 /// Registers the snapshot hook and `/rewind`, and collects the checkpoints of
 /// sessions that are no longer there when the process starts.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct CheckpointsPlugin {
     /// Built in `register`, where the environment is; used by `start`, which
     /// is handed nothing but the host.
     store: OnceLock<Arc<Checkpoints>>,
+    host: Arc<OnceLock<HostHandle>>,
 }
 
 #[async_trait]
@@ -73,6 +74,16 @@ impl Plugin for CheckpointsPlugin {
         registrar.add(Contribution::Command(
             Arc::new(RewindCommand::new(store.clone())) as Arc<dyn Command>,
         ));
+        let service: Arc<dyn bingo_services::checkpoints::Checkpoints> =
+            Arc::new(preview::Preview {
+                store: store.clone(),
+                host: self.host.clone(),
+            });
+        registrar.add(Contribution::service(
+            &bingo_services::checkpoints::KEY,
+            service.clone(),
+            Some(bingo_services::checkpoints::wire(service)),
+        ));
         registrar.add(guide::contribution(registrar));
         self.store
             .set(store)
@@ -88,6 +99,7 @@ impl Plugin for CheckpointsPlugin {
         let Some(store) = self.store.get() else {
             return Ok(());
         };
+        let _ = self.host.set(host.clone());
         let alive = match host.sessions(SessionFilter::default()).await {
             Ok(sessions) => sessions,
             // Collection that cannot run is not a reason to refuse to start.
@@ -135,6 +147,7 @@ mod plugin_tests {
                 "hook:checkpoints",
                 "command:rewind",
                 &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
+                bingo_services::checkpoints::CAPABILITY,
             ]
         );
         assert!(MANIFEST.requires.is_empty());
@@ -148,7 +161,7 @@ mod plugin_tests {
         assert_eq!(contributions.len(), MANIFEST.provides.len());
         assert!(matches!(contributions[0], Contribution::Hook(_)));
         assert!(matches!(contributions[1], Contribution::Command(_)));
-        match &contributions[2] {
+        match &contributions[3] {
             Contribution::Service { key, wire, .. } => {
                 assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
