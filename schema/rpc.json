@@ -753,6 +753,7 @@
     "Component": {
       "type": "string",
       "enum": [
+        "ModelPicker",
         "Browse",
         "Plugins",
         "Palette",
@@ -3484,6 +3485,50 @@
         "line"
       ]
     },
+    "ModelPickerProps": {
+      "type": "object",
+      "properties": {
+        "filter": {
+          "type": "string"
+        },
+        "selected": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "scope": {
+          "$ref": "#/$defs/ModelScope"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Effort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sheet": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "filter",
+        "selected",
+        "scope"
+      ]
+    },
+    "ModelScope": {
+      "type": "string",
+      "enum": [
+        "session",
+        "keep"
+      ]
+    },
     "NextStart": {
       "type": "string",
       "enum": [
@@ -4184,6 +4229,22 @@
     },
     "Props": {
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "ModelPicker"
+            },
+            "props": {
+              "$ref": "#/$defs/ModelPickerProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
         {
           "type": "object",
           "properties": {

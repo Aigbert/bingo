@@ -1188,6 +1188,7 @@
     "Component": {
       "type": "string",
       "enum": [
+        "ModelPicker",
         "Browse",
         "Plugins",
         "Palette",

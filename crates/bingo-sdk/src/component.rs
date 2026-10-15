@@ -4,6 +4,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+mod model_picker;
+pub use model_picker::*;
 mod browse;
 pub use browse::*;
 mod plugins;
@@ -33,6 +35,7 @@ macro_rules! components {
     };
 }
 components! {
+    ModelPicker(ModelPickerProps),
     Browse(Box<BrowseProps>),
     Plugins(PluginsProps),
     Palette(Box<PaletteProps>),

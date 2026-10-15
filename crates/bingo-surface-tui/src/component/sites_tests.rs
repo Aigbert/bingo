@@ -79,9 +79,11 @@ fn site(component: Component) -> bingo_sdk::SessionState {
     use bingo_sdk::{ItemStatus, ToolOutput};
     let completed_item = |item| folded(vec![frame(1, Event::ItemCompleted { item })]);
     match component {
-        Component::Browse | Component::Palette | Component::Plugins | Component::Sessions => {
-            state()
-        }
+        Component::ModelPicker
+        | Component::Browse
+        | Component::Palette
+        | Component::Plugins
+        | Component::Sessions => state(),
         Component::Permission | Component::SignIn => sealed_site(component),
         Component::Question => folded(vec![frame(
             1,
@@ -436,7 +438,10 @@ screen_test!(welcome_backend, Welcome);
 fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
     for component in Component::ALL {
         // Pulled sites wait for their first answer; they have no surface body.
-        if matches!(component, Component::Pane | Component::Status) {
+        if matches!(
+            component,
+            Component::Pane | Component::Status | Component::ModelPicker
+        ) {
             continue;
         }
         let mut state = site(component);
