@@ -100,9 +100,9 @@ pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
                 ui.dialog.aside = false;
                 return crate::input::palette_submit(ui, tree, now);
             }
-            if let Some((_, value)) = rows.get(at) {
-                let mut action = props.action;
-                action.args["value"] = value.clone();
+            if let Some((_, value)) = rows.get(at)
+                && let Some(action) = props.action.with_value(value.clone())
+            {
                 // The client drew these rows itself; no mod answered.
                 return result(ui, tree, &action, true, now);
             }

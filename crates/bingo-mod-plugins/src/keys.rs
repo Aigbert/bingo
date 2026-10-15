@@ -34,8 +34,10 @@ impl Command for Handler {
         cx.host
             .invalidate(&cx.session, vec![request.into()])
             .await?;
-        let mut action = props.action;
-        action.args["value"] = value;
+        let action = props
+            .action
+            .with_value(value)
+            .ok_or_else(|| crate::error(Action::UNVALUED))?;
         Ok(CommandOutcome::Surface {
             action,
             fallback: None,

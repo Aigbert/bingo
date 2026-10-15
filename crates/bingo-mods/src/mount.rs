@@ -19,13 +19,13 @@ pub fn find<'a>(tree: &'a View, key: &str) -> Option<&'a View> {
 }
 pub fn action(tree: &View, key: &str, event: &str, value: Value) -> Result<Action, String> {
     let view = find(tree, key).ok_or_else(|| format!("no element matches {key:?}"))?;
-    let mut action = handlers(view)
+    handlers(view)
         .into_iter()
         .find(|action| action.args["event"] == event)
         .cloned()
-        .ok_or_else(|| format!("{key:?} has no {event} handler"))?;
-    action.args["value"] = value;
-    Ok(action)
+        .ok_or_else(|| format!("{key:?} has no {event} handler"))?
+        .with_value(value)
+        .ok_or_else(|| format!("{key:?} has a {event} handler whose arguments are not an object"))
 }
 
 pub struct Mount {

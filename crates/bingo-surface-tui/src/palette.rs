@@ -212,11 +212,10 @@ pub fn waiting(ui: &Ui, tree: &Tree, now: Now) -> bool {
         || ui.placed.pulled.get(key).is_none()
 }
 pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
-    if let Some(mut action) = handler(ui) {
-        if action.args.is_object()
-            && let Some(chord) = crate::keys::commands::chord(key)
+    if let Some(action) = handler(ui) {
+        if let Some(chord) = crate::keys::commands::chord(key)
+            && let Some(action) = action.with_value(json!({"key":chord}))
         {
-            action.args["value"] = json!({"key":chord});
             return vec![Effect::SiteKey { action, key }];
         }
         return Vec::new();

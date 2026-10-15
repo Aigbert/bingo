@@ -111,8 +111,9 @@ fn resume_request(
         && let Some(bingo_sdk::View::Box { layout, .. }) = previous
         && let Some(action) = &layout.on_key
         && let Some(selected) = action.args["selected"].as_str()
+        && let Some(props) = request.props.as_object_mut()
     {
-        request.props["selected"] = selected.into();
+        props.insert("selected".into(), selected.into());
     }
     request
 }

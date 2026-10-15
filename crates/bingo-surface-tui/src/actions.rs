@@ -135,7 +135,10 @@ impl Pending {
             return Addressed::Held;
         }
         match resolution.action {
-            Some(action) => Addressed::Ready(valued(action, gesture)),
+            Some(action) => match valued(action, gesture) {
+                Some(action) => Addressed::Ready(action),
+                None => Addressed::Stale(binding.notice()),
+            },
             None => Addressed::Stale(binding.notice()),
         }
     }
@@ -150,9 +153,45 @@ impl Pending {
 }
 
 /// The current handler carries the value the person gave the drawn one.
-fn valued(mut action: Action, gesture: &Action) -> Action {
-    if let Some(value) = gesture.args.get("value") {
-        action.args["value"] = value.clone();
+fn valued(action: Action, gesture: &Action) -> Option<Action> {
+    match gesture.args.get("value") {
+        Some(value) => action.with_value(value.clone()),
+        None => Some(action),
     }
-    action
+}
+
+#[cfg(test)]
+mod value_tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn values_keep_existing_arguments_and_accept_null() {
+        for args in [json!(null), json!({"handler":"minted"})] {
+            let action = Action {
+                name: "probe:ui".into(),
+                args: args.clone(),
+            };
+            let gesture = Action {
+                name: "probe:ui".into(),
+                args: json!({"value":"typed"}),
+            };
+            let changed = valued(action, &gesture).unwrap();
+            assert_eq!(changed.args["value"], "typed");
+            assert_eq!(changed.args["handler"], args["handler"]);
+        }
+    }
+    #[test]
+    fn malformed_value_arguments_do_not_panic() {
+        for args in [json!(false), json!(42), json!("text"), json!([])] {
+            let action = Action {
+                name: "probe:ui".into(),
+                args,
+            };
+            let gesture = Action {
+                name: "probe:ui".into(),
+                args: json!({"value":"typed"}),
+            };
+            assert!(valued(action, &gesture).is_none());
+        }
+    }
 }

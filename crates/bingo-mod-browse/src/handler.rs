@@ -92,7 +92,7 @@ async fn load_preview(
     Ok(())
 }
 async fn outcome(
-    mut action: Action,
+    action: Action,
     value: Value,
     request: &str,
     cx: &CommandContext,
@@ -103,7 +103,9 @@ async fn outcome(
             .await?;
         return Ok(CommandOutcome::Handled { handled: true });
     }
-    action.args["value"] = value;
+    let action = action
+        .with_value(value)
+        .ok_or_else(|| crate::error(Action::UNVALUED))?;
     Ok(CommandOutcome::Surface {
         action,
         fallback: None,

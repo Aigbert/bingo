@@ -82,12 +82,10 @@ fn close_action(view: &View) -> Option<bingo_sdk::Action> {
     let View::Box { layout, .. } = view else {
         return None;
     };
-    let mut action = layout.on_key.clone()?;
-    if !action.args.is_object() {
-        return None;
-    }
-    action.args["value"] = serde_json::json!({"key":"ctrl+c"});
-    Some(action)
+    layout
+        .on_key
+        .clone()?
+        .with_value(serde_json::json!({"key":"ctrl+c"}))
 }
 
 fn send_close(run: &mut Run, session: SessionId, action: bingo_sdk::Action) {

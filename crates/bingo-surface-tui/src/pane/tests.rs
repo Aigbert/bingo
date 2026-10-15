@@ -119,3 +119,62 @@ fn pane_keys_use_handlers_and_an_independent_composer() {
         matches!(&closed[..],[crate::effect::Effect::Submit(bingo_sdk::Input::Action{action, ..})] if action.args["event"]=="close")
     );
 }
+
+/// One control alone in the counter pane, focused, and the effects of `key`.
+fn pressed_on(control: View, key: crossterm::event::KeyCode) -> Vec<crate::effect::Effect> {
+    let mut slot = pane(true);
+    if let Slot::Pane { view, .. } = &mut slot {
+        *view = View::column(vec![control]).into();
+    }
+    let state = with(slot);
+    let tree = solo(&state);
+    let (mut ui, now) = scene();
+    ui.sync_panes(&state);
+    draw_tree(80, 24, &tree, &mut ui, now);
+    let key = crossterm::event::KeyEvent::new(key, crossterm::event::KeyModifiers::NONE);
+    crate::input::on_key(&mut ui, &tree, key, now)
+}
+
+/// A control whose arguments are not an object cannot carry the value typed
+/// or chosen: nothing is sent, and nothing panics.
+#[test]
+fn a_select_or_input_over_arguments_that_are_not_an_object_sends_nothing() {
+    use bingo_sdk::view::{InputProps, SelectOption, SelectProps};
+    use crossterm::event::KeyCode;
+    use serde_json::json;
+    for args in [json!("text"), json!(42), json!([1]), json!(true)] {
+        let action = bingo_sdk::Action {
+            name: "counter:ui".into(),
+            args,
+        };
+        let select = View::Select {
+            select: SelectProps {
+                options: Some(vec![SelectOption {
+                    label: "One".into(),
+                    value: "one".into(),
+                }]),
+                on_select: Some(action.clone()),
+                ..Default::default()
+            }
+            .into(),
+        };
+        assert!(pressed_on(select, KeyCode::Enter).is_empty());
+        let typed = View::Input {
+            input: InputProps {
+                on_input: Some(action.clone()),
+                ..Default::default()
+            }
+            .into(),
+        };
+        assert!(pressed_on(typed, KeyCode::Char('x')).is_empty());
+        let submitted = View::Input {
+            input: InputProps {
+                value: Some("x".into()),
+                on_submit: Some(action),
+                ..Default::default()
+            }
+            .into(),
+        };
+        assert!(pressed_on(submitted, KeyCode::Enter).is_empty());
+    }
+}

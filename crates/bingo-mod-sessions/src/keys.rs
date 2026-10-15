@@ -99,9 +99,10 @@ impl Handler {
         };
         cx.host.invalidate(&owner, vec![request.into()]).await?;
         if let Operation::Surface(value) = operation {
-            let mut action: Action =
-                serde_json::from_value(args["action"].clone()).map_err(crate::error)?;
-            action.args["value"] = value;
+            let action = serde_json::from_value::<Action>(args["action"].clone())
+                .map_err(crate::error)?
+                .with_value(value)
+                .ok_or_else(|| crate::error(Action::UNVALUED))?;
             Ok(CommandOutcome::Surface {
                 action,
                 fallback: None,
@@ -221,8 +222,11 @@ impl Handler {
                 json!({"refresh":true})
             }
         };
-        let mut action = props.action.clone();
-        action.args["value"] = value;
+        let action = props
+            .action
+            .clone()
+            .with_value(value)
+            .ok_or_else(|| crate::error(Action::UNVALUED))?;
         Ok(CommandOutcome::Surface {
             action,
             fallback: None,

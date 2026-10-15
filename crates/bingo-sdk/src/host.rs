@@ -174,6 +174,24 @@ pub struct Action {
     pub args: Value,
 }
 
+impl Action {
+    /// Why [`Action::with_value`] refused.
+    pub const UNVALUED: &'static str =
+        "the control's arguments are not an object, so it cannot carry a value";
+
+    /// This action carrying what the person gave a control under `value`.
+    /// Arguments are a drawing's to choose, so they are checked rather than
+    /// indexed: an object keeps its other fields, no arguments become an
+    /// object, and anything else is refused.
+    pub fn with_value(mut self, value: Value) -> Option<Action> {
+        if self.args.is_null() {
+            self.args = Value::Object(serde_json::Map::new());
+        }
+        self.args.as_object_mut()?.insert("value".into(), value);
+        Some(self)
+    }
+}
+
 /// The one submission entry. The kernel parses `/`, `!` and `@` in text and
 /// decides turn, queue, steer or deliver; a client never chooses.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -803,6 +821,36 @@ impl std::ops::Deref for HostHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_value_keeps_object_arguments_and_gives_none_an_object() {
+        for args in [serde_json::json!(null), serde_json::json!({"handler":"h1"})] {
+            let action = Action {
+                name: "probe:ui".into(),
+                args: args.clone(),
+            }
+            .with_value(serde_json::json!({"key":"enter"}))
+            .expect("an object");
+            assert_eq!(action.args["value"]["key"], "enter");
+            assert_eq!(action.args["handler"], args["handler"]);
+        }
+    }
+
+    #[test]
+    fn a_value_is_refused_for_arguments_that_are_not_an_object() {
+        for args in [
+            serde_json::json!("approve p full"),
+            serde_json::json!(42),
+            serde_json::json!(true),
+            serde_json::json!([]),
+        ] {
+            let action = Action {
+                name: "probe:ui".into(),
+                args,
+            };
+            assert_eq!(action.with_value(serde_json::json!("typed")), None);
+        }
+    }
 
     /// The field is new (M68) and the line that never asks for it is the line
     /// every client has always sent: it reads without one and writes none.

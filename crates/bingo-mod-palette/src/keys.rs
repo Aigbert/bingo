@@ -121,11 +121,9 @@ impl Handler {
     }
 }
 fn surface(props: &PaletteProps, operation: Value) -> Result<CommandOutcome, KernelError> {
-    let mut action = props.action.clone();
-    if !action.args.is_object() {
+    let Some(action) = props.action.clone().with_value(operation) else {
         return Ok(CommandOutcome::Handled { handled: false });
-    }
-    action.args["value"] = operation;
+    };
     Ok(CommandOutcome::Surface {
         action,
         fallback: None,

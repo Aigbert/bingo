@@ -126,10 +126,12 @@ pub fn key(ui: &mut Ui, tree: &Tree, event: KeyEvent, now: Now) -> Vec<Effect> {
                 && k.request.props["query"].as_str() == Some(ui.composer.text())
         })
         && let Some(View::Box { layout, .. }) = ui.placed.pulled.get(key)
-        && let Some(mut action) = layout.on_key.clone()
         && let Some(chord) = crate::keys::commands::chord(event)
+        && let Some(action) = layout
+            .on_key
+            .clone()
+            .and_then(|on_key| on_key.with_value(json!({"key":chord})))
     {
-        action.args["value"] = json!({"key":chord});
         return vec![Effect::SiteKey { action, key: event }];
     }
     if event.code == KeyCode::Esc {

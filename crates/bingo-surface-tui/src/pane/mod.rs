@@ -304,14 +304,10 @@ pub fn key_handler(ui: &Ui, state: &SessionState, key: KeyEvent) -> Option<Actio
     let View::Box { layout, .. } = view(ui, state, &pane, seated)? else {
         return None;
     };
-    let mut action = layout.on_key.clone()?;
+    let action = layout.on_key.clone()?;
     // A key names only itself: a key queued behind a redraw would carry a
     // drawing the site has already replaced. The site keeps its own cursor.
-    action.args.as_object_mut()?.insert(
-        "value".into(),
-        serde_json::json!({"key": crate::keys::commands::chord(key)?}),
-    );
-    Some(action)
+    action.with_value(serde_json::json!({"key": crate::keys::commands::chord(key)?}))
 }
 
 pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
@@ -460,11 +456,14 @@ fn select_key(select: &SelectProps, key: KeyEvent) -> Vec<Effect> {
         .map(|action| submit(action, Some(options[index].value.clone())))
         .unwrap_or_default()
 }
-fn submit(mut action: Action, value: Option<String>) -> Vec<Effect> {
-    if let Some(value) = value {
-        action.args["value"] = value.into();
-    }
-    vec![Effect::Submit(crate::acted(action))]
+fn submit(action: Action, value: Option<String>) -> Vec<Effect> {
+    let action = match value {
+        Some(value) => action.with_value(value.into()),
+        None => Some(action),
+    };
+    action
+        .map(|action| vec![Effect::Submit(crate::acted(action))])
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

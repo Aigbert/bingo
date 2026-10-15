@@ -137,7 +137,7 @@ impl Runner {
         principal: &str,
         session: SessionId,
         id: &str,
-        mut action: Action,
+        action: Action,
         value: Option<Value>,
     ) {
         let allowed = self
@@ -149,11 +149,16 @@ impl Runner {
             }
             return;
         }
-        if let Some(value) = value
-            && action.args.is_object()
-        {
-            action.args["value"] = value;
-        }
+        let action = match value {
+            Some(value) => action.with_value(value),
+            None => Some(action),
+        };
+        let Some(action) = action else {
+            if let Err(error) = self.post(bingo_sdk::view::STALE_CONTROL).await {
+                tracing::warn!(%error, "the stale control notice could not be sent");
+            }
+            return;
+        };
         let intent = IntentId::mint();
         let input = Input::action(action, incoming_origin(principal, &self.key));
         self.handle.submit(intent.clone(), input.clone());

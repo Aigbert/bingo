@@ -117,9 +117,10 @@ pub fn waiting(ui: &Ui) -> bool {
         })
 }
 pub fn key(ui: &mut Ui, key: KeyEvent, now: Now) -> Vec<Effect> {
-    if let Some(mut action) = handler(ui) {
-        if let Some(chord) = crate::keys::commands::chord(key) {
-            action.args["value"] = json!({"key":chord});
+    if let Some(action) = handler(ui) {
+        if let Some(chord) = crate::keys::commands::chord(key)
+            && let Some(action) = action.with_value(json!({"key":chord}))
+        {
             return vec![Effect::SiteKey { action, key }];
         }
     } else if key.code == KeyCode::Esc {
@@ -151,4 +152,67 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, vouched: bool, now: Now
         return crate::input::command_line(ui, tree, now, line.into());
     }
     vec![]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bingo_sdk::render::{Component, RenderRequest, SurfaceName, Viewport};
+    use crossterm::event::KeyModifiers;
+
+    fn panel(args: serde_json::Value) -> (Ui, Now) {
+        let now = Now::real();
+        let mut ui = Ui::new(vec![], now.instant);
+        open(&mut ui, PluginsOpen::Plugins, now);
+        let request = RenderRequest {
+            component: Component::Plugins,
+            request_id: request(&ui).unwrap().into(),
+            surface: SurfaceName::Terminal,
+            props: json!({}),
+            viewport: Viewport {
+                place: None,
+                columns: 80,
+                rows: 24,
+            },
+        };
+        let key = crate::pulled::Key::new(&crate::test_support::state(), &request, 80, 24);
+        ui.shown.pulls.push(key.clone());
+        ui.placed.pulled.request(&key);
+        ui.placed.pulled.answer(
+            key,
+            serde_json::from_value(json!({
+                "kind":"Box","onKey":{"name":"probe:ui","args":args},"children":[]
+            }))
+            .unwrap(),
+        );
+        (ui, now)
+    }
+    #[test]
+    fn malformed_key_arguments_are_refused() {
+        for args in [json!(false), json!(42), json!("text"), json!([])] {
+            let (mut ui, now) = panel(args);
+            assert!(
+                key(
+                    &mut ui,
+                    KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+                    now
+                )
+                .is_empty()
+            );
+        }
+    }
+    #[test]
+    fn object_and_null_key_arguments_receive_the_key() {
+        for args in [json!(null), json!({"handler":"minted"})] {
+            let (mut ui, now) = panel(args);
+            let effects = key(
+                &mut ui,
+                KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+                now,
+            );
+            assert!(
+                matches!(&effects[..], [Effect::SiteKey { action, .. }] if action.args["value"]["key"].is_string())
+            );
+        }
+    }
 }

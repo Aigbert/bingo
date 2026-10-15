@@ -201,10 +201,9 @@ pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
             .pulls
             .iter()
             .any(|key| Some(key.request.request_id.as_str()) == request(ui))
-        && let Some(mut action) = handler(ui)
         && let Some(chord) = crate::keys::commands::chord(key)
+        && let Some(action) = handler(ui).and_then(|action| action.with_value(json!({"key":chord})))
     {
-        action.args["value"] = json!({"key":chord});
         return vec![Effect::SiteKey { action, key }];
     }
     if key == KeyEvent::new(KeyCode::Char('f'), crossterm::event::KeyModifiers::CONTROL) {
@@ -239,10 +238,10 @@ pub fn preview(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
     if props.previewed || props.selected.is_none() || tree.viewed().busy() {
         return vec![];
     }
-    let Some(mut action) = handler(ui) else {
+    let Some(action) = handler(ui).and_then(|action| action.with_value(json!({"key":"preview"})))
+    else {
         return vec![];
     };
-    action.args["value"] = json!({"key":"preview"});
     vec![Effect::SiteKey {
         action,
         key: KeyEvent::new(KeyCode::Char('r'), crossterm::event::KeyModifiers::NONE),
