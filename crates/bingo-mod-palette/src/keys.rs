@@ -165,6 +165,24 @@ fn activate(target: Target, props: &PaletteProps) -> Value {
     }
 }
 
+/// A row runs a line only the person may run only when the row shows what
+/// the line runs: its last argument, on the label or beside it.
+fn shown(row: Option<&crate::rows::Row>, operation: Value, props: &PaletteProps) -> Value {
+    let Some(line) = operation["run"].as_str() else {
+        return operation;
+    };
+    let last = line.split_whitespace().last().unwrap_or_default();
+    let visible = row.is_some_and(|row| {
+        [&row.label, &row.hint]
+            .iter()
+            .any(|text| text.split_whitespace().any(|word| word == last))
+    });
+    if visible || !crate::args::person_only(line, &props.commands) {
+        return operation;
+    }
+    json!({"message":format!("not run: this row does not show what {line} runs; type it yourself")})
+}
+
 fn operation(
     cursor: &mut crate::Cursor,
     rows: &[&crate::rows::Row],
@@ -204,6 +222,7 @@ fn operation(
         "enter" => target
             .filter(|target| !matches!(target, Target::Inert))
             .map(|target| activate(target, props))
+            .map(|operation| shown(rows.get(cursor.selected).copied(), operation, props))
             .or_else(|| {
                 (props.query.starts_with('/') && props.query.len() > 1)
                     .then(|| json!({"run":props.query.trim()}))
@@ -304,5 +323,52 @@ mod review_tests {
             matches!(outcome, CommandOutcome::Surface { action, .. } if action.args["value"]["key"] == "ctrl+o")
         );
         assert!(state.lock().unwrap().cursors.is_empty());
+    }
+    /// A link that fills the plugin catalogue names the id `evil` "good".
+    /// The trust row shows `evil`, and a row that hides it runs nothing.
+    #[test]
+    fn a_person_only_row_runs_only_the_argument_it_shows() {
+        let home = tempfile::tempdir().unwrap();
+        let mut props = props();
+        props.open = bingo_sdk::component::PaletteOpen::Commands;
+        props.commands = vec![CatalogEntry {
+            id: "plugins".into(),
+            label: "plugins".into(),
+            meta: json!({"name":"plugins","hint":"plugins","family":"session","args":{"kind":"words","values":["enable","trust"],"person":["trust"],"alone":[],"then":{"kind":"catalog","source":"plugins"}}}),
+        }];
+        props.catalogs.insert(
+            "plugins".into(),
+            vec![CatalogEntry {
+                id: "evil".into(),
+                label: "good".into(),
+                meta: Value::Null,
+            }],
+        );
+        props.query = "/plugins trust ".into();
+        let state = Arc::new(Mutex::new(crate::State {
+            recent: crate::recent::Recent::load(home.path().join("recent.json")),
+            cursors: Default::default(),
+        }));
+        let (groups, _) = crate::draw::groups(&props, &[]);
+        let row = &groups[0].rows[0];
+        assert_eq!((row.label.as_str(), row.hint.as_str()), ("evil", "good"));
+        let outcome = Handler(state).press("opening", "enter", &props).unwrap();
+        assert!(
+            matches!(&outcome, CommandOutcome::Surface { action, .. } if action.args["value"]["run"] == "/plugins trust evil"),
+            "{outcome:?}"
+        );
+        let forged = crate::rows::Row {
+            label: "good".into(),
+            hint: String::new(),
+            alert: None,
+            now: String::new(),
+            marks: vec![],
+            hint_marks: vec![],
+            target: Target::Run("/plugins trust evil".into()),
+        };
+        let run = json!({"run":"/plugins trust evil"});
+        assert!(shown(Some(&forged), run.clone(), &props)["message"].is_string());
+        props.commands[0].meta["args"]["person"] = json!([]);
+        assert_eq!(shown(Some(&forged), run.clone(), &props), run);
     }
 }

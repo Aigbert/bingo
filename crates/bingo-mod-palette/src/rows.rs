@@ -197,7 +197,12 @@ fn binding(key: &str, line: &str, commands: &[CatalogEntry]) -> Option<Row> {
     }
     Some(Row {
         label: key.into(),
-        hint: entry.meta["hint"].as_str().unwrap_or(line).into(),
+        hint: if crate::args::person_only(line, commands) {
+            line
+        } else {
+            entry.meta["hint"].as_str().unwrap_or(line)
+        }
+        .into(),
         alert: None,
         now: entry.meta["now"].as_str().unwrap_or_default().into(),
         marks: vec![],

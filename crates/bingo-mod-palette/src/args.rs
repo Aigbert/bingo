@@ -7,23 +7,52 @@ pub struct Arguments {
     pub rows: Vec<Row>,
     pub selected: usize,
 }
-pub fn arguments(
-    line: &str,
-    commands: &[CatalogEntry],
-    catalogs: &BTreeMap<String, Vec<CatalogEntry>>,
-) -> Option<Arguments> {
-    let (name, text) = line.strip_prefix('/')?.split_once(' ')?;
+/// What every row of one argument level is offered from.
+struct Offer<'a> {
+    catalogs: &'a BTreeMap<String, Vec<CatalogEntry>>,
+    current: &'a str,
+    /// The level's lines are ones only the person may run, so a row shows
+    /// the argument it runs and whatever names it only as secondary text.
+    guarded: bool,
+}
+fn named<'a>(name: &str, commands: &'a [CatalogEntry]) -> Option<(&'a CatalogEntry, CommandSpec)> {
     let entry = commands.iter().find(|entry| {
         entry.id == name
             || entry.meta["aliases"]
                 .as_array()
                 .is_some_and(|aliases| aliases.iter().any(|alias| alias == name))
     })?;
-    let spec: CommandSpec = serde_json::from_value(entry.meta.clone()).ok()?;
+    Some((entry, serde_json::from_value(entry.meta.clone()).ok()?))
+}
+/// Whether `line` is one only the person may run.
+pub fn person_only(line: &str, commands: &[CatalogEntry]) -> bool {
+    line.strip_prefix('/')
+        .and_then(|rest| {
+            let (name, args) = rest.split_once(' ').unwrap_or((rest, ""));
+            named(name, commands).map(|(_, spec)| spec.person_only(args))
+        })
+        .unwrap_or(false)
+}
+pub fn arguments(
+    line: &str,
+    commands: &[CatalogEntry],
+    catalogs: &BTreeMap<String, Vec<CatalogEntry>>,
+) -> Option<Arguments> {
+    let (name, text) = line.strip_prefix('/')?.split_once(' ')?;
+    let (entry, spec) = named(name, commands)?;
     let (args, prefix, query) = resolve(&spec.args, text, format!("/{name} "));
     let current = entry.meta["now"].as_str().unwrap_or_default();
-    let rows = option_rows(&spec.args, text, &format!("/{name} "), catalogs, current)
-        .unwrap_or_else(|| offered(args, &prefix, query, catalogs, current));
+    let offer = Offer {
+        catalogs,
+        current,
+        guarded: spec.person_only(
+            prefix
+                .strip_prefix(&format!("/{name} "))
+                .unwrap_or_default(),
+        ),
+    };
+    let rows = option_rows(&spec.args, text, &format!("/{name} "), &offer)
+        .unwrap_or_else(|| offered(args, &prefix, query, &offer));
     let selected = rows.iter().position(|row| row.now == "now").unwrap_or(0);
     Some(Arguments {
         title: format!("/{name}  {}", spec.hint),
@@ -51,13 +80,8 @@ fn resolve<'a>(args: &'a ArgSpec, text: &'a str, prefix: String) -> (&'a ArgSpec
         _ => (args, prefix, text),
     }
 }
-fn offered(
-    args: &ArgSpec,
-    prefix: &str,
-    query: &str,
-    catalogs: &BTreeMap<String, Vec<CatalogEntry>>,
-    current: &str,
-) -> Vec<Row> {
+fn offered(args: &ArgSpec, prefix: &str, query: &str, offer: &Offer) -> Vec<Row> {
+    let current = offer.current;
     match args {
         ArgSpec::Words {
             person: _,
@@ -77,11 +101,12 @@ fn offered(
                 )
             })
             .collect(),
-        ArgSpec::Catalog { source } => catalogs
+        ArgSpec::Catalog { source } => offer
+            .catalogs
             .get(source)
             .into_iter()
             .flatten()
-            .filter_map(|entry| choice(&entry.id, &entry.label, prefix, query, current, false))
+            .filter_map(|entry| entry_row(entry, prefix, query, offer))
             .collect(),
         ArgSpec::Free { hint } => vec![Row {
             label: if query.is_empty() {
@@ -105,8 +130,21 @@ fn offered(
             hint_marks: vec![],
             target: Target::Run(format!("{prefix}{query}").trim_end().into()),
         }],
-        ArgSpec::Options { args, .. } => offered(args, prefix, query, catalogs, current),
+        ArgSpec::Options { args, .. } => offered(args, prefix, query, offer),
     }
+}
+/// A catalogue entry as a row. On a guarded level the row's label is the
+/// id the line runs; the entry's own label, which whoever filled the
+/// catalogue chose, is only the hint beside it.
+fn entry_row(entry: &CatalogEntry, prefix: &str, query: &str, offer: &Offer) -> Option<Row> {
+    if !offer.guarded {
+        return choice(&entry.id, &entry.label, prefix, query, offer.current, false);
+    }
+    let mut row = choice(&entry.id, &entry.id, prefix, query, offer.current, false)?;
+    if entry.label != entry.id {
+        row.hint = entry.label.clone();
+    }
+    Some(row)
 }
 fn choice(
     value: &str,
@@ -137,18 +175,12 @@ fn choice(
     })
 }
 
-fn option_rows(
-    args: &ArgSpec,
-    text: &str,
-    prefix: &str,
-    catalogs: &BTreeMap<String, Vec<CatalogEntry>>,
-    current: &str,
-) -> Option<Vec<Row>> {
+fn option_rows(args: &ArgSpec, text: &str, prefix: &str, offer: &Offer) -> Option<Vec<Row>> {
     let ArgSpec::Options { args, flags } = args else {
         return None;
     };
     let (head, query) = text.rsplit_once(' ')?;
-    if !offered(args, prefix, head, catalogs, current)
+    if !offered(args, prefix, head, offer)
         .iter()
         .any(|row| matches!(&row.target,Target::Run(line) if line==&format!("{prefix}{head}")))
     {
@@ -172,13 +204,7 @@ fn preview(prefix: &str, query: &str) -> String {
 
 pub fn parent(line: &str, commands: &[CatalogEntry]) -> Option<String> {
     let (name, text) = line.strip_prefix('/')?.split_once(' ')?;
-    let entry = commands.iter().find(|entry| {
-        entry.id == name
-            || entry.meta["aliases"]
-                .as_array()
-                .is_some_and(|aliases| aliases.iter().any(|alias| alias == name))
-    })?;
-    let spec: CommandSpec = serde_json::from_value(entry.meta.clone()).ok()?;
+    let (_, spec) = named(name, commands)?;
     let (_, prefix, _) = resolve(&spec.args, text, format!("/{name} "));
     Some(
         prefix
@@ -191,6 +217,13 @@ pub fn parent(line: &str, commands: &[CatalogEntry]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn offer<'a>(catalogs: &'a BTreeMap<String, Vec<CatalogEntry>>, current: &'a str) -> Offer<'a> {
+        Offer {
+            catalogs,
+            current,
+            guarded: false,
+        }
+    }
     #[test]
     fn words_options_catalog_free_and_none_have_one_argument_path() {
         let catalogs = BTreeMap::new();
@@ -215,7 +248,10 @@ mod tests {
                 flags: vec!["--keep".into()],
             },
         ] {
-            assert_eq!(offered(&args, "/think ", "", &catalogs, "low").len(), 1);
+            assert_eq!(
+                offered(&args, "/think ", "", &offer(&catalogs, "low")).len(),
+                1
+            );
         }
         assert!(
             offered(
@@ -224,8 +260,7 @@ mod tests {
                 },
                 "/model ",
                 "",
-                &catalogs,
-                ""
+                &offer(&catalogs, "")
             )
             .is_empty()
         );
@@ -242,7 +277,7 @@ mod tests {
         assert_eq!(prefix, "/plugins enable ");
         assert_eq!(query, "abc");
         assert!(matches!(
-            offered(&args, "/plugins ", "reload", &catalogs, "")[0].target,
+            offered(&args, "/plugins ", "reload", &offer(&catalogs, ""))[0].target,
             Target::Run(_)
         ));
     }
