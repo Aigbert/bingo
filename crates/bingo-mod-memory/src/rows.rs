@@ -47,21 +47,7 @@ pub fn rows(listing: Listing, entries: Vec<EntryRow>) -> Vec<Group> {
             rows: listing
                 .memories
                 .into_iter()
-                .map(|row| Row {
-                    label: format!(
-                        "{:<7}  {:<9}  {:name_width$}   {}",
-                        row.scope.as_str(),
-                        row.kind.as_str(),
-                        row.name,
-                        row.error.unwrap_or(row.description)
-                    ),
-                    tokens: row.tokens,
-                    target: Target::Memory {
-                        scope: row.scope,
-                        name: row.name,
-                        path: row.path,
-                    },
-                })
+                .map(|row| memory(row, name_width))
                 .collect(),
         },
         Group {
@@ -101,6 +87,23 @@ pub fn rows(listing: Listing, entries: Vec<EntryRow>) -> Vec<Group> {
                 .collect(),
         },
     ]
+}
+fn memory(row: bingo_services::memory::MemoryRow, name_width: usize) -> Row {
+    Row {
+        label: format!(
+            "{:<7}  {:<9}  {:name_width$}   {}",
+            row.scope.as_str(),
+            row.kind.as_str(),
+            row.name,
+            row.error.unwrap_or(row.description)
+        ),
+        tokens: row.tokens,
+        target: Target::Memory {
+            scope: row.scope,
+            name: row.name,
+            path: row.path,
+        },
+    }
 }
 pub fn total(groups: &[Group]) -> u64 {
     groups

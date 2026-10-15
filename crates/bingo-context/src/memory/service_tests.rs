@@ -131,3 +131,31 @@ async fn only_carried_index_lines_count_not_the_body_or_omitted_lines() {
     .unwrap();
     assert_eq!(service.list(list()).await.unwrap().memories[0].tokens, 0);
 }
+
+#[tokio::test]
+async fn an_index_line_linking_two_memories_is_counted_once() {
+    let home = tempfile::tempdir().unwrap();
+    let data = home.path().join("data");
+    let user = dir::user(&data);
+    std::fs::create_dir_all(&user).unwrap();
+    let line = "[a](a.md) and [b](b.md)\n";
+    std::fs::write(user.join("MEMORY.md"), line).unwrap();
+    for name in ["a.md", "b.md"] {
+        std::fs::write(user.join(name), "body").unwrap();
+    }
+    let service = Memories {
+        data,
+        config: home.path().join("config"),
+    };
+    let rows = service
+        .list(List {
+            cwd: home.path().into(),
+        })
+        .await
+        .unwrap()
+        .memories;
+    assert_eq!(
+        rows.iter().map(|row| row.tokens).sum::<u64>(),
+        bingo_sdk::tokens::text(line)
+    );
+}

@@ -133,23 +133,26 @@ async fn list_scope(path: &Path, scope: Scope) -> Result<Vec<MemoryRow>, KernelE
         if !entry.file_type().await.map_err(forget::io)?.is_file() {
             continue;
         }
-        rows.push(row(path, scope.clone(), &carried).await);
+        rows.push(row(path, scope.clone()).await);
     }
     rows.sort_by(|a, b| a.name.cmp(&b.name));
+    for line in carried.split_inclusive('\n') {
+        if let Some(row) = rows
+            .iter_mut()
+            .find(|row| super::index::targets(line, &format!("{}.md", row.name)))
+        {
+            row.tokens += bingo_sdk::tokens::text(line);
+        }
+    }
     Ok(rows)
 }
-async fn row(path: PathBuf, scope: Scope, carried: &str) -> MemoryRow {
+async fn row(path: PathBuf, scope: Scope) -> MemoryRow {
     let name = path
         .file_stem()
         .unwrap_or_default()
         .to_string_lossy()
         .into_owned();
     let read = tokio::fs::read_to_string(&path).await;
-    let tokens = carried
-        .split_inclusive('\n')
-        .filter(|line| super::index::targets(line, &format!("{name}.md")))
-        .map(bingo_sdk::tokens::text)
-        .sum();
     let parsed = read
         .map_err(|e| e.to_string())
         .and_then(|text| file::parse(&name, &text).map_err(|e| e.to_string()));
@@ -172,7 +175,7 @@ async fn row(path: PathBuf, scope: Scope, carried: &str) -> MemoryRow {
         kind,
         description,
         path,
-        tokens,
+        tokens: 0,
         error,
     }
 }
