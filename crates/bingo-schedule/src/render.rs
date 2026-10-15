@@ -10,7 +10,7 @@ use jiff::tz::TimeZone;
 use crate::entry::Entry;
 use crate::store::Shelf;
 
-pub const HEADERS: [&str; 5] = ["id", "spec", "next fire", "enabled", "text"];
+pub const HEADERS: [&str; 6] = ["id", "spec", "next fire", "enabled", "by", "text"];
 
 /// What a store with nothing in it says.
 const NONE: &str = "no schedules yet";
@@ -66,6 +66,7 @@ pub fn row(entry: &Entry, tz: &TimeZone) -> Vec<String> {
         entry.spec.to_string(),
         when(entry.next_fire(tz).as_ref()),
         if entry.enabled { "yes" } else { "no" }.into(),
+        entry.by.word().into(),
         head(&entry.text, HEAD),
     ]
 }
@@ -102,7 +103,8 @@ mod tests {
         assert_eq!(row[1], "every 30m");
         assert_eq!(row[2], "1970-01-01 00:30");
         assert_eq!(row[3], "yes");
-        assert_eq!(row[4], "check whether the nightly build is green");
+        assert_eq!(row[4], "unconfirmed", "nobody's consent is on record");
+        assert_eq!(row[5], "check whether the nightly build is green");
     }
 
     #[test]

@@ -44,7 +44,7 @@ impl Services {
 pub(super) const SURFACE: &str = "command";
 
 /// The one name that is its own prefix.
-const BANG: &str = "!";
+const BANG: &str = bingo_sdk::command::SHELL;
 
 /// Whether a name is the shell line's (ADR-0008 §5).
 pub(crate) fn is_shell(name: &str) -> bool {
@@ -134,21 +134,7 @@ pub(super) fn parse(input: &Input) -> Option<Parsed> {
 }
 
 fn parse_line(text: &str) -> Option<Parsed> {
-    let line = text.trim_start();
-    if let Some(rest) = line.strip_prefix(BANG) {
-        return Some(Parsed {
-            name: BANG.into(),
-            args: rest.trim().to_string(),
-        });
-    }
-    let rest = line.strip_prefix('/')?;
-    let (name, args) = match rest.split_once(char::is_whitespace) {
-        Some((name, args)) => (name, args.trim()),
-        None => (rest.trim_end(), ""),
-    };
-    if name.is_empty() {
-        return None;
-    }
+    let (name, args) = bingo_sdk::command::command_line(text)?;
     Some(Parsed {
         name: name.to_string(),
         args: args.to_string(),

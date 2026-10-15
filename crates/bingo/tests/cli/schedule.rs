@@ -49,6 +49,18 @@ fn write_entry(
     .unwrap();
 }
 
+/// Mark a written entry as asked for by `by` — `person` or `tool` — as the
+/// person's `/schedule add` or the model's `ScheduleCreate` would have.
+fn asked_by(home: &Path, id: &str, by: &str) {
+    let mut entry = entry_of(home, id);
+    entry["by"] = serde_json::json!(by);
+    std::fs::write(
+        schedules(home).join(format!("{id}.json")),
+        serde_json::to_string_pretty(&entry).unwrap(),
+    )
+    .unwrap();
+}
+
 fn entry_of(home: &Path, id: &str) -> serde_json::Value {
     let text = std::fs::read_to_string(schedules(home).join(format!("{id}.json")))
         .unwrap_or_else(|e| panic!("{id}.json: {e}"));
@@ -212,6 +224,10 @@ fn the_create_tool_writes_one_entry_a_person_can_read() {
     assert_eq!(entry["cwd"], home.path().to_string_lossy().as_ref());
     assert_eq!(entry["enabled"], true);
     assert!(entry.get("lastFired").is_none(), "it has not fired yet");
+    assert_eq!(
+        entry["by"], "tool",
+        "the model asked for it, not the person"
+    );
 }
 
 #[test]
@@ -393,6 +409,96 @@ fn a_stored_mode_cannot_grant_permission_to_a_scheduled_turn() {
         !target.exists(),
         "an unconsented stored mode allowed a write: {journal}"
     );
+    let journal = until("the refusal was said in the transcript", || {
+        transcript(home.path(), "schedule/ffff6666").filter(|text| text.contains(REFUSED))
+    });
+    assert!(journal.contains("acceptEdits"), "{journal}");
+    running.stop();
+}
+
+/// The code a refused fire is noticed under (ADR-0094 §5).
+const REFUSED: &str = "schedule.refused";
+
+/// The person's own entry carries their consent to its mode (ADR-0094 §2).
+#[test]
+fn a_persons_stored_mode_widens_their_scheduled_turn() {
+    let home = tempfile::tempdir().unwrap();
+    let target = home.path().join("written-by-their-schedule.txt");
+    write_entry(
+        home.path(),
+        "abab1212",
+        "every 1h",
+        "write the file",
+        Timestamp::now() - SignedDuration::from_hours(2),
+        Some("acceptEdits"),
+    );
+    asked_by(home.path(), "abab1212", "person");
+    let script = script(&format!(
+        r#"{{"responses":[
+            {{"steps":[{{"toolCall":{{"name":"Write","input":{{
+                "file_path":{},
+                "content":"the person's schedule wrote this\n"
+            }}}}}}]}},
+            {{"steps":[{{"text":"Written."}}]}}
+        ]}}"#,
+        serde_json::to_string(&target).unwrap()
+    ));
+    let running = Running::unattended(home.path(), &script);
+
+    until("the person's scheduled write landed", || {
+        target.exists().then_some(())
+    });
+    running.stop();
+}
+
+/// The person's command line runs as the command it names: `/wake` answers
+/// without a model, which the empty script would have failed.
+#[test]
+fn a_persons_command_line_runs_as_the_command() {
+    let home = tempfile::tempdir().unwrap();
+    write_entry(
+        home.path(),
+        "cdcd3434",
+        "every 1h",
+        "/wake",
+        Timestamp::now() - SignedDuration::from_hours(2),
+        None,
+    );
+    asked_by(home.path(), "cdcd3434", "person");
+    let script = script(r#"{"responses":[]}"#);
+    let running = Running::start(home.path(), &script);
+
+    let journal = until("the command answered", || {
+        transcript(home.path(), "schedule/cdcd3434")
+            .filter(|text| text.contains("no wake is standing"))
+    });
+    assert!(!journal.contains(REFUSED), "{journal}");
+    running.stop();
+}
+
+/// Anyone else's command line reaches the model as prose, and the person is
+/// told why it did not run (ADR-0094 §3, §5).
+#[test]
+fn a_models_command_line_reaches_the_model_as_prose_and_says_so() {
+    let home = tempfile::tempdir().unwrap();
+    write_entry(
+        home.path(),
+        "efef5656",
+        "every 1h",
+        "/wake",
+        Timestamp::now() - SignedDuration::from_hours(2),
+        None,
+    );
+    asked_by(home.path(), "efef5656", "tool");
+    let script = script(r#"{"responses":[{"steps":[{"text":"read as prose"}]}]}"#);
+    let running = Running::start(home.path(), &script);
+
+    let journal = until("the model heard the line", || {
+        transcript(home.path(), "schedule/efef5656")
+            .filter(|text| text.contains("read as prose") && text.contains(REFUSED))
+    });
+    assert!(!journal.contains("no wake is standing"), "{journal}");
+    assert!(journal.contains("/schedule confirm efef5656"), "{journal}");
     running.stop();
 }
 

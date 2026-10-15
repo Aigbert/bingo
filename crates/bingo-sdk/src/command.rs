@@ -167,6 +167,26 @@ pub fn split_verb(text: &str) -> (&str, &str) {
     (&text[..end], text[end..].trim())
 }
 
+/// The prefix that is its own command name: `!rest` is the shell line.
+pub const SHELL: &str = "!";
+
+/// The command a typed line names, and its argument text: `!rest` is the
+/// shell's, `/name rest` is `name`'s, and anything else is prose (`None`).
+/// The kernel reads a person's line with this, and so does anything that
+/// must know beforehand whether a line it holds will run as a command.
+pub fn command_line(text: &str) -> Option<(&str, &str)> {
+    let line = text.trim_start();
+    if let Some(rest) = line.strip_prefix(SHELL) {
+        return Some((SHELL, rest.trim()));
+    }
+    let rest = line.strip_prefix('/')?;
+    let (name, args) = match rest.split_once(char::is_whitespace) {
+        Some((name, args)) => (name, args.trim()),
+        None => (rest.trim_end(), ""),
+    };
+    (!name.is_empty()).then_some((name, args))
+}
+
 impl ArgSpec {
     /// The words a line only the person may run starts with.
     pub fn person_words(&self) -> &[String] {
@@ -473,3 +493,18 @@ mod ui_name_tests {
     }
 }
 
+#[cfg(test)]
+mod line_tests {
+    use super::command_line;
+
+    #[test]
+    fn a_line_names_a_command_only_when_it_starts_with_one() {
+        assert_eq!(command_line("!ls -la "), Some(("!", "ls -la")));
+        assert_eq!(command_line("  /wake off"), Some(("wake", "off")));
+        assert_eq!(command_line("/help"), Some(("help", "")));
+        assert_eq!(command_line("/model\tnext"), Some(("model", "next")));
+        for prose in ["check the build", "/", "/ wake", "", "a /wake"] {
+            assert_eq!(command_line(prose), None, "{prose:?}");
+        }
+    }
+}

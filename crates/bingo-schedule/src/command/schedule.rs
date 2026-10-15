@@ -1,12 +1,16 @@
 //! `/schedule`: the store as a person reads it — one row per entry, and the
-//! line that says whether anything here will fire them (ADR-0019 §7).
+//! line that says whether anything here will fire them (ADR-0019 §7) — and
+//! the person's own `add` and `confirm` (ADR-0094).
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bingo_sdk::{ArgSpec, Command, CommandContext, CommandOutcome, CommandSpec, KernelError};
+use bingo_sdk::{
+    ArgSpec, Command, CommandContext, CommandOutcome, CommandSpec, ErrorCode, KernelError,
+};
 use jiff::tz::TimeZone;
 
+use super::consent::{self, ADD, CONFIRM};
 use crate::render;
 use crate::schedules::Schedules;
 
@@ -31,23 +35,46 @@ impl Command for ScheduleCommand {
             name: "schedule".into(),
             aliases: vec!["schedules".into()],
             hint: "what fires later, and whether anything will fire it".into(),
-            args: ArgSpec::None,
-            // Reading a directory of small files touches nothing a turn is
-            // using.
+            args: ArgSpec::Words {
+                alone: vec![],
+                values: vec![ADD.into(), CONFIRM.into()],
+                // Both write the person's consent into an entry: no link
+                // rewrites them and no drawing may send one.
+                person: vec![ADD.into(), CONFIRM.into()],
+                then: Some(Box::new(ArgSpec::Free {
+                    hint: "<spec> [as <mode>] -- <text> | <id>".into(),
+                })),
+            },
+            // Reading or writing a directory of small files touches nothing
+            // a turn is using.
             instant: true,
             family: "schedule".into(),
         }
     }
 
-    async fn run(&self, _args: &str, _cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
-        Ok(CommandOutcome::View {
+    async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
+        match bingo_sdk::command::split_verb(args) {
+            ("", _) => Ok(self.listed()),
+            (ADD, rest) => consent::add(&self.schedules, rest, cx),
+            (CONFIRM, rest) => consent::confirm(&self.schedules, rest),
+            (other, _) => Err(KernelError::new(
+                ErrorCode::InvalidInput,
+                format!("/schedule takes `{ADD}` or `{CONFIRM}`, not `{other}`"),
+            )),
+        }
+    }
+}
+
+impl ScheduleCommand {
+    fn listed(&self) -> CommandOutcome {
+        CommandOutcome::View {
             view: render::view(
                 &self.schedules.store().load(),
                 &self.schedules.holder(),
                 self.schedules.trouble().as_deref(),
                 &TimeZone::system(),
             ),
-        })
+        }
     }
 }
 
@@ -101,13 +128,87 @@ mod tests {
     }
 
     #[test]
-    fn the_spec_runs_now_and_takes_nothing() {
+    fn the_spec_runs_now_and_its_verbs_are_the_persons() {
         let fixture = Fixture::new();
         let spec = ScheduleCommand::new(fixture.schedules.clone()).spec();
         assert_eq!(spec.name, "schedule");
         assert_eq!(spec.aliases, ["schedules"]);
         assert!(spec.instant, "reading a directory never waits for a turn");
-        assert_eq!(spec.args, ArgSpec::None);
+        assert!(spec.person_only("add every 1h -- x"));
+        assert!(spec.person_only("confirm abcd"));
+        assert!(!spec.person_only(""));
         assert_eq!(spec.family, "schedule");
+    }
+
+    async fn ran(
+        fixture: &Fixture,
+        asked: bool,
+        args: &str,
+    ) -> Result<CommandOutcome, KernelError> {
+        let command = ScheduleCommand::new(fixture.schedules.clone());
+        bingo_sdk::render::under_input(asked, command.run(args, &fixture.command())).await
+    }
+
+    #[tokio::test]
+    async fn the_persons_add_writes_an_entry_that_is_theirs() {
+        let fixture = Fixture::new();
+        ran(&fixture, true, "add every 1h as acceptEdits -- /wake")
+            .await
+            .expect("an asked add");
+        let shelf = fixture.shelf();
+        let entry = &shelf.entries[0];
+        assert!(entry.asked(), "{entry:?}");
+        assert_eq!(entry.text, "/wake");
+        assert_eq!(entry.permission_mode.as_deref(), Some("acceptEdits"));
+        assert_eq!(entry.cwd, fixture.cwd());
+    }
+
+    #[tokio::test]
+    async fn an_add_or_confirm_nobody_asked_for_writes_nothing() {
+        let fixture = Fixture::new();
+        let refused = ran(&fixture, false, "add every 1h -- /wake").await;
+        assert_eq!(
+            refused.expect_err("refused").code,
+            ErrorCode::PermissionDenied
+        );
+        assert!(fixture.shelf().is_empty());
+
+        fixture.schedules.store().save(&entry()).expect("an entry");
+        let refused = ran(&fixture, false, "confirm abcd").await;
+        assert_eq!(
+            refused.expect_err("refused").code,
+            ErrorCode::PermissionDenied
+        );
+        assert!(!fixture.shelf().entries[0].asked(), "still unconfirmed");
+    }
+
+    #[tokio::test]
+    async fn the_persons_confirm_makes_an_entry_theirs_and_keeps_the_rest() {
+        let fixture = Fixture::new();
+        let before = Entry {
+            permission_mode: Some("acceptEdits".into()),
+            ..entry()
+        };
+        fixture.schedules.store().save(&before).expect("an entry");
+        ran(&fixture, true, "confirm abcd")
+            .await
+            .expect("confirmed");
+        let after = &fixture.shelf().entries[0];
+        assert!(after.asked());
+        assert_eq!(
+            Entry {
+                by: before.by,
+                ..after.clone()
+            },
+            before,
+            "only who asked changed"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_word_it_does_not_take_is_refused() {
+        let fixture = Fixture::new();
+        let refused = ran(&fixture, true, "pause abcd").await;
+        assert_eq!(refused.expect_err("refused").code, ErrorCode::InvalidInput);
     }
 }

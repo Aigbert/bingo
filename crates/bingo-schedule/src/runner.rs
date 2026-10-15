@@ -13,23 +13,28 @@
 //! that fired something recomputes at once rather than trusting a schedule
 //! it has just changed.
 
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use bingo_sdk::{
     Action, Attachment, CancellationToken, ClientIdentity, Delivery, ErrorCode, HostHandle, Input,
-    IntentId, KernelError, OpenOptions, Origin, SessionSelector, SessionSpec,
+    IntentId, KernelError, Level, OpenOptions, Origin, SessionSelector, SessionSpec,
 };
 use jiff::Zoned;
 use tokio::sync::Notify;
 
 use crate::entry::Entry;
 use crate::render;
+use crate::signed::{self, asked_origin};
 use crate::store::Store;
 
 /// The surface a scheduled turn comes from; a person's says `tui` or
 /// `print`.
 pub const SURFACE: &str = "schedule";
+
+/// The code a refused mode or command line is noticed under.
+const REFUSED: &str = "schedule.refused";
 
 /// How long the loop will sleep without looking at the store again. The
 /// tools ring the bell when they change it; a person editing a file by hand
@@ -83,6 +88,9 @@ pub struct Runner {
     changed: Arc<Notify>,
     /// Where a fire that never became a turn is left for a person to find.
     trouble: Arc<Mutex<Option<String>>>,
+    /// Every refusal already said to the person in this process: an entry
+    /// that fires every minute is told once, not once a minute.
+    said: Mutex<HashSet<String>>,
     cancel: CancellationToken,
 }
 
@@ -99,6 +107,7 @@ impl Runner {
             host,
             changed,
             trouble,
+            said: Mutex::default(),
             cancel,
         }
     }
@@ -170,16 +179,9 @@ impl Runner {
 
     /// The entry's own session, opened or continued, told what to do.
     async fn turn(&self, entry: &Entry) -> Result<(), KernelError> {
-        let attachment = self.session(entry).await?;
-        self.choose_mode(entry, &attachment);
-        self.host
-            .deliver(
-                &attachment.session,
-                IntentId::mint(),
-                Input::text(entry.text.clone(), origin()),
-                Delivery::Wake,
-            )
-            .await
+        let mut attachment = self.session(entry).await?;
+        self.choose_mode(entry, &mut attachment).await;
+        self.say(entry, &mut attachment).await
     }
 
     /// The session keyed `schedule/<id>`: the one this entry has been
@@ -199,22 +201,77 @@ impl Runner {
         }
     }
 
-    /// Stored modes carry no person consent; the command may only tighten
-    /// the current policy. Unknown or widening modes leave it intact.
-    fn choose_mode(&self, entry: &Entry, attachment: &Attachment) {
+    /// The entry's mode, set before its text (ADR-0094 §2). The person's own
+    /// entry asks for it as they would have typed it, so it may widen; any
+    /// other entry's is the schedule's word and may only keep or tighten.
+    /// A refusal leaves the session's mode and is said where a person looks.
+    async fn choose_mode(&self, entry: &Entry, attachment: &mut Attachment) {
         let Some(mode) = &entry.permission_mode else {
             return;
         };
-        attachment.handle.submit(
-            IntentId::mint(),
-            Input::action(
+        let input = match entry.asked() {
+            true => Input::text(format!("/permission {mode}"), asked_origin()),
+            false => Input::action(
                 Action {
                     name: "permission".into(),
                     args: serde_json::Value::String(mode.clone()),
                 },
                 origin(),
             ),
-        );
+        };
+        if let Err(error) = signed::submitted(attachment, input, &self.cancel).await {
+            let why = format!(
+                "its mode {mode} was refused ({}); the turn runs in the session's own mode",
+                error.message
+            );
+            self.refused(entry, &why).await;
+        }
+    }
+
+    /// The entry's text: the person's own command line runs as the command
+    /// it names; everything else is prose to the model, delivered as a wake.
+    async fn say(&self, entry: &Entry, attachment: &mut Attachment) -> Result<(), KernelError> {
+        let command = bingo_sdk::command::command_line(&entry.text).is_some();
+        if command && entry.asked() {
+            let line = Input::text(entry.text.clone(), asked_origin());
+            if let Err(error) = signed::submitted(attachment, line, &self.cancel).await {
+                let why = format!("its command line was refused: {}", error.message);
+                self.refused(entry, &why).await;
+            }
+            return Ok(());
+        }
+        if command {
+            let why = format!(
+                "no ask of the person's is on record for it, so its command line went to \
+                 the model as prose; `/schedule confirm {}` makes it theirs",
+                entry.id
+            );
+            self.refused(entry, &why).await;
+        }
+        self.host
+            .deliver(
+                &attachment.session,
+                IntentId::mint(),
+                Input::text(entry.text.clone(), origin()),
+                Delivery::Wake,
+            )
+            .await
+    }
+
+    /// A refusal, where a person finds it: the `/schedule` badge every time,
+    /// and a transcript notice the first time this process sees it.
+    async fn refused(&self, entry: &Entry, why: &str) {
+        let said = format!("schedule {}: {why}", entry.id);
+        tracing::warn!("{said}");
+        *self.trouble.lock().unwrap_or_else(|held| held.into_inner()) = Some(said.clone());
+        let first = self
+            .said
+            .lock()
+            .unwrap_or_else(|held| held.into_inner())
+            .insert(said.clone());
+        if first && let Err(error) = self.host.notice(Level::Warn, REFUSED, &said).await {
+            tracing::debug!(%error, "a schedule refusal reached no transcript");
+        }
     }
 }
 

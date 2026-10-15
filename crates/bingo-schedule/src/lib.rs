@@ -14,7 +14,8 @@
 //! - [`entry`] — one schedule, and the session key it fires on.
 //! - [`store`] — the directory, rebuilt on every read.
 //! - [`lock`] — one runner per store, held by an OS file lock.
-//! - [`runner`] — the timer loop, and the pure pass that decides it.
+//! - [`runner`] — the timer loop, and the pure pass that decides it;
+//!   `signed` is what a fire submits under whose name.
 //! - [`schedules`] — what this process has: the store, the claim, the bell.
 //! - [`wake`] and [`wakes`] — the model's own `once` on its own session:
 //!   what one is, and the process-local shelf and loop that deliver it.
@@ -32,6 +33,7 @@ pub mod lock;
 mod render;
 pub mod runner;
 pub mod schedules;
+mod signed;
 pub mod spec;
 pub mod store;
 mod supervisor;

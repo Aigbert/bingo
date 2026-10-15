@@ -18,6 +18,38 @@ use crate::spec::Spec;
 /// this is ours.
 const OWNER: &str = "schedule";
 
+/// Who asked for an entry (ADR-0019 §9). Only the person's own asked
+/// `/schedule add` or `/schedule confirm` is consent: such an entry's
+/// command line runs as a command and its mode may widen. Anything else is
+/// prose to the model under a mode that may only tighten.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Provenance {
+    /// No record of who asked: a file from before the key, or one written
+    /// by hand without it. Never read as consent.
+    #[default]
+    Unrecorded,
+    /// Proposed by a tool call: the model's, whoever approved the card.
+    Tool,
+    /// The person's own asked command.
+    Person,
+}
+
+impl Provenance {
+    fn is_unrecorded(&self) -> bool {
+        *self == Self::Unrecorded
+    }
+
+    /// How a row says it.
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Unrecorded => "unconfirmed",
+            Self::Tool => "model",
+            Self::Person => "you",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Entry {
@@ -36,6 +68,8 @@ pub struct Entry {
     pub created: Timestamp,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_fired: Option<Timestamp>,
+    #[serde(default, skip_serializing_if = "Provenance::is_unrecorded")]
+    pub by: Provenance,
 }
 
 impl Entry {
@@ -71,6 +105,11 @@ impl Entry {
         }
     }
 
+    /// Whether the person asked for this entry themselves.
+    pub fn asked(&self) -> bool {
+        self.by == Provenance::Person
+    }
+
     /// The file, as it is written and as the creation card shows it: one
     /// rendering, so what a person approved is what lands on disk.
     pub fn document(&self) -> Result<String, serde_json::Error> {
@@ -92,6 +131,7 @@ pub(crate) mod tests {
             enabled: true,
             created: Timestamp::UNIX_EPOCH,
             last_fired: None,
+            by: Provenance::Unrecorded,
         }
     }
 
@@ -101,6 +141,7 @@ pub(crate) mod tests {
         let written = Entry {
             permission_mode: Some("acceptEdits".into()),
             last_fired: Some(Timestamp::UNIX_EPOCH + jiff::SignedDuration::from_hours(1)),
+            by: Provenance::Person,
             ..entry()
         }
         .document()
@@ -114,7 +155,8 @@ pub(crate) mod tests {
   "permissionMode": "acceptEdits",
   "enabled": true,
   "created": "1970-01-01T00:00:00Z",
-  "lastFired": "1970-01-01T01:00:00Z"
+  "lastFired": "1970-01-01T01:00:00Z",
+  "by": "person"
 }
 "#
         );
@@ -128,9 +170,25 @@ pub(crate) mod tests {
         let written = entry().document().expect("json");
         assert!(!written.contains("permissionMode"), "{written}");
         assert!(!written.contains("lastFired"), "{written}");
+        assert!(!written.contains("\"by\""), "{written}");
         let read: Entry = serde_json::from_str(&written).expect("it reads back");
         assert_eq!(read.permission_mode, None);
         assert_eq!(read.last_fired, None);
+        assert_eq!(read.by, Provenance::Unrecorded);
+        assert!(!read.asked(), "a file with no record is nobody's consent");
+    }
+
+    #[test]
+    fn who_asked_reads_back_and_an_unknown_asker_is_no_entry() {
+        for (by, asked) in [("tool", false), ("person", true)] {
+            let file = format!(
+                r#"{{"spec":"every 1h","text":"t","cwd":"/","enabled":true,"created":"1970-01-01T00:00:00Z","by":"{by}"}}"#
+            );
+            let read: Entry = serde_json::from_str(&file).expect("it reads");
+            assert_eq!(read.asked(), asked, "{by}");
+        }
+        let wrong = r#"{"spec":"every 1h","text":"t","cwd":"/","enabled":true,"created":"1970-01-01T00:00:00Z","by":"someone"}"#;
+        assert!(serde_json::from_str::<Entry>(wrong).is_err());
     }
 
     /// A wake was a key of this format for one day (ADR-0019 §8, 2026-09-04)

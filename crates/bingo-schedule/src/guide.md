@@ -29,13 +29,42 @@ the usual way to have one.
 The person sees the file the call would write before it is written, and the
 receipt gives the id.
 
-`ScheduleList` is every entry — `id`, `spec`, `next fire`, `enabled`, `text` —
-and the line saying whether any process runs them. `ScheduleForget` deletes one
+`ScheduleList` is every entry — `id`, `spec`, `next fire`, `enabled`, `by`,
+`text` — and the line saying whether any process runs them. `ScheduleForget` deletes one
 by a unique prefix of its id; turns it has already run are transcripts of their
 own and are untouched. There is no cap, no expiry and no other pruning.
 
 Every id is a unique prefix. One that names nothing, or several, comes back as
 a sentence to act on rather than a failed call.
+
+### Whose entry it is
+
+The `by` column says who asked for the entry, and that decides what a fire
+may do:
+
+- `you` — written by the person's own `/schedule add` or made theirs by
+  `/schedule confirm`. Its text runs as the person typed it: a `/command`
+  line runs as that command, a `!` line runs in the shell, and its stored
+  mode is applied as the person's own `/permission` would be, so it may
+  widen the session's mode.
+- `model` — written by `ScheduleCreate`. Its text is prose for the model,
+  even a line that begins with `/` or `!`, and its mode only keeps or
+  tightens.
+- `unconfirmed` — an entry from before this column existed. It is treated
+  like the model's until the person confirms it.
+
+`/schedule add <spec> [as <mode>] -- <text>` writes an entry as the
+person's, working in this session's directory: `/schedule add every 30m --
+/wake`, `/schedule add daily at 09:00 as acceptEdits -- tidy the docs`.
+`/schedule confirm <id>` makes an entry the person has read theirs, text
+and mode exactly as listed. Both count only as a line the person typed
+themselves; sent by a model, a mod, a button or a chat correspondent, they
+are refused.
+
+A fire that is refused — a command line or a wider mode on an entry that is
+not the person's — is never silent. The `/schedule` listing names the entry
+and what was refused under its table, and the first such refusal in a
+process also raises a warning notice. A refused command line still reaches the model, as prose.
 
 ### What a fire is
 

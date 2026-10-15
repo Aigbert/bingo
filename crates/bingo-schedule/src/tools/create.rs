@@ -15,7 +15,7 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::entry::Entry;
+use crate::entry::{Entry, Provenance};
 use crate::schedules::Schedules;
 use crate::{diff, render, tools};
 
@@ -26,9 +26,9 @@ const UNNAMED: &str = "<new>";
 const DESCRIPTION: &str = "\
 Set work to happen later, or over and over: `every 30m`, `daily at 09:00` \
 (the machine's own clock), `once at 2026-09-01T09:00:00-07:00`. When it \
-fires, `text` is delivered as a turn on a session of the schedule's own — a \
-prompt, or a `/command` line — and everything it does lands in that \
-session's transcript. Nobody is watching it, so write a `text` that stands \
+fires, `text` is delivered as prose to a turn on a session of the \
+schedule's own — a line starting with `/` or `!` too — and everything it \
+does lands in that session's transcript. A stored mode can only tighten. Nobody is watching it, so write a `text` that stands \
 on its own and needs no answer from anyone. Schedules fire only while a \
 bingo process is running; there is no daemon. The person sees the entry \
 this would write before it is written.";
@@ -73,6 +73,9 @@ impl Create {
             enabled: true,
             created: now,
             last_fired: None,
+            // A card a person approved shows the file, not their own ask:
+            // the model proposed it, so it is prose and tighten-only.
+            by: Provenance::Tool,
         })
     }
 }
@@ -219,6 +222,8 @@ mod tests {
         let entry = &fixture.shelf().entries[0];
         assert_eq!(entry.cwd, PathBuf::from("/elsewhere"));
         assert_eq!(entry.permission_mode.as_deref(), Some("acceptEdits"));
+        assert_eq!(entry.by, Provenance::Tool, "the model proposed it");
+        assert!(!entry.asked(), "an approved card is not the person's ask");
     }
 
     #[tokio::test]
