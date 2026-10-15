@@ -1,9 +1,20 @@
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Guess {
     pub name: String,
     pub shape: String,
     pub address: String,
     pub key: Option<String>,
+}
+/// A picker's state is logged and asserted on; the key it holds never is.
+impl std::fmt::Debug for Guess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Guess")
+            .field("name", &self.name)
+            .field("shape", &self.shape)
+            .field("address", &self.address)
+            .field("key", &self.key.as_ref().map(|_| "[pasted]"))
+            .finish()
+    }
 }
 pub fn guess(value: &str, names: &[String]) -> Option<Guess> {
     let value = unwrapped(value);
@@ -121,6 +132,13 @@ mod tests {
         ] {
             assert!(guess(value, &[]).is_none());
         }
+    }
+    #[test]
+    fn debug_never_shows_a_pasted_key() {
+        let guess = guess("sk-ant-dummy-secret", &[]).unwrap();
+        let printed = format!("{guess:?}");
+        assert!(!printed.contains("sk-ant-dummy-secret"), "{printed}");
+        assert!(printed.contains("[pasted]"), "{printed}");
     }
     #[test]
     fn a_wrapped_paste_keeps_one_clean_key() {
