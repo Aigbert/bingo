@@ -318,21 +318,12 @@ fn paste_keeps_the_host_editor() {
         View::column(vec![View::text("sign-in frame"), key.request.engine()]),
     );
     assert!(draw_tree(80, 24, &tree, &mut ui, now).contains("sign-in frame"));
-    crate::input::on_key(
-        &mut ui,
-        &tree,
-        KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
-        now,
-    );
     assert!(ui.dialog.words.is_some());
-    for ch in "test-token".chars() {
-        crate::input::on_key(
-            &mut ui,
-            &tree,
-            KeyEvent::new(KeyCode::Char(ch), KeyModifiers::NONE),
-            now,
-        );
-    }
+    crate::input::on_paste(&mut ui, "test-token");
+    let frame = draw_tree(80, 24, &tree, &mut ui, now);
+    assert!(!frame.contains("test-token"));
+    assert!(frame.contains("••"));
+    assert!(ui.composer.is_empty());
     let effects = crate::input::on_key(
         &mut ui,
         &tree,

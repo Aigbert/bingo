@@ -855,3 +855,29 @@ async fn a_synchronous_browse_projection_owes_the_frame_with_its_matches() {
     assert!(screen.last().contains("matches: 1"), "{}", screen.last());
     assert!(!run.behind, "a settled projection does not keep ticking");
 }
+
+#[tokio::test]
+async fn a_login_opened_after_typing_keeps_paste_out_of_the_composer() {
+    let mut state = state();
+    let mut open = permission(None, None);
+    open.kind = bingo_sdk::InteractionKind::Login {
+        provider: "example".into(),
+        flow: bingo_sdk::LoginFlow::Paste,
+    };
+    open.answers = vec![bingo_sdk::AnswerSpec::Text, bingo_sdk::AnswerSpec::Cancel];
+    state.interactions = vec![open];
+    let now = still(scene().1);
+    let mut run = tests::idle_in(state, Arc::new(TestSession::default()), now.instant);
+    run.ui.last_typed = Some(now.wall);
+    interactions::refocus_at(&mut run, now.wall);
+    assert!(!run.ui.dialog.aside);
+    run.terminal_event(Term::Paste("sk-dummy-never-unmasked".into()));
+    let mut screen = Recorder::default();
+    run.paint(&mut screen, Wake::Frame, now).unwrap();
+    assert!(!screen.last().contains("sk-dummy-never-unmasked"));
+    assert_eq!(
+        run.ui.dialog.words.as_ref().unwrap().text(),
+        "sk-dummy-never-unmasked"
+    );
+    assert!(run.ui.composer.is_empty());
+}

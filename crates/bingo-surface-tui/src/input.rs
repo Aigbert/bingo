@@ -374,6 +374,15 @@ fn suggestions(ui: &Ui, tree: &Tree) -> Vec<commands::Suggestion> {
 
 /// A bracketed paste lands verbatim wherever the caret is.
 pub fn on_paste(ui: &mut Ui, text: &str) {
+    if ui.dialog.current().is_some() && !ui.dialog.aside {
+        if let Some(words) = &mut ui.dialog.words {
+            words.insert(text);
+        }
+        return;
+    }
+    if matches!(ui.focus, crate::focus::Focus::Pane(_)) {
+        return;
+    }
     ui.composer.insert(text);
     ui.edited();
 }
@@ -3180,4 +3189,15 @@ pub(crate) fn palette_edit(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) ->
 }
 pub(crate) fn palette_submit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     submit(ui, tree, now, Delivery::default())
+}
+
+#[cfg(test)]
+mod paste_focus_tests {
+    #[test]
+    fn paste_waiting_for_a_panes_editor_cannot_spill_into_the_composer() {
+        let (mut ui, _) = crate::test_support::scene();
+        ui.focus = crate::focus::Focus::Pane("picker".into());
+        super::on_paste(&mut ui, "sk-dummy-never-unmasked");
+        assert!(ui.composer.is_empty());
+    }
 }

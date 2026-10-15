@@ -53,6 +53,17 @@ impl Dialog {
             *self = Self {
                 current: id,
                 focus: interaction.map_or(0, crate::ask::options::initial),
+                words: interaction
+                    .filter(|i| {
+                        matches!(
+                            i.kind,
+                            InteractionKind::Login {
+                                flow: LoginFlow::Paste,
+                                ..
+                            }
+                        )
+                    })
+                    .map(|_| Composer::default()),
                 ..Self::default()
             };
         }
@@ -318,9 +329,14 @@ pub fn rows(
     }
     for (index, option) in options(interaction).iter().enumerate() {
         out.extend(
-            option_lines(dialog, index, option)
-                .into_iter()
-                .map(|line| (line, Some(index))),
+            option_lines(
+                dialog,
+                index,
+                option,
+                matches!(interaction.kind, InteractionKind::Login { .. }),
+            )
+            .into_iter()
+            .map(|line| (line, Some(index))),
         );
     }
     out.extend(caution_rows(interaction));
@@ -467,7 +483,7 @@ fn login_lines(flow: &LoginFlow) -> Vec<Line<'static>> {
     }
 }
 
-fn option_lines(dialog: &Dialog, index: usize, option: &Opt) -> Vec<Line<'static>> {
+fn option_lines(dialog: &Dialog, index: usize, option: &Opt, secret: bool) -> Vec<Line<'static>> {
     let focused = index == dialog.focus;
     let style = if focused { theme::text() } else { theme::dim() };
     let label = if let Some(words) = dialog.words.as_ref().filter(|_| focused) {
@@ -476,7 +492,12 @@ fn option_lines(dialog: &Dialog, index: usize, option: &Opt) -> Vec<Line<'static
         } else {
             "No, because "
         };
-        format!("{prefix}{}{}", words.text(), theme::caret())
+        let text = if secret {
+            "•".repeat(words.text().chars().count())
+        } else {
+            words.text().to_owned()
+        };
+        format!("{prefix}{text}{}", theme::caret())
     } else {
         format!("{}{}", box_mark(dialog, option), option.label)
     };
