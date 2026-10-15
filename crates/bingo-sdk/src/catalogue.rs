@@ -62,6 +62,15 @@ impl Entry {
             valid_result: |_| true,
         }
     }
+
+    /// The same point holding `pinned` in place of the catalogue's pins; a
+    /// dispatch that must hold more of its input passes a superset.
+    pub fn pinning(&self, pinned: &'static [&'static str]) -> Self {
+        Self {
+            pinned,
+            ..self.clone()
+        }
+    }
 }
 
 mod matcher;
@@ -219,6 +228,9 @@ mod tests {
         ));
         assert_eq!(COMMAND_RUN.matcher, &["command"]);
         assert_eq!(COMMAND_RUN.pinned, &["/command"]);
+        let held = COMMAND_RUN.pinning(&["/command", "/args"]);
+        assert_eq!(held, *COMMAND_RUN);
+        assert_eq!(held.pinned, &["/command", "/args"]);
     }
 
     #[test]

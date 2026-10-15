@@ -61,12 +61,9 @@ pub(crate) async fn run(
 /// A line only the person may run keeps its arguments through every link,
 /// as every line keeps its command.
 fn point(spec: &CommandSpec, args: &str) -> catalogue::Entry {
-    let entry = catalogue::COMMAND_RUN.clone();
-    if !spec.person_only(args) {
-        return entry;
-    }
-    catalogue::Entry {
-        pinned: &["/command", "/args"],
-        ..entry
+    if spec.person_only(args) {
+        catalogue::COMMAND_RUN.pinning(&["/command", "/args"])
+    } else {
+        catalogue::COMMAND_RUN.clone()
     }
 }
