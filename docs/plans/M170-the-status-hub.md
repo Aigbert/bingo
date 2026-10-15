@@ -55,9 +55,9 @@ is informational. Problems appear on their own rows. The feature is the built-in
   props. Existing pane FIFO/site keys handle input; no additional ordering queue.
 - Ordinary panes keep dev's Escape behavior. Status follows the existing site
   convention: idle closes, busy ends the turn. Question/form paths stay intact.
-- Session and permission prefill `/rename ` and `/permission ` via the generic
-  Composer surface action. A nonempty draft is preserved with a short notice;
-  overwriting a draft is not an editing shortcut (fix round 2).
+- One typed Composer action, `composer::fill::Fill`, serves the hub's `/rename `
+  and `/permission ` prefill and browse rewind: a nonempty draft is kept with a
+  notice, never overwritten; M177's `browse::composer` was folded into it.
 - Row dispatch uses the session handle and returns its first acknowledgement to
   the original key action. Queued returns its position immediately; the instant
   handler holds no actor queue. Pulls continue while actions are queued. Stale
@@ -81,8 +81,8 @@ is informational. Problems appear on their own rows. The feature is the built-in
   so simultaneous viewers still share a session cursor. Refresh hooks resume too.
 - Plugin states deserialize as SDK PluginState; malformed states say unavailable.
   Registering is pending; Pending counts its current state and warns of transition.
-  MCP configuration is not live status: use the default `Servers::status` service
-  method and typed services State projection, without credentials or plugin imports.
+  MCP rows read M173's `ServerRow` from `Servers::rows`; `Status::said()` in
+  services/mcp/row.rs is the one wording both panels use (rebase onto af2a1cde).
 - Context parts sum to the local estimate, not the anchored server count; scaling
   would invent accuracy. Label them `about`. Four fixed categories use an optional
   array and Copy names, avoiding a Vec-induced loss of Copy in shared consumers.
@@ -108,27 +108,12 @@ identity means shared cursors. Missing native C toolchains limit Windows evidenc
 
 ## Verified — 2026-10-15
 
-History folded here after fix round 2 to keep the plan within 150 lines. Initial
-M170 passed 5719 tests; M168 rebase at c33b0700 passed 5686; first review rebased
-onto dev 222d4c72 without conflicts/squashing and passed 5749 tests (174 groups,
-0 failed, 5 ignored). All native gates and isolated smoke passed in those runs.
-First-review regressions were observed failing before fixes; removing Refresh
-registration failed the invalidation test. Schema generators and 31 TypeScript
-tests passed with no drift. Status drive covered 108×30/80×24, navigation, Escape,
-reopen and both prefills. First implementation had an inherited endpoint auth
-failure and two PTY load flakes; sanitized final runs passed without retries.
-The old Enter usage-error assertion was replaced by composer-prefill assertions.
-
-Previous Windows evidence: core/context/experience/mod-status/persona/sdk/services/
-skills/tasks passed; bin/channel-feishu/mcp/plugin-rpc/print/tui stopped in
-aws-lc-sys (missing Windows headers), permissions in tree-sitter C headers.
-First review rechecked core/mod-status successfully. Windows stays unticked where
-native dependencies stop before Rust checking. No auth or allowlist changes.
-
-Fix round 2: public unauthenticated `bash scripts/models_dev.sh --preserve-capabilities`
-succeeded: `12 providers, 287 models, 127047 bytes`. Snapshot diff is generator-only;
-embedded Anthropic cache-write regression passes. Focused fixes are on the previous
-HEAD, without squashing. Final gate summaries follow.
+Earlier runs (initial 5719, c33b0700 5686, 222d4c72 5749/5757 tests) passed all
+native gates, schema drift checks, 31 TypeScript tests and isolated Status drives.
+Windows: core/context/experience/mod-status/persona/sdk/services/skills/tasks
+passed; bin/channel-feishu/mcp/plugin-rpc/print/tui stop in aws-lc-sys headers,
+permissions in tree-sitter C headers, so Windows stays unticked. Fix round 2
+regenerated prices with `models_dev.sh --preserve-capabilities` (generator-only).
 
 Final gates ran serially with `RUST_TEST_THREADS=4`; OPENAI_API_KEY/OPENAI_BASE_URL/ANTHROPIC_API_KEY/ANTHROPIC_BASE_URL and provider/proxy overrides unset.
 
@@ -147,3 +132,7 @@ Final gates ran serially with `RUST_TEST_THREADS=4`; OPENAI_API_KEY/OPENAI_BASE_
 | `BINGO_UPDATE_SCHEMA=1 cargo test -p <crate> --locked` generators | SDK/plugin-rpc/surface-rpc/store-jsonl/mods passed after baseline regeneration; `git diff --exit-code -- schema/ sdk/typescript/` exit 0 |
 | `npm test` in sdk/typescript | tests 31; pass 31; fail 0 |
 | Focused tests and isolated Status tmux drive | 18 mod tests; 1160 TUI passed/2 ignored; 6 RPC tests; 108x30/80x24, navigation, Escape, reopen and both prefills passed |
+
+Rebase onto dev af2a1cde: fmt/clippy 0; tests 185 groups, 5991 passed, 0 failed,
+5 ignored; schema regen clean; 32 TS tests; discipline/budget/deny ok; smoke 3/3;
+tmux drive 108x30/80x24: hub and /plugins both show repo waiting for your yes.
