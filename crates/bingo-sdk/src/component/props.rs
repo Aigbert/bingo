@@ -154,9 +154,14 @@ pub struct StatusFacts {
     pub context: Option<crate::ContextUsage>,
 }
 impl From<&crate::SessionState> for StatusFacts {
+    /// The card reads no history; the first ask is a whole message and would
+    /// carry the transcript the facts exist to leave behind.
     fn from(state: &crate::SessionState) -> Self {
         Self {
-            summary: state.summary.clone(),
+            summary: crate::SessionSummary {
+                history: crate::SessionHistory::default(),
+                ..state.summary.clone()
+            },
             config: state.config.clone(),
             context: state.context,
         }
