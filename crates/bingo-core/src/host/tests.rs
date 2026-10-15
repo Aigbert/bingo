@@ -19,6 +19,7 @@ mod latest;
 mod login;
 mod model_choice;
 mod models;
+mod plugin_approval;
 mod policy;
 mod providers;
 mod queue;

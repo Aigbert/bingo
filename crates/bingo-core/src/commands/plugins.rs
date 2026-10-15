@@ -106,21 +106,34 @@ async fn approve(host: &Host, name: &str) -> Result<CommandOutcome, KernelError>
         }
     }
     let request = request.ok_or_else(|| invalid(format!("no waiting plugin named `{name}`")))?;
-    if let Some(tier) = tier {
-        let waiting = format!("plugins:{}", name.strip_prefix("plugins:").unwrap_or(name));
-        super::plugin_trust::set(host, &waiting, tier).await?;
-    }
     let digest = host.approve(request).await?;
+    let trusted = match tier {
+        Some(tier) => grant(host, name, tier).await,
+        None => String::new(),
+    };
     let mut report = PluginReload::default();
     for source in &host.registry().sources.plugins {
         report.append(source.reload().await?);
     }
     Ok(CommandOutcome::Applied {
         message: Some(format!(
-            "approved {name} ({digest}); modules reload now, process plugins start next time. {}",
+            "approved {name} ({digest}); modules reload now, process plugins start next time. {}{trusted}",
             report.message()
         )),
     })
+}
+
+/// The tier asked for with an approval, written only once the approval
+/// stands; a failed write is said with the line that retries it.
+async fn grant(host: &Host, name: &str, tier: &str) -> String {
+    let waiting = format!("plugins:{}", name.strip_prefix("plugins:").unwrap_or(name));
+    match super::plugin_trust::set(host, &waiting, tier).await {
+        Ok(()) => format!(" trust: {tier}."),
+        Err(error) => format!(
+            " warning: trust was not saved ({}); run /plugins trust {name} {tier}",
+            error.message
+        ),
+    }
 }
 
 /// The line as a switch to write, or `None` for the listing.

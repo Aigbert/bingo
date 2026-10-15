@@ -14,9 +14,7 @@ pub(super) async fn set(host: &Host, name: &str, tier: &str) -> Result<(), Kerne
         KernelError::new(ErrorCode::InvalidInput, "trust is tighten, rewrite or full")
     })?;
     let listed = crate::plugins::listing(host.registry()).await;
-    let status = listed
-        .iter()
-        .find(|entry| entry.id == name)
+    let status = listed_as(&listed, name)
         .ok_or_else(|| KernelError::new(ErrorCode::InvalidInput, "no plugin with that name"))?;
     if status.from == BUILT_IN || name.starts_with("mcp:") {
         return Err(KernelError::new(
@@ -44,6 +42,16 @@ pub(super) async fn set(host: &Host, name: &str, tier: &str) -> Result<(), Kerne
         .map_err(failed)?;
     host.plugins_changed();
     Ok(())
+}
+/// A plugin's listing by its exact id first, then by the same name with or
+/// without the `plugins:` a repository's plugin carries while it waits.
+fn listed_as<'a>(listed: &'a [PluginStatus], name: &str) -> Option<&'a PluginStatus> {
+    let bare = name.strip_prefix("plugins:").unwrap_or(name);
+    listed.iter().find(|entry| entry.id == name).or_else(|| {
+        listed
+            .iter()
+            .find(|entry| entry.id == bare || entry.id.strip_prefix("plugins:") == Some(bare))
+    })
 }
 fn failed(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::Internal, error.to_string())
