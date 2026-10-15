@@ -1,6 +1,6 @@
 # ADR-0091 — Rewind names what it takes back
 
-Status: proposed · 2026-10-15 · Plan: M177 · Amends: ADR-0045 §3, ADR-0084 §1 (`Browse`)
+Status: accepted · 2026-10-15 · Plan: M177 · Amends: ADR-0045 §3, ADR-0084 §1 (`Browse`)
 
 ## Context
 

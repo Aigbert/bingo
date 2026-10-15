@@ -7192,6 +7192,7 @@
     "Component": {
       "type": "string",
       "enum": [
+        "Browse",
         "Palette",
         "Sessions",
         "Question",

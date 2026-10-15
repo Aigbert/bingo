@@ -179,6 +179,7 @@
           "Component": {
             "type": "string",
             "enum": [
+              "Browse",
               "Palette",
               "Sessions",
               "Question",
@@ -1310,6 +1311,7 @@
           "Component": {
             "type": "string",
             "enum": [
+              "Browse",
               "Palette",
               "Sessions",
               "Question",
@@ -3405,6 +3407,7 @@
           "Component": {
             "type": "string",
             "enum": [
+              "Browse",
               "Palette",
               "Sessions",
               "Question",
@@ -7375,6 +7378,7 @@
           "Component": {
             "type": "string",
             "enum": [
+              "Browse",
               "Palette",
               "Sessions",
               "Question",
@@ -10263,6 +10267,7 @@
           "Component": {
             "type": "string",
             "enum": [
+              "Browse",
               "Palette",
               "Sessions",
               "Question",

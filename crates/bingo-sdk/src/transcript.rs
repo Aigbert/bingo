@@ -1,6 +1,10 @@
 //! The client and model orders over shared transcript items.
 
 pub(crate) mod checkpoint;
+mod find;
+mod turns;
+pub use find::{Match, find, text};
+pub use turns::{Turn, from, turns};
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

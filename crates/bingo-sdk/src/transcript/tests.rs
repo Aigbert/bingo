@@ -266,3 +266,73 @@ fn checkpoint_window_can_restore_full_client_order_without_losing_live_bodies() 
     );
     assert_eq!(bytes["items"].as_array().unwrap().len(), 2);
 }
+
+#[test]
+fn turns_keep_full_prompts_and_share_the_cut_boundaries() {
+    let mut first = item(1, String::new());
+    first.turn = Some(TurnId::from_raw("t1"));
+    first.body = ItemBody::User {
+        parts: vec![ContentPart::text("first\nsecond")],
+        origin: Origin::surface("terminal"),
+    };
+    let between = item(2, "notice".into());
+    let mut last = item(3, "automatic".into());
+    last.turn = Some(TurnId::from_raw("t2"));
+    let transcript: Transcript = [first, between, last].into_iter().collect();
+    let rows = turns(&transcript);
+    assert_eq!(rows[0].asked.as_deref(), Some("first\nsecond"));
+    assert_eq!(rows[0].label(), "first");
+    assert_eq!((rows[0].first, rows[0].last, rows[0].items()), (0, 1, 2));
+    assert_eq!(rows[1].label(), "t2");
+    assert_eq!(from(&rows, &TurnId::from_raw("t1")).unwrap().len(), 2);
+    assert!(from(&rows, &TurnId::from_raw("missing")).is_none());
+}
+#[test]
+fn search_reads_full_results_reasoning_and_only_retained_items() {
+    let mut tool = item(1, String::new());
+    tool.turn = Some(TurnId::from_raw("t"));
+    tool.body = ItemBody::ToolCall {
+        call_id: "c".into(),
+        name: "Read".into(),
+        input: serde_json::json!({"file_path":"file"}),
+        output: Some(ToolOutput::text("one\ntwo\nthree\nfour\nfive\nFORK")),
+        progress: None,
+        duration_ms: None,
+        quiet: false,
+    };
+    let mut reasoning = item(2, String::new());
+    reasoning.body = ItemBody::Reasoning {
+        text: "a fork\nFORK again".into(),
+        provider_metadata: Default::default(),
+    };
+    let mut transcript: Transcript = [tool, reasoning].into_iter().collect();
+    assert!(find(&transcript, "").is_empty());
+    let matches = find(&transcript, "Fork");
+    assert_eq!(
+        matches.iter().map(|m| m.line).collect::<Vec<_>>(),
+        [6, 0, 1]
+    );
+    transcript.apply(&Event::Rewound {
+        generation: 1,
+        to_turn: TurnId::from_raw("t"),
+        dropped: vec![ItemId::from_raw("i1")],
+        files_restored: vec![],
+    });
+    assert_eq!(find(&transcript, "fork").len(), 2);
+}
+#[test]
+fn asked_ignores_shells_and_injected_context_but_keeps_commands() {
+    let mut row = item(1, String::new());
+    row.body = ItemBody::Shell {
+        command: "echo no".into(),
+        output: "no".into(),
+        exit: Some(0),
+        cwd: ".".into(),
+    };
+    assert!(crate::asked(&row).is_none());
+    row.body = ItemBody::User {
+        parts: vec![ContentPart::text("/guide the wire\nexpanded prompt")],
+        origin: Origin::surface("command"),
+    };
+    assert_eq!(crate::asked(&row).as_deref(), Some("/guide the wire"));
+}

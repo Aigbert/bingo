@@ -61,7 +61,7 @@ The feature is the built-in mod `bingo-mod-browse`; with it off,
    `crates/bingo-sdk/src/component/{browse.rs,props.json}` and
    `components!`; golden contract; schema and TypeScript regenerated. The
    surface fills `matches` from brick 2 and peeks a folded block that
-   holds the current match (`fold.rs`), restoring its fold on close.
+   holds the current match (`fold.rs`), deriving a temporary fold map while open; the saved fold never changes.
 7. **Keys.** `crates/bingo-mod-browse/src/keys.rs` through `onKey`: `[`
    `]` → select previous/next turn (scroll to its first item), `n` `N`
    step, `⏎` → `Pager { item }` surface action (`pager.rs::open`), `y` →
@@ -120,6 +120,24 @@ The feature is the built-in mod `bingo-mod-browse`; with it off,
 - [ ] `cargo check -p bingo-checkpoints -p bingo-mod-browse -p
       bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc
       --locked` (clipboard and path display).
+
+## Decisions
+
+- M175 is not merged: add the pure `asked` brick here, returning the full typed
+  text; labels take its first line. This preserves multiline prompts on rewind.
+- M170 is not merged: add the generic Composer action in the TUI here; do not
+  edit the status mod. Surface actions remain existing named `Action` receipts.
+- Props also carry the projected turn rows, current match, confirmation opener
+  and a minted client action, as Palette does. They contain no second transcript.
+  Selection/query live only in the mod; the surface reads its accepted drawing
+  to derive search matches, scroll position and temporary folds.
+- Search commits on Enter; `/` edits a new query. This disambiguates `n`, `r`
+  and `y` from search text and avoids scanning every item per keystroke.
+- File lists scroll with ↑↓/PgUp/PgDn; warnings and mode choices stay visible.
+- A queued rewind keeps its own intent until completion, so its prompt returns
+  even when it waited behind a running turn. Withdrawing it retires that intent.
+- Guides use `crates/bingo-mod-browse/src/guide.md` and its registered Page.
+  Only existing workspace edges are added; the member budget grows 414 → 415.
 
 ## In-flight dependencies
 

@@ -1,0 +1,24 @@
+{
+  "method": "touched",
+  "params": {
+    "session": "ses_1",
+    "from": "trn_1"
+  },
+  "answer": {
+    "files": [
+      {
+        "path": "src/main.rs",
+        "fate": "restored"
+      },
+      {
+        "path": "new.txt",
+        "fate": "removed"
+      },
+      {
+        "path": "big.bin",
+        "fate": "skipped"
+      }
+    ],
+    "shellCalls": 2
+  }
+}

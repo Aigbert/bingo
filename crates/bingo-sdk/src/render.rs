@@ -10,6 +10,7 @@ pub use matched::{Matched, matched};
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
 pub enum Component {
+    Browse,
     Palette,
     Sessions,
     Question,
@@ -74,7 +75,9 @@ impl Component {
 
     pub const fn surfaces(self) -> &'static [SurfaceName] {
         match self {
-            Self::Palette | Self::Sessions => &[SurfaceName::Terminal, SurfaceName::Desktop],
+            Self::Browse | Self::Palette | Self::Sessions => {
+                &[SurfaceName::Terminal, SurfaceName::Desktop]
+            }
             Self::AssistantMessage | Self::CommandOutput | Self::InfoNotice | Self::ShellRun => &[
                 SurfaceName::Terminal,
                 SurfaceName::Desktop,
@@ -114,7 +117,8 @@ impl Component {
         }
     }
 
-    pub const ALL: [Self; 32] = [
+    pub const ALL: [Self; 33] = [
+        Self::Browse,
         Self::Palette,
         Self::Sessions,
         Self::Question,
@@ -191,7 +195,10 @@ mod tests {
             assert!(component.surfaces().contains(&SurfaceName::Desktop));
             assert_eq!(
                 component.surfaces().contains(&SurfaceName::Text),
-                !matches!(component, Component::Palette | Component::Sessions)
+                !matches!(
+                    component,
+                    Component::Browse | Component::Palette | Component::Sessions
+                )
             );
             assert_eq!(
                 component.surfaces().contains(&SurfaceName::Chat),

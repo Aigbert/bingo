@@ -1236,6 +1236,59 @@
         "input"
       ]
     },
+    "BrowseProps": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "selected": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "query": {
+          "type": "string"
+        },
+        "matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Match"
+          }
+        },
+        "turns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Turn2"
+          }
+        },
+        "current": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "action": {
+          "$ref": "#/$defs/Action"
+        },
+        "confirm": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "session",
+        "query",
+        "matches",
+        "turns",
+        "current",
+        "action",
+        "confirm"
+      ]
+    },
     "CallbackParams": {
       "type": "object",
       "properties": {
@@ -2091,6 +2144,7 @@
     "Component": {
       "type": "string",
       "enum": [
+        "Browse",
         "Palette",
         "Sessions",
         "Question",
@@ -5242,6 +5296,33 @@
         }
       ]
     },
+    "Match": {
+      "type": "object",
+      "properties": {
+        "item": {
+          "$ref": "#/$defs/ItemId"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "line": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "item",
+        "line"
+      ]
+    },
     "Message": {
       "type": "object",
       "properties": {
@@ -6984,6 +7065,22 @@
     },
     "Props": {
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Browse"
+            },
+            "props": {
+              "$ref": "#/$defs/BrowseProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
         {
           "type": "object",
           "properties": {
@@ -9908,6 +10005,35 @@
         "outcome",
         "usage",
         "answer"
+      ]
+    },
+    "Turn2": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/TurnId"
+        },
+        "asked": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "first": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "last": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "first",
+        "last"
       ]
     },
     "TurnDurationProps": {

@@ -4,6 +4,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+mod browse;
+pub use browse::*;
 mod palette;
 mod sessions;
 pub use sessions::*;
@@ -29,6 +31,7 @@ macro_rules! components {
     };
 }
 components! {
+    Browse(Box<BrowseProps>),
     Palette(Box<PaletteProps>),
     Sessions(Box<SessionsProps>),
     Question(QuestionProps), UserMessage(UserMessageProps),
