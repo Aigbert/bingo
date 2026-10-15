@@ -260,25 +260,7 @@ impl Renderer {
                     self.prose(rest, out)?;
                 }
             }
-            ItemBody::ToolCall {
-                call_id,
-                name,
-                input,
-                output,
-                duration_ms,
-                ..
-            } => {
-                let external = bingo_sdk::ExternalCall::from_input(&bingo_sdk::ToolCall {
-                    call_id: call_id.clone(),
-                    name: name.clone(),
-                    input: input.clone(),
-                })
-                .filter(|_| item.external());
-                let title = external
-                    .as_ref()
-                    .map_or(name.as_str(), |c| c.title.as_str());
-                self.tool_done(item, title, output.as_ref(), *duration_ms, err)?;
-            }
+            ItemBody::ToolCall { .. } => self.tool_completed(item, err)?,
             ItemBody::Shell {
                 command,
                 output,
@@ -286,7 +268,7 @@ impl Renderer {
                 ..
             } => self.shell(command, output, *exit, err)?,
             // A command's receipt is printed from its ack.
-            ItemBody::Notice { .. } if item.intent.is_some() => {}
+            ItemBody::Notice { .. } if item.intent.is_some() && item.body.receipt().is_some() => {}
             ItemBody::Notice { code, text, .. } => {
                 self.diagnostic(&format!("[notice] {code} {text}"), err)?;
             }
@@ -303,6 +285,32 @@ impl Renderer {
             | ItemBody::Unknown { .. } => {}
         }
         Ok(())
+    }
+
+    /// A finished call, titled as the person knows it: an external call by
+    /// its own title, any other by the tool's name.
+    fn tool_completed(&mut self, item: &Item, err: &mut (impl Write + ?Sized)) -> io::Result<()> {
+        let ItemBody::ToolCall {
+            call_id,
+            name,
+            input,
+            output,
+            duration_ms,
+            ..
+        } = &item.body
+        else {
+            return Ok(());
+        };
+        let external = bingo_sdk::ExternalCall::from_input(&bingo_sdk::ToolCall {
+            call_id: call_id.clone(),
+            name: name.clone(),
+            input: input.clone(),
+        })
+        .filter(|_| item.external());
+        let title = external
+            .as_ref()
+            .map_or(name.as_str(), |c| c.title.as_str());
+        self.tool_done(item, title, output.as_ref(), *duration_ms, err)
     }
 
     /// The verdict line, then what a person would have seen (ADR-0013 §2):

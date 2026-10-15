@@ -571,6 +571,20 @@ impl ItemBody {
             _ => false,
         }
     }
+
+    /// The words of a command's receipt: an informational notice, which the
+    /// command's ack also carries for a client that draws no transcript. A
+    /// warning or an error is a diagnostic, never a command's answer.
+    pub fn receipt(&self) -> Option<&str> {
+        match self {
+            ItemBody::Notice {
+                level: Level::Info,
+                text,
+                ..
+            } => Some(text),
+            _ => None,
+        }
+    }
 }
 
 /// A shell line as a model reads it ([`ItemBody::Shell`]): the line under the

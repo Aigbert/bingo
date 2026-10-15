@@ -571,3 +571,34 @@ fn panel_commands_keep_print_output_and_ndjson_when_disabled() {
         }
     }
 }
+
+/// A plugin's warning is a diagnostic: it reaches stderr as a notice and never
+/// stdout, which carries only answers. A stale control is one such warning.
+#[test]
+fn a_plugin_warning_stays_off_stdout() {
+    let home = tempfile::tempdir().unwrap();
+    let fixture =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mods/counter");
+    let plugin = home.path().join(".bingo/plugins/counter");
+    std::fs::create_dir_all(&plugin).unwrap();
+    for file in ["plugin.json", "main.ts"] {
+        std::fs::copy(fixture.join(file), plugin.join(file)).unwrap();
+    }
+    let script = script(r#"{"responses":[]}"#);
+    let out = run_within(
+        bingo()
+            .envs(home_env(home.path()))
+            .env("BINGO_FAKE_SCRIPT", script.path())
+            .args(["--print", "--cwd"])
+            .arg(home.path())
+            .arg(r#"/counter:ui {"handler":"gone","event":"press","value":{"key":"x"}}"#),
+        std::time::Duration::from_secs(20),
+    );
+    let (out_text, err) = (stdout(&out), stderr(&out));
+    assert_eq!(out.status.code(), Some(0), "stderr: {err}");
+    assert_eq!(out_text, "", "stdout carries no warning");
+    assert!(
+        err.contains("[notice] UI_HANDLER counter: This control belongs to an earlier drawing"),
+        "{err}"
+    );
+}

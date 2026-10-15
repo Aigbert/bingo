@@ -146,10 +146,7 @@ impl Actor {
     /// A recorded receipt: the item in the transcript, and its words on the
     /// ack for a client that draws no transcript.
     async fn recorded(&mut self, intent: IntentId, body: ItemBody) -> Result<(), KernelError> {
-        let message = match &body {
-            ItemBody::Notice { text, .. } => Some(text.clone()),
-            _ => None,
-        };
+        let message = body.receipt().map(str::to_owned);
         let item = self.record_for(Some(intent.clone()), body).await?;
         let mut result = json!({ "item": item });
         if let Some(message) = message {
