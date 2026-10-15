@@ -18,9 +18,6 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
         return;
     };
     let handle = run.session.handles.get(&session).cloned();
-    if !asked && handle.is_none() {
-        return run.not_yet();
-    }
     let intent = run.mint(None);
     run.site_keys.insert(
         intent.clone(),
@@ -30,15 +27,26 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
             key,
         },
     );
+    if let Some(handle) = handle {
+        submit(run, session, handle, intent, action, asked);
+    } else {
+        open(run, session, intent, action);
+    }
+}
+
+fn submit(
+    run: &mut Run,
+    session: SessionId,
+    handle: SessionHandle,
+    intent: IntentId,
+    action: bingo_sdk::Action,
+    asked: bool,
+) {
     if asked {
         // The action asking this question may still hold the shared queue.
         // Interaction keys already wait for their own site's acknowledgement.
-        if let Some(handle) = handle {
-            handle.submit(intent, crate::acted(action));
-        } else {
-            open(run, session, intent, action);
-        }
-    } else if let Some(handle) = handle {
+        handle.submit(intent, crate::acted(action));
+    } else {
         run.enqueue_action(session, handle, intent, action);
     }
 }
@@ -107,28 +115,19 @@ pub(super) fn opened(run: &mut Run, opened: Opened) {
         run.mine.remove(&opened.intent);
         return;
     };
-    let live = run
-        .session
-        .tree
-        .state(&pending.session)
-        .is_some_and(|owner| {
-            owner
-                .interactions
-                .iter()
-                .any(|open| open.id.as_str() == pending.focus)
-        });
-    if !live {
-        run.site_keys.remove(&opened.intent);
-        run.mine.remove(&opened.intent);
-        super::typeahead::drain(run);
-        return;
-    }
+    let session = pending.session.clone();
+    run.ui.sync_panes(run.session.tree.viewed());
+    let current = target(run)
+        .filter(|(session, focus, _)| session == &pending.session && focus == &pending.focus);
     match opened.handle {
         Ok(handle) => {
-            run.session
-                .handles
-                .insert(pending.session.clone(), handle.clone());
-            handle.submit(opened.intent, crate::acted(opened.action));
+            run.session.handles.insert(session, handle.clone());
+            if let Some((session, _, asked)) = current {
+                submit(run, session, handle, opened.intent, opened.action, asked);
+            } else if let Some(pending) = run.site_keys.remove(&opened.intent) {
+                run.mine.remove(&opened.intent);
+                super::typeahead::retry(run, pending.focus, pending.key);
+            }
         }
         Err(error) => run.ack(&opened.intent, &IntentOutcome::Rejected { error }),
     }
@@ -338,3 +337,6 @@ mod tests {
         assert!(!vouched(&json!({}), PALETTE));
     }
 }
+
+#[cfg(test)]
+mod opening_tests;

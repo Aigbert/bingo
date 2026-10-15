@@ -47,7 +47,6 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
    turn is interrupted immediately.
 6. Applying queued input or its drop notice owes a frame, including after paint
    releases the command deadline; otherwise the edited composer remains invisible.
-
 7. Smoke readiness requires a persistent composer echo after closing Browse.
    The shortcut hint is shared; header absence can match an intermediate redraw.
    Encode closing Escape as CSI 27 u before the probe, avoiding an Alt chord.
@@ -80,7 +79,7 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
 - [x] Permission ask, `/nosuch⏎y`: the ask remains unanswered, with a truthful count.
 - [x] Review native non-smoke gates and regenerated schemas/TypeScript.
 - [x] Three passing isolated smoke runs after the readiness fix; earlier 1/3 results retained below.
-- [x] M173/M170 rebase: status receipt before paint, pane handoff, ask exclusion, immediate interrupts.
+- [x] M173/M170/M166 rebases: status before paint, pane handoff, delayed handles, ask exclusion, immediate interrupts.
 - [ ] Windows cross-check: known missing MSVC C toolchain; see below.
 
 ## Non-goals
@@ -92,7 +91,7 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
 
 ## Risks
 
-- The model picker is not on dev; `/model⏎openai` uses the same command receipt path.
+- M166 model picker uses the pane path. Keys await missing handles; delayed opens check the current target, re-addressing displaced keys in order and excluding asks.
 - After a command exceeds the 1 s hold, new input goes to the composer as before M180.
 - During the hold the composer does not echo; at most 1 s of keys appear at once.
 

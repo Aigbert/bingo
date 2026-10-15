@@ -155,6 +155,15 @@ pub(super) fn queue(run: &mut Run, key: KeyEvent) {
     });
 }
 
+/// A site closed while its handle was opening; this key precedes the held tail.
+pub(super) fn retry(run: &mut Run, site: String, key: KeyEvent) {
+    run.typeahead.inputs.push_front(Queued {
+        site: Some(site),
+        input: Held::Key(key),
+    });
+    drain(run);
+}
+
 /// A paste waits in the same order as keys, but never enters an ask from here.
 pub(super) fn paste(run: &mut Run, text: String) {
     if blocked(run) {
