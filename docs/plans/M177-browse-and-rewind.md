@@ -102,6 +102,7 @@ feature is the built-in mod `bingo-mod-browse`; with it off, `ctrl+f` is the ter
   that intent only after a successful withdrawal; a failed withdrawal leaves the running rewind identifiable.
 - Guides use `crates/bingo-mod-browse/src/guide.md` and its registered Page. Only existing workspace edges are added; the member budget grows 414
   → 415.
+- A synchronous answer after drawing schedules another frame: the smoke exposed a committed query whose second projection otherwise stayed invisible.
 - Key waiting uses the same render predicate as placement; switching off or narrowing a replacement cannot strand queued keys.
 
 ## In-flight dependencies

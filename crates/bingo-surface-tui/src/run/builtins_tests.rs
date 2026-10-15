@@ -809,3 +809,49 @@ async fn plugin_switch_redraws_the_toast_and_refreshes_default_keys() {
     }
     host.shutdown().await;
 }
+
+#[tokio::test]
+async fn a_synchronous_browse_projection_owes_the_frame_with_its_matches() {
+    let now = scene().1;
+    let mut state = state();
+    state.config.kernel["render"] = json!({"Browse":[{}]});
+    state.transcript = vec![user("i1", "needle")].into_iter().collect();
+    let host = bingo_sdk::testing::TestHost::default();
+    host.on_render(|_, request| async move {
+        let mut props = request.props;
+        props["query"] = json!("needle");
+        Ok(View::Box {
+            children: vec![View::text(format!(
+                "matches: {}",
+                props["matches"].as_array().unwrap().len()
+            ))],
+            layout: Box::new(bingo_sdk::view::BoxStyle {
+                on_key: Some(bingo_sdk::Action {
+                    name: "browse:ui".into(),
+                    args: json!({"props":props}),
+                }),
+                ..Default::default()
+            }),
+        })
+    });
+    let mut run = tests::idle(now.instant);
+    run.session.tree = solo(&state);
+    run.host = host.handle();
+    run.ui.catalogs.commands.push(
+        serde_json::from_value(
+            json!({"name":"browse","hint":"browse","args":{"kind":"none"},"family":"terminal"}),
+        )
+        .unwrap(),
+    );
+    crate::browse::open(&mut run.ui, &run.session.tree, None, false, now);
+    let mut screen = Recorder::default();
+    run.paint(&mut screen, Wake::Frame, now).unwrap();
+    assert!(
+        run.behind,
+        "the synchronous final answer still needs painting"
+    );
+    assert!(run.next_draw().is_some());
+    run.paint(&mut screen, Wake::Frame, now).unwrap();
+    assert!(screen.last().contains("matches: 1"), "{}", screen.last());
+    assert!(!run.behind, "a settled projection does not keep ticking");
+}

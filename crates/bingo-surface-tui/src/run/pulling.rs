@@ -88,7 +88,7 @@ pub(super) fn paint(
     screen
         .draw(&layout, &run.detection.render())
         .map_err(stdio)?;
-    pulling::request(run, &layout.pulls);
+    run.behind |= pulling::request(run, &layout.pulls);
     run.ui.shown = layout;
     run.release_actions_at(now.instant);
     site_keys::drain(run);
