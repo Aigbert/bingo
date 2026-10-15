@@ -416,12 +416,22 @@ async fn unlisted_models_switch_by_path_and_by_the_typed_filter() {
     session = reopen(&kernel, &session).await;
     assert_eq!(session.snapshot.summary.model.as_deref(), Some("unlisted"));
     assert!(!picker_open(&session));
+    // A bare word names a model of the current provider.
+    command(&mut session, "model", json!("zeta")).await;
+    let req = request(&kernel, &mut session).await;
+    let id = req.request_id.clone();
+    let view = kernel.render(&session.session, req).await.unwrap().fold();
+    assert!(view.contains("⏎ use fake/zeta"), "{view}");
+    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
+    session = reopen(&kernel, &session).await;
+    assert_eq!(session.snapshot.summary.model.as_deref(), Some("zeta"));
+    assert!(!picker_open(&session));
 }
 fn row_press(id: &str, key: &str, row: &str) -> serde_json::Value {
     json!({"handler":id,"event":"press","value":{"key":key,"row":row}})
 }
 #[tokio::test(flavor = "multi_thread")]
-async fn keys_act_on_the_drawn_row_and_never_on_a_heading() {
+async fn keys_act_on_the_kept_row_and_never_on_a_heading() {
     let mut server = Server::spawn(SCRIPT);
     let kernel = ready(&mut server).await;
     let mut session = kernel
@@ -443,27 +453,94 @@ async fn keys_act_on_the_drawn_row_and_never_on_a_heading() {
         cursor.contains("fake-1") && !cursor.contains("pinned"),
         "{view}"
     );
-    // A row that is gone takes no action.
-    command(
-        &mut session,
-        "bingo.mod.models:ui",
-        row_press(&id, "enter", "provider:gone"),
-    )
-    .await;
+    // The kept row is gone once the pin goes: enter takes no action.
+    command(&mut session, "model", json!("unpin fake/fake-1")).await;
+    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
     session = reopen(&kernel, &session).await;
     assert_eq!(session.snapshot.summary.model.as_deref(), Some("other"));
     assert!(picker_open(&session));
-    // The cursor has moved on, but the enter was pressed on the pinned row as drawn.
+    // The cursor landed on the first model row, and the next enter takes it.
+    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
+    session = reopen(&kernel, &session).await;
+    assert_ne!(session.snapshot.summary.model.as_deref(), Some("other"));
+    assert!(!picker_open(&session));
+}
+async fn listing(ids: &[&str]) -> (MockServer, tempfile::TempDir) {
+    let data: Vec<_> = ids.iter().map(|id| json!({ "id": id })).collect();
+    let endpoint = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "data": data })))
+        .mount(&endpoint)
+        .await;
+    let home = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
+    std::fs::write(
+        home.path().join(".bingo/settings.toml"),
+        format!(
+            "[update]\ncheck = false\n[openai]\nbaseUrl = \"{}\"\napiKey = \"dummy-local-only\"\n",
+            endpoint.uri()
+        ),
+    )
+    .unwrap();
+    (endpoint, home)
+}
+async fn cursor_line(kernel: &impl HostApi, session: &mut Attachment) -> String {
+    let req = request(kernel, session).await;
+    let view = kernel.render(&session.session, req).await.unwrap().fold();
+    view.lines()
+        .find(|l| l.contains('❯'))
+        .unwrap_or_else(|| panic!("no cursor: {view}"))
+        .to_owned()
+}
+#[tokio::test(flavor = "multi_thread")]
+async fn a_queued_enter_takes_the_row_the_cursor_moved_to() {
+    let (_endpoint, home) = listing(&["alpha", "beta", "gamma"]).await;
+    let mut server = Server::spawn_at(home, SCRIPT, &[]);
+    let kernel = ready(&mut server).await;
+    let mut session = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    command(&mut session, "models", json!("refresh openai")).await;
+    command(&mut session, "model", json!("openai/")).await;
+    let id = request(&kernel, &mut session).await.request_id;
+    assert!(cursor_line(&kernel, &mut session).await.contains("alpha"));
     command(&mut session, "bingo.mod.models:ui", press(&id, "down")).await;
+    // A key queued while alpha was drawn names that drawing's row; the kept row wins.
     command(
         &mut session,
         "bingo.mod.models:ui",
-        row_press(&id, "enter", "pin:fake/fake-1"),
+        row_press(&id, "enter", "model:openai/alpha"),
     )
     .await;
     session = reopen(&kernel, &session).await;
-    assert_eq!(session.snapshot.summary.model.as_deref(), Some("fake-1"));
-    assert!(!picker_open(&session));
+    assert_eq!(session.snapshot.summary.model.as_deref(), Some("beta"));
+}
+#[tokio::test(flavor = "multi_thread")]
+async fn a_reorder_between_the_move_and_the_enter_keeps_the_row() {
+    let (_endpoint, home) = listing(&["alpha", "beta", "gamma"]).await;
+    let mut server = Server::spawn_at(home, SCRIPT, &[]);
+    let kernel = ready(&mut server).await;
+    let mut session = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    command(&mut session, "models", json!("refresh openai")).await;
+    command(&mut session, "model", json!("")).await;
+    let id = request(&kernel, &mut session).await.request_id;
+    for _ in 0..40 {
+        if cursor_line(&kernel, &mut session).await.contains("beta") {
+            break;
+        }
+        command(&mut session, "bingo.mod.models:ui", press(&id, "down")).await;
+    }
+    assert!(cursor_line(&kernel, &mut session).await.contains("beta"));
+    // A pin puts a group above every row; beta moves down, the kept row stays beta.
+    command(&mut session, "model", json!("pin openai/gamma")).await;
+    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
+    session = reopen(&kernel, &session).await;
+    assert_eq!(session.snapshot.summary.model.as_deref(), Some("beta"));
 }
 #[tokio::test(flavor = "multi_thread")]
 async fn site_commands_open_their_picker_and_keep_their_argument_hints() {

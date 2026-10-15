@@ -32,7 +32,7 @@ impl Command for Handler {
         };
         let result = tokio::select! {
             _=cx.cancel.cancelled()=>Err(crate::error("picker action cancelled")),
-            result=press(&mut picker,key,args["value"]["row"].as_str(),cx)=>result,
+            result=press(&mut picker,key,cx)=>result,
         };
         let close = match result {
             Ok(close) => close,
@@ -57,12 +57,7 @@ impl Command for Handler {
 fn handled() -> CommandOutcome {
     CommandOutcome::Handled { handled: true }
 }
-async fn press(
-    picker: &mut Picker,
-    key: &str,
-    drawn: Option<&str>,
-    cx: &CommandContext,
-) -> Result<bool, KernelError> {
+async fn press(picker: &mut Picker, key: &str, cx: &CommandContext) -> Result<bool, KernelError> {
     picker.message = None;
     if key == "esc" {
         return Ok(back(picker));
@@ -73,19 +68,23 @@ async fn press(
     if key == "+" || key == "shift++" {
         return add(picker, cx).await;
     }
-    if edit(picker, key) {
-        return Ok(false);
-    }
+    let edited = edit(picker, key);
     let models = cx.host.catalog(CatalogKind::Models).await?.entries;
     let providers = cx.host.catalog(CatalogKind::Providers).await?.entries;
     let rows = crate::rows::rows(&models, &providers, &picker.props.filter, picker.all);
+    if edited {
+        keep_cursor(picker, &rows);
+        return Ok(false);
+    }
+    if key == "enter"
+        && let Some(id) = unlisted(picker, &rows, cx).await?
+    {
+        return use_unlisted(picker, &id, cx).await;
+    }
     match key {
         "up" | "down" => step(picker, &rows, key == "down"),
-        "enter" if crate::rows::unlisted(&rows, &picker.props.filter) => {
-            return use_unlisted(picker, cx).await;
-        }
         _ => {
-            if let Some(at) = acted_on(picker, &rows, drawn) {
+            if let Some(at) = acted_on(picker, &rows) {
                 return act(picker, key, &rows[at], &models, &providers, cx).await;
             }
         }
@@ -127,12 +126,20 @@ fn step(picker: &mut Picker, rows: &[Row], forward: bool) {
     };
     picker.props.selected = Some(rows[next.unwrap_or(at)].key());
 }
-/// The row a key acts on is the one drawn when it was pressed. A row that is
-/// gone takes no action; the cursor goes back to the first row instead.
-fn acted_on(picker: &mut Picker, rows: &[Row], drawn: Option<&str>) -> Option<usize> {
-    let at = match drawn {
+/// A new filter puts the cursor on its first row; keeping that row by name
+/// holds the cursor there while probes add rows above it.
+pub(crate) fn keep_cursor(picker: &mut Picker, rows: &[Row]) {
+    if picker.props.selected.is_none() {
+        picker.props.selected = crate::rows::cursor(rows, None).map(|i| rows[i].key());
+    }
+}
+/// A key acts on the row the picker keeps selected, never on whatever a
+/// redraw now puts in its place. A row that is gone takes no action; the
+/// cursor lands on the first row instead.
+fn acted_on(picker: &mut Picker, rows: &[Row]) -> Option<usize> {
+    let at = match picker.props.selected.as_deref() {
         Some(key) => crate::rows::named(rows, key),
-        None => crate::rows::cursor(rows, picker.props.selected.as_deref()),
+        None => crate::rows::cursor(rows, None),
     };
     let kept = at.or_else(|| crate::rows::cursor(rows, None));
     picker.props.selected = kept.map(|i| rows[i].key());
@@ -289,17 +296,25 @@ pub(crate) async fn choose(
     }
     Ok(true)
 }
-/// Nothing listed matches, so the filter is taken as the model's name and the kernel decides.
-async fn use_unlisted(picker: &Picker, cx: &CommandContext) -> Result<bool, KernelError> {
+/// The model the filter names when nothing listed matches it.
+async fn unlisted(
+    picker: &Picker,
+    rows: &[Row],
+    cx: &CommandContext,
+) -> Result<Option<String>, KernelError> {
+    if picker.props.filter.is_empty() || rows.iter().any(|r| r.model().is_some()) {
+        return Ok(None);
+    }
+    let attached = crate::bridge::attach(&cx.host, &cx.session).await?;
+    let current = crate::state::chat(&attached.snapshot).current;
+    Ok(crate::rows::unlisted(rows, &picker.props.filter, &current))
+}
+/// Nothing listed matches, so the filter is taken as the model's name and the
+/// kernel decides. The id names its provider: `/model` would take a bare word
+/// as a filter and open the picker again.
+async fn use_unlisted(picker: &Picker, id: &str, cx: &CommandContext) -> Result<bool, KernelError> {
     let keep = if picker.keep() { " --keep" } else { "" };
-    crate::bridge::run(
-        &cx.host,
-        &cx.session,
-        "model",
-        &format!("{}{keep}", picker.props.filter),
-        None,
-    )
-    .await?;
+    crate::bridge::run(&cx.host, &cx.session, "model", &format!("{id}{keep}"), None).await?;
     Ok(true)
 }
 async fn add(picker: &mut Picker, cx: &CommandContext) -> Result<bool, KernelError> {

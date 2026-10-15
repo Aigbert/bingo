@@ -87,9 +87,18 @@ pub fn rows(
     }
     rows
 }
-/// A filter that lists no model offers itself as the model to use.
-pub fn unlisted(rows: &[Row], filter: &str) -> bool {
-    !filter.is_empty() && !rows.iter().any(|r| r.model().is_some())
+/// A filter that lists no model offers itself as the model to use: a
+/// `provider/model` as typed, a bare name under the current model's provider.
+/// The id always names its provider, so `/model` takes it as a switch.
+pub fn unlisted(rows: &[Row], filter: &str, current: &str) -> Option<String> {
+    if filter.is_empty() || rows.iter().any(|r| r.model().is_some()) {
+        return None;
+    }
+    let (provider, model) = match filter.split_once('/') {
+        Some(pair) => pair,
+        None => (current.split_once('/')?.0, filter),
+    };
+    (!provider.is_empty() && !model.is_empty()).then(|| format!("{provider}/{model}"))
 }
 fn hidden(model: &CatalogEntry) -> bool {
     model.meta["chat"] == false || model.meta["aliasOf"].is_string()
@@ -166,11 +175,14 @@ mod tests {
         assert_eq!(cursor(&listed, None), Some(1));
         assert_eq!(cursor(&[Row::Heading, Row::Add], None), Some(1));
         assert_eq!(cursor(&[], Some("add")), None);
-        assert!(unlisted(
-            &rows(&models, &providers, "p/zzz", false),
-            "p/zzz"
-        ));
-        assert!(!unlisted(&rows(&models, &providers, "p/a", false), "p/a"));
-        assert!(!unlisted(&rows(&models, &providers, "", false), ""));
+        let unlisted_as = |filter: &str, current: &str| {
+            unlisted(&rows(&models, &providers, filter, false), filter, current)
+        };
+        assert_eq!(unlisted_as("p/zzz", "q/x").as_deref(), Some("p/zzz"));
+        assert_eq!(unlisted_as("zzz", "q/x").as_deref(), Some("q/zzz"));
+        assert_eq!(unlisted_as("zzz", "/"), None, "no provider to name");
+        assert_eq!(unlisted_as("other/", "q/x"), None, "no model to name");
+        assert_eq!(unlisted_as("p/a", "q/x"), None);
+        assert_eq!(unlisted_as("", "q/x"), None);
     }
 }

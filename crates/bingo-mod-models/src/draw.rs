@@ -95,21 +95,17 @@ pub fn tree(
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
-            on_key: Some(on_key(picker, at.map(|i| &rows[i]))),
+            on_key: Some(on_key(picker)),
             ..Default::default()
         }),
     }
 }
-/// A key carries the row it was pressed on, so a key queued behind a redraw
-/// acts on what the person saw, not on whatever row now has that position.
-fn on_key(picker: &Picker, row: Option<&Row>) -> Action {
-    let mut args = json!({"handler":picker.id,"event":"press"});
-    if let Some(row) = row.filter(|_| picker.sheet.is_none()) {
-        args["value"] = json!({"row": row.key()});
-    }
+/// A key names only itself: it acts on the row the picker keeps selected,
+/// which a key queued behind a redraw has already moved.
+fn on_key(picker: &Picker) -> Action {
     Action {
         name: "bingo.mod.models:ui".into(),
-        args,
+        args: json!({"handler":picker.id,"event":"press"}),
     }
 }
 struct List<'a> {
@@ -121,12 +117,11 @@ struct List<'a> {
 }
 impl List<'_> {
     fn draw(&self, picker: &Picker, width: u16, height: u16) -> Vec<View> {
-        let unlisted = crate::rows::unlisted(self.rows, &picker.props.filter);
+        let unlisted = crate::rows::unlisted(self.rows, &picker.props.filter, &self.chat.current);
         let row = self.at.map(|i| &self.rows[i]);
-        let details = if unlisted {
-            self::unlisted(&picker.props.filter)
-        } else {
-            details(row, self.models, self.providers, self.chat, picker)
+        let details = match &unlisted {
+            Some(id) => self::unlisted(id),
+            None => details(row, self.models, self.providers, self.chat, picker),
         };
         let left_width = if width >= 100 {
             56
@@ -147,10 +142,9 @@ impl List<'_> {
                 width.saturating_sub(left_width),
             )
         }));
-        let label = if unlisted {
-            format!("use {}", picker.props.filter)
-        } else {
-            action_label(row, self.models, self.providers, picker)
+        let label = match &unlisted {
+            Some(id) => format!("use {id}"),
+            None => action_label(row, self.models, self.providers, picker),
         };
         children.push(key_hint(&label, picker.keep()));
         children
@@ -297,11 +291,11 @@ fn details(
         _ => vec!["No matching models".into()],
     }
 }
-fn unlisted(filter: &str) -> Vec<String> {
+fn unlisted(id: &str) -> Vec<String> {
     vec![
         "No matching models".into(),
         String::new(),
-        format!("⏎ use {filter}"),
+        format!("⏎ use {id}"),
         "the provider decides whether it exists".into(),
     ]
 }

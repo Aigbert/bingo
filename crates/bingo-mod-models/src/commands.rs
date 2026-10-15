@@ -72,9 +72,17 @@ async fn opens(name: &str, args: &str, host: &HostHandle) -> Result<bool, Kernel
         _ => Ok(false),
     }
 }
-/// A `provider/model` argument names a model outright, listed or not, so it is the kernel's to switch.
+/// A `provider/model` argument names a model outright, listed or not, so it
+/// is the kernel's to switch. A bare word or a `provider/` with nothing after
+/// it names no model and filters the list.
 fn filters(args: &str) -> bool {
-    !args.contains(char::is_whitespace) && !args.contains('/') && args != "next"
+    if args.contains(char::is_whitespace) || args == "next" {
+        return false;
+    }
+    match args.split_once('/') {
+        None => true,
+        Some((provider, model)) => !provider.is_empty() && model.is_empty(),
+    }
 }
 
 async fn fallback(args: &str, value: &Value, next: Next<'_, Value, Value>) -> String {
@@ -123,6 +131,7 @@ async fn opening(
         .iter()
         .find(|r| r.model() == Some(current.as_str()))
         .map(crate::rows::Row::key);
+    crate::keys::keep_cursor(&mut picker, &rows);
     if matches!(name, "login" | "logout")
         && let Some(provider) = providers
             .iter()
@@ -148,10 +157,13 @@ async fn opening(
 mod tests {
     use super::*;
     #[test]
-    fn only_a_bare_word_filters_and_a_provider_path_switches() {
+    fn a_bare_word_or_a_provider_prefix_filters_and_a_path_switches() {
         assert!(filters("opus"));
         assert!(!filters("fake/unlisted"));
         assert!(!filters("next"));
         assert!(!filters("pin fake/a"));
+        assert!(filters("openai/"), "a provider prefix filters");
+        assert!(!filters("/"));
+        assert!(!filters("/gpt-5"));
     }
 }
