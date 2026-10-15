@@ -126,7 +126,7 @@ fn ran(id: &str, fired: Fired) -> Result<String, KernelError> {
     };
     match answer {
         Answer::Taken => Ok(format!(
-            "ran {id}; a concurrent runner fire may add one extra turn"
+            "ran {id}; a fire in another process may add one extra turn"
         )),
         Answer::Unanswered => Ok(format!(
             "started {id}; it is still running after {}s",
@@ -152,4 +152,25 @@ pub fn contribution(owner: Arc<Owner>) -> Contribution {
         service.clone(),
         Some(schedule::wire(service)),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_taken_run_names_only_the_cross_process_race() {
+        let message = ran(
+            "abcd",
+            Fired::Spent {
+                at: jiff::Timestamp::UNIX_EPOCH,
+                answer: Answer::Taken,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            message,
+            "ran abcd; a fire in another process may add one extra turn"
+        );
+    }
 }

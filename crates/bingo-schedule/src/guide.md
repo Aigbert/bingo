@@ -151,7 +151,7 @@ session's working directory and no stored mode. Add `as <mode>` before
 `daily at HH:MM` and `once at <RFC3339>`; ` -- ` separates spec and text.
 `/schedule pause <id>` disables it; `/schedule resume <id>` enables it.
 `/schedule run <id>` fires now, including from a dormant process, and refuses
-a disabled entry: resume first. A concurrent runner fire may add one extra turn.
+a disabled entry: resume first. A fire in another process may add one extra turn.
 `/schedule forget <id>` removes the entry while keeping its session. Unique
 id prefixes work; ambiguous prefixes are refused. All these lines require a
 person's input; a model or a mod cannot run them on its own.

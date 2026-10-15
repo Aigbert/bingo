@@ -91,6 +91,7 @@ line is submitted, on the entry as it stands then. Only a session that did
 not open within 30 seconds leaves the occurrence unspent; it waits a rescan
 before another try. The answer is awaited, at most 30 seconds, only to
 report it: a refusal or failure is spent and badged (ADR-0094 §5), and a
-command still running is not fired again. Other entries' command-looking text still reaches the model as prose, with the
-ADR-0094 notice and trouble badge. Pane confirmations submit the same
+command still running is not fired again. Other entries' command-looking
+text still reaches the model as prose, with the ADR-0094 notice and trouble
+badge. Pane confirmations submit the same
 asked lines through the client, vouched only by their own built-in owner.
