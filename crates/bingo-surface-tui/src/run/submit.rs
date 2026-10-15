@@ -189,7 +189,11 @@ impl Run {
             Input::Text { text, .. } => Some(text.clone()),
             Input::Action { .. } => None,
         };
+        let command = about.as_deref().is_some_and(|text| text.starts_with('/'));
         let intent = self.mint(about);
+        if command {
+            super::typeahead::command_sent(self, intent.clone());
+        }
         handle.submit(intent, input);
     }
 }

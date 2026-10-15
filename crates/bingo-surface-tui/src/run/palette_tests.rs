@@ -160,7 +160,7 @@ async fn an_unmatched_palette_replacement_never_queues_the_keyboard() {
     assert_eq!(run.ui.composer.text(), "/m");
     run.terminal_event(Term::Key(key(KeyCode::Esc)));
     assert!(!crate::palette::active(&run.ui));
-    assert!(run.site_queue.is_empty());
+    assert!(run.typeahead.is_empty());
 }
 
 #[test]
@@ -250,7 +250,7 @@ async fn acknowledgements_refetch_only_plugins_and_changes_fetch_only_their_kind
     let now = still(scene().1);
     let mut run = tests::idle(now.instant);
     let senders = run.replies.strong_count();
-    run.applied(&json!({"message":"renamed"}));
+    surface::receipt(&mut run, &json!({"message":"renamed"}));
     assert_eq!(
         run.replies.strong_count(),
         senders + 1,

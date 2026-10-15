@@ -3,7 +3,7 @@ use crossterm::event::KeyEvent;
 
 pub(super) struct Pending {
     session: SessionId,
-    focus: String,
+    pub(super) focus: String,
     key: KeyEvent,
 }
 
@@ -43,7 +43,7 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
     }
 }
 
-fn target(run: &Run) -> Option<(SessionId, String, bool)> {
+pub(super) fn target(run: &Run) -> Option<(SessionId, String, bool)> {
     if crate::sessions::active(&run.ui) {
         return crate::sessions::request(&run.ui)
             .map(|id| (run.session.tree.view().clone(), id.into(), true));
@@ -120,7 +120,7 @@ pub(super) fn opened(run: &mut Run, opened: Opened) {
     if !live {
         run.site_keys.remove(&opened.intent);
         run.mine.remove(&opened.intent);
-        drain(run);
+        super::typeahead::drain(run);
         return;
     }
     match opened.handle {
@@ -217,7 +217,7 @@ fn interaction_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome)
     }
     let interaction = open.id.clone();
     run.ui.dialog.answered = true;
-    run.site_queue.retain(|(site, _)| site != &pending.focus);
+    run.typeahead.forget_site(&pending.focus);
     super::interactions::answer(run, interaction, answer, bingo_sdk::Activation::Keyboard);
     true
 }
@@ -303,66 +303,6 @@ fn vouched(result: &serde_json::Value, owner: &str) -> bool {
 pub(super) fn notices(run: &mut Run) {
     for notice in crate::keys::commands::bindings(&run.ui, run.session.tree.viewed()).notices {
         run.ui.notify(Level::Warn, notice, Instant::now());
-    }
-}
-
-fn focus(run: &Run) -> Option<String> {
-    // An unhandled printable key sets the ask aside; finish its already queued
-    // burst in the composer instead of dropping the remaining letters.
-    target(run).map(|(_, focus, _)| focus).or_else(|| {
-        run.session
-            .tree
-            .open_interaction()
-            .map(|(_, open)| open.id.to_string())
-    })
-}
-fn palette_waiting(run: &Run) -> bool {
-    crate::browse::waiting(&run.ui, &run.session.tree)
-        || crate::plugins::waiting(&run.ui)
-        || crate::palette::waiting(&run.ui, &run.session.tree, run.detection.now())
-}
-pub(super) fn blocked(run: &Run) -> bool {
-    if palette_waiting(run)
-        || crate::sessions::waiting(&run.ui, &run.session.tree, run.detection.now())
-    {
-        return true;
-    }
-    focus(run).is_some_and(|focus| {
-        run.site_keys.values().any(|p| p.focus == focus)
-            || run.site_queue.iter().any(|(site, _)| site == &focus)
-    })
-}
-pub(super) fn queue(run: &mut Run, key: KeyEvent) {
-    if let Some(focus) = focus(run) {
-        run.site_queue.push_back((focus, key));
-    }
-}
-pub(super) fn drain(run: &mut Run) {
-    while let Some((site, key)) = run.site_queue.front().cloned() {
-        if focus(run).as_ref() != Some(&site) {
-            run.site_queue.pop_front();
-            continue;
-        }
-        if palette_waiting(run)
-            || crate::sessions::waiting(&run.ui, &run.session.tree, run.detection.now())
-        {
-            break;
-        }
-        if run.site_keys.values().any(|p| p.focus == site) {
-            break;
-        }
-        if crate::focus::owner(&run.ui, &run.session.tree) == crate::focus::Owner::Interaction
-            && run
-                .session
-                .tree
-                .open_interaction()
-                .is_some_and(|(owner, open)| crate::ask::waiting(&run.ui, owner, open))
-        {
-            break;
-        }
-        run.site_queue.pop_front();
-        let effects = input::on_key(&mut run.ui, &run.session.tree, key, run.detection.now());
-        run.apply(effects);
     }
 }
 

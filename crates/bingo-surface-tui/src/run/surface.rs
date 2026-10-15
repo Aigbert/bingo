@@ -1,5 +1,29 @@
 //! Client actions returned in command receipts.
 use super::*;
+/// What a command's receipt asks of the surface: an action, a message, a view.
+pub(super) fn receipt(run: &mut Run, result: &Value) {
+    if let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone()) {
+        sessions::surface_action(run, &action);
+        self::action(run, action);
+    }
+    // Acknowledgements refresh the palette alongside asynchronous changes.
+    catalogues::fetch(run, "plugins", CatalogKind::Plugins);
+    // A recorded receipt is already a line in the transcript.
+    if result.get("surface").is_none()
+        && result.get("item").is_none()
+        && let Some(message) = result.get("message").and_then(Value::as_str)
+    {
+        run.ui
+            .notify(Level::Info, message.to_string(), Instant::now());
+    }
+    if let Some(view) = result
+        .get("view")
+        .and_then(|v| serde_json::from_value::<View>(v.clone()).ok())
+    {
+        run.ui.block = Some(view);
+    }
+}
+
 pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
     let now = run.detection.now();
     match action.name.as_str() {

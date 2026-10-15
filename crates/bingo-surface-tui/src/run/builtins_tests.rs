@@ -309,7 +309,7 @@ async fn resize_then_down_then_enter_uses_one_cursor() {
         "the fallback must not move another cursor"
     );
     pull_question(&mut run, 80, now);
-    site_keys::drain(&mut run);
+    typeahead::drain(&mut run);
     // The real mod's pure state interprets the requests in mailbox order.
     let mut state = bingo_mod_ask::state::State::default();
     let bingo_sdk::InteractionKind::Question(question) = question(false, true).kind else {
@@ -612,14 +612,14 @@ async fn escape_discards_keys_waiting_for_the_asking_sessions_handle() {
     run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Down)));
     run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Enter)));
     let pending = run.site_keys.keys().next().unwrap().clone();
-    assert_eq!(run.site_queue.len(), 1);
+    assert_eq!(run.typeahead.len(), 1);
     run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Esc)));
     assert!(
         run.site_keys.is_empty(),
         "discard the key whose mailbox is still opening"
     );
     assert!(
-        run.site_queue.is_empty(),
+        run.typeahead.is_empty(),
         "discard its queued follow-up key too"
     );
     for _ in 0..2 {
@@ -824,6 +824,10 @@ async fn plugin_switch_redraws_the_toast_and_refreshes_default_keys() {
         let before = session.submitted().len();
         run.terminal_event(Term::Key(ctrl('x')));
         assert_eq!(session.submitted().len() - before, usize::from(enabled));
+        // The kernel answers the command the key sent, as it does live.
+        if let Some((intent, _)) = session.submissions().last().cloned() {
+            run.ack(&intent, &IntentOutcome::Applied { result: json!({}) });
+        }
     }
     host.shutdown().await;
 }

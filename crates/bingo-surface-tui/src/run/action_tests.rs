@@ -339,7 +339,10 @@ async fn a_surface_action_prefills_the_composer_without_submitting() {
     let mut run = tests::idle_in(state(), session.clone(), now.instant);
     for text in ["/rename ", "/permission "] {
         run.ui.composer.set("");
-        run.applied(&json!({"surface":{"name":"Composer","args":{"text":text}}}));
+        surface::receipt(
+            &mut run,
+            &json!({"surface":{"name":"Composer","args":{"text":text}}}),
+        );
         assert_eq!(run.ui.composer.text(), text);
         assert!(session.submissions().is_empty());
     }
@@ -352,7 +355,10 @@ async fn a_composer_action_preserves_an_existing_draft_and_explains_why() {
     for text in ["/rename ", "/permission "] {
         let mut run = tests::idle_in(state(), session.clone(), now.instant);
         run.ui.composer.set("my unfinished draft");
-        run.applied(&json!({"surface":{"name":"Composer","args":{"text":text}}}));
+        surface::receipt(
+            &mut run,
+            &json!({"surface":{"name":"Composer","args":{"text":text}}}),
+        );
         assert_eq!(run.ui.composer.text(), "my unfinished draft");
         assert_eq!(
             run.ui.notice().unwrap().text,

@@ -37,6 +37,7 @@ mod site_lifecycle;
 /// A line on its way out of the composer, and the pictures it named.
 mod submit;
 mod surface;
+mod typeahead;
 /// Whether a newer release is out, asked once at start (M63).
 mod updates;
 /// A line on its way back out of the queue and into the composer (M68).
@@ -175,7 +176,7 @@ struct Run {
     rewind_prompts: surface::Prompts,
     received_asks: HashMap<bingo_sdk::InteractionId, jiff::Timestamp>,
     site_keys: HashMap<IntentId, site_keys::Pending>,
-    site_queue: std::collections::VecDeque<(String, crossterm::event::KeyEvent)>,
+    typeahead: typeahead::Typeahead,
     replies: mpsc::Sender<Reply>,
     /// A selection a key asked for, handed to the terminal between frames.
     clipboard: Option<String>,
@@ -326,7 +327,7 @@ async fn attach(
         rewind_prompts: Default::default(),
         received_asks: HashMap::new(),
         site_keys: HashMap::new(),
-        site_queue: Default::default(),
+        typeahead: Default::default(),
         replies,
         clipboard: None,
         opener: viewer::system(),
@@ -416,6 +417,7 @@ impl Run {
             .into_iter()
             .chain(self.behind.then_some(self.painted + TICK))
             .chain(self.ui.actions.deadline())
+            .chain(self.typeahead.deadline())
             .min()
     }
 
@@ -601,7 +603,7 @@ impl Run {
         site_keys::answered(self, intent, outcome);
         self.ui.actions.acknowledge(intent);
         self.release_actions();
-        site_keys::drain(self);
+        typeahead::drain(self);
         if matches!(outcome, IntentOutcome::Rejected { .. }) {
             self.rewind_prompts.cancel(intent);
         }
@@ -610,9 +612,10 @@ impl Run {
         };
         match outcome {
             IntentOutcome::Rejected { error } => self.rejected(&error.message, about),
-            IntentOutcome::Applied { result } => self.applied(result),
+            IntentOutcome::Applied { result } => surface::receipt(self, result),
             _ => {}
         }
+        typeahead::settled(self, intent);
     }
 
     fn rejected(&mut self, message: &str, about: Option<String>) {
@@ -622,29 +625,6 @@ impl Run {
                 .ui
                 .notify_about(Level::Error, message.to_string(), text, now),
             None => self.ui.notify(Level::Error, message.to_string(), now),
-        }
-    }
-
-    fn applied(&mut self, result: &Value) {
-        if let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone()) {
-            sessions::surface_action(self, &action);
-            surface::action(self, action);
-        }
-        // Acknowledgements refresh the palette alongside asynchronous changes.
-        catalogues::fetch(self, "plugins", CatalogKind::Plugins);
-        // A recorded receipt is already a line in the transcript.
-        if result.get("surface").is_none()
-            && result.get("item").is_none()
-            && let Some(message) = result.get("message").and_then(Value::as_str)
-        {
-            self.ui
-                .notify(Level::Info, message.to_string(), Instant::now());
-        }
-        if let Some(view) = result
-            .get("view")
-            .and_then(|v| serde_json::from_value::<View>(v.clone()).ok())
-        {
-            self.ui.block = Some(view);
         }
     }
 
@@ -698,13 +678,13 @@ impl Run {
                     || (chord.as_deref() == Some("esc") && !site_lifecycle::open(&self.ui))
                 {
                     self.site_keys.clear();
-                    self.site_queue.clear();
+                    self.typeahead.clear();
                     if chord.as_deref() == Some("ctrl+c") && site_lifecycle::ctrl_c(self, key) {
                         return;
                     }
                 }
-                if site_keys::blocked(self) {
-                    site_keys::queue(self, key);
+                if typeahead::blocked(self) {
+                    typeahead::queue(self, key);
                     return;
                 }
                 self.session.tree.mark_read();
@@ -745,7 +725,7 @@ impl Run {
         match effect {
             Effect::Submit(input) => self.submit(input),
             Effect::Run(line) => self.run_line(line),
-            Effect::AwaitSiteKey(key) => site_keys::queue(self, key),
+            Effect::AwaitSiteKey(key) => typeahead::queue(self, key),
             Effect::SiteKey { action, key } => site_keys::send(self, action, key),
             Effect::Withdraw(intent) => withdraw::ask(self, intent),
             Effect::Interrupt => self.interrupt(),
@@ -1668,7 +1648,7 @@ mod tests {
             rewind_prompts: Default::default(),
             received_asks: HashMap::new(),
             site_keys: HashMap::new(),
-            site_queue: Default::default(),
+            typeahead: Default::default(),
             replies: mpsc::channel(1).0,
             clipboard: None,
             opener: viewer::system(),
@@ -2844,6 +2824,9 @@ mod action_tests;
 
 #[cfg(test)]
 mod palette_tests;
+
+#[cfg(test)]
+mod typeahead_tests;
 
 #[cfg(test)]
 mod palette_close_tests;

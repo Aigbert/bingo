@@ -105,5 +105,5 @@ pub(super) fn rendered(run: &mut Run, epoch: u64, key: crate::pulled::Key, view:
     }
     run.ui.placed.pulled.answer_at(epoch, key, view);
     run.release_actions();
-    site_keys::drain(run);
+    typeahead::drain(run);
 }
