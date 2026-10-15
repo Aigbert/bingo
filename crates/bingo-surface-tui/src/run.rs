@@ -606,6 +606,11 @@ impl Run {
         if matches!(outcome, IntentOutcome::Rejected { .. }) {
             self.rewind_prompts.cancel(intent);
         }
+        if matches!(outcome, IntentOutcome::Queued { .. }) {
+            typeahead::settled(self, intent);
+            typeahead::drain(self);
+            return;
+        }
         let Some(about) = self.mine.remove(intent) else {
             typeahead::drain(self);
             return;

@@ -239,6 +239,10 @@ async fn queued_acknowledgements_release_edits_without_waiting_for_a_turn() {
             &IntentOutcome::Queued { position: 2 },
         );
         assert!(run.ui.actions.action().is_none());
+        assert_eq!(run.mine.len(), 2);
+        for (intent, _) in session.submissions() {
+            run.ack(&intent, &IntentOutcome::Applied { result: json!({}) });
+        }
         assert!(run.mine.is_empty());
     }
 }

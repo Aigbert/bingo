@@ -234,3 +234,50 @@ async fn opener_receipt_addresses_held_keys_before_releasing_them() {
         )));
     }
 }
+
+#[tokio::test]
+async fn queued_opener_refocuses_only_when_its_final_receipt_arrives() {
+    let now = scene().1;
+    let mut run = tests::idle(now.instant);
+    let mut screen = Recorder::default();
+    run.frame(&frame(1, publication(true)), &mut screen)
+        .unwrap();
+    run.ui.sync_panes(run.session.tree.viewed());
+    draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+    run.ui.focus = Focus::Composer;
+    run.ui.composer.set("draft");
+    let intent = run.mint(Some("/open-keys".into()));
+    run.ack(&intent, &IntentOutcome::Queued { position: 1 });
+    run.frame(&frame(2, publication(true)), &mut screen)
+        .unwrap();
+    draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+    assert!(matches!(run.ui.focus, Focus::Composer));
+    run.ack(
+        &intent,
+        &IntentOutcome::Applied {
+            result: json!({"surface":{"name":"Pane","args":{"plugin":"fixture","id":"keys"}}}),
+        },
+    );
+    draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+    assert!(matches!(run.ui.focus, Focus::Pane(_)));
+    assert_eq!(run.ui.composer.text(), "draft");
+    assert!(!run.mine.contains_key(&intent));
+}
+
+#[tokio::test]
+async fn queued_opener_releases_typeahead_but_keeps_its_final_receipt() {
+    let now = still(scene().1);
+    let mut run = tests::idle(now.instant);
+    let intent = run.mint(Some("/open-keys".into()));
+    typeahead::command_sent(&mut run, intent.clone());
+    run.terminal_event(Term::Key(typed('a')));
+    assert_eq!(run.typeahead.len(), 1);
+    run.ack(&intent, &IntentOutcome::Queued { position: 1 });
+    draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+    assert!(run.typeahead.deadline().is_none());
+    assert!(run.typeahead.is_empty());
+    assert_eq!(run.ui.composer.text(), "a");
+    assert!(run.mine.contains_key(&intent));
+    run.ack(&intent, &IntentOutcome::Applied { result: json!({}) });
+    assert!(!run.mine.contains_key(&intent));
+}
