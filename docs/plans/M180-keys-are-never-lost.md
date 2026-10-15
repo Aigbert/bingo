@@ -4,30 +4,16 @@ ADR-0002, ADR-0079. A bug fix with a decision in it, so it gets a plan.
 
 ## Goal
 
-A key a person types reaches the place that reads it, in the order typed, or it
-stays visible in the composer. No path discards one silently. One exception is
-deliberate: input typed elsewhere is never entered into an ask that takes focus.
+Input reaches its reader in typed order or stays visible in the composer, never
+silently discarded. Input typed elsewhere never enters an ask that takes focus.
 
 ## The drop
 
-A key typed at a site (palette, directory, browse, an ask) while the site was still
-drawing or still judging the key before it waited in `Run::site_queue`, tagged with
-the site's id. `site_keys::drain` let them go in order, and a key whose site was no
-longer the keyboard's owner was popped and discarded:
-
-```
-run.rs  terminal_event → site_keys::blocked → site_keys::queue (tag = palette id)
-run.rs  ack(Enter)     → site_keys::answered → palette::result {"run":"/sessions"}
-                       → palette::close + input::command_line → Submit(Text)
-                       → site_keys::drain: focus ≠ palette → pop_front, continue
-```
-
-So `/sessions⏎abc` (or `/model⏎openai`) typed in one burst lost `abc`: the keys
-waited for the palette's verdict on Enter, and that verdict closed the palette.
-Keys typed after the line went out and before its acknowledgement were not queued
-at all: they went to the composer, and the opened directory then took the composer
-as its draft, so its filter started empty. `site_keys::queue` also dropped a key
-outright when nothing owned the keyboard.
+Previously, `site_keys::drain` discarded queued keys when their site lost focus.
+A palette Enter could close the palette and submit `/sessions`, so the remaining
+`abc` in `/sessions⏎abc` disappeared. Keys typed after submission but before the
+command receipt instead reached the composer, then became the directory's saved
+draft rather than its filter. `queue` also discarded keys with no focused site.
 
 The `M141` smoke flake (`/ledger⏎` ending at `/ledge`) is not this drop. Instrumented
 runs (45+ rounds) never lost a key there: every key waits for the palette drawing of
@@ -49,8 +35,7 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
    an already open ask regaining focus and a paste queued at that ask. Record
    actual keyboard ownership, never the identity of an ask set aside. A command
    hold also excludes asks: palette close may restore one before the command ack.
-   Queued pastes
-   are always excluded from asks, including ones queued at that ask, to protect
+   Queued pastes are always excluded from asks, including ones queued at that ask, to protect
    answers and secret fields. This covers every ask, not only the sealed ones
    (permission, sign-in): a `y` meant for a filter must never approve a tool, and a
    password field must never receive a fragment of a command. Leaving them in the
@@ -61,12 +46,18 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
 6. Applying queued input or its drop notice owes a frame, including after paint
    releases the command deadline; otherwise the edited composer remains invisible.
 
+7. Smoke readiness requires a persistent composer echo after closing Browse.
+   The shortcut hint is shared; header absence can match an intermediate redraw.
+   Encode closing Escape as CSI 27 u before the probe, avoiding an Alt chord.
+   Product behavior stays: ctrl+c at an idle open site closes it and is consumed.
+
 ## Files
 
 - `crates/bingo-surface-tui/src/run/typeahead.rs` (new), `run/typeahead_tests.rs` (new).
 - `run/site_keys.rs` sheds focus/blocked/queue/drain; `run.rs` holds `typeahead`.
 - `run/submit.rs` marks a command line; `run/pulling.rs`, `run/site_lifecycle.rs` drain.
 - `run/surface.rs` takes the receipt handling out of `run.rs` (size budget).
+- `scripts/tui-smoke.sh` verifies composer ownership before `finish` sends ctrl+u/ctrl+c.
 
 ## Exit criteria
 
@@ -86,40 +77,33 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
 - [x] Held `ab`, paste `X`, `cd` arrive as `abXcd`; asks reject queued pastes.
 - [x] Permission ask, `/nosuch⏎y`: the ask remains unanswered, with a truthful count.
 - [x] Review native non-smoke gates and regenerated schemas/TypeScript.
-- [ ] Three passing isolated smoke runs: 1/3; runs 1 and 3 hit the browse-close timeout.
+- [x] Three passing isolated smoke runs after the readiness fix; earlier 1/3 results retained below.
 - [ ] Windows cross-check: known missing MSVC C toolchain; see below.
 
 ## Non-goals
 
-- Mouse events during a command hold may act ahead of queued input; pointer
-  ordering is outside this review round.
-- Palette latency per key (a drawing plus a round trip). The smoke's 10 s wait is
-  not raised here either; the numbers are in Verified.
+- Mouse events may act ahead of held input; pointer ordering is outside this round.
+- Palette latency per key; the smoke poll count and interval stay unchanged.
 - Keys queued at an ask that is then answered are still forgotten with it.
 - Stale actions dropped by `release_actions_at` keep their existing notice.
 
 ## Risks
 
-- The model picker is not on dev. It opens the same way (a command whose receipt's
-  `surface` action opens a site), so `/model⏎openai` takes this path unchanged.
-- A command that takes longer than 1 s to acknowledge releases the keyboard; what
-  is typed then goes to the composer, as before M180, and nothing is lost.
+- The model picker is not on dev; `/model⏎openai` uses the same command receipt path.
+- After a command exceeds the 1 s hold, new input goes to the composer as before M180.
 - During the hold the composer does not echo; at most 1 s of keys appear at once.
 
 ## Verified
 
-2026-10-15, macOS arm64, `typeahead-fix` from dev ee4ad7dc. The host was shared:
-load averages 20–270 throughout, so "unloaded" below means only no build of ours.
+2026-10-15, macOS arm64, `typeahead-fix` from dev ee4ad7dc; shared load 20–270 ("unloaded" means no build of ours).
 
 - `cargo test -p bingo-surface-tui typeahead_tests`: 4 passed. Restoring the discard
   in `drain` fails `keys_typed_behind_a_command_reach_the_site_it_opens` (0 keys
   waiting); re-addressing into dialogs fails `…never_entered_into_it` (an answer went).
 - tmux drive (`/sessions` Enter `abc` in one send-keys, own socket, fake provider):
   before, the directory opened with an empty filter; after, `sessions · here · abc`.
-- `tui-smoke.sh` ×10, runs 1–6 beside a looping release build in another target dir:
-  before 6/10 (all four failures at `finish` after the ctrl+f browse step, waiting for
-  the ctrl+c hint; none at M141); after 10/10. The earlier failures fit a ctrl+c
-  queued at the closing browse site and then discarded, the drop this plan removes.
+- `tui-smoke.sh` ×10, runs 1–6 beside a looping release build: before 6/10 (four exit-hint failures after browse, none at M141); after 10/10.
+  The earlier attribution to dropped ctrl+c was conjecture; the instrumented follow-up below supersedes it.
 - `cargo fmt --all -- --check` 0; `cargo clippy --workspace --all-targets --locked
   -- -D warnings` 0; `RUST_TEST_THREADS=4 cargo test --workspace --locked` 0
   (5868 passed, 0 failed, 5 ignored); `scripts/check_discipline.sh` ok (run.rs 982
@@ -147,3 +131,16 @@ load averages 20–270 throughout, so "unloaded" below means only no build of ou
 - `bash scripts/tui-smoke.sh` run 3: exit 1, same browse-close timeout. All three used separate own sockets (`-f /dev/null`), temporary HOME/data, fake provider, and the four provider env variables unset; timeouts unchanged.
 - `cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc`: exit 101 in `aws-lc-sys v0.44.0`.
   `fatal error: 'windows.h' file not found` (also `stdlib.h`): known C toolchain deferral; Windows CI remains required.
+
+### Follow-up — 2026-10-15: isolate the browse finish failure
+
+- Scratch copies of only the Browse step: `bash /tmp/m180-investigation.A8CufY/loop.sh <revision> <worktree>`; 20 runs each, socket `m180s`, `-f /dev/null`, temp HOME/data, fake provider, provider env unset. The committed script stayed unchanged during comparison.
+- `0f86e36b`: 16/20 passed, 4 failures, load 344–414. Detached worktree `e1bfa6da`: 17/20 passed, 3 failures, load 220–331. These are observed samples under different loads, not a rate comparison.
+- All seven failures were `finish` after “ctrl+f browses full blocks”; none reached the Browse-disabled step. Traces: `TERM ctrl+c open=true opening=None → CLEAR → SITE_CTRL_C busy=false`; no queued ctrl+c, no `ARM`, no hint drawing.
+- Ctrl+c reached the loop 10–60 ms after send. Largest failed-run poll gap: 287 ms. `EXIT_WINDOW` is 2,000 ms (ordinary notices hold 4 s); successful hints were drawn in 3–77 ms and detected in 6–196 ms. No observed failure was a missed hint window. Baseline run 8, relative to the closing Escape send: shortcut matched +25 ms, Escape drained +51 ms, ctrl+c consumed by Browse +59 ms; no ARM followed.
+- The shared shortcut hint matched before Browse closed. Six failures had a normal closing Escape still awaiting its site; one combined Escape plus ctrl+u into ctrl+alt+u during a delayed tty read. Ctrl+c intentionally closes an idle site and is consumed; neither review hold/filter change caused this path.
+- A scratch header-disappearance guard passed 19/20, then matched an intermediate redraw before Escape arrived; rejected. Require the persistent `> smoke-ready` composer echo instead, using CSI 27 u for the closing Escape so the probe cannot form an Alt chord. `finish` clears the unsubmitted probe.
+- Corrected scratch scenarios: 20/20 passed at load 314–530, with normal arming/exiting in every trace. One run reported `repro ok` then a disposable-home removal race; its scenario passed and its remaining disposable directory is included in final cleanup. No product change; smoke-only commit `3250bdfa`.
+- Temporary source tracing removed in both revisions; smoke binary checked for trace strings. `bash -n scripts/tui-smoke.sh`, fmt, workspace check, Clippy: exit 0; `RUST_TEST_THREADS=4 cargo test --workspace --locked` with provider env unset: 5875 passed, 0 failed, 5 ignored.
+- Discipline: `discipline ok`; budget: 417 dependencies, warm core 0s, relink 0, `budget ok` (6 GB soft-size warning); deny: `advisories ok, bans ok, licenses ok, sources ok`.
+- After removing instrumentation, `bash scripts/tui-smoke.sh` runs 1, 2, and 3: each exit 0, `tui-smoke ok` (3/3), each on its own socket/temp HOME with provider env unset; poll count/interval and product unchanged.
