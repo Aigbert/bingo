@@ -166,21 +166,41 @@ fn activate(target: Target, props: &PaletteProps) -> Value {
 }
 
 /// A row runs a line only the person may run only when the row shows what
-/// the line runs: its last argument, on the label or beside it.
+/// the line runs: every argument the person has not typed, in order, on the
+/// label or beside it.
 fn shown(row: Option<&crate::rows::Row>, operation: Value, props: &PaletteProps) -> Value {
     let Some(line) = operation["run"].as_str() else {
         return operation;
     };
-    let last = line.split_whitespace().last().unwrap_or_default();
+    let unseen = unseen(line, &props.query);
     let visible = row.is_some_and(|row| {
         [&row.label, &row.hint]
             .iter()
-            .any(|text| text.split_whitespace().any(|word| word == last))
+            .any(|text| holds(text, &unseen))
     });
     if visible || !crate::args::person_only(line, &props.commands) {
         return operation;
     }
     json!({"message":format!("not run: this row does not show what {line} runs; type it yourself")})
+}
+/// The words of `line` past the ones the person finished typing, or, when
+/// the line does not continue what they typed, its whole argument string.
+fn unseen<'a>(line: &'a str, query: &str) -> Vec<&'a str> {
+    let words = line.split_whitespace().collect::<Vec<_>>();
+    let finished = query
+        .rsplit_once(char::is_whitespace)
+        .map_or(vec![], |(typed, _)| typed.split_whitespace().collect());
+    let skip = if !finished.is_empty() && words.starts_with(&finished) {
+        finished.len()
+    } else {
+        1
+    };
+    words.into_iter().skip(skip).collect()
+}
+/// Whether `text` holds `words` side by side, in order.
+fn holds(text: &str, words: &[&str]) -> bool {
+    let said = text.split_whitespace().collect::<Vec<_>>();
+    words.is_empty() || said.windows(words.len()).any(|run| run == words)
 }
 
 fn operation(
@@ -370,5 +390,57 @@ mod review_tests {
         assert!(shown(Some(&forged), run.clone(), &props)["message"].is_string());
         props.commands[0].meta["args"]["person"] = json!([]);
         assert_eq!(shown(Some(&forged), run.clone(), &props), run);
+    }
+    /// A row that shows only the tier runs nothing: the name it trusts is
+    /// part of what it runs, and so is the verb nobody typed.
+    #[test]
+    fn a_person_only_row_must_show_every_argument_not_typed() {
+        let mut props = props();
+        props.commands = vec![CatalogEntry {
+            id: "plugins".into(),
+            label: "plugins".into(),
+            meta: json!({"name":"plugins","hint":"plugins","family":"session","args":{"kind":"words","values":["approve"],"person":["approve"]}}),
+        }];
+        let row = |label: &str, hint: &str| crate::rows::Row {
+            label: label.into(),
+            hint: hint.into(),
+            alert: None,
+            now: String::new(),
+            marks: vec![],
+            hint_marks: vec![],
+            target: Target::Run("/plugins approve evil full".into()),
+        };
+        let run = json!({"run":"/plugins approve evil full"});
+        let refused = |row, props: &PaletteProps| {
+            shown(Some(&row), run.clone(), props)["message"].is_string()
+        };
+        props.query = "/plugins approve ".into();
+        assert!(refused(row("full", ""), &props));
+        assert!(refused(row("evil", "full"), &props));
+        assert!(!refused(row("evil full", ""), &props));
+        props.query = "/plugins approve evil ".into();
+        assert!(!refused(row("full", ""), &props));
+        props.query = "/pl".into();
+        assert!(refused(row("evil full", ""), &props));
+        assert!(!refused(row("x", "/plugins approve evil full"), &props));
+        props.query = "/plugins\tapprove  evil ".into();
+        assert!(!refused(row("full", ""), &props));
+    }
+    /// The palette reads a person-only line the way its owner does.
+    #[test]
+    fn a_person_only_line_is_read_at_any_whitespace() {
+        let commands = vec![CatalogEntry {
+            id: "plugins".into(),
+            label: "plugins".into(),
+            meta: json!({"name":"plugins","hint":"plugins","family":"session","args":{"kind":"words","values":["trust"],"person":["trust"]}}),
+        }];
+        for line in [
+            "/plugins trust x full",
+            "/plugins\ttrust x full",
+            "/plugins  trust  x full",
+        ] {
+            assert!(crate::args::person_only(line, &commands), "{line:?}");
+        }
+        assert!(!crate::args::person_only("/plugins\tlist", &commands));
     }
 }
