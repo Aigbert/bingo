@@ -24,7 +24,7 @@ async fn line(attached: &mut Attachment, line: &str) -> Value {
         attached,
         Input::text(
             line,
-            Origin::surface("test").on(render::SurfaceName::Terminal),
+            Origin::surface("tui").on(render::SurfaceName::Terminal),
         ),
     )
     .await
@@ -68,9 +68,13 @@ async fn key(host: &bingo_core::Host, attached: &mut Attachment, key: &str) -> V
     let View::Box { layout, .. } = view else {
         panic!("pane")
     };
-    let mut action = layout.on_key.unwrap();
-    action.args["value"] = json!({"key":key});
-    submit(attached, crate::acted(action)).await
+    let action = layout
+        .on_key
+        .unwrap()
+        .with_value(json!({"key":key}))
+        .unwrap();
+    assert_eq!(action.name, CommandSpec::ui_name("bingo.mod.crew"));
+    submit(attached, crate::pressed("bingo.mod.crew", action)).await
 }
 async fn open(
     host: &bingo_core::Host,
@@ -132,24 +136,8 @@ async fn backend_keys_stop_refuse_prefill_and_tick_without_rooms() {
     line(&mut root, "/tasks add Check the cut").await;
     line(&mut root, "/crew").await;
     assert!(!backend(&drawing(&host, &root.session).await).contains("rooms ("));
-    let stopped = key(&host, &mut root, "s").await;
-    assert!(
-        stopped["result"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("stopped"),
-        "{stopped}"
-    );
-    tokio::time::timeout(std::time::Duration::from_secs(10), async {
-        loop {
-            if backend(&drawing(&host, &root.session).await).contains("■ stopped") {
-                break;
-            }
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .unwrap();
+    key(&host, &mut root, "s").await;
+    confirm_stop_and_follow(&host, &mut root).await;
     let fill = key(&host, &mut root, "m").await;
     assert_eq!(
         fill["result"]["surface"]["args"]["text"],
@@ -174,4 +162,25 @@ async fn backend_keys_stop_refuse_prefill_and_tick_without_rooms() {
         "{refused}"
     );
     host.shutdown().await;
+}
+
+async fn confirm_stop_and_follow(host: &bingo_core::Host, root: &mut Attachment) {
+    let stopped = key(host, root, "enter").await;
+    assert!(
+        stopped["result"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("stopped"),
+        "{stopped}"
+    );
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        loop {
+            if backend(&drawing(host, &root.session).await).contains("■ stopped") {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
 }

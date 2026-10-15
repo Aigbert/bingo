@@ -125,6 +125,18 @@ fn ctrl_n_is_bound_only_when_the_command_is_installed() {
             }
         })
         .collect();
+    assert!(
+        ui.catalogs
+            .commands
+            .iter()
+            .all(|spec| spec.foreign_handler("bingo.mod.crew").is_none())
+    );
+    assert!(
+        ui.catalogs
+            .commands
+            .iter()
+            .any(|spec| spec.name == CommandSpec::ui_name("bingo.mod.crew"))
+    );
     let key = crossterm::event::KeyEvent::new(
         crossterm::event::KeyCode::Char('n'),
         crossterm::event::KeyModifiers::CONTROL,
@@ -172,7 +184,8 @@ fn crew_tab_switch_reaches_the_mod_without_taking_focus_keys() {
     let effects = crate::input::on_key(&mut ui, &tree, key(KeyCode::Char(']')), now);
     assert!(
         matches!(&effects[..], [crate::effect::Effect::SiteKey { action, .. }]
-        if action.args["value"]["key"] == "]")
+        if action.name == CommandSpec::ui_name("bingo.mod.crew")
+            && action.args["value"]["key"] == "]")
     );
     let effects = crate::input::on_key(&mut ui, &tree, key(KeyCode::Tab), now);
     assert!(effects.is_empty());
@@ -182,6 +195,7 @@ fn crew_tab_switch_reaches_the_mod_without_taking_focus_keys() {
 #[test]
 fn escape_is_delivered_to_the_confirmation_instead_of_closing_the_pane() {
     for confirm in [
+        bingo_mod_crew::state::Confirmation::Stop("scout".into()),
         bingo_mod_crew::state::Confirmation::Dismiss("scout".into()),
         bingo_mod_crew::state::Confirmation::CloseRoom("design".into()),
     ] {

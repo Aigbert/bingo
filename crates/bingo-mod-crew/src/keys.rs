@@ -24,6 +24,7 @@ pub fn operation(panel: &Panel, rows: &Rows, key: &str) -> Operation {
     if let Some(name) = &panel.confirm {
         return if key == "enter" {
             match name {
+                Confirmation::Stop(name) => Operation::Stop(name.clone()),
                 Confirmation::Dismiss(name) => Operation::Dismiss(name.clone()),
                 Confirmation::CloseRoom(name) => Operation::CloseRoom(name.clone()),
             }
@@ -51,7 +52,9 @@ fn agent(panel: &Panel, rows: &Rows, key: &str) -> Operation {
         "left" | "right" => Operation::Model,
         "enter" if panel.model => Operation::Pick(row.summary.id.clone()),
         "enter" => Operation::View(row.summary.id.clone()),
-        "s" => Operation::Stop(bingo_collab::name::of_session(&row.summary).into()),
+        "s" => Operation::Confirm(Confirmation::Stop(
+            bingo_collab::name::of_session(&row.summary).into(),
+        )),
         "x" => Operation::Confirm(Confirmation::Dismiss(
             bingo_collab::name::of_session(&row.summary).into(),
         )),

@@ -19,12 +19,14 @@ impl Tab {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Confirmation {
+    Stop(String),
     Dismiss(String),
     CloseRoom(String),
 }
 impl Confirmation {
     pub fn prompt(&self) -> String {
         match self {
+            Self::Stop(name) => format!("Stop {name}? ⏎ confirm · esc cancel"),
             Self::Dismiss(name) => {
                 format!("Dismiss {name} and delete its journal? ⏎ confirm · esc cancel")
             }

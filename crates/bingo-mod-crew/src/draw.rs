@@ -125,7 +125,7 @@ pub fn tree(panel: &Panel, rows: &Rows, models: &[CatalogEntry], height: u16) ->
             .collect(),
         layout: Box::new(view::BoxStyle {
             on_key: Some(Action {
-                name: format!("{}:ui", crate::ID),
+                name: CommandSpec::ui_name(crate::ID),
                 args: json!({"handler":crate::REQUEST,"event":"press","row":rows.identity(panel.tab,panel.selected),"tab":panel.tab.label()}),
             }),
             ..Default::default()

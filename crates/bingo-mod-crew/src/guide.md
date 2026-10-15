@@ -9,7 +9,8 @@ selected agent shows its current tool and latest line. A missing price is
 `$—`, never a guessed zero. Enter steps into the session. Left or right
 selects the model line; Enter opens that session's model picker.
 
-`s` stops a running child, `x` asks before dismissing an idle child and deleting its journal.
+`s` asks before stopping a running child; `x` asks before dismissing an idle
+child and deleting its journal.
 Enter confirms; Escape cancels and stays in the list.
 Only its starter may do either. `m` fills `/agents message <name> ` in the
 composer; finish and send it without changing sessions. For an interrupted

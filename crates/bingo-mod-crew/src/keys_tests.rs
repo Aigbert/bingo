@@ -70,7 +70,10 @@ fn agent_keys_view_stop_message_pick_and_confirm_dismissal() {
     let rows = rows();
     let panel = Panel::default();
     for (key, expected) in [
-        ("s", Operation::Stop("reviewer".into())),
+        (
+            "s",
+            Operation::Confirm(Confirmation::Stop("reviewer".into())),
+        ),
         (
             "x",
             Operation::Confirm(Confirmation::Dismiss("reviewer".into())),
@@ -129,6 +132,10 @@ fn task_keys_change_status_or_prefill_owner() {
 #[test]
 fn confirmations_hold_the_target_and_require_enter() {
     for (confirm, expected) in [
+        (
+            Confirmation::Stop("reviewer".into()),
+            Operation::Stop("reviewer".into()),
+        ),
         (
             Confirmation::CloseRoom("#design".into()),
             Operation::CloseRoom("#design".into()),

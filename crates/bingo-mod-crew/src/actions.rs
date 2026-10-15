@@ -92,7 +92,7 @@ async fn act(
             crate::command::close(cx, shared).await?;
             return crate::dispatch::model(cx, &id).await;
         }
-        op @ (Operation::CloseRoom(_) | Operation::Dismiss(_)) => {
+        op @ (Operation::Stop(_) | Operation::CloseRoom(_) | Operation::Dismiss(_)) => {
             let outcome = write(op, cx).await?;
             panel.confirm = None;
             return Ok(outcome);
@@ -123,7 +123,7 @@ fn move_row(panel: &mut Panel, rows: &Rows, down: bool) {
 }
 
 fn person() -> Result<(), KernelError> {
-    if render::vouched() {
+    if render::asked() && render::vouched() {
         Ok(())
     } else {
         Err(crate::error(
@@ -186,7 +186,7 @@ fn surface(name: &str, args: Value) -> CommandOutcome {
 mod tests {
     use super::*;
     #[tokio::test]
-    async fn a_non_person_pick_is_refused_before_opening_a_session() {
+    async fn person_controls_require_both_asked_and_the_owners_drawing() {
         let host = testing::TestHost::default();
         let cx = CommandContext {
             session: SessionId::from_raw("ses_parent"),
@@ -194,17 +194,33 @@ mod tests {
             host: host.handle(),
             cancel: Default::default(),
         };
-        let error = act(
-            Operation::Pick(SessionId::from_raw("ses_child")),
-            &mut Panel::default(),
-            &Rows::default(),
-            &cx,
-            &crate::Shared::default(),
-        )
-        .await
-        .unwrap_err();
-        assert!(error.message.contains("own control"));
-        assert!(host.calls().is_empty());
+        for (asked, vouched) in [(false, false), (true, false), (false, true)] {
+            for operation in [
+                Operation::Pick(SessionId::from_raw("ses_child")),
+                Operation::Stop("reviewer".into()),
+                Operation::Dismiss("reviewer".into()),
+                Operation::CloseRoom("design".into()),
+                Operation::Confirm(crate::state::Confirmation::Dismiss("reviewer".into())),
+            ] {
+                let error = render::under_input(
+                    asked,
+                    render::under_press(
+                        vouched,
+                        act(
+                            operation,
+                            &mut Panel::default(),
+                            &Rows::default(),
+                            &cx,
+                            &crate::Shared::default(),
+                        ),
+                    ),
+                )
+                .await
+                .unwrap_err();
+                assert!(error.message.contains("own control"), "{error}");
+                assert!(host.calls().is_empty());
+            }
+        }
     }
     #[tokio::test]
     async fn dismissal_waits_for_confirmation_and_escape_cancels() {
@@ -217,14 +233,17 @@ mod tests {
         };
         let mut panel = Panel::default();
         let confirm = crate::state::Confirmation::Dismiss("reviewer".into());
-        render::under_press(
+        render::under_input(
             true,
-            act(
-                Operation::Confirm(confirm.clone()),
-                &mut panel,
-                &Rows::default(),
-                &cx,
-                &crate::Shared::default(),
+            render::under_press(
+                true,
+                act(
+                    Operation::Confirm(confirm.clone()),
+                    &mut panel,
+                    &Rows::default(),
+                    &cx,
+                    &crate::Shared::default(),
+                ),
             ),
         )
         .await

@@ -10,7 +10,7 @@ async fn command(session: &mut Attachment, line: &str) -> Value {
         intent.clone(),
         Input::text(
             line,
-            Origin::surface("test").on(render::SurfaceName::Terminal),
+            Origin::surface("tui").on(render::SurfaceName::Terminal),
         ),
     );
     serde_json::to_value(ack_for(session, &intent).await).unwrap()
@@ -38,12 +38,16 @@ async fn key(host: &impl HostApi, session: &mut Attachment, key: &str) -> Value 
     let View::Box { layout, .. } = view else {
         panic!("crew pane: {view:?}")
     };
-    let mut action = layout.on_key.unwrap();
-    action.args["value"] = json!({"key":key});
+    let action = layout
+        .on_key
+        .unwrap()
+        .with_value(json!({"key":key}))
+        .unwrap();
+    assert_eq!(action.name, CommandSpec::ui_name("bingo.mod.crew"));
     let intent = IntentId::mint();
     session.handle.submit(
         intent.clone(),
-        Input::action(action, Origin::surface("test")),
+        Input::action(action, Origin::surface("tui")),
     );
     serde_json::to_value(ack_for(session, &intent).await).unwrap()
 }
@@ -121,7 +125,7 @@ async fn crew_stops_prefills_ticks_and_closes_through_minted_keys() {
     let intent = IntentId::mint();
     child.handle.submit(
         intent.clone(),
-        Input::text("Review the cut", Origin::surface("test")),
+        Input::text("Review the cut", Origin::surface("tui")),
     );
     assert!(matches!(
         ack_for(&mut child, &intent).await,
@@ -130,46 +134,14 @@ async fn crew_stops_prefills_ticks_and_closes_through_minted_keys() {
     let opened = command(&mut root, "/crew").await;
     assert_eq!(opened["result"]["surface"]["name"], "Pane");
     assert!(draw(&host, &root.session).await.fold().contains("reviewer"));
-    let stopped = key(&host, &mut root, "s").await;
-    assert!(
-        stopped["result"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("stopped"),
-        "{stopped}"
-    );
-    tokio::time::timeout(LIMIT, async {
-        loop {
-            if draw(&host, &root.session)
-                .await
-                .fold()
-                .contains("■ stopped")
-            {
-                break;
-            }
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .unwrap();
+    stop_and_follow(&host, &mut root).await;
     let fill = key(&host, &mut root, "m").await;
     assert_eq!(
         fill["result"]["surface"],
         json!({"name":"Composer","args":{"text":"/agents reopen reviewer "}})
     );
     assert!(fill["result"].get("view").is_none());
-    command(&mut root, "/crew").await;
-    key(&host, &mut root, "right").await;
-    let picker = key(&host, &mut root, "enter").await;
-    assert_eq!(picker["result"]["surface"]["name"], "Pane");
-    assert_eq!(
-        picker["result"]["surface"]["args"]["plugin"],
-        "bingo.mod.models"
-    );
-    assert_eq!(
-        picker["result"]["surface"]["args"]["view"],
-        json!(child.session)
-    );
+    model_picker(&host, &mut root, &child.session).await;
     command(&mut root, "/crew").await;
     key(&host, &mut root, "]").await;
     assert!(draw(&host, &root.session).await.fold().contains("#design"));
@@ -216,3 +188,51 @@ async fn disabled_crew_retains_tables_and_no_key() {
             .success()
     );
 }
+
+async fn stop_and_follow(host: &impl HostApi, root: &mut Attachment) {
+    key(host, root, "s").await;
+    assert!(
+        draw(host, &root.session)
+            .await
+            .fold()
+            .contains("Stop reviewer?")
+    );
+    key(host, root, "esc").await;
+    let view = draw(host, &root.session).await.fold();
+    assert!(!view.contains("Stop reviewer?"));
+    assert!(view.contains("working"), "{view}");
+    key(host, root, "s").await;
+    let stopped = key(host, root, "enter").await;
+    assert!(
+        stopped["result"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("stopped"),
+        "{stopped}"
+    );
+    tokio::time::timeout(LIMIT, async {
+        loop {
+            if draw(host, &root.session).await.fold().contains("■ stopped") {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+}
+
+async fn model_picker(host: &impl HostApi, root: &mut Attachment, child: &SessionId) {
+    command(root, "/crew").await;
+    key(host, root, "right").await;
+    let picker = key(host, root, "enter").await;
+    assert_eq!(picker["result"]["surface"]["name"], "Pane");
+    assert_eq!(
+        picker["result"]["surface"]["args"]["plugin"],
+        "bingo.mod.models"
+    );
+    assert_eq!(picker["result"]["surface"]["args"]["view"], json!(child));
+}
+
+#[path = "crew_panel/actions.rs"]
+mod actions;
