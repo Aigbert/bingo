@@ -80,6 +80,13 @@ async fn compaction_replay_reissues_a_removed_snapshot_then_keeps_the_request_pr
     run_and_journal(&cfg, &mut frames, TurnKind::Respond).await;
     let initial_items = ContextView::items(&frames);
     assert_eq!(snapshot_count(&initial_items), 1);
+    let snapshot = initial_items.iter().find(|item| {
+        matches!(&item.body, ItemBody::User { origin, .. } if origin.surface == "contributor:inventory")
+    }).unwrap();
+    assert!(bingo_sdk::asked(snapshot).is_none());
+    assert!(
+        matches!(&snapshot.body, ItemBody::User { origin, .. } if origin.voice == Some(Voice::Quiet))
+    );
     run_and_journal(&cfg, &mut frames, TurnKind::Respond).await;
     let before_cut = ContextView::items(&frames);
     assert_eq!(
