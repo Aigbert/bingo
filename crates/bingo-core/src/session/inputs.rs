@@ -52,7 +52,7 @@ impl Actor {
     ) -> Result<(), KernelError> {
         let instant = command.is_instant(&parsed.args, &self.state).await;
         if !instant && !queued && (self.busy() || self.queue.ready()) {
-            return self.enqueue(intent, Pending::Submitted(input)).await;
+            return self.enqueue(intent, Pending::Command(input)).await;
         }
         let run = commands::Run {
             intent,
@@ -164,7 +164,7 @@ impl Actor {
             return self.log_input(intent, input).await;
         }
         if self.busy() || self.queue.ready() {
-            return self.enqueue(intent, Pending::Submitted(input)).await;
+            return self.enqueue(intent, Pending::Prose(input)).await;
         }
         let inputs = self.held_then(intent, input).await?;
         self.start_turn(inputs, TurnOrigin::Submit, TurnKind::Respond)
@@ -232,7 +232,7 @@ impl Actor {
             return self.log_input(intent, input).await;
         }
         if self.busy() || self.queue.ready() || input.is_held() {
-            return self.enqueue(intent, Pending::Delivered(input)).await;
+            return self.enqueue(intent, Pending::Prose(input)).await;
         }
         let inputs = self.held_then(intent, input).await?;
         self.start_turn(inputs, TurnOrigin::Peer, TurnKind::Respond)

@@ -546,3 +546,5 @@ async fn an_acknowledged_result_is_forwarded_without_another_item() {
     );
     assert!(state.transcript.items().is_empty());
 }
+
+mod rewrites;

@@ -7,8 +7,6 @@ use std::collections::VecDeque;
 
 use bingo_sdk::*;
 
-use super::commands;
-
 /// Characters of a queued input shown in `QueueChanged`.
 const PREVIEW_CHARS: usize = 80;
 
@@ -18,33 +16,27 @@ pub(super) struct Queue {
     revision: u64,
 }
 
-/// Delivery timing is already on `Input`; this preserves how it arrived.
+/// Preserve the gate verdict; rewritten and delivered prose stays prose.
 pub(super) enum Pending {
-    Submitted(Input),
-    Delivered(Input),
-}
-
-impl From<Input> for Pending {
-    fn from(input: Input) -> Self {
-        Self::Submitted(input)
-    }
+    Command(Input),
+    Prose(Input),
 }
 
 impl Pending {
     fn input(&self) -> &Input {
         match self {
-            Self::Submitted(input) | Self::Delivered(input) => input,
+            Self::Command(input) | Self::Prose(input) => input,
         }
     }
 
     fn into_input(self) -> Input {
         match self {
-            Self::Submitted(input) | Self::Delivered(input) => input,
+            Self::Command(input) | Self::Prose(input) => input,
         }
     }
 
     fn is_command(&self) -> bool {
-        matches!(self, Self::Submitted(input) if commands::is_command(input))
+        matches!(self, Self::Command(_))
     }
 
     fn steerable(&self) -> bool {
@@ -67,8 +59,8 @@ impl Queue {
     }
 
     /// Append; returns the 1-based position.
-    pub(super) fn push(&mut self, intent: IntentId, input: impl Into<Pending>) -> u32 {
-        self.entries.push_back((intent, input.into()));
+    pub(super) fn push(&mut self, intent: IntentId, input: Pending) -> u32 {
+        self.entries.push_back((intent, input));
         self.entries.len() as u32
     }
 
@@ -206,7 +198,7 @@ mod tests {
                     delivery,
                 };
                 let mut queue = Queue::default();
-                queue.push(IntentId::mint(), Pending::Delivered(input.clone()));
+                queue.push(IntentId::mint(), Pending::Prose(input.clone()));
                 assert_eq!(queue.ready(), delivery == Delivery::Wake);
                 let Event::QueueChanged { entries, .. } = queue.changed() else {
                     panic!("queue event");
@@ -222,24 +214,30 @@ mod tests {
         }
     }
 
-    fn text(t: &str) -> (IntentId, Input) {
-        (IntentId::mint(), Input::text(t, Origin::surface("rpc")))
+    fn text(t: &str) -> (IntentId, Pending) {
+        let input = Input::text(t, Origin::surface("rpc"));
+        let pending = if super::super::commands::parse(&input).is_some() {
+            Pending::Command(input)
+        } else {
+            Pending::Prose(input)
+        };
+        (IntentId::mint(), pending)
     }
 
     /// A line that asked to wait for the turn to end (M68).
-    fn held(t: &str) -> (IntentId, Input) {
+    fn held(t: &str) -> (IntentId, Pending) {
         (
             IntentId::mint(),
-            Input::Text {
+            Pending::Prose(Input::Text {
                 text: t.into(),
                 images: Vec::new(),
                 origin: Origin::surface("rpc"),
                 delivery: Delivery::Hold,
-            },
+            }),
         )
     }
 
-    fn push(q: &mut Queue, entry: (IntentId, Input)) -> IntentId {
+    fn push(q: &mut Queue, entry: (IntentId, Pending)) -> IntentId {
         q.push(entry.0.clone(), entry.1);
         entry.0
     }
@@ -292,7 +290,7 @@ mod tests {
             delivery: Delivery::Wake,
         };
         let mut q = Queue::default();
-        q.push(IntentId::mint(), input);
+        q.push(IntentId::mint(), Pending::Prose(input));
         let Event::QueueChanged { entries, .. } = q.changed() else {
             panic!("a queue change");
         };

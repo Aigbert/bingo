@@ -150,10 +150,6 @@ fn parse_line(text: &str) -> Option<Parsed> {
     })
 }
 
-pub(super) fn is_command(input: &Input) -> bool {
-    parse(input).is_some()
-}
-
 /// How a command was invoked, kept for as long as it runs: the line that
 /// asked for it, and the origin whatever it produces re-enters the session
 /// with.

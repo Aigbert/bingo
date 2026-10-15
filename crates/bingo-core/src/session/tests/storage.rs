@@ -114,7 +114,7 @@ async fn storage_failure_never_publishes_or_observes_the_failed_frame() {
     let queued = IntentId::mint();
     actor.queue.push(
         queued.clone(),
-        Input::text("queued", Origin::surface("test")),
+        super::super::queue::Pending::Prose(Input::text("queued", Origin::surface("rpc"))),
     );
     store
         .fail_at
