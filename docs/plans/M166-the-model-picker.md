@@ -41,8 +41,8 @@ Facts come from M164/M165 catalogues. The surface gains no picker code.
    sign out — disabled for `from: env` —, remove with confirm, use
    anyway); sign-in (browser, device, paste) using the existing
    `Login` interaction drawn inside the panel, then chains to the
-   pending model; add: a pasted `sk-ant-`, `sk-or-`, `sk-`, `:11434`,
-   `:1234` or http(s) address prefills name, shape and address
+   pending model; add: a pasted `sk-ant-`, `sk-or-`, `:11434`, `:1234`
+   or http(s) address prefills name, shape and address (bare `sk-` asks)
    (`picker::guess`, pure, table test), then `/provider add`, then the
    pasted key answers the paste interaction, then "pick one".
 8. **Transcript line.** The mod draws the `⇄` outcome lines of M164
@@ -53,41 +53,42 @@ Facts come from M164/M165 catalogues. The surface gains no picker code.
 
 ## Decisions
 
-- `command.run` lacked the submitting surface: add optional, pinned `origin` so
-  terminal commands can open the site without intercepting headless print commands.
-  Forwarding a terminal error must not produce an interceptor-failure notice.
-- Mount the interaction site in an existing focused, bottom-anchored pulled pane.
-  The mod owns selection, filter and sheets; the surface keeps placement and the FIFO.
-  A normal Above seat reserves eight transcript rows and clips the card at 80×24;
-  the existing bottom-anchored Rect seat preserves the approved 18-row interaction.
-- A pane arriving while the palette closes must retain its opening focus request;
-  generic pane sync now claims it once the composer is free, without FIFO changes.
-- Sign-in and the initial add paste use sealed Login (ADR-0086 §7) above the
-  prompt. Its private reply can infer a provider without exposing a key to
-  the composer, handlers, props or journal; the mod owns no credential editor.
-- Login Paste opens its sealed masked editor immediately; bracketed paste routes to
-  that editor; pastes before a focused pane opens its editor are ignored. The terminal
-  drive exposed the old composer fall-through. No FIFO changes.
-- Choice receipts were acknowledgement-only, so the mod converts successful `⇄`
-  command outcomes (including thinking receipts) to transcript notices before drawing them. The fallback keeps
-  M164's plain acknowledgements; only terminal InfoNotice links draw receipts.
-- Text's semantic `attention` color reuses the badge tone to draw the ember glyph
-  without hard-coded RGB values or changing the theme's spending allowlists.
-- Register catalogue commands `model next` and `think next` for default key lines;
-  the existing parser dispatches their base command and argument. No new key wire format.
-- The command-describe link marks site-opening commands as argument-free for the
-  palette; the real commands still accept explicit arguments. This avoids a second
-  generic argument list swallowing `/model` before the picker can open.
-- Pasted OpenAI API addresses lose a trailing `/v1` at the command boundary:
-  M165’s adapter appends that path itself. The reviewed address stays visible.
-- The old catalogue omitted configured/learned limits, and window × 90% ignored
-  reserved output. Publish resolved limits and `switchAt` from the existing kernel
-  resolver/threshold brick; the mod consumes them instead of reimplementing the ruler.
-- Chords are checked at the surface boundary; cycling and refresh at host/RPC
-  boundaries, because the surface is a client and owns no choice state.
-- Guides are owning-crate Pages, including the TUI Choosing a model section.
-- Existing dependencies are reused; the new workspace member raises the
-  normal-tree budget by one. No external package is added.
+- `command.run` lacked the submitting surface, so it gained an optional `origin`
+  for the terminal-only picker opening. M170's typed `CommandRun.surface` wins:
+  `origin` and the `"tui"` filter are dropped when this branch rebases after M170.
+- The site mounts in a focused, bottom-anchored pulled pane (18 rows at 80×24);
+  a late pane keeps its focus request. The mod owns filter and sheets; the pane
+  title names a placement in words ("own place ▾"), never the wire's `rect`.
+- Selection is the drawn row's id, never an index: rows are keyed controls whose
+  action carries `{row}`; a key for a vanished row does nothing and the cursor
+  falls to the first selectable row, never a heading. Probes run concurrently
+  after the picker is published, so rows change under a stable cursor.
+- `/model` opens the picker bare or with a filter that has no `/`; a
+  `provider/model` argument goes to the kernel, listed or not. ⏎ on an empty
+  match offers "use <arg>". Bare `/model` elsewhere names the model, the pins
+  and a count, never the whole catalogue. `next` walks `pinned` in its order.
+- Sign-in and the add paste use sealed Login (ADR-0086 §7); keys never reach
+  composer, handlers, props or journal, and pastes before a pane's editor opens
+  are ignored. A pasted key is trimmed and unwrapped before it is kept, drawn as
+  `••••••••  pasted` on one line, and `Guess`'s Debug redacts it.
+- A bare `sk-` key names no vendor: the add sheet opens on its address and
+  refuses to save without one. `sk-ant-` and `sk-or-` still name theirs.
+- A pasted OpenAI address loses a trailing `/v1`: M165's adapter appends it.
+- `⇄` receipts are recorded for every client: an interceptor turns a model or
+  effort outcome into a recorded Notice tied to its intent, and the ack carries
+  the same words. Print skips the item its own ack already printed.
+- Text's `attention` tone draws the ember glyph without hard-coded RGB.
+- `/model next` and `/think next` are key bindings on `model` and `think`: a
+  `KeyBinding` is a chord or `{chord, args}`. No catalogue entry has a space.
+- A command spec's `opens` says running it bare opens where its argument is
+  chosen; the models mod sets it for its five commands. The palette runs such a
+  command bare or as typed (a filter reaches the picker), its hints one arrow away.
+- The catalogue publishes resolved limits, `switchAt` and, through the
+  `bingo.modelSwitch` service, the kernel's own compact-before-switch decision;
+  the mod never recomputes either. A context nobody reported draws "—".
+- Chords are checked at the surface; cycling and refresh at host/RPC boundaries.
+- Guides are owning-crate Pages. Existing dependencies are reused; the new
+  workspace member raises the normal-tree budget by one.
 
 ## Files
 
@@ -124,27 +125,26 @@ Desktop/chat drawings; the merged palette; mouse; editing `models` overrides fro
 - A pasted key must never be drawn unmasked or reach the journal:
   test the frame text and the journal.
 
-## Verified — 2026-10-15
+## Verified — 2026-10-15 (review fixes)
 
-All runs unset OPENAI_*/ANTHROPIC_*; terminal drives use owned sockets, temp homes and local mocks.
-Command output summaries (Windows crates checked separately):
+Runs unset OPENAI_*/ANTHROPIC_*; drives use an owned tmux socket, a temp HOME, the fake provider.
 
 ```text
 cargo fmt --all -- --check: exit 0
-cargo check --workspace --all-targets --locked: Finished dev profile
-cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev profile
-cargo test --workspace --locked: 5689 passed; 0 failed; 6 ignored
-bash scripts/check_discipline.sh: discipline ok (no new picker warnings)
-bash scripts/budget.sh: 415/415 dependencies; warm core 0s; isolation 0; budget ok
-  target/debug: 10 GB (soft max 5); final cleanup follows commits
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished, exit 0
+RUST_TEST_THREADS=4 cargo test --workspace --locked: 5777 passed; 0 failed; 6 ignored
+bash scripts/check_discipline.sh: discipline ok
+bash scripts/budget.sh: 415/415 dependencies; warm core 1s; isolation 0; budget ok
 cargo deny check: advisories ok, bans ok, licenses ok, sources ok
-bash scripts/tui-smoke.sh: tui-smoke ok
-BINGO_UPDATE_SCHEMA=1 generator lib tests (SDK/mods/plugin-rpc/store/rpc): 443 passed; 1 ignored
-npm test (sdk/typescript): pass 31; fail 0
-cargo test -p bingo --test model_picker_tmux --locked -- --ignored --nocapture: 1 passed
-cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc:
-  bingo-sdk, bingo-core, bingo-mod-models: Finished dev profile
-  bingo-mods, bingo-surface-tui, bingo: exit 101; known MSVC C-toolchain deferral
+bash scripts/tui-smoke.sh (3 runs): tui-smoke ok ×3
+node --test src/*.test.ts (sdk/typescript): pass 31; fail 0
+cargo check -p bingo-mod-models -p bingo-sdk -p bingo-core --all-targets
+  --target x86_64-pc-windows-msvc: exit 0
+tmux 108×30 and 80×24: `/model fake/other` → "⇄ other · fake …", status fake/other;
+  palette /model ⏎ opens "own place ▾"; ⏎ during the opening probes uses the drawn
+  fake-1; a 200-char dummy paste draws "••••••••  pasted" on one line, bare sk- opens
+  the address row; the dummy is in no frame and no file under the temp HOME;
+  palette `/model fak` ⏎ opens "1 match for “fak”".
+cargo test -p bingo --test model_picker_tmux --locked -- --ignored: 1 passed
+  (owned socket, wiremock; 18 captures, none says "rect")
 ```
-
-18 TestBackend snapshots and 18 captures in `/tmp/m166-picker-captures` were compared with the local prototype.
