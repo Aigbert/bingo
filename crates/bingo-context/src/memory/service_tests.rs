@@ -159,3 +159,43 @@ async fn an_index_line_linking_two_memories_is_counted_once() {
         bingo_sdk::tokens::text(line)
     );
 }
+
+#[tokio::test]
+async fn the_listing_counts_exactly_the_links_the_contributor_carries() {
+    let home = tempfile::tempdir().unwrap();
+    let data = home.path().join("data");
+    let user = dir::user(&data);
+    std::fs::create_dir_all(&user).unwrap();
+    let total = INDEX_LINES + 10;
+    let mut index = String::new();
+    for n in 0..total {
+        std::fs::write(user.join(format!("fact-{n:03}.md")), "body").unwrap();
+        index.push_str(&format!("- [fact {n}](fact-{n:03}.md)\n"));
+    }
+    std::fs::write(user.join("MEMORY.md"), &index).unwrap();
+    let service = Memories {
+        data: data.clone(),
+        config: home.path().join("config"),
+    };
+    let rows = service
+        .list(List {
+            cwd: home.path().into(),
+        })
+        .await
+        .unwrap()
+        .memories;
+    let blocks = crate::baseline::testing::Journal::at(home.path())
+        .contribute(&MemoryContributor::new(data), home.path())
+        .await;
+    let carried = blocks
+        .iter()
+        .filter_map(|piece| match piece {
+            bingo_sdk::ContextPiece::System(block) => Some(block.text.as_str()),
+            bingo_sdk::ContextPiece::User { .. } => None,
+        })
+        .flat_map(str::lines)
+        .filter(|line| line.contains("](fact-"))
+        .count();
+    assert_eq!(carried, INDEX_LINES);
+    assert_eq!(rows.iter().filter(|row| row.tokens > 0).count(), carried);
+}

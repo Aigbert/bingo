@@ -115,7 +115,13 @@ async fn scope(whose: &str, at: &Path) -> SystemBlock {
         index.as_str()
     };
     let heading = format!("# Memories about {whose} — {}", at.display());
-    files::block(&heading, body, false, INDEX_LINES)
+    files::shown(&heading, carried_lines(body), false)
+}
+
+/// What the prompt carries of one scope's index: its newest lines within both
+/// caps, and how many earlier lines that leaves out. The panel counts these.
+pub(crate) fn carried_lines(index: &str) -> (String, usize) {
+    files::capped(index, INDEX_LINES, files::MAX_BYTES)
 }
 
 #[cfg(test)]

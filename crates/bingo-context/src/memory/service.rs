@@ -121,7 +121,7 @@ async fn list_scope(path: &Path, scope: Scope) -> Result<Vec<MemoryRow>, KernelE
         Err(error) => return Err(forget::io(error)),
     };
     let index = store::index_text(path).await;
-    let (carried, _) = crate::files::capped(&index, super::INDEX_LINES, crate::files::MAX_BYTES);
+    let (carried, _) = super::carried_lines(&index);
     let mut rows = Vec::new();
     while let Some(entry) = entries.next_entry().await.map_err(forget::io)? {
         let path = entry.path();

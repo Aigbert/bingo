@@ -27,7 +27,11 @@ pub fn capped(text: &str, max_lines: usize, max_bytes: usize) -> (String, usize)
 
 /// One file as a system block: what it is, what was left out, and the rest.
 pub fn block(heading: &str, text: &str, cache: bool, max_lines: usize) -> SystemBlock {
-    let (kept, dropped) = capped(text, max_lines, MAX_BYTES);
+    shown(heading, capped(text, max_lines, MAX_BYTES), cache)
+}
+
+/// Lines already capped as a system block, opening with what was left out.
+pub fn shown(heading: &str, (kept, dropped): (String, usize), cache: bool) -> SystemBlock {
     let mut body = String::new();
     if dropped > 0 {
         body.push_str(&omitted(dropped));
