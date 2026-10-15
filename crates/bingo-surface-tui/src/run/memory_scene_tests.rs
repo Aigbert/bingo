@@ -85,8 +85,16 @@ fn snapshot(width: u16, height: u16, scene: &str) -> String {
     if scene == "malformed" {
         listed.memories[0].error = Some("missing frontmatter: description".into());
         listed.memories[0].kind = bingo_services::memory::Kind::Malformed;
+        listed.memories[1].name = "a-memory-name-far-past-the-column-cap".into();
     }
-    let groups = rows::rows(listed, if scene == "empty" { vec![] } else { entries() });
+    let mut entries = if scene == "empty" { vec![] } else { entries() };
+    if scene == "malformed" {
+        entries[2].status = Status::Unreadable;
+        entries[2].error = Some("missing frontmatter".into());
+        entries[2].outcomes.clear();
+        entries[2].tokens = 0;
+    }
+    let groups = rows::rows(listed, entries);
     let confirming: Option<&Target> = (scene == "confirming").then(|| &groups[0].rows[0].target);
     let view = draw::tree(&groups, 0, confirming, height, width);
     let lines = crate::views::render(&view, usize::from(width));

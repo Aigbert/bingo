@@ -34,11 +34,14 @@ pub struct Group {
     pub name: &'static str,
     pub rows: Vec<Row>,
 }
+/// Past this a memory name is cut, so one long name does not squeeze every
+/// description beside it at 80 columns.
+const NAME_WIDTH: usize = 24;
 pub fn rows(listing: Listing, entries: Vec<EntryRow>) -> Vec<Group> {
     let name_width = listing
         .memories
         .iter()
-        .map(|row| row.name.chars().count())
+        .map(|row| row.name.chars().count().min(NAME_WIDTH))
         .max()
         .unwrap_or(0);
     vec![
@@ -64,27 +67,7 @@ pub fn rows(listing: Listing, entries: Vec<EntryRow>) -> Vec<Group> {
         },
         Group {
             name: "experience",
-            rows: entries
-                .into_iter()
-                .map(|row| Row {
-                    label: format!(
-                        "{}  {}  {}  {} ok · {} harmful",
-                        row.id,
-                        row.status.as_str(),
-                        row.error.unwrap_or(row.summary),
-                        row.outcomes
-                            .iter()
-                            .filter(|outcome| **outcome == Outcome::Helpful)
-                            .count(),
-                        row.outcomes
-                            .iter()
-                            .filter(|outcome| **outcome == Outcome::Harmful)
-                            .count()
-                    ),
-                    tokens: row.tokens,
-                    target: Target::Experience(row.id),
-                })
-                .collect(),
+            rows: entries.into_iter().map(experience).collect(),
         },
     ]
 }
@@ -94,7 +77,7 @@ fn memory(row: bingo_services::memory::MemoryRow, name_width: usize) -> Row {
             "{:<7}  {:<9}  {:name_width$}   {}",
             row.scope.as_str(),
             row.kind.as_str(),
-            row.name,
+            cut(&row.name, NAME_WIDTH),
             row.error.unwrap_or(row.description)
         ),
         tokens: row.tokens,
@@ -104,6 +87,35 @@ fn memory(row: bingo_services::memory::MemoryRow, name_width: usize) -> Row {
             path: row.path,
         },
     }
+}
+/// An unreadable entry has no outcomes to count; it says why instead.
+fn experience(row: EntryRow) -> Row {
+    let label = match &row.error {
+        Some(error) => format!("{}  {}  {error}", row.id, row.status.as_str()),
+        None => format!(
+            "{}  {}  {}  {} ok · {} harmful",
+            row.id,
+            row.status.as_str(),
+            row.summary,
+            counted(&row.outcomes, Outcome::Helpful),
+            counted(&row.outcomes, Outcome::Harmful),
+        ),
+    };
+    Row {
+        label,
+        tokens: row.tokens,
+        target: Target::Experience(row.id),
+    }
+}
+fn counted(outcomes: &[Outcome], which: Outcome) -> usize {
+    outcomes.iter().filter(|outcome| **outcome == which).count()
+}
+fn cut(name: &str, width: usize) -> String {
+    if name.chars().count() <= width {
+        return name.into();
+    }
+    let kept: String = name.chars().take(width.saturating_sub(1)).collect();
+    format!("{kept}…")
 }
 pub fn total(groups: &[Group]) -> u64 {
     groups
@@ -160,5 +172,53 @@ mod tests {
         );
         assert!(groups[0].rows[0].label.contains("missing frontmatter"));
         assert_eq!(total(&groups), 8);
+    }
+    #[test]
+    fn unreadable_entries_show_why_and_no_counts() {
+        let row = EntryRow {
+            id: "broken".into(),
+            status: bingo_services::experience::Status::Unreadable,
+            summary: String::new(),
+            outcomes: vec![],
+            error: Some("missing frontmatter".into()),
+            tokens: 0,
+        };
+        let label = &rows(Listing::default(), vec![row])[2].rows[0].label;
+        assert_eq!(label, "broken  unreadable  missing frontmatter");
+    }
+    #[test]
+    fn a_long_name_is_cut_and_does_not_widen_the_column() {
+        let memory = |name: &str| bingo_services::memory::MemoryRow {
+            scope: Scope::User,
+            name: name.into(),
+            kind: bingo_services::memory::Kind::User,
+            description: "what it says".into(),
+            path: format!("{name}.md").into(),
+            tokens: 1,
+            error: None,
+        };
+        let long = "a".repeat(40);
+        let groups = rows(
+            Listing {
+                memories: vec![memory(&long), memory("short")],
+                instructions: vec![],
+            },
+            vec![],
+        );
+        let cut = format!("{}…", "a".repeat(23));
+        assert!(
+            groups[0].rows[0]
+                .label
+                .contains(&format!("{cut}   what it says"))
+        );
+        assert!(
+            groups[0].rows[1]
+                .label
+                .contains(&format!("short{}   what it says", " ".repeat(19)))
+        );
+        assert!(matches!(
+            &groups[0].rows[0].target,
+            Target::Memory { name, .. } if *name == long
+        ));
     }
 }
