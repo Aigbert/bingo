@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct ModelPickerProps {
     pub filter: String,
-    pub selected: usize,
+    /// The chosen row's key; its position is found again on every drawing.
+    pub selected: Option<String>,
     pub scope: ModelScope,
     pub effort: Option<Effort>,
     pub sheet: Option<String>,

@@ -169,6 +169,24 @@ async fn a_malformed_handler_cannot_panic_the_surface() {
 }
 
 #[tokio::test]
+async fn a_key_keeps_the_value_the_drawing_gave_its_handler() {
+    let mut view = drawing().await;
+    if let View::Box { layout, .. } = &mut view {
+        layout.on_key.as_mut().unwrap().args["value"] = json!({"row":"model:a"});
+    }
+    let session = Arc::new(TestSession::default());
+    let now = scene().1;
+    let mut run = tests::idle_in(pane(view), session.clone(), now.instant);
+    run.paint(&mut Recorder::default(), Wake::Frame, now)
+        .unwrap();
+    run.terminal_event(Term::Key(typed('x')));
+    assert!(
+        matches!(&session.submitted()[0], Input::Action { action } if action.args["value"] == json!({"row":"model:a","key":"x"})),
+        "{:?}",
+        session.submitted()
+    );
+}
+#[tokio::test]
 async fn escape_stops_the_asking_session_in_every_ask_state() {
     for child_asks in [false, true] {
         for editing in ["list", "aside", "change"] {

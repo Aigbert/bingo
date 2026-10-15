@@ -67,13 +67,22 @@ pub fn tree(
     width: u16,
     height: u16,
 ) -> View {
+    let rows = crate::rows::rows(models, providers, &picker.props.filter, picker.all);
+    let at = crate::rows::cursor(&rows, picker.props.selected.as_deref());
     let mut children = if let Some(sheet) = &picker.sheet {
         crate::sheet::lines(sheet, providers)
             .into_iter()
             .map(dim)
             .collect()
     } else {
-        list(picker, models, providers, chat, width, height)
+        let list = List {
+            rows: &rows,
+            at,
+            models,
+            providers,
+            chat,
+        };
+        list.draw(picker, width, height)
     };
     if let Some(message) = &picker.message {
         children.push(dim(format!("   {message}")));
@@ -86,80 +95,98 @@ pub fn tree(
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
-            on_key: Some(Action {
-                name: "bingo.mod.models:ui".into(),
-                args: json!({"handler":picker.id,"event":"press"}),
-            }),
+            on_key: Some(on_key(picker, at.map(|i| &rows[i]))),
             ..Default::default()
         }),
     }
 }
-fn list(
-    picker: &Picker,
-    models: &[CatalogEntry],
-    providers: &[CatalogEntry],
-    chat: &crate::card::Chat,
-    width: u16,
-    height: u16,
-) -> Vec<View> {
-    let rows = crate::rows::rows(models, providers, &picker.props.filter, picker.all);
-    let selected = picker.props.selected.min(rows.len().saturating_sub(1));
-    let details = if crate::rows::unlisted(&rows, &picker.props.filter) {
-        unlisted(&picker.props.filter)
-    } else {
-        details(rows.get(selected), models, providers, chat, picker)
-    };
-    let room = usize::from(height).saturating_sub(4).max(1);
-    let start = selected
-        .saturating_sub(room / 2)
-        .min(rows.len().saturating_sub(room));
-    let left_width = if width >= 100 {
-        56
-    } else {
-        width.saturating_mul(2) / 5
-    };
-    let mut children = vec![dim(format!(
-        "   {} models · {} providers    ★ pinned · ∴ thinks · ▣ sees images",
-        models.len(),
-        providers.len()
-    ))];
-    for i in 0..room {
-        let left = if i + 1 == room && start + room < rows.len() && selected != start + i {
-            format!("↓ {} more", rows.len() - start - room + 1)
+/// A key carries the row it was pressed on, so a key queued behind a redraw
+/// acts on what the person saw, not on whatever row now has that position.
+fn on_key(picker: &Picker, row: Option<&Row>) -> Action {
+    let mut args = json!({"handler":picker.id,"event":"press"});
+    if let Some(row) = row.filter(|_| picker.sheet.is_none()) {
+        args["value"] = json!({"row": row.key()});
+    }
+    Action {
+        name: "bingo.mod.models:ui".into(),
+        args,
+    }
+}
+struct List<'a> {
+    rows: &'a [Row],
+    at: Option<usize>,
+    models: &'a [CatalogEntry],
+    providers: &'a [CatalogEntry],
+    chat: &'a crate::card::Chat,
+}
+impl List<'_> {
+    fn draw(&self, picker: &Picker, width: u16, height: u16) -> Vec<View> {
+        let unlisted = crate::rows::unlisted(self.rows, &picker.props.filter);
+        let row = self.at.map(|i| &self.rows[i]);
+        let details = if unlisted {
+            self::unlisted(&picker.props.filter)
         } else {
-            rows.get(start + i)
-                .map(|row| row_text(row, models, providers, chat))
-                .unwrap_or_default()
+            details(row, self.models, self.providers, self.chat, picker)
         };
-        let mark = if start + i == selected {
-            " ❯ "
+        let left_width = if width >= 100 {
+            56
         } else {
-            "   "
+            width.saturating_mul(2) / 5
         };
-        let left = cell(format!("{mark}{left}"), left_width, start + i == selected);
-        let right = cell(
-            format!(
-                "│ {}",
-                details.get(i).map(String::as_str).unwrap_or_default()
+        let mut children = vec![dim(format!(
+            "   {} models · {} providers    ★ pinned · ∴ thinks · ▣ sees images",
+            self.models.len(),
+            self.providers.len()
+        ))];
+        let room = usize::from(height).saturating_sub(4).max(1);
+        children.extend((0..room).map(|i| {
+            self.line(
+                i,
+                room,
+                &details,
+                left_width,
+                width.saturating_sub(left_width),
+            )
+        }));
+        let label = if unlisted {
+            format!("use {}", picker.props.filter)
+        } else {
+            action_label(row, self.models, self.providers, self.chat, picker)
+        };
+        children.push(key_hint(&label, picker.keep()));
+        children
+    }
+    /// One visible line: a keyed row on the left, a line of the card on the right.
+    fn line(&self, i: usize, room: usize, details: &[String], left: u16, right: u16) -> View {
+        let selected = self.at.unwrap_or(0);
+        let start = selected
+            .saturating_sub(room / 2)
+            .min(self.rows.len().saturating_sub(room));
+        let index = start + i;
+        let more = i + 1 == room && start + room < self.rows.len() && selected != index;
+        let (text, key) = match self.rows.get(index) {
+            _ if more => (format!("↓ {} more", self.rows.len() - index), None),
+            Some(row) => (
+                row_text(row, self.models, self.providers, self.chat),
+                Some(row.key()),
             ),
-            width.saturating_sub(left_width),
-            false,
-        );
-        children.push(View::Box {
-            children: vec![left, right],
+            None => (String::new(), None),
+        };
+        let chosen = self.at == Some(index);
+        let mark = if chosen { " ❯ " } else { "   " };
+        let detail = details.get(i).map(String::as_str).unwrap_or_default();
+        View::Box {
+            children: vec![
+                cell(format!("{mark}{text}"), left, chosen),
+                cell(format!("│ {detail}"), right, false),
+            ],
             layout: Box::new(view::BoxStyle {
                 flex_direction: Some(view::Direction::Row),
+                key,
                 ..Default::default()
             }),
-        });
+        }
     }
-    let label = if crate::rows::unlisted(&rows, &picker.props.filter) {
-        format!("use {}", picker.props.filter)
-    } else {
-        action_label(rows.get(selected), models, providers, chat, picker)
-    };
-    children.push(key_hint(&label, picker.keep()));
-    children
 }
 fn key_hint(label: &str, keep: bool) -> View {
     dim(format!(
@@ -185,7 +212,7 @@ fn row_text(
         ),
         Row::Hidden(_, count) => format!("   · {count} hidden"),
         Row::Add => "+ add a provider".into(),
-        Row::Model(id) => models
+        Row::Pinned(id) | Row::Model(id) => models
             .iter()
             .find(|m| &m.id == id)
             .map(|m| {
@@ -217,7 +244,7 @@ fn details(
     picker: &Picker,
 ) -> Vec<String> {
     match row {
-        Some(Row::Model(id)) => models
+        Some(Row::Pinned(id) | Row::Model(id)) => models
             .iter()
             .find(|m| &m.id == id)
             .map(|m| crate::card::card(m, chat, picker.props.effort, picker.keep()))
@@ -324,7 +351,7 @@ fn action_label(
     picker: &Picker,
 ) -> String {
     match row {
-        Some(Row::Model(id)) => models
+        Some(Row::Pinned(id) | Row::Model(id)) => models
             .iter()
             .find(|m| &m.id == id)
             .and_then(|m| {

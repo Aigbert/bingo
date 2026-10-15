@@ -5857,9 +5857,11 @@
           "type": "string"
         },
         "selected": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The chosen row's key; its position is found again on every drawing."
         },
         "scope": {
           "$ref": "#/$defs/ModelScope"
@@ -5883,7 +5885,6 @@
       },
       "required": [
         "filter",
-        "selected",
         "scope"
       ]
     },

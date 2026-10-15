@@ -112,12 +112,8 @@ async fn opening(
     let current = crate::state::chat(&attached.snapshot).current;
     picker.props.selected = rows
         .iter()
-        .position(|r| matches!(r,crate::rows::Row::Model(id) if id==&current))
-        .or_else(|| {
-            rows.iter()
-                .position(|r| matches!(r, crate::rows::Row::Model(_)))
-        })
-        .unwrap_or(0);
+        .find(|r| r.model() == Some(current.as_str()))
+        .map(crate::rows::Row::key);
     if matches!(name, "login" | "logout")
         && let Some(provider) = providers
             .iter()

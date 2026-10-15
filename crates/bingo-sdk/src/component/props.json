@@ -1,5 +1,5 @@
 [
-  {"component":"ModelPicker","props":{"filter":"opus","selected":0,"scope":"session","effort":"medium","sheet":null}},
+  {"component":"ModelPicker","props":{"filter":"opus","selected":"model:anthropic/claude-opus-5-5","scope":"session","effort":"medium","sheet":null}},
   {
     "component": "Plugins",
     "props": {

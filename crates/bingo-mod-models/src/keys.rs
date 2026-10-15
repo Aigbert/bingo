@@ -32,7 +32,7 @@ impl Command for Handler {
         };
         let result = tokio::select! {
             _=cx.cancel.cancelled()=>Err(crate::error("picker action cancelled")),
-            result=press(&mut picker,key,cx)=>result,
+            result=press(&mut picker,key,args["value"]["row"].as_str(),cx)=>result,
         };
         let close = match result {
             Ok(close) => close,
@@ -57,7 +57,12 @@ impl Command for Handler {
 fn handled() -> CommandOutcome {
     CommandOutcome::Handled { handled: true }
 }
-async fn press(picker: &mut Picker, key: &str, cx: &CommandContext) -> Result<bool, KernelError> {
+async fn press(
+    picker: &mut Picker,
+    key: &str,
+    drawn: Option<&str>,
+    cx: &CommandContext,
+) -> Result<bool, KernelError> {
     picker.message = None;
     if key == "esc" {
         return Ok(back(picker));
@@ -68,23 +73,29 @@ async fn press(picker: &mut Picker, key: &str, cx: &CommandContext) -> Result<bo
     if key == "+" || key == "shift++" {
         return add(picker, cx).await;
     }
+    if edit(picker, key) {
+        return Ok(false);
+    }
     let models = cx.host.catalog(CatalogKind::Models).await?.entries;
     let providers = cx.host.catalog(CatalogKind::Providers).await?.entries;
     let rows = crate::rows::rows(&models, &providers, &picker.props.filter, picker.all);
-    picker.props.selected = picker.props.selected.min(rows.len().saturating_sub(1));
-    let selected = rows.get(picker.props.selected);
     match key {
-        "up" => {
-            picker.props.selected = (0..picker.props.selected)
-                .rev()
-                .find(|i| rows[*i].selectable())
-                .unwrap_or(picker.props.selected)
+        "up" | "down" => step(picker, &rows, key == "down"),
+        "enter" if crate::rows::unlisted(&rows, &picker.props.filter) => {
+            return use_unlisted(picker, cx).await;
         }
-        "down" => {
-            picker.props.selected = (picker.props.selected + 1..rows.len())
-                .find(|i| rows[*i].selectable())
-                .unwrap_or(picker.props.selected)
+        _ => {
+            if let Some(at) = acted_on(picker, &rows, drawn) {
+                return act(picker, key, &rows[at], &models, &providers, cx).await;
+            }
         }
+    }
+    Ok(false)
+}
+/// Keys that change the filter or the scope, whatever row is under the cursor.
+fn edit(picker: &mut Picker, key: &str) -> bool {
+    let text = key.strip_prefix("shift+").unwrap_or(key);
+    match key {
         "tab" => {
             picker.props.scope = if picker.keep() {
                 component::ModelScope::Session
@@ -92,35 +103,66 @@ async fn press(picker: &mut Picker, key: &str, cx: &CommandContext) -> Result<bo
                 component::ModelScope::Keep
             }
         }
-        "left" | "right" => dial(picker, selected, &models, key == "right"),
-        "*" | "shift+*" => {
-            if let Some(Row::Model(id)) = selected {
-                pin(cx, id, &models).await?;
-            }
-        }
-        "enter" if crate::rows::unlisted(&rows, &picker.props.filter) => {
-            return use_unlisted(picker, cx).await;
-        }
-        "enter" => return activate(picker, selected, &models, &providers, cx).await,
         "backspace" => {
             picker.props.filter.pop();
-            picker.props.selected = 0;
+            picker.props.selected = None;
         }
-        _ => {
-            let text = key.strip_prefix("shift+").unwrap_or(key);
-            if text.chars().count() == 1 {
-                picker.props.filter.push_str(text);
-                picker.props.selected = 1;
+        _ if text.chars().count() == 1 && text != "*" => {
+            picker.props.filter.push_str(text);
+            picker.props.selected = None;
+        }
+        _ => return false,
+    }
+    true
+}
+/// Moves from where the cursor is drawn to the next row that can be chosen.
+fn step(picker: &mut Picker, rows: &[Row], forward: bool) {
+    let Some(at) = crate::rows::cursor(rows, picker.props.selected.as_deref()) else {
+        return;
+    };
+    let next = if forward {
+        (at + 1..rows.len()).find(|i| rows[*i].selectable())
+    } else {
+        (0..at).rev().find(|i| rows[*i].selectable())
+    };
+    picker.props.selected = Some(rows[next.unwrap_or(at)].key());
+}
+/// The row a key acts on is the one drawn when it was pressed. A row that is
+/// gone takes no action; the cursor goes back to the first row instead.
+fn acted_on(picker: &mut Picker, rows: &[Row], drawn: Option<&str>) -> Option<usize> {
+    let at = match drawn {
+        Some(key) => crate::rows::named(rows, key),
+        None => crate::rows::cursor(rows, picker.props.selected.as_deref()),
+    };
+    let kept = at.or_else(|| crate::rows::cursor(rows, None));
+    picker.props.selected = kept.map(|i| rows[i].key());
+    at
+}
+async fn act(
+    picker: &mut Picker,
+    key: &str,
+    row: &Row,
+    models: &[CatalogEntry],
+    providers: &[CatalogEntry],
+    cx: &CommandContext,
+) -> Result<bool, KernelError> {
+    match key {
+        "left" | "right" => dial(picker, row, models, key == "right"),
+        "*" | "shift+*" => {
+            if let Some(id) = row.model() {
+                pin(cx, id, models).await?;
             }
         }
+        "enter" => return activate(picker, row, models, providers, cx).await,
+        _ => {}
     }
     Ok(false)
 }
-fn dial(picker: &mut Picker, row: Option<&Row>, models: &[CatalogEntry], forward: bool) {
-    let Some(Row::Model(id)) = row else {
-        return;
-    };
-    let Some(model) = models.iter().find(|m| &m.id == id) else {
+fn dial(picker: &mut Picker, row: &Row, models: &[CatalogEntry], forward: bool) {
+    let Some(model) = row
+        .model()
+        .and_then(|id| models.iter().find(|m| m.id == id))
+    else {
         return;
     };
     let efforts = crate::card::efforts(model);
@@ -155,18 +197,18 @@ async fn pin(cx: &CommandContext, id: &str, models: &[CatalogEntry]) -> Result<(
 }
 async fn activate(
     picker: &mut Picker,
-    row: Option<&Row>,
+    row: &Row,
     models: &[CatalogEntry],
     providers: &[CatalogEntry],
     cx: &CommandContext,
 ) -> Result<bool, KernelError> {
     match row {
-        Some(Row::Add) => add(picker, cx).await,
-        Some(Row::Hidden(_, _)) => {
+        Row::Add => add(picker, cx).await,
+        Row::Hidden(_, _) => {
             picker.all = true;
             Ok(false)
         }
-        Some(Row::Provider(id)) => {
+        Row::Provider(id) => {
             picker.sheet = Some(Sheet::Manage {
                 provider: id.clone(),
                 selected: 0,
@@ -175,7 +217,7 @@ async fn activate(
             });
             Ok(false)
         }
-        Some(Row::Model(id)) => {
+        Row::Pinned(id) | Row::Model(id) => {
             let Some(model) = models.iter().find(|m| &m.id == id) else {
                 return Ok(false);
             };

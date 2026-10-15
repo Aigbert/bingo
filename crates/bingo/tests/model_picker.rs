@@ -391,3 +391,51 @@ async fn unlisted_models_switch_by_path_and_by_the_typed_filter() {
     assert_eq!(session.snapshot.summary.model.as_deref(), Some("unlisted"));
     assert!(!picker_open(&session));
 }
+fn row_press(id: &str, key: &str, row: &str) -> serde_json::Value {
+    json!({"handler":id,"event":"press","value":{"key":key,"row":row}})
+}
+#[tokio::test(flavor = "multi_thread")]
+async fn keys_act_on_the_drawn_row_and_never_on_a_heading() {
+    let mut server = Server::spawn(SCRIPT);
+    let kernel = ready(&mut server).await;
+    let mut session = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    command(&mut session, "model", json!("fake/other")).await;
+    command(&mut session, "model", json!("pin fake/fake-1")).await;
+    command(&mut session, "model", json!("")).await;
+    let req = request(&kernel, &mut session).await;
+    let id = req.request_id.clone();
+    for key in ["x", "backspace"] {
+        command(&mut session, "bingo.mod.models:ui", press(&id, key)).await;
+    }
+    let req = request(&kernel, &mut session).await;
+    let view = kernel.render(&session.session, req).await.unwrap().fold();
+    let cursor = view.lines().find(|l| l.contains('❯')).unwrap();
+    assert!(
+        cursor.contains("fake-1") && !cursor.contains("pinned"),
+        "{view}"
+    );
+    // A row that is gone takes no action.
+    command(
+        &mut session,
+        "bingo.mod.models:ui",
+        row_press(&id, "enter", "provider:gone"),
+    )
+    .await;
+    session = reopen(&kernel, &session).await;
+    assert_eq!(session.snapshot.summary.model.as_deref(), Some("other"));
+    assert!(picker_open(&session));
+    // The cursor has moved on, but the enter was pressed on the pinned row as drawn.
+    command(&mut session, "bingo.mod.models:ui", press(&id, "down")).await;
+    command(
+        &mut session,
+        "bingo.mod.models:ui",
+        row_press(&id, "enter", "pin:fake/fake-1"),
+    )
+    .await;
+    session = reopen(&kernel, &session).await;
+    assert_eq!(session.snapshot.summary.model.as_deref(), Some("fake-1"));
+    assert!(!picker_open(&session));
+}

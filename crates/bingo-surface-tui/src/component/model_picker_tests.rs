@@ -53,7 +53,6 @@ fn scenario(scene: &str, models: &[CatalogEntry]) -> (Picker, Chat) {
     let mut picker = Picker {
         id: "picker".into(),
         props: component::ModelPickerProps {
-            selected: 1,
             effort: Some(Effort::Medium),
             ..Default::default()
         },
@@ -67,13 +66,11 @@ fn scenario(scene: &str, models: &[CatalogEntry]) -> (Picker, Chat) {
     match scene {
         "direct" => {
             picker.props.filter = "opus".into();
-            picker.props.selected = 1;
         }
         "long" => {
             chat.used = 182000;
             chat.pictures = true;
             picker.props.filter = "qwen".into();
-            picker.props.selected = 1;
         }
         "all" => picker.all = true,
         "quick" => picker.props.effort = Some(Effort::High),

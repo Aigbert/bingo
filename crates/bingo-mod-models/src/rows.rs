@@ -3,6 +3,8 @@ use bingo_sdk::CatalogEntry;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Row {
     Heading,
+    /// A pinned model at the top; the same model is listed again under its provider.
+    Pinned(String),
     Model(String),
     Provider(String),
     Hidden(String, usize),
@@ -12,6 +14,36 @@ impl Row {
     pub fn selectable(&self) -> bool {
         !matches!(self, Self::Heading)
     }
+    /// The model this row stands for, wherever it is listed.
+    pub fn model(&self) -> Option<&str> {
+        match self {
+            Self::Pinned(id) | Self::Model(id) => Some(id),
+            _ => None,
+        }
+    }
+    /// Names the row across redraws, so a key acts on the row a person saw.
+    pub fn key(&self) -> String {
+        match self {
+            Self::Heading => "heading".into(),
+            Self::Pinned(id) => format!("pin:{id}"),
+            Self::Model(id) => format!("model:{id}"),
+            Self::Provider(id) => format!("provider:{id}"),
+            Self::Hidden(id, _) => format!("hidden:{id}"),
+            Self::Add => "add".into(),
+        }
+    }
+}
+/// The row a key names, if it is still listed and can be chosen.
+pub fn named(rows: &[Row], key: &str) -> Option<usize> {
+    rows.iter().position(|r| r.selectable() && r.key() == key)
+}
+/// Where the cursor stands: on the kept row while it is listed, else on the
+/// first model, else on the first row that can be chosen; never on a heading.
+pub fn cursor(rows: &[Row], selected: Option<&str>) -> Option<usize> {
+    selected
+        .and_then(|key| named(rows, key))
+        .or_else(|| rows.iter().position(|r| r.model().is_some()))
+        .or_else(|| rows.iter().position(Row::selectable))
 }
 pub fn rows(
     models: &[CatalogEntry],
@@ -24,7 +56,7 @@ pub fn rows(
         let pins: Vec<_> = models
             .iter()
             .filter(|m| m.meta["pinned"] == true)
-            .map(|m| Row::Model(m.id.clone()))
+            .map(|m| Row::Pinned(m.id.clone()))
             .collect();
         if !pins.is_empty() {
             rows.push(Row::Heading);
@@ -57,7 +89,7 @@ pub fn rows(
 }
 /// A filter that lists no model offers itself as the model to use.
 pub fn unlisted(rows: &[Row], filter: &str) -> bool {
-    !filter.is_empty() && !rows.iter().any(|r| matches!(r, Row::Model(_)))
+    !filter.is_empty() && !rows.iter().any(|r| r.model().is_some())
 }
 fn hidden(model: &CatalogEntry) -> bool {
     model.meta["chat"] == false || model.meta["aliasOf"].is_string()
@@ -108,7 +140,7 @@ mod tests {
             rows(&models, &providers, "", false),
             vec![
                 Row::Heading,
-                Row::Model("p/a".into()),
+                Row::Pinned("p/a".into()),
                 Row::Provider("p".into()),
                 Row::Model("p/a".into()),
                 Row::Hidden("p".into(), 2),
@@ -122,11 +154,18 @@ mod tests {
         assert_eq!(
             rows(&models, &providers, "", true)
                 .iter()
-                .filter(|r| matches!(r, Row::Model(_)))
+                .filter(|r| r.model().is_some())
                 .count(),
             4
         );
         assert!(rows(&models, &providers, "other/", false).is_empty());
+        let listed = rows(&models, &providers, "", false);
+        assert_eq!(cursor(&listed, Some("model:p/a")), Some(3));
+        assert_eq!(cursor(&listed, Some("model:p/gone")), Some(1));
+        assert_eq!(cursor(&listed, Some("heading")), Some(1));
+        assert_eq!(cursor(&listed, None), Some(1));
+        assert_eq!(cursor(&[Row::Heading, Row::Add], None), Some(1));
+        assert_eq!(cursor(&[], Some("add")), None);
         assert!(unlisted(
             &rows(&models, &providers, "p/zzz", false),
             "p/zzz"

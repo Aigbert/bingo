@@ -129,7 +129,7 @@ async fn save_provider(
     )
     .await?;
     picker.props.filter = format!("{}/", guess.name);
-    picker.props.selected = 1;
+    picker.props.selected = None;
     picker.sheet = Some(crate::sheet::Sheet::Manage {
         provider: guess.name.clone(),
         selected: 0,
