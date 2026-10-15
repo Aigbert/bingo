@@ -87,7 +87,7 @@ Verbs drift: every key is a verbs-table line. A handshake moves rows: the cursor
 - Server rows keep typed transport for ACP forwarding; tools, runs and address derive from
   status/transport; origins come from registrar sources; unknown latency stays absent.
 - Guides use the crate's registered Page (ADR-0054). Only typed `Pages` are catalogue facts;
-  other services still pin a mod to next start. Workspace edges only: 414 → 415 members.
+  other services still pin a mod to next start. Workspace edges only: one member more.
 - Trust changes reread user grants and retire the module before reenabling; process/tool
   grants apply at next start. Unreadable settings suspend admission. Handlers carry opening
   identity only and reread catalogue facts when pressed.
@@ -131,20 +131,20 @@ Verbs drift: every key is a verbs-table line. A handshake moves rows: the cursor
 - `CommandSpec::person_verb` is the one reader of person-only verbs (sdk, plugins command,
   ACP approval, palette); a palette row must show every untyped argument, contiguously.
 - `Input::Action` carries an optional `origin`; it is asked only when signed by a surface in
-  core's `PERSON_SURFACES` (tui, print, rpc, acp, channels), else fail closed. RPC signs a
+  the sdk's `PERSON_SURFACES` (tui, print, rpc, acp, channels), else fail closed. RPC signs a
   client's unsigned action `rpc`; a mod's `$.command.run` is `plugin:<name>`, so a pane it
-  opens waits for room (pane example updated). M177's sdk `PERSON_SURFACES` replaces core's
-  at merge. Decided: `/plugins reload|enable` stay not person-only (neither raises trust);
+  opens waits for room. `/plugins reload|enable` stay not person-only (neither raises trust);
   follow-up: `enable` can undo a person's `off`.
+- On M178: the panel opens and closes through `site_lifecycle`/`site_keys` like the other
+  sites; browse runs a person-only line only when vouched by `browse`, as the palette does.
 
 ## Verified — 2026-10-15
 
-Rounds 1–3: all gates, test 5,811 passed (5 ignored), tui-smoke ×3; Windows PASS for sdk,
-services, mod-plugins, mod-palette, DEFER bingo-mcp/core/TUI (aws-lc-sys). Own tmux at
-108×30 and 80×24: a project server ran only on the second `⏎`; no secret value shown.
-
-Fourth round: fmt, clippy, test (5,821 passed; 5 ignored), `node --test` 31, discipline
-ok, budget ok, deny ok, tui-smoke ×3 ok; Windows PASS for sdk, services, mod-plugins,
-mod-palette, surface-rpc. Own tmux at 108×30 and 80×24 with the NODE_OPTIONS repro: the
-review shows `env NODE_OPTIONS=--require ./evil.js  (loads code)`, `env TOKEN (values
-hidden)`, no secret; the unreviewed card says `env`, not `sign-in`.
+Rounds 1–3: all gates, test 5,811 passed, tui-smoke ×3; Windows PASS sdk, services,
+mod-plugins, mod-palette, DEFER bingo-mcp/core/TUI (aws-lc-sys). Own tmux at 108×30 and
+80×24: a project server ran only on the second `⏎`; no secret value shown.
+Fourth round: all gates, test 5,821 passed, `node --test` 31, tui-smoke ×3; Windows PASS
+sdk, services, mod-plugins, mod-palette, surface-rpc. tmux NODE_OPTIONS repro: the review
+shows `env NODE_OPTIONS=--require ./evil.js  (loads code)`, `env TOKEN (values hidden)`.
+On M178 (rebased): all gates, test 5,950 passed, `node --test` 32, tui-smoke ×3; tmux 108×30:
+/plugins shows db's review card; /sessions, /memory and ctrl+f browse open and close.
