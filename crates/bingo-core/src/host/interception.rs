@@ -1,6 +1,8 @@
 //! Context and catalogue reads shared by interception sites.
 use super::*;
 
+pub(crate) mod reserved;
+
 pub(super) fn hook_set(host: &Host) -> HookSet {
     HookSet {
         running: host.registry.switches.running.clone(),
@@ -140,6 +142,10 @@ pub(super) async fn register_pending(host: &Host) {
     for source in &host.registry.sources.plugins {
         for registration in source.registrations(&trust).await {
             let name = registration.name.clone();
+            if let Some(why) = reserved::taken(&host.registry, &name) {
+                source.registered(&name, Err(why)).await;
+                continue;
+            }
             let links = registration_links(host).await;
             let result = crate::chain::registration::register(
                 registration,

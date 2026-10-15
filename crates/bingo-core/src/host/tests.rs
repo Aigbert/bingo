@@ -23,6 +23,7 @@ mod plugin_approval;
 mod policy;
 mod providers;
 mod queue;
+mod reserved;
 mod resume;
 mod rewind;
 mod routes;

@@ -22,6 +22,10 @@ pub(super) async fn set(host: &Host, name: &str, tier: &str) -> Result<(), Kerne
             "only external plugins have a configurable trust tier",
         ));
     }
+    let bare = name.strip_prefix("plugins:").unwrap_or(name);
+    if let Some(why) = crate::host::interception::reserved::taken(host.registry(), bare) {
+        return Err(KernelError::new(ErrorCode::InvalidInput, why));
+    }
     let _guard = host.registry().switches.switching.lock().await;
     let path = settings::user_path(host.env());
     let mut document = settings::preview_document(&path).map_err(failed)?;
@@ -29,8 +33,7 @@ pub(super) async fn set(host: &Host, name: &str, tier: &str) -> Result<(), Kerne
     let grants = grants.as_object_mut().ok_or_else(|| {
         KernelError::new(ErrorCode::InvalidInput, "pluginTrust must be an object")
     })?;
-    let name = name.strip_prefix("plugins:").unwrap_or(name);
-    let grant = grants.entry(name).or_insert_with(|| json!({}));
+    let grant = grants.entry(bare).or_insert_with(|| json!({}));
     if !grant.is_object() {
         return Err(KernelError::new(
             ErrorCode::InvalidInput,

@@ -8,6 +8,7 @@ use crate::settings;
 /// A repository plugin `p` waiting for a yes, listed under the name it
 /// waits with.
 struct Waiting {
+    name: &'static str,
     request: bingo_sdk::Approval,
     listed: bool,
 }
@@ -21,7 +22,7 @@ impl bingo_sdk::PluginSource for Waiting {
             return vec![];
         }
         vec![PluginStatus {
-            id: "plugins:p".into(),
+            id: format!("plugins:{}", self.name),
             version: "1".into(),
             state: PluginState::Waiting { changed: false },
             from: "discovered".into(),
@@ -44,21 +45,36 @@ async fn scene(
     present: bool,
     listed: bool,
 ) -> Arc<Host> {
+    named(home, repo, "p", present, listed).await
+}
+
+/// A host whose repository holds a plugin called `name`.
+async fn named(
+    home: &std::path::Path,
+    repo: &std::path::Path,
+    name: &'static str,
+    present: bool,
+    listed: bool,
+) -> Arc<Host> {
     if present {
-        let dir = repo.join(".bingo/plugins/p");
+        let dir = repo.join(".bingo/plugins").join(name);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("plugin.json"), "{}").unwrap();
     }
     let request = bingo_sdk::Approval {
         root: repo.into(),
-        what: "plugin:p".into(),
+        what: format!("plugin:{name}"),
     };
     Host::build(
         vec![TestPlugin::boxed(
             &PROVIDER,
             vec![
                 Contribution::Provider(ScriptedProvider::new(vec![])),
-                Contribution::Plugins(Arc::new(Waiting { request, listed })),
+                Contribution::Plugins(Arc::new(Waiting {
+                    name,
+                    request,
+                    listed,
+                })),
             ],
         )],
         HostConfig::new(env_in(home)).with_layer("cli", json!({"model":"m"})),
@@ -117,4 +133,22 @@ async fn an_approval_reads_its_verb_at_any_whitespace() {
     let (ack, _) = client.ack("/plugins approve\tp  full").await;
     assert!(message(&ack).contains("trust: full"), "{ack:?}");
     assert_eq!(saved(home.path())["pluginTrust"]["p"]["tier"], "full");
+}
+
+/// A repository plugin named after a built-in never loads as itself, so a
+/// grant written for it would sit in the settings for whatever later takes
+/// the name; it is refused before anything is written.
+#[tokio::test]
+async fn a_built_ins_name_is_never_granted_trust() {
+    let (home, repo) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let host = named(home.path(), repo.path(), "test.provider", true, true).await;
+    let mut client = Client::open(&host).await;
+    let (ack, _) = client.ack("/plugins approve test.provider full").await;
+    let said = message(&ack);
+    assert!(said.contains("trust was not saved"), "{said}");
+    assert!(said.contains("belongs to a built-in"), "{said}");
+    assert!(saved(home.path()).get("pluginTrust").is_none());
+    let (ack, _) = client.ack("/plugins trust test.provider full").await;
+    assert!(!matches!(ack, IntentOutcome::Applied { .. }), "{ack:?}");
+    assert!(saved(home.path()).get("pluginTrust").is_none());
 }

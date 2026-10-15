@@ -12,7 +12,7 @@ mod completion;
 mod config;
 pub use config::HostConfig;
 mod instances;
-mod interception;
+pub(crate) mod interception;
 mod live;
 pub(crate) mod model_switch;
 pub(crate) mod pins;
