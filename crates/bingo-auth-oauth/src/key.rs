@@ -163,7 +163,7 @@ impl ApiKey {
                 message: "Sign-in cancelled.".into(),
             });
         };
-        let key = text.trim().to_string();
+        let key = unwrapped(&text);
         if key.is_empty() {
             return Err(ProviderError::Auth {
                 message: "No credential was pasted.".into(),
@@ -286,6 +286,17 @@ fn spelling(method: LoginMethod) -> &'static str {
         LoginMethod::Device => "device",
         LoginMethod::Paste => "paste",
     }
+}
+
+/// A key pasted from a wrapped terminal or a file arrives with line breaks a
+/// key never contains.
+fn unwrapped(pasted: &str) -> String {
+    pasted
+        .chars()
+        .filter(|c| !matches!(c, '\r' | '\n'))
+        .collect::<String>()
+        .trim()
+        .to_owned()
 }
 
 #[cfg(test)]
@@ -522,7 +533,7 @@ mod tests {
             configured("sk-settings", "anthropic.instances.proxy1.apiKey"),
         );
         let receipt = key
-            .login(Arc::new(Pasting("  sk-pasted  ")), None)
+            .login(Arc::new(Pasting("  sk-pas\r\nted\n  ")), None)
             .await
             .expect("a paste");
         assert_eq!(receipt, "Signed in to proxy1 with a pasted key.");
@@ -531,7 +542,7 @@ mod tests {
             Some(Entry::Api {
                 key: "sk-pasted".into()
             }),
-            "the credential is trimmed and stored under the provider's own id"
+            "the credential is trimmed, unwrapped and stored under the provider's own id"
         );
 
         assert_eq!(

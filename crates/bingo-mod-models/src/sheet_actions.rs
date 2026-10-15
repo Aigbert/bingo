@@ -104,7 +104,11 @@ pub async fn add_key(
                     .address;
             }
         }
-        3 => guess.key = crate::bridge::paste(&cx.host, &cx.session, "provider key").await?,
+        3 => {
+            guess.key = crate::bridge::paste(&cx.host, &cx.session, "provider key")
+                .await?
+                .and_then(|pasted| crate::guess::key(&pasted))
+        }
         _ => save_provider(guess, picker, cx).await?,
     }
     Ok(false)

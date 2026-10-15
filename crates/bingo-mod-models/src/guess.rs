@@ -6,7 +6,8 @@ pub struct Guess {
     pub key: Option<String>,
 }
 pub fn guess(value: &str, names: &[String]) -> Option<Guess> {
-    let value = value.trim();
+    let value = unwrapped(value);
+    let value = value.as_str();
     let (name, shape, address, key) = if value.starts_with("sk-ant-") {
         (
             "anthropic".into(),
@@ -52,6 +53,19 @@ pub fn guess(value: &str, names: &[String]) -> Option<Guess> {
         address,
         key,
     })
+}
+/// What is kept of a pasted key: never the line breaks a wrapped paste
+/// brings, and nothing when nothing is left.
+pub fn key(pasted: &str) -> Option<String> {
+    Some(unwrapped(pasted)).filter(|key| !key.is_empty())
+}
+fn unwrapped(pasted: &str) -> String {
+    pasted
+        .chars()
+        .filter(|c| !matches!(c, '\r' | '\n'))
+        .collect::<String>()
+        .trim()
+        .to_owned()
 }
 fn address(value: &str) -> Option<String> {
     if value.is_empty() || value.contains(char::is_whitespace) || value.contains(['@', '?', '#']) {
@@ -107,5 +121,12 @@ mod tests {
         ] {
             assert!(guess(value, &[]).is_none());
         }
+    }
+    #[test]
+    fn a_wrapped_paste_keeps_one_clean_key() {
+        assert_eq!(key("  sk-ant-du\r\nmmy\n "), Some("sk-ant-dummy".into()));
+        assert_eq!(key(" \n "), None);
+        let guess = guess("sk-ant-du\nmmy\n", &[]).unwrap();
+        assert_eq!(guess.key.as_deref(), Some("sk-ant-dummy"));
     }
 }
