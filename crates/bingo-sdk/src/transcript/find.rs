@@ -15,22 +15,22 @@ pub fn find(transcript: &Transcript, query: &str) -> Vec<Match> {
         return Vec::new();
     }
     let query = query.to_lowercase();
-    transcript
-        .items()
-        .iter()
-        .flat_map(|item| {
-            text(item)
-                .lines()
-                .enumerate()
-                .filter(|(_, line)| line.to_lowercase().contains(&query))
-                .map(|(line, _)| Match {
+    let mut hits = Vec::new();
+    for item in transcript.items() {
+        for (line, text) in text(item).lines().enumerate() {
+            if text.to_lowercase().contains(&query) {
+                hits.push(Match {
                     item: item.id.clone(),
                     turn: item.turn.clone(),
                     line,
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect()
+                });
+                if hits.len() == 1000 {
+                    return hits;
+                }
+            }
+        }
+    }
+    hits
 }
 
 /// Full searchable and copyable text; presentation never limits this projection.
@@ -58,12 +58,27 @@ pub fn text(item: &Item) -> String {
                         .join("\n")
                 })
                 .unwrap_or_default();
-            format!("{name} {input}\n{result}")
+            format!("{name}\n{}\n{result}", readable(input))
         }
         ItemBody::Shell {
             command, output, ..
         } => format!("{command}\n{output}"),
         ItemBody::Compaction { summary, .. } => summary.clone(),
         _ => serde_json::to_string(&item.body).unwrap_or_default(),
+    }
+}
+
+fn readable(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::String(text) => text.clone(),
+        serde_json::Value::Array(values) => {
+            values.iter().map(readable).collect::<Vec<_>>().join("\n")
+        }
+        serde_json::Value::Object(fields) => fields
+            .iter()
+            .map(|(name, value)| format!("{name}:\n{}", readable(value)))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        value => value.to_string(),
     }
 }

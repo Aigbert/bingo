@@ -310,7 +310,7 @@ fn search_reads_full_results_reasoning_and_only_retained_items() {
     let matches = find(&transcript, "Fork");
     assert_eq!(
         matches.iter().map(|m| m.line).collect::<Vec<_>>(),
-        [6, 0, 1]
+        [8, 0, 1]
     );
     transcript.apply(&Event::Rewound {
         generation: 1,
@@ -379,4 +379,23 @@ fn shell_lines_neither_open_turns_nor_replace_the_asked_prompt() {
     let rows = turns(&[user, shell].into_iter().collect());
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].label(), "why is the build red?");
+}
+
+#[test]
+fn search_caps_results_and_reads_tool_input_as_lines() {
+    let mut row = item(1, String::new());
+    row.body = ItemBody::ToolCall {
+        call_id: "c".into(),
+        name: "Write".into(),
+        input: serde_json::json!({"content":"first needle\nsecond needle", "file_path":"note.txt"}),
+        output: None,
+        progress: None,
+        duration_ms: None,
+        quiet: false,
+    };
+    let transcript = [row].into_iter().collect();
+    let hits = find(&transcript, "needle");
+    assert_eq!(hits.iter().map(|hit| hit.line).collect::<Vec<_>>(), [2, 3]);
+    let transcript = [item(2, "needle\n".repeat(1001))].into_iter().collect();
+    assert_eq!(find(&transcript, "needle").len(), 1000);
 }

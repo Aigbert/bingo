@@ -73,7 +73,7 @@
     "props": {
       "word": "Kindling",
       "message": null,
-      "suffix": "\u2026",
+      "suffix": "…",
       "mode": "requesting"
     }
   },
@@ -311,13 +311,6 @@
       "session": "ses_1",
       "selected": "trn_1",
       "query": "fork",
-      "matches": [
-        {
-          "item": "itm_1",
-          "turn": "trn_1",
-          "line": 0
-        }
-      ],
       "turns": [
         {
           "id": "trn_1",
@@ -333,7 +326,17 @@
           "handler": "opening"
         }
       },
-      "confirm": false
+      "confirm": false,
+      "hit": {
+        "item": "itm_1",
+        "turn": "trn_1",
+        "line": 0
+      },
+      "count": 1,
+      "length": 2,
+      "busy": false,
+      "previewed": false,
+      "refresh": false
     }
   }
 ]

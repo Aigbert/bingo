@@ -1255,11 +1255,34 @@
         "query": {
           "type": "string"
         },
-        "matches": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Match"
-          }
+        "hit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Match"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "length": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "busy": {
+          "type": "boolean"
+        },
+        "previewed": {
+          "type": "boolean"
+        },
+        "refresh": {
+          "type": "boolean"
         },
         "turns": {
           "type": "array",
@@ -1282,7 +1305,11 @@
       "required": [
         "session",
         "query",
-        "matches",
+        "count",
+        "length",
+        "busy",
+        "previewed",
+        "refresh",
         "turns",
         "current",
         "action",
