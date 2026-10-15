@@ -336,7 +336,7 @@ impl Commands {
         let input = bingo_sdk::catalogue::CommandRun {
             name: command.spec().name,
             args,
-            surface: invocation.surface.clone(),
+            surface: invocation.surface,
         };
         self.inflight.insert(
             intent.clone(),
