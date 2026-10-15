@@ -76,12 +76,17 @@ impl Transport {
     }
     /// What a row carries while it waits for the person's yes: everything
     /// the repository wrote that a yes would run, with the values of its
-    /// environment and headers hidden and their names kept.
+    /// environment and headers hidden and their names kept — except an
+    /// environment value that changes what code the program loads
+    /// ([`LOADS_CODE`]), which is part of what a yes runs.
     pub fn reviewed(&self) -> Self {
-        let hidden = |values: &BTreeMap<String, String>| {
+        let hidden = |values: &BTreeMap<String, String>, shown: fn(&str) -> bool| {
             values
-                .keys()
-                .map(|name| (name.clone(), HIDDEN.to_string()))
+                .iter()
+                .map(|(name, value)| {
+                    let value = if shown(name) { value } else { HIDDEN };
+                    (name.clone(), value.to_string())
+                })
                 .collect()
         };
         match self {
@@ -93,12 +98,12 @@ impl Transport {
             } => Self::Stdio {
                 command: command.clone(),
                 args: args.clone(),
-                env: hidden(env),
+                env: hidden(env, loads_code),
                 cwd: cwd.clone(),
             },
             Self::Http { url, headers } => Self::Http {
                 url: url.clone(),
-                headers: hidden(headers),
+                headers: hidden(headers, |_| false),
             },
         }
     }
@@ -112,13 +117,61 @@ impl Transport {
             Self::Http { url, .. } => url.clone(),
         }
     }
-    /// The names of the environment or headers it is given, never values.
+    /// The names of the environment or headers it is given whose values a
+    /// person is not shown.
     pub fn named(&self) -> Vec<&str> {
         match self {
-            Self::Stdio { env, .. } => env.keys().map(String::as_str).collect(),
+            Self::Stdio { env, .. } => env
+                .keys()
+                .map(String::as_str)
+                .filter(|name| !loads_code(name))
+                .collect(),
             Self::Http { headers, .. } => headers.keys().map(String::as_str).collect(),
         }
     }
+    /// The environment it is given that changes what code it loads, name
+    /// and value, as a person must read them before saying yes.
+    pub fn loaders(&self) -> Vec<(&str, &str)> {
+        match self {
+            Self::Stdio { env, .. } => env
+                .iter()
+                .filter(|(name, _)| loads_code(name))
+                .map(|(name, value)| (name.as_str(), value.as_str()))
+                .collect(),
+            Self::Http { .. } => vec![],
+        }
+    }
+}
+/// Environment variables whose value changes what code a process loads or
+/// where it finds programs. A repository that sets one decides what a yes
+/// runs as surely as by its command line, so the review shows its value.
+pub const LOADS_CODE: &[&str] = &[
+    "NODE_OPTIONS",
+    "NODE_PATH",
+    "LD_PRELOAD",
+    "LD_LIBRARY_PATH",
+    "DYLD_INSERT_LIBRARIES",
+    "DYLD_LIBRARY_PATH",
+    "DYLD_FRAMEWORK_PATH",
+    "PYTHONPATH",
+    "PYTHONSTARTUP",
+    "PYTHONHOME",
+    "PERL5OPT",
+    "PERL5LIB",
+    "RUBYOPT",
+    "RUBYLIB",
+    "JAVA_TOOL_OPTIONS",
+    "_JAVA_OPTIONS",
+    "BASH_ENV",
+    "ENV",
+    "PATH",
+];
+/// Whether `name` is one of [`LOADS_CODE`]; Windows spells names in any
+/// case (`Path`), so case does not hide one.
+pub fn loads_code(name: &str) -> bool {
+    LOADS_CODE
+        .iter()
+        .any(|loader| loader.eq_ignore_ascii_case(name))
 }
 const HIDDEN: &str = "…";
 /// A line of free text a server wrote, with what looks like a token cut out:
@@ -340,6 +393,36 @@ mod tests {
         assert_eq!(web.line(), "https://mcp.example.com/mcp?debug");
         assert_eq!(web.named(), ["Authorization"]);
         assert!(!format!("{:?}", serde_json::to_value(&web).unwrap()).contains("s3cret"));
+    }
+    /// A value that changes what code the program loads is what a yes runs:
+    /// the review shows it; every other value, and every header, stays hidden.
+    #[test]
+    fn a_reviewed_row_shows_an_environment_value_that_loads_code() {
+        let repo = Transport::Stdio {
+            command: "npx".into(),
+            args: vec![],
+            env: BTreeMap::from([
+                ("NODE_OPTIONS".into(), "--require ./evil.js".into()),
+                ("Path".into(), "./bin".into()),
+                ("TOKEN".into(), "s3cret".into()),
+            ]),
+            cwd: None,
+        }
+        .reviewed();
+        assert_eq!(
+            repo.loaders(),
+            [("NODE_OPTIONS", "--require ./evil.js"), ("Path", "./bin")]
+        );
+        assert_eq!(repo.named(), ["TOKEN"]);
+        assert!(!serde_json::to_string(&repo).unwrap().contains("s3cret"));
+        let web = Transport::Http {
+            url: "https://h.example".into(),
+            headers: BTreeMap::from([("NODE_OPTIONS".into(), "s3cret".into())]),
+        }
+        .reviewed();
+        assert!(web.loaders().is_empty());
+        assert!(!serde_json::to_string(&web).unwrap().contains("s3cret"));
+        assert!(LOADS_CODE.iter().all(|name| loads_code(name)));
     }
     /// The recorded rows nobody may dial are pinned in their redacted shape:
     /// an owner that answers more for them breaks the contract.
