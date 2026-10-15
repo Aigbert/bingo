@@ -81,16 +81,8 @@ impl Handler {
         if !matches!(key, "up" | "down") && at.row != Some(row.key.as_str()) {
             return Ok(stale());
         }
-        if let Some(choice) = &mut cursor.trust {
-            let Kind::Plugin(i) = row.kind else {
-                cursor.trust = None;
-                return Ok(json!({}));
-            };
-            let result = crate::trust::press(choice, &props.plugins[i], key);
-            if result.is_some() {
-                cursor.trust = None;
-            }
-            return Ok(operation(result.unwrap_or(Verb::None)));
+        if cursor.trust.is_some() {
+            return Ok(trusting(cursor, &row.kind, props, key));
         }
         if key == "up" || key == "down" {
             navigate(cursor, &groups, key);
@@ -102,28 +94,36 @@ impl Handler {
             Kind::Builtins => crate::verbs::pressed(crate::verbs::builtins(cursor.expanded), key),
         };
         cursor.reviewing = false;
-        match verb {
-            Verb::Trust => {
-                cursor.trust = Some(Default::default());
-                Ok(json!({}))
-            }
-            Verb::Review => {
-                cursor.reviewing = true;
-                Ok(json!({}))
-            }
-            Verb::Fold => {
-                fold(cursor, props);
-                Ok(json!({}))
-            }
-            _ => {
-                if matches!(&verb, Verb::Line(line) if line.starts_with("/mcp login ") || line.starts_with("/mcp tools "))
-                {
-                    state.remove(&identity);
-                }
-                Ok(operation(verb))
-            }
+        if matches!(&verb, Verb::Line(line) if line.starts_with("/mcp login ") || line.starts_with("/mcp tools "))
+        {
+            state.remove(&identity);
+            return Ok(operation(verb));
         }
+        Ok(acted(cursor, verb, props))
     }
+}
+/// What a verb the selected row answered does to the panel, or runs.
+fn acted(cursor: &mut crate::Cursor, verb: Verb, props: &PluginsProps) -> Value {
+    match verb {
+        Verb::Trust => cursor.trust = Some(Default::default()),
+        Verb::Review => cursor.reviewing = true,
+        Verb::Fold => fold(cursor, props),
+        verb => return operation(verb),
+    }
+    json!({})
+}
+/// A key while the trust choice is open: it answers the choice, which closes
+/// once a tier is picked or the row is no longer a plugin.
+fn trusting(cursor: &mut crate::Cursor, kind: &Kind, props: &PluginsProps, key: &str) -> Value {
+    let (Kind::Plugin(i), Some(choice)) = (kind, &mut cursor.trust) else {
+        cursor.trust = None;
+        return json!({});
+    };
+    let result = crate::trust::press(choice, &props.plugins[*i], key);
+    if result.is_some() {
+        cursor.trust = None;
+    }
+    operation(result.unwrap_or(Verb::None))
 }
 /// A key that answers a drawing whose selected row is gone or no longer the
 /// cursor's acts on nothing; the redraw shows the person what is there now.
