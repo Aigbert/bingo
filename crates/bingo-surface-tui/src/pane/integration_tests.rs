@@ -212,7 +212,7 @@ fn escape_closes_a_focused_pane_despite_a_retained_or_late_answer() {
         now,
     );
     assert!(
-        matches!(&effects[..], [Effect::Submit(Input::Action { action })]
+        matches!(&effects[..], [Effect::Submit(Input::Action { action, .. })]
         if action.name == "counter:ui" && action.args == json!({"handler":"counter","event":"close"}))
     );
     let closing = draw_sized(80, 24, &state, &mut ui, now);

@@ -60,9 +60,13 @@ impl Driver {
 impl Driver {
     async fn fire(&mut self, action: bingo_sdk::Action) -> Result<(), String> {
         let intent = IntentId::mint();
-        self.session
-            .handle
-            .submit(intent.clone(), Input::Action { action });
+        self.session.handle.submit(
+            intent.clone(),
+            Input::Action {
+                action,
+                origin: Some(bingo_sdk::Origin::surface("plugin-kit")),
+            },
+        );
         self.wait(intent, false).await
     }
     fn pane_close(&self, id: &str) -> Result<bingo_sdk::Action, String> {

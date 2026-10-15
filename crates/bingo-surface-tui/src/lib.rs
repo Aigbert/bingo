@@ -143,6 +143,12 @@ pub use theme::PROBE_THROUGH;
 /// The surface id, and the origin every input it submits carries.
 pub const SURFACE_ID: &str = "tui";
 
+/// An action fired here, signed with this surface: the kernel takes an
+/// unsigned action as nobody's (fail closed).
+pub(crate) fn acted(action: bingo_sdk::Action) -> bingo_sdk::Input {
+    bingo_sdk::Input::action(action, bingo_sdk::Origin::surface(SURFACE_ID))
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TuiSurface {
     options: Options,

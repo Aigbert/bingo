@@ -77,6 +77,7 @@ async fn a_pulled_counter_invalidates_and_renders_after_a_press() {
         intent.clone(),
         Input::Action {
             action: action.clone(),
+            origin: Some(bingo_sdk::Origin::surface("tui")),
         },
     );
     assert!(matches!(
@@ -93,9 +94,13 @@ async fn a_pulled_counter_invalidates_and_renders_after_a_press() {
     let second = kernel.render(&session, request.clone()).await.unwrap();
     assert!(second.fold().contains("Count: 1"), "{second:?}");
     let intent = IntentId::mint();
-    attachment
-        .handle
-        .submit(intent.clone(), Input::Action { action });
+    attachment.handle.submit(
+        intent.clone(),
+        Input::Action {
+            action,
+            origin: Some(bingo_sdk::Origin::surface("tui")),
+        },
+    );
     assert!(matches!(
         ack_for(&mut attachment, &intent).await,
         IntentOutcome::Applied { .. }
@@ -188,9 +193,13 @@ async fn edit_and_close(
         .unwrap();
     typed.args["value"] = serde_json::json!("Ada");
     let intent = IntentId::mint();
-    attachment
-        .handle
-        .submit(intent.clone(), Input::Action { action: typed });
+    attachment.handle.submit(
+        intent.clone(),
+        Input::Action {
+            action: typed,
+            origin: Some(bingo_sdk::Origin::surface("tui")),
+        },
+    );
     assert!(matches!(
         ack_for(attachment, &intent).await,
         IntentOutcome::Applied { .. }
@@ -203,6 +212,7 @@ async fn edit_and_close(
                 name: "counter:ui".into(),
                 args: serde_json::json!({"handler":"counter","event":"close"}),
             },
+            origin: Some(bingo_sdk::Origin::surface("tui")),
         },
     );
     assert!(matches!(

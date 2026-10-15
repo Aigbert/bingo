@@ -54,7 +54,7 @@ impl Run {
                 origin,
                 delivery,
             } => self.submit_text(handle, text, images, origin, delivery),
-            Input::Action { action } => {
+            Input::Action { action, .. } => {
                 let intent = self.mint(None);
                 self.enqueue_action(
                     self.session.tree.viewed().summary.id.clone(),

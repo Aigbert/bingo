@@ -140,7 +140,7 @@ fn preview(input: &Input) -> String {
             return "(an image)".to_string();
         }
         Input::Text { text, .. } => text.as_str(),
-        Input::Action { action } => action.name.as_str(),
+        Input::Action { action, .. } => action.name.as_str(),
     };
     bingo_sdk::command::recorded_line(text)
         .chars()

@@ -2,7 +2,7 @@
 mod binding;
 mod control;
 pub use binding::{Binding, Resolution};
-use bingo_sdk::{Action, Input, IntentId, SessionHandle, SessionId};
+use bingo_sdk::{Action, IntentId, SessionHandle, SessionId};
 use std::{
     collections::VecDeque,
     time::{Duration, Instant},
@@ -141,12 +141,8 @@ impl Pending {
     }
 
     fn send(&mut self, action: Action) {
-        self.handle.submit(
-            self.intent.clone(),
-            Input::Action {
-                action: action.clone(),
-            },
-        );
+        self.handle
+            .submit(self.intent.clone(), crate::acted(action.clone()));
         self.target = Target::Action(action);
         self.sent = true;
         self.deadline = None;

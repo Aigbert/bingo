@@ -190,10 +190,22 @@ pub enum Input {
     },
     Action {
         action: Action,
+        /// The door it came through. Absent, or a door that is not a person
+        /// surface, and the action is not the person's own: it fails closed.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        origin: Option<Origin>,
     },
 }
 
 impl Input {
+    /// An action sent through `origin`.
+    pub fn action(action: Action, origin: Origin) -> Self {
+        Input::Action {
+            action,
+            origin: Some(origin),
+        }
+    }
+
     pub fn text(text: impl Into<String>, origin: Origin) -> Self {
         Input::Text {
             text: text.into(),
@@ -878,6 +890,7 @@ mod tests {
                 name: "x".into(),
                 args: Value::Null,
             },
+            origin: None,
         };
         assert!(!action.is_held());
     }

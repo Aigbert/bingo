@@ -75,7 +75,7 @@ export type Delivery = ("wake" | "hold");
 export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
 export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
 export type Voice = ("said" | "note" | "quiet" | "aside");
-export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; [key: string]: unknown; });
+export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
 }
 export namespace PromptSubmitResult {
 // Generated from JSON Schema. Do not edit.
@@ -83,7 +83,7 @@ export type Action = { "args"?: unknown; "name": string; [key: string]: unknown;
 export type Delivery = ("wake" | "hold");
 export type ErrorCode = (("SESSION_NOT_FOUND" | "SESSION_LOCKED" | "SESSION_CLOSED" | "INTERACTION_CLOSED" | "NOT_READY" | "STALE_GENERATION" | "NOT_INITIALIZED" | "INVALID_INPUT" | "PERMISSION_DENIED" | "TOOL_NOT_FOUND" | "TOOL_FAILED" | "PROVIDER_UNAVAILABLE" | "AUTH_REQUIRED" | "RATE_LIMITED" | "CONTEXT_OVERFLOW" | "TIMEOUT" | "OFFLINE" | "SERVER_ERROR" | "TURN_LOST" | "TURN_BUDGET_EXHAUSTED" | "UNSUPPORTED" | "INTERNAL") | "INTERRUPTED" | "PROTOCOL_LIMIT" | "NOT_FOUND" | "STORAGE");
 export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
-export type Input = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; [key: string]: unknown; });
+export type Input = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
 export type KernelError = { "code": ErrorCode; "message": string; [key: string]: unknown; };
 export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
 export type SessionId = string;
@@ -283,7 +283,7 @@ export namespace SessionSendInput {
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
 export type Delivery = ("wake" | "hold");
 export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
-export type Input = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; [key: string]: unknown; });
+export type Input = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
 export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
 export type SessionId = string;
 export type Voice = ("said" | "note" | "quiet" | "aside");
@@ -301,7 +301,7 @@ export type Delivery = ("wake" | "hold");
 export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
 export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
 export type Voice = ("said" | "note" | "quiet" | "aside");
-export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; [key: string]: unknown; });
+export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
 }
 export namespace SessionReceiveResult {
 // Generated from JSON Schema. Do not edit.
@@ -310,7 +310,7 @@ export type Delivery = ("wake" | "hold");
 export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
 export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
 export type Voice = ("said" | "note" | "quiet" | "aside");
-export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; [key: string]: unknown; });
+export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
 }
 export type SessionReceive = SessionReceiveInput.Payload;
 export namespace SessionAppendInput {

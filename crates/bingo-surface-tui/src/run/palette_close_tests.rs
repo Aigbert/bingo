@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 async fn answer(run: &mut Run, session: &TestSession, fixture: &Fixture, index: usize) {
     let submissions = session.submissions();
-    let (intent, Input::Action { action }) = &submissions[index] else {
+    let (intent, Input::Action { action, .. }) = &submissions[index] else {
         panic!("the run must send a palette action")
     };
     let outcome = fixture
@@ -159,7 +159,7 @@ async fn palette_retirement_targets_each_drawing_even_with_a_redraw_pending() {
         .submitted()
         .into_iter()
         .map(|input| {
-            let Input::Action { action } = input else {
+            let Input::Action { action, .. } = input else {
                 panic!("retirement")
             };
             assert_eq!(action.args["value"]["key"], "ctrl+c");

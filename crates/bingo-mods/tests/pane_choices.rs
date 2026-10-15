@@ -80,6 +80,7 @@ fn submit(attachment: &Attachment, name: &str, args: Value) {
                 name: name.into(),
                 args,
             },
+            origin: Some(Origin::surface("tui")),
         },
     );
 }

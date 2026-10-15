@@ -67,7 +67,7 @@ fn deliver_view(run: &mut Run, now: crate::clock::Now, view: View) {
 }
 
 fn handler(session: &TestSession, index: usize) -> serde_json::Value {
-    let Input::Action { action } = &session.submitted()[index] else {
+    let Input::Action { action, .. } = &session.submitted()[index] else {
         panic!("a gesture")
     };
     action.args["handler"].clone()
@@ -98,7 +98,7 @@ async fn rapid_pulled_edits_resolve_current_handlers_after_ack_before_rendered()
     assert_eq!(session.submitted().len(), 1);
     let mut received = Vec::new();
     for (index, value) in ["A", "Ad", "Ada"].into_iter().enumerate() {
-        let Input::Action { action } = &session.submitted()[index] else {
+        let Input::Action { action, .. } = &session.submitted()[index] else {
             panic!("edit")
         };
         assert_eq!(action.args["handler"], format!("name-{index}"));
@@ -168,7 +168,7 @@ async fn a_missing_redraw_releases_at_its_deadline_without_sleeping() {
     run.release_actions_at(deadline);
     assert_eq!(session.submitted().len(), 2);
     assert!(run.ui.actions.deadline().is_none());
-    let Input::Action { action } = &session.submitted()[1] else {
+    let Input::Action { action, .. } = &session.submitted()[1] else {
         panic!("edit")
     };
     assert_eq!(action.args["handler"], "name-0");
@@ -196,7 +196,7 @@ async fn an_edit_typed_during_an_in_flight_redraw_uses_its_new_handler() {
         &mut None,
     );
     for (index, value) in ["A", "Ad", "Ada"].into_iter().enumerate() {
-        let Input::Action { action } = &session.submitted()[index] else {
+        let Input::Action { action, .. } = &session.submitted()[index] else {
             panic!("edit")
         };
         assert_eq!(action.args["handler"], format!("name-{}", index + 1));

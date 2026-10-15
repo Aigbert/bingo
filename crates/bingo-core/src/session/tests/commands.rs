@@ -262,6 +262,7 @@ async fn a_record_outcome_is_an_item_and_an_action_dispatches_by_name() {
                 name: "note".into(),
                 args: json!({ "k": 1 }),
             },
+            origin: None,
         },
     );
     let frames = collect(&mut events, &mut state, |f| {

@@ -175,6 +175,7 @@ async fn node_registered_commands_refresh_callbacks_before_the_next_call() {
                     name: "hello".into(),
                     args: Value::Null,
                 },
+                origin: Some(Origin::surface("tui")),
             },
         );
         loop {

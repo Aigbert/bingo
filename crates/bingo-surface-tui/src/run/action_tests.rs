@@ -29,7 +29,7 @@ fn finish_newest(run: &mut Run, session: &TestSession) -> (String, Vec<String>) 
             .into_iter()
             .rev()
             .find(|(intent, _)| !finished.contains(intent));
-        let Some((intent, Input::Action { action })) = next else {
+        let Some((intent, Input::Action { action, .. })) = next else {
             break;
         };
         if action.args["event"] == "input" {
@@ -152,7 +152,7 @@ async fn replacing_the_attachment_discards_its_waiting_edits() {
     run.heard(Term::Key(typed('B')));
     assert_eq!(old.submitted().len(), 1);
     assert!(
-        matches!(&next.submitted()[..], [Input::Action { action }] if action.args["value"] == "B")
+        matches!(&next.submitted()[..], [Input::Action { action, .. }] if action.args["value"] == "B")
     );
 }
 
@@ -184,7 +184,7 @@ fn removing_a_session_releases_the_next_action_to_its_original_mailbox() {
     actions.release(Instant::now(), |_, _| unreachable!());
     assert_eq!(first.submitted().len(), 1);
     assert!(
-        matches!(&second.submitted()[..], [Input::Action { action }] if action.args["value"] == "second")
+        matches!(&second.submitted()[..], [Input::Action { action, .. }] if action.args["value"] == "second")
     );
 }
 
@@ -208,12 +208,10 @@ async fn escape_on_an_ask_discards_its_owners_waiting_actions_only() {
         .handles
         .insert(child_id(), SessionHandle(child.clone()));
     run.session.tree.show(&child_id());
-    run.submit(Input::Action {
-        action: bingo_sdk::Action {
-            name: "counter:ui".into(),
-            args: json!({"value":"child edit"}),
-        },
-    });
+    run.submit(crate::acted(bingo_sdk::Action {
+        name: "counter:ui".into(),
+        args: json!({"value":"child edit"}),
+    }));
     run.frame(&frame(1, opened(permission(None, None))), &mut screen)
         .unwrap();
     run.heard(Term::Key(key(crossterm::event::KeyCode::Esc)));

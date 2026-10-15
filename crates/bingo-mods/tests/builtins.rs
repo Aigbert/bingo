@@ -152,7 +152,7 @@ async fn rust_render_is_ready_on_the_calling_thread_and_handler_results_round_tr
         let mut action = layout.on_key.clone().unwrap();
         action.args["value"] = json!({"key":key});
         assert!(
-            matches!(command(&mut attachment, Input::Action { action }).await, IntentOutcome::Applied { result } if result == json!({"handled":expected}))
+            matches!(command(&mut attachment, Input::action(action, Origin::surface("tui"))).await, IntentOutcome::Applied { result } if result == json!({"handled":expected}))
         );
     }
     host.shutdown().await;
@@ -169,7 +169,11 @@ async fn javascript_key_handler_preserves_handled_false() {
     for (key, expected) in [("x", true), ("y", false)] {
         let mut action = layout.on_key.clone().unwrap();
         action.args["value"] = json!({"key":key});
-        let outcome = command(&mut attachment, Input::Action { action }).await;
+        let outcome = command(
+            &mut attachment,
+            Input::action(action, Origin::surface("tui")),
+        )
+        .await;
         assert!(
             matches!(outcome, IntentOutcome::Applied { result } if result == json!({"handled":expected}))
         );
@@ -226,7 +230,11 @@ async fn the_ask_handler_returns_an_answer_for_the_surface_to_send() {
     };
     let mut action = layout.on_key.clone().unwrap();
     action.args["value"] = json!({"key":"2"});
-    let outcome = command(&mut attachment, Input::Action { action }).await;
+    let outcome = command(
+        &mut attachment,
+        Input::action(action, Origin::surface("tui")),
+    )
+    .await;
     let IntentOutcome::Applied { result } = outcome else {
         panic!("applied")
     };

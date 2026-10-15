@@ -383,19 +383,19 @@ impl Runtime {
             }
             "command.run" => {
                 let input: Run = parse(params)?;
-                Input::Action {
-                    action: Action {
-                        name: input.name,
-                        args: input.args,
-                    },
-                }
+                let action = Action {
+                    name: input.name,
+                    args: input.args,
+                };
+                Input::action(action, plugin_origin(caller))
             }
-            _ => Input::Action {
-                action: Action {
+            _ => {
+                let action = Action {
                     name: "compact".into(),
                     args: Value::Null,
-                },
-            },
+                };
+                Input::action(action, plugin_origin(caller))
+            }
         };
         live.handle.submit(intent.clone(), input);
         Ok(json!(intent))
@@ -445,10 +445,15 @@ fn parse<T: DeserializeOwned>(input: Value) -> Result<T, String> {
 fn failed(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
+/// Whatever a mod submits is signed with its own name, whatever it wrote.
 fn bind_origin(caller: &Caller, input: &mut Input) {
-    if let Input::Text { origin, .. } = input {
-        *origin = Origin::surface(format!("plugin:{}", caller.plugin));
+    match input {
+        Input::Text { origin, .. } => *origin = plugin_origin(caller),
+        Input::Action { origin, .. } => *origin = Some(plugin_origin(caller)),
     }
+}
+fn plugin_origin(caller: &Caller) -> Origin {
+    Origin::surface(format!("plugin:{}", caller.plugin))
 }
 async fn operation(caller: &Caller, method: &str, input: Value) -> Result<Value, String> {
     Operations {

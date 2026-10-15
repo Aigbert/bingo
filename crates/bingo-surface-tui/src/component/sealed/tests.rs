@@ -178,7 +178,7 @@ fn a_button_gets_its_own_click_but_cannot_take_the_yes_key() {
         now,
     );
     assert!(
-        matches!(&effects[..], [Effect::Submit(bingo_sdk::Input::Action { action })] if action.name == "frame:ui")
+        matches!(&effects[..], [Effect::Submit(bingo_sdk::Input::Action { action, .. })] if action.name == "frame:ui")
     );
     assert!(!ui.dialog.answered);
     let effects = crate::input::on_key(

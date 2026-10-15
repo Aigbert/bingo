@@ -2557,6 +2557,17 @@
             "action": {
               "$ref": "#/$defs/Action"
             },
+            "origin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Origin"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The door it came through. Absent, or a door that is not a person\nsurface, and the action is not the person's own: it fails closed."
+            },
             "kind": {
               "type": "string",
               "const": "action"

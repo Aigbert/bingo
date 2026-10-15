@@ -34,7 +34,7 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
         // The action asking this question may still hold the shared queue.
         // Interaction keys already wait for their own site's acknowledgement.
         if let Some(handle) = handle {
-            handle.submit(intent, Input::Action { action });
+            handle.submit(intent, crate::acted(action));
         } else {
             open(run, session, intent, action);
         }
@@ -128,12 +128,7 @@ pub(super) fn opened(run: &mut Run, opened: Opened) {
             run.session
                 .handles
                 .insert(pending.session.clone(), handle.clone());
-            handle.submit(
-                opened.intent,
-                Input::Action {
-                    action: opened.action,
-                },
-            );
+            handle.submit(opened.intent, crate::acted(opened.action));
         }
         Err(error) => run.ack(&opened.intent, &IntentOutcome::Rejected { error }),
     }

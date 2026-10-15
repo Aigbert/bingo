@@ -78,9 +78,9 @@ pub fn press(
         .map(fire)
 }
 fn fire(mark: &crate::views::targets::Target) -> Vec<crate::effect::Effect> {
-    vec![crate::effect::Effect::Submit(bingo_sdk::Input::Action {
-        action: mark.item.action.clone(),
-    })]
+    vec![crate::effect::Effect::Submit(crate::acted(
+        mark.item.action.clone(),
+    ))]
 }
 pub fn hotkey(
     ui: &crate::ui::Ui,

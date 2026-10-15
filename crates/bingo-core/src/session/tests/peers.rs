@@ -162,6 +162,7 @@ async fn a_peer_may_not_deliver_an_action() {
                 name: "compact".into(),
                 args: Value::Null,
             },
+            origin: None,
         },
         Delivery::Wake,
     );

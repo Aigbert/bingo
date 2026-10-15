@@ -100,7 +100,7 @@ fn clicked_pane_with_a_hotkey_takes_its_letter() {
         now,
     );
     assert!(
-        matches!(&effects[..], [crate::effect::Effect::Submit(bingo_sdk::Input::Action { action })] if action.name == "test:run"),
+        matches!(&effects[..], [crate::effect::Effect::Submit(bingo_sdk::Input::Action { action, .. })] if action.name == "test:run"),
         "{effects:?}"
     );
     assert_eq!(ui.composer.text(), "");
@@ -166,7 +166,7 @@ fn escape_keeps_close_or_release_semantics_for_text_only_focus() {
         );
         if close {
             assert!(
-                matches!(&effects[..], [crate::effect::Effect::Submit(bingo_sdk::Input::Action { action })] if action.args["event"] == "close")
+                matches!(&effects[..], [crate::effect::Effect::Submit(bingo_sdk::Input::Action { action, .. })] if action.args["event"] == "close")
             );
         } else {
             assert!(matches!(ui.focus, Focus::Composer));

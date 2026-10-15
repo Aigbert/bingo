@@ -606,7 +606,7 @@ impl Server {
     fn submit(&mut self, params: Value) -> Result<Reply, RpcError> {
         let params: SubmitParams = parse(params)?;
         self.port(&params.session)?
-            .submit(params.intent, params.input);
+            .submit(params.intent, signed(params.input));
         Reply::empty()
     }
 
@@ -732,6 +732,19 @@ impl Server {
 
 /// Absent params are an empty object, so a method whose params are all optional
 /// can be called without them.
+/// An action a client fires without signing it is this surface's: a client
+/// that speaks for another surface (the TUI attached over a socket) signs its
+/// own, and the kernel takes an unsigned action as nobody's.
+fn signed(input: bingo_sdk::Input) -> bingo_sdk::Input {
+    match input {
+        bingo_sdk::Input::Action {
+            action,
+            origin: None,
+        } => bingo_sdk::Input::action(action, bingo_sdk::Origin::surface(crate::SURFACE_ID)),
+        input => input,
+    }
+}
+
 fn parse<T: DeserializeOwned>(params: Value) -> Result<T, RpcError> {
     let params = if params.is_null() {
         Value::Object(serde_json::Map::new())
@@ -765,4 +778,34 @@ fn validate_budget(budget: usize) -> Result<(), RpcError> {
         )));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::signed;
+    use bingo_sdk::{Action, Input, Origin};
+
+    fn fired(origin: Option<Origin>) -> Input {
+        Input::Action {
+            action: Action {
+                name: "permission".into(),
+                args: serde_json::json!("plan"),
+            },
+            origin,
+        }
+    }
+
+    /// A client's unsigned button is this surface's; one a client signed for
+    /// another surface keeps that signature.
+    #[test]
+    fn an_unsigned_action_is_signed_by_this_surface() {
+        let Input::Action { origin, .. } = signed(fired(None)) else {
+            panic!("action")
+        };
+        assert_eq!(origin, Some(Origin::surface(crate::SURFACE_ID)));
+        let Input::Action { origin, .. } = signed(fired(Some(Origin::surface("tui")))) else {
+            panic!("action")
+        };
+        assert_eq!(origin, Some(Origin::surface("tui")));
+    }
 }

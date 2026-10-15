@@ -104,6 +104,7 @@ async fn band_renders_and_hides_after_its_press_over_rpc() {
         intent.clone(),
         Input::Action {
             action: press(&first).expect("hide handler"),
+            origin: Some(bingo_sdk::Origin::surface("tui")),
         },
     );
     assert!(matches!(

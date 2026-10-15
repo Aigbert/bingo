@@ -394,6 +394,7 @@ async fn an_unknown_command_an_unknown_action_and_empty_text_are_rejected() {
                 name: "x".into(),
                 args: Value::Null,
             },
+            origin: None,
         },
     ];
     for input in inputs {

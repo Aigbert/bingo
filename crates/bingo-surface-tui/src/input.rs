@@ -237,7 +237,7 @@ fn background(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         ui.notify(Level::Info, NOTHING_RUNNING, now.instant);
         return Vec::new();
     };
-    vec![Effect::Submit(Input::Action { action })]
+    vec![Effect::Submit(crate::acted(action))]
 }
 
 /// The newest unfinished item owns a key only when its producer places it.
@@ -360,7 +360,7 @@ fn fire(ui: &mut Ui, tree: &Tree, key: char) -> Option<Vec<Effect>> {
     let action = views::actions::fired(&actions.iter().collect::<Vec<_>>(), key)?
         .action
         .clone();
-    Some(vec![Effect::Submit(Input::Action { action })])
+    Some(vec![Effect::Submit(crate::acted(action))])
 }
 
 /// The directory a session's `@` mentions are read from.
@@ -763,7 +763,7 @@ fn cycle_mode(ui: &mut Ui, state: &SessionState, now: Now) -> Vec<Effect> {
         ui.notify(Level::Warn, UNKNOWN_MODE, now.instant);
         return Vec::new();
     };
-    vec![Effect::Submit(Input::Action { action })]
+    vec![Effect::Submit(crate::acted(action))]
 }
 
 /// Enter sends, unless the line ends in a backslash — the newline chord for
@@ -1239,12 +1239,10 @@ mod tests {
                     shift(KeyCode::BackTab),
                     now
                 ),
-                vec![Effect::Submit(Input::Action {
-                    action: bingo_sdk::Action {
-                        name: "permission".into(),
-                        args: next.into()
-                    }
-                })],
+                vec![Effect::Submit(crate::acted(bingo_sdk::Action {
+                    name: "permission".into(),
+                    args: next.into()
+                }))],
                 "{mode}"
             );
             assert!(ui.notices.is_empty(), "{mode}");
@@ -2781,12 +2779,10 @@ mod tests {
         let effects = press(&mut ui, &running_bash(), ctrl('b'), now);
         assert_eq!(
             effects,
-            vec![Effect::Submit(Input::Action {
-                action: bingo_sdk::Action {
-                    name: "bash.promote".into(),
-                    args: serde_json::Value::String("call_1".into()),
-                },
-            })]
+            vec![Effect::Submit(crate::acted(bingo_sdk::Action {
+                name: "bash.promote".into(),
+                args: serde_json::Value::String("call_1".into()),
+            }))]
         );
         assert!(ui.notices.is_empty(), "the plugin answers, not the surface");
     }
@@ -3158,7 +3154,7 @@ mod m148 {
         assert!(render(&state, &mut ui, now).contains("❯ Board"));
         let effects = super::on_key(&mut ui, &solo(&state), typed('1'), now);
         assert!(
-            matches!(&effects[..], [crate::effect::Effect::Submit(Input::Action { action })] if action.name == "stranger.tick")
+            matches!(&effects[..], [crate::effect::Effect::Submit(Input::Action { action, .. })] if action.name == "stranger.tick")
         );
         assert!(ui.composer.is_empty());
         super::on_key(&mut ui, &solo(&state), key(KeyCode::Tab), now);

@@ -5,8 +5,9 @@ test('session startup opens tool-calls and completed rows respect the viewport',
   await mock.session({cwd:$.plugin.root,model:{responses:[readFile,readFile,readFile,{steps:[{text:'Finished.'}]}]}});
   await mock.session.waitForSlot($.plugin.name, 'tool-calls');
   expect((await $.ui.panes()).some(pane => pane.id === 'tool-calls')).toBe(true);
+  // A mod running its own command is not the person asking: the pane waits for room.
   await $.command.run({name:'tool-calls',args:{}});
-  expect((await $.ui.panes()).find(pane => pane.id === 'tool-calls')?.asked).toBe(true);
+  expect((await $.ui.panes()).find(pane => pane.id === 'tool-calls')?.asked).toBe(false);
   await mock.session.submit('Read three times');
   const pane = await $.ui.mount({pane:'tool-calls'});
   expect((await pane.drawn()).split('\n').length).toBe(3);

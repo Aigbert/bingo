@@ -390,7 +390,7 @@ async fn choosing_the_mode_key_replays_shift_tab_after_closing() {
         .await;
     assert!(!active(&ui));
     assert!(
-        matches!(&effects[0], Effect::Submit(Input::Action {action}) if action.name == "permission")
+        matches!(&effects[0], Effect::Submit(Input::Action {action, ..}) if action.name == "permission")
     );
 }
 

@@ -547,6 +547,7 @@ mod registered {
                     name: "hello".into(),
                     args: serde_json::Value::Null,
                 },
+                origin: Some(Origin::surface("tui")),
             },
         );
         loop {

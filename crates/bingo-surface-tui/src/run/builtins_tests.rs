@@ -113,7 +113,7 @@ async fn focused_root_handler_gets_keys_and_unhandled_returns_to_controls() {
     assert!(screen.last().contains("Hello from a built-in mod"));
     run.terminal_event(Term::Key(typed('x')));
     assert!(
-        matches!(&session.submitted()[0], Input::Action { action } if action.args["value"] == json!({"key":"x"}))
+        matches!(&session.submitted()[0], Input::Action { action, .. } if action.args["value"] == json!({"key":"x"}))
     );
     let intent = run.site_keys.keys().next().unwrap().clone();
     run.ack(
@@ -130,7 +130,7 @@ async fn focused_root_handler_gets_keys_and_unhandled_returns_to_controls() {
         ));
         run.terminal_event(Term::Key(key));
     }
-    assert!(!session.submitted().iter().any(|input| matches!(input, Input::Action {action} if action.args["value"]["key"] == "esc" || action.args["value"]["key"] == "ctrl+c")));
+    assert!(!session.submitted().iter().any(|input| matches!(input, Input::Action {action, ..} if action.args["value"]["key"] == "esc" || action.args["value"]["key"] == "ctrl+c")));
 }
 #[tokio::test]
 async fn an_immediately_ready_tree_is_drawn_in_the_requesting_pass() {
@@ -303,7 +303,7 @@ async fn resize_then_down_then_enter_uses_one_cursor() {
             .get(index)
             .cloned()
             .expect("queued key dispatched");
-        let Input::Action { action } = input else {
+        let Input::Action { action, .. } = input else {
             panic!("action")
         };
         let (handled, answer) = state.key(
@@ -396,7 +396,7 @@ async fn a_question_key_can_finish_the_pane_action_waiting_for_its_answer() {
 }
 
 fn answer_key(run: &mut Run, submission: &(IntentId, Input), open: &bingo_sdk::Interaction) {
-    let Input::Action { action } = &submission.1 else {
+    let Input::Action { action, .. } = &submission.1 else {
         panic!("key action")
     };
     let bingo_sdk::InteractionKind::Question(question) = open.kind.clone() else {

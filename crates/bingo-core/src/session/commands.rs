@@ -57,8 +57,8 @@ pub(super) fn is_shell(name: &str) -> bool {
 /// the session works for may write one — the same bareness the provider fold
 /// reads a person's own line by (`crate::context`). An agent's post, a room's
 /// nudge, a correspondent writing from a chat all sign what they send, and a
-/// signed line that starts with `!` is refused rather than run. A typed
-/// action carries no origin at all, which is the same answer.
+/// signed line that starts with `!` is refused rather than run. An action
+/// runs no shell line, whoever signed it.
 pub(super) fn may_run_shell(input: &Input) -> bool {
     match input {
         Input::Text { origin, .. } => crate::context::the_persons_own(origin),
@@ -70,8 +70,15 @@ pub(super) fn asked(input: &Input) -> bool {
     invocation::current().is_empty()
         && match input {
             Input::Text { origin, .. } => crate::context::the_persons_own(origin),
-            Input::Action { .. } => true,
+            Input::Action { origin, .. } => origin.as_ref().is_some_and(pressed_by_a_person),
         }
+}
+
+/// An action is the person's own only when a person surface signed it; an
+/// unsigned action, or one a plugin or any other surface fired, is nobody's
+/// (fail closed).
+fn pressed_by_a_person(origin: &Origin) -> bool {
+    PERSON_SURFACES.contains(&origin.surface.as_str())
 }
 
 /// What a name nothing answers to is refused with. A `!` that found nothing
@@ -118,7 +125,7 @@ pub(super) fn spelled(name: &str) -> String {
 pub(super) fn parse(input: &Input) -> Option<Parsed> {
     match input {
         Input::Text { text, .. } => parse_line(text),
-        Input::Action { action } => Some(Parsed {
+        Input::Action { action, .. } => Some(Parsed {
             name: action.name.clone(),
             args: match &action.args {
                 serde_json::Value::String(s) => s.clone(),
@@ -167,8 +174,8 @@ pub(super) struct Invocation {
 impl Invocation {
     /// What the submitter's origin becomes once a command stands between them
     /// and the session: the same person, in the same conversation, through the
-    /// command surface (ADR-0008 §3). A typed action carries no origin on the
-    /// wire, so it starts from none.
+    /// command surface (ADR-0008 §3). An action's signature says only whose
+    /// press it was (`asked`), so its invocation starts from no origin.
     pub(super) fn of(input: &Input, parsed: &Parsed) -> Self {
         let submitted = match input {
             Input::Text { origin, .. } => origin.clone(),
@@ -276,7 +283,7 @@ impl Commands {
     /// The built-in that drew the key handler an action presses, if one did.
     pub(super) fn vouched(&self, input: &Input) -> Option<String> {
         match input {
-            Input::Action { action } => self.drawings.vouches(action),
+            Input::Action { action, .. } => self.drawings.vouches(action),
             Input::Text { .. } => None,
         }
     }
@@ -534,6 +541,7 @@ mod tests {
                 name: "permission".into(),
                 args: json!("plan"),
             },
+            origin: None,
         };
         assert_eq!(
             parse(&action).map(|p| p.typed()),
@@ -620,9 +628,33 @@ mod tests {
                     name: BANG.into(),
                     args: json!("ls"),
                 },
+                origin: Some(Origin::surface("tui")),
             }),
-            "a button carries no origin, and a shell line needs one"
+            "a button runs no shell line, even the person's own"
         );
+    }
+
+    /// An action is the person's only when a person surface signed it: one a
+    /// plugin fired, one from a surface nobody presses, and one signed by no
+    /// surface at all are nobody's (fail closed).
+    #[test]
+    fn an_action_is_asked_only_when_a_person_surface_signed_it() {
+        let fired = |origin: Option<Origin>| {
+            asked(&Input::Action {
+                action: Action {
+                    name: "plugins".into(),
+                    args: json!("approve p full"),
+                },
+                origin,
+            })
+        };
+        for surface in PERSON_SURFACES {
+            assert!(fired(Some(Origin::surface(surface))), "{surface}");
+        }
+        assert!(!fired(Some(Origin::surface("plugin:counter"))));
+        assert!(!fired(Some(Origin::surface("plugin-kit"))));
+        assert!(!fired(Some(Origin::surface("kernel"))));
+        assert!(!fired(None), "an unsigned action is nobody's");
     }
 
     /// A `!` nothing answers to is not a misspelling.
@@ -640,6 +672,7 @@ mod tests {
                 name: "permission".into(),
                 args,
             },
+            origin: None,
         };
         assert_eq!(
             parse(&action(json!("plan"))).map(|p| p.args),

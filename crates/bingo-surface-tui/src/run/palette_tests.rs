@@ -48,7 +48,7 @@ async fn rapid_text_then_enter_waits_for_the_matching_palette_frame() {
         pull(&mut run, now);
         let submissions = session.submissions();
         assert_eq!(submissions.len(), index + 1);
-        let (intent, Input::Action { action }) = &submissions[index] else {
+        let (intent, Input::Action { action, .. }) = &submissions[index] else {
             panic!("key action")
         };
         assert_eq!(action.args["query"], query);

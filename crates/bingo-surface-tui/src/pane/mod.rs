@@ -5,7 +5,7 @@ mod moved;
 pub mod seat;
 use crate::{composer::Composer, effect::Effect, focus::Focus, theme, ui::Ui};
 use bingo_sdk::{
-    Action, Input, SessionState, View,
+    Action, SessionState, View,
     slot::{Shown, Slot},
     view::{InputProps, SelectProps},
 };
@@ -443,7 +443,7 @@ fn submit(mut action: Action, value: Option<String>) -> Vec<Effect> {
     if let Some(value) = value {
         action.args["value"] = value.into();
     }
-    vec![Effect::Submit(Input::Action { action })]
+    vec![Effect::Submit(crate::acted(action))]
 }
 
 #[cfg(test)]

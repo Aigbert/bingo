@@ -447,6 +447,7 @@ async fn an_action_carries_no_prompt_and_runs_no_hook() {
             name: "permission".into(),
             args: json!({}),
         },
+        origin: Some(bingo_sdk::Origin::surface("tui")),
     };
     assert_eq!(
         f.hooks.on_submit(&mut input, &f.cx).await,

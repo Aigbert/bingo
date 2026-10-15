@@ -187,7 +187,7 @@ fn a_stranger_places_every_slot_without_a_surface_registration() {
         now,
     );
     assert!(
-        matches!(&effects[..], [Effect::Submit(bingo_sdk::Input::Action { action })]
+        matches!(&effects[..], [Effect::Submit(bingo_sdk::Input::Action { action, .. })]
         if action.name == "stranger.choose" && action.args == "rest")
     );
 }

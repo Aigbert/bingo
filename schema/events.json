@@ -1545,6 +1545,17 @@
               "action": {
                 "$ref": "#/$defs/Action"
               },
+              "origin": {
+                "description": "The door it came through. Absent, or a door that is not a person\nsurface, and the action is not the person's own: it fails closed.",
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Origin"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "kind": {
                 "type": "string",
                 "const": "action"
@@ -1766,6 +1777,17 @@
                 "properties": {
                   "action": {
                     "$ref": "#/$defs/Action"
+                  },
+                  "origin": {
+                    "description": "The door it came through. Absent, or a door that is not a person\nsurface, and the action is not the person's own: it fails closed.",
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Origin"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "kind": {
                     "type": "string",
@@ -8203,6 +8225,17 @@
                   "action": {
                     "$ref": "#/$defs/Action"
                   },
+                  "origin": {
+                    "description": "The door it came through. Absent, or a door that is not a person\nsurface, and the action is not the person's own: it fails closed.",
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Origin"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "kind": {
                     "type": "string",
                     "const": "action"
@@ -8391,6 +8424,17 @@
               "action": {
                 "$ref": "#/$defs/Action"
               },
+              "origin": {
+                "description": "The door it came through. Absent, or a door that is not a person\nsurface, and the action is not the person's own: it fails closed.",
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Origin"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "kind": {
                 "type": "string",
                 "const": "action"
@@ -8560,6 +8604,17 @@
             "properties": {
               "action": {
                 "$ref": "#/$defs/Action"
+              },
+              "origin": {
+                "description": "The door it came through. Absent, or a door that is not a person\nsurface, and the action is not the person's own: it fails closed.",
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Origin"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "kind": {
                 "type": "string",

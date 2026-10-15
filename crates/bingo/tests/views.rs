@@ -48,6 +48,7 @@ async fn fire(attachment: &mut Attachment, n: u8, name: &str) -> IntentOutcome {
                 name: name.into(),
                 args: serde_json::Value::Null,
             },
+            origin: Some(bingo_sdk::Origin::surface("tui")),
         },
     );
     ack_for(attachment, &intent).await

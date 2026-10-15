@@ -100,7 +100,7 @@ fn shell(item: &bingo_sdk::Item) -> Option<(String, Props)> {
 
 fn command(input: &bingo_sdk::Input) -> (String, String) {
     match input {
-        bingo_sdk::Input::Action { action } => (
+        bingo_sdk::Input::Action { action, .. } => (
             action.name.clone(),
             action
                 .args

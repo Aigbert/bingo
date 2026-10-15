@@ -690,7 +690,7 @@ pub(super) fn validate(input: &Input) -> Result<(), String> {
             }
             images.iter().try_for_each(validate_image)
         }
-        Input::Action { action } => Err(format!("unknown action: {}", action.name)),
+        Input::Action { action, .. } => Err(format!("unknown action: {}", action.name)),
     }
 }
 

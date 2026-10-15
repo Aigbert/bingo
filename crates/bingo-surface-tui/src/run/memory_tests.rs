@@ -201,7 +201,7 @@ impl MemoryFixture {
             "a fresh key action"
         );
         let submissions = self.session.submissions();
-        let (intent, Input::Action { action }) = submissions.last().unwrap() else {
+        let (intent, Input::Action { action, .. }) = submissions.last().unwrap() else {
             panic!("pane action")
         };
         let cx = self.cx();

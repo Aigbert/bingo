@@ -154,7 +154,7 @@ impl Runner {
             action.args["value"] = value;
         }
         let intent = IntentId::mint();
-        let input = Input::Action { action };
+        let input = Input::action(action, bingo_sdk::Origin::surface(super::SURFACE_ID));
         self.handle.submit(intent.clone(), input.clone());
         self.deliverer.expecting_input(intent, input);
     }

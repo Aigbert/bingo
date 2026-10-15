@@ -57,7 +57,7 @@ fn asked_panes_are_inline_at_both_widths_and_unasked_panes_wait_for_a_click() {
         now,
     );
     assert!(
-        matches!(&effects[..], [crate::effect::Effect::Submit(bingo_sdk::Input::Action { action })] if action.name == "counter:ui" && action.args["event"] == "open")
+        matches!(&effects[..], [crate::effect::Effect::Submit(bingo_sdk::Input::Action { action, .. })] if action.name == "counter:ui" && action.args["event"] == "open")
     );
     assert!(draw_tree(200, 24, &tree, &mut ui, now).contains("1 pane waiting"));
     let tree = solo(&with(pane(true)));
@@ -105,17 +105,17 @@ fn pane_keys_use_handlers_and_an_independent_composer() {
     let key = |code| KeyEvent::new(code, KeyModifiers::NONE);
     let fired = crate::input::on_key(&mut ui, &tree, key(KeyCode::Char('i')), now);
     assert!(
-        matches!(&fired[..],[crate::effect::Effect::Submit(bingo_sdk::Input::Action{action})] if action.args["event"]=="press")
+        matches!(&fired[..],[crate::effect::Effect::Submit(bingo_sdk::Input::Action{action, ..})] if action.args["event"]=="press")
     );
     crate::input::on_key(&mut ui, &tree, key(KeyCode::Tab), now);
     let typed = crate::input::on_key(&mut ui, &tree, key(KeyCode::Char('b')), now);
     assert!(
-        matches!(&typed[..],[crate::effect::Effect::Submit(bingo_sdk::Input::Action{action})] if action.args["value"]=="Ab")
+        matches!(&typed[..],[crate::effect::Effect::Submit(bingo_sdk::Input::Action{action, ..})] if action.args["value"]=="Ab")
     );
     assert!(ui.composer.is_empty());
     assert!(draw_tree(80, 24, &tree, &mut ui, now).contains("Ab"));
     let closed = crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
     assert!(
-        matches!(&closed[..],[crate::effect::Effect::Submit(bingo_sdk::Input::Action{action})] if action.args["event"]=="close")
+        matches!(&closed[..],[crate::effect::Effect::Submit(bingo_sdk::Input::Action{action, ..})] if action.args["event"]=="close")
     );
 }

@@ -122,8 +122,7 @@ async fn key(host: &bingo_core::Host, attachment: &mut Attachment, key: &str) ->
     };
     let mut action = layout.on_key.unwrap();
     action.args["value"] = json!({"key":key});
-    let IntentOutcome::Applied { result } = submit(attachment, Input::Action { action }).await
-    else {
+    let IntentOutcome::Applied { result } = submit(attachment, crate::acted(action)).await else {
         panic!("handled")
     };
     result["surface"]["args"]["value"].clone()
@@ -342,8 +341,7 @@ async fn ack_on(view: &View, attachment: &mut Attachment, key: &str) -> serde_js
     };
     let mut action = layout.on_key.clone().unwrap();
     action.args["value"] = json!({"key":key});
-    let IntentOutcome::Applied { result } = submit(attachment, Input::Action { action }).await
-    else {
+    let IntentOutcome::Applied { result } = submit(attachment, crate::acted(action)).await else {
         panic!("handled")
     };
     result
@@ -391,8 +389,7 @@ async fn a_key_moves_the_cursor_of_the_session_it_came_from() {
     let mut action = layout.on_key.take().unwrap();
     action.args["props"]["session"] = json!("ses_elsewhere");
     action.args["value"] = json!({"key":"down"});
-    let IntentOutcome::Applied { .. } = submit(&mut attachment, Input::Action { action }).await
-    else {
+    let IntentOutcome::Applied { .. } = submit(&mut attachment, crate::acted(action)).await else {
         panic!("handled")
     };
     assert!(backend(panel(&host, &attachment).await).contains("❯  ▸ 2 built in"));
