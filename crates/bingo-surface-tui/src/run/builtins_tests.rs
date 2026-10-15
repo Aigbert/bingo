@@ -169,7 +169,7 @@ async fn a_malformed_handler_cannot_panic_the_surface() {
 }
 
 #[tokio::test]
-async fn a_key_keeps_the_value_the_drawing_gave_its_handler() {
+async fn a_key_names_only_itself_never_the_drawing_it_was_pressed_on() {
     let mut view = drawing().await;
     if let View::Box { layout, .. } = &mut view {
         layout.on_key.as_mut().unwrap().args["value"] = json!({"row":"model:a"});
@@ -181,7 +181,7 @@ async fn a_key_keeps_the_value_the_drawing_gave_its_handler() {
         .unwrap();
     run.terminal_event(Term::Key(typed('x')));
     assert!(
-        matches!(&session.submitted()[0], Input::Action { action } if action.args["value"] == json!({"row":"model:a","key":"x"})),
+        matches!(&session.submitted()[0], Input::Action { action } if action.args["value"] == json!({"key":"x"})),
         "{:?}",
         session.submitted()
     );

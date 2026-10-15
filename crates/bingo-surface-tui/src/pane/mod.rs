@@ -299,20 +299,12 @@ pub fn key_handler(ui: &Ui, state: &SessionState, key: KeyEvent) -> Option<Actio
         return None;
     };
     let mut action = layout.on_key.clone()?;
-    let chord = crate::keys::commands::chord(key)?;
-    let args = action.args.as_object_mut()?;
-    match args
-        .get_mut("value")
-        .and_then(serde_json::Value::as_object_mut)
-    {
-        // The drawing's own value (the row under the cursor) rides with the key.
-        Some(value) => {
-            value.insert("key".into(), chord.into());
-        }
-        None => {
-            args.insert("value".into(), serde_json::json!({"key": chord}));
-        }
-    }
+    // A key names only itself: a key queued behind a redraw would carry a
+    // drawing the site has already replaced. The site keeps its own cursor.
+    action.args.as_object_mut()?.insert(
+        "value".into(),
+        serde_json::json!({"key": crate::keys::commands::chord(key)?}),
+    );
     Some(action)
 }
 
