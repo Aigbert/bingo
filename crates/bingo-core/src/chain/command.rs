@@ -20,6 +20,8 @@ pub(crate) async fn run(
         name: command.spec().name,
         args: args.clone(),
     };
+    // A link may rewrite the line, but the rewrite is the link's, not the person's.
+    let asked = bingo_sdk::render::asked();
     let answered = Arc::new(Mutex::new(None));
     let own = answered.clone();
     let reply: catalogue::CommandReply = json::dispatch(
@@ -29,9 +31,12 @@ pub(crate) async fn run(
         input,
         Next::new(|input: catalogue::CommandRun| {
             Box::pin(async move {
-                let outcome = command.run(&input.args, cx).await?;
+                let original = input.args == args;
+                let outcome =
+                    bingo_sdk::render::under_input(asked && original, command.run(&input.args, cx))
+                        .await?;
                 if let Ok(mut own) = own.lock() {
-                    *own = (input.args == args).then(|| outcome.clone());
+                    *own = original.then(|| outcome.clone());
                 }
                 Ok(catalogue::CommandReply::Outcome(Box::new(outcome)))
             })
