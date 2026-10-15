@@ -7,6 +7,7 @@ mod guide;
 mod keys;
 mod live;
 mod panel;
+mod whole;
 use bingo_sdk::*;
 use bingo_services::schedule;
 use std::{

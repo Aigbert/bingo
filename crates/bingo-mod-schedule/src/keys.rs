@@ -40,7 +40,7 @@ fn press(
             let Some(confirmation) = cursor.confirming.take() else {
                 return json!({});
             };
-            return json!({"run":format!("/schedule {} {}", confirmation.verb(), row.id)});
+            return run(confirmation.verb(), &row.id);
         }
         return json!({});
     }
@@ -48,10 +48,8 @@ fn press(
 }
 fn operation(cursor: &mut Cursor, row: &Row, key: &str) -> Value {
     match key {
-        "space" | " " => {
-            json!({"run":format!("/schedule {} {}", if row.enabled { "pause" } else { "resume" }, row.id)})
-        }
-        "r" => json!({"run":format!("/schedule run {}", row.id)}),
+        "space" | " " => run(if row.enabled { "pause" } else { "resume" }, &row.id),
+        "r" => run("run", &row.id),
         "d" => {
             cursor.confirming = Some(Confirmation::Forget(row.clone()));
             json!({})
@@ -66,6 +64,24 @@ fn operation(cursor: &mut Cursor, row: &Row, key: &str) -> Value {
         },
         _ => json!({}),
     }
+}
+/// The command line for `verb` on `id`, if `id` can ride on one. An id is a
+/// file's name, and a file a person named by hand could otherwise put words
+/// of its own on the line the pane runs.
+fn run(verb: &str, id: &str) -> Value {
+    match carried(id) {
+        true => json!({"run":format!("/schedule {verb} {id}")}),
+        false => {
+            json!({"message":format!("{id:?} is not an id a command line can carry; rename its file")})
+        }
+    }
+}
+/// What a minted id is made of, with room for a person's own name.
+fn carried(id: &str) -> bool {
+    (1..=64).contains(&id.len())
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
 }
 #[async_trait::async_trait]
 impl Command for Handler {

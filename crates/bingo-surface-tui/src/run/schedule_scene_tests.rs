@@ -30,7 +30,7 @@ fn listing(scene: &str) -> Listing {
                     enabled: true,
                     by: "model".into(),
                     mode: Some("acceptEdits".into()),
-                    text: "/review dev".into(),
+                    text: "/review dev\nthen post the summary to the team".into(),
                     session: None,
                 },
                 Row {
@@ -88,7 +88,7 @@ fn schedules_at_both_sizes() {
                 .collect::<Vec<_>>()
                 .join("\n");
             insta::assert_snapshot!(format!("schedules_{scene}_{width}x{height}"), text);
-            if scene != "empty" {
+            if !matches!(scene, "empty" | "ownership") {
                 let modifier = |id: &str| {
                     buffer
                         .content

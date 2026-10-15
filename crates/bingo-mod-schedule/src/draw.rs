@@ -70,19 +70,11 @@ pub fn tree(
             true,
         ),
     ];
-    let room = usize::from(height.saturating_sub(5)).max(1);
-    let start = selected
-        .saturating_sub(room / 2)
-        .min(listing.entries.len().saturating_sub(room));
-    if listing.entries.is_empty() {
-        children.push(line(
-            " no schedules yet · /schedule add every 2h -- check".into(),
-            true,
-        ));
-    }
-    for (index, row) in listing.entries.iter().enumerate().skip(start).take(room) {
-        children.push(entry(row, index == selected, now));
-    }
+    let (body, armed) = match confirming {
+        Some(Confirmation::Confirm(row)) => crate::whole::body(row, width, height),
+        _ => (entries(listing, selected, height, now), true),
+    };
+    children.extend(body);
     if let Some(trouble) = &listing.trouble {
         children.push(View::Badge {
             text: trouble.clone(),
@@ -91,10 +83,11 @@ pub fn tree(
     }
     children.push(line("─".repeat(usize::from(width)), true));
     children.push(line(
-        footer(listing.entries.get(selected), confirming),
+        footer(listing.entries.get(selected), confirming, armed),
         true,
     ));
-
+    // A confirmation not shown whole is not offered to ⏎.
+    let confirming = confirming.filter(|_| armed);
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
@@ -106,36 +99,63 @@ pub fn tree(
         }),
     }
 }
+/// The rows that fit, scrolled to keep the selection in view.
+fn entries(listing: &Listing, selected: usize, height: u16, now: jiff::Timestamp) -> Vec<View> {
+    if listing.entries.is_empty() {
+        return vec![line(
+            " no schedules yet · /schedule add every 2h -- check".into(),
+            true,
+        )];
+    }
+    let room = usize::from(height.saturating_sub(5)).max(1);
+    let start = selected
+        .saturating_sub(room / 2)
+        .min(listing.entries.len().saturating_sub(room));
+    listing
+        .entries
+        .iter()
+        .enumerate()
+        .skip(start)
+        .take(room)
+        .map(|(index, row)| entry(row, index == selected, now))
+        .collect()
+}
 fn entry(row: &Row, selected: bool, now: jiff::Timestamp) -> View {
     line(
         format!(
-            "{}{}  {}  {}  {}  {}  {}",
+            "{}{}  {}  {}  {}  {}  {}{}",
             if selected { "❯ " } else { "  " },
             row.id,
             row.spec,
             next(row, now),
             if row.enabled { "on" } else { "off" },
             row.by,
-            row.text.lines().next().unwrap_or_default()
+            row.text.lines().next().unwrap_or_default(),
+            more(&row.text)
         ),
         !row.enabled,
     )
 }
-fn footer(selected: Option<&Row>, confirming: Option<&Confirmation>) -> String {
+/// What a first line leaves out, said so a row never passes for the whole.
+fn more(text: &str) -> String {
+    match text.lines().count() {
+        0 | 1 => String::new(),
+        2 => "  (+1 line)".into(),
+        lines => format!("  (+{} lines)", lines - 1),
+    }
+}
+fn footer(selected: Option<&Row>, confirming: Option<&Confirmation>, armed: bool) -> String {
     if let Some(confirmation) = confirming {
         let row = confirmation.row();
         if matches!(confirmation, Confirmation::Confirm(_)) {
-            return format!(
-                " confirm {} as yours, mode {}?  ⏎ yes  esc",
-                row.id,
-                row.mode.as_deref().unwrap_or("the session's")
-            );
+            return confirm_footer(row, armed);
         }
         return format!(
-            " forget {} \"{} {}\"? its session stays.  ⏎ yes  esc",
+            " forget {} \"{} {}\"{}? its session stays.  ⏎ yes  esc",
             row.id,
             row.spec,
-            row.text.lines().next().unwrap_or_default()
+            row.text.lines().next().unwrap_or_default(),
+            more(&row.text)
         );
     }
     selected
@@ -150,6 +170,19 @@ fn footer(selected: Option<&Row>, confirming: Option<&Confirmation>) -> String {
             )
         })
         .unwrap_or_default()
+}
+fn confirm_footer(row: &Row, armed: bool) -> String {
+    match armed {
+        true => format!(
+            " confirm {} as yours, mode {}?  ⏎ yes  esc",
+            row.id,
+            row.mode.as_deref().unwrap_or("the session's")
+        ),
+        false => format!(
+            " too long to confirm here: `/schedule confirm {}` answers with all of it  esc",
+            row.id
+        ),
+    }
 }
 fn next(row: &Row, now: jiff::Timestamp) -> String {
     row.next_fire
@@ -167,7 +200,7 @@ fn holder(value: &str) -> &str {
         value
     }
 }
-fn line(text: String, dim: bool) -> View {
+pub(crate) fn line(text: String, dim: bool) -> View {
     View::Text {
         children: vec![view::TextChild::String(text)],
         style: view::TextStyle {

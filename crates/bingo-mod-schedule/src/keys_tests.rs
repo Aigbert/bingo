@@ -151,3 +151,30 @@ fn ownership_confirmation_pins_the_mode_and_only_confirms_once() {
         "a person's entry needs no confirmation"
     );
 }
+#[test]
+fn an_id_no_command_line_can_carry_runs_nothing() {
+    for id in ["abcd 1234", "a\nb", "x;y", "", &"a".repeat(65)] {
+        let row = Row {
+            id: id.into(),
+            ..row()
+        };
+        let mut cursor = Cursor::default();
+        let pressed = press(
+            &mut cursor,
+            std::slice::from_ref(&row),
+            Some(&row),
+            None,
+            "r",
+        );
+        assert!(pressed.get("run").is_none(), "{id:?}: {pressed}");
+        assert!(
+            pressed["message"]
+                .as_str()
+                .is_some_and(|m| m.contains("rename"))
+        );
+    }
+    assert_eq!(
+        run("run", "01hz-x_9"),
+        json!({"run":"/schedule run 01hz-x_9"})
+    );
+}

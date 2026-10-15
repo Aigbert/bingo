@@ -5,7 +5,7 @@ expression: text
  schedules · held by this process (pid 4120)
  ↑↓ choose  space pause/enable  r run  c confirm  d forget  → session  esc close
   01JA4  daily at 09:00  in 14h  on  you  triage new issues
-❯ 01JA7  every 2h  in 37m  on  model  /review dev
+❯ 01JA7  every 2h  in 37m  on  model  /review dev  (+1 line)
   01J9X  once at 2026-10-20T00:00:00Z  —  off  unconfirmed  ship the notes
 ────────────────────────────────────────────────────────────────────────────────
- forget 01JA7 "every 2h /review dev"? its session stays.  ⏎ yes  esc
+ forget 01JA7 "every 2h /review dev"  (+1 line)? its session stays.  ⏎ yes  esc
