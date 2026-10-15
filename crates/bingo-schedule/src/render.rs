@@ -39,7 +39,16 @@ pub fn view(shelf: &Shelf, holder: &str, trouble: Option<&str>, tz: &TimeZone) -
         tone: bingo_sdk::Tone::Bad,
     }));
     parts.extend(unreadable(shelf));
+    parts.extend(shelf.entries.iter().filter_map(in_full));
     View::column(parts)
+}
+
+/// An entry whose cell could not hold its text, in full: what fires is
+/// what a person confirms, so none of it may hide behind an ellipsis or a
+/// first line.
+fn in_full(entry: &Entry) -> Option<View> {
+    let whole = head(&entry.text, HEAD) == entry.text;
+    (!whole).then(|| View::text(format!("{} in full:\n{}", entry.id, entry.text)))
 }
 
 /// A file that was meant to be an entry says so here, and nowhere else: a
@@ -228,6 +237,26 @@ mod tests {
                 tone: bingo_sdk::Tone::Bad
             },
             "this tree installs no tracing subscriber, so a log line would be nowhere"
+        );
+    }
+
+    #[test]
+    fn a_text_the_cell_cut_is_shown_in_full_under_the_table() {
+        let long = Entry {
+            id: "long0001".into(),
+            text: "/guard\nrm -rf target".into(),
+            ..entry()
+        };
+        let shown = children(view(
+            &shelf(vec![entry(), long]),
+            "held by this process",
+            None,
+            &TimeZone::UTC,
+        ));
+        assert_eq!(shown.len(), 3, "the short entry needs no second look");
+        assert_eq!(
+            shown[2],
+            View::text("long0001 in full:\n/guard\nrm -rf target")
         );
     }
 
