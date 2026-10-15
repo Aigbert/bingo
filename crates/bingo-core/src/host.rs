@@ -98,8 +98,7 @@ pub struct Host {
     weak: Weak<Host>,
     plugin_host: HostHandle,
     pinned: Mutex<Vec<String>>,
-    /// What the person was last told about a trust file bingo cannot read,
-    /// so a registration pass that finds it unread again says nothing new.
+    /// The unreadable trust file the person was last told about, told once.
     trust_unread: Mutex<Option<String>>,
 }
 
@@ -209,8 +208,7 @@ impl Host {
         self.served.get(provider).map(|served| served.fetched)
     }
 
-    /// What a session actor needs from the host: the command table and a
-    /// weak way back.
+    /// What a session actor needs from the host: commands, drawings, a way back.
     fn services(&self, drawings: &session::Drawings) -> session::Services {
         let weak = Arc::downgrade(&self.plugin_host.0);
         session::Services {
