@@ -9,7 +9,7 @@ pub mod agent;
 mod ago;
 mod asked;
 pub use ago::ago;
-pub use asked::asked;
+pub use asked::{asked, first_ask};
 pub mod bytes;
 pub mod command;
 pub mod compactor;

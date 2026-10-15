@@ -214,20 +214,7 @@ impl SessionState {
         }
         self.seq = frame.seq;
         if frame.event.completes_a_message() {
-            self.count_a_message();
-            if self.summary.history.first_ask.is_none()
-                && let Event::ItemCompleted { item } = &frame.event
-            {
-                self.summary.history.first_ask = crate::asked(item).map(|ask| {
-                    ask.lines()
-                        .next()
-                        .unwrap_or_default()
-                        .trim()
-                        .chars()
-                        .take(200)
-                        .collect()
-                });
-            }
+            self.count_a_message(&frame.event);
         }
         let applied = self.transcript.apply(&frame.event);
         match &frame.event {
@@ -266,15 +253,17 @@ impl SessionState {
                 kind,
                 payload,
             } => self.signalled(plugin, kind, payload, generation.as_ref()),
-            Event::Invalidated { requests } => {
-                for request in requests {
-                    let generation = self.invalidated.entry(request.clone()).or_default();
-                    *generation = generation.saturating_add(1);
-                }
-                Applied::Signal
-            }
+            Event::Invalidated { requests } => self.invalidate(requests),
             Event::Lagged { .. } => Applied::Lagged,
         }
+    }
+
+    fn invalidate(&mut self, requests: &[String]) -> Applied {
+        for request in requests {
+            let generation = self.invalidated.entry(request.clone()).or_default();
+            *generation = generation.saturating_add(1);
+        }
+        Applied::Signal
     }
 
     fn extended(&mut self, plugin: &str, kind: &str, payload: &Value) -> Applied {
@@ -328,8 +317,14 @@ impl SessionState {
     /// A journal that was never counted starts counting here; what came before
     /// this fold is lost either way, and a rebuild from the whole journal is
     /// what puts an old session's true number back.
-    fn count_a_message(&mut self) {
-        self.summary.history.messages = Some(self.summary.history.messages.unwrap_or(0) + 1);
+    fn count_a_message(&mut self, event: &Event) {
+        let history = &mut self.summary.history;
+        history.messages = Some(history.messages.unwrap_or(0) + 1);
+        if history.first_ask.is_none()
+            && let Event::ItemCompleted { item } = event
+        {
+            history.first_ask = crate::first_ask(item);
+        }
     }
 
     /// Only a running session says what it is, so a summary after a

@@ -13,6 +13,17 @@ pub fn asked(item: &Item) -> Option<&str> {
     }
     parts.iter().find_map(ContentPart::as_text)
 }
+
+/// The longest first ask a summary carries.
+const FIRST_ASK_CHARS: usize = 200;
+
+/// What a summary's `first_ask` holds for this item: the first line of what
+/// was [`asked`], trimmed and capped. The live fold, the store's counter and
+/// the store's rebuild all derive it here.
+pub fn first_ask(item: &Item) -> Option<String> {
+    let line = asked(item)?.lines().next().unwrap_or_default();
+    Some(line.trim().chars().take(FIRST_ASK_CHARS).collect())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -32,10 +43,17 @@ mod tests {
             origin: Origin::surface("tui"),
         };
         assert_eq!(asked(&item), Some("  first\nsecond"));
+        assert_eq!(first_ask(&item).as_deref(), Some("first"));
+        item.body = ItemBody::User {
+            parts: vec![ContentPart::text("字".repeat(300))],
+            origin: Origin::surface("tui"),
+        };
+        assert_eq!(first_ask(&item).map(|ask| ask.chars().count()), Some(200));
         if let ItemBody::User { origin, .. } = &mut item.body {
             origin.voice = Some(Voice::Note);
         }
         assert_eq!(asked(&item), None);
+        assert_eq!(first_ask(&item), None);
         item.body = ItemBody::Assistant {
             text: "answer".into(),
         };

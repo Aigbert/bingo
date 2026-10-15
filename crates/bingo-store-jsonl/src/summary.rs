@@ -47,15 +47,7 @@ fn rebuild(dir: &Path) -> Result<Option<SessionSummary>, KernelError> {
         .filter(|frame| frame.event.completes_a_message())
         .count();
     let first_ask = frames.iter().find_map(|frame| match &frame.event {
-        Event::ItemCompleted { item } => bingo_sdk::asked(item).map(|ask| {
-            ask.lines()
-                .next()
-                .unwrap_or_default()
-                .trim()
-                .chars()
-                .take(200)
-                .collect()
-        }),
+        Event::ItemCompleted { item } => bingo_sdk::first_ask(item),
         _ => None,
     });
     let latest = frames

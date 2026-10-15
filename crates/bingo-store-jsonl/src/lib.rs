@@ -81,18 +81,9 @@ impl JsonlStore {
             Event::SessionUpdated { summary } => summary::write(&dir, summary),
             // A message is worth no frame of its own, so the derived file — not
             // the journal — is what stays fresh between one head and the next.
-            Event::ItemCompleted { item } if item.body.is_message() => summary::count_message(
-                &dir,
-                bingo_sdk::asked(item).map(|ask| {
-                    ask.lines()
-                        .next()
-                        .unwrap_or_default()
-                        .trim()
-                        .chars()
-                        .take(200)
-                        .collect()
-                }),
-            ),
+            Event::ItemCompleted { item } if item.body.is_message() => {
+                summary::count_message(&dir, bingo_sdk::first_ask(item))
+            }
             _ => Ok(()),
         };
         if let Err(error) = derived {
