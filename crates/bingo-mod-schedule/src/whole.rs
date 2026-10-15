@@ -14,7 +14,9 @@ const AROUND: u16 = 6;
 /// The pane's body while `row` waits for its confirmation, and whether it
 /// shows the whole text, which is what arms ⏎.
 pub(crate) fn body(row: &Row, width: u16, height: u16) -> (Vec<View>, bool) {
-    let rows = chunks(&row.text, usize::from(width).saturating_sub(INDENT.len()));
+    let visible = bingo_services::schedule::visible(&row.text);
+    let safe = matches!(visible, std::borrow::Cow::Borrowed(_));
+    let rows = chunks(&visible, usize::from(width).saturating_sub(INDENT.len()));
     if rows.len() > usize::from(height.saturating_sub(AROUND)) {
         let said = format!(
             " {}'s text is {} rows here, more than this pane holds",
@@ -29,7 +31,7 @@ pub(crate) fn body(row: &Row, width: u16, height: u16) -> (Vec<View>, bool) {
         .map(|row| line(format!("{INDENT}{row}"), false));
     (
         std::iter::once(line(named, false)).chain(text).collect(),
-        true,
+        safe,
     )
 }
 
@@ -39,7 +41,7 @@ pub(crate) fn body(row: &Row, width: u16, height: u16) -> (Vec<View>, bool) {
 pub(crate) fn chunks(text: &str, width: usize) -> Vec<String> {
     let width = width.max(1);
     text.split('\n')
-        .flat_map(|line| split(line.trim_end_matches('\r'), width))
+        .flat_map(|line| split(line, width))
         .collect()
 }
 
@@ -97,7 +99,7 @@ mod tests {
             ["日本", "語"],
             "wide characters count twice"
         );
-        assert_eq!(chunks("a\r\n\nb", 9), ["a", "", "b"], "blank lines stay");
+        assert_eq!(chunks("a\r\n\nb", 9), ["a\r", "", "b"], "blank lines stay");
     }
 
     #[test]
@@ -144,6 +146,22 @@ mod tests {
             panic!("the pane is a box");
         };
         layout.on_key.expect("keys").args["confirming"].clone()
+    }
+
+    #[test]
+    fn invisible_text_is_escaped_and_never_arms_enter() {
+        for text in ["a\rb", "a\u{1b}b", "a\u{202e}b", "a\u{2069}b"] {
+            let (views, armed) = body(&row(text), 80, 24);
+            assert!(!armed);
+            assert!(
+                views
+                    .iter()
+                    .map(View::fold)
+                    .collect::<String>()
+                    .contains("\\u{")
+            );
+            assert!(offered(text).is_null());
+        }
     }
 
     #[test]

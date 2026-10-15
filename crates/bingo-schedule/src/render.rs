@@ -4,6 +4,7 @@
 //! and what the model sees cannot drift apart.
 
 use bingo_sdk::View;
+use bingo_services::schedule::visible;
 use jiff::Zoned;
 use jiff::tz::TimeZone;
 
@@ -47,8 +48,9 @@ pub fn view(shelf: &Shelf, holder: &str, trouble: Option<&str>, tz: &TimeZone) -
 /// what a person confirms, so none of it may hide behind an ellipsis or a
 /// first line.
 fn in_full(entry: &Entry) -> Option<View> {
-    let whole = head(&entry.text, HEAD) == entry.text;
-    (!whole).then(|| View::text(format!("{} in full:\n{}", entry.id, entry.text)))
+    let text = visible(&entry.text);
+    let whole = head(&text, HEAD) == text;
+    (!whole).then(|| View::text(format!("{} in full:\n{text}", entry.id)))
 }
 
 /// A file that was meant to be an entry says so here, and nowhere else: a
@@ -83,7 +85,7 @@ pub fn row(entry: &Entry, tz: &TimeZone) -> Vec<String> {
         ),
         if row.enabled { "yes" } else { "no" }.into(),
         row.by,
-        head(&row.text, HEAD),
+        head(&visible(&row.text), HEAD),
     ]
 }
 
@@ -258,6 +260,19 @@ mod tests {
             shown[2],
             View::text("long0001 in full:\n/guard\nrm -rf target")
         );
+    }
+
+    #[test]
+    fn hidden_characters_are_escaped_in_both_the_row_and_full_text() {
+        let entry = Entry {
+            text: "a\u{202e}b\rc\nsecond\u{1b}".into(),
+            ..entry()
+        };
+        let shown = view(&shelf(vec![entry]), "no runner", None, &TimeZone::UTC).fold();
+        assert!(shown.contains("a\\u{202e}b\\u{d}c"));
+        assert!(shown.contains("second\\u{1b}"));
+        assert!(!shown.contains('\u{202e}'));
+        assert!(!shown.contains('\r'));
     }
 
     #[test]

@@ -130,7 +130,10 @@ fn entry(row: &Row, selected: bool, now: jiff::Timestamp) -> View {
             next(row, now),
             if row.enabled { "on" } else { "off" },
             row.by,
-            row.text.lines().next().unwrap_or_default(),
+            bingo_services::schedule::visible(&row.text)
+                .split('\n')
+                .next()
+                .unwrap_or_default(),
             more(&row.text)
         ),
         !row.enabled,
@@ -154,7 +157,10 @@ fn footer(selected: Option<&Row>, confirming: Option<&Confirmation>, armed: bool
             " forget {} \"{} {}\"{}? its session stays.  ⏎ yes  esc",
             row.id,
             row.spec,
-            row.text.lines().next().unwrap_or_default(),
+            bingo_services::schedule::visible(&row.text)
+                .split('\n')
+                .next()
+                .unwrap_or_default(),
             more(&row.text)
         );
     }
@@ -179,7 +185,7 @@ fn confirm_footer(row: &Row, armed: bool) -> String {
             row.mode.as_deref().unwrap_or("the session's")
         ),
         false => format!(
-            " too long to confirm here: `/schedule confirm {}` answers with all of it  esc",
+            " cannot confirm here: `/schedule confirm {}` answers with all of it  esc",
             row.id
         ),
     }

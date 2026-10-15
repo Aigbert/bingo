@@ -107,3 +107,40 @@ fn schedules_at_both_sizes() {
         }
     }
 }
+
+#[test]
+fn hidden_schedule_text_survives_terminal_rendering_and_disarms_enter() {
+    for (width, height) in [(80, 24), (108, 30)] {
+        let mut listing = listing("ownership");
+        listing.entries[1].text = "first\u{202e}\r\nsecond\u{1b}".into();
+        let confirmation = bingo_mod_schedule::Confirmation::Confirm(listing.entries[1].clone());
+        let view = bingo_mod_schedule::draw::tree(
+            &listing,
+            1,
+            Some(&confirmation),
+            width,
+            height,
+            jiff::Timestamp::UNIX_EPOCH,
+        );
+        let bingo_sdk::View::Box { layout, .. } = &view else {
+            panic!("pane");
+        };
+        assert!(layout.on_key.as_ref().unwrap().args["confirming"].is_null());
+        let lines = crate::views::render(&view, usize::from(width));
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal
+            .draw(|f| f.render_widget(Paragraph::new(lines), f.area()))
+            .unwrap();
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|c| c.symbol())
+            .collect();
+        assert!(text.contains("first\\u{202e}\\u{d}"));
+        assert!(text.contains("second\\u{1b}"));
+        assert!(text.contains("/schedule confirm 01JA7"));
+        assert!(!text.contains("⏎ yes"));
+    }
+}

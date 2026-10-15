@@ -119,7 +119,7 @@ fn written(
             entry.id,
             entry.spec,
             render::when(entry.next_fire(&TimeZone::system()).as_ref()),
-            entry.text
+            bingo_services::schedule::visible(&entry.text)
         )),
     })
 }
@@ -131,6 +131,23 @@ fn invalid(message: String) -> KernelError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn confirmation_reply_reveals_hidden_characters() {
+        let fixture = crate::tests::Fixture::new();
+        let entry = Entry {
+            text: "a\u{202e}b\rc".into(),
+            ..crate::entry::tests::entry()
+        };
+        let outcome = written(&fixture.schedules, &entry, "confirmed").unwrap();
+        let CommandOutcome::Applied {
+            message: Some(message),
+        } = outcome
+        else {
+            panic!("reply");
+        };
+        assert!(message.contains("a\\u{202e}b\\u{d}c"));
+    }
 
     #[test]
     fn an_add_line_reads_its_spec_mode_and_text() {

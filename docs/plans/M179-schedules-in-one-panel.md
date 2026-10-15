@@ -45,7 +45,7 @@ A pending wake appears in Status, counts down, and prefills `/wake off`.
 - ADR-0094 owns add/confirm: by person, explicit `as <mode>` only, never copied from session mode.
   Every mutation uses dev's `render::asked()` predicate and PermissionDenied refusal. Wire mutations
   clear that context. Model tools keep their existing permission-gated contracts and tool provenance.
-- c confirms a model/unconfirmed row through `/schedule confirm <id>` after showing its explicit mode.
+- c confirms through `/schedule confirm <id> [digest]`, binding the shown text and explicit mode.
   The built-in's vouched press returns the line; the client submits it as asked. A plugin cannot
   invoke the service or fabricate a button to grant consent. d uses the same stale-row check.
 - Run and automatic fire share dev's signing and refusal notice/trouble. Each automatic entry has
@@ -56,7 +56,8 @@ A pending wake appears in Status, counts down, and prefills `/wake off`.
   Existing destination sessions outside the current tree are opened by id.
 - RFC3339 at/next_fire stay on the wire; row_of needs no now. Full row equality pins confirmation;
   live ticks cover other processes/hand edits. Disabling the mod clears its panes.
-- Existing jiff/tokio edges supply clock/redraw; no new resolved external dependency or allowlist change.
+- Shared escaping lives in services; services → bingo-digest binds text/mode without a new external
+  dependency. Controls except LF/tab and bidi marks escape; such text cannot arm panel Enter.
 - TestBackend controls the clock/styles; real RPC covers fake Wake, delivery/navigation and confirmation.
   This replaces timing-sensitive UI waits in the original combined test. Guides never use docs/guide/.
 
@@ -75,8 +76,8 @@ A pending wake appears in Status, counts down, and prefills `/wake off`.
 
 ## Non-goals and risks
 
-No cron, in-place editing, daemon, or wakes in the schedule panel. Manual and automatic fire can race
-and add one extra turn; the reply says so. Wakes are visible on demand. A stamp the disk refused is
+No cron, in-place editing, daemon, or wakes in the schedule panel. Only separate processes can race
+and add one extra turn; same-process spending rereads serialize runner and manual fire. Wakes are visible on demand. A stamp the disk refused is
 kept only in memory and badged, so a restart may fire that occurrence once more.
 `/schedule run` typed in the entry's own session cannot deadlock: the command runs in its own task.
 
