@@ -32,11 +32,10 @@ pub fn card(model: &CatalogEntry, chat: &Chat, effort: Option<Effort>, keep: boo
             .map_or(model.id.as_str(), |(_, m)| m)
             .into(),
         String::new(),
-        context(meta["context"].as_u64(), chat.used),
+        context(known(&meta["context"]), chat.used),
         format!(
             "output    {}",
-            meta["output"]
-                .as_u64()
+            known(&meta["output"])
                 .map(|v| format!("{} per answer", tokens(v)))
                 .unwrap_or_else(|| "unknown".into())
         ),
@@ -74,8 +73,12 @@ pub fn card(model: &CatalogEntry, chat: &Chat, effort: Option<Effort>, keep: boo
     append_controls(&mut lines, model, chat, effort, keep);
     lines
 }
+/// A limit an endpoint reports as zero is a limit nobody knows.
+pub fn known(limit: &serde_json::Value) -> Option<u64> {
+    limit.as_u64().filter(|v| *v > 0)
+}
 fn context(window: Option<u64>, used: u64) -> String {
-    let Some(window) = window.filter(|v| *v > 0) else {
+    let Some(window) = window else {
         return "context   unknown until it answers".into();
     };
     let fill = ((used as f64 / window as f64 * 10.0).round() as usize).min(10);

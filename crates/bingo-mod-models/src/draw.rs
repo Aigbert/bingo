@@ -230,8 +230,7 @@ fn row_text(
                     if m.meta["pinned"] == true { "★" } else { " " },
                     if id == &chat.current { "●" } else { " " },
                     id.split_once('/').map_or(id.as_str(), |(_, m)| m),
-                    m.meta["context"]
-                        .as_u64()
+                    crate::card::known(&m.meta["context"])
                         .map(crate::card::tokens)
                         .unwrap_or_else(|| "—".into()),
                     if m.meta["reasoning"] == true {
@@ -390,5 +389,20 @@ mod tests {
         assert_eq!(header(&rows, "", 3), "2 models · 3 providers");
         assert_eq!(header(&rows, "a", 3), "2 matches for “a”");
         assert_eq!(header(&rows[..4], "a", 3), "1 match for “a”");
+    }
+    #[test]
+    fn a_window_nobody_reported_is_a_dash() {
+        let models = [CatalogEntry {
+            id: "openai/chatgpt-image-latest".into(),
+            label: String::new(),
+            meta: json!({"context": 0}),
+        }];
+        let text = row_text(
+            &Row::Model(models[0].id.clone()),
+            &models,
+            &[],
+            &crate::card::Chat::default(),
+        );
+        assert!(text.contains("chatgpt-image-latest —"), "{text}");
     }
 }
