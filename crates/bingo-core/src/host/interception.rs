@@ -127,7 +127,9 @@ impl InterceptorSource for RegisteredSource {
 }
 
 pub(super) async fn register_pending(host: &Host) {
-    let trust = host.current_trust().unwrap_or_default();
+    let Ok(trust) = host.current_trust() else {
+        return;
+    };
     for source in &host.registry.sources.plugins {
         for registration in source.registrations(&trust).await {
             let name = registration.name.clone();

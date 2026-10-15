@@ -189,6 +189,15 @@ mod tests {
             .unwrap();
         assert_eq!(*source.1.lock().unwrap(), Some(Tier::Full));
         assert_eq!(source.0.lock().unwrap().len(), 2);
+        std::fs::write(&path, "[invalid").unwrap();
+        HostApi::catalog(host.as_ref(), CatalogKind::Plugins)
+            .await
+            .unwrap();
+        assert_eq!(
+            *source.1.lock().unwrap(),
+            Some(Tier::Full),
+            "invalid live settings must not start a registration with default grants"
+        );
         host.shutdown().await;
     }
 }
