@@ -77,3 +77,4 @@ first record; 0036 §2 answered it before it was named).
 - [0091 — Rewind names what it takes back](0091-rewind-names-what-it-takes-back.md) — proposed
 - [0092 — The person may read and forget](0092-the-person-may-forget.md) — proposed
 - [0093 — Schedules are the person's too](0093-schedules-are-the-persons-too.md) — proposed
+- [0094 — A schedule carries who asked for it](0094-a-schedule-carries-who-asked.md)

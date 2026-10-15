@@ -70,3 +70,11 @@ the schedule's record by plugin id. Wake ownership and restart bounds stand.
 §8 keeps wakes in memory, now in owned keyed `bingo-alarm` tasks. A session
 start with no held wake clears the entire journaled wake extension, including
 its M121 status slot; a countdown cannot survive the wake it describes.
+
+## Amendment — 2026-10-16
+
+[ADR-0094](0094-a-schedule-carries-who-asked.md) supersedes §3 and §4.
+Only an entry the person asked for — their own `/schedule add` or
+`/schedule confirm` — fires its `/command` and `!` lines as typed, and
+only it can widen the mode. Every other entry's text is prose, and its
+mode can only keep or tighten. Every refusal is shown.

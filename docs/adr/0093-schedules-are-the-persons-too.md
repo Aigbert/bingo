@@ -38,3 +38,9 @@ not arise.
 - `bingo-schedule` gains a service and switches at the next start.
 
 Refs: ADR-0011, ADR-0019, ADR-0071, ADR-0082, ADR-0086, ADR-0088.
+
+## Amendment — 2026-10-16
+
+[ADR-0094](0094-a-schedule-carries-who-asked.md) §1 takes over `add`:
+`/schedule add <spec> [as <mode>] -- <text>`, an asked line only. The
+entry stores the explicit mode or none; it does not copy the session's.
