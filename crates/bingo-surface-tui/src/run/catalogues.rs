@@ -17,11 +17,12 @@ const COMMAND_WAIT: Duration = Duration::from_secs(5);
 
 pub(super) async fn fetch_all(run: &mut Run) {
     run.typeahead.catalogue_pending = true;
+    let generation = next_fetch(run);
     let host = run.host.clone();
     let mut request = Box::pin(request_commands(host));
     match tokio::time::timeout(INITIAL_WAIT, &mut request).await {
-        Ok(result) => received(run, result),
-        Err(_) => run.spawn(async move { Ok(Reply::Commands(request.await)) }),
+        Ok(result) => received(run, generation, result),
+        Err(_) => run.spawn(async move { Ok(Reply::Commands(generation, request.await)) }),
     }
     for (source, kind) in CATALOGUES {
         fetch(run, source, *kind);
@@ -29,8 +30,9 @@ pub(super) async fn fetch_all(run: &mut Run) {
 }
 
 pub(super) fn fetch_commands(run: &mut Run) {
+    let generation = next_fetch(run);
     let host = run.host.clone();
-    run.spawn(async move { Ok(Reply::Commands(request_commands(host).await)) });
+    run.spawn(async move { Ok(Reply::Commands(generation, request_commands(host).await)) });
 }
 
 async fn request_commands(host: HostHandle) -> Result<Vec<CommandSpec>, KernelError> {
@@ -42,7 +44,15 @@ async fn request_commands(host: HostHandle) -> Result<Vec<CommandSpec>, KernelEr
         .map(|catalog| commands::specs_from(&catalog))
 }
 
-pub(super) fn received(run: &mut Run, result: Result<Vec<CommandSpec>, KernelError>) {
+fn next_fetch(run: &mut Run) -> u64 {
+    run.command_fetch += 1;
+    run.command_fetch
+}
+
+pub(super) fn received(run: &mut Run, fetch: u64, result: Result<Vec<CommandSpec>, KernelError>) {
+    if fetch != run.command_fetch {
+        return;
+    }
     run.typeahead.catalogue_pending = false;
     match result {
         Ok(specs) => {

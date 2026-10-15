@@ -802,7 +802,7 @@ async fn plugin_switch_redraws_the_toast_and_refreshes_default_keys() {
         }
         loop {
             let reply = replies.recv().await.unwrap();
-            let commands = matches!(reply, Reply::Commands(_));
+            let commands = matches!(reply, Reply::Commands(..));
             run.reply(reply, &mut None);
             if commands {
                 break;

@@ -63,7 +63,7 @@ async fn a_slow_catalogue_releases_first_paint_and_keeps_the_first_shortcut() {
     release.notify_one();
     loop {
         let reply = replies.recv().await.unwrap();
-        let ready = matches!(reply, Reply::Commands(_));
+        let ready = matches!(reply, Reply::Commands(..));
         run.reply(reply, &mut None);
         if ready {
             break;
@@ -98,16 +98,16 @@ async fn a_background_error_releases_held_input_and_allows_a_later_refresh() {
     run.terminal_event(Term::Key(ctrl('n')));
     run.terminal_event(Term::Key(typed('a')));
     run.reply(
-        Reply::Commands(Err(KernelError::new(
-            bingo_sdk::ErrorCode::Internal,
-            "offline",
-        ))),
+        Reply::Commands(
+            0,
+            Err(KernelError::new(bingo_sdk::ErrorCode::Internal, "offline")),
+        ),
         &mut None,
     );
     assert!(run.typeahead.is_empty());
     assert_eq!(run.ui.composer.text(), "a");
     run.reply(
-        Reply::Commands(Ok(commands::specs_from(&answer(CatalogKind::Commands)))),
+        Reply::Commands(0, Ok(commands::specs_from(&answer(CatalogKind::Commands)))),
         &mut None,
     );
     assert_eq!(
@@ -137,7 +137,7 @@ async fn a_stalled_initial_catalogue_fails_at_its_overall_deadline() {
     assert_eq!(run.typeahead.len(), 1);
     loop {
         let reply = replies.recv().await.unwrap();
-        let ready = matches!(reply, Reply::Commands(_));
+        let ready = matches!(reply, Reply::Commands(..));
         run.reply(reply, &mut None);
         if ready {
             break;
@@ -173,4 +173,57 @@ async fn only_catalogue_holds_let_plain_keys_and_exit_pass() {
         run.terminal_event(Term::Key(typed('a')));
         assert_eq!(run.typeahead.len(), 2, "opening still preserves order");
     }
+}
+
+#[tokio::test]
+async fn an_older_fetch_cannot_replace_a_newer_catalogue_or_report_failure() {
+    let mut run = super::super::tests::idle(scene().1.instant);
+    let host = TestHost::default();
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counter = calls.clone();
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let started = entered.clone();
+    let release = Arc::new(tokio::sync::Notify::new());
+    let gate = release.clone();
+    host.on_catalog(move |kind| {
+        let first = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0;
+        let gate = gate.clone();
+        let started = started.clone();
+        async move {
+            if first {
+                started.notify_one();
+                gate.notified().await;
+                Ok(Catalog {
+                    kind,
+                    entries: vec![],
+                })
+            } else {
+                Ok(answer(kind))
+            }
+        }
+    });
+    run.host = host.handle();
+    let (tx, mut replies) = mpsc::channel(16);
+    run.replies = tx;
+    run.typeahead.catalogue_pending = true;
+    fetch_commands(&mut run);
+    entered.notified().await;
+    fetch_commands(&mut run);
+    run.reply(replies.recv().await.unwrap(), &mut None);
+    assert!(!run.typeahead.catalogue_pending);
+    release.notify_one();
+    run.reply(replies.recv().await.unwrap(), &mut None);
+    run.reply(
+        Reply::Commands(
+            1,
+            Err(KernelError::new(bingo_sdk::ErrorCode::Timeout, "old")),
+        ),
+        &mut None,
+    );
+    assert_eq!(run.command_fetch, 2);
+    assert_eq!(
+        crate::keys::commands::line(&run.ui, run.session.tree.viewed(), ctrl('n')).as_deref(),
+        Some("/review")
+    );
+    assert!(run.ui.notices.is_empty());
 }

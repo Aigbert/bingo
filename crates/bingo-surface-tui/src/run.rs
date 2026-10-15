@@ -84,7 +84,7 @@ enum Reply {
     Resume(SessionId, Option<Box<SessionSummary>>),
     /// What the store holds, for the switcher's stored rows.
     Stored(String, Vec<SessionSummary>),
-    Commands(Result<Vec<CommandSpec>, KernelError>),
+    Commands(u64, Result<Vec<CommandSpec>, KernelError>),
     /// One catalogue's ids, by the source name a command's argument gives.
     Catalogue(String, Vec<bingo_sdk::CatalogEntry>),
     /// A line whose pictures have been read in (ADR-0041): the loop asked for
@@ -176,6 +176,7 @@ struct Run {
     rewind_prompts: surface::Prompts,
     received_asks: HashMap<bingo_sdk::InteractionId, jiff::Timestamp>,
     site_keys: HashMap<IntentId, site_keys::Pending>,
+    command_fetch: u64,
     typeahead: typeahead::Typeahead,
     replies: mpsc::Sender<Reply>,
     /// A selection a key asked for, handed to the terminal between frames.
@@ -327,6 +328,7 @@ async fn attach(
         rewind_prompts: Default::default(),
         received_asks: HashMap::new(),
         site_keys: HashMap::new(),
+        command_fetch: 0,
         typeahead: Default::default(),
         replies,
         clipboard: None,
@@ -877,7 +879,7 @@ impl Run {
                 }
             }
             Reply::Stored(request, sessions) => palette::fill_palette(self, &request, sessions),
-            Reply::Commands(result) => catalogues::received(self, result),
+            Reply::Commands(fetch, result) => catalogues::received(self, fetch, result),
             Reply::Catalogue(source, ids) => {
                 if source == "plugins" {
                     self.ui.catalogs.plugins = ids;
@@ -1651,6 +1653,7 @@ mod tests {
             rewind_prompts: Default::default(),
             received_asks: HashMap::new(),
             site_keys: HashMap::new(),
+            command_fetch: 0,
             typeahead: Default::default(),
             replies: mpsc::channel(1).0,
             clipboard: None,
