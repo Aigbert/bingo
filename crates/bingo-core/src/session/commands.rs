@@ -672,6 +672,56 @@ mod tests {
         assert!(!fired(None), "an unsigned action is nobody's");
     }
 
+    #[test]
+    fn generated_origins_are_never_the_persons_commands() {
+        for surface in ["wake", "plugin:probe", "scheduler", "hook:probe", "unknown"] {
+            for voice in [
+                None,
+                Some(Voice::Said),
+                Some(Voice::Note),
+                Some(Voice::Quiet),
+            ] {
+                let mut origin = Origin::surface(surface);
+                origin.voice = voice;
+                let input = Input::text("!touch marker", origin.clone());
+                assert!(!may_run_shell(&input), "{origin:?}");
+                assert!(!asked(&input), "{origin:?}");
+                assert!(parse(&input).is_none(), "{origin:?}");
+                let slash = Input::text("/plugins trust probe full", origin);
+                assert!(parse(&slash).is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn a_person_surface_cannot_turn_a_note_or_signature_into_consent() {
+        for surface in PERSON_SURFACES {
+            for voice in [Voice::Note, Voice::Quiet] {
+                let origin = Origin::surface(surface).voiced(voice);
+                assert!(!asked(&Input::text(
+                    "/plugins trust probe full",
+                    origin.clone()
+                )));
+                assert!(!asked(&Input::action(
+                    Action {
+                        name: "plugins".into(),
+                        args: json!("trust probe full")
+                    },
+                    origin
+                )));
+            }
+            let mut origin = Origin::surface(surface);
+            origin.principal = Some("someone else".into());
+            assert!(!asked(&Input::action(
+                Action {
+                    name: "plugins".into(),
+                    args: json!("trust probe full")
+                },
+                origin
+            )));
+        }
+    }
+
     /// A `!` nothing answers to is not a misspelling.
     #[test]
     fn a_shell_line_with_no_shell_says_that_is_what_is_missing() {
