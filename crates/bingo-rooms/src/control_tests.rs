@@ -63,6 +63,20 @@ async fn commands_and_services_share_receipts_and_refusals() {
 }
 
 #[tokio::test]
+async fn close_has_exactly_the_spelling_guarded_by_the_person_contract() {
+    let fleet = Fleet::default();
+    let root = fleet.root();
+    let cx = command_context(&root, &fleet);
+    crate::RoomCommand
+        .run("design reviewer", &cx)
+        .await
+        .unwrap();
+    assert!(!crate::RoomCommand.spec().person_only("CLOSE design"));
+    assert!(crate::RoomCommand.run("CLOSE design", &cx).await.is_err());
+    assert!(!crate::control::rows(&fleet.handle(), &root).await.unwrap()[0].closed);
+}
+
+#[tokio::test]
 async fn room_rows_name_the_holder_instead_of_showing_a_session_id() {
     let fleet = Fleet::default();
     let root = fleet.root();

@@ -16,6 +16,12 @@ async fn answer(verb: &str, wire: bool, id: u64) -> Result<String, String> {
     .await
     .unwrap();
     let (method, args, params) = match verb {
+        "empty-add" => ("add", "add".into(), json!({"subject":""})),
+        "empty-assign" => (
+            "reassign",
+            format!("assign {id}"),
+            json!({"id":id,"owner":""}),
+        ),
         "add" => (
             "add",
             "add second @reviewer".into(),
@@ -55,7 +61,7 @@ async fn answer(verb: &str, wire: bool, id: u64) -> Result<String, String> {
 }
 #[tokio::test]
 async fn commands_and_services_share_receipts_and_refusals() {
-    for verb in ["add", "done", "open", "assign"] {
+    for verb in ["add", "done", "open", "assign", "empty-add", "empty-assign"] {
         for id in [1, 99] {
             assert_eq!(
                 answer(verb, false, id).await,

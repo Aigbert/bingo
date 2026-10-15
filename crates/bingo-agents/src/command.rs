@@ -55,12 +55,12 @@ impl Command for AgentsCommand {
             DISMISS => dismiss::dismiss(&cx.host, &cx.session, named(verb, name)?).await?,
             "message" | "reopen" => {
                 let name = named(verb, name)?;
-                let text = args
+                let rest = args
                     .trim()
-                    .splitn(3, char::is_whitespace)
-                    .nth(2)
+                    .strip_prefix(verb)
                     .unwrap_or_default()
-                    .trim();
+                    .trim_start();
+                let text = rest.strip_prefix(name).unwrap_or_default().trim_start();
                 crate::message::send(&cx.host, &cx.session, name, text, verb == "reopen").await?
             }
             other => {

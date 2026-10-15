@@ -42,8 +42,10 @@ impl AgentsControl for crate::service::AgentService {
     }
 }
 pub async fn roster(host: &HostHandle, session: &SessionId) -> Result<Vec<AgentRow>, KernelError> {
-    Ok(crate::names::agents(host, session)
-        .await?
+    let mut visible = crate::names::agents(host, session).await?;
+    visible.extend(crate::names::siblings(host, session).await?);
+    visible.sort_by(|a, b| crate::names::name_of(a).cmp(crate::names::name_of(b)));
+    Ok(visible
         .into_iter()
         .map(|summary| AgentRow { summary })
         .collect())

@@ -86,6 +86,32 @@ impl Tool for TaskUpdateTool {
     }
 }
 
+pub(crate) async fn assign(
+    host: &bingo_sdk::HostHandle,
+    session: &bingo_sdk::SessionId,
+    id: u64,
+    owner: &str,
+) -> Result<String, bingo_sdk::KernelError> {
+    let owner = owner.trim().trim_start_matches('@');
+    if owner.is_empty() {
+        return Err(bingo_sdk::KernelError::new(
+            bingo_sdk::ErrorCode::InvalidInput,
+            "/tasks assign <id> <owner>",
+        ));
+    }
+    change(
+        host,
+        session,
+        Change {
+            id,
+            owner: Some(owner.into()),
+            ..Default::default()
+        },
+        false,
+    )
+    .await
+}
+
 pub(crate) async fn change(
     host: &bingo_sdk::HostHandle,
     session: &bingo_sdk::SessionId,

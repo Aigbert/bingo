@@ -70,6 +70,12 @@ pub(crate) async fn add(
     session: &bingo_sdk::SessionId,
     draft: Draft,
 ) -> Result<String, bingo_sdk::KernelError> {
+    if draft.subject.trim().is_empty() {
+        return Err(bingo_sdk::KernelError::new(
+            bingo_sdk::ErrorCode::InvalidInput,
+            "/tasks add <subject> [@owner]",
+        ));
+    }
     let mut tasks = journal::read(host, session).await?;
     let task = task::create(&mut tasks, draft);
     journal::write(host, session, &tasks).await?;

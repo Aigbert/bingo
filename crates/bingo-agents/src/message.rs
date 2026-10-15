@@ -198,14 +198,6 @@ impl Tool for MessageTool {
     }
 }
 
-#[cfg(test)]
-mod voice_tests {
-    #[test]
-    fn producer_stamps_its_voice() {
-        assert_eq!(super::origin(None).voice, Some(bingo_sdk::Voice::Quiet));
-    }
-}
-
 /// A direct message retains the current view; reopening is limited to a child.
 pub async fn send(
     host: &bingo_sdk::HostHandle,
@@ -221,7 +213,7 @@ pub async fn send(
         ));
     }
     let to = if reopen {
-        names::child(host, session, name).await?
+        crate::spawn::reopen(host, session, name).await?
     } else {
         names::resolve(host, session, name).await?
     };
@@ -240,4 +232,12 @@ pub async fn send(
     )
     .await?;
     Ok(receipt(name, to.driver))
+}
+
+#[cfg(test)]
+mod voice_tests {
+    #[test]
+    fn producer_stamps_its_voice() {
+        assert_eq!(super::origin(None).voice, Some(bingo_sdk::Voice::Quiet));
+    }
 }

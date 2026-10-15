@@ -315,7 +315,15 @@ impl SpawnAgentTool {
         let (name, attachment) = match standing(args, &plan, &children) {
             Some(child) => (
                 names::name_of(&child).to_string(),
-                watch::follow(host, &child.id).await.map_err(failed)?,
+                watch::follow(
+                    host,
+                    &reopen(host, &cx.session, names::name_of(&child))
+                        .await
+                        .map_err(failed)?
+                        .id,
+                )
+                .await
+                .map_err(failed)?,
             ),
             None => start(&plan, names::names_of(&children), cx)
                 .await
@@ -376,6 +384,15 @@ fn standing(args: &SpawnArgs, plan: &Plan, children: &[SessionSummary]) -> Optio
         return None;
     }
     names::named(children, &plan.base).filter(|child| child.driver != Driver::Log)
+}
+
+/// Resolve only a standing child; control callers must never create a replacement.
+pub(crate) async fn reopen(
+    host: &HostHandle,
+    parent: &SessionId,
+    name: &str,
+) -> Result<SessionSummary, KernelError> {
+    names::mine(host, parent, name).await
 }
 
 /// The address the caller writes to afterwards, as every spawn hands it back.

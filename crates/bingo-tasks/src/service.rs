@@ -49,18 +49,9 @@ impl TasksWrite for Writer {
         .map_err(failed)
     }
     async fn reassign(&self, request: Reassign) -> Result<String, ServiceError> {
-        crate::update::change(
-            &self.host()?,
-            &request.session,
-            crate::Change {
-                id: request.id,
-                owner: Some(request.owner),
-                ..Default::default()
-            },
-            false,
-        )
-        .await
-        .map_err(failed)
+        crate::update::assign(&self.host()?, &request.session, request.id, &request.owner)
+            .await
+            .map_err(failed)
     }
 }
 fn failed(error: KernelError) -> ServiceError {

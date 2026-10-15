@@ -73,7 +73,7 @@ impl Command for RoomCommand {
                 message: Some(message),
             });
         }
-        if name::same(word, name::CLOSE) {
+        if word == name::CLOSE {
             return ended(cx, words.next()).await;
         }
         let seats: Vec<Seat> = words.map(Seat::read).collect::<Result<_, _>>()?;

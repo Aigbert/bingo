@@ -71,9 +71,6 @@ async fn write(args: &str, cx: &CommandContext) -> Result<Option<String>, Kernel
                 .map_or((rest, None), |(subject, owner)| {
                     (subject, Some(owner.into()))
                 });
-            if subject.trim().is_empty() {
-                return Err(invalid("/tasks add <subject> [@owner]"));
-            }
             crate::create::add(
                 &cx.host,
                 &cx.session,
@@ -91,23 +88,20 @@ async fn write(args: &str, cx: &CommandContext) -> Result<Option<String>, Kernel
                 .split_once(char::is_whitespace)
                 .unwrap_or((rest.trim(), ""));
             let id = id.parse().map_err(|_| invalid("name a numeric task id"))?;
-            let mut change = crate::Change {
-                id,
-                ..Default::default()
-            };
             if verb == "assign" {
-                if owner.trim().is_empty() {
-                    return Err(invalid("/tasks assign <id> <owner>"));
-                }
-                change.owner = Some(owner.trim().trim_start_matches('@').into());
+                crate::update::assign(&cx.host, &cx.session, id, owner).await?
             } else {
-                change.status = Some(if verb == "done" {
-                    crate::Status::Completed
-                } else {
-                    crate::Status::Pending
-                });
+                let change = crate::Change {
+                    id,
+                    status: Some(if verb == "done" {
+                        crate::Status::Completed
+                    } else {
+                        crate::Status::Pending
+                    }),
+                    ..Default::default()
+                };
+                crate::update::change(&cx.host, &cx.session, change, false).await?
             }
-            crate::update::change(&cx.host, &cx.session, change, false).await?
         }
         _ => return Ok(None),
     };

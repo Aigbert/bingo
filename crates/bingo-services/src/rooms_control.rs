@@ -67,7 +67,7 @@ impl WireService for ToWire {
             .method::<Seat, String>("seat", false)
             .method::<Seat, String>("unseat", false)
             .method::<Purpose, String>("set_purpose", false)
-            .method::<Named, String>("close", false);
+            .method::<Named, String>("close", true);
         for method in &mut face.methods {
             method.entry.pinned = &["/session"];
         }
