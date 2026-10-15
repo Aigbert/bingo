@@ -392,3 +392,117 @@ async fn an_unknown_command_never_answers_the_ask_it_set_aside() {
         assert_eq!(run.ui.notices[0].text, typeahead::kept_out_notice(1));
     }
 }
+
+fn status_pane(state: &mut SessionState) {
+    let rows = bingo_mod_status::rows::rows(&(&*state).into(), &[], &[], None);
+    let view = bingo_mod_status::draw::tree(&rows, "session", 108, 12, 0);
+    let pane: bingo_sdk::slot::Slot = serde_json::from_value(json!({
+        "kind":"pane", "id":"status", "title":"", "focus":true, "asked":true,
+        "closeOnEscape":true, "holdToasts":true, "rows":12, "view":view
+    }))
+    .unwrap();
+    state
+        .signals
+        .entry("bingo.mod.status".into())
+        .or_default()
+        .insert(
+            "status".into(),
+            bingo_sdk::slot::with(json!({}), [pane]).into(),
+        );
+}
+
+#[tokio::test]
+async fn held_status_keys_follow_the_pane_handoff_but_never_a_returning_ask() {
+    let now = still(scene().1);
+    for ask in [false, true] {
+        let mut state = state();
+        status_pane(&mut state);
+        if ask {
+            state.apply(&frame(1, opened(permission(None, None))));
+        }
+        let session = Arc::new(TestSession::default());
+        let mut run = tests::idle_in(state, session.clone(), now.instant);
+        run.ui.dialog.aside = ask;
+        let mut screen = crate::doubles::Recorder::default();
+        run.paint(&mut screen, Wake::Frame, now).unwrap();
+        assert_eq!(
+            crate::focus::owner(&run.ui, &run.session.tree),
+            crate::focus::Owner::Pane
+        );
+        type_burst(&mut run, "\ny");
+        let (intent, action) = unanswered(&session, &[]).unwrap();
+        assert_eq!(action.name, "bingo.mod.status:ui");
+        assert_eq!(action.args["value"]["key"], "enter");
+        assert_eq!(run.typeahead.len(), 1);
+        if ask {
+            run.ui.dialog.aside = false;
+        }
+        run.session.tree.fold.apply(&frame(
+            2,
+            Event::Signal {
+                generation: None,
+                plugin: "bingo.mod.status".into(),
+                kind: "status".into(),
+                payload: json!({}),
+            },
+        ));
+        run.paint(&mut screen, Wake::Frame, now).unwrap();
+        run.ack(
+            &intent,
+            &IntentOutcome::Applied {
+                result: json!({"handled":true}),
+            },
+        );
+        assert!(run.typeahead.is_empty());
+        assert!(session.answers().is_empty());
+        assert_eq!(
+            session.submissions().len(),
+            1,
+            "no held key is sent back to the old pane"
+        );
+        assert_eq!(run.ui.composer.text(), if ask { "" } else { "y" });
+        if ask {
+            assert_eq!(run.ui.notices[0].text, typeahead::kept_out_notice(1));
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_surface_run_line_holds_keys_until_its_status_pane_opens() {
+    let now = still(scene().1);
+    let (_home, mut run, session) = palette_run(now);
+    run.effect(Effect::Run("/status".into()));
+    type_burst(&mut run, "xy");
+    assert_eq!(run.typeahead.len(), 2);
+    let (intent, input) = session.submissions()[0].clone();
+    assert!(matches!(input, Input::Text { text, .. } if text == "/status"));
+    let mut state = state();
+    status_pane(&mut state);
+    run.session.tree.fold.apply(&frame(
+        1,
+        Event::Signal {
+            generation: None,
+            plugin: "bingo.mod.status".into(),
+            kind: "status".into(),
+            payload: state.signals["bingo.mod.status"]["status"]
+                .payload()
+                .clone(),
+        },
+    ));
+    let mut screen = crate::doubles::Recorder::default();
+    run.paint(&mut screen, Wake::Frame, now).unwrap();
+    run.ack(&intent, &IntentOutcome::Applied {
+        result: json!({"surface":{"name":"Pane","args":{"plugin":"bingo.mod.status","id":"status"}}}),
+    });
+    let (key_intent, action) = unanswered(&session, &[]).unwrap();
+    assert_eq!(action.name, "bingo.mod.status:ui");
+    assert_eq!(action.args["value"]["key"], "x");
+    run.ack(
+        &key_intent,
+        &IntentOutcome::Applied {
+            result: json!({"handled":false}),
+        },
+    );
+    assert_eq!(run.ui.composer.text(), "xy");
+    assert!(run.typeahead.is_empty());
+}
