@@ -133,20 +133,18 @@ gone() {
 # Each leaving is numbered: the pane keeps the last one's line, and a wait
 # for the same words would match it before this shell has even come back.
 LEFT=0
-finish() {
-  # A retry loop may have left a stray key in the composer, and a draft
-  # takes the hint off the status line.
-  keys C-u
-  # While a turn runs the status line says `esc to interrupt`, and a ctrl+c
-  # then interrupts the turn instead of asking to leave: wait for it to end.
-  await "${1:-? for shortcuts}"
-  keys C-c
-  await 'press ctrl+c again to exit'
-  keys C-c
+left() {
   gone
   LEFT=$((LEFT + 1))
   keys "echo \"left $LEFT with: \$?\"" Enter
   await "left $LEFT with: 0"
+}
+
+# A reply may be visible before its turn finishes. Exit is a persistent
+# readiness check; the idle notice scenario below covers ctrl+c twice.
+finish() {
+  keys C-u C-d
+  left
 }
 
 tmux -L "$SOCKET" -f /dev/null new-session -d -s "$SESSION" -x 120 -y 40 \
@@ -309,14 +307,15 @@ press_until 'y' 'Wrote it.'
 grep -q 'written by the smoke test' "$WORK/cwd/note.txt"
 finish
 
-step 'a notice holds the status line and then leaves it'
+step 'a notice expires and ctrl+c twice exits the idle composer'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys C-c
 await 'press ctrl+c again to exit'
 # It holds its window and goes on its own: nothing is pressed to dismiss it.
 vanish 'press ctrl+c again to exit'
 await '? for shortcuts'
-finish
+keys C-c C-c
+left
 
 step 'a question on a window nobody watches notifies and nothing else'
 start '{"responses":[
@@ -463,7 +462,7 @@ await 'Bash ·'
 await 'Read ·'
 keys Escape
 vanish 'Tool ledger'
-finish 'Example calls: 2'
+finish
 step 'M141: band hidden; Edit denied; Bash rewritten; two pane rows; Escape closed'
 
 # Every sealed fixture runs in this harness's socket and disposable home.
