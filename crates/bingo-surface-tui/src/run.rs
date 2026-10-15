@@ -495,6 +495,7 @@ impl Run {
         }
         surface::restore_prompt(self, undone);
         interactions::refocus(self);
+        surface::pane_published(self, frame);
         match &frame.event {
             Event::InteractionOpened { .. } => {
                 screen.bell().map_err(stdio)?;
@@ -2838,3 +2839,6 @@ mod rebinding_tests;
 mod memory_scene_tests;
 #[cfg(test)]
 mod memory_tests;
+
+#[cfg(test)]
+mod pane_focus_tests;
