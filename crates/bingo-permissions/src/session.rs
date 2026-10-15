@@ -74,6 +74,24 @@ impl Sessions {
         }
     }
 
+    pub fn change_mode(
+        &self,
+        session: &SessionId,
+        configured: Mode,
+        mode: Mode,
+        asked: bool,
+    ) -> bool {
+        let Ok(mut sessions) = self.by_session.lock() else {
+            return false;
+        };
+        let decided = sessions.entry(session.clone()).or_default();
+        if !asked && !mode.tightens(decided.mode.unwrap_or(configured)) {
+            return false;
+        }
+        decided.mode = Some(mode);
+        true
+    }
+
     fn read<T>(&self, session: &SessionId, of: impl FnOnce(&Decided) -> T) -> Option<T> {
         self.by_session
             .lock()

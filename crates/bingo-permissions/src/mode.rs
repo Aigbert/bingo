@@ -32,6 +32,20 @@ impl Mode {
         Self::DontAsk,
     ];
 
+    pub(crate) fn tightens(self, before: Self) -> bool {
+        self == before
+            || matches!(
+                (before, self),
+                (
+                    Self::BypassPermissions,
+                    Self::AcceptEdits | Self::Default | Self::Plan | Self::DontAsk
+                ) | (
+                    Self::AcceptEdits,
+                    Self::Default | Self::Plan | Self::DontAsk
+                ) | (Self::Default, Self::Plan | Self::DontAsk)
+            )
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Default => "default",

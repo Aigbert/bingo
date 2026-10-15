@@ -68,7 +68,7 @@ impl Command for PermissionCommand {
             aliases: vec!["permissions".into()],
             hint: "show or change the permission mode".into(),
             args: ArgSpec::Words {
-                person: vec![],
+                person: Mode::ALL.map(|mode| mode.as_str().to_string()).to_vec(),
                 alone: Mode::ALL.map(|mode| mode.as_str().to_string()).to_vec(),
                 values: Mode::ALL
                     .iter()
@@ -108,7 +108,17 @@ impl Command for PermissionCommand {
         let mode: Mode = asked.parse().map_err(|unknown: crate::UnknownMode| {
             KernelError::new(ErrorCode::InvalidInput, unknown.to_string())
         })?;
-        self.policy.choose_mode(&cx.session, mode);
+        if !self.policy.sessions.change_mode(
+            &cx.session,
+            self.policy.mode,
+            mode,
+            bingo_sdk::render::asked(),
+        ) {
+            return Err(KernelError::new(
+                ErrorCode::PermissionDenied,
+                "only the person's own command may widen the permission mode",
+            ));
+        }
         // Read back rather than echo: the message says what the next call will
         // be decided against.
         Ok(CommandOutcome::Applied {
@@ -240,8 +250,7 @@ mod tests {
     }
 
     async fn typed(command: &PermissionCommand, args: &str, session: &str) -> CommandOutcome {
-        command
-            .run(args, &context(session))
+        bingo_sdk::render::under_input(true, command.run(args, &context(session)))
             .await
             .expect("a mode this crate knows")
     }

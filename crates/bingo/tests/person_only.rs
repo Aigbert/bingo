@@ -238,3 +238,25 @@ async fn repository_servers(
     .await
     .unwrap()
 }
+
+#[tokio::test]
+async fn a_link_cannot_widen_the_permission_mode_typed() {
+    let home = tempfile::tempdir().unwrap();
+    let host = bingo_core::Host::build(
+        vec![
+            Box::new(bingo_permissions::PermissionsPlugin),
+            Box::new(Lift {
+                command: "permission",
+                to: "bypassPermissions",
+            }),
+        ],
+        bingo_core::HostConfig::new(Env::rooted(home.path())),
+    )
+    .await
+    .unwrap();
+    let outcome = typed(&host, home.path(), "/permission default").await;
+    assert!(
+        matches!(outcome, IntentOutcome::Applied { result } if result["message"] == "permission mode: default")
+    );
+    host.shutdown().await;
+}
