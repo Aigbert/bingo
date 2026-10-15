@@ -104,7 +104,11 @@ fn list(
 ) -> Vec<View> {
     let rows = crate::rows::rows(models, providers, &picker.props.filter, picker.all);
     let selected = picker.props.selected.min(rows.len().saturating_sub(1));
-    let details = details(rows.get(selected), models, providers, chat, picker);
+    let details = if crate::rows::unlisted(&rows, &picker.props.filter) {
+        unlisted(&picker.props.filter)
+    } else {
+        details(rows.get(selected), models, providers, chat, picker)
+    };
     let room = usize::from(height).saturating_sub(4).max(1);
     let start = selected
         .saturating_sub(room / 2)
@@ -149,7 +153,11 @@ fn list(
             }),
         });
     }
-    let label = action_label(rows.get(selected), models, providers, chat, picker);
+    let label = if crate::rows::unlisted(&rows, &picker.props.filter) {
+        format!("use {}", picker.props.filter)
+    } else {
+        action_label(rows.get(selected), models, providers, chat, picker)
+    };
     children.push(key_hint(&label, picker.keep()));
     children
 }
@@ -253,6 +261,14 @@ fn details(
         ],
         _ => vec!["No matching models".into()],
     }
+}
+fn unlisted(filter: &str) -> Vec<String> {
+    vec![
+        "No matching models".into(),
+        String::new(),
+        format!("⏎ use {filter}"),
+        "the provider decides whether it exists".into(),
+    ]
 }
 fn cell(text: String, width: u16, selected: bool) -> View {
     View::Box {

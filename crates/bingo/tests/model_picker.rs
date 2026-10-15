@@ -335,3 +335,59 @@ async fn disabled_picker_keeps_plain_listing_and_switching() {
         )
     }));
 }
+
+fn picker_open(session: &Attachment) -> bool {
+    slot::placed(&session.snapshot).iter().any(|placed| {
+        matches!(
+            &placed.slot,
+            slot::Slot::Pane { view: slot::Shown::Pull { request }, .. }
+                if request.component == render::Component::ModelPicker
+        )
+    })
+}
+async fn reopen(kernel: &impl HostApi, session: &Attachment) -> Attachment {
+    kernel
+        .open(
+            SessionSelector::ById {
+                id: session.session.clone(),
+            },
+            who(),
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap()
+}
+#[tokio::test(flavor = "multi_thread")]
+async fn unlisted_models_switch_by_path_and_by_the_typed_filter() {
+    let mut server = Server::spawn(SCRIPT);
+    let kernel = ready(&mut server).await;
+    let mut session = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    assert!(matches!(
+        command(&mut session, "model", json!("fake/other")).await,
+        IntentOutcome::Applied { .. }
+    ));
+    session = reopen(&kernel, &session).await;
+    assert_eq!(session.snapshot.summary.model.as_deref(), Some("other"));
+    assert!(!picker_open(&session));
+    command(&mut session, "model", json!("")).await;
+    let req = request(&kernel, &mut session).await;
+    let id = req.request_id;
+    for letter in "fake/unlisted".chars() {
+        command(
+            &mut session,
+            "bingo.mod.models:ui",
+            press(&id, &letter.to_string()),
+        )
+        .await;
+    }
+    let req = request(&kernel, &mut session).await;
+    let view = kernel.render(&session.session, req).await.unwrap().fold();
+    assert!(view.contains("⏎ use fake/unlisted"), "{view}");
+    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
+    session = reopen(&kernel, &session).await;
+    assert_eq!(session.snapshot.summary.model.as_deref(), Some("unlisted"));
+    assert!(!picker_open(&session));
+}

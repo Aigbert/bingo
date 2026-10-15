@@ -54,7 +54,7 @@ async fn opens(name: &str, args: &str, host: &HostHandle) -> Result<bool, Kernel
         "think" | "models" => Ok(args.is_empty()),
         "login" | "logout" => Ok(args.is_empty()),
         "model" if args.is_empty() => Ok(true),
-        "model" if !args.contains(char::is_whitespace) && args != "next" => {
+        "model" if filters(args) => {
             let models = host.catalog(CatalogKind::Models).await?.entries;
             Ok(!models
                 .iter()
@@ -62,6 +62,10 @@ async fn opens(name: &str, args: &str, host: &HostHandle) -> Result<bool, Kernel
         }
         _ => Ok(false),
     }
+}
+/// A `provider/model` argument names a model outright, listed or not, so it is the kernel's to switch.
+fn filters(args: &str) -> bool {
+    !args.contains(char::is_whitespace) && !args.contains('/') && args != "next"
 }
 
 async fn fallback(args: &str, value: &Value, next: Next<'_, Value, Value>) -> String {
@@ -161,6 +165,13 @@ fn outcome(value: Value) -> Result<Value, KernelError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn only_a_bare_word_filters_and_a_provider_path_switches() {
+        assert!(filters("opus"));
+        assert!(!filters("fake/unlisted"));
+        assert!(!filters("next"));
+        assert!(!filters("pin fake/a"));
+    }
     #[test]
     fn choice_receipts_are_recorded_and_other_outcomes_are_unchanged() {
         let value = outcome(json!({"kind":"applied","message":"⇄ small · here"})).unwrap();

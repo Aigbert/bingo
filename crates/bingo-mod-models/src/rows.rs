@@ -55,6 +55,10 @@ pub fn rows(
     }
     rows
 }
+/// A filter that lists no model offers itself as the model to use.
+pub fn unlisted(rows: &[Row], filter: &str) -> bool {
+    !filter.is_empty() && !rows.iter().any(|r| matches!(r, Row::Model(_)))
+}
 fn hidden(model: &CatalogEntry) -> bool {
     model.meta["chat"] == false || model.meta["aliasOf"].is_string()
 }
@@ -123,5 +127,11 @@ mod tests {
             4
         );
         assert!(rows(&models, &providers, "other/", false).is_empty());
+        assert!(unlisted(
+            &rows(&models, &providers, "p/zzz", false),
+            "p/zzz"
+        ));
+        assert!(!unlisted(&rows(&models, &providers, "p/a", false), "p/a"));
+        assert!(!unlisted(&rows(&models, &providers, "", false), ""));
     }
 }

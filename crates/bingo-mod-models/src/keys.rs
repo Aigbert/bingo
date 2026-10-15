@@ -98,6 +98,9 @@ async fn press(picker: &mut Picker, key: &str, cx: &CommandContext) -> Result<bo
                 pin(cx, id, &models).await?;
             }
         }
+        "enter" if crate::rows::unlisted(&rows, &picker.props.filter) => {
+            return use_unlisted(picker, cx).await;
+        }
         "enter" => return activate(picker, selected, &models, &providers, cx).await,
         "backspace" => {
             picker.props.filter.pop();
@@ -242,6 +245,19 @@ pub(crate) async fn choose(
         )
         .await?;
     }
+    Ok(true)
+}
+/// Nothing listed matches, so the filter is taken as the model's name and the kernel decides.
+async fn use_unlisted(picker: &Picker, cx: &CommandContext) -> Result<bool, KernelError> {
+    let keep = if picker.keep() { " --keep" } else { "" };
+    crate::bridge::run(
+        &cx.host,
+        &cx.session,
+        "model",
+        &format!("{}{keep}", picker.props.filter),
+        None,
+    )
+    .await?;
     Ok(true)
 }
 async fn add(picker: &mut Picker, cx: &CommandContext) -> Result<bool, KernelError> {
