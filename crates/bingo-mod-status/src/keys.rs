@@ -39,13 +39,7 @@ impl Command for Handler {
         if args["event"] != "press" || !["up", "down", "enter"].contains(&key) {
             return Ok(CommandOutcome::Handled { handled: false });
         }
-        let label = self
-            .0
-            .lock()
-            .map_err(error)?
-            .get(&cx.session)
-            .map(|selection| selection.label.clone())
-            .unwrap_or_else(|| args["selected"].as_str().unwrap_or("session").into());
+        let label = args["selected"].as_str().unwrap_or_default();
         let facts = (&crate::snapshot(&cx.host, &cx.session).await?.snapshot).into();
         let rows = crate::draw::read(&cx.host, &facts).await?;
         if !rows
@@ -55,11 +49,11 @@ impl Command for Handler {
             return Ok(CommandOutcome::Handled { handled: true });
         }
         if key == "enter" {
-            return enter(&rows, &label, cx, &self.0).await;
+            return enter(&rows, label, cx, &self.0).await;
         }
         self.0.lock().map_err(error)?.insert(
             cx.session.clone(),
-            moved(&rows, &label, key == "down").into(),
+            moved(&rows, label, key == "down").into(),
         );
         cx.host
             .invalidate(&cx.session, vec![REQUEST.into()])

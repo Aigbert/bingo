@@ -87,10 +87,10 @@ async fn enter_submits_each_rows_command_after_removing_the_card() {
         selections
             .lock()
             .unwrap()
-            .insert(cx.session.clone(), row.label.into());
+            .insert(cx.session.clone(), row.label.clone().into());
         let outcome = handler
             .run(
-                &json!({"handler":"status","event":"press","value":{"key":"enter"}}).to_string(),
+                &json!({"handler":"status","event":"press","value":{"key":"enter"},"selected":row.label}).to_string(),
                 &cx,
             )
             .await
@@ -145,7 +145,7 @@ async fn editable_rows_prefill_instead_of_submitting_bare_commands() {
             .insert(cx.session.clone(), label.into());
         let outcome = keys::Handler(selections.clone())
             .run(
-                &json!({"handler":"status","event":"press","value":{"key":"enter"}}).to_string(),
+                &json!({"handler":"status","event":"press","value":{"key":"enter"},"selected":label}).to_string(),
                 &cx,
             )
             .await
@@ -210,7 +210,12 @@ async fn client_commands_and_unknown_row_ids_cannot_dispatch() {
     for label in ["injected", "spent", "permission"] {
         let args = json!({"handler":"status","event":"press","value":{"key":"enter"},
             "selected":label,"rows":[{"label":label,"command":"dangerous injected"}]});
-        let outcome = keys::Handler(Default::default())
+        let selections = Selections::default();
+        selections
+            .lock()
+            .unwrap()
+            .insert(cx.session.clone(), "model".into());
+        let outcome = keys::Handler(selections)
             .run(&args.to_string(), &cx)
             .await
             .unwrap();
