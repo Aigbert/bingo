@@ -166,7 +166,7 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
                 &mut run.ui,
                 &run.session.tree,
                 &action,
-                vouched(result),
+                vouched(result, PLUGINS),
                 run.detection.now(),
             );
             run.apply(effects);
@@ -199,7 +199,7 @@ fn palette_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
             &mut run.ui,
             &run.session.tree,
             &action,
-            vouched(result),
+            vouched(result, PALETTE),
             now,
         )
     } else if result["handled"] == false {
@@ -291,10 +291,15 @@ fn browse_answer(run: &mut Run, outcome: &IntentOutcome) {
     }
 }
 
+/// The built-ins that draw the plugin panel and the palette.
+const PLUGINS: &str = "plugins";
+const PALETTE: &str = "palette";
+
 /// Only the kernel writes `drawnBy` into an ack, never a mod's answer: the
-/// answer itself sits under `surface`.
-fn vouched(result: &serde_json::Value) -> bool {
-    result["drawnBy"].is_string()
+/// answer itself sits under `surface`. It vouches for a site only when it
+/// names the built-in that owns that site.
+fn vouched(result: &serde_json::Value, owner: &str) -> bool {
+    result["drawnBy"] == owner
 }
 
 pub(super) fn notices(run: &mut Run) {
@@ -376,5 +381,21 @@ fn directory_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
             Vec::new()
         };
         run.apply(effects);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// The palette vouching for an answer is no word on the plugin panel's.
+    #[test]
+    fn a_site_is_vouched_for_only_by_the_built_in_that_owns_it() {
+        let palette = json!({"drawnBy": PALETTE});
+        assert!(vouched(&palette, PALETTE));
+        assert!(!vouched(&palette, PLUGINS));
+        assert!(!vouched(&json!({"drawnBy": "rogue"}), PLUGINS));
+        assert!(!vouched(&json!({}), PALETTE));
     }
 }
