@@ -72,10 +72,13 @@ fn focus(ui: &mut Ui, state: &SessionState, key: &str) {
     let seating = super::seating(ui, state, ui.shown.seating.area);
     let focusable = placed(state).iter().any(|pane| {
         pane.key == key
-            && seating
+            && ui
+                .shown
+                .seating
                 .panes
                 .iter()
                 .find(|seat| seat.key == key)
+                .or_else(|| seating.panes.iter().find(|seat| seat.key == key))
                 .is_some_and(|seat| super::focusable(ui, state, pane, seat))
     });
     ui.focus = if focusable {

@@ -269,3 +269,23 @@ fn text_without_a_key_path_is_skipped_by_tab() {
     crate::input::on_key(&mut ui, &tree, key(KeyCode::Tab), now);
     assert!(matches!(ui.focus, Focus::Composer));
 }
+
+#[test]
+fn unasked_seated_controls_accept_person_driven_focus() {
+    let tree = solo(&fixture(false, true, true));
+    let (mut ui, now) = scene();
+    let screen = draw_tree(108, 30, &tree, &mut ui, now);
+    assert!(screen.contains("Run"));
+    let area = ui.shown.seating.panes[0].area;
+    // The declaration changes before the next draw; the person still sees this seat.
+    let tree = solo(&fixture(false, false, true));
+    click(&mut ui, &tree, area, now);
+    assert!(matches!(ui.focus, Focus::Pane(_)));
+    for tab in [key(KeyCode::Tab), shift(KeyCode::BackTab)] {
+        ui.focus = Focus::Composer;
+        let effects = crate::input::on_key(&mut ui, &tree, tab, now);
+        assert!(effects.is_empty());
+        assert!(matches!(ui.focus, Focus::Pane(_)));
+    }
+    assert!(ui.composer.text().is_empty());
+}

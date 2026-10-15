@@ -4,7 +4,7 @@ use crate::{focus::Focus, ui::Ui};
 use bingo_sdk::{SessionState, View};
 
 pub fn focusable(ui: &Ui, state: &SessionState, pane: &Pane, seat: &Seated) -> bool {
-    pane.asked && view(ui, state, pane, seat).is_some_and(takes_keys)
+    view(ui, state, pane, seat).is_some_and(takes_keys)
 }
 
 fn takes_keys(view: &View) -> bool {
@@ -17,7 +17,7 @@ fn takes_keys(view: &View) -> bool {
 }
 
 pub fn keys(ui: &Ui, state: &SessionState) -> Vec<String> {
-    let panes = super::wanted(ui, state);
+    let panes = super::placed(state);
     ui.shown
         .seating
         .panes
