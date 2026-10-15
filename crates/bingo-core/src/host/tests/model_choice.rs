@@ -326,3 +326,71 @@ async fn catalogue_switch_threshold_uses_the_resolved_output_budget() {
     assert_eq!(small.meta["limitsSource"], "configured");
     host.shutdown().await;
 }
+
+static REORDER: PluginManifest = PluginManifest {
+    id: "test.reorder",
+    version: "0",
+    uses: &[],
+    provides: &[],
+    requires: &[],
+    config: None,
+};
+
+/// A catalogue link may list models in any order it likes.
+struct Reversed;
+#[async_trait]
+impl Interceptor for Reversed {
+    fn id(&self) -> &str {
+        "reversed"
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher::at(bingo_sdk::catalogue::PROMPT_AUTOCOMPLETE)
+    }
+    async fn chain(
+        &self,
+        _: &bingo_sdk::catalogue::Entry,
+        _: &HookContext,
+        value: Value,
+        next: Next<'_, Value, Value>,
+    ) -> Result<Value, KernelError> {
+        let mut catalog: Catalog = serde_json::from_value(next.run(value).await?).unwrap();
+        catalog.entries.reverse();
+        Ok(serde_json::to_value(catalog).unwrap())
+    }
+}
+
+#[tokio::test]
+async fn next_walks_the_pins_in_their_setting_order() {
+    let home = tempfile::tempdir().unwrap();
+    let provider = ScriptedProvider::new(vec![]);
+    provider.serves(&["large", "small", "tiny"]);
+    let plugins = vec![
+        TestPlugin::boxed(&PROVIDER, vec![Contribution::Provider(provider)]),
+        TestPlugin::boxed(
+            &REORDER,
+            vec![Contribution::Interceptor {
+                placement: Default::default(),
+                external: None,
+                link: Arc::new(Reversed),
+            }],
+        ),
+    ];
+    let config = HostConfig::new(env_in(home.path())).with_layer(
+        "test",
+        json!({"provider":"scripted", "model":"large", "maxTokens":1000}),
+    );
+    let host = Host::build(plugins, config).await.unwrap();
+    let mut client = Client::open(&host).await;
+    for id in ["large", "tiny", "small", "gone"] {
+        crate::host::pins::pin_model(&host, &format!("scripted/{id}"), true).unwrap();
+    }
+    let mut walked = Vec::new();
+    for _ in 0..3 {
+        let (ack, _) = client.ack("/model next").await;
+        assert!(matches!(ack, IntentOutcome::Applied { .. }), "{ack:?}");
+        let model = host.session_model(&client.state.summary.id).await;
+        walked.push(model.unwrap().unwrap().id);
+    }
+    assert_eq!(walked, ["tiny", "small", "large"]);
+    host.shutdown().await;
+}

@@ -95,26 +95,7 @@ async fn target(
 ) -> Result<ModelChoice, KernelError> {
     let next;
     let wanted = if wanted == "next" {
-        let choice = host.session_model(session).await?.ok_or_else(|| {
-            KernelError::new(ErrorCode::InvalidInput, "a log session has no model")
-        })?;
-        let current = format!("{}/{}", choice.endpoint.id(), choice.id);
-        let pins = host
-            .catalog(CatalogKind::Models)
-            .await?
-            .entries
-            .into_iter()
-            .filter(|entry| entry.meta["pinned"] == true)
-            .map(|entry| entry.id)
-            .collect::<Vec<_>>();
-        next = super::next::after(&pins, &current)
-            .ok_or_else(|| {
-                KernelError::new(
-                    ErrorCode::InvalidInput,
-                    "No pinned models; use /model pin <id> first.",
-                )
-            })?
-            .to_owned();
+        next = next_pin(host, session).await?;
         &next
     } else {
         wanted
@@ -122,6 +103,29 @@ async fn target(
     let known = host.catalog(CatalogKind::Providers).await?.entries;
     let (provider, model) = split(wanted, |id| known.iter().any(|p| p.id == id));
     model_switch::proposed_model(host, session, provider.map(str::to_owned), model.to_owned()).await
+}
+
+/// The pin after the session's model, in the order the `pinned` setting
+/// keeps (ADR-0085 §4), skipping pins no provider offers any more.
+async fn next_pin(host: &Host, session: &SessionId) -> Result<String, KernelError> {
+    let choice = host
+        .session_model(session)
+        .await?
+        .ok_or_else(|| KernelError::new(ErrorCode::InvalidInput, "a log session has no model"))?;
+    let current = format!("{}/{}", choice.endpoint.id(), choice.id);
+    let listed = host.catalog(CatalogKind::Models).await?.entries;
+    let pins = crate::host::pins::pinned_models(host)
+        .into_iter()
+        .filter(|pin| listed.iter().any(|entry| &entry.id == pin))
+        .collect::<Vec<_>>();
+    super::next::after(&pins, &current)
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            KernelError::new(
+                ErrorCode::InvalidInput,
+                "No pinned models; use /model pin <id> first.",
+            )
+        })
 }
 
 async fn set(
