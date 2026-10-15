@@ -131,6 +131,10 @@ pub fn action_notice(
     else {
         return None;
     };
+    // A receipt's words ride on its ack, which answers with a card already.
+    if result.get("message").is_some() {
+        return None;
+    }
     let id = bingo_sdk::ItemId::from_raw(result["item"].as_str()?);
     let ItemBody::Notice { text, .. } = &state.item(&id)?.body else {
         return None;

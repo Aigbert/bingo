@@ -168,6 +168,7 @@ mod tests {
         loopback::{Loopback, Record},
     };
     use bingo_sdk::testing::{HostCall, TestHost};
+    use bingo_sdk::{IntentOutcome, Item, ItemBody, ItemStatus, Level};
     use serde_json::json;
 
     async fn runner(matched: bool, edits: bool) -> (Runner, TestHost, Arc<Loopback>) {
@@ -234,6 +235,63 @@ mod tests {
         assert!(
             matches!(adapter.records().last(),Some(Record::Draw {at:updated,..}) if updated == &at)
         );
+    }
+    /// A control's recorded notice, as its ack and its transcript item.
+    async fn notice_from_a_press(runner: &mut Runner, level: Level, said: bool) {
+        let intent = IntentId::mint();
+        runner.deliverer.expecting_input(
+            intent.clone(),
+            Input::Action {
+                action: Action {
+                    name: "fixture:ui".into(),
+                    args: json!({"handler":"minted"}),
+                },
+            },
+        );
+        let item = Item {
+            intent: Some(intent.clone()),
+            ..fixtures::assistant("itm_receipt", "", ItemStatus::Completed)
+        };
+        let item = Item {
+            body: ItemBody::Notice {
+                level,
+                code: "RECEIPT".into(),
+                text: "⇄ other · fake".into(),
+            },
+            ..item
+        };
+        let mut result = json!({"item": "itm_receipt"});
+        if said {
+            result["message"] = json!("⇄ other · fake");
+        }
+        for mut frame in [
+            fixtures::frame(1, Event::ItemCompleted { item }),
+            fixtures::frame(
+                2,
+                Event::IntentAck {
+                    intent,
+                    outcome: IntentOutcome::Applied { result },
+                },
+            ),
+        ] {
+            frame.session = runner.tree.root().summary.id.clone();
+            runner.saw(&frame).await;
+        }
+    }
+    #[tokio::test]
+    async fn a_pressed_control_s_notice_is_said_once() {
+        for (level, said) in [(Level::Info, true), (Level::Warn, false)] {
+            let (mut runner, _host, adapter) = runner(false, true).await;
+            notice_from_a_press(&mut runner, level, said).await;
+            let lines = adapter
+                .records()
+                .into_iter()
+                .filter(|record| {
+                    matches!(record, Record::Send { text, .. } if text.contains("⇄ other · fake"))
+                })
+                .count();
+            assert_eq!(lines, 1, "{level:?}: {:?}", adapter.records());
+        }
     }
     #[tokio::test]
     async fn a_chat_without_edits_does_not_reask_delivered_sites() {
