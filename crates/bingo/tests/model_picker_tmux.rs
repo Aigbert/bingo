@@ -158,26 +158,30 @@ async fn local_model_picker_scenes() {
         let term = start(&endpoint.uri(), width, height);
         choose_and_pin(&term, width, height).await;
         add_by_paste(&term, &endpoint.uri(), width, height).await;
-        term.line("/model work/").await;
+        term.line("/model").await;
+        term.wait("↑↓ pick").await;
+        term.text("work/");
         term.wait("fix work").await;
         term.keys(&["Enter"]);
         term.capture("use anyway", "down", width, height).await;
         term.keys(&["Escape"]);
         term.wait("/model work/").await;
         term.close_picker().await;
-        term.line("/logout openai-2").await;
-        term.wait("Signed out of openai-2").await;
-        term.line("/model openai-2/gpt").await;
+        term.line("/logout provider").await;
+        term.wait("Signed out of provider").await;
+        term.line("/model").await;
+        term.wait("↑↓ pick").await;
+        term.text("provider/gpt");
         term.wait("sign in, then use").await;
         term.keys(&["Enter"]);
         term.wait("paste a key").await;
         term.keys(&["Enter"]);
-        term.wait("Sign in to openai-2").await;
+        term.wait("Sign in to provider").await;
         term.text("\x1b[200~dummy-local-only\x1b[201~");
         assert!(!term.wait("••").await.contains("dummy-local-only"));
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         term.keys(&["Enter"]);
-        term.capture("openai-2/gpt-5", "signin-chain", width, height)
+        term.capture("provider/gpt-5", "signin-chain", width, height)
             .await;
         term.absent("↑↓ pick").await;
         term.wait("? for shortcuts").await;
@@ -198,7 +202,7 @@ async fn add_by_paste(term: &Terminal, endpoint: &str, width: u16, height: u16) 
     term.capture("add provider", "add-by-paste", width, height)
         .await;
     assert!(!term.screen().contains("sk-dummy-never-unmasked"));
-    term.keys(&["Down", "Down", "Enter"]);
+    term.keys(&["Enter"]);
     term.wait("provider address").await;
     term.text(&format!("\x1b[200~{}\x1b[201~", endpoint));
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
@@ -207,7 +211,7 @@ async fn add_by_paste(term: &Terminal, endpoint: &str, width: u16, height: u16) 
     term.keys(&["Down", "Down", "Enter"]);
     term.wait("Provider added.").await;
     term.keys(&["Escape"]);
-    term.wait("/model openai-2/").await;
+    term.wait("/model provider/").await;
     term.close_picker().await;
 }
 

@@ -119,6 +119,11 @@ async fn save_provider(
     picker: &mut Picker,
     cx: &CommandContext,
 ) -> Result<(), KernelError> {
+    if guess.address.is_empty() {
+        return Err(crate::error(
+            "Paste the provider's address first: an sk- key does not say whose it is.",
+        ));
+    }
     crate::bridge::run(
         &cx.host,
         &cx.session,

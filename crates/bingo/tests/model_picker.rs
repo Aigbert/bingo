@@ -131,9 +131,25 @@ async fn pasted_key_is_masked_in_frames_and_absent_from_the_journal() {
     let view = kernel.render(&session.session, req).await.unwrap();
     assert!(view.fold().contains("••••••••"), "{}", view.fold());
     assert!(!serde_json::to_string(&view).unwrap().contains(SECRET));
-    // The guessed vendor URL is replaced before any command can send the dummy key.
+    // An `sk-` key names no vendor: the sheet waits on its address and adds nothing without one.
+    assert!(
+        view.fold()
+            .contains("❯ address    none · ⏎ paste whose key this is"),
+        "{}",
+        view.fold()
+    );
     command(&mut session, "bingo.mod.models:ui", press(&id, "down")).await;
     command(&mut session, "bingo.mod.models:ui", press(&id, "down")).await;
+    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
+    let req = request(&kernel, &mut session).await;
+    let refused = kernel.render(&session.session, req).await.unwrap().fold();
+    assert!(
+        refused.contains("Paste the provider's address first"),
+        "{refused}"
+    );
+    assert!(endpoint.received_requests().await.unwrap().is_empty());
+    command(&mut session, "bingo.mod.models:ui", press(&id, "up")).await;
+    command(&mut session, "bingo.mod.models:ui", press(&id, "up")).await;
     private_press(
         &mut session,
         &id,
@@ -150,7 +166,7 @@ async fn pasted_key_is_masked_in_frames_and_absent_from_the_journal() {
         models
             .entries
             .iter()
-            .any(|m| m.id == "openai-2/picker-local")
+            .any(|m| m.id == "provider/picker-local")
     );
     assert!(!endpoint.received_requests().await.unwrap().is_empty());
     command(&mut session, "bingo.mod.models:ui", press(&id, "esc")).await;

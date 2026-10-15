@@ -2,6 +2,7 @@
 pub struct Guess {
     pub name: String,
     pub shape: String,
+    /// Empty until someone says whose key this is.
     pub address: String,
     pub key: Option<String>,
 }
@@ -34,10 +35,11 @@ pub fn guess(value: &str, names: &[String]) -> Option<Guess> {
             Some(value.into()),
         )
     } else if value.starts_with("sk-") {
+        // Many vendors mint `sk-` keys; the person says whose this is.
         (
-            "openai".into(),
+            "provider".into(),
             "openai",
-            "https://api.openai.com/v1".into(),
+            String::new(),
             Some(value.into()),
         )
     } else {
@@ -114,7 +116,7 @@ mod tests {
         for (value, name, shape, key) in [
             ("sk-ant-dummy", "anthropic", "anthropic", true),
             ("sk-or-dummy", "openrouter", "openai", true),
-            ("sk-dummy", "openai", "openai", true),
+            ("sk-dummy", "provider", "openai", true),
             ("localhost:11434", "ollama", "openai", false),
             ("http://localhost:1234", "lmstudio", "openai", false),
             ("https://example.invalid/v1", "server", "openai", false),
@@ -132,6 +134,12 @@ mod tests {
         ] {
             assert!(guess(value, &[]).is_none());
         }
+    }
+    #[test]
+    fn a_bare_sk_key_names_no_vendor() {
+        let guess = guess("sk-dummy", &[]).unwrap();
+        assert_eq!(guess.address, "");
+        assert_ne!(guess.name, "openai");
     }
     #[test]
     fn debug_never_shows_a_pasted_key() {

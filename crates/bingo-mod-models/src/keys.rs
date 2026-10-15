@@ -323,7 +323,9 @@ async fn add(picker: &mut Picker, cx: &CommandContext) -> Result<bool, KernelErr
         .collect::<Vec<_>>();
     let guess = crate::guess::guess(&value, &names)
         .ok_or_else(|| crate::error("Use an API key or an http(s) server address."))?;
-    picker.sheet = Some(Sheet::Add { guess, selected: 0 });
+    // An unknown vendor opens on its address, the one thing still to say.
+    let selected = if guess.address.is_empty() { 2 } else { 0 };
+    picker.sheet = Some(Sheet::Add { guess, selected });
     Ok(false)
 }
 async fn sheet_key(

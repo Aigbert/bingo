@@ -75,45 +75,50 @@ pub fn lines(sheet: &Sheet, providers: &[CatalogEntry]) -> Vec<String> {
         ),
         Sheet::SignIn {
             selected, pending, ..
-        } => {
-            if let Some(id) = pending {
-                lines.push(format!("   then switch to {id}"));
-            }
-            for (i, label) in [
-                "open the browser",
-                "use a code on another device",
-                "paste a key or token",
-            ]
-            .iter()
-            .enumerate()
-            {
-                lines.push(format!("{}{label}", mark(i == *selected)));
-            }
-        }
-        Sheet::Add { guess, selected } => {
-            for (i, (label, value)) in [
-                ("name", guess.name.as_str()),
-                ("shape", guess.shape.as_str()),
-                ("address", guess.address.as_str()),
-                (
-                    "key",
-                    if guess.key.is_some() {
-                        "••••••••"
-                    } else {
-                        "none"
-                    },
-                ),
-                ("add provider", "then pick one of its models"),
-            ]
-            .iter()
-            .enumerate()
-            {
-                lines.push(format!("{}{label:10} {value}", mark(i == *selected)));
-            }
-            lines.push("   ⏎ edit / add · esc back".into());
-        }
+        } => append_sign_in(&mut lines, *selected, pending.as_deref()),
+        Sheet::Add { guess, selected } => append_add(&mut lines, guess, *selected),
     }
     lines
+}
+fn append_sign_in(lines: &mut Vec<String>, selected: usize, pending: Option<&str>) {
+    if let Some(id) = pending {
+        lines.push(format!("   then switch to {id}"));
+    }
+    for (i, label) in [
+        "open the browser",
+        "use a code on another device",
+        "paste a key or token",
+    ]
+    .iter()
+    .enumerate()
+    {
+        lines.push(format!("{}{label}", mark(i == selected)));
+    }
+}
+fn append_add(lines: &mut Vec<String>, guess: &crate::guess::Guess, selected: usize) {
+    let address = if guess.address.is_empty() {
+        "none · ⏎ paste whose key this is"
+    } else {
+        guess.address.as_str()
+    };
+    let key = if guess.key.is_some() {
+        "••••••••"
+    } else {
+        "none"
+    };
+    for (i, (label, value)) in [
+        ("name", guess.name.as_str()),
+        ("shape", guess.shape.as_str()),
+        ("address", address),
+        ("key", key),
+        ("add provider", "then pick one of its models"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        lines.push(format!("{}{label:10} {value}", mark(i == selected)));
+    }
+    lines.push("   ⏎ edit / add · esc back".into());
 }
 fn mark(selected: bool) -> &'static str {
     if selected { " ❯ " } else { "   " }

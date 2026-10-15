@@ -289,7 +289,7 @@ fn details(
             String::new(),
             "sk-ant-…   Anthropic".into(),
             "sk-or-…    OpenRouter".into(),
-            "sk-…       OpenAI".into(),
+            "sk-…       paste its address next".into(),
             "localhost:11434   Ollama".into(),
             "localhost:1234    LM Studio".into(),
             "any http(s) address".into(),
