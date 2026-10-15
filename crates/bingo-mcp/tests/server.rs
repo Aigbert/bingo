@@ -91,10 +91,10 @@ async fn connected() -> (Arc<Manager>, tempfile::TempDir) {
 /// tests here have nothing to say about.
 async fn states(manager: &Arc<Manager>) -> Vec<(String, Status)> {
     manager
-        .lines()
+        .rows()
         .await
         .into_iter()
-        .map(|line| (line.server, line.status))
+        .map(|row| (row.name, row.status))
         .collect()
 }
 

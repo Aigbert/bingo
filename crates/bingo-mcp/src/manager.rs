@@ -48,18 +48,6 @@ struct Slot {
 
 pub use bingo_services::mcp::Status;
 
-/// One line of the `/mcp` table: what a server is doing, and how it stands
-/// with the sign-in it may need. The two are different facts — a server can be
-/// signed in to and still unreachable — so they are two columns, not one.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Line {
-    pub server: String,
-    pub status: Status,
-    /// `None` for a server that signs in to nothing: a child process, or an
-    /// HTTP server whose `Authorization` a person wrote themselves.
-    pub auth: Option<bingo_auth_oauth::Status>,
-}
-
 pub struct Manager {
     host: std::sync::OnceLock<std::sync::Weak<dyn bingo_sdk::HostApi>>,
     servers: BTreeMap<String, Server>,
@@ -341,38 +329,26 @@ impl Manager {
         self.spawn_dial(name, claimed)
     }
 
+    /// Every configured server as a row, in name order. A row nobody may
+    /// dial — switched off, or waiting for a yes — carries only the program
+    /// or the host it would reach (ADR-0036 §4, ADR-0087 §1).
     pub async fn rows(&self) -> Vec<bingo_services::mcp::ServerRow> {
         let slots = self.slots.read().await;
         self.servers
             .iter()
             .filter_map(|(name, server)| {
                 let slot = slots.get(name)?;
-                crate::rows::row(
+                let mut row = crate::rows::row(
                     name,
                     server,
                     status_of(slot),
                     self.auth.get(name).map(|auth| auth.status()),
                     slot.waiting.as_ref(),
-                )
-                .map(|mut row| {
-                    if let Some(origin) = self.origins.get(name) {
-                        row.origin = Some(origin.clone());
-                    }
-                    row
-                })
-            })
-            .collect()
-    }
-
-    /// One line per configured server, for `/mcp`.
-    pub async fn lines(&self) -> Vec<Line> {
-        let slots = self.slots.read().await;
-        slots
-            .iter()
-            .map(|(name, slot)| Line {
-                server: name.clone(),
-                status: status_of(slot),
-                auth: self.auth.get(name).map(|auth| auth.status()),
+                );
+                if let Some(origin) = self.origins.get(name) {
+                    row.origin = Some(origin.clone());
+                }
+                Some(row)
             })
             .collect()
     }
@@ -644,15 +620,15 @@ impl bingo_sdk::PluginSource for Manager {
         "bingo.mcp"
     }
     async fn plugins(&self) -> Vec<bingo_sdk::PluginStatus> {
-        self.lines()
+        self.rows()
             .await
             .into_iter()
-            .filter_map(|line| {
-                let Status::Waiting { changed } = line.status else {
+            .filter_map(|row| {
+                let Status::Waiting { changed } = row.status else {
                     return None;
                 };
                 Some(bingo_sdk::PluginStatus {
-                    id: format!("mcp:{}", line.server),
+                    id: format!("mcp:{}", row.name),
                     version: String::new(),
                     state: bingo_sdk::PluginState::Waiting { changed },
                     from: "bingo.mcp".into(),
@@ -693,10 +669,10 @@ mod tests {
     /// The states of every configured server, in the order they are read.
     async fn states(manager: &Manager) -> Vec<(String, Status)> {
         manager
-            .lines()
+            .rows()
             .await
             .into_iter()
-            .map(|line| (line.server, line.status))
+            .map(|row| (row.name, row.status))
             .collect()
     }
 
@@ -718,7 +694,7 @@ mod tests {
     #[tokio::test]
     async fn a_child_process_has_no_sign_in_of_its_own() {
         let manager = manager(&[]);
-        assert!(manager.lines().await.iter().all(|line| line.auth.is_none()));
+        assert!(manager.rows().await.iter().all(|row| row.auth.is_none()));
         assert!(manager.auth("files").is_none());
     }
 
@@ -883,7 +859,7 @@ mod approval_tests {
         });
         manager.approve("repo", &host.handle()).await.unwrap();
         assert!(!manager.waiting("repo").await);
-        assert_eq!(manager.lines().await[0].status, Status::Disabled);
+        assert_eq!(manager.rows().await[0].status, Status::Disabled);
         assert!(manager.pending().await.is_empty());
         assert!(manager.rows().await.iter().all(|row| !row.forwardable()));
         assert!(manager.connect("repo").await.is_err());
@@ -931,7 +907,7 @@ mod approval_tests {
         assert!(manager.tools().await.is_empty());
         assert!(manager.pending().await.is_empty());
         assert_eq!(
-            manager.lines().await[0].status,
+            manager.rows().await[0].status,
             Status::Waiting { changed: true }
         );
         assert!(

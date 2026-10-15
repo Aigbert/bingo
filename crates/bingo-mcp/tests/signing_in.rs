@@ -208,7 +208,7 @@ fn unix_now() -> i64 {
 
 async fn state(manager: &Arc<Manager>) -> Status {
     manager
-        .lines()
+        .rows()
         .await
         .into_iter()
         .next()
@@ -242,8 +242,8 @@ async fn a_server_that_wants_a_bearer_nobody_has_needs_authentication() {
         panic!("a 401 with no stored sign-in: {:?}", state(&manager).await);
     };
     assert!(!why.contains("at_"), "no credential in the reason: {why}");
-    let line = manager.lines().await.remove(0);
-    assert_eq!(line.auth, Some(bingo_auth_oauth::Status::SignedOut));
+    let row = manager.rows().await.remove(0);
+    assert_eq!(row.auth, Some(bingo_services::mcp::Auth::SignedOut));
     assert!(
         endpoint.offered().iter().all(String::is_empty),
         "nothing was signed in, so nothing was offered"
@@ -269,11 +269,8 @@ async fn a_stored_sign_in_is_the_bearer_the_dial_carries() {
         "the stored token reached the wire: {:?}",
         endpoint.offered()
     );
-    let line = manager.lines().await.remove(0);
-    assert_eq!(
-        line.auth,
-        Some(bingo_auth_oauth::Status::SignedIn { account: None })
-    );
+    let row = manager.rows().await.remove(0);
+    assert_eq!(row.auth, Some(bingo_services::mcp::Auth::SignedIn));
     assert_eq!(manager.tools().await.len(), 1);
 }
 
@@ -371,7 +368,7 @@ async fn a_header_a_person_wrote_themselves_fails_rather_than_needing_a_sign_in(
     };
     assert!(!why.contains("mine"), "no credential in the reason: {why}");
     assert!(manager.auth("remote").is_none());
-    assert_eq!(manager.lines().await.remove(0).auth, None);
+    assert_eq!(manager.rows().await.remove(0).auth, None);
 }
 
 /// `/mcp tools <server>`: what one connected server offers, first line only.

@@ -15,7 +15,8 @@ use bingo_sdk::{
     HostHandle, InteractionKind, KernelError, Prompter, SessionId, View,
 };
 
-use crate::manager::{Line, Manager, Status};
+use crate::manager::{Manager, Status};
+use bingo_services::mcp::{Auth, ServerRow};
 
 pub struct McpCommand {
     manager: Arc<Manager>,
@@ -46,7 +47,7 @@ impl McpCommand {
                     "tools".into(),
                     "auth".into(),
                 ],
-                rows: self.manager.lines().await.iter().map(row).collect(),
+                rows: self.manager.rows().await.iter().map(row).collect(),
             },
         }
     }
@@ -221,7 +222,7 @@ impl Prompter for SessionPrompter {
 
 /// One server's line: what it is doing, how many tools it gave us, and where
 /// its sign-in stands.
-fn row(line: &Line) -> Vec<String> {
+fn row(line: &ServerRow) -> Vec<String> {
     let (state, tools) = match &line.status {
         Status::Waiting { changed } => (
             format!(
@@ -231,7 +232,7 @@ fn row(line: &Line) -> Vec<String> {
                 } else {
                     "waits for your yes"
                 },
-                line.server
+                line.name
             ),
             String::new(),
         ),
@@ -242,12 +243,7 @@ fn row(line: &Line) -> Vec<String> {
         Status::Failed { why } => (format!("failed: {why}"), String::new()),
         Status::Disabled => ("disabled".to_string(), String::new()),
     };
-    vec![
-        line.server.clone(),
-        state,
-        tools,
-        signin(line.auth.as_ref()),
-    ]
+    vec![line.name.clone(), state, tools, signin(line.auth.as_ref())]
 }
 
 const NEEDS_AUTH: &str = "needs authentication";
@@ -256,12 +252,11 @@ const NEEDS_AUTH: &str = "needs authentication";
 /// nothing, or one nobody has signed in to — whether it wants a sign-in is
 /// the status column's word, since a server that never asked for one has
 /// nothing missing.
-fn signin(auth: Option<&bingo_auth_oauth::Status>) -> String {
-    use bingo_auth_oauth::Status;
+fn signin(auth: Option<&Auth>) -> String {
     match auth {
-        None | Some(Status::SignedOut) => "-".to_string(),
-        Some(Status::SignedIn { .. }) => "signed in".to_string(),
-        Some(Status::Expired { .. }) => "expired".to_string(),
+        None | Some(Auth::SignedOut) => "-".to_string(),
+        Some(Auth::SignedIn) => "signed in".to_string(),
+        Some(Auth::Expired { .. }) => "expired".to_string(),
     }
 }
 
@@ -397,11 +392,18 @@ mod tests {
         Request::parse(args)
     }
 
-    fn line(status: Status, auth: Option<bingo_auth_oauth::Status>) -> Line {
-        Line {
-            server: "files".into(),
+    fn line(status: Status, auth: Option<Auth>) -> ServerRow {
+        ServerRow {
+            name: "files".into(),
+            transport: bingo_services::mcp::Transport::Http {
+                url: "https://mcp.example.com".into(),
+                headers: Default::default(),
+            },
+            origin: None,
             status,
             auth,
+            latency: None,
+            sign_in_from: None,
         }
     }
 
@@ -484,7 +486,7 @@ mod tests {
     /// nothing, so a signed-out server reads as a dash either way.
     #[test]
     fn the_auth_column_says_where_the_sign_in_stands() {
-        use bingo_auth_oauth::Status as Signin;
+        use Auth as Signin;
         assert_eq!(
             row(&line(
                 Status::NeedsAuth {
@@ -504,7 +506,7 @@ mod tests {
         assert_eq!(
             row(&line(
                 Status::Connected { tools: 2 },
-                Some(Signin::SignedIn { account: None })
+                Some(Signin::SignedIn)
             )),
             ["files", "connected", "2", "signed in"]
         );

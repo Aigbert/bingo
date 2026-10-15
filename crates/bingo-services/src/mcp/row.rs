@@ -48,15 +48,114 @@ impl Transport {
             Self::Http { .. } => "http",
         }
     }
+    /// What a person reads it runs: tokens a line carries are cut out.
     pub fn runs(&self) -> String {
         match self {
-            Self::Stdio { command, args, .. } => std::iter::once(command.as_str())
-                .chain(args.iter().map(String::as_str))
+            Self::Stdio { command, args, .. } => std::iter::once(command.clone())
+                .chain(redacted_args(args))
                 .collect::<Vec<_>>()
                 .join(" "),
-            Self::Http { url, .. } => url.clone(),
+            Self::Http { url, .. } => redacted_url(url),
         }
     }
+    /// What a row may carry when nobody may dial it: the program or the
+    /// host, never its arguments, environment, headers, path or query.
+    pub fn redacted(&self) -> Self {
+        match self {
+            Self::Stdio { command, .. } => Self::Stdio {
+                command: command.clone(),
+                args: vec![],
+                env: BTreeMap::new(),
+                cwd: None,
+            },
+            Self::Http { url, .. } => Self::Http {
+                url: origin(url),
+                headers: BTreeMap::new(),
+            },
+        }
+    }
+}
+const HIDDEN: &str = "…";
+fn sensitive(name: &str) -> bool {
+    let name = name.trim_start_matches('-').to_ascii_lowercase();
+    [
+        "token",
+        "key",
+        "secret",
+        "password",
+        "auth",
+        "bearer",
+        "credential",
+    ]
+    .iter()
+    .any(|word| name.contains(word))
+}
+fn env_like(name: &str) -> bool {
+    name.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+}
+fn redacted_args(args: &[String]) -> Vec<String> {
+    let mut shown = Vec::with_capacity(args.len());
+    let mut hide_next = false;
+    for arg in args {
+        shown.push(if std::mem::take(&mut hide_next) {
+            HIDDEN.to_string()
+        } else {
+            redacted_arg(arg)
+        });
+        hide_next = arg.starts_with('-') && !arg.contains('=') && sensitive(arg);
+    }
+    shown
+}
+fn redacted_arg(arg: &str) -> String {
+    if arg.contains("://") {
+        return redacted_url(arg);
+    }
+    match arg.split_once('=') {
+        Some((name, _)) if env_like(name) || sensitive(name) => format!("{name}={HIDDEN}"),
+        _ => arg.to_string(),
+    }
+}
+fn split_url(url: &str) -> (&str, &str, &str) {
+    let Some((scheme, rest)) = url.split_once("://") else {
+        return ("", "", url);
+    };
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let (authority, tail) = rest.split_at(end);
+    let host = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    (scheme, host, tail)
+}
+fn origin(url: &str) -> String {
+    match split_url(url) {
+        ("", _, _) => String::new(),
+        (scheme, host, _) => format!("{scheme}://{host}"),
+    }
+}
+fn redacted_url(url: &str) -> String {
+    let (scheme, host, tail) = split_url(url);
+    let tail = tail.split_once('#').map_or(tail, |(before, _)| before);
+    let tail = match tail.split_once('?') {
+        Some((path, query)) => format!(
+            "{path}?{}",
+            query
+                .split('&')
+                .map(|pair| match pair.split_once('=') {
+                    Some((name, _)) => format!("{name}={HIDDEN}"),
+                    None => pair.to_string(),
+                })
+                .collect::<Vec<_>>()
+                .join("&")
+        ),
+        None => tail.to_string(),
+    };
+    if scheme.is_empty() {
+        return tail;
+    }
+    format!("{scheme}://{host}{tail}")
 }
 impl std::fmt::Debug for Transport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -85,5 +184,82 @@ impl ServerRow {
     }
     pub fn forwardable(&self) -> bool {
         !matches!(self.status, Status::Disabled | Status::Waiting { .. })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn stdio(args: &[&str]) -> Transport {
+        Transport::Stdio {
+            command: "npx".into(),
+            args: args.iter().map(|arg| arg.to_string()).collect(),
+            env: BTreeMap::from([("TOKEN".into(), "s3cret".into())]),
+            cwd: Some("/home/me/secret-project".into()),
+        }
+    }
+    fn http(url: &str) -> Transport {
+        Transport::Http {
+            url: url.into(),
+            headers: BTreeMap::from([("Authorization".into(), "Bearer s3cret".into())]),
+        }
+    }
+    #[test]
+    fn what_a_row_runs_never_shows_a_token() {
+        assert_eq!(
+            stdio(&[
+                "-y",
+                "files",
+                "API_KEY=s3cret",
+                "--token",
+                "s3cret",
+                "--auth=s3cret"
+            ])
+            .runs(),
+            "npx -y files API_KEY=… --token … --auth=…"
+        );
+        assert_eq!(
+            http("https://me:s3cret@mcp.example.com/mcp?key=s3cret&debug#s3cret").runs(),
+            "https://mcp.example.com/mcp?key=…&debug"
+        );
+        assert_eq!(
+            stdio(&["--url", "https://u:s3cret@h.example/x?t=s3cret"]).runs(),
+            "npx --url https://h.example/x?t=…"
+        );
+    }
+    #[test]
+    fn a_redacted_row_keeps_only_the_program_or_the_host() {
+        assert_eq!(
+            stdio(&["--token", "s3cret"]).redacted(),
+            stdio(&[]).redacted()
+        );
+        let Transport::Stdio { args, env, cwd, .. } = stdio(&["x"]).redacted() else {
+            panic!("stdio stays stdio")
+        };
+        assert!(args.is_empty() && env.is_empty() && cwd.is_none());
+        assert_eq!(
+            http("https://me:s3cret@mcp.example.com:8443/mcp/s3cret?key=s3cret").redacted(),
+            Transport::Http {
+                url: "https://mcp.example.com:8443".into(),
+                headers: BTreeMap::new()
+            }
+        );
+    }
+    /// The recorded rows nobody may dial are pinned in their redacted shape:
+    /// an owner that answers more for them breaks the contract.
+    #[test]
+    fn rows_nobody_may_dial_are_recorded_redacted() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../fixtures/mcp.json")).unwrap();
+        let rows: Vec<ServerRow> =
+            serde_json::from_value(fixture["answer"]["servers"].clone()).unwrap();
+        let closed = rows
+            .iter()
+            .filter(|row| !row.forwardable())
+            .collect::<Vec<_>>();
+        assert_eq!(closed.len(), 2);
+        for row in closed {
+            assert_eq!(row.transport, row.transport.redacted(), "{}", row.name);
+        }
     }
 }

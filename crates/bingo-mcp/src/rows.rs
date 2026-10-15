@@ -57,23 +57,11 @@ pub(crate) fn row(
     status: bingo_services::mcp::Status,
     auth: Option<bingo_auth_oauth::Status>,
     waiting: Option<&bingo_sdk::Waiting>,
-) -> Option<bingo_services::mcp::ServerRow> {
+) -> bingo_services::mcp::ServerRow {
     use bingo_services::mcp::{Auth, ServerRow};
-    let transport = serde_json::from_value(crate::config::row(server)).ok()?;
-    let sign_in_from = match server {
-        crate::Server::Stdio { env, .. } if !env.is_empty() => Some(format!(
-            "{} from settings",
-            env.keys().cloned().collect::<Vec<_>>().join(", ")
-        )),
-        crate::Server::Http { headers, .. } if !headers.is_empty() => Some(format!(
-            "{} from settings",
-            headers.keys().cloned().collect::<Vec<_>>().join(", ")
-        )),
-        _ => None,
-    };
-    Some(ServerRow {
+    let mut row = ServerRow {
         name: name.into(),
-        transport,
+        transport: transport(server),
         status,
         origin: waiting.map(|entry| format!("this project · {}", entry.root.display())),
         auth: auth.map(|auth| match auth {
@@ -82,19 +70,62 @@ pub(crate) fn row(
             bingo_auth_oauth::Status::Expired { reason } => Auth::Expired { reason },
         }),
         latency: None,
-        sign_in_from,
-    })
+        sign_in_from: sign_in_from(server),
+    };
+    // Only a row somebody may dial carries what dialling needs.
+    if !row.forwardable() {
+        row.transport = row.transport.redacted();
+    }
+    row
+}
+
+fn transport(server: &crate::Server) -> bingo_services::mcp::Transport {
+    use bingo_services::mcp::Transport;
+    match server {
+        crate::Server::Stdio {
+            command,
+            args,
+            env,
+            cwd,
+            ..
+        } => Transport::Stdio {
+            command: command.clone(),
+            args: args.clone(),
+            env: env.clone(),
+            cwd: cwd.clone(),
+        },
+        crate::Server::Http { url, headers, .. } => Transport::Http {
+            url: url.clone(),
+            headers: headers.clone(),
+        },
+    }
+}
+
+/// Which settings carry a credential, named and never shown.
+fn sign_in_from(server: &crate::Server) -> Option<String> {
+    let names = match server {
+        crate::Server::Stdio { env, .. } => env.keys(),
+        crate::Server::Http { headers, .. } => headers.keys(),
+    }
+    .cloned()
+    .collect::<Vec<_>>();
+    (!names.is_empty()).then(|| format!("{} from settings", names.join(", ")))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use bingo_services::mcp::{Status, Transport};
+    /// A server a person switched off is not a row anyone is handed whole:
+    /// bingo would not dial it, so nobody learns its arguments, environment
+    /// or headers from it — and the answer is live, not a boot snapshot.
     #[tokio::test]
-    async fn rows_include_disabled_servers_but_forbid_forwarding_them() {
-        let servers = serde_json::from_value(
-            serde_json::json!({"local":{"command":"fixture","env":{"TOKEN":"secret"}}}),
-        )
+    async fn a_server_switched_off_is_handed_only_its_program() {
+        let servers = serde_json::from_value(serde_json::json!({
+            "local":{"command":"fixture","args":["--token","s3cret"],"env":{"TOKEN":"s3cret"}},
+            "web":{"type":"http","url":"https://me:s3cret@mcp.example.com/mcp?key=s3cret",
+                   "headers":{"Authorization":"Bearer s3cret"}}
+        }))
         .unwrap();
         let manager = Arc::new(Manager::new(
             bingo_http::client(bingo_http::Bounds::CALL).unwrap(),
@@ -102,12 +133,48 @@ mod tests {
             &["local".into()],
             std::env::temp_dir(),
         ));
-        let rows = Rows::new(manager).rows().await;
-        assert_eq!(rows.len(), 1);
+        let rows = Rows::new(manager.clone()).rows().await;
+        assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].status, Status::Disabled);
         assert!(!rows[0].forwardable());
         assert_eq!(rows[0].sign_in_from.as_deref(), Some("TOKEN from settings"));
-        assert!(matches!(rows[0].transport, Transport::Stdio { .. }));
-        assert!(!format!("{:?}", rows[0]).contains("secret"));
+        assert_eq!(rows[0].transport, rows[0].transport.redacted());
+        assert!(!serde_json::to_string(&rows[0]).unwrap().contains("s3cret"));
+        assert!(rows[1].forwardable(), "an enabled row is handed whole");
+        assert!(serde_json::to_string(&rows[1]).unwrap().contains("s3cret"));
+
+        manager.disable("web").await;
+        let rows = Rows::new(manager).rows().await;
+        assert_eq!(
+            rows[1].transport,
+            Transport::Http {
+                url: "https://mcp.example.com".into(),
+                headers: Default::default()
+            }
+        );
+        assert!(!serde_json::to_string(&rows).unwrap().contains("s3cret"));
+    }
+    #[test]
+    fn a_server_waiting_for_a_yes_is_handed_only_its_program() {
+        let server: crate::Server = serde_json::from_value(
+            serde_json::json!({"command":"./run.sh","args":["API_KEY=s3cret"],"env":{"TOKEN":"s3cret"}}),
+        )
+        .unwrap();
+        let row = row(
+            "repo",
+            &server,
+            Status::Waiting { changed: false },
+            None,
+            None,
+        );
+        assert_eq!(
+            row.transport,
+            Transport::Stdio {
+                command: "./run.sh".into(),
+                args: vec![],
+                env: Default::default(),
+                cwd: None
+            }
+        );
     }
 }

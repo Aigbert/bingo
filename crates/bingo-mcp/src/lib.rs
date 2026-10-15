@@ -38,7 +38,7 @@ pub use client::{Asker, Client};
 pub use command::McpCommand;
 pub use config::{Server, Settings};
 pub use dial::CONNECT_TIMEOUT;
-pub use manager::{Line, Manager, Status};
+pub use manager::{Manager, Status};
 pub use rows::Rows;
 pub use source::McpSource;
 pub use tool::{McpTool, tool_name};

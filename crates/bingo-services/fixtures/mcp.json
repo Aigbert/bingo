@@ -39,6 +39,39 @@
         "auth": null,
         "latency": null,
         "signInFrom": null
+      },
+      {
+        "name": "switched-off",
+        "transport": {
+          "type": "stdio",
+          "command": "npx",
+          "args": [],
+          "env": {},
+          "cwd": null
+        },
+        "origin": null,
+        "status": {
+          "kind": "disabled"
+        },
+        "auth": null,
+        "latency": null,
+        "signInFrom": "TOKEN from settings"
+      },
+      {
+        "name": "repo-tool",
+        "transport": {
+          "type": "http",
+          "url": "https://mcp.example.com",
+          "headers": {}
+        },
+        "origin": "this project \u00b7 /work/repo",
+        "status": {
+          "kind": "waiting",
+          "changed": false
+        },
+        "auth": null,
+        "latency": null,
+        "signInFrom": "Authorization from settings"
       }
     ]
   }
