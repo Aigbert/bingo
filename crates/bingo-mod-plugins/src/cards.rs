@@ -5,32 +5,73 @@ pub struct Fact {
     pub text: String,
     pub error: bool,
     pub aside: Option<String>,
+    /// The column a wrapped line continues at: under the value it carries.
+    pub hang: usize,
 }
+/// A line that wraps under its own first word.
 fn line(text: impl Into<String>) -> Fact {
+    let text = text.into();
     Fact {
-        text: text.into(),
+        hang: text.len() - text.trim_start_matches(' ').len(),
+        text,
         error: false,
         aside: None,
     }
 }
 fn title(name: &str, aside: &str) -> Fact {
     Fact {
-        text: format!(" {name}"),
-        error: false,
         aside: Some(aside.into()),
+        ..line(format!(" {name}"))
     }
 }
+/// Where a fact's value starts: past its key's column.
+const VALUE: usize = 10;
 fn fact(key: &str, value: impl std::fmt::Display) -> Fact {
-    line(format!(" {key:8} {value}"))
+    Fact {
+        hang: VALUE,
+        ..line(format!(" {key:8} {value}"))
+    }
 }
 /// An error line: indented inside the card, and cut at its edge by the
 /// drawing rather than wrapped under the card's left margin.
 fn error(text: &str) -> Fact {
     Fact {
-        text: format!(" {text}"),
         error: true,
-        aside: None,
+        ..line(format!(" {text}"))
     }
+}
+/// `text` wrapped at its spaces to `width` columns, every line after the
+/// first starting `hang` columns in; a word wider than a line is split.
+pub fn hanging(text: &str, width: usize, hang: usize) -> String {
+    let hang = hang.min(width / 2);
+    let mut lines = vec![];
+    let mut rest = text.chars().collect::<Vec<_>>();
+    loop {
+        let room = if lines.is_empty() {
+            width
+        } else {
+            width - hang
+        };
+        if room == 0 || rest.len() <= room {
+            lines.push(rest.iter().collect::<String>());
+            break;
+        }
+        let cut = break_at(&rest, room);
+        lines.push(rest[..cut].iter().collect::<String>().trim_end().into());
+        let next = rest[cut..].iter().skip_while(|c| **c == ' ');
+        rest = next.copied().collect();
+    }
+    let indent = " ".repeat(hang);
+    lines.join(&format!("\n{indent}"))
+}
+/// The last space a line of `room` columns may break at, past its indent;
+/// `room` itself when there is none.
+fn break_at(chars: &[char], room: usize) -> usize {
+    let indent = chars.iter().take_while(|c| **c == ' ').count();
+    (indent + 1..=room)
+        .rev()
+        .find(|at| chars[*at] == ' ')
+        .unwrap_or(room)
 }
 /// A failure's words after a blank line, one card line per line it has.
 fn errors(why: &str) -> Vec<Fact> {
@@ -208,14 +249,10 @@ fn trust_card(p: &CatalogEntry, choice: &crate::trust::Choice) -> Vec<Fact> {
         )));
     }
     rows.push(if choice.confirm {
-        Fact {
-            text: format!(
-                " ⏎ again: {} could run tools unasked",
-                crate::groups::name(p)
-            ),
-            error: true,
-            aside: None,
-        }
+        error(&format!(
+            "⏎ again: {} could run tools unasked",
+            crate::groups::name(p)
+        ))
     } else {
         line(" kept in ~/.bingo/settings.toml, never the repo")
     });
@@ -255,7 +292,7 @@ pub fn server_card(s: &ServerRow, reviewing: bool) -> Vec<Fact> {
         "from",
         middle(s.origin.as_deref().unwrap_or("configured settings"), BESIDE),
     ));
-    rows.push(fact("sign-in", sign_in(s)));
+    rows.extend(handed(s, reviewing));
     if let Some(ms) = s.latency {
         rows.push(fact("latency", format!("{ms} ms")));
     }
@@ -267,6 +304,15 @@ pub fn server_card(s: &ServerRow, reviewing: bool) -> Vec<Fact> {
         }
     }
     rows
+}
+/// What a server is handed besides its line: a remote server's sign-in, a
+/// program's environment. A review already lists the environment.
+fn handed(s: &ServerRow, reviewing: bool) -> Option<Fact> {
+    match (&s.transport, &s.sign_in_from) {
+        (Transport::Http { .. }, _) => Some(fact("sign-in", sign_in(s))),
+        (Transport::Stdio { .. }, Some(names)) if !reviewing => Some(fact("env", names)),
+        (Transport::Stdio { .. }, _) => None,
+    }
 }
 /// OAuth is named only where it is in play: a server that asked for a
 /// sign-in or holds one. An HTTP server that never asked needs none, as the
@@ -290,7 +336,8 @@ fn offered(status: &Status) -> String {
 }
 /// What a yes would start, said first on the card so the warning fits any
 /// height, then the whole line the repository wrote, wrapped rather than cut,
-/// and the names of what it is handed; their values are never on the row.
+/// the environment that changes what it loads with its values, and the
+/// names of the rest of what it is handed; their values are never on the row.
 fn review(s: &ServerRow) -> Vec<Fact> {
     let (what, handed) = if s.transport.name() == "http" {
         ("dial", "headers")
@@ -298,25 +345,36 @@ fn review(s: &ServerRow) -> Vec<Fact> {
         ("run", "env")
     };
     let mut rows = vec![
-        Fact {
-            text: format!(" ⏎ again: approve {} for this checkout", s.name),
-            error: true,
-            aside: None,
-        },
+        error(&format!("⏎ again: approve {} for this checkout", s.name)),
         line(format!(" approving lets bingo {what}:")),
         line(format!("   {}", s.transport.line())),
     ];
+    for (name, value) in s.transport.loaders() {
+        rows.push(Fact {
+            hang: 5,
+            ..line(format!(" {handed} {name}={value}  (loads code)"))
+        });
+    }
     let named = s.transport.named();
     if !named.is_empty() {
-        rows.push(line(format!(
-            " {handed} {} (values hidden)",
-            named.join(", ")
-        )));
+        rows.push(Fact {
+            hang: 5,
+            ..line(format!(" {handed} {} (values hidden)", named.join(", ")))
+        });
     }
     if let Transport::Stdio { cwd: Some(cwd), .. } = &s.transport {
-        rows.push(line(format!(" in {}", cwd.display())));
+        rows.push(line(ran_in(cwd)));
     }
     rows
+}
+/// A relative directory is joined to the one bingo started in, which the
+/// card says, since the line alone does not.
+fn ran_in(cwd: &std::path::Path) -> String {
+    if cwd.is_relative() {
+        format!(" in ./{}, from where bingo started", cwd.display())
+    } else {
+        format!(" in {}", cwd.display())
+    }
 }
 pub fn builtins_card(plugins: &[CatalogEntry], expanded: bool) -> Vec<Fact> {
     let builtins = plugins

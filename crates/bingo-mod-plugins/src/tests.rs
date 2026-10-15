@@ -323,7 +323,8 @@ fn approving_a_server_shows_what_it_runs_and_moving_forgets_it() {
         "{said:?}"
     );
     assert!(
-        said.iter().any(|text| text.contains("in tools")),
+        said.iter()
+            .any(|text| text.contains("in ./tools, from where bingo started")),
         "{said:?}"
     );
     assert!(!said.concat().contains("s3cret"), "{said:?}");

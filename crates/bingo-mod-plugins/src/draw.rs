@@ -328,11 +328,12 @@ fn fact_view(fact: crate::cards::Fact, width: u16) -> View {
         if fact.error {
             return text(cut(&fact.text, usize::from(width)), Some("red"), false);
         }
-        let mut view = text(fact.text, None, false);
-        if let View::Text { style, .. } = &mut view {
-            style.wrap = Some("wrap".into());
-        }
-        return view;
+        let width = usize::from(width);
+        return text(
+            crate::cards::hanging(&fact.text, width, fact.hang),
+            None,
+            false,
+        );
     };
     View::Box {
         children: vec![

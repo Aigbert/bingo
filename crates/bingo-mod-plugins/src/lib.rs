@@ -68,4 +68,6 @@ async fn servers(host: &HostHandle) -> Vec<bingo_services::mcp::ServerRow> {
 }
 
 #[cfg(test)]
+mod card_tests;
+#[cfg(test)]
 mod tests;
