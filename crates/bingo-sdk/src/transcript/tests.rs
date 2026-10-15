@@ -335,4 +335,33 @@ fn asked_ignores_shells_and_injected_context_but_keeps_commands() {
         origin: Origin::surface("command"),
     };
     assert_eq!(crate::asked(&row).as_deref(), Some("/guide the wire"));
+    for voice in [Voice::Note, Voice::Quiet, Voice::Aside] {
+        row.body = ItemBody::User {
+            parts: vec![ContentPart::text("injected text")],
+            origin: Origin::surface("test").voiced(voice),
+        };
+        assert!(crate::asked(&row).is_none());
+    }
+}
+
+#[test]
+fn shell_lines_neither_open_turns_nor_replace_the_asked_prompt() {
+    let mut shell = item(2, String::new());
+    shell.body = ItemBody::Shell {
+        command: "echo shell".into(),
+        output: "shell".into(),
+        exit: Some(0),
+        cwd: ".".into(),
+    };
+    assert!(turns(&[shell.clone()].into_iter().collect()).is_empty());
+    let mut user = item(1, String::new());
+    user.turn = Some(TurnId::from_raw("t"));
+    shell.turn = user.turn.clone();
+    user.body = ItemBody::User {
+        parts: vec![ContentPart::text("why is the build red?")],
+        origin: Origin::surface("terminal"),
+    };
+    let rows = turns(&[user, shell].into_iter().collect());
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].label(), "why is the build red?");
 }
