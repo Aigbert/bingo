@@ -22,6 +22,10 @@ impl Probe for Table {
     }
 }
 
+// A fork temporarily inherits every open descriptor until exec closes it.
+// Keep the release probe outside that window; resident children still overlap.
+static SPAWNING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 struct Owned(Child);
 impl Drop for Owned {
     fn drop(&mut self) {
@@ -31,6 +35,7 @@ impl Drop for Owned {
 }
 
 fn child(home: &Path, resident: bool, live: u32) -> (Owned, String) {
+    let _spawning = SPAWNING.lock().unwrap();
     let mut child = Command::new(std::env::current_exe().unwrap())
         .args(["--exact", "child_process", "--nocapture"])
         .env("M129_CHILD_HOME", home)
@@ -171,6 +176,7 @@ fn a_second_gateway_cannot_overwrite_a_held_claim() {
 
 #[test]
 fn doctor_never_removes_the_gateway_claim_file() {
+    let _spawning = SPAWNING.lock().unwrap();
     let home = tempfile::tempdir().unwrap();
     let env = Env::rooted(home.path());
     let paths = Paths::new(&env);
