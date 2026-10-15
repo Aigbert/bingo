@@ -16,6 +16,7 @@ bingo-mod-memory = { path = "crates/bingo-mod-memory" }
 bingo-mod-plugins = { path = "crates/bingo-mod-plugins" }
 bingo-mod-palette = { path = "crates/bingo-mod-palette" }
 bingo-mod-browse = { path = "crates/bingo-mod-browse" }
+bingo-mod-crew = { path = "crates/bingo-mod-crew" }
 bingo-mod-status = { path = "crates/bingo-mod-status" }
 bingo-mod-models = { path = "crates/bingo-mod-models" }
 bingo-mod-ask = { path = "crates/bingo-mod-ask" }

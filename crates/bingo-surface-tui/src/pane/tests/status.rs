@@ -76,7 +76,7 @@ fn status_scenarios_match_at_both_terminal_sizes() {
                 "status": status
             }]))
             .unwrap();
-            let price = (which == "long").then_some(bingo_mod_status::spent::Price {
+            let price = (which == "long").then_some(bingo_sdk::spent::Price {
                 input: Some(3.0),
                 output: Some(15.0),
                 cache_read: Some(0.3),

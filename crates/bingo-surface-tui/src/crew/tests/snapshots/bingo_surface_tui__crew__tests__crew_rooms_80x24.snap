@@ -1,0 +1,28 @@
+---
+source: crates/bingo-surface-tui/src/crew/tests/mod.rs
+expression: screen
+---
+"                                                                                "
+"                                                                                "
+"█      ▀                                                                        "
+"█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█                                                   "
+"█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍                                                 "
+"                ▄▄▄▄▄█                                                          "
+"fake-1 · /tmp/project                                                           "
+"                                                                                "
+"crew                                                                     above ▾"
+"crew · agents (3) │ ❯ rooms (1) │ tasks (1)   ] switches                        "
+"❯ #design   Review the fork boundary                                            "
+"    seats   reviewer, fixer                                                     "
+"    holder  parent                                                              "
+"p purpose · a seat · u unseat · c close · esc                                   "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"╭──────────────────────────────────────────────────────────────────────────────╮"
+"│ > ask anything · / for commands · ! for shell                                │"
+"╰──────────────────────────────────────────────────────────────────────────────╯"
+"? for shortcuts                                                      fake/fake-1"

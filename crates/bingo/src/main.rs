@@ -711,15 +711,10 @@ fn plugins(
         Box::new(OpenAiPlugin),
         Box::new(AcpPlugin::default()),
         Box::new(PermissionsPlugin),
-        Box::new(bingo_mod_ask::Ask),
-        Box::new(bingo_mod_palette::Palette),
-        Box::new(bingo_mod_sessions::Sessions),
-        Box::new(bingo_mod_browse::Browse),
-        Box::new(bingo_mod_memory::MemoryPanel),
-        Box::new(bingo_mod_plugins::Plugins),
-        Box::new(bingo_mod_status::Status::default()),
-        Box::new(bingo_mod_models::Models),
-        Box::new(ShellHooksPlugin),
+    ]);
+    all.extend(builtin_mods());
+    all.extend([
+        Box::new(ShellHooksPlugin) as Box<dyn Plugin>,
         Box::new(JsonlStorePlugin::default()),
         Box::new(ContextPlugin),
         Box::new(PersonaPlugin),
@@ -737,7 +732,7 @@ fn plugins(
         ),
         Box::new(AgentsPlugin::default()),
         Box::new(RoomsPlugin::default()),
-        Box::new(TasksPlugin),
+        Box::new(TasksPlugin::default()),
         Box::new(ExperiencePlugin::default()),
         Box::new(SchedulePlugin::default()),
         Box::new(CheckpointsPlugin::default()),
@@ -750,6 +745,20 @@ fn plugins(
         all.push(Box::new(DemoUiPlugin::default()));
     }
     Ok(all)
+}
+
+fn builtin_mods() -> [Box<dyn Plugin>; 9] {
+    [
+        Box::new(bingo_mod_ask::Ask),
+        Box::new(bingo_mod_palette::Palette),
+        Box::new(bingo_mod_sessions::Sessions),
+        Box::new(bingo_mod_browse::Browse),
+        Box::new(bingo_mod_memory::MemoryPanel),
+        Box::new(bingo_mod_plugins::Plugins),
+        Box::new(bingo_mod_status::Status::default()),
+        Box::new(bingo_mod_models::Models),
+        Box::new(bingo_mod_crew::Crew::default()),
+    ]
 }
 
 /// `bingo provider add` (`ProviderAction::Add`, the only one), before any

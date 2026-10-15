@@ -3,6 +3,13 @@ use super::*;
 /// What a command's receipt asks of the surface: an action, a message, a view.
 pub(super) fn receipt(run: &mut Run, result: &Value) {
     if let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone()) {
+        // ack calls receipt only for this client's own intent. Publications and
+        // other clients' receipts cannot navigate this surface.
+        if matches!(action.name.as_str(), "Pane" | "View")
+            && let Some(id) = action.args["view"].as_str()
+        {
+            run.show(SessionId::from_raw(id));
+        }
         sessions::surface_action(run, &action);
         self::action(run, action);
     }
@@ -171,5 +178,37 @@ mod tests {
                 }
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod pane_receipt_tests {
+    use super::*;
+    use crate::test_support::*;
+    #[tokio::test]
+    async fn a_generic_view_action_keeps_the_root_and_changes_the_view() {
+        let now = still(scene().1);
+        let session = std::sync::Arc::new(crate::doubles::TestSession::default());
+        let mut run = super::super::tests::idle_in(state(), session.clone(), now.instant);
+        let root = run.session.tree.root_id().clone();
+        let child = SessionId::from_raw("ses_child");
+        run.session
+            .handles
+            .insert(child.clone(), bingo_sdk::SessionHandle(session));
+        let action = bingo_sdk::Action {
+            name: "View".into(),
+            args: serde_json::json!({"view":child}),
+        };
+        super::action(&mut run, action.clone());
+        assert_eq!(run.session.tree.view(), &root);
+        let outcome = IntentOutcome::Applied {
+            result: serde_json::json!({"surface": action}),
+        };
+        run.ack(&IntentId::mint(), &outcome);
+        assert_eq!(run.session.tree.view(), &root);
+        let intent = run.mint(None);
+        run.ack(&intent, &outcome);
+        assert_eq!(run.session.tree.root_id(), &root);
+        assert_eq!(run.session.tree.view(), &child);
     }
 }
