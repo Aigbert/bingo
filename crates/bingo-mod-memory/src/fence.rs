@@ -12,7 +12,8 @@ pub fn document(text: &str) -> String {
             let (front, body) = text.split_at(end);
             let longest = front.split(|c| c != '~').map(str::len).max().unwrap_or(0);
             let fence = "~".repeat((longest + 1).max(3));
-            return format!("{fence}yaml\n{front}\n{fence}\n\n{body}");
+            let close = if front.ends_with('\n') { "" } else { "\n" };
+            return format!("{fence}yaml\n{front}{close}{fence}\n\n{body}");
         }
     }
     text.into()
@@ -25,7 +26,11 @@ mod tests {
         let source = "---\r\nname: rule\r\ntype: feedback\r\n---\r\n**body**";
         assert_eq!(
             document(source),
-            "~~~yaml\n---\r\nname: rule\r\ntype: feedback\r\n---\r\n\n~~~\n\n**body**"
+            "~~~yaml\n---\r\nname: rule\r\ntype: feedback\r\n---\r\n~~~\n\n**body**"
+        );
+        assert_eq!(
+            document("---\na: b\n---"),
+            "~~~yaml\n---\na: b\n---\n~~~\n\n"
         );
         assert_eq!(document("ordinary **body**"), "ordinary **body**");
         assert_eq!(document("---\nunfinished"), "---\nunfinished");
