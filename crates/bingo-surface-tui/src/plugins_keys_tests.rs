@@ -231,31 +231,24 @@ impl PluginSource for Facts {
         }]
     }
 }
-#[tokio::test]
-async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
-    use bingo_services::mcp::Status;
-    let home = tempfile::tempdir().unwrap();
-    let row = Arc::new(std::sync::Mutex::new(
-        serde_json::from_value(json!({
-            "name":"local", "transport":{"type":"stdio","command":"fixture"},
-            "status":{"kind":"disabled"}
-        }))
-        .unwrap(),
-    ));
+async fn facts_scene(
+    home: &std::path::Path,
+    row: Arc<std::sync::Mutex<bingo_services::mcp::ServerRow>>,
+) -> (Arc<bingo_core::Host>, Attachment) {
     let host = bingo_core::Host::build(
         vec![
             Box::new(Facts(row.clone())),
             Box::new(bingo_mod_plugins::Plugins),
         ],
-        bingo_core::HostConfig::new(Env::rooted(home.path())),
+        bingo_core::HostConfig::new(Env::rooted(home)),
     )
     .await
     .unwrap();
-    let mut attachment = host
+    let attachment = host
         .open(
             SessionSelector::Create {
                 spec: SessionSpec {
-                    cwd: home.path().into(),
+                    cwd: home.into(),
                     driver: Driver::Log,
                     ..Default::default()
                 },
@@ -268,6 +261,20 @@ async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
         )
         .await
         .unwrap();
+    (host, attachment)
+}
+#[tokio::test]
+async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
+    use bingo_services::mcp::Status;
+    let home = tempfile::tempdir().unwrap();
+    let row = Arc::new(std::sync::Mutex::new(
+        serde_json::from_value(json!({
+            "name":"local", "transport":{"type":"stdio","command":"fixture"},
+            "status":{"kind":"disabled"}
+        }))
+        .unwrap(),
+    ));
+    let (host, mut attachment) = facts_scene(home.path(), row.clone()).await;
     key(&host, &mut attachment, "enter").await;
     key(&host, &mut attachment, "down").await;
     key(&host, &mut attachment, "down").await;
