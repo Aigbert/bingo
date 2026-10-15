@@ -230,7 +230,7 @@ async fn keys_wait_no_longer_than_the_command_wait() {
     run.typeahead.expire();
     typeahead::drain(&mut run);
     assert_eq!(run.ui.composer.text(), "hi");
-    assert!(run.next_draw().is_none_or(|at| at > Instant::now()));
+    assert!(run.behind, "released keys owe a drawing");
     assert!(session.submitted().is_empty());
 }
 
@@ -259,4 +259,20 @@ fn interrupt_command_hold(chord: crossterm::event::KeyEvent) {
     assert!(run.typeahead.is_empty());
     assert!(run.typeahead.deadline().is_none());
     assert!(run.ui.composer.is_empty());
+}
+#[tokio::test]
+async fn deadline_release_owes_a_frame_showing_the_keys() {
+    let now = still(scene().1);
+    let (_home, mut run, _) = palette_run(now);
+    let mut screen = crate::doubles::Recorder::default();
+    typeahead::command_sent(&mut run, IntentId::from_raw("slow"));
+    type_burst(&mut run, "zq");
+    run.typeahead.expire();
+    run.paint(&mut screen, Wake::Frame, now).unwrap();
+    assert_eq!(run.ui.composer.text(), "zq");
+    assert!(!screen.last().contains("zq"));
+    assert!(run.next_draw().is_some(), "released keys owe a frame");
+    run.paint(&mut screen, Wake::Frame, later(now, 100))
+        .unwrap();
+    assert!(screen.last().contains("zq"), "{}", screen.last());
 }

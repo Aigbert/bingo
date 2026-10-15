@@ -165,6 +165,7 @@ pub(super) fn drain(run: &mut Run) {
             break;
         }
         run.typeahead.keys.pop_front();
+        run.behind = true;
         let effects = input::on_key(&mut run.ui, &run.session.tree, key, run.detection.now());
         run.apply(effects);
     }
