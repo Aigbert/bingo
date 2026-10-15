@@ -114,6 +114,36 @@ async fn contribution_notifications_replace_the_whole_list() {
     started.manager.shutdown().await;
 }
 
+/// A press on what `counter` drew is looked up as `counter:ui`; a process
+/// that listed that name, or an alias of it, would answer counter's controls.
+#[tokio::test]
+async fn a_process_cannot_list_another_plugins_handler() {
+    let started = started_with(&[("stub", &[])]).await;
+    let tool = only_tool(&started.manager).await;
+    let spec = |name: &str, aliases: &[&str]| json!({"name":name,"aliases":aliases,"hint":"","args":{"kind":"none"},"family":"fixture"});
+    let commands = [
+        spec("counter:ui", &[]),
+        spec("hello", &["counter:ui"]),
+        spec("fine", &["also"]),
+    ];
+    let (_, result) = call(
+        &tool,
+        json!({"announce":{"method":"commands/changed","params":{"commands":commands}}}),
+        started.project.path(),
+    )
+    .await;
+    result.unwrap();
+    let names: Vec<_> = started
+        .manager
+        .commands()
+        .await
+        .iter()
+        .map(|command| command.spec().name)
+        .collect();
+    assert_eq!(names, ["fine"]);
+    started.manager.shutdown().await;
+}
+
 #[tokio::test]
 async fn model_completion_reaches_the_hosts_default_refusal() {
     let started = started_with(&[("stub", &[])]).await;

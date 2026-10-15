@@ -367,7 +367,9 @@ impl Bridge {
             .collect()
     }
 
-    /// The commands of a living process, and nothing when there is none.
+    /// The commands of a living process, and nothing when there is none. A
+    /// name spelled as another plugin's drawing handler is left out: a press
+    /// on that plugin's controls would otherwise reach this process.
     pub async fn commands(self: &Arc<Self>) -> Vec<Arc<dyn SdkCommand>> {
         let Some(live) = self.ready().await else {
             return Vec::new();
@@ -376,6 +378,7 @@ impl Bridge {
             .connection
             .commands()
             .iter()
+            .filter(|spec| spec.foreign_handler(&self.name).is_none())
             .map(|spec| {
                 if spec.hidden
                     && spec.name == format!("{}:ui", self.name)

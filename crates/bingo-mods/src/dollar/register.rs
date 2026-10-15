@@ -36,6 +36,12 @@ impl Registrations {
         Ok(name)
     }
     pub fn command(&self, caller: &Caller, input: RegisterCommand) -> Result<String, String> {
+        if let Some(taken) = input.spec.foreign_handler(&caller.plugin) {
+            return Err(format!(
+                "{taken} answers another plugin's controls; a mod may name only its own {}",
+                CommandSpec::ui_name(&caller.plugin)
+            ));
+        }
         let name = input.spec.name.clone();
         self.insert(caller, input.callback, Spec::Command(input.spec))?;
         Ok(name)
@@ -183,4 +189,46 @@ impl Command for RegisteredCommand {
 }
 fn failed(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::Internal, error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bingo_plugin_host::state::Store;
+
+    fn caller(root: &std::path::Path) -> Caller {
+        Caller {
+            plugin: "aaa".into(),
+            host: testing::TestHost::default().handle(),
+            state: Store::new(root, "aaa"),
+        }
+    }
+    fn named(name: &str, aliases: &[&str]) -> RegisterCommand {
+        serde_json::from_value(serde_json::json!({
+            "session": "s",
+            "spec": {"name": name, "aliases": aliases, "hint": "", "args": {"kind": "none"},
+                "family": "fixture"},
+            "callback": "command/1",
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_mod_cannot_register_another_plugins_handler() {
+        let root = tempfile::tempdir().unwrap();
+        let registrations = Registrations::default();
+        for (name, aliases) in [("counter:ui", &[][..]), ("hello", &["counter:ui"][..])] {
+            let refused = registrations
+                .command(&caller(root.path()), named(name, aliases))
+                .unwrap_err();
+            assert!(refused.contains("counter:ui"), "{refused}");
+        }
+        for own in ["aaa:ui", "hello"] {
+            let refused = registrations
+                .command(&caller(root.path()), named(own, &[]))
+                .unwrap_err();
+            assert!(!refused.contains("controls"), "{own}: {refused}");
+        }
+        assert!(registrations.commands().is_empty());
+    }
 }

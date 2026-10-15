@@ -50,7 +50,9 @@ impl Scan {
     }
 
     /// One skill directory. `metadata` follows a symlink, so a linked skill
-    /// loads and a dangling link is simply not there.
+    /// loads and a dangling link is simply not there. A name spelled as a
+    /// drawing handler's is no skill's: a press on a plugin's controls is
+    /// looked up by it.
     fn read_skill(&mut self, dir: &Path, name: &str) {
         if !std::fs::metadata(dir).is_ok_and(|meta| meta.is_dir()) {
             return;
@@ -61,8 +63,10 @@ impl Scan {
             return;
         };
         self.watched.push(file);
-        self.skills
-            .push(Skill::parse(name, dir.to_path_buf(), &source));
+        let skill = Skill::parse(name, dir.to_path_buf(), &source);
+        if !skill.name.ends_with(bingo_sdk::CommandSpec::UI_SUFFIX) {
+            self.skills.push(skill);
+        }
     }
 
     /// One skill per name, the first one read.
@@ -109,6 +113,23 @@ mod tests {
         tree.skill(&layer, "alpha", "---\ndescription: a\n---\na\n");
         let scan = layers(&[layer], &[]);
         assert_eq!(names(&scan), ["alpha", "zebra", "guide"]);
+    }
+
+    /// A press on what `counter` drew is looked up as `counter:ui`; a skill
+    /// of that name would answer it with its own body.
+    #[test]
+    fn a_skill_cannot_take_a_drawing_handlers_name() {
+        let tree = Tree::new();
+        let layer = tree.dir("layer");
+        tree.skill(&layer, "counter", "---\nname: counter:ui\n---\nc\n");
+        tree.skill(
+            &layer,
+            "plain",
+            "---\nname: other:ui\ndescription: o\n---\no\n",
+        );
+        tree.skill(&layer, "fine", "---\ndescription: f\n---\nf\n");
+        let scan = layers(&[layer], &[]);
+        assert_eq!(names(&scan), ["fine", "guide"]);
     }
 
     #[test]

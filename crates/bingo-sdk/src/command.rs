@@ -70,6 +70,18 @@ impl CommandSpec {
         name.strip_suffix(Self::UI_SUFFIX)
             .is_some_and(|plugin| !plugin.is_empty())
     }
+
+    /// The first of this spec's names that `owner` may not take: any name
+    /// spelled as a drawing handler but its own. A press on what a plugin
+    /// drew is looked up by that name, so whoever held another's would
+    /// answer its controls. A registrar refuses the spec when this is `Some`.
+    pub fn foreign_handler(&self, owner: &str) -> Option<&str> {
+        let own = Self::ui_name(owner);
+        std::iter::once(&self.name)
+            .chain(&self.aliases)
+            .find(|name| name.ends_with(Self::UI_SUFFIX) && **name != own)
+            .map(String::as_str)
+    }
 }
 
 /// A chord a command declares for itself. A bare chord runs the command
@@ -490,6 +502,25 @@ mod ui_name_tests {
         for typed in ["plugins", "permission", ":ui", "plugins:uix", "ui"] {
             assert!(!CommandSpec::is_ui(typed), "{typed}");
         }
+    }
+
+    #[test]
+    fn only_its_drawer_may_take_a_handler_name() {
+        let spec = |name: &str, aliases: &[&str]| CommandSpec {
+            aliases: aliases.iter().map(|alias| alias.to_string()).collect(),
+            ..CommandSpec::ui(name.trim_end_matches(":ui"))
+        };
+        assert_eq!(spec("counter:ui", &[]).foreign_handler("counter"), None);
+        assert_eq!(
+            spec("counter:ui", &[]).foreign_handler("aaa"),
+            Some("counter:ui")
+        );
+        let mut plain = spec("x", &["counter:ui"]);
+        plain.name = "hello".into();
+        assert_eq!(plain.foreign_handler("aaa"), Some("counter:ui"));
+        plain.aliases = vec!["hi".into()];
+        assert_eq!(plain.foreign_handler("aaa"), None);
+        assert_eq!(spec("x", &[]).foreign_handler(""), Some("x:ui"));
     }
 }
 
