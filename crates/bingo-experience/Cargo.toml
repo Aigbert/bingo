@@ -12,6 +12,7 @@ description = "Experience plugin for bingo: procedural playbooks as files, recal
 workspace = true
 
 [dependencies]
+bingo-services.workspace = true
 bingo-shelf.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true

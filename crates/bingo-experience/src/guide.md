@@ -84,3 +84,7 @@ no tools, no index, no recall, no `/experience`. The switch takes effect at the
 next start. Legacy `[experience]` with `enabled = false` remains readable for
 one release and reports a notice naming `enabledPlugins`; replace it with the
 example above.
+
+`/experience forget <id>` removes an entry from this project. The memory
+panel also lists these entries: Enter reads, `d` asks to forget. The command
+and panel use the same store deletion as `ExperienceForget`.

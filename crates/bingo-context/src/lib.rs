@@ -50,14 +50,15 @@ pub(crate) static MANIFEST: PluginManifest = PluginManifest {
         "context:memory",
         "command:memory",
         "service:bingo.context.pages",
+        bingo_services::memory::CAPABILITY,
     ],
     requires: &[],
     config: None,
 };
 
 /// Registers the summary compactor, the instruction files, the two memory
-/// scopes and the command that lists them. Nothing writes a memory but the
-/// model, with the tools it already has (ADR-0049).
+/// scopes, their reading service and the command that lists or forgets them.
+/// The model remains their only author (ADR-0049, ADR-0092).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ContextPlugin;
 
@@ -72,7 +73,8 @@ impl Plugin for ContextPlugin {
         let data_dir: PathBuf = registrar.env().data_dir.clone();
         registrar.add(Contribution::Compactor(Arc::new(SummaryCompactor)));
         registrar.add(Contribution::Context(
-            Arc::new(InstructionsContributor::new(config_dir)) as Arc<dyn ContextContributor>,
+            Arc::new(InstructionsContributor::new(config_dir.clone()))
+                as Arc<dyn ContextContributor>,
         ));
         registrar.add(Contribution::Context(
             Arc::new(MemoryContributor::new(data_dir.clone())) as Arc<dyn ContextContributor>,
@@ -81,10 +83,11 @@ impl Plugin for ContextPlugin {
             Arc::new(MemoryCommand::new(data_dir.clone())) as Arc<dyn Command>,
         ));
         registrar.add(Contribution::Hook(Arc::new(baseline::BaselineHook::new(
-            data_dir,
+            data_dir.clone(),
         ))));
         registrar.add(guide::contribution(registrar));
         registrar.add(Contribution::Hook(Arc::new(memory::row::MemoryRows)));
+        registrar.add(memory::service::contribution(data_dir, config_dir));
         Ok(())
     }
 }
@@ -112,7 +115,7 @@ mod tests {
         assert!(MANIFEST.config.is_none(), "no switch turns memory off");
     }
 
-    /// The baseline hook is the one hook: nothing here writes a memory.
+    /// Baselines and transcript rows retain their original contribution order.
     #[test]
     fn the_plugin_registers_a_compactor_two_contributors_the_command_and_two_hooks() {
         let contributions = contributions(json!({}));

@@ -41,7 +41,19 @@ impl Command for ExperienceCommand {
         }
     }
 
-    async fn run(&self, _args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
+    async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
+        if !args.trim().is_empty() {
+            let words = args.split_whitespace().collect::<Vec<_>>();
+            let ["forget", id] = words.as_slice() else {
+                return Err(KernelError::new(
+                    bingo_sdk::ErrorCode::InvalidInput,
+                    "usage: /experience forget <id>",
+                ));
+            };
+            return Ok(CommandOutcome::Applied {
+                message: Some(crate::service::forget(&self.library, &cx.cwd, id)?),
+            });
+        }
         let shelf = self.library.load(&cx.cwd);
         Ok(CommandOutcome::View {
             view: view(&shelf, Timestamp::now()),

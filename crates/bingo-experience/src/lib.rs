@@ -19,6 +19,7 @@
 pub mod bm25;
 mod command;
 mod contributor;
+mod service;
 use bingo_shelf::diff;
 pub mod entry;
 mod frontmatter;
@@ -59,6 +60,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "context:experience:index",
         "context:experience:recall",
         "service:bingo.experience.pages",
+        bingo_services::experience::CAPABILITY,
     ],
     requires: &[],
     // Where the library lives is not a setting — it follows the config
@@ -148,9 +150,10 @@ impl Plugin for ExperiencePlugin {
             Arc::new(IndexContributor::new(library.clone())) as Arc<dyn ContextContributor>,
         ));
         registrar.add(Contribution::Context(
-            Arc::new(RecallContributor::new(library)) as Arc<dyn ContextContributor>,
+            Arc::new(RecallContributor::new(library.clone())) as Arc<dyn ContextContributor>,
         ));
         registrar.add(guide::contribution(registrar));
+        registrar.add(service::contribution(library));
         Ok(())
     }
 

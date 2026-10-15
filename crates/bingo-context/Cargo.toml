@@ -12,6 +12,7 @@ description = "Context plugin for bingo: the summary compactor, instruction file
 workspace = true
 
 [dependencies]
+bingo-services.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
 futures.workspace = true

@@ -31,6 +31,19 @@ impl InstructionsContributor {
         Self { config_dir }
     }
 
+    pub async fn loaded(&self, cwd: &Path) -> Vec<bingo_services::memory::Loaded> {
+        let mut loaded = Vec::new();
+        for path in self.paths(cwd).await {
+            if let Some(block) = block(&path).await {
+                loaded.push(bingo_services::memory::Loaded {
+                    path,
+                    tokens: crate::estimate::text(&block.text),
+                });
+            }
+        }
+        loaded
+    }
+
     /// The user's file first, then one file per directory from the root down:
     /// the nearer a file is to the work, the later it speaks.
     async fn paths(&self, cwd: &Path) -> Vec<PathBuf> {
@@ -197,6 +210,40 @@ mod tests {
         match piece {
             ContextPiece::System(block) => block.text.clone(),
             ContextPiece::User { .. } => String::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod measured_tests {
+    use super::*;
+    #[tokio::test]
+    async fn loaded_files_follow_the_contributors_order_and_measure_its_blocks() {
+        let home = tempfile::tempdir().unwrap();
+        let config = home.path().join("config");
+        let cwd = home.path().join("work");
+        std::fs::create_dir(&config).unwrap();
+        std::fs::create_dir(&cwd).unwrap();
+        let paths = [config.join("AGENTS.md"), cwd.join("CLAUDE.md")];
+        for path in &paths {
+            std::fs::write(path, "use fixtures\n").unwrap();
+        }
+        let loaded = InstructionsContributor::new(config).loaded(&cwd).await;
+        assert_eq!(
+            loaded
+                .iter()
+                .map(|file| file.path.canonicalize().unwrap())
+                .collect::<Vec<_>>(),
+            paths
+                .iter()
+                .map(|path| path.canonicalize().unwrap())
+                .collect::<Vec<_>>()
+        );
+        for file in loaded {
+            assert_eq!(
+                file.tokens,
+                crate::estimate::text(&block(&file.path).await.unwrap().text)
+            );
         }
     }
 }

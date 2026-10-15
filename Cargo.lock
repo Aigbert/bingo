@@ -460,6 +460,7 @@ version = "0.6.6"
 dependencies = [
  "async-trait",
  "bingo-sdk",
+ "bingo-services",
  "futures",
  "insta",
  "jiff",
@@ -519,6 +520,7 @@ version = "0.6.6"
 dependencies = [
  "async-trait",
  "bingo-sdk",
+ "bingo-services",
  "bingo-shelf",
  "jiff",
  "proptest",

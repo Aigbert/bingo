@@ -1,6 +1,5 @@
-//! The memory directory on disk, read: the index as it stands and the files
-//! that parse. Nothing here writes one — the model does, with `Write` and
-//! `Edit`, which is the whole of ADR-0049.
+//! Memory files, their index, and the person’s forget operation.
+pub use super::forget::forget;
 
 use std::path::Path;
 

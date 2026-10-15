@@ -255,3 +255,9 @@ mod tests {
         assert!(!blocks[2].contains("fact-10.md"));
     }
 }
+
+mod forget;
+mod index;
+pub(crate) mod service;
+#[cfg(test)]
+mod service_tests;

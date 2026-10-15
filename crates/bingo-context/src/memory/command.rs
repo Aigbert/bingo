@@ -1,8 +1,8 @@
 //! `/memory`: what is remembered, in both scopes, for the person who cannot
 //! read the prompt.
 //!
-//! It answers and nothing more. Correcting a memory is `Read` and `Edit` on
-//! the file, by the model or by the person's own editor.
+//! Listing and forgetting share the store with the panel. The model remains
+//! the only author.
 
 use std::path::{Path, PathBuf};
 
@@ -41,7 +41,24 @@ impl Command for MemoryCommand {
         }
     }
 
-    async fn run(&self, _args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
+    async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
+        if !args.trim().is_empty() {
+            let (scope, name) = forget_args(args)?;
+            use bingo_services::memory::Service;
+            let message = super::service::Memories {
+                data: self.data_dir.clone(),
+                config: PathBuf::new(),
+            }
+            .forget(bingo_services::memory::Forget {
+                cwd: cx.cwd.clone(),
+                scope,
+                name,
+            })
+            .await?;
+            return Ok(CommandOutcome::Applied {
+                message: Some(message),
+            });
+        }
         let user = dir::user(&self.data_dir);
         let project = project_dir(&self.data_dir, &cx.cwd).await;
         let mut listed = rows("user", &store::list(&user).await);
@@ -58,6 +75,23 @@ impl Command for MemoryCommand {
             },
         })
     }
+}
+
+fn forget_args(args: &str) -> Result<(Option<bingo_services::memory::Scope>, String), KernelError> {
+    use bingo_services::memory::Scope;
+    let words = args.split_whitespace().collect::<Vec<_>>();
+    let (scope, name) = match words.as_slice() {
+        ["forget", name] => (None, *name),
+        ["forget", "user", name] => (Some(Scope::User), *name),
+        ["forget", "project", name] => (Some(Scope::Project), *name),
+        _ => {
+            return Err(KernelError::new(
+                bingo_sdk::ErrorCode::InvalidInput,
+                "usage: /memory forget [user|project] <name>",
+            ));
+        }
+    };
+    Ok((scope, name.into()))
 }
 
 /// One scope's memories, in the columns the model reads them by.

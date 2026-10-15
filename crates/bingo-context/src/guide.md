@@ -62,9 +62,13 @@ A memory is background, not an instruction: it says what was true when it was
 written. The conversation and the working tree outrank it, and one they
 contradict is fixed or deleted rather than followed.
 
-- `/memory` — a table of what is remembered: scope, name, type, description,
-  for the person who cannot read the prompt. It answers and nothing more;
-  correcting a memory is `Read` and `Edit` on the file.
+- `/memory` opens the memory panel: memories, loaded instructions and project
+  experience. Enter reads, `d` asks to forget, Escape cancels or closes. With
+  `bingo.mod.memory` disabled, the original memory table is shown.
+- `/memory forget [user|project] <name>` removes the file and its index lines.
+  If both scopes contain the name, specify one. The session prompt may keep
+  the fact until next composed. The model remains the only author; the panel
+  never launches an editor. See `guide-memory-panel` for the full controls.
 
 ## Instruction files
 
