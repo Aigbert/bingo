@@ -99,7 +99,7 @@ impl MemoryFixture {
             host,
             signals,
             open: link("memory:open"),
-            draw: link("memory"),
+            draw: link(bingo_mod_memory::ID),
             handler,
             session,
             run,
@@ -183,7 +183,7 @@ impl MemoryFixture {
         bingo_sdk::view::answer_ok(
             render::Component::Pane,
             &key.request.props,
-            "memory",
+            bingo_mod_memory::ID,
             None,
             &view,
         )

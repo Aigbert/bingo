@@ -20,7 +20,8 @@ struct Cursor {
     confirming: Option<rows::Target>,
 }
 type Shared = Arc<Mutex<BTreeMap<SessionId, Cursor>>>;
-const ID: &str = "bingo.mod.memory";
+/// The plugin id the memory pane is placed, drawn and answered under.
+pub const ID: &str = "bingo.mod.memory";
 const REQUEST: &str = "memory";
 static MANIFEST: PluginManifest = PluginManifest {
     id: ID,
@@ -30,7 +31,10 @@ static MANIFEST: PluginManifest = PluginManifest {
         bingo_services::experience::KEY.name(),
     ],
     requires: &[],
-    provides: &["command:memory:ui", "service:bingo.mod.memory.pages"],
+    provides: &[
+        "command:bingo.mod.memory:ui",
+        "service:bingo.mod.memory.pages",
+    ],
     config: None,
 };
 impl Plugin for MemoryPanel {

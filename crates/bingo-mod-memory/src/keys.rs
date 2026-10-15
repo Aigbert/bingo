@@ -55,7 +55,7 @@ pub struct Handler(pub Shared, pub std::path::PathBuf);
 #[async_trait::async_trait]
 impl Command for Handler {
     fn spec(&self) -> CommandSpec {
-        CommandSpec::ui("memory")
+        CommandSpec::ui(crate::ID)
     }
     async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
         let args: Value = serde_json::from_str(args).map_err(crate::error)?;
@@ -221,6 +221,31 @@ async fn forget(target: Target, cx: &CommandContext) -> Result<String, KernelErr
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn the_handler_answers_to_the_name_the_pane_is_placed_under() {
+        let name = CommandSpec::ui_name(crate::ID);
+        let handler = Handler(Shared::default(), Default::default());
+        assert_eq!(handler.spec().name, name);
+        assert!(
+            crate::MANIFEST
+                .provides
+                .contains(&format!("command:{name}").as_str())
+        );
+        let drawn = crate::draw::tree(&[], 0, None, 10, 40);
+        let drawer = crate::draw::Drawing(Shared::default());
+        view::answer_ok(
+            render::Component::Pane,
+            &json!({"owner":crate::ID}),
+            drawer.id(),
+            None,
+            &drawn,
+        )
+        .unwrap();
+        let View::Box { layout, .. } = drawn else {
+            panic!("the memory pane is a box");
+        };
+        assert_eq!(layout.on_key.map(|action| action.name), Some(name));
+    }
     #[test]
     fn keys_read_confirm_cancel_and_refuse_instructions() {
         for target in [

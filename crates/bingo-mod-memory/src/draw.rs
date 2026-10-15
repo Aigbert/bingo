@@ -9,7 +9,7 @@ pub(crate) struct Drawing(pub Shared);
 #[async_trait::async_trait]
 impl Interceptor for Drawing {
     fn id(&self) -> &str {
-        "memory"
+        crate::ID
     }
     fn matcher(&self) -> LinkMatcher {
         LinkMatcher {
@@ -83,7 +83,7 @@ pub fn tree(
         children,
         layout: Box::new(view::BoxStyle {
             on_key: Some(Action {
-                name: "memory:ui".into(),
+                name: CommandSpec::ui_name(crate::ID),
                 args: json!({"handler":crate::REQUEST,"event":"press","target":target,"confirming":confirming}),
             }),
             ..Default::default()
