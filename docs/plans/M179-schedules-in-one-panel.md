@@ -1,140 +1,142 @@
 # M179 — Schedules in one panel
 
-ADR-0093, ADR-0019, ADR-0071, ADR-0082, ADR-0086, ADR-0088. Needs M167,
-M170 (the Status card and its rows), M175 (`ago` and the session jump).
+ADR-0093, ADR-0019, ADR-0071, ADR-0082, ADR-0086, ADR-0088; reconciled with ADR-0094.
+Prerequisites: M167, M170, M173, M175. Existing `m179-schedules` rebased with `git rebase dev`
+onto `7a759d8a`; no new branch, merge, push or PR.
 
 ## Goal
 
-What fires later, run by the person and not only by the model.
-`/schedule` opens a panel: each schedule's id, spec, next fire, enabled,
-text and the session it fires into, with the runner that holds the store
-on top. `space` pauses or enables, `r` runs now, `d` forgets after a
-confirmation, `→` jumps to the schedule's session. The same verbs are
-lines: `/schedule add|pause|resume|run|forget`. A pending wake is a row
-of the `/status` card again: `wake in 4m · <note>`, counting down while
-the card is open, `⏎` prefills `/wake off`. The feature is the built-in
-mod `bingo-mod-schedule`, a plugin view; with it off `/schedule` draws
-its table and the verbs still work as lines.
+`/schedule` opens the built-in panel: id, spec, next fire, enabled, by, text and destination.
+Space pauses/resumes, r runs now, c confirms ownership, d forgets, → visits the session.
+Both c and d require confirmation. The same verbs work as lines; disabling the mod retains the table.
+A pending wake appears in Status, counts down, and prefills `/wake off`.
 
-```
- schedules · held by this process (pid 4120)              space r d → esc
-❯ 01JA4  daily at 09:00   in 14h · tomorrow 09:00   on   triage new issues
-  01JA7  every 2h         in 37m                    on   /review dev
-  01J9X  once at 10-20    —                         off  ship the notes
- ─────────────────────────────────────────────────────────────────────
- forget 01JA7 "every 2h /review dev"? its session stays.  ⏎ yes  esc
+## Bricks (implemented in order)
 
- /status card, when a wake stands:
-   wake       in 3m 40s · check the CI run again           ⏎ /wake off
-```
-
-## Bricks
-
-1. **One shape of a wake.** `bingo_services::schedule::Pending { at,
-   note }` (new `crates/bingo-services/src/schedule.rs`);
-   `crates/bingo-schedule/src/wake.rs::payload` (:79) serialises it, so
-   the extension and the service cannot disagree. The fixture of the
-   journaled payload is unchanged byte for byte (test), and
-   `slots_leave_the_wake_record_unplaced` stays green.
-2. **The service, contract first.** `schedule.rs`: `list() -> Listing {
-   entries: [Row { id, spec, next_fire, enabled, text, session }],
-   holder }`, `pending(session) -> Option<Pending>`, `add(spec, text,
-   cwd, mode)`, `pause(id)`, `resume(id)`, `run(id)`, `forget(id)`; id
-   prefixes resolved as `tools/forget.rs` does. `find(host)`
-   native-or-wire; fixtures `crates/bingo-services/fixtures/schedule/`
-   before the implementation.
-3. **Rows, pure.** `crates/bingo-schedule/src/render.rs` grows `row_of(
-   entry, tz, now, session) -> Row` beside the table's `row`, one
-   derivation for both: `next_fire` through `Entry::next_fire`, `session`
-   the id whose summary key is `entry.key()` (looked up in one
-   `HostApi::sessions` listing, never by `open`, which would create it).
-4. **Verbs in the plugin.** `crates/bingo-schedule/src/command/
-   schedule.rs` parses `add <spec> -- <text>`, `pause|resume|run|forget
-   <id>`; `ArgSpec` values from the store. `add` writes the entry
-   `tools/create.rs` writes, with this session's cwd and permission mode.
-   `run` dispatches through the runner's delivery (`runner.rs`,
-   `Delivery::Wake` on `schedule/<id>`) whether or not this process holds
-   the store, and stamps `last_fired`. `pause`/`resume` flip `enabled`
-   through `store.rs::save`. `forget` is `store.rs::delete`. Bare
-   `/schedule` unchanged. Test per verb in a temp data dir, incl. an
-   ambiguous prefix and `run` on a disabled entry (refused: resume first).
-5. **The wake row on the card.** `crates/bingo-mod-status/src/rows.rs`
-   gains `wake(pending, now) -> Option<Row>` (tone `warn`, `⏎` →
-   `Composer` prefill `/wake off`), reading `bingo_services::schedule::
-   find(host)?.pending(session)` when the card opens and on each
-   `Event::Extension` from `bingo.schedule`; the countdown uses the frame
-   clock and the card's existing redraw. Table test: none, 4m, past due.
-6. **Keys.** `crates/bingo-mod-schedule/src/keys.rs` through `onKey`:
-   `space` → `/schedule pause|resume <id>`, `r` → `/schedule run <id>`,
-   `d` → confirmation then `/schedule forget <id>`, `→` → `{"view":
-   session}` or the toast `has not fired yet`. Table test.
-7. **Drawing.** `draw.rs`: holder line (`held by this process`,
-   `dormant — held by another bingo`, `no runner`, as `lock.rs::holder`),
-   rows with `next fire` as `in 37m` by `bingo_sdk::until` (in `ago.rs`
-   beside M175's `ago`, same units), a disabled row dim. Snapshots at 108×30 and 80×24: held, dormant, empty, confirming.
-8. **Guide.** `guide.md` (<200 lines) by `guide.rs`, as in
-   `bingo-mod-palette`; `crates/bingo-schedule/src/guide.md` names the
-   new lines.
+1. **One wake shape.** `bingo_services::schedule::Pending { at, note }` supplies the unchanged
+   journal payload, including empty slots. Wakes remain process-local.
+2. **Service, contracts first.** Fixtures pin Pending, Listing and mutation refusals. Rows include
+   by and explicit mode; Listing includes trouble. Native-or-wire list/pending/pause/resume/run/forget.
+   Add/confirm remain on dev's command path, avoiding a second way to grant consent.
+3. **Pure rows.** `row_of` derives table/service rows from Entry; one sessions listing resolves
+   `entry.key()`. Reading never opens a session; relative time belongs to the drawing.
+4. **Verbs.** Keep dev's add/confirm grammar and asked-line predicate. Pause/resume/run/forget
+   share it and the prefix resolver. Run uses the runner's signed delivery regardless of the claim.
+   It waits for acknowledgement, then stamps last_fired; disabled run is refused.
+5. **Wake on Status.** Read pending on draw; invalidate on extensions/live ticks. Place near
+   context so 80×24 shows it. Enter calls Composer to prefill the line.
+6. **Keys.** Pure mapping and full-row confirmation; stale modes/provenance/text cannot be accepted.
+   Missing destination says `has not fired yet`. All client replies require the pane owner's drawnBy.
+7. **Drawing.** Shared ui.render/Pane path; holder, by, deadline, dim disabled rows, explicit mode,
+   trouble badge and scrolling. Ten TestBackend snapshots at 108×30 and 80×24.
+8. **Guide.** Owning-crate guide.md Pages registered in guide.rs, each below 200 lines (ADR-0054).
 
 ## Files
 
-- `crates/bingo-services/src/{lib.rs,schedule.rs}` and fixtures;
-  `crates/bingo-sdk/src/{ago.rs,lib.rs}` (`until`).
-- `crates/bingo-schedule/src/{lib.rs,wake.rs,render.rs,store.rs,
-  runner.rs,command/schedule.rs,guide.md}`.
-- `crates/bingo-mod-status/src/{rows.rs,live.rs}` (wake row).
-- New `crates/bingo-mod-schedule/src/{lib.rs,keys.rs,draw.rs,guide.rs,
-  guide.md}`; listed in `crates/bingo/src/main.rs`; +1 member in
-  `scripts/budget.toml`, no dependency.
-- `docs/adr/0019-schedules.md` gains the amendment line for §6 and §8.
+- bingo-services: contract and fixtures; bingo-sdk: generic `until` beside `ago` only.
+- bingo-schedule: service, verbs, rows, payload, shared signed delivery, concurrent runner, guide/tests.
+- bingo-mod-status: wake row, prefill and invalidation; new bingo-mod-schedule: pane and owner keys.
+- TUI: generic pane reply handling and tests; binary registration and real RPC/CLI tests.
+- Cargo manifests/lock and budget: keep both dev's models mod and schedule mod; max_dependencies 421.
+- ADR-0019/0093 amendments; gateway test spawn/probe isolation retained from the original verification.
+
+## Decisions — 2026-10-16
+
+- ADR-0094 owns add/confirm: by person, explicit `as <mode>` only, never copied from session mode.
+  Every mutation uses dev's `render::asked()` predicate and PermissionDenied refusal. Wire mutations
+  clear that context. Model tools keep their existing permission-gated contracts and tool provenance.
+- c confirms a model/unconfirmed row through `/schedule confirm <id>` after showing its explicit mode.
+  The built-in's vouched press returns the line; the client submits it as asked. A plugin cannot
+  invoke the service or fabricate a button to grant consent. d uses the same stale-row check.
+- Run and automatic fire share dev's signing and refusal notice/trouble. Each automatic entry has
+  one independent in-flight attempt, bounded at 30 seconds. Failed delivery remains unspent and
+  retries after a rescan, so one stalled entry cannot block the rest or spin. A rejected signed line
+  remains unspent. Before stamping, reread the entry and skip it if changed/deleted.
+- Generic pane replies require the pressed owner's drawnBy for run, view and message alike.
+  Existing destination sessions outside the current tree are opened by id.
+- RFC3339 at/next_fire stay on the wire; row_of needs no now. Full row equality pins confirmation;
+  live ticks cover other processes/hand edits. Disabling the mod clears its panes.
+- Existing jiff/tokio edges supply clock/redraw; no new resolved external dependency or allowlist change.
+- TestBackend controls the clock/styles; real RPC covers fake Wake, delivery/navigation and confirmation.
+  This replaces timing-sensitive UI waits in the original combined test. Guides never use docs/guide/.
 
 ## Exit criteria
 
-- [ ] Service fixtures; payload byte-for-byte test; rows and keys
-      tables; a test per verb, refusals included.
-- [ ] `TestBackend`: `/schedule` opens the panel; `space` dims a row and
-      `/schedule` table agrees; `r` opens a turn on `schedule/<id>`; `d`
-      then `⏎` removes the row; `→` views the session.
-- [ ] `TestBackend`: the fake provider calls `Wake{after:"4m"}`; `/status`
-      shows the wake row counting down; `⏎` prefills `/wake off`; after
-      `/wake off` the row is gone.
-- [ ] Two processes on one data dir: the second's panel says dormant;
-      its `r` still fires once (black-box, temp HOME).
-- [ ] `enabledPlugins: {"bingo.mod.schedule": false}`: the table draws,
-      the lines work; the wake row still shows (it is the status mod's).
-- [ ] tmux drive on an isolated socket, temp HOME, fake provider: add,
-      pause, run, forget, and a wake on the card; captures pasted.
-- [ ] `bash scripts/tui-smoke.sh`; `cargo fmt --all -- --check`; `cargo
-      check --workspace --all-targets --locked`; `cargo clippy --workspace
-      --all-targets --locked -- -D warnings`; `cargo test --workspace
-      --locked`; `scripts/check_discipline.sh`; `scripts/budget.sh`;
-      `cargo deny check`.
-- [ ] `cargo check -p bingo-schedule -p bingo-mod-schedule -p
-      bingo-mod-status --all-targets --target x86_64-pc-windows-msvc
-      --locked` (the lock and the clock).
+- [x] Fixtures, byte-for-byte wake payload, row/key tables, all verbs and unasked/disabled/ambiguous refusals.
+- [x] Panel/Table agreement, by column, ownership confirmation with stale-mode rejection, and forget.
+- [x] Fake Wake(4m), Status countdown, Composer prefill and cancellation; original RPC/tmux coverage retained.
+- [x] Two-process dormant panel can run once; original run/navigation and disabled-mod fallback remain covered.
+- [x] Failed acknowledgement stays unspent; stalled entry does not block another; refusal notice is shared.
+- [x] Foreign/unvouched pane messages and session jumps have no effect.
+- [x] New isolated tmux drive: add, confirm, pause, resume, forget at 108×30 and 80×24.
+- [x] Final sequential native gates pass; output recorded below.
+- [ ] All Windows checks pass: tui/bingo/gateway remain deferred by the permitted C-toolchain
+  failures; the other five crates pass. Individual outputs below.
 
-## In-flight dependencies
+## Non-goals and risks
 
-- M166: none.
-- M170: `bingo-mod-status` rows, live redraw and `Composer`; land after.
-- M173: `bingo-schedule` gains a service, so its switch says `off at next
-  start`; `bingo-mod-schedule` switches now.
-- M174: `d`'s confirmation resolves against the current drawing; a row
-  that fired and was forgotten meanwhile forgets nothing twice.
+No cron, in-place editing, daemon, or wakes in the schedule panel. Manual and automatic fire can race
+and add one extra turn; the reply says so. Wakes are visible on demand. A delivery timeout is an
+unknown acceptance result, so a later retry can duplicate a turn whose acknowledgement was lost.
 
-## Non-goals
+## Verified — 2026-10-15
 
-Cron expressions; editing a schedule's spec or text in place (forget and
-add); an OS daemon; wakes in the panel (they are the session's, on the
-card and `/wake`).
+Original branch: generators passed without generated diff; focused RPC tests: 4 passed.
+Native gates: fmt/check/Clippy passed; workspace 6011 passed, 0 failed, 5 ignored; discipline ok;
+budget 420/420, core 0s, relink 0; deny advisories/bans/licenses/sources ok; tui-smoke ok.
+Windows: sdk/services/schedule/mod-schedule/mod-status passed; tui/bingo/gateway deferred at aws-lc-sys.
+The gateway probe/fork race was isolated without serializing resident children. Final cargo clean ran.
+Original tmux `-L m179 -f /dev/null`, fake provider, temp HOME, both sizes:
 
-## Risks
+```text
+❯ 4b3wp8bm  every 2h  —  off  review build
+ forget 4b3wp8bm "every 2h review build"? its session stays.  ⏎ yes  esc
+❯ 9hqq2tvc  every 2h  in 2h  on  review build
+ ❯ wake       in 3m 57s · check CI again                 ⏎ /wake off
+│ > /wake off
+ the wake set for 2026-10-15 20:10 is off
+```
 
-- `run` from a process that does not hold the store can race the
-  holder's fire in the same minute; `last_fired` is written by both, the
-  later one wins, and at most one extra turn runs. Stated in the reply.
-- The wake moving from always-on to the card weakens ADR-0019 §8's
-  passive visibility; the note still arrives under `wake`, and `/wake`
-  stays. Recorded in ADR-0093.
-- `add` with `--` splitting spec and text is new grammar; a spec without
-  `--` is `INVALID_INPUT` with the three forms of ADR-0019 §2 spelled.
+## Verified — 2026-10-16
+
+Every run unsets OPENAI_API_KEY, OPENAI_BASE_URL, ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL.
+Only fake/local fixtures, temporary homes/data, and owned tmux sockets; no live credential tests.
+Focused tests: services 20 passed; owner 130 passed; panel keys 4 passed; RPC panel 4 passed.
+TestBackend snapshots include ownership confirmation with all three by labels at both sizes.
+Tmux `-L m179r -f /dev/null`: fake ScheduleCreate produced the model entry, the person added another,
+c/Enter recorded by person, space paused/resumed, d/Enter deleted only the selected entry. Captures:
+
+```text
+❯ sy0mst0t  every 2h  in 1h  on  model  model review
+ confirm sy0mst0t as yours, mode acceptEdits?  ⏎ yes  esc
+❯ sy0mst0t  every 2h  —  off  you  model review
+❯ sy0mst0t  every 2h  in 1h  on  you  model review
+❯ qwb1zq7j  every 3h  in 2h  on  you  person review
+```
+
+The tmux server was stopped. Captures/logs stay outside commits; owned temporary data is removed
+and cargo clean is run at completion. Commands below ran one at a time.
+
+Generators: `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-plugin-rpc -p bingo-surface-rpc --lib`,
+then `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --test record --locked`: all passed, no generated diff.
+Windows uses `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked`.
+
+```text
+cargo fmt --all -- --check: exit 0
+cargo check --workspace --all-targets --locked: Finished dev profile (0.52s)
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev profile (12.32s)
+cargo test --workspace --locked: 6157 passed; 0 failed; 6 ignored (194 groups)
+bash scripts/check_discipline.sh: discipline ok; advisory warnings remain
+bash scripts/budget.sh: dependencies 421/421; core 1s; relink 0; budget ok
+  target/debug 8 GB exceeds soft max 5; final cargo clean removes build output
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok
+bash scripts/tui-smoke.sh: tui-smoke ok
+Windows bingo-sdk: Finished dev profile (5.88s); exit 0
+Windows bingo-services: Finished dev profile (8.25s); exit 0
+Windows bingo-schedule: Finished dev profile (6.13s); exit 0
+Windows bingo-mod-schedule: Finished dev profile (0.34s); exit 0
+Windows bingo-mod-status: Finished dev profile (0.47s); exit 0
+Windows bingo-surface-tui: aws-lc-sys build failed; stdlib.h/windows.h missing; exit 101
+Windows bingo: aws-lc-sys and rquickjs-sys build failed; headers/MSVC C flags unavailable; exit 101
+Windows bingo-gateway: aws-lc-sys build failed; stdlib.h/windows.h missing; exit 101
+```

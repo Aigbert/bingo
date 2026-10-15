@@ -57,21 +57,23 @@ may do:
 person's, working in this session's directory: `/schedule add every 30m --
 /wake`, `/schedule add daily at 09:00 as acceptEdits -- tidy the docs`.
 `/schedule confirm <id>` makes an entry the person has read theirs, text
-and mode exactly as listed. Both count only as a line the person typed
-themselves; sent by a model, a mod, a button or a chat correspondent, they
-are refused.
+and mode exactly as listed. Both require the person's asked line. The built-in panel can ask the client
+to submit a line after the person confirms; a model, a mod acting alone,
+an arbitrary button or a chat correspondent cannot authorize it.
 
 A fire that is refused — a command line or a wider mode on an entry that is
 not the person's — is never silent. The `/schedule` listing names the entry
 and what was refused under its table, and the first such refusal in a
-process also raises a warning notice. A refused command line still reaches the model, as prose.
+process also raises a warning notice. An unconfirmed command line reaches the model as prose. A rejected
+command belonging to the person remains unspent and reports its refusal.
 
 ### What a fire is
 
 The entry's session is opened by the key `schedule/<id>` — one key per entry,
 so every one of its turns lands in one transcript that `--resume` reads like
-any other. The clock moves before the turn is asked for, so a session that
-cannot be opened costs one occurrence, not a retry every pass.
+any other. The clock moves only after delivery is acknowledged. A failed attempt
+remains due and retries after a rescan; each entry has its own bounded
+attempt, so a stalled entry does not hold up the others.
 
 A missed window is **one** fire, not the backlog: `every` counts from the last
 fire, so a process that was down for three intervals owes one turn. A `once at`
@@ -100,8 +102,8 @@ version marker, so an older doctor reading one will not mistake it for a dead PI
 sentinel. A downgrade likewise requires stopping every modern runner before
 removing its marker; never mix the old and new lock protocols.
 
-`/schedule` (`/schedules`) is the same table for a person, with that holder
-line under it and any file that could not be read named.
+`/schedule` (`/schedules`) opens the built-in panel. With the mod disabled,
+it shows the table, its holder line, and any file that could not be read.
 
 ## Wakes
 
@@ -141,7 +143,8 @@ the block is a startup failure rather than a silence.
 ## Managing schedules
 
 `/schedule add every 2h -- review the build` creates a schedule with this
-session's working directory and permission mode. The other forms are
+session's working directory and no stored mode. Add `as <mode>` before
+` -- ` to store an explicit mode. The other forms are
 `daily at HH:MM` and `once at <RFC3339>`; ` -- ` separates spec and text.
 `/schedule pause <id>` disables it; `/schedule resume <id>` enables it.
 `/schedule run <id>` fires now, including from a dormant process, and refuses

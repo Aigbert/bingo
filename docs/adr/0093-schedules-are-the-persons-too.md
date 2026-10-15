@@ -1,6 +1,6 @@
 # ADR-0093 — Schedules are the person's too
 
-Status: proposed · 2026-10-15 · Plan: M179 · Amends: ADR-0019 §6, §8 ("visible")
+Status: accepted · 2026-10-15 · Plan: M179 · Amends: ADR-0019 §6, §8 ("visible")
 
 ## Context
 
@@ -15,19 +15,26 @@ not arise.
 
 ## Decision
 
-1. **`/schedule add <spec> -- <text> | pause | resume | run | forget
-   <id>`.** `add` writes the entry `ScheduleCreate` writes, with this
-   session's cwd and mode; `run` fires now through the runner's own
-   delivery, held or not; bare `/schedule` is unchanged.
-2. **`bingo_services::schedule`**: `list -> { entries, holder }`,
-   `pending(session) -> Option<Pending { at, note }>`, and the §1 verbs.
-   `Pending` is the one shape of a wake: `wake::payload` serialises it.
+1. **Person-only schedule lines.** ADR-0094 owns `add <spec> [as <mode>]
+   -- <text>` and `confirm <id>`: explicit mode only, `by: person`.
+   `pause | resume | run | forget <id>` use the same asked-line predicate.
+   `run` uses the runner's signed delivery whether this process holds the
+   store or not. No mutation accepts a mod's or model's own invocation.
+2. **`bingo_services::schedule`**: `list -> { entries, holder, trouble }`,
+   `pending(session) -> Option<Pending { at, note }>`, pause/resume/run/forget.
+   Add and confirm stay on the owner's command path. Rows carry `by` and
+   the explicit mode. `Pending` is the wake payload's one shape.
 3. **The wake is a row of the Status card.** `bingo-mod-status` draws
    `wake in 4m · <note>` from `pending`, counting down while open; `⏎`
    prefills `/wake off`. The slot stays unplaced (M148). §8's bound now
    reads "visible (the Status card, `/wake`)".
 4. **`bingo-mod-schedule` is the schedules' plugin view** (ADR-0082 §3);
-   its keys run the §1 lines, `d` after a confirmation.
+   its keys return §1 lines to the client. `d` confirms forgetting; `c`
+   confirms taking a model/unconfirmed entry as the person's own. All mutation lines
+   require person input; wire service mutations cannot inherit it. Generic
+   pane replies, including messages and session jumps, require that pane's
+   owner in `drawnBy`. The client then submits an asked line; a plugin
+   cannot mint consent by invoking a service or drawing a button.
 
 ## Consequences
 
@@ -44,3 +51,8 @@ Refs: ADR-0011, ADR-0019, ADR-0071, ADR-0082, ADR-0086, ADR-0088.
 [ADR-0094](0094-a-schedule-carries-who-asked.md) §1 takes over `add`:
 `/schedule add <spec> [as <mode>] -- <text>`, an asked line only. The
 entry stores the explicit mode or none; it does not copy the session's.
+
+A fire moves `last_fired` only after delivery is acknowledged. Each entry
+has one independent in-flight attempt, bounded at 30 seconds; failures wait
+for a rescan before retrying. A rejected signed line remains unspent. Before
+stamping, the owner rereads the entry and skips it if it changed or is gone.

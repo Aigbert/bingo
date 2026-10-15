@@ -78,3 +78,17 @@ Only an entry the person asked for — their own `/schedule add` or
 `/schedule confirm` — fires its `/command` and `!` lines as typed, and
 only it can widen the mode. Every other entry's text is prose, and its
 mode can only keep or tighten. Every refusal is shown.
+
+## Amendment — 2026-10-16 (M179; ADR-0093)
+
+Section 6 also offers asked-line `add`, `confirm`, `pause`, `resume`,
+`run`, and `forget`, plus the built-in schedules panel. ADR-0094 owns the
+add/confirm grammar, provenance and explicit-mode semantics. Section 8's wake
+is visible in the Status card and `/wake`; its extension stays unplaced.
+
+Section 3's clock now moves after acknowledged delivery. Independent
+per-entry attempts have a 30-second bound; failures remain unspent and
+retry after a rescan. A person's rejected command stays unspent; other
+entries' command-looking text still reaches the model as prose, with the
+ADR-0094 notice and trouble badge. Pane confirmations submit the same
+asked lines through the client, vouched only by their own built-in owner.
