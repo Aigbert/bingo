@@ -62,6 +62,24 @@ fn waiting_click_opens_without_taking_composer_keys() {
     }
 }
 #[test]
+fn an_opening_pane_claims_focus_after_the_palette_releases_it_once() {
+    let tree = solo(&fixture(true, true, true));
+    let (mut ui, now) = scene();
+    ui.focus = Focus::Layer(crate::ui::Layer::shut(now.instant));
+    ui.sync_panes(tree.viewed());
+    draw_tree(80, 24, &tree, &mut ui, now);
+    assert!(matches!(ui.focus, Focus::Layer(_)));
+    ui.focus = Focus::Composer;
+    ui.sync_panes(tree.viewed());
+    let screen = draw_tree(80, 24, &tree, &mut ui, now);
+    assert!(screen.contains("Run"));
+    assert!(matches!(ui.focus, Focus::Pane(_)));
+    ui.focus = Focus::Composer;
+    ui.sync_panes(tree.viewed());
+    draw_tree(80, 24, &tree, &mut ui, now);
+    assert!(matches!(ui.focus, Focus::Composer));
+}
+#[test]
 fn text_only_pane_click_leaves_keys_with_the_composer() {
     for focus in [false, true] {
         let tree = solo(&fixture(focus, true, false));

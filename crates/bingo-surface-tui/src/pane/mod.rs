@@ -104,6 +104,10 @@ impl State {
             if self.order.contains(&pane.key) {
                 continue;
             }
+            // A closing palette still owns focus; keep the opening request pending.
+            if pane.focus && !matches!(focus, Focus::Composer) {
+                continue;
+            }
             self.order.push(pane.key.clone());
             if pane.asked && pane.focus && matches!(focus, Focus::Composer) {
                 *focus = Focus::Pane(pane.key);
