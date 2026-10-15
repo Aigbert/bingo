@@ -88,7 +88,7 @@ async fn a_resumed_session_comes_back_on_the_model_it_was_moved_to() {
 
     a.handle.submit(
         IntentId::mint(),
-        Input::text("/model m2", Origin::surface("test")),
+        Input::text("/model m2", Origin::surface("rpc")),
     );
     while let Some(frame) = a.events.next().await {
         a.snapshot.apply(&frame);
@@ -143,7 +143,7 @@ async fn a_resumed_session_thinks_as_hard_as_it_was_left() {
     let id = a.session.clone();
     a.handle.submit(
         IntentId::mint(),
-        Input::text("/think high", Origin::surface("test")),
+        Input::text("/think high", Origin::surface("rpc")),
     );
     while let Some(frame) = a.events.next().await {
         a.snapshot.apply(&frame);
@@ -210,7 +210,7 @@ async fn a_renamed_session_comes_back_under_its_name() {
 
     a.handle.submit(
         IntentId::mint(),
-        Input::text("/rename the release", Origin::surface("test")),
+        Input::text("/rename the release", Origin::surface("rpc")),
     );
     while let Some(frame) = a.events.next().await {
         a.snapshot.apply(&frame);

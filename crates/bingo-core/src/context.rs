@@ -323,27 +323,19 @@ fn speaker(origin: &Origin) -> Option<String> {
 /// The stable marker on every line from the person the session works for.
 const THE_PERSON: &str = "from the person you work for";
 
-/// The surfaces the kernel itself speaks through in a user's turn: a
-/// contributor's piece, a hook's, its own. Each signs nothing, exactly as the
-/// person's own line signs nothing, so the surface is the only thing that
-/// tells them apart — which is why they are named here, beside the rule that
-/// reads them, and used from wherever a piece is minted.
+/// The origins used when the kernel and contributors provide context.
 pub(crate) const KERNEL_SURFACE: &str = "kernel";
 pub(crate) use bingo_sdk::CONTRIBUTOR_PREFIX;
-pub(crate) const HOOK_PREFIX: &str = "hook:";
 
-fn kernel_speaks_through(surface: &str) -> bool {
-    surface == KERNEL_SURFACE
-        || surface.starts_with(CONTRIBUTOR_PREFIX)
-        || surface.starts_with(HOOK_PREFIX)
+/// Only an unsigned line spoken through a known person surface is their own.
+pub(crate) fn the_persons_own(origin: &Origin) -> bool {
+    speaker(origin).is_none() && person_surface(origin)
 }
 
-/// The person's own line: signed by nobody, from nowhere, through a door the
-/// kernel does not speak through. A door that is not the person has to sign
-/// what it sends — a principal, a conversation, or both — because the fold has
-/// nothing else to tell it apart by.
-pub(crate) fn the_persons_own(origin: &Origin) -> bool {
-    speaker(origin).is_none() && !kernel_speaks_through(&origin.surface)
+/// A correspondent can use ordinary commands without becoming the owner.
+pub(crate) fn person_surface(origin: &Origin) -> bool {
+    bingo_sdk::PERSON_SURFACES.contains(&origin.surface.as_str())
+        && bingo_sdk::effective_voice(origin) == bingo_sdk::Voice::Said
 }
 
 #[cfg(test)]
@@ -370,7 +362,7 @@ mod tests {
             id,
             ItemBody::User {
                 parts: vec![ContentPart::text(text)],
-                origin: Origin::surface("t"),
+                origin: Origin::surface("rpc"),
             },
         )
     }
@@ -591,12 +583,7 @@ mod tests {
     fn the_kernel_and_its_hooks_speak_unsigned_and_are_not_the_person() {
         let msgs = ContextView::fold_items(&[
             said("i1", "trn_1", Origin::surface(KERNEL_SURFACE), "carry on"),
-            said(
-                "i2",
-                "trn_1",
-                Origin::surface(format!("{HOOK_PREFIX}guard")),
-                "not yet",
-            ),
+            said("i2", "trn_1", Origin::surface("hook:guard"), "not yet"),
             said("i3", "trn_1", person(), "ok"),
         ]);
         assert_eq!(

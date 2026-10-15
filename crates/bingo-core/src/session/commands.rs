@@ -51,14 +51,8 @@ pub(super) fn is_shell(name: &str) -> bool {
     name == BANG
 }
 
-/// Whether this submitter may run a shell line. A `!` is not a message to
-/// anybody: it runs a program on the machine bingo runs on, with the
-/// privileges bingo was started with, and nothing asks first. Only the person
-/// the session works for may write one — the same bareness the provider fold
-/// reads a person's own line by (`crate::context`). An agent's post, a room's
-/// nudge, a correspondent writing from a chat all sign what they send, and a
-/// signed line that starts with `!` is refused rather than run. An action
-/// runs no shell line, whoever signed it.
+/// Shell execution requires the same person origin as command consent.
+/// Actions never run a shell line.
 pub(super) fn may_run_shell(input: &Input) -> bool {
     match input {
         Input::Text { origin, .. } => crate::context::the_persons_own(origin),
@@ -70,15 +64,10 @@ pub(super) fn asked(input: &Input) -> bool {
     invocation::current().is_empty()
         && match input {
             Input::Text { origin, .. } => crate::context::the_persons_own(origin),
-            Input::Action { origin, .. } => origin.as_ref().is_some_and(pressed_by_a_person),
+            Input::Action { origin, .. } => {
+                origin.as_ref().is_some_and(crate::context::the_persons_own)
+            }
         }
-}
-
-/// An action is the person's own only when a person surface signed it; an
-/// unsigned action, or one a plugin or any other surface fired, is nobody's
-/// (fail closed).
-fn pressed_by_a_person(origin: &Origin) -> bool {
-    PERSON_SURFACES.contains(&origin.surface.as_str())
 }
 
 /// What a name nothing answers to is refused with. A `!` that found nothing
@@ -124,7 +113,10 @@ pub(super) fn spelled(name: &str) -> String {
 /// `/name rest` → `name`, `!rest` → `!`, an action → its name; prose → `None`.
 pub(super) fn parse(input: &Input) -> Option<Parsed> {
     match input {
-        Input::Text { text, .. } => parse_line(text),
+        Input::Text { text, origin, .. } if crate::context::person_surface(origin) => {
+            parse_line(text)
+        }
+        Input::Text { .. } => None,
         Input::Action { action, .. } => Some(Parsed {
             name: action.name.clone(),
             args: match &action.args {
@@ -501,7 +493,7 @@ mod tests {
     use serde_json::json;
 
     fn text(t: &str) -> Input {
-        Input::text(t, Origin::surface("test"))
+        Input::text(t, Origin::surface("rpc"))
     }
 
     #[test]
@@ -574,7 +566,12 @@ mod tests {
                 conversation: Some("loopback/oc_1".into()),
             },
         );
-        let parsed = parse(&input).expect("a command line");
+        let parsed = parse(&input).expect("a correspondent can use an ordinary command");
+        assert!(
+            !asked(&input),
+            "a correspondent cannot grant person consent"
+        );
+        assert!(!may_run_shell(&input), "a correspondent cannot run a shell");
         let invocation = Invocation::of(&input, &parsed);
         assert_eq!(invocation.line, "/guide do the thing");
         assert_eq!(

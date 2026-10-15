@@ -161,7 +161,7 @@ fn history(prompt: &str) -> Vec<Frame> {
         intent: None,
         body: ItemBody::User {
             parts: vec![ContentPart::text(prompt)],
-            origin: Origin::surface("test"),
+            origin: Origin::surface("rpc"),
         },
         meta: Default::default(),
     };

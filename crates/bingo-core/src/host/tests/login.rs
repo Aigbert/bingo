@@ -100,7 +100,7 @@ async fn ack_answering(
     let intent = IntentId::mint();
     client
         .handle
-        .submit(intent.clone(), Input::text(line, Origin::surface("test")));
+        .submit(intent.clone(), Input::text(line, Origin::surface("rpc")));
     let mut seen = Vec::new();
     while let Some(frame) = client.events.next().await {
         client.state.apply(&frame);
@@ -214,7 +214,7 @@ async fn cancelling_the_dialog_fails_the_login_and_an_instant_command_does_not()
     let login = IntentId::mint();
     client.handle.submit(
         login.clone(),
-        Input::text("/login signing paste", Origin::surface("test")),
+        Input::text("/login signing paste", Origin::surface("rpc")),
     );
     let dialog = loop {
         let frame = client.events.next().await.unwrap();

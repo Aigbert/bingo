@@ -20,7 +20,7 @@ fn configured(cfg: TurnConfig, commands: Vec<Arc<dyn Command>>) -> Mailbox {
 }
 
 fn input(text: &str) -> Input {
-    Input::text(text, Origin::surface("test"))
+    Input::text(text, Origin::surface("rpc"))
 }
 
 fn tool_config() -> TurnConfig {

@@ -70,7 +70,7 @@ async fn an_instant_command_runs_during_a_turn_and_is_applied() {
     );
     let mailbox = with_commands(provider, vec![echo.clone()]);
     let (mut state, mut events) = mailbox.attach().await.unwrap();
-    mailbox.submit(IntentId::mint(), Input::text("go", Origin::surface("test")));
+    mailbox.submit(IntentId::mint(), Input::text("go", Origin::surface("rpc")));
     drive(&mut events, &mut state, |f| {
         matches!(f.event, Event::ItemStarted { .. })
     })
@@ -80,7 +80,7 @@ async fn an_instant_command_runs_during_a_turn_and_is_applied() {
     let intent = IntentId::mint();
     mailbox.submit(
         intent.clone(),
-        Input::text("/echo  hello there", Origin::surface("test")),
+        Input::text("/echo  hello there", Origin::surface("rpc")),
     );
     let frames = collect(
         &mut events,
@@ -111,7 +111,7 @@ async fn a_command_that_is_not_instant_waits_and_holds_the_prose_behind_it() {
     let (mut state, mut events) = mailbox.attach().await.unwrap();
     mailbox.submit(
         IntentId::mint(),
-        Input::text("first", Origin::surface("test")),
+        Input::text("first", Origin::surface("rpc")),
     );
     drive(&mut events, &mut state, |f| {
         matches!(f.event, Event::ItemStarted { .. })
@@ -121,13 +121,10 @@ async fn a_command_that_is_not_instant_waits_and_holds_the_prose_behind_it() {
     let command = IntentId::mint();
     mailbox.submit(
         command.clone(),
-        Input::text("/slow", Origin::surface("test")),
+        Input::text("/slow", Origin::surface("rpc")),
     );
     let prose = IntentId::mint();
-    mailbox.submit(
-        prose.clone(),
-        Input::text("second", Origin::surface("test")),
-    );
+    mailbox.submit(prose.clone(), Input::text("second", Origin::surface("rpc")));
     let frames = collect(
         &mut events,
         &mut state,
@@ -194,7 +191,7 @@ async fn a_prompt_outcome_opens_a_turn_with_the_commands_own_intent() {
     let intent = IntentId::mint();
     mailbox.submit(
         intent.clone(),
-        Input::text("/greet", Origin::surface("test")),
+        Input::text("/greet", Origin::surface("rpc")),
     );
     let frames = collect(&mut events, &mut state, turn_completed).await;
     assert!(matches!(
@@ -233,7 +230,7 @@ async fn a_prompt_outcome_does_not_name_the_session() {
     let (mut state, mut events) = mailbox.attach().await.unwrap();
     mailbox.submit(
         IntentId::mint(),
-        Input::text("/greet", Origin::surface("test")),
+        Input::text("/greet", Origin::surface("rpc")),
     );
     collect(&mut events, &mut state, turn_completed).await;
     assert_eq!(state.summary.title, None);
@@ -291,7 +288,7 @@ async fn a_failing_command_is_rejected_with_its_error() {
     let intent = IntentId::mint();
     mailbox.submit(
         intent.clone(),
-        Input::text("/bad x", Origin::surface("test")),
+        Input::text("/bad x", Origin::surface("rpc")),
     );
     let frames = collect(&mut events, &mut state, |f| {
         matches!(f.event, Event::IntentAck { .. })
@@ -316,7 +313,7 @@ async fn a_compaction_turn_compacts_and_closes_and_is_refused_while_a_turn_runs(
         Arc::new(cfg)
     });
     let (mut state, mut events) = mailbox.attach().await.unwrap();
-    mailbox.submit(IntentId::mint(), Input::text("hi", Origin::surface("test")));
+    mailbox.submit(IntentId::mint(), Input::text("hi", Origin::surface("rpc")));
     drive(&mut events, &mut state, turn_completed).await;
 
     mailbox.compact(None).await.unwrap();
@@ -336,7 +333,7 @@ async fn a_compaction_turn_compacts_and_closes_and_is_refused_while_a_turn_runs(
 
     mailbox.submit(
         IntentId::mint(),
-        Input::text("more", Origin::surface("test")),
+        Input::text("more", Origin::surface("rpc")),
     );
     drive(&mut events, &mut state, |f| {
         matches!(f.event, Event::ItemStarted { .. })
@@ -358,7 +355,7 @@ async fn turn_end_hooks_run_after_the_completion_is_published() {
         Arc::new(cfg)
     });
     let (mut state, mut events) = mailbox.attach().await.unwrap();
-    mailbox.submit(IntentId::mint(), Input::text("hi", Origin::surface("test")));
+    mailbox.submit(IntentId::mint(), Input::text("hi", Origin::surface("rpc")));
     drive(&mut events, &mut state, turn_completed).await;
     assert!(
         !fired.load(std::sync::atomic::Ordering::SeqCst),
@@ -411,10 +408,7 @@ async fn a_command_from_a_source_dispatches_like_a_registered_one() {
     });
     let (mut state, mut events) = mailbox.attach().await.unwrap();
     let intent = IntentId::mint();
-    mailbox.submit(
-        intent.clone(),
-        Input::text("/late", Origin::surface("test")),
-    );
+    mailbox.submit(intent.clone(), Input::text("/late", Origin::surface("rpc")));
     let frames = collect(&mut events, &mut state, |f| {
         matches!(f.event, Event::IntentAck { .. })
     })
@@ -439,7 +433,7 @@ async fn session_and_journal_hooks_observe_without_delaying_anything() {
         Arc::new(cfg)
     });
     let (mut state, mut events) = mailbox.attach().await.unwrap();
-    mailbox.submit(IntentId::mint(), Input::text("hi", Origin::surface("test")));
+    mailbox.submit(IntentId::mint(), Input::text("hi", Origin::surface("rpc")));
     let received = collect(&mut events, &mut state, turn_completed).await;
     assert!(
         !hook.calls().iter().any(|c| c.starts_with("event:")),
@@ -475,11 +469,10 @@ async fn session_and_journal_hooks_observe_without_delaying_anything() {
 
 /// A shell line runs a program on this machine with no gate in front of it,
 /// so the person the session works for is the only one who may write one
-/// (M65). An agent's post that starts with `!` is refused, and the command
-/// behind it is never asked to run.
+/// (M65). Signed shell-looking text is prose; the command never runs.
 #[tokio::test]
-async fn a_shell_line_from_anyone_but_the_person_is_refused() {
-    let provider = ScriptedProvider::new(vec![]);
+async fn a_shell_line_from_anyone_but_the_person_is_prose() {
+    let provider = ScriptedProvider::new(vec![Script::Events(text("received"))]);
     let shell = ScriptedCommand::new(
         "!",
         true,
@@ -497,10 +490,11 @@ async fn a_shell_line_from_anyone_but_the_person_is_refused() {
         |f| matches!(&f.event, Event::IntentAck { intent: i, .. } if i == &intent),
     )
     .await;
-    let Some(IntentOutcome::Rejected { error }) = ack_of(&frames, &intent) else {
-        panic!("a signed shell line is refused: {frames:?}");
-    };
-    assert_eq!(error.code, ErrorCode::PermissionDenied);
+    assert!(matches!(
+        ack_of(&frames, &intent),
+        Some(IntentOutcome::TurnStarted { .. })
+    ));
+    assert_eq!(user_texts(&state), ["!rm -rf /"]);
     assert!(shell.calls().is_empty(), "nothing ran");
 }
 
@@ -514,7 +508,7 @@ async fn a_shell_line_with_no_shell_registered_says_so() {
     let intent = IntentId::mint();
     mailbox.submit(
         intent.clone(),
-        Input::text("!echo hi", Origin::surface("test")),
+        Input::text("!echo hi", Origin::surface("rpc")),
     );
     let frames = collect(
         &mut events,
@@ -540,7 +534,7 @@ async fn an_acknowledged_result_is_forwarded_without_another_item() {
     let intent = IntentId::mint();
     mailbox.submit(
         intent.clone(),
-        Input::text("/forward", Origin::surface("test")),
+        Input::text("/forward", Origin::surface("rpc")),
     );
     let frames = collect(&mut events, &mut state, |f| {
         matches!(f.event, Event::IntentAck { .. })

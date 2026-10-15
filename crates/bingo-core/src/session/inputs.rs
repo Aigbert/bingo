@@ -16,7 +16,7 @@ use serde_json::json;
 use jiff::Timestamp;
 use serde_json::Value;
 
-use super::queue::{self, Unit};
+use super::queue::{self, Pending, Unit};
 use super::running::Running;
 use super::{
     Actor, commands,
@@ -52,7 +52,7 @@ impl Actor {
     ) -> Result<(), KernelError> {
         let instant = command.is_instant(&parsed.args, &self.state).await;
         if !instant && !queued && (self.busy() || self.queue.ready()) {
-            return self.enqueue(intent, input).await;
+            return self.enqueue(intent, Pending::Submitted(input)).await;
         }
         let run = commands::Run {
             intent,
@@ -164,7 +164,7 @@ impl Actor {
             return self.log_input(intent, input).await;
         }
         if self.busy() || self.queue.ready() {
-            return self.enqueue(intent, input).await;
+            return self.enqueue(intent, Pending::Submitted(input)).await;
         }
         let inputs = self.held_then(intent, input).await?;
         self.start_turn(inputs, TurnOrigin::Submit, TurnKind::Respond)
@@ -232,7 +232,7 @@ impl Actor {
             return self.log_input(intent, input).await;
         }
         if self.busy() || self.queue.ready() || input.is_held() {
-            return self.enqueue(intent, input).await;
+            return self.enqueue(intent, Pending::Delivered(input)).await;
         }
         let inputs = self.held_then(intent, input).await?;
         self.start_turn(inputs, TurnOrigin::Peer, TurnKind::Respond)
@@ -251,7 +251,7 @@ impl Actor {
         Ok(inputs)
     }
 
-    async fn enqueue(&mut self, intent: IntentId, input: Input) -> Result<(), KernelError> {
+    async fn enqueue(&mut self, intent: IntentId, input: Pending) -> Result<(), KernelError> {
         let position = self.queue.push(intent.clone(), input);
         let changed = self.queue.changed();
         self.publish(changed, None).await?;

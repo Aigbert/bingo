@@ -388,7 +388,7 @@ async fn an_unknown_command_an_unknown_action_and_empty_text_are_rejected() {
     let mailbox = start(ScriptedProvider::new(vec![]), vec![]);
     let (mut state, mut events) = mailbox.attach().await.unwrap();
     let inputs = vec![
-        Input::text("/help", Origin::surface("test")),
+        Input::text("/help", Origin::surface("rpc")),
         Input::text("   ", Origin::surface("test")),
         Input::Action {
             action: Action {

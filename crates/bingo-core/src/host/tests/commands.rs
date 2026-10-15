@@ -72,7 +72,7 @@ impl Client {
     pub(super) async fn ack(&mut self, line: &str) -> (IntentOutcome, Vec<Frame>) {
         let intent = IntentId::mint();
         self.handle
-            .submit(intent.clone(), Input::text(line, Origin::surface("test")));
+            .submit(intent.clone(), Input::text(line, Origin::surface("rpc")));
         let mut seen = Vec::new();
         while let Some(frame) = self.events.next().await {
             self.state.apply(&frame);

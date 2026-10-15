@@ -14,8 +14,42 @@ const PREVIEW_CHARS: usize = 80;
 
 #[derive(Default)]
 pub(super) struct Queue {
-    entries: VecDeque<(IntentId, Input)>,
+    entries: VecDeque<(IntentId, Pending)>,
     revision: u64,
+}
+
+/// Delivery timing is already on `Input`; this preserves how it arrived.
+pub(super) enum Pending {
+    Submitted(Input),
+    Delivered(Input),
+}
+
+impl From<Input> for Pending {
+    fn from(input: Input) -> Self {
+        Self::Submitted(input)
+    }
+}
+
+impl Pending {
+    fn input(&self) -> &Input {
+        match self {
+            Self::Submitted(input) | Self::Delivered(input) => input,
+        }
+    }
+
+    fn into_input(self) -> Input {
+        match self {
+            Self::Submitted(input) | Self::Delivered(input) => input,
+        }
+    }
+
+    fn is_command(&self) -> bool {
+        matches!(self, Self::Submitted(input) if commands::is_command(input))
+    }
+
+    fn steerable(&self) -> bool {
+        !self.is_command() && !self.input().is_held()
+    }
 }
 
 /// What the head of the queue asks the idle session to do next.
@@ -29,41 +63,41 @@ impl Queue {
     pub(super) fn ready(&self) -> bool {
         self.entries
             .iter()
-            .any(|(_, input)| !input.is_held() || commands::is_command(input))
+            .any(|(_, input)| !input.input().is_held() || input.is_command())
     }
 
     /// Append; returns the 1-based position.
-    pub(super) fn push(&mut self, intent: IntentId, input: Input) -> u32 {
-        self.entries.push_back((intent, input));
+    pub(super) fn push(&mut self, intent: IntentId, input: impl Into<Pending>) -> u32 {
+        self.entries.push_back((intent, input.into()));
         self.entries.len() as u32
     }
 
     /// Everything, for a session that is closing.
     pub(super) fn drain_all(&mut self) -> Vec<(IntentId, Input)> {
-        self.entries.drain(..).collect()
+        self.entries.drain(..).map(unpack).collect()
     }
 
     /// The prose at the head, up to the first command: what a turn opening
     /// now takes with it. A held line is prose here — it asked to wait for a
     /// turn, and this is the turn it waited for.
     pub(super) fn take_prose(&mut self) -> Vec<(IntentId, Input)> {
-        self.take_run(|input| !commands::is_command(input))
+        self.take_run(|input| !input.is_command())
     }
 
     /// The prose a running turn may be steered with: up to the first command
     /// and the first line that asked to wait (M68).
     pub(super) fn take_steers(&mut self) -> Vec<(IntentId, Input)> {
-        self.take_run(steerable)
+        self.take_run(Pending::steerable)
     }
 
     /// The head of the queue for as long as `keep` holds.
-    fn take_run(&mut self, keep: impl Fn(&Input) -> bool) -> Vec<(IntentId, Input)> {
+    fn take_run(&mut self, keep: impl Fn(&Pending) -> bool) -> Vec<(IntentId, Input)> {
         let n = self
             .entries
             .iter()
             .take_while(|(_, input)| keep(input))
             .count();
-        self.entries.drain(..n).collect()
+        self.entries.drain(..n).map(unpack).collect()
     }
 
     /// What `intent` is queued as, while it still is: what a withdraw reads
@@ -72,23 +106,23 @@ impl Queue {
         self.entries
             .iter()
             .find(|(queued, _)| queued == intent)
-            .map(|(_, input)| input)
+            .map(|(_, input)| input.input())
     }
 
     /// Take `intent` out of the queue; `None` when it is not in it.
     pub(super) fn take(&mut self, intent: &IntentId) -> Option<Input> {
         let at = self.entries.iter().position(|(id, _)| id == intent)?;
-        self.entries.remove(at).map(|(_, input)| input)
+        self.entries.remove(at).map(|(_, input)| input.into_input())
     }
 
     /// The next unit, when there is one.
     pub(super) fn take_unit(&mut self) -> Option<Unit> {
         let (_, head) = self.entries.front()?;
-        if commands::is_command(head) {
+        if head.is_command() {
             return self
                 .entries
                 .pop_front()
-                .map(|(i, input)| Unit::Command(i, input));
+                .map(|(i, input)| Unit::Command(i, input.into_input()));
         }
         Some(Unit::Prose(self.take_prose()))
     }
@@ -108,21 +142,18 @@ impl Queue {
     }
 }
 
-fn entry(intent: &IntentId, input: &Input, position: u32) -> QueueEntry {
+fn entry(intent: &IntentId, input: &Pending, position: u32) -> QueueEntry {
     QueueEntry {
         intent: intent.clone(),
         position,
-        preview: preview(input),
-        steerable: steerable(input),
-        origin: origin_of(input),
+        preview: preview(input.input()),
+        steerable: input.steerable(),
+        origin: origin_of(input.input()),
     }
 }
 
-/// Whether a running turn may be steered with this line: not a command, and
-/// not one that asked to wait for the turn to end (M68). It is what the wire's
-/// `steerable` says and what the barrier obeys, from the one reading.
-fn steerable(input: &Input) -> bool {
-    !commands::is_command(input) && !input.is_held()
+fn unpack((intent, input): (IntentId, Pending)) -> (IntentId, Input) {
+    (intent, input.into_input())
 }
 
 pub(super) fn origin_of(input: &Input) -> Origin {
@@ -164,8 +195,35 @@ mod tests {
         );
     }
 
+    #[test]
+    fn delivered_command_spelling_stays_prose_with_either_timing() {
+        for spelling in ["!touch marker", "/plugins trust probe full"] {
+            for delivery in [Delivery::Wake, Delivery::Hold] {
+                let input = Input::Text {
+                    text: spelling.into(),
+                    images: Vec::new(),
+                    origin: Origin::surface("rpc"),
+                    delivery,
+                };
+                let mut queue = Queue::default();
+                queue.push(IntentId::mint(), Pending::Delivered(input.clone()));
+                assert_eq!(queue.ready(), delivery == Delivery::Wake);
+                let Event::QueueChanged { entries, .. } = queue.changed() else {
+                    panic!("queue event");
+                };
+                assert_eq!(entries[0].steerable, delivery == Delivery::Wake);
+                if delivery == Delivery::Hold {
+                    assert!(queue.take_steers().is_empty());
+                }
+                assert!(
+                    matches!(queue.take_unit(), Some(Unit::Prose(lines)) if lines[0].1 == input)
+                );
+            }
+        }
+    }
+
     fn text(t: &str) -> (IntentId, Input) {
-        (IntentId::mint(), Input::text(t, Origin::surface("test")))
+        (IntentId::mint(), Input::text(t, Origin::surface("rpc")))
     }
 
     /// A line that asked to wait for the turn to end (M68).
@@ -175,7 +233,7 @@ mod tests {
             Input::Text {
                 text: t.into(),
                 images: Vec::new(),
-                origin: Origin::surface("test"),
+                origin: Origin::surface("rpc"),
                 delivery: Delivery::Hold,
             },
         )
@@ -230,7 +288,7 @@ mod tests {
         let input = Input::Text {
             text: String::new(),
             images: vec![image],
-            origin: Origin::surface("test"),
+            origin: Origin::surface("rpc"),
             delivery: Delivery::Wake,
         };
         let mut q = Queue::default();
