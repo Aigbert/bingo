@@ -379,3 +379,32 @@ async fn instruction_pager_uses_a_relative_title() {
     assert!(title.starts_with("./"));
     assert!(title.ends_with("AGENTS.md"));
 }
+
+#[tokio::test]
+async fn memory_returns_to_focus_after_typing_and_reopening() {
+    let mut fixture = MemoryFixture::new();
+    fixture.open().await;
+    fixture.paint(108, 30).await;
+    fixture.press(typed('a')).await;
+    assert_eq!(fixture.run.ui.composer.text(), "a");
+    assert!(matches!(
+        fixture.run.ui.focus,
+        crate::focus::Focus::Composer
+    ));
+    fixture.paint(108, 30).await;
+    fixture.run.terminal_event(Term::Key(key(KeyCode::Tab)));
+    assert!(matches!(fixture.run.ui.focus, crate::focus::Focus::Pane(_)));
+    fixture.press(key(KeyCode::Esc)).await;
+    assert!(crate::pane::placed(fixture.run.session.tree.viewed()).is_empty());
+    fixture.open().await;
+    fixture.paint(108, 30).await;
+    fixture.run.ui.focus = crate::focus::Focus::Composer;
+    fixture.open().await;
+    fixture.paint(108, 30).await;
+    assert!(matches!(fixture.run.ui.focus, crate::focus::Focus::Pane(_)));
+    assert_eq!(
+        crate::pane::placed(fixture.run.session.tree.viewed()).len(),
+        1
+    );
+    assert_eq!(fixture.run.ui.composer.text(), "a");
+}

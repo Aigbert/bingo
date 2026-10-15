@@ -76,12 +76,7 @@ fn focus(ui: &mut Ui, state: &SessionState, key: &str) {
                 .panes
                 .iter()
                 .find(|seat| seat.key == key)
-                .and_then(|seat| super::view(ui, state, pane, seat))
-                .is_some_and(|view| {
-                    let mut items = Vec::new();
-                    super::controls(view, &mut items);
-                    !items.is_empty()
-                })
+                .is_some_and(|seat| super::focusable(ui, state, pane, seat))
     });
     ui.focus = if focusable {
         Focus::Pane(key.into())

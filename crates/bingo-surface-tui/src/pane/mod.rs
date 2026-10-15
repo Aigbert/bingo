@@ -1,5 +1,7 @@
 //! Pane declarations and the surface state belonging to their controls.
 mod draw;
+mod focus;
+pub use focus::{focusable, keys as focus_keys, tab_control};
 mod mouse;
 mod moved;
 pub(crate) mod readiness;

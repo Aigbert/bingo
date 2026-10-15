@@ -222,3 +222,50 @@ fn escape_reaches_a_root_callback_without_synthesizing_a_close() {
     assert!(matches!(&ui.focus, Focus::Pane(key) if key == &focused));
     assert_eq!(super::placed(tree.viewed()).len(), 1);
 }
+
+fn keyed_fixture() -> bingo_sdk::SessionState {
+    let mut state = fixture(true, true, false);
+    state
+        .signals
+        .get_mut("test")
+        .unwrap()
+        .get_mut("pane")
+        .unwrap()["slots"][0]["view"]["onKey"] =
+        json!({"name":"test:ui","args":{"handler":"root","event":"key"}});
+    state
+}
+
+#[test]
+fn root_handler_without_controls_rejoins_the_focus_ring() {
+    let tree = solo(&keyed_fixture());
+    let (mut ui, now) = scene();
+    draw_tree(108, 30, &tree, &mut ui, now);
+    let pane = ui.shown.seating.panes[0].key.clone();
+    ui.focus = Focus::Pane(pane.clone());
+    // A site's unhandled printable key returns through this same fallback.
+    crate::input::pane_keys(&mut ui, &tree, key(KeyCode::Char('a')), now);
+    assert_eq!(ui.composer.text(), "a");
+    for tab in [key(KeyCode::Tab), shift(KeyCode::BackTab)] {
+        assert!(crate::input::on_key(&mut ui, &tree, tab, now).is_empty());
+        assert!(matches!(&ui.focus, Focus::Pane(key) if key == &pane));
+        assert!(crate::input::on_key(&mut ui, &tree, tab, now).is_empty());
+        assert!(matches!(ui.focus, Focus::Composer));
+    }
+    let area = ui.shown.seating.panes[0].area;
+    click(&mut ui, &tree, area, now);
+    assert!(matches!(&ui.focus, Focus::Pane(key) if key == &pane));
+    let effects = crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
+    assert!(
+        matches!(&effects[..], [crate::effect::Effect::Submit(bingo_sdk::Input::Action { action, .. })] if action.args["event"] == "close")
+    );
+    assert_eq!(ui.composer.text(), "a");
+}
+
+#[test]
+fn text_without_a_key_path_is_skipped_by_tab() {
+    let tree = solo(&fixture(false, true, false));
+    let (mut ui, now) = scene();
+    draw_tree(108, 30, &tree, &mut ui, now);
+    crate::input::on_key(&mut ui, &tree, key(KeyCode::Tab), now);
+    assert!(matches!(ui.focus, Focus::Composer));
+}

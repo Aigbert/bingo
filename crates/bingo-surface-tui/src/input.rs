@@ -72,6 +72,23 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if let Some(effects) = leaving(ui, tree.viewed(), key, now) {
         return effects;
     }
+    owned_keys(ui, tree, key, now, owner)
+}
+
+fn owned_keys(
+    ui: &mut Ui,
+    tree: &Tree,
+    key: KeyEvent,
+    now: Now,
+    owner: crate::focus::Owner,
+) -> Vec<Effect> {
+    if owner == crate::focus::Owner::Pane && matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
+        let backwards = key.code == KeyCode::BackTab;
+        if !crate::pane::tab_control(ui, tree.viewed(), backwards) {
+            cycle_focus(ui, tree, now, backwards);
+        }
+        return Vec::new();
+    }
     if owner == crate::focus::Owner::Pane
         && let Some(action) = crate::pane::key_handler(ui, tree.viewed(), key)
     {
@@ -121,6 +138,10 @@ fn composer_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effec
     if key.code == KeyCode::Esc {
         return escape(ui, tree, now);
     }
+    if key.code == KeyCode::BackTab && !crate::pane::focus_keys(ui, tree.viewed()).is_empty() {
+        cycle_focus(ui, tree, now, true);
+        return Vec::new();
+    }
     if key.code == KeyCode::Tab {
         return tabbed(ui, tree, now);
     }
@@ -138,7 +159,8 @@ fn tabbed(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         dropdown: !suggestions(ui, tree).is_empty(),
         busy: tree.viewed().busy(),
         typing: !ui.composer.text().trim().is_empty(),
-        focusable: !row_actions(tree.viewed()).is_empty(),
+        focusable: !row_actions(tree.viewed()).is_empty()
+            || !crate::pane::focus_keys(ui, tree.viewed()).is_empty(),
     };
     match keys::tab(at) {
         Some(keys::Tab::Complete) => accept(ui, tree),
@@ -146,7 +168,7 @@ fn tabbed(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         // waits for the running turn rather than steering it.
         Some(keys::Tab::Queue) => submit(ui, tree, now, Delivery::Hold),
         Some(keys::Tab::Focus) => {
-            cycle_focus(ui, tree, now);
+            cycle_focus(ui, tree, now, false);
             Vec::new()
         }
         None => Vec::new(),
@@ -326,20 +348,38 @@ fn row_actions(state: &SessionState) -> Vec<(bingo_sdk::ItemId, Vec<bingo_sdk::A
         .collect()
 }
 
-/// Tab walks the placed rows, then returns the keyboard to the composer.
-fn cycle_focus(ui: &mut Ui, tree: &Tree, now: Now) {
-    let rows = row_actions(tree.viewed());
-    let next = ui
-        .focus
-        .row()
-        .and_then(|id| rows.iter().position(|(item, _)| item == id))
-        .map_or(0, |at| at + 1);
-    let Some((item, _)) = rows.get(next) else {
-        ui.focus = crate::focus::Focus::Composer;
-        return;
+/// Panes and transcript rows share a ring with the composer.
+fn cycle_focus(ui: &mut Ui, tree: &Tree, now: Now, backwards: bool) {
+    use crate::focus::Focus;
+    let mut ring = vec![Focus::Composer];
+    ring.extend(
+        crate::pane::focus_keys(ui, tree.viewed())
+            .into_iter()
+            .map(Focus::Pane),
+    );
+    ring.extend(
+        row_actions(tree.viewed())
+            .into_iter()
+            .map(|(item, _)| Focus::Row(item)),
+    );
+    let current = ring
+        .iter()
+        .position(|focus| match (focus, &ui.focus) {
+            (Focus::Pane(a), Focus::Pane(b)) => a == b,
+            (Focus::Row(a), Focus::Row(b)) => a == b,
+            (Focus::Composer, Focus::Composer) => true,
+            _ => false,
+        })
+        .unwrap_or_default();
+    let next = if backwards {
+        (current + ring.len() - 1) % ring.len()
+    } else {
+        (current + 1) % ring.len()
     };
-    ui.focus = crate::focus::Focus::Row(item.clone());
-    if let Some((line, _)) = ui.shown.blocks.span(item) {
+    ui.focus = ring.swap_remove(next);
+    if let Focus::Row(item) = &ui.focus
+        && let Some((line, _)) = ui.shown.blocks.span(item)
+    {
         ui.scroll.reveal(
             line,
             ui.shown.height,
