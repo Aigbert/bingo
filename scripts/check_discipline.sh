@@ -75,6 +75,15 @@ nouns=$(grep -rEinw 'room|team|hire|experience|schedule' crates/bingo-sdk/src cr
 if [ -n "$nouns" ]; then
   say "feature noun found in kernel/sdk code:"; say "$nouns" | head; fail=1
 fi
+# 4a. The same nouns reach the kernel through data it embeds: a JSON table, a manifest, a page.
+#     A TOML comment is prose, as a Rust comment is.
+data_nouns=$( { grep -rEinw 'room|team|hire|experience|schedule' crates/bingo-sdk crates/bingo-core \
+    --include='*.json' --include='*.jsonl' --include='*.md' --include='*.txt' 2>/dev/null
+  grep -rEinw 'room|team|hire|experience|schedule' crates/bingo-sdk crates/bingo-core \
+    --include='*.toml' 2>/dev/null | grep -vE '^[^:]+:[0-9]+:\s*#'; } | grep -v '/target/' || true)
+if [ -n "$data_nouns" ]; then
+  say "feature noun found in kernel/sdk data:"; say "$data_nouns" | head; fail=1
+fi
 # 4b. `agent` is a plugin noun too (ADR-0010): as an identifier in the kernel it is a leak;
 #     in a string it is prose (the system prompt calls the product an agent) or a test's surface name;
 #     a string continued with a trailing backslash is a string line too.
