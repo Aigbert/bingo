@@ -233,3 +233,30 @@ async fn keys_wait_no_longer_than_the_command_wait() {
     assert!(run.next_draw().is_none_or(|at| at > Instant::now()));
     assert!(session.submitted().is_empty());
 }
+
+#[tokio::test]
+async fn escape_ends_a_busy_command_hold_immediately() {
+    interrupt_command_hold(key(KeyCode::Esc));
+}
+
+#[tokio::test]
+async fn ctrl_c_ends_a_busy_command_hold_immediately() {
+    interrupt_command_hold(ctrl('c'));
+}
+
+fn interrupt_command_hold(chord: crossterm::event::KeyEvent) {
+    let now = still(scene().1);
+    let (_home, mut run, session) = palette_run(now);
+    run.session.tree.fold.apply(&frame(1, started("busy")));
+    typeahead::command_sent(&mut run, IntentId::from_raw("slow"));
+    type_burst(&mut run, "zq");
+    run.terminal_event(Term::Key(chord));
+    assert_eq!(
+        session.interrupts(),
+        1,
+        "interrupt before any acknowledgement"
+    );
+    assert!(run.typeahead.is_empty());
+    assert!(run.typeahead.deadline().is_none());
+    assert!(run.ui.composer.is_empty());
+}

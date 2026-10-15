@@ -6,7 +6,7 @@ ADR-0002, ADR-0079. A bug fix with a decision in it, so it gets a plan.
 
 A key a person types reaches the place that reads it, in the order typed, or it
 stays visible in the composer. No path discards one silently. One exception is
-deliberate: a key typed before a dialog opened is never entered into that dialog.
+deliberate: input typed elsewhere is never entered into an ask that takes focus.
 
 ## The drop
 
@@ -36,7 +36,7 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
 
 ## Bricks
 
-1. `run/typeahead.rs` owns keys typed ahead. Each waits with the site it was typed
+1. `run/typeahead.rs` owns keys and pastes in one ordered queue. Each waits with the site it was typed
    at (`None` for the composer). `queue` never drops.
 2. A key whose site has gone is addressed again to whatever owns the keyboard now:
    the next site, or the composer.
@@ -44,13 +44,20 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
    which is when a command's `surface` action has opened its site, or for at most
    `OPENING_WAIT` (1 s); the loop wakes at that deadline.
 4. Dialogs: if the keyboard's owner is now an open ask (not set aside), typed-ahead
-   keys are dropped and a warning says how many: "N keys typed before this dialog
-   opened were not entered into it". This covers every ask, not only the sealed ones
+   inputs are dropped with "N queued inputs from elsewhere were not entered into
+   this dialog" (singular: "input"). Count each key or paste once; do not expose
+   content. This wording also covers an already open ask regaining focus. Record
+   actual keyboard ownership, never the identity of an ask set aside. Queued pastes
+   are always excluded from asks, including ones queued at that ask, to protect
+   answers and secret fields. This covers every ask, not only the sealed ones
    (permission, sign-in): a `y` meant for a filter must never approve a tool, and a
    password field must never receive a fragment of a command. Leaving them in the
    composer was rejected: the composer is hidden behind the ask and would carry the
    keys into the next prompt unseen.
-5. Escape and ctrl+c still clear everything waiting.
+5. Escape and ctrl+c clear the command hold as well as queued input, so an active
+   turn is interrupted immediately.
+6. Applying queued input or its drop notice owes a frame, including after paint
+   releases the command deadline; otherwise the edited composer remains invisible.
 
 ## Files
 
@@ -72,8 +79,16 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
 - [x] Isolated tmux drive of `/sessions⏎abc`, before and after.
 - [x] Gates and ten smoke runs, five or more beside a parallel cargo build.
 
+- [ ] Esc and ctrl+c during a busy command hold interrupt now and leave no queue.
+- [ ] Deadline release during paint schedules a following frame showing `zq`.
+- [ ] Held `ab`, paste `X`, `cd` arrive as `abXcd`; asks reject queued pastes.
+- [ ] Permission ask, `/nosuch⏎y`: the ask remains unanswered, with a truthful count.
+- [ ] Review gates, regenerated schemas/TypeScript, and three isolated smoke runs.
+
 ## Non-goals
 
+- Mouse events during a command hold may act ahead of queued input; pointer
+  ordering is outside this review round.
 - Palette latency per key (a drawing plus a round trip). The smoke's 10 s wait is
   not raised here either; the numbers are in Verified.
 - Keys queued at an ask that is then answered are still forgotten with it.

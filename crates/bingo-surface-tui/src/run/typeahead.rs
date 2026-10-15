@@ -54,6 +54,7 @@ impl Typeahead {
     /// Escape and ctrl+c end what was typed ahead along with everything else.
     pub(super) fn clear(&mut self) {
         self.keys.clear();
+        self.opening = None;
     }
 
     /// Keys typed at a dialog that has been answered go with it.
