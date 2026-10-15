@@ -38,7 +38,14 @@ impl Interceptor for Open {
             .invalidate(&cx.session, vec![REQUEST.into()])
             .await?;
         cx.host.signal(&cx.session, ID, REQUEST, slot()).await?;
-        serde_json::to_value(CommandOutcome::Applied { message: None }).map_err(error)
+        serde_json::to_value(CommandOutcome::Surface {
+            action: Action {
+                name: "Pane".into(),
+                args: json!({"plugin":ID,"id":REQUEST}),
+            },
+            fallback: Some("Status opened.".into()),
+        })
+        .map_err(error)
     }
 }
 pub fn slot() -> Value {

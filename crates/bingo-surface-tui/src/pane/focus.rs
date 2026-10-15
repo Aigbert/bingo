@@ -64,29 +64,3 @@ pub fn tab_control(ui: &mut Ui, state: &SessionState, backwards: bool) -> bool {
         false
     }
 }
-
-/// Publishing a focused, asked pane is an explicit request, even for an open ID.
-pub fn published(ui: &mut Ui, state: &SessionState, plugin: &str, kind: &str) {
-    let requested = bingo_sdk::slot::placed(state)
-        .into_iter()
-        .find_map(|placed| {
-            if placed.plugin != plugin || placed.kind != kind {
-                return None;
-            }
-            match placed.slot {
-                bingo_sdk::slot::Slot::Pane {
-                    id,
-                    focus: true,
-                    asked: true,
-                    view,
-                    ..
-                } if view.view().is_none_or(takes_keys) => {
-                    Some(format!("{}/{plugin}/{id}", state.summary.id))
-                }
-                _ => None,
-            }
-        });
-    if let Some(key) = requested {
-        ui.focus = Focus::Pane(key);
-    }
-}

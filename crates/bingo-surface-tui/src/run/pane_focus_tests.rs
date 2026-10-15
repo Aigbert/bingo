@@ -21,23 +21,58 @@ fn publication(asked: bool) -> Event {
     }
 }
 
+fn hub_publication() -> Event {
+    let rows = bingo_mod_status::rows::rows(&(&state()).into(), &[], &[], None);
+    let view = bingo_mod_status::draw::tree(&rows, "session", 108, 14, 0);
+    let Event::Signal { mut payload, .. } = publication(true) else {
+        unreachable!()
+    };
+    payload["slots"][0]["id"] = json!("status");
+    payload["slots"][0]["rows"] = json!(14);
+    payload["slots"][0]["view"] = json!(view);
+    Event::Signal {
+        generation: None,
+        plugin: bingo_sdk::Plugin::manifest(&bingo_mod_status::Status::default())
+            .id
+            .into(),
+        kind: "status".into(),
+        payload,
+    }
+}
+
 #[tokio::test]
-async fn publishing_an_open_pane_requests_focus_again_without_duplicating_it() {
+async fn refresh_preserves_a_draft_and_only_own_opener_receipt_refocuses() {
     let now = scene().1;
     let mut run = tests::idle(now.instant);
     let mut screen = Recorder::default();
-    for seq in 1..=3 {
-        if seq < 3 {
-            run.ui.focus = Focus::Composer;
-        }
-        run.frame(&frame(seq, publication(true)), &mut screen)
-            .unwrap();
-        run.ui.sync_panes(run.session.tree.viewed());
-        let drawn = draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
-        assert!(drawn.contains("Key-only pane"));
-        assert!(matches!(run.ui.focus, Focus::Pane(_)), "publication {seq}");
-        assert_eq!(crate::pane::placed(run.session.tree.viewed()).len(), 1);
-    }
+    run.frame(&frame(1, hub_publication()), &mut screen)
+        .unwrap();
+    run.ui.sync_panes(run.session.tree.viewed());
+    draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+    run.ui.focus = Focus::Composer;
+    run.ui.composer.set("a draft");
+    run.frame(&frame(2, hub_publication()), &mut screen)
+        .unwrap();
+    run.ui.sync_panes(run.session.tree.viewed());
+    let drawn = draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+    assert!(drawn.contains("spent"));
+    assert!(matches!(run.ui.focus, Focus::Composer));
+    assert_eq!(run.ui.composer.text(), "a draft");
+    let pane = crate::pane::placed(run.session.tree.viewed()).remove(0);
+    let outcome = IntentOutcome::Applied {
+        result: json!({"surface":{"name":"Pane","args":{"plugin":pane.plugin,"id":pane.id}}}),
+    };
+    run.ack(&IntentId::mint(), &outcome);
+    assert!(matches!(run.ui.focus, Focus::Composer));
+    let intent = run.mint(Some("/status".into()));
+    run.ack(&intent, &outcome);
+    draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+    assert!(matches!(run.ui.focus, Focus::Pane(_)));
+    assert_eq!(crate::pane::placed(run.session.tree.viewed()).len(), 1);
+    assert_eq!(run.ui.composer.text(), "a draft");
+    run.ui.focus = Focus::Composer;
+    run.ack(&intent, &outcome);
+    assert!(matches!(run.ui.focus, Focus::Composer));
 }
 
 #[tokio::test]
@@ -135,4 +170,67 @@ async fn unasked_publications_and_redraws_do_not_request_focus() {
     run.ui.sync_panes(run.session.tree.viewed());
     draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
     assert!(matches!(run.ui.focus, Focus::Composer));
+}
+
+#[tokio::test]
+async fn opener_receipt_consumes_the_pending_initial_focus() {
+    let now = scene().1;
+    let mut run = tests::idle(now.instant);
+    let mut screen = Recorder::default();
+    run.ui.focus = Focus::Layer(crate::ui::Layer::shut(now.instant));
+    run.frame(&frame(1, publication(true)), &mut screen)
+        .unwrap();
+    run.ui.sync_panes(run.session.tree.viewed());
+    let intent = run.mint(Some("/open-keys".into()));
+    run.ack(
+        &intent,
+        &IntentOutcome::Applied {
+            result: json!({"surface":{"name":"Pane","args":{"plugin":"fixture","id":"keys"}}}),
+        },
+    );
+    draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+    assert!(matches!(run.ui.focus, Focus::Pane(_)));
+    run.ui.focus = Focus::Composer;
+    run.ui.composer.set("draft");
+    run.frame(&frame(2, publication(true)), &mut screen)
+        .unwrap();
+    run.ui.sync_panes(run.session.tree.viewed());
+    draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+    assert!(matches!(run.ui.focus, Focus::Composer));
+    assert_eq!(run.ui.composer.text(), "draft");
+}
+
+#[tokio::test]
+async fn opener_receipt_addresses_held_keys_before_releasing_them() {
+    for expired in [false, true] {
+        let now = still(scene().1);
+        let session = Arc::new(TestSession::default());
+        let mut run = tests::idle_in(state(), session.clone(), now.instant);
+        let mut screen = Recorder::default();
+        run.frame(&frame(1, publication(true)), &mut screen)
+            .unwrap();
+        run.ui.sync_panes(run.session.tree.viewed());
+        draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+        run.ui.focus = Focus::Composer;
+        let intent = run.mint(Some("/open-keys".into()));
+        typeahead::command_sent(&mut run, intent.clone());
+        run.terminal_event(Term::Key(typed('x')));
+        assert_eq!(run.typeahead.len(), 1);
+        if expired {
+            run.typeahead.expire();
+        }
+        run.ack(
+            &intent,
+            &IntentOutcome::Applied {
+                result: json!({"surface":{"name":"Pane","args":{"plugin":"fixture","id":"keys"}}}),
+            },
+        );
+        draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+        assert!(matches!(run.ui.focus, Focus::Pane(_)));
+        assert_eq!(run.ui.composer.text(), "");
+        assert!(run.typeahead.is_empty());
+        assert!(session.submitted().iter().any(|input| matches!(input,
+            Input::Action { action, .. } if action.name == "fixture:ui" && action.args["value"]["key"] == "x"
+        )));
+    }
 }

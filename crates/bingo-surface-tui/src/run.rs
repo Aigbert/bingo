@@ -495,7 +495,6 @@ impl Run {
         }
         surface::restore_prompt(self, undone);
         interactions::refocus(self);
-        surface::pane_published(self, frame);
         match &frame.event {
             Event::InteractionOpened { .. } => {
                 screen.bell().map_err(stdio)?;
@@ -604,11 +603,11 @@ impl Run {
         site_keys::answered(self, intent, outcome);
         self.ui.actions.acknowledge(intent);
         self.release_actions();
-        typeahead::drain(self);
         if matches!(outcome, IntentOutcome::Rejected { .. }) {
             self.rewind_prompts.cancel(intent);
         }
         let Some(about) = self.mine.remove(intent) else {
+            typeahead::drain(self);
             return;
         };
         match outcome {
@@ -617,6 +616,7 @@ impl Run {
             _ => {}
         }
         typeahead::settled(self, intent);
+        typeahead::drain(self);
     }
 
     fn rejected(&mut self, message: &str, about: Option<String>) {

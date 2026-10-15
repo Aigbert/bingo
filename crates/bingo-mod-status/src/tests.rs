@@ -272,3 +272,35 @@ async fn an_unmodified_pull_slot_renders_from_a_bounded_attachment() {
         if options.max_snapshot_bytes == Some(64 * 1024))
     ));
 }
+
+#[tokio::test]
+async fn opener_returns_a_pane_receipt_each_time() {
+    let host = testing::TestHost::default();
+    host.on_signal(|_, _, _, _| async { Ok(()) });
+    let cx = HookContext {
+        session: state().summary.id,
+        turn: None,
+        item: None,
+        cwd: "/unused".into(),
+        provider: None,
+        model: None,
+        host: host.handle(),
+    };
+    let opener = command::Open(Default::default());
+    for _ in 0..2 {
+        let result = opener
+            .chain(
+                catalogue::COMMAND_RUN,
+                &cx,
+                json!({"command":"status","args":"","surface":"terminal"}),
+                Next::new(|_| Box::pin(async { panic!("terminal opener fell through") })),
+            )
+            .await
+            .unwrap();
+        assert_eq!(result["kind"], "surface");
+        assert_eq!(
+            result["action"],
+            json!({"name":"Pane","args":{"plugin":ID,"id":REQUEST}})
+        );
+    }
+}

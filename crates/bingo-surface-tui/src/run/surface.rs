@@ -63,15 +63,7 @@ fn focus(run: &mut Run, args: &Value) {
         .find(|pane| pane.plugin == plugin && pane.id == id && pane.asked)
     {
         run.ui.focus = crate::focus::Focus::Pane(pane.key);
-    }
-}
-
-pub(super) fn pane_published(run: &mut Run, frame: &bingo_sdk::Frame) {
-    if &frame.session != run.session.tree.view() || run.session.tree.open_interaction().is_some() {
-        return;
-    }
-    if let Event::Signal { plugin, kind, .. } = &frame.event {
-        crate::pane::published(&mut run.ui, run.session.tree.viewed(), plugin, kind);
+        run.ui.sync_panes(run.session.tree.viewed());
     }
 }
 

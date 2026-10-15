@@ -121,3 +121,47 @@ async fn click_and_commands_keep_only_the_persons_choice_across_hosts() {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "corrupted");
     host.shutdown().await;
 }
+
+#[tokio::test]
+async fn repeated_mod_openers_return_pane_receipts() {
+    let home = tempfile::tempdir().unwrap();
+    let (host, mut attachment) = start(home.path()).await;
+    assert_eq!(pane(&mut attachment).await, Some(false));
+    for _ in 0..2 {
+        let intent = IntentId::mint();
+        attachment.handle.submit(
+            intent.clone(),
+            Input::Action {
+                action: Action {
+                    name: "open-pane".into(),
+                    args: json!({}),
+                },
+                origin: Some(Origin::surface("tui")),
+            },
+        );
+        let result = tokio::time::timeout(Duration::from_secs(10), async {
+            while let Some(frame) = attachment.events.next().await {
+                if let Event::IntentAck {
+                    intent: ack,
+                    outcome,
+                    ..
+                } = frame.event
+                    && ack == intent
+                {
+                    return outcome;
+                }
+            }
+            panic!("command receipt missing")
+        })
+        .await
+        .unwrap();
+        let IntentOutcome::Applied { result } = result else {
+            panic!("opener failed: {result:?}")
+        };
+        assert_eq!(
+            result["surface"],
+            json!({"name":"Pane","args":{"plugin":"fixture","id":"main"}})
+        );
+    }
+    host.shutdown().await;
+}
