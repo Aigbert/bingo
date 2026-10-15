@@ -393,6 +393,10 @@ async fn an_unknown_command_never_answers_the_ask_it_set_aside() {
     }
 }
 
+fn status_id() -> &'static str {
+    bingo_sdk::Plugin::manifest(&bingo_mod_status::Status::default()).id
+}
+
 fn status_pane(state: &mut SessionState) {
     let rows = bingo_mod_status::rows::rows(&(&*state).into(), &[], &[], None);
     let view = bingo_mod_status::draw::tree(&rows, "session", 108, 12, 0);
@@ -401,14 +405,10 @@ fn status_pane(state: &mut SessionState) {
         "closeOnEscape":true, "holdToasts":true, "rows":12, "view":view
     }))
     .unwrap();
-    state
-        .signals
-        .entry("bingo.mod.status".into())
-        .or_default()
-        .insert(
-            "status".into(),
-            bingo_sdk::slot::with(json!({}), [pane]).into(),
-        );
+    state.signals.entry(status_id().into()).or_default().insert(
+        "status".into(),
+        bingo_sdk::slot::with(json!({}), [pane]).into(),
+    );
 }
 
 #[tokio::test]
@@ -431,7 +431,7 @@ async fn held_status_keys_follow_the_pane_handoff_but_never_a_returning_ask() {
         );
         type_burst(&mut run, "\ny");
         let (intent, action) = unanswered(&session, &[]).unwrap();
-        assert_eq!(action.name, "bingo.mod.status:ui");
+        assert_eq!(action.name, format!("{}:ui", status_id()));
         assert_eq!(action.args["value"]["key"], "enter");
         assert_eq!(run.typeahead.len(), 1);
         if ask {
@@ -441,7 +441,7 @@ async fn held_status_keys_follow_the_pane_handoff_but_never_a_returning_ask() {
             2,
             Event::Signal {
                 generation: None,
-                plugin: "bingo.mod.status".into(),
+                plugin: status_id().into(),
                 kind: "status".into(),
                 payload: json!({}),
             },
@@ -482,20 +482,21 @@ async fn a_surface_run_line_holds_keys_until_its_status_pane_opens() {
         1,
         Event::Signal {
             generation: None,
-            plugin: "bingo.mod.status".into(),
+            plugin: status_id().into(),
             kind: "status".into(),
-            payload: state.signals["bingo.mod.status"]["status"]
-                .payload()
-                .clone(),
+            payload: state.signals[status_id()]["status"].payload().clone(),
         },
     ));
     let mut screen = crate::doubles::Recorder::default();
     run.paint(&mut screen, Wake::Frame, now).unwrap();
-    run.ack(&intent, &IntentOutcome::Applied {
-        result: json!({"surface":{"name":"Pane","args":{"plugin":"bingo.mod.status","id":"status"}}}),
-    });
+    run.ack(
+        &intent,
+        &IntentOutcome::Applied {
+            result: json!({"surface":{"name":"Pane","args":{"plugin":status_id(),"id":"status"}}}),
+        },
+    );
     let (key_intent, action) = unanswered(&session, &[]).unwrap();
-    assert_eq!(action.name, "bingo.mod.status:ui");
+    assert_eq!(action.name, format!("{}:ui", status_id()));
     assert_eq!(action.args["value"]["key"], "x");
     run.ack(
         &key_intent,
@@ -510,9 +511,7 @@ async fn a_surface_run_line_holds_keys_until_its_status_pane_opens() {
 fn publish_status(run: &mut Run, pulled: bool) -> View {
     let mut state = state();
     status_pane(&mut state);
-    let mut payload = state.signals["bingo.mod.status"]["status"]
-        .payload()
-        .clone();
+    let mut payload = state.signals[status_id()]["status"].payload().clone();
     let view = serde_json::from_value(payload["slots"][0]["view"].clone()).unwrap();
     if pulled {
         payload["slots"][0]["view"] = json!({"request":{
@@ -531,7 +530,7 @@ fn publish_status(run: &mut Run, pulled: bool) -> View {
         2,
         Event::Signal {
             generation: None,
-            plugin: "bingo.mod.status".into(),
+            plugin: status_id().into(),
             kind: "status".into(),
             payload,
         },
@@ -565,7 +564,7 @@ async fn status_receipt_before_paint_keeps_keys_until_the_pane_can_read_them() {
         let intent = session.submissions()[0].0.clone();
         let view = publish_status(&mut run, pulled);
         run.ack(&intent, &IntentOutcome::Applied {
-            result: json!({"surface":{"name":"Pane","args":{"plugin":"bingo.mod.status","id":"status"}}}),
+            result: json!({"surface":{"name":"Pane","args":{"plugin":status_id(),"id":"status"}}}),
         });
         assert_eq!(
             run.typeahead.len(),
@@ -583,7 +582,7 @@ async fn status_receipt_before_paint_keeps_keys_until_the_pane_can_read_them() {
             answer_status_drawing(&mut run, view);
         }
         let (key_intent, action) = unanswered(&session, &[]).unwrap();
-        assert_eq!(action.name, "bingo.mod.status:ui");
+        assert_eq!(action.name, format!("{}:ui", status_id()));
         assert_eq!(action.args["value"]["key"], "x");
         run.ack(
             &key_intent,
@@ -607,7 +606,7 @@ async fn interrupts_do_not_wait_for_a_status_panes_first_drawing() {
             &mut run,
             Action {
                 name: "Pane".into(),
-                args: json!({"plugin":"bingo.mod.status","id":"status"}),
+                args: json!({"plugin":status_id(),"id":"status"}),
             },
         );
         typeahead::command_sent(&mut run, IntentId::from_raw("slow"));
