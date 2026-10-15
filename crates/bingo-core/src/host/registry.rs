@@ -102,6 +102,9 @@ fn contribution_kind(contribution: &Contribution) -> ContributionKind {
         | Contribution::Agent(_) => ContributionKind::Providers,
         Contribution::Store(_) => ContributionKind::Store,
         Contribution::Surface(_) => ContributionKind::Surface,
+        Contribution::Service {
+            value, wire: None, ..
+        } if value.is::<Arc<bingo_sdk::Pages>>() => ContributionKind::Catalogue,
         Contribution::Service { .. } => ContributionKind::Service,
         Contribution::Context(_) | Contribution::Contexts(_) => ContributionKind::Context,
         Contribution::Policy(_) => ContributionKind::Policy,
@@ -1054,5 +1057,25 @@ mod tests {
         let (code, text) = registry.notices.first().expect("one notice");
         assert_eq!(code, crate::plugins::NEEDED);
         assert!(text.contains("test.store"), "{text}");
+    }
+}
+
+#[cfg(test)]
+mod page_switch_tests {
+    use super::*;
+    #[test]
+    fn static_guides_are_catalogue_content_but_runtime_services_are_not() {
+        let pages = Contribution::service(
+            &bingo_sdk::Pages::key("example"),
+            Arc::new(bingo_sdk::Pages(&[])),
+            None,
+        );
+        assert_eq!(contribution_kind(&pages), ContributionKind::Catalogue);
+        let runtime = Contribution::service(
+            &bingo_sdk::ServiceKey::new("example"),
+            Arc::new(42u64),
+            None,
+        );
+        assert_eq!(contribution_kind(&runtime), ContributionKind::Service);
     }
 }
