@@ -111,8 +111,7 @@ identity means shared cursors. Missing native C toolchains limit Windows evidenc
 
 ## Verified — 2026-10-15
 
-Earlier runs (initial 5719, c33b0700 5686, 222d4c72 5749/5757 tests) passed all
-native gates, schema drift checks, 31 TypeScript tests and isolated Status drives.
+Earlier runs (initial 5719, c33b0700 5686, 222d4c72 5749/5757 tests) passed all native gates, schema drift checks, 31 TypeScript tests and isolated Status drives.
 Windows: core/context/experience/mod-status/persona/sdk/services/skills/tasks
 passed; bin/channel-feishu/mcp/plugin-rpc/print/tui stop in aws-lc-sys headers,
 permissions in tree-sitter C headers, so Windows stays unticked. Fix round 2
@@ -148,3 +147,4 @@ tmux drive 108x30/80x24: hub and /plugins both show repo waiting for your yes.
 - Final `bash scripts/tui-smoke.sh` ×3 → tui-smoke ok (351.8/313.2/294.2 seconds). Two earlier final-build attempts timed out waiting for `press ctrl+c again to exit` (first reply and ASCII cases); fresh reruns passed. Isolated `tmux -L hubfocus -f /dev/null`, temporary HOME/data/cwd, fake provider, 108×30 → /status, type a, submit, draft intact in composer after turn/live refresh; /status refocuses hub; Escape closes. Earlier Status/Memory Tab/Escape/reopen drives also passed.
 - `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked` → mod-status passed; mods and surface-tui deferred in aws-lc-sys: missing Windows C headers `stdlib.h`/`windows.h`; Windows criterion stays unticked.
 - `BINGO_UPDATE_SCHEMA=1 cargo test -p <generator crate> --locked` for sdk/plugin-rpc/surface-rpc/store-jsonl/mods → 666 passed, 3 ignored; generated schema/TypeScript outputs unchanged. TypeScript `npm test` → 33 passed, 0 failed. `run.rs`: 957 non-test lines; `impl Run`: two files.
+- Rebase onto `dev ccd1bacc` — Verified 2026-10-15: serial fmt/clippy `-D warnings` exit 0; `RUST_TEST_THREADS=4 cargo test --workspace --locked` → 189 groups, 6071 passed, 0 failed, 6 ignored; discipline ok (advisories only); budget ok (420/420 dependencies, warm core 0s, relink 0, 6 GB soft warning); deny advisories/bans/licenses/sources ok; tui-smoke ×3 → ok (246.8/270.5/233.6s). Three M166/M180 ordering regressions failed before the fixes and pass; isolated `tmux -L hubfocus -f /dev/null`, temp HOME/data/cwd, fake provider, 108×30 → Status turn/refresh preserves composer draft, repeated /status refocuses, single-send `/status⏎x` composes x, single-send `/model⏎fake` filters the picker, Tab reaches picker. Four provider variables unset throughout; run.rs 942 non-test lines, impl Run in two files.
