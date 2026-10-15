@@ -107,6 +107,7 @@ pub(crate) fn groups(props: &PaletteProps, recent: &[String]) -> (Vec<Group>, us
             },
         );
     }
+    all_sessions(&mut groups, props.open, query);
     crate::hints::append(&mut groups, props, query);
     let selected = if props.open == component::PaletteOpen::Sessions && query.is_empty() {
         groups.iter().flat_map(|g| &g.rows).position(|row| matches!(&row.target, crate::rows::Target::View(id) if id == props.session.as_str())).unwrap_or(0)
@@ -115,6 +116,22 @@ pub(crate) fn groups(props: &PaletteProps, recent: &[String]) -> (Vec<Group>, us
     };
     (groups, selected)
 }
+fn all_sessions(groups: &mut Vec<Group>, open: component::PaletteOpen, query: &str) {
+    if open == component::PaletteOpen::Sessions
+        || (!query.is_empty() && "all sessions".contains(&query.to_lowercase()))
+    {
+        let row = crate::rows::all_sessions();
+        if let Some(group) = groups.iter_mut().find(|g| g.name == "stored sessions") {
+            group.rows.push(row);
+        } else {
+            groups.push(Group {
+                name: "stored sessions".into(),
+                rows: vec![row],
+            });
+        }
+    }
+}
+
 pub fn tree(
     props: &PaletteProps,
     groups: &[Group],

@@ -2092,6 +2092,7 @@
       "type": "string",
       "enum": [
         "Palette",
+        "Sessions",
         "Question",
         "UserMessage",
         "AssistantMessage",
@@ -7004,6 +7005,22 @@
           "properties": {
             "component": {
               "type": "string",
+              "const": "Sessions"
+            },
+            "props": {
+              "$ref": "#/$defs/SessionsProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
               "const": "Question"
             },
             "props": {
@@ -8830,6 +8847,62 @@
         "cwd",
         "createdAt",
         "updatedAt"
+      ]
+    },
+    "SessionsProps": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/SessionsScope"
+        },
+        "limit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionSummary"
+          },
+          "description": "One extra summary is the sentinel for the next page."
+        },
+        "current": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "now": {
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/Action"
+        }
+      },
+      "required": [
+        "session",
+        "cwd",
+        "query",
+        "scope",
+        "limit",
+        "sessions",
+        "current",
+        "now",
+        "action"
+      ]
+    },
+    "SessionsScope": {
+      "type": "string",
+      "enum": [
+        "here",
+        "all"
       ]
     },
     "Setting": {

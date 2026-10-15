@@ -14,7 +14,7 @@ pub fn recent_roots(mut sessions: Vec<SessionSummary>) -> Vec<SessionSummary> {
     sessions
 }
 
-pub fn stored(summary: &SessionSummary) -> PaletteSession {
+pub fn stored(summary: &SessionSummary, now: jiff::Timestamp) -> PaletteSession {
     PaletteSession {
         id: summary.id.clone(),
         label: summary
@@ -23,7 +23,7 @@ pub fn stored(summary: &SessionSummary) -> PaletteSession {
             .unwrap_or_else(|| tree::directory(&summary.cwd)),
         detail: format!(
             "{}{}",
-            summary.updated_at,
+            bingo_sdk::ago(now, summary.updated_at),
             summary
                 .history
                 .messages

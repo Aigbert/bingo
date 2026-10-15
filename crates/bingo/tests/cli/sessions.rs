@@ -106,15 +106,23 @@ fn a_resumed_session_carries_its_first_ask_and_what_was_said_in_it() {
     };
     assert_eq!(
         summary()["title"],
-        "Fix the parser",
-        "the first sentence of the first ask, and not the paragraph"
+        "Fix the parser. It crashes on unicode.",
+        "the first line of the first ask"
+    );
+    assert_eq!(
+        summary()["firstAsk"],
+        "Fix the parser. It crashes on unicode."
     );
     assert_eq!(summary()["messages"], 2, "the ask and the answer");
 
     let again = say("Second.");
     let second = scripted_run(home.path(), &again, &["--continue"], "and the lexer");
     assert_eq!(second.status.code(), Some(0), "stderr: {}", stderr(&second));
-    assert_eq!(summary()["title"], "Fix the parser", "the mint fires once");
+    assert_eq!(
+        summary()["title"],
+        "Fix the parser. It crashes on unicode.",
+        "the mint fires once"
+    );
     assert_eq!(summary()["messages"], 4);
 
     // A summary as it was written before the count existed: it says nothing
@@ -184,4 +192,86 @@ fn a_session_another_process_holds_cannot_be_continued() {
     assert!(err.starts_with("[error] code=SESSION_LOCKED"), "{err}");
     let status = holder.wait().unwrap();
     assert!(status.success());
+}
+
+#[test]
+fn bare_resume_under_print_is_one_error_line() {
+    let out = run(bingo().args(["--print", "--resume"]));
+    assert!(!out.status.success());
+    assert!(stdout(&out).is_empty());
+    let error = stderr(&out);
+    assert_eq!(error.lines().count(), 1, "{error}");
+    assert!(
+        error.contains("--resume without an id requires a terminal"),
+        "{error}"
+    );
+}
+#[test]
+fn sessions_returns_a_surface_action_without_a_provider_turn() {
+    let home = tempfile::tempdir().unwrap();
+    let script = script(r#"{"responses":[]}"#);
+    let out = run_within(
+        bingo()
+            .env("BINGO_FAKE_SCRIPT", script.path())
+            .envs(home_env(home.path()))
+            .args([
+                "--print",
+                "--provider",
+                "fake",
+                "--output-format",
+                "json",
+                "--cwd",
+            ])
+            .arg(home.path())
+            .arg("/sessions"),
+        PATIENCE,
+    );
+    assert!(out.status.success(), "{}", stderr(&out));
+    let frames = frames_of(&out);
+    assert!(
+        !frames
+            .iter()
+            .any(|f| matches!(f.event, Event::TurnStarted { .. }))
+    );
+    assert!(frames.iter().any(|f| matches!(&f.event, Event::IntentAck { outcome: bingo_sdk::IntentOutcome::Applied { result }, .. } if result["surface"]["name"] == "Sessions")));
+}
+
+#[test]
+fn rename_cannot_steal_a_lock_from_another_process() {
+    let home = tempfile::tempdir().unwrap();
+    let script = script(r#"{"responses":[{"steps":[{"text":"done"}]}]}"#);
+    let first = scripted_run(home.path(), &script, &[], "first ask");
+    assert!(first.status.success(), "{}", stderr(&first));
+    let id = frames_of(&first)[0].session.to_string();
+    let dir = home.path().join(".bingo/data/sessions").join(&id);
+    let lock = std::fs::File::options()
+        .read(true)
+        .write(true)
+        .open(dir.join(".lock"))
+        .unwrap();
+    lock.try_lock().unwrap();
+    let before = std::fs::read(dir.join("summary.json")).unwrap();
+    let second = scripted_run(home.path(), &script, &["--resume", &id], "/rename stolen");
+    assert!(!second.status.success());
+    assert!(stderr(&second).contains("open elsewhere"));
+    assert_eq!(std::fs::read(dir.join("summary.json")).unwrap(), before);
+    let probe = std::fs::File::options()
+        .read(true)
+        .write(true)
+        .open(dir.join(".lock"))
+        .unwrap();
+    assert!(matches!(
+        probe.try_lock(),
+        Err(std::fs::TryLockError::WouldBlock)
+    ));
+}
+
+#[test]
+fn bare_resume_with_a_prompt_explains_the_conflict() {
+    let out = run(bingo().args(["--print", "--resume", "--", "do not drop this"]));
+    assert!(!out.status.success());
+    assert!(stdout(&out).is_empty());
+    let error = stderr(&out);
+    assert_eq!(error.lines().count(), 1, "{error}");
+    assert!(error.contains("pass an id to submit a prompt"), "{error}");
 }

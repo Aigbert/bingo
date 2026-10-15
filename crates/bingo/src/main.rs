@@ -129,8 +129,8 @@ struct Cli {
     #[arg(long, conflicts_with_all = ["resume", "session_id"])]
     r#continue: bool,
 
-    /// Reopen the session with this id.
-    #[arg(long, value_name = "ID", conflicts_with = "session_id")]
+    /// Open the session directory, or reopen a session by id.
+    #[arg(long, value_name = "ID", num_args = 0..=1, default_missing_value = "", conflicts_with = "session_id")]
     resume: Option<String>,
 
     /// Stop the turn after this many model rounds; without it a turn runs
@@ -376,6 +376,18 @@ fn surface_for(
     env: &Arc<Env>,
     interactive: bool,
 ) -> Result<(&'static str, SurfaceOptions), KernelError> {
+    if cli.resume.as_deref() == Some("") && cli.prompt.is_some() {
+        return Err(KernelError::new(
+            ErrorCode::InvalidInput,
+            "--resume without an id opens the session list; pass an id to submit a prompt",
+        ));
+    }
+    if cli.resume.as_deref() == Some("") && !interactive {
+        return Err(KernelError::new(
+            ErrorCode::InvalidInput,
+            "--resume without an id requires a terminal",
+        ));
+    }
     let (cwd, env) = (cwd.to_path_buf(), env.clone());
     Ok(match work {
         Work::Rpc { stdio } => ("rpc", serve_options(stdio, cwd, env)?),
@@ -701,6 +713,7 @@ fn plugins(
         Box::new(PermissionsPlugin),
         Box::new(bingo_mod_ask::Ask),
         Box::new(bingo_mod_palette::Palette),
+        Box::new(bingo_mod_sessions::Sessions),
         Box::new(ShellHooksPlugin),
         Box::new(JsonlStorePlugin::default()),
         Box::new(ContextPlugin),
@@ -788,7 +801,11 @@ fn surface_options(cli: Cli, cwd: PathBuf, env: Arc<Env>) -> SurfaceOptions {
     SurfaceOptions {
         selector: selector(&cli, cwd.clone()),
         cwd,
-        prompt: cli.prompt,
+        prompt: if cli.resume.as_deref() == Some("") {
+            Some("/sessions".into())
+        } else {
+            cli.prompt
+        },
         env,
     }
 }
@@ -798,7 +815,9 @@ fn selector(cli: &Cli, cwd: PathBuf) -> SessionSelector {
     if cli.r#continue {
         return SessionSelector::Latest { cwd };
     }
-    if let Some(id) = &cli.resume {
+    if let Some(id) = &cli.resume
+        && !id.is_empty()
+    {
         return SessionSelector::ById {
             id: SessionId::from_raw(id),
         };

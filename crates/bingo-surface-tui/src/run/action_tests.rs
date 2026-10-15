@@ -233,3 +233,60 @@ async fn escape_on_an_ask_discards_its_owners_waiting_actions_only() {
     );
     assert!(run.ui.actions.action().is_none());
 }
+
+#[tokio::test]
+async fn switching_discards_only_an_empty_bare_resume_bootstrap() {
+    for (bootstrap, messages, title, expected) in [
+        (true, 0, None, "delete"),
+        (true, 1, None, "close"),
+        (false, 0, None, "close"),
+        (true, 0, Some("named"), "close"),
+    ] {
+        let now = scene().1;
+        let mut snapshot = state();
+        snapshot.summary.history.messages = Some(messages);
+        snapshot.summary.title = title.map(str::to_owned);
+        let mut run = tests::idle_in(
+            snapshot.clone(),
+            Arc::new(TestSession::default()),
+            now.instant,
+        );
+        run.session.bootstrap = bootstrap;
+        let host = bingo_sdk::testing::TestHost::default();
+        let (sent, mut received) = tokio::sync::mpsc::unbounded_channel();
+        let deleting = sent.clone();
+        host.on_delete(move |_| {
+            let sent = deleting.clone();
+            async move {
+                sent.send("delete").unwrap();
+                Ok(())
+            }
+        });
+        host.on_close(move |_, _| {
+            let sent = sent.clone();
+            async move {
+                sent.send("close").unwrap();
+                Ok(())
+            }
+        });
+        run.host = host.handle();
+        snapshot.summary.id = SessionId::from_raw("replacement");
+        run.attach(
+            Attachment {
+                session: snapshot.summary.id.clone(),
+                snapshot,
+                history: None,
+                events: Box::pin(futures::stream::empty()),
+                handle: SessionHandle(Arc::new(TestSession::default())),
+            },
+            &mut None,
+        );
+        assert_eq!(
+            tokio::time::timeout(std::time::Duration::from_secs(10), received.recv())
+                .await
+                .unwrap()
+                .unwrap(),
+            expected
+        );
+    }
+}

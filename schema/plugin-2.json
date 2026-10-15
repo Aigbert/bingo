@@ -7193,6 +7193,7 @@
       "type": "string",
       "enum": [
         "Palette",
+        "Sessions",
         "Question",
         "UserMessage",
         "AssistantMessage",

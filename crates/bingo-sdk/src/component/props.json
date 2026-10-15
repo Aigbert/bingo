@@ -286,5 +286,24 @@
       "session": "s",
       "conversation": []
     }
+  },
+  {
+    "component": "Sessions",
+    "props": {
+      "session": "ses_1",
+      "cwd": "/work",
+      "query": "",
+      "scope": "here",
+      "limit": 50,
+      "sessions": [],
+      "current": "ses_1",
+      "now": "2026-10-15T12:00:00Z",
+      "action": {
+        "name": "surface:sessions",
+        "args": {
+          "handler": "opening"
+        }
+      }
+    }
   }
 ]

@@ -44,6 +44,10 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
 }
 
 fn target(run: &Run) -> Option<(SessionId, String, bool)> {
+    if crate::sessions::active(&run.ui) {
+        return crate::sessions::request(&run.ui)
+            .map(|id| (run.session.tree.view().clone(), id.into(), true));
+    }
     if crate::palette::active(&run.ui) {
         return crate::palette::request(&run.ui).map(|id| {
             (
@@ -131,6 +135,12 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
     let Some(pending) = run.site_keys.remove(intent) else {
         return;
     };
+    if crate::sessions::active(&run.ui)
+        && crate::sessions::request(&run.ui) == Some(pending.focus.as_str())
+    {
+        directory_answer(run, &pending, outcome);
+        return;
+    }
     if crate::palette::active(&run.ui)
         && crate::palette::request(&run.ui) == Some(pending.focus.as_str())
     {
@@ -213,7 +223,9 @@ fn palette_waiting(run: &Run) -> bool {
     crate::palette::waiting(&run.ui, &run.session.tree, run.detection.now())
 }
 pub(super) fn blocked(run: &Run) -> bool {
-    if palette_waiting(run) {
+    if palette_waiting(run)
+        || crate::sessions::waiting(&run.ui, &run.session.tree, run.detection.now())
+    {
         return true;
     }
     focus(run).is_some_and(|focus| {
@@ -232,7 +244,9 @@ pub(super) fn drain(run: &mut Run) {
             run.site_queue.pop_front();
             continue;
         }
-        if palette_waiting(run) {
+        if palette_waiting(run)
+            || crate::sessions::waiting(&run.ui, &run.session.tree, run.detection.now())
+        {
             break;
         }
         if run.site_keys.values().any(|p| p.focus == site) {
@@ -249,6 +263,22 @@ pub(super) fn drain(run: &mut Run) {
         }
         run.site_queue.pop_front();
         let effects = input::on_key(&mut run.ui, &run.session.tree, key, run.detection.now());
+        run.apply(effects);
+    }
+}
+
+fn directory_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
+    if let IntentOutcome::Applied { result } = outcome {
+        let now = run.detection.now();
+        let effects = if let Ok(action) =
+            serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
+        {
+            crate::sessions::result(&mut run.ui, &action, now)
+        } else if result["handled"] == false {
+            input::palette_edit(&mut run.ui, &run.session.tree, pending.key, now)
+        } else {
+            Vec::new()
+        };
         run.apply(effects);
     }
 }

@@ -151,6 +151,7 @@ pub enum Open {
     #[default]
     Nothing,
     Palette(crate::palette::Opened),
+    Sessions(crate::sessions::Opened),
     /// One block, whole, as a sheet.
     Pager(Pager),
     /// The turns of this transcript, as a card above the input box.
@@ -161,7 +162,10 @@ impl Open {
     /// Whether the keyboard belongs to it while it is open. The lists and the
     /// panel answer keys; help is read while a person goes on typing.
     pub fn captures(&self) -> bool {
-        matches!(self, Open::Palette(_) | Open::Pager(_) | Open::Rewind(_))
+        matches!(
+            self,
+            Open::Sessions(_) | Open::Palette(_) | Open::Pager(_) | Open::Rewind(_)
+        )
     }
 
     /// How many frames its arrival takes: a card comes down, a sheet rises.
@@ -437,7 +441,7 @@ impl Ui {
     /// handed in rather than read here: what is the surface's own is the caret
     /// and the memo of the walk, and neither of those is the tree.
     pub fn suggestions(&self, cwd: &str, mentions: &[String]) -> Vec<Suggestion> {
-        if self.menu.dismissed || crate::palette::active(self) {
+        if self.menu.dismissed || crate::palette::active(self) || crate::sessions::active(self) {
             return Vec::new();
         }
         let line = self.composer.text();

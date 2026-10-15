@@ -45,6 +45,9 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if key == KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL) && ui.composer.is_empty() {
         return vec![Effect::Exit];
     }
+    if crate::sessions::active(ui) {
+        return crate::sessions::key(ui, tree, key, now);
+    }
     if crate::palette::active(ui) {
         return crate::palette::key(ui, tree, key, now);
     }

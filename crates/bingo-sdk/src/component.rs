@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 mod palette;
+mod sessions;
+pub use sessions::*;
 mod props;
 pub use palette::*;
 mod sealed;
@@ -28,6 +30,7 @@ macro_rules! components {
 }
 components! {
     Palette(Box<PaletteProps>),
+    Sessions(Box<SessionsProps>),
     Question(QuestionProps), UserMessage(UserMessageProps),
     AssistantMessage(AssistantMessageProps), ToolUse(ToolUseProps),
     ToolResult(ToolResultProps), ToolGroup(ToolGroupProps),

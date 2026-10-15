@@ -27,9 +27,11 @@ mod opening;
 mod palette;
 #[path = "run/pulling.rs"]
 mod pulling;
+mod sessions;
 /// The pictures a frame drew, on their way to the terminal.
 mod showing;
 mod site_keys;
+mod site_lifecycle;
 /// A line on its way out of the composer, and the pictures it named.
 mod submit;
 /// Whether a newer release is out, asked once at start (M63).
@@ -76,6 +78,7 @@ pub(crate) type Keys = Pin<Box<dyn Stream<Item = Term> + Send>>;
 enum Reply {
     Rendered(u64, crate::pulled::Key, Box<bingo_sdk::View>),
     Attached(Box<Attachment>),
+    Sessions(String, Vec<SessionSummary>),
     /// A child's mailbox, so a line typed in its view reaches it. The
     /// attachment's own stream is dropped: the tree's carries the child.
     Handle(SessionId, SessionHandle),
@@ -107,6 +110,7 @@ enum Reply {
 /// What this surface is attached to: the reducer's state for every session
 /// in the tree, and one mailbox per session it may write to.
 struct Attached {
+    bootstrap: bool,
     tree: Tree,
     handles: HashMap<SessionId, SessionHandle>,
 }
@@ -115,7 +119,11 @@ impl Attached {
     fn new(snapshot: SessionState, handle: SessionHandle) -> Self {
         let tree = Tree::new(snapshot);
         let handles = HashMap::from([(tree.root_id().clone(), handle)]);
-        Self { tree, handles }
+        Self {
+            bootstrap: false,
+            tree,
+            handles,
+        }
     }
 
     /// The mailbox the keyboard writes to: the session on screen.
@@ -306,6 +314,8 @@ async fn attach(
     surface: crate::TuiSurface,
     replies: mpsc::Sender<Reply>,
 ) -> Result<(Run, Option<FrameStream>), KernelError> {
+    let bootstrap = matches!(opts.selector, SessionSelector::Create { .. })
+        && opts.prompt.as_deref() == Some("/sessions");
     let attachment = host
         .open(opts.selector, identity(), OpenOptions::with_children())
         .await?;
@@ -333,6 +343,7 @@ async fn attach(
         sluggish: false,
         exit: None,
     };
+    run.session.bootstrap = bootstrap;
     run.ui.catalogs.current = host
         .service(&bingo_sdk::command::COMMAND_CATALOG)
         .map(crate::palette::Current);
@@ -613,6 +624,7 @@ impl Run {
 
     fn applied(&mut self, result: &Value) {
         if let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone()) {
+            sessions::surface_action(self, &action);
             palette::surface_action(self, action);
         }
         // Acknowledgements refresh the palette alongside asynchronous changes.
@@ -678,11 +690,13 @@ impl Run {
             Term::Key(key) => {
                 let chord = crate::keys::commands::chord(key);
                 if chord.as_deref() == Some("ctrl+c")
-                    || (chord.as_deref() == Some("esc") && !crate::palette::active(&self.ui))
+                    || (chord.as_deref() == Some("esc")
+                        && !crate::palette::active(&self.ui)
+                        && !crate::sessions::active(&self.ui))
                 {
                     self.site_keys.clear();
                     self.site_queue.clear();
-                    if chord.as_deref() == Some("ctrl+c") && palette::ctrl_c(self, key) {
+                    if chord.as_deref() == Some("ctrl+c") && site_lifecycle::ctrl_c(self, key) {
                         return;
                     }
                 }
@@ -744,6 +758,7 @@ impl Run {
             Effect::View(session) => self.show(session),
             Effect::Open(selector) => self.open(selector),
 
+            Effect::ListSessions => sessions::list(self),
             Effect::ListStored => palette::list_stored(self),
             Effect::Copy(text) => self.clipboard = Some(text),
             Effect::PasteImage => self.paste_image(),
@@ -900,14 +915,8 @@ impl Run {
 
     fn reply(&mut self, reply: Reply, events: &mut Option<FrameStream>) {
         match reply {
-            Reply::Rendered(epoch, key, view) => {
-                if palette::retired(self, &key, &view) {
-                    return;
-                }
-                self.ui.placed.pulled.answer_at(epoch, key, *view);
-                self.release_actions();
-                site_keys::drain(self);
-            }
+            Reply::Rendered(epoch, key, view) => site_lifecycle::rendered(self, epoch, key, *view),
+            Reply::Sessions(request, rows) => sessions::fill(self, &request, rows),
             Reply::Attached(attachment) => self.attach(*attachment, events),
             Reply::SiteKeyOpened(opened) => site_keys::opened(self, *opened),
             Reply::Handle(session, handle) => {
@@ -945,9 +954,7 @@ impl Run {
     /// Swap trees: the old attachment is closed on its own task, the new one
     /// replaces it whole, and the scroll starts at the bottom again.
     fn attach(&mut self, attachment: Attachment, events: &mut Option<FrameStream>) {
-        let host = self.host.clone();
-        let old = self.session.tree.root_id().clone();
-        tokio::spawn(async move { host.close(&old, CloseReason::Client).await });
+        sessions::leave(self, &attachment.session);
         let sessions: Vec<_> = self.session.handles.keys().cloned().collect();
         self.discard_actions(&sessions);
         self.session = Attached::new(attachment.snapshot, attachment.handle);

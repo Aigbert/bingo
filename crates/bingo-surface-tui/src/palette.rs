@@ -92,7 +92,7 @@ fn props(ui: &Ui, tree: &Tree, open: &Opened, now: Now) -> PaletteProps {
             .sessions
             .iter()
             .filter(|s| !tree.is_root(&s.id))
-            .map(sessions::stored)
+            .map(|summary| sessions::stored(summary, now.wall))
             .collect(),
         conversation: sessions::conversation(tree, &open.children, now),
         session: tree.view().clone(),
@@ -272,6 +272,14 @@ pub fn command(ui: &mut Ui, line: &str, now: Now) -> Option<Vec<Effect>> {
         return None;
     }
     match name {
+        "sessions" => {
+            ui.notify(
+                Level::Info,
+                "Sessions is off · enable bingo.mod.sessions to open the directory",
+                now.instant,
+            );
+            Some(vec![])
+        }
         "help" => Some(open(ui, PaletteOpen::Keys, now)),
         "resume" if args.is_empty() => Some(open(ui, PaletteOpen::Sessions, now)),
         "resume" => Some(vec![Effect::Open(SessionSelector::ById {

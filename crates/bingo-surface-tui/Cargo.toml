@@ -69,6 +69,7 @@ bingo-mod-ask.workspace = true
 bingo-core.workspace = true
 bingo-mod-hello.workspace = true
 bingo-mod-palette.workspace = true
+bingo-mod-sessions.workspace = true
 bingo-sdk = { workspace = true, features = ["testing"] }
 # The pictures the transcript's tests hand over, drawn by the crate that
 # reads them back rather than pasted into a source file.

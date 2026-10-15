@@ -360,3 +360,15 @@ mod review_tests {
         assert_eq!(rows[0].rows[0].target, Target::Command("exit".into()));
     }
 }
+
+pub(crate) fn all_sessions() -> Row {
+    Row {
+        label: "All sessions…".into(),
+        hint: String::new(),
+        alert: None,
+        now: String::new(),
+        marks: vec![],
+        hint_marks: vec![],
+        target: Target::Run("/sessions".into()),
+    }
+}

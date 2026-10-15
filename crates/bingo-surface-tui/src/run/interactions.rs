@@ -20,7 +20,8 @@ pub(super) fn refocus_at(run: &mut Run, now: jiff::Timestamp) {
     let changed = run.ui.dialog.current() != open.map(|open| &open.id);
     run.ui.dialog.focus_on(open);
     if changed && let Some(open) = open {
-        run.ui.dialog.aside = crate::palette::active(&run.ui)
+        run.ui.dialog.aside = crate::sessions::active(&run.ui)
+            || crate::palette::active(&run.ui)
             || crate::ask::aside::recent(
                 run.received_asks.get(&open.id).copied().unwrap_or(now),
                 run.ui.last_typed,

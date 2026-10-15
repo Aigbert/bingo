@@ -10,6 +10,7 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
         Box::new(bingo_mod_hello::Hello),
         Box::new(bingo_mod_ask::Ask),
         Box::new(bingo_mod_palette::Palette),
+        Box::new(bingo_mod_sessions::Sessions),
     ];
     if let Some(source) = source {
         let root = home.join("outside");
@@ -27,7 +28,7 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
         ));
     }
     let env = Env::rooted(home);
-    for name in ["hello", "ask", "bingo.mod.palette"] {
+    for name in ["hello", "ask", "bingo.mod.palette", "bingo.mod.sessions"] {
         bingo_core::plugins::switch(&env, name, !disabled).unwrap();
     }
     let path = bingo_core::settings::user_path(&env);
@@ -383,6 +384,33 @@ async fn live_switch_restores_commands_bindings_and_drawing_even_when_booted_off
                     .any(|plugin| plugin.id == link.plugin)
             );
         }
+        host.shutdown().await;
+    }
+}
+
+#[tokio::test]
+async fn sessions_obeys_the_same_switch_for_commands_and_rendering() {
+    for disabled in [false, true] {
+        let home = tempfile::tempdir().unwrap();
+        let (host, attachment) = start(home.path(), None, disabled).await;
+        let commands = host.catalog(CatalogKind::Commands).await.unwrap();
+        assert_eq!(
+            commands.entries.iter().any(|entry| entry.id == "sessions"),
+            !disabled
+        );
+        let request: render::RenderRequest = serde_json::from_value(json!({
+            "component":"Sessions", "requestId":"sessions", "surface":"terminal",
+            "viewport":{"columns":80,"rows":20},
+            "props":{"session":attachment.session,"current":attachment.session,"cwd":home.path(),
+                "query":"","scope":"here","limit":50,"sessions":[],"now":"2026-10-15T12:00:00Z",
+                "action":{"name":"surface:sessions","args":{}}}
+        }))
+        .unwrap();
+        let view = host
+            .render(&attachment.session, request.clone())
+            .await
+            .unwrap();
+        assert_eq!(view == request.engine(), disabled);
         host.shutdown().await;
     }
 }

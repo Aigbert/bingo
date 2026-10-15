@@ -11,6 +11,7 @@ pub use matched::{Matched, matched};
 )]
 pub enum Component {
     Palette,
+    Sessions,
     Question,
     UserMessage,
     AssistantMessage,
@@ -73,7 +74,7 @@ impl Component {
 
     pub const fn surfaces(self) -> &'static [SurfaceName] {
         match self {
-            Self::Palette => &[SurfaceName::Terminal, SurfaceName::Desktop],
+            Self::Palette | Self::Sessions => &[SurfaceName::Terminal, SurfaceName::Desktop],
             Self::AssistantMessage | Self::CommandOutput | Self::InfoNotice | Self::ShellRun => &[
                 SurfaceName::Terminal,
                 SurfaceName::Desktop,
@@ -113,8 +114,9 @@ impl Component {
         }
     }
 
-    pub const ALL: [Self; 31] = [
+    pub const ALL: [Self; 32] = [
         Self::Palette,
+        Self::Sessions,
         Self::Question,
         Self::UserMessage,
         Self::AssistantMessage,
@@ -189,7 +191,7 @@ mod tests {
             assert!(component.surfaces().contains(&SurfaceName::Desktop));
             assert_eq!(
                 component.surfaces().contains(&SurfaceName::Text),
-                component != Component::Palette
+                !matches!(component, Component::Palette | Component::Sessions)
             );
             assert_eq!(
                 component.surfaces().contains(&SurfaceName::Chat),

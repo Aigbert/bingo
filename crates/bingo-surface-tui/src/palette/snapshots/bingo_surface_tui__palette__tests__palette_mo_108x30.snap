@@ -17,7 +17,7 @@ expression: screen
 " ❯ /model          choose model                                                                 fake/small  "
 "   /permission     choose permission                                                               default  "
 "   stored sessions                                                                                          "
-"   model migration                                                      2023-11-14T22:13:20Z · 12 messages  "
+"   model migration                                                                  just now · 12 messages  "
 "   keys                                                                                                     "
 "   shift+tab      turn · cycle permission mode                                                     default  "
 "   ctrl+o         move · expand result · then all                                                           "

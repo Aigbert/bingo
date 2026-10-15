@@ -160,14 +160,13 @@ fn resume(previous: Option<&SessionSummary>, width: usize, now: Timestamp) -> St
     let Some(previous) = previous else {
         return String::new();
     };
-    let age = now.duration_since(previous.updated_at).unsigned_abs();
     let arrow = if theme::glyphs() == &theme::ASCII {
         "<"
     } else {
         "↺"
     };
     let title = previous.title.as_deref().unwrap_or("previous session");
-    let suffix = format!(" · {} ago · /resume", crate::worked::duration(age));
+    let suffix = format!(" · {} · /resume", bingo_sdk::ago(now, previous.updated_at));
     let room = width.saturating_sub(suffix.chars().count() + 2);
     crate::views::clip(
         &format!("{arrow} {}{suffix}", crate::views::clip(title, room)),

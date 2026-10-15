@@ -44,6 +44,7 @@ bingo-plugin-host.workspace = true
 bingo-mods.workspace = true
 bingo-mod-ask.workspace = true
 bingo-mod-palette.workspace = true
+bingo-mod-sessions.workspace = true
 bingo-agents.workspace = true
 bingo-rooms.workspace = true
 bingo-tasks.workspace = true

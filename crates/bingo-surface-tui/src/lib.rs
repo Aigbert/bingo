@@ -99,6 +99,7 @@ mod scroll;
 mod search;
 mod seats;
 mod select;
+mod sessions;
 /// What a person may set about this surface: the measure prose is drawn to,
 /// and the check the welcome box says the answer to.
 pub mod settings;

@@ -15,6 +15,9 @@ pub fn lines(
         .label
         .clone()
         .unwrap_or_else(|| bingo_sdk::view::text_children(children));
+    if props.variant.as_deref() == Some("plain") {
+        return super::text::lines(&label);
+    }
     let mut lines = if let Some(action) = &props.on_press {
         super::actions::lines(
             &[ActionItem {

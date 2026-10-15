@@ -62,4 +62,8 @@ record adds component names and props to the sdk.
   replacing the built-in that owns it, at its tier (ADR-0086 §3).
 - Snapshot tests per site, as ADR-0082 had.
 
+- M175 / ADR-0089 adds the eighth interaction site, `Sessions`, for terminal and
+  desktop, owned by `bingo-mod-sessions`. Its props include the client's minted action
+  and clock; selection, preview, filtering and verbs remain with the mod.
+
 Refs: ADR-0064, ADR-0079, ADR-0082, ADR-0085, ADR-0086.

@@ -228,6 +228,10 @@ fn layer(
     let rows = usize::from(above.height);
     match ui.focus.open() {
         Open::Nothing => {}
+        Open::Sessions(_) => {
+            let lines = crate::sessions::draw(ui, tree, frame, above.width, above.height, _now);
+            over(frame, above, lines);
+        }
         Open::Palette(_) => {
             let lines = crate::palette::draw(
                 ui,
