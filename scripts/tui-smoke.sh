@@ -219,7 +219,7 @@ await '? for shortcuts'
 finish
 
 step 'ctrl+f remains line search with Browse disabled'
-printf '{"update":{"check":false},"enabledPlugins":{"bingo.mod.browse":false}}' >"$WORK/home/.bingo/settings.json"
+printf '[update]\ncheck = false\n[enabledPlugins]\n"bingo.mod.browse" = false\n' >"$WORK/home/.bingo/settings.toml"
 start "$(long_reply)"
 keys 'say a lot' Enter
 await ' line 80'
@@ -228,7 +228,7 @@ await '1/1'
 vanish 'browse · turn'
 keys Escape
 finish
-printf '{"update":{"check":false}}' >"$WORK/home/.bingo/settings.json"
+printf '[update]\ncheck = false\n' >"$WORK/home/.bingo/settings.toml"
 
 step 'a focused block opens whole in the pager and gives the frame back'
 start "$(long_reply)"
