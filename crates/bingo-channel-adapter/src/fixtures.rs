@@ -20,6 +20,11 @@ pub fn ts() -> Timestamp {
 
 pub fn summary() -> SessionSummary {
     SessionSummary {
+        history: bingo_sdk::SessionHistory {
+            first_ask: None,
+            forked_from: None,
+            messages: None,
+        },
         id: SessionId::from_raw(SESSION),
         key: Some("loopback/oc_1".into()),
         title: None,
@@ -35,7 +40,6 @@ pub fn summary() -> SessionSummary {
         usage: Usage::default(),
         busy: false,
         asking: false,
-        messages: None,
     }
 }
 

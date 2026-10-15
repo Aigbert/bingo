@@ -39,6 +39,11 @@ pub fn session_id() -> SessionId {
 
 pub fn summary() -> SessionSummary {
     SessionSummary {
+        history: bingo_sdk::SessionHistory {
+            first_ask: None,
+            forked_from: None,
+            messages: None,
+        },
         tools: None,
         system_extra: None,
         driver: Default::default(),
@@ -54,7 +59,6 @@ pub fn summary() -> SessionSummary {
         usage: Usage::default(),
         busy: false,
         asking: false,
-        messages: None,
     }
 }
 

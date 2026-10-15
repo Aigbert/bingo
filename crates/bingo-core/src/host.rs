@@ -19,6 +19,9 @@ pub(crate) mod pins;
 pub(crate) mod plugin;
 pub(crate) mod provider;
 use live::Live;
+mod deletion;
+mod fork;
+mod inspection;
 mod reach;
 mod refresh;
 mod registry;
@@ -433,32 +436,6 @@ impl Host {
         Ok(())
     }
 
-    /// The identity and initial progress of a newly minted session.
-    fn summarize(&self) -> SessionSummary {
-        let now = Timestamp::now();
-        SessionSummary {
-            driver: Driver::default(),
-            id: SessionId::mint(),
-            key: None,
-            title: None,
-            cwd: String::new(),
-            parent: None,
-            model: None,
-            provider: None,
-            system_extra: None,
-            tools: None,
-            created_at: now,
-            updated_at: now,
-            usage: Usage::default(),
-            busy: false,
-            asking: false,
-            // A session the kernel has just minted has been counted, and the
-            // count is nought; `None` is only ever a summary older than the
-            // field.
-            messages: Some(0),
-        }
-    }
-
     /// The registered tools this session may call; `None` means every one.
     fn tools_for(&self, wanted: Option<&[String]>) -> Vec<Arc<dyn Tool>> {
         self.registry
@@ -546,7 +523,7 @@ impl Host {
         self.check_key_free(spec.key.as_deref())?;
         let spec = self.inherited(spec);
         let choice = self.model_for(&spec).await?;
-        let summary = crate::spec::stated(&spec, choice.as_ref(), self.summarize());
+        let summary = crate::spec::stated(&spec, choice.as_ref(), live::summarize());
         if let Some(store) = &self.registry.store {
             store.create(&summary).await?;
             store.acquire(&summary.id).await?;
@@ -735,18 +712,29 @@ impl HostApi for Host {
         self.live(session).map(|_| ())
     }
 
+    async fn read(&self, session: &SessionId) -> Result<SessionState, KernelError> {
+        inspection::read(self, session).await
+    }
+
+    async fn summary(&self, session: &SessionId) -> Result<SessionSummary, KernelError> {
+        inspection::summary(self, session).await
+    }
+
+    async fn check_delete(&self, session: &SessionId) -> Result<(), KernelError> {
+        inspection::check_delete(self, session).await
+    }
+
+    async fn fork(
+        &self,
+        session: &SessionId,
+        at: Option<TurnId>,
+    ) -> Result<SessionId, KernelError> {
+        fork::fork_session(self, session, at).await
+    }
+
     /// A session and everything under it, children first (ADR-0010 §6).
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
-        let mut doomed: Vec<SessionId> = self
-            .descendants(session)
-            .into_iter()
-            .map(|(id, _)| id)
-            .collect();
-        doomed.reverse();
-        for id in &doomed {
-            self.delete_one(id).await?;
-        }
-        self.delete_one(session).await
+        deletion::delete(self, session).await
     }
 
     async fn deliver(
@@ -883,14 +871,19 @@ impl HostApi for Host {
             .await
     }
 
-    /// Reconfigure a live session and hand the actor the config its next turn
-    /// runs on (ADR-0008 §4, ADR-0047 §3). The spec is the one holder of what
-    /// was moved, so the change is written there and read back from there.
+    /// Reconfigure the next live turn through its spec (ADR-0008, ADR-0047).
+    /// A stored title uses a brief store claim instead of starting an actor.
     async fn reconfigure(
         &self,
         session: &SessionId,
         change: SessionChange,
     ) -> Result<(), KernelError> {
+        if let SessionChange::Title(title) = &change {
+            let _guard = self.reopening.lock().await;
+            if self.live(session).is_err() {
+                return inspection::store(self)?.rename(session, title).await;
+            }
+        }
         let change = crate::config::change(self, session, change).await?;
         let changing = self.live(session)?.changing;
         let _guard = changing.lock().await;

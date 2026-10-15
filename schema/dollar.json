@@ -1325,6 +1325,22 @@
           "description": "An interaction is open; stamped only by the session actor.",
           "default": false
         },
+        "firstAsk": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "forkedFrom": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ForkLink"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "messages": {
           "type": [
             "integer",
@@ -1420,6 +1436,31 @@
         "outputTokens"
       ],
       "description": "Token counts as the provider reports them, the three input counts kept\napart: `input_tokens` is what the model read fresh, the cache counts are\nwhat it read from or wrote to a cached prefix. The whole input side is\n`input_total()`."
+    },
+    "ForkLink": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
+    "TurnId": {
+      "type": "string",
+      "description": "One run of the turn loop, closed exactly once."
     },
     "Fetch": {
       "type": "object",
@@ -1905,10 +1946,6 @@
         "startedAt",
         "body"
       ]
-    },
-    "TurnId": {
-      "type": "string",
-      "description": "One run of the turn loop, closed exactly once."
     },
     "ItemStatus": {
       "type": "string",

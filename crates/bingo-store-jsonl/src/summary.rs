@@ -31,7 +31,7 @@ pub fn of(dir: &Path) -> Result<Option<SessionSummary>, KernelError> {
 
 /// A summary that will not parse is treated as a missing one: it is derived,
 /// so the journal decides and the repair is silent.
-fn read(dir: &Path) -> Option<SessionSummary> {
+pub(crate) fn read(dir: &Path) -> Option<SessionSummary> {
     let bytes = std::fs::read(layout::summary(dir)).ok()?;
     serde_json::from_slice(&bytes).ok()
 }
@@ -46,6 +46,18 @@ fn rebuild(dir: &Path) -> Result<Option<SessionSummary>, KernelError> {
         .iter()
         .filter(|frame| frame.event.completes_a_message())
         .count();
+    let first_ask = frames.iter().find_map(|frame| match &frame.event {
+        Event::ItemCompleted { item } => bingo_sdk::asked(item).map(|ask| {
+            ask.lines()
+                .next()
+                .unwrap_or_default()
+                .trim()
+                .chars()
+                .take(200)
+                .collect()
+        }),
+        _ => None,
+    });
     let latest = frames
         .into_iter()
         .filter_map(|frame| match frame.event {
@@ -54,7 +66,11 @@ fn rebuild(dir: &Path) -> Result<Option<SessionSummary>, KernelError> {
         })
         .next_back()
         .map(|summary| SessionSummary {
-            messages: Some(messages as u64),
+            history: bingo_sdk::SessionHistory {
+                first_ask,
+                messages: Some(messages as u64),
+                ..summary.history
+            },
             ..summary
         });
     if let Some(summary) = &latest {
@@ -67,13 +83,17 @@ fn rebuild(dir: &Path) -> Result<Option<SessionSummary>, KernelError> {
 /// (ADR-0005 §5 — the derived file is where freshness lives). A file that never
 /// counted, or is gone, is rebuilt from the journal, which already holds this
 /// frame and counts it there; after that the cheap path serves every message.
-pub fn count_message(dir: &Path) -> Result<(), KernelError> {
-    let counted = read(dir).and_then(|summary| Some((summary.messages?, summary)));
+pub fn count_message(dir: &Path, first_ask: Option<String>) -> Result<(), KernelError> {
+    let counted = read(dir).and_then(|summary| Some((summary.history.messages?, summary)));
     match counted {
         Some((messages, summary)) => write(
             dir,
             &SessionSummary {
-                messages: Some(messages + 1),
+                history: bingo_sdk::SessionHistory {
+                    first_ask: summary.history.first_ask.or(first_ask),
+                    messages: Some(messages + 1),
+                    ..summary.history
+                },
                 ..summary
             },
         ),
@@ -190,7 +210,7 @@ mod tests {
     /// The three that must agree: the file the appends kept, the file a
     /// rebuild writes, and the journal they both read.
     fn counted(dir: &Path) -> Option<u64> {
-        of(dir).expect("a summary").and_then(|s| s.messages)
+        of(dir).expect("a summary").and_then(|s| s.history.messages)
     }
 
     #[test]
@@ -205,7 +225,7 @@ mod tests {
         for message in [said(2, "itm_1"), answered(3, "itm_2"), called(4, "itm_3")] {
             journal::append(dir.path(), &message).expect("append");
             if message.event.completes_a_message() {
-                count_message(dir.path()).expect("count");
+                count_message(dir.path(), Some("hi".into())).expect("count");
             }
         }
         assert_eq!(counted(dir.path()), Some(2), "an ask and an answer");
@@ -246,12 +266,15 @@ mod tests {
     fn a_file_that_never_counted_is_rebuilt_rather_than_guessed() {
         let dir = planted();
         let old = SessionSummary {
-            messages: None,
+            history: bingo_sdk::SessionHistory {
+                messages: None,
+                ..summary().history
+            },
             ..summary()
         };
         write(dir.path(), &old).expect("write");
         assert_eq!(
-            read(dir.path()).and_then(|s| s.messages),
+            read(dir.path()).and_then(|s| s.history.messages),
             None,
             "an old file lies about nothing"
         );
@@ -262,7 +285,7 @@ mod tests {
         ] {
             journal::append(dir.path(), &message).expect("append");
         }
-        count_message(dir.path()).expect("count");
+        count_message(dir.path(), Some("hi".into())).expect("count");
         assert_eq!(counted(dir.path()), Some(2), "not 1");
     }
 

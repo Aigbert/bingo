@@ -40,6 +40,38 @@ pub trait SessionStore: Send + Sync {
 
     async fn list(&self, filter: &SessionFilter) -> Result<Vec<SessionSummary>, KernelError>;
 
+    /// Read one summary without acquiring ownership or repairing files.
+    async fn summary(&self, session: &SessionId) -> Result<SessionSummary, KernelError> {
+        let frames = self.replay(session, Seq::ZERO).await?;
+        let summary = frames
+            .iter()
+            .find_map(|frame| match &frame.event {
+                crate::Event::SessionUpdated { summary } => Some(summary.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                KernelError::new(crate::ErrorCode::SessionNotFound, "no stored summary")
+            })?;
+        let mut state = crate::SessionState::new(summary);
+        for frame in frames {
+            state.apply(&frame);
+        }
+        Ok(state.summary)
+    }
+
+    /// Change only the title under a temporary exclusive claim, preserving activity time.
+    async fn rename(&self, _session: &SessionId, _title: &str) -> Result<(), KernelError> {
+        Err(KernelError::new(
+            crate::ErrorCode::Internal,
+            "this store cannot rename sessions",
+        ))
+    }
+
+    /// Observe ownership without claiming an unowned session.
+    async fn locked(&self, _session: &SessionId) -> Result<bool, KernelError> {
+        Ok(false)
+    }
+
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError>;
 
     /// Take the session for this process, from create or resume until

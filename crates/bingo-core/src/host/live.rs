@@ -27,3 +27,30 @@ impl Live {
         }
     }
 }
+
+/// The identity and initial progress of a newly minted session.
+pub(super) fn summarize() -> SessionSummary {
+    let now = Timestamp::now();
+    SessionSummary {
+        history: bingo_sdk::SessionHistory {
+            first_ask: None,
+            forked_from: None,
+            messages: Some(0),
+        },
+        driver: Driver::default(),
+        id: SessionId::mint(),
+        key: None,
+        title: None,
+        cwd: String::new(),
+        parent: None,
+        model: None,
+        provider: None,
+        system_extra: None,
+        tools: None,
+        created_at: now,
+        updated_at: now,
+        usage: Usage::default(),
+        busy: false,
+        asking: false,
+    }
+}

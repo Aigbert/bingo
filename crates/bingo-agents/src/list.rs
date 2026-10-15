@@ -50,7 +50,10 @@ pub fn row(child: &SessionSummary) -> Vec<String> {
         child.id.to_string(),
         state(child).to_string(),
         child.model.clone().unwrap_or_else(|| NONE.into()),
-        child.messages.map_or(NONE.into(), |n| n.to_string()),
+        child
+            .history
+            .messages
+            .map_or(NONE.into(), |n| n.to_string()),
         tokens(child).to_string(),
     ]
 }
@@ -320,7 +323,7 @@ mod tests {
             ["reviewer", "ses_child", "idle", NONE, NONE, "0"]
         );
         child.model = Some("fake-2".into());
-        child.messages = Some(3);
+        child.history.messages = Some(3);
         child.usage.input_tokens = 100;
         child.usage.cache_read_tokens = 50;
         child.usage.output_tokens = 7;

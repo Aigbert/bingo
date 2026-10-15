@@ -23,6 +23,11 @@ impl Asked {
     pub fn new() -> Self {
         Self {
             session: SessionSummary {
+                history: bingo_sdk::SessionHistory {
+                    first_ask: None,
+                    forked_from: None,
+                    messages: None,
+                },
                 tools: None,
                 system_extra: None,
                 driver: Default::default(),
@@ -38,7 +43,6 @@ impl Asked {
                 usage: Usage::default(),
                 busy: false,
                 asking: false,
-                messages: None,
             },
             turn: TurnId::from_raw("trn_test"),
             items: Vec::new(),

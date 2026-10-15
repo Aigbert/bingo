@@ -99,6 +99,31 @@ impl SessionStore for MemoryStore {
         Ok(out)
     }
 
+    async fn summary(&self, session: &SessionId) -> Result<SessionSummary, KernelError> {
+        self.lock()
+            .get(session)
+            .map(|entry| entry.summary.clone())
+            .ok_or_else(|| Self::missing(session))
+    }
+
+    async fn rename(&self, session: &SessionId, title: &str) -> Result<(), KernelError> {
+        let mut sessions = self.lock();
+        let entry = sessions
+            .get_mut(session)
+            .ok_or_else(|| Self::missing(session))?;
+        entry.summary.title = Some(title.to_owned());
+        entry.frames.push(Frame {
+            seq: Seq(entry.frames.last().map_or(1, |frame| frame.seq.0 + 1)),
+            ts: entry.summary.updated_at,
+            session: session.clone(),
+            cause: None,
+            event: bingo_sdk::Event::SessionUpdated {
+                summary: entry.summary.clone(),
+            },
+        });
+        Ok(())
+    }
+
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
         self.lock()
             .remove(session)
@@ -116,6 +141,11 @@ mod tests {
     fn summary(id: &str, cwd: &str, second: i64) -> SessionSummary {
         let ts = Timestamp::from_second(second).unwrap();
         SessionSummary {
+            history: bingo_sdk::SessionHistory {
+                first_ask: None,
+                forked_from: None,
+                messages: None,
+            },
             tools: None,
             system_extra: None,
             driver: Default::default(),
@@ -131,7 +161,6 @@ mod tests {
             usage: Usage::default(),
             busy: false,
             asking: false,
-            messages: None,
         }
     }
 

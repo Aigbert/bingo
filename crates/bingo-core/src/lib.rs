@@ -8,6 +8,7 @@ pub(crate) mod commands;
 mod config;
 pub mod context;
 pub mod executor;
+pub mod fork;
 pub mod gate;
 pub mod host;
 pub mod journal;

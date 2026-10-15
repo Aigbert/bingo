@@ -653,6 +653,11 @@ pub(crate) mod tests {
 
     fn summary() -> SessionSummary {
         SessionSummary {
+            history: bingo_sdk::SessionHistory {
+                first_ask: None,
+                forked_from: None,
+                messages: None,
+            },
             tools: None,
             system_extra: None,
             driver: Default::default(),
@@ -668,7 +673,6 @@ pub(crate) mod tests {
             usage: Usage::default(),
             busy: false,
             asking: false,
-            messages: None,
         }
     }
 

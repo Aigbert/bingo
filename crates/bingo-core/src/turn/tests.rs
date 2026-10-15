@@ -92,6 +92,11 @@ impl TurnHost for RecordingHost {
 fn summary() -> SessionSummary {
     let ts = Timestamp::from_second(0).unwrap();
     SessionSummary {
+        history: bingo_sdk::SessionHistory {
+            first_ask: None,
+            forked_from: None,
+            messages: None,
+        },
         tools: None,
         system_extra: None,
         driver: Default::default(),
@@ -107,7 +112,6 @@ fn summary() -> SessionSummary {
         usage: Usage::default(),
         busy: false,
         asking: false,
-        messages: None,
     }
 }
 

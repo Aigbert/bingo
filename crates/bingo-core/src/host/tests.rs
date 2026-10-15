@@ -12,6 +12,7 @@ mod checkpoint;
 mod commands;
 mod complete;
 mod disabled;
+mod fork;
 mod instance_origin;
 mod instances;
 mod latest;

@@ -9,7 +9,7 @@ use std::sync::{Arc, Weak};
 
 use async_trait::async_trait;
 use bingo_sdk::*;
-use jiff::{SignedDuration, Timestamp};
+use jiff::Timestamp;
 
 use crate::host::{Host, Refreshed, provider};
 
@@ -60,10 +60,7 @@ impl Command for ModelsCommand {
 async fn listing(host: &Arc<Host>) -> Result<String, KernelError> {
     let entries = host.catalog(CatalogKind::Models).await?.entries;
     let now = Timestamp::now();
-    let asked = |provider: &str| {
-        host.served_at(provider)
-            .map(|at| ago(now.duration_since(at)))
-    };
+    let asked = |provider: &str| host.served_at(provider).map(|at| bingo_sdk::ago(now, at));
     Ok(blocks(&entries, &asked))
 }
 
@@ -140,25 +137,15 @@ fn counted(refreshed: &[Refreshed]) -> String {
     said.join(" · ")
 }
 
-/// How long ago, coarsely: a person asking where a list came from wants this
-/// morning told from last week, not a count of seconds.
-fn ago(past: SignedDuration) -> String {
-    const MINUTE: i64 = 60;
-    const HOUR: i64 = 60 * MINUTE;
-    const DAY: i64 = 24 * HOUR;
-    match past.as_secs().max(0) {
-        ..MINUTE => "just now".to_string(),
-        seconds @ MINUTE..HOUR => format!("{}m ago", seconds / MINUTE),
-        seconds @ HOUR..DAY => format!("{}h ago", seconds / HOUR),
-        seconds => format!("{}d ago", seconds / DAY),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::json;
 
     use super::*;
+    use jiff::SignedDuration;
+    fn ago(duration: SignedDuration) -> String {
+        bingo_sdk::ago(Timestamp::UNIX_EPOCH + duration, Timestamp::UNIX_EPOCH)
+    }
 
     fn entry(provider: &str, id: &str, source: &str) -> CatalogEntry {
         CatalogEntry {

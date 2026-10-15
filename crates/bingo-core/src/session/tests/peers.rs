@@ -14,13 +14,8 @@ async fn a_wake_delivery_to_an_idle_session_opens_a_peer_turn_that_says_who_spok
     assert_eq!(turn_origin(&frames), Some(TurnOrigin::Peer));
     let labels: Vec<String> = frames.iter().map(|f| label(&f.event)).collect();
     assert_eq!(
-        &labels[..4],
-        [
-            "completed:user/completed",
-            "SessionUpdated",
-            "turnStarted",
-            "ack:TurnStarted"
-        ]
+        &labels[..3],
+        ["completed:user/completed", "turnStarted", "ack:TurnStarted"]
     );
     let ItemBody::User { origin, .. } = &state.transcript.items()[0].body else {
         panic!("a user item first");

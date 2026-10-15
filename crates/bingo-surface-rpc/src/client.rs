@@ -338,6 +338,23 @@ impl HostApi for RemoteKernel {
         Ok(())
     }
 
+    async fn fork(
+        &self,
+        session: &SessionId,
+        at: Option<bingo_sdk::TurnId>,
+    ) -> Result<SessionId, KernelError> {
+        let result: crate::methods::ForkResult = self
+            .connection
+            .call(
+                name::SESSION_FORK,
+                &crate::methods::ForkParams {
+                    session: session.clone(),
+                    at,
+                },
+            )
+            .await?;
+        Ok(result.session)
+    }
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
         let params = SessionParams {
             session: session.clone(),

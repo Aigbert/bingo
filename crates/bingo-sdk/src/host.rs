@@ -474,6 +474,42 @@ pub trait HostApi: Send + Sync {
     /// Detach this client; the session keeps running.
     async fn close(&self, session: &SessionId, reason: CloseReason) -> Result<(), KernelError>;
 
+    /// Inspect a live or stored session without opening it or taking ownership.
+    async fn read(&self, _session: &SessionId) -> Result<SessionState, KernelError> {
+        Err(KernelError::new(
+            ErrorCode::Internal,
+            "this host cannot inspect sessions",
+        ))
+    }
+
+    /// Look up one summary without listing the session store.
+    async fn summary(&self, _session: &SessionId) -> Result<SessionSummary, KernelError> {
+        Err(KernelError::new(
+            ErrorCode::Internal,
+            "this host cannot inspect summaries",
+        ))
+    }
+
+    /// Check one row for a delete confirmation; deletion rechecks the whole set.
+    async fn check_delete(&self, _session: &SessionId) -> Result<(), KernelError> {
+        Err(KernelError::new(
+            ErrorCode::Internal,
+            "this host cannot check deletion",
+        ))
+    }
+
+    /// Copy a durable root journal through a completed turn; no children are copied.
+    async fn fork(
+        &self,
+        _session: &SessionId,
+        _at: Option<TurnId>,
+    ) -> Result<SessionId, KernelError> {
+        Err(KernelError::new(
+            ErrorCode::Internal,
+            "this host does not fork sessions",
+        ))
+    }
+
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError>;
 
     /// The peer-messaging primitive (ADR-0010 §1, ADR-0011 §3): the target's

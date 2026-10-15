@@ -215,6 +215,19 @@ impl SessionState {
         self.seq = frame.seq;
         if frame.event.completes_a_message() {
             self.count_a_message();
+            if self.summary.history.first_ask.is_none()
+                && let Event::ItemCompleted { item } = &frame.event
+            {
+                self.summary.history.first_ask = crate::asked(item).map(|ask| {
+                    ask.lines()
+                        .next()
+                        .unwrap_or_default()
+                        .trim()
+                        .chars()
+                        .take(200)
+                        .collect()
+                });
+            }
         }
         let applied = self.transcript.apply(&frame.event);
         match &frame.event {
@@ -316,7 +329,7 @@ impl SessionState {
     /// this fold is lost either way, and a rebuild from the whole journal is
     /// what puts an old session's true number back.
     fn count_a_message(&mut self) {
-        self.summary.messages = Some(self.summary.messages.unwrap_or(0) + 1);
+        self.summary.history.messages = Some(self.summary.history.messages.unwrap_or(0) + 1);
     }
 
     /// Only a running session says what it is, so a summary after a
@@ -324,7 +337,14 @@ impl SessionState {
     /// process that wrote it, not the session, and it is open again by
     /// saying so.
     fn session_updated(&mut self, summary: &SessionSummary) -> Applied {
+        let first_ask = self
+            .summary
+            .history
+            .first_ask
+            .clone()
+            .or_else(|| summary.history.first_ask.clone());
         self.summary = summary.clone();
+        self.summary.history.first_ask = first_ask;
         self.closed = false;
         Applied::Session
     }
@@ -439,6 +459,11 @@ mod tests {
 
     fn summary() -> SessionSummary {
         SessionSummary {
+            history: crate::SessionHistory {
+                first_ask: None,
+                forked_from: None,
+                messages: None,
+            },
             id: SessionId::from_raw("ses_1"),
             key: None,
             title: None,
@@ -454,7 +479,6 @@ mod tests {
             usage: Usage::default(),
             busy: false,
             asking: false,
-            messages: None,
         }
     }
 
@@ -620,7 +644,10 @@ mod tests {
     #[test]
     fn a_message_is_counted_where_it_is_completed_and_only_there() {
         let mut st = SessionState::new(summary());
-        assert_eq!(st.summary.messages, None, "a summary that never counted");
+        assert_eq!(
+            st.summary.history.messages, None,
+            "a summary that never counted"
+        );
         st.apply(&frame(
             1,
             Event::ItemCompleted {
@@ -648,7 +675,7 @@ mod tests {
             },
         ));
         assert_eq!(
-            st.summary.messages,
+            st.summary.history.messages,
             Some(2),
             "an ask and an answer; the tool call between them is not a message"
         );
@@ -666,18 +693,21 @@ mod tests {
             },
         ));
         let head = SessionSummary {
-            messages: st.summary.messages,
+            history: crate::SessionHistory {
+                messages: st.summary.history.messages,
+                ..summary().history
+            },
             ..summary()
         };
         st.apply(&frame(2, Event::SessionUpdated { summary: head }));
-        assert_eq!(st.summary.messages, Some(1));
+        assert_eq!(st.summary.history.messages, Some(1));
         st.apply(&frame(
             3,
             Event::ItemCompleted {
                 item: user("itm_2", "two"),
             },
         ));
-        assert_eq!(st.summary.messages, Some(2));
+        assert_eq!(st.summary.history.messages, Some(2));
     }
 
     /// The close at the end of a segment is not the end of the session: the

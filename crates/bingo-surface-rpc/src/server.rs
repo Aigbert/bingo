@@ -244,6 +244,15 @@ impl Server {
             name::SESSION_CHILDREN => self.children(params, id).await,
             name::SESSION_OPEN => self.open(params, id).await,
             name::SESSION_CLOSE => self.close(params).await,
+            name::SESSION_FORK => {
+                let params: crate::methods::ForkParams = parse(params)?;
+                let session = self
+                    .host
+                    .fork(&params.session, params.at)
+                    .await
+                    .map_err(crate::codec::from_kernel)?;
+                Reply::of(&crate::methods::ForkResult { session })
+            }
             name::SESSION_DELETE => self.delete(params).await,
             name::SESSION_DELIVER => self.deliver(params).await,
             name::SESSION_EXTEND => self.extend(params).await,

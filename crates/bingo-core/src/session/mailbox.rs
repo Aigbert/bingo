@@ -12,6 +12,9 @@ use tokio::sync::{mpsc, oneshot, watch};
 use crate::turn::{TurnConfig, TurnHost};
 
 pub(crate) enum Msg {
+    ReserveDelete {
+        reply: oneshot::Sender<Result<oneshot::Sender<()>, KernelError>>,
+    },
     Calling(Vec<invocation::CallingHook>, Box<Msg>),
     CatalogueEvent(Box<Event>),
     Observe(LinkPoint, Value),
@@ -409,6 +412,10 @@ impl Mailbox {
             reply,
         })
         .await?
+    }
+
+    pub async fn reserve_delete(&self) -> Result<oneshot::Sender<()>, KernelError> {
+        self.call(|reply| Msg::ReserveDelete { reply }).await?
     }
 
     pub fn close(&self, reason: CloseReason) {

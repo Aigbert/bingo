@@ -3558,6 +3558,27 @@
         "prompt"
       ]
     },
+    "ForkLink": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
     "Frame": {
       "type": "object",
       "properties": {
@@ -8777,6 +8798,22 @@
           "type": "boolean",
           "description": "An interaction is open; stamped only by the session actor.",
           "default": false
+        },
+        "firstAsk": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "forkedFrom": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ForkLink"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "messages": {
           "type": [

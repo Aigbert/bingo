@@ -11,7 +11,7 @@
 //! ADR-0045) and the chord is live; nothing here changed for it, which was
 //! the point of asking the catalogue rather than assuming.
 
-use bingo_sdk::{CommandSpec, ContentPart, ItemBody, SessionState, TurnId};
+use bingo_sdk::{CommandSpec, SessionState, TurnId};
 use ratatui::text::{Line, Span};
 
 use crate::{theme, window};
@@ -65,30 +65,21 @@ pub fn turns(state: &SessionState) -> Vec<Turn> {
                 items: 1,
             }),
         }
-        if let (Some(turn), Some(asked)) = (out.last_mut(), asked(item)) {
-            turn.asked.get_or_insert(asked);
+        if let (Some(turn), Some(asked)) = (
+            out.last_mut(),
+            asked(item)
+                .and_then(|text| text.lines().next())
+                .map(str::trim)
+                .filter(|line| !line.is_empty()),
+        ) {
+            turn.asked.get_or_insert_with(|| asked.to_owned());
         }
     }
     out.reverse();
     out
 }
 
-/// The line a person typed, when the item is one.
-fn asked(item: &bingo_sdk::Item) -> Option<String> {
-    let ItemBody::User { parts, origin } = &item.body else {
-        return None;
-    };
-    if origin.is_context() {
-        return None;
-    }
-    let text = parts
-        .iter()
-        .filter_map(ContentPart::as_text)
-        .collect::<Vec<_>>()
-        .join("");
-    let line = text.lines().next().unwrap_or_default().trim().to_string();
-    (!line.is_empty()).then_some(line)
-}
+use bingo_sdk::asked;
 
 /// Whether this session has a `/rewind` to run. Nothing is offered that could
 /// not be done.

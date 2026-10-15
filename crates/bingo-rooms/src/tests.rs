@@ -509,6 +509,11 @@ pub(crate) fn hook_context(session: &SessionId, fleet: &Fleet, cwd: &Path) -> Ho
 
 pub(crate) fn summary(id: &str, title: Option<&str>, parent: Option<SessionId>) -> SessionSummary {
     SessionSummary {
+        history: bingo_sdk::SessionHistory {
+            first_ask: None,
+            forked_from: None,
+            messages: None,
+        },
         tools: None,
         system_extra: None,
         id: SessionId::from_raw(id),
@@ -527,7 +532,6 @@ pub(crate) fn summary(id: &str, title: Option<&str>, parent: Option<SessionId>) 
         usage: Usage::default(),
         busy: false,
         asking: false,
-        messages: None,
     }
 }
 

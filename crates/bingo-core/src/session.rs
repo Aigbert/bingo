@@ -20,7 +20,6 @@ mod signals;
 mod spawn;
 mod storage;
 mod subscribers;
-mod title;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -257,6 +256,7 @@ impl Actor {
                 instructions,
                 reply,
             } => drop(reply.send(self.compact(instructions).await)),
+            Msg::ReserveDelete { reply } => return self.reserve_delete(reply).await,
             Msg::Close { reason } => return self.close(reason).await,
         }
         Ok(if self.state.closed {
@@ -264,6 +264,27 @@ impl Actor {
         } else {
             Flow::Continue
         })
+    }
+
+    async fn reserve_delete(
+        &mut self,
+        reply: tokio::sync::oneshot::Sender<Result<tokio::sync::oneshot::Sender<()>, KernelError>>,
+    ) -> Result<Flow, KernelError> {
+        if self.state.busy() || self.running.is_some() {
+            let _ = reply.send(Err(KernelError::new(
+                ErrorCode::NotReady,
+                "session is busy; wait for its turn to finish",
+            )));
+            return Ok(Flow::Continue);
+        }
+        let (commit, decision) = tokio::sync::oneshot::channel();
+        let _ = reply.send(Ok(commit));
+        // Freeze admission until every member is reserved; dropping the caller cancels.
+        if decision.await.is_ok() {
+            self.close(CloseReason::Deleted).await
+        } else {
+            Ok(Flow::Continue)
+        }
     }
 
     /// A plugin's state, whole, as a durable frame (ADR-0011 §2).
@@ -283,34 +304,6 @@ impl Actor {
         } else {
             self.publish(event, None).await?;
         }
-        Ok(())
-    }
-
-    /// The session's name: the one it was given, else the one its first ask
-    /// earns it. A minted name is a name, so once it is published this reads
-    /// it back like any other and mints nothing further.
-    fn title(&self) -> Option<String> {
-        self.state
-            .summary
-            .title
-            .clone()
-            .or_else(|| title::first_ask(self.state.transcript.items()).and_then(title::mint))
-    }
-
-    /// The mint's own `SessionUpdated`, sent once when the first prose lands
-    /// live — the heads of a segment carry it the rest of the time, and no
-    /// item or turn is worth a frame of its own (ADR-0005 §5).
-    async fn mint_title(&mut self) -> Result<(), KernelError> {
-        let minted = self.title();
-        if minted == self.state.summary.title {
-            return Ok(());
-        }
-        let summary = SessionSummary {
-            title: minted,
-            updated_at: Timestamp::now(),
-            ..self.state.summary.clone()
-        };
-        self.publish_summary(summary).await?;
         Ok(())
     }
 
@@ -361,10 +354,7 @@ impl Actor {
     /// The head of this segment of the journal: what the session is now.
     /// The start hooks it hands back run while the session opens for reads.
     async fn open(&mut self) -> Result<Starting, KernelError> {
-        let summary = SessionSummary {
-            title: self.title(),
-            ..self.restated()
-        };
+        let summary = self.restated();
         self.observe_journal();
         self.publish_summary(summary).await?;
         self.restate_extensions().await?;

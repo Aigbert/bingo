@@ -1772,6 +1772,59 @@
       ],
       "description": "`HostApi::extend` (ADR-0011 §2): a plugin's state into a session's journal."
     },
+    "ForkLink": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
+    "ForkParams": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
+    "ForkResult": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/SessionId"
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
     "GatewayEvent": {
       "oneOf": [
         {
@@ -5305,6 +5358,22 @@
           "description": "An interaction is open; stamped only by the session actor.",
           "default": false
         },
+        "firstAsk": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "forkedFrom": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ForkLink"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "messages": {
           "type": [
             "integer",
@@ -6970,6 +7039,14 @@
       },
       "result": {
         "$ref": "#/$defs/Empty"
+      }
+    },
+    "session/fork": {
+      "params": {
+        "$ref": "#/$defs/ForkParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ForkResult"
       }
     },
     "session/delete": {

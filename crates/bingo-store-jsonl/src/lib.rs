@@ -8,6 +8,7 @@
 mod blobs;
 mod checkpoint;
 pub mod gc;
+mod inspection;
 pub mod journal;
 pub mod layout;
 pub mod lock;
@@ -80,7 +81,18 @@ impl JsonlStore {
             Event::SessionUpdated { summary } => summary::write(&dir, summary),
             // A message is worth no frame of its own, so the derived file — not
             // the journal — is what stays fresh between one head and the next.
-            event if event.completes_a_message() => summary::count_message(&dir),
+            Event::ItemCompleted { item } if item.body.is_message() => summary::count_message(
+                &dir,
+                bingo_sdk::asked(item).map(|ask| {
+                    ask.lines()
+                        .next()
+                        .unwrap_or_default()
+                        .trim()
+                        .chars()
+                        .take(200)
+                        .collect()
+                }),
+            ),
             _ => Ok(()),
         };
         if let Err(error) = derived {
@@ -156,6 +168,32 @@ impl SessionStore for JsonlStore {
         off_runtime(move || summary::list(&root, &filter)).await
     }
 
+    async fn summary(&self, session: &SessionId) -> Result<SessionSummary, KernelError> {
+        let store = self.clone();
+        let session = session.clone();
+        off_runtime(move || inspection::summary(&store, &session)).await
+    }
+
+    async fn rename(&self, session: &SessionId, title: &str) -> Result<(), KernelError> {
+        let store = self.clone();
+        let session = session.clone();
+        let title = title.to_owned();
+        off_runtime(move || inspection::rename(&store, &session, &title)).await
+    }
+
+    async fn locked(&self, session: &SessionId) -> Result<bool, KernelError> {
+        let store = self.clone();
+        let session = session.clone();
+        off_runtime(move || {
+            let path = layout::lock(&store.existing(&session)?);
+            if !path.exists() {
+                return Ok(false);
+            }
+            Ok(lock::take(&path)?.is_none())
+        })
+        .await
+    }
+
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
         let store = self.clone();
         let session = session.clone();
@@ -163,9 +201,10 @@ impl SessionStore for JsonlStore {
             let dir = store.existing(&session)?;
             let mut writer = store.writer.lock().unwrap_or_else(|e| e.into_inner());
             writer.forget(&dir);
-            store.locks.release(&session);
-            std::fs::remove_dir_all(&dir)
-                .map_err(|e| storage(format!("remove {}: {e}", dir.display())))
+            store.locks.remove(&session, &layout::lock(&dir), || {
+                std::fs::remove_dir_all(&dir)
+                    .map_err(|e| storage(format!("remove {}: {e}", dir.display())))
+            })
         })
         .await
     }
@@ -266,6 +305,11 @@ pub(crate) mod tests {
 
     pub(crate) fn summary() -> SessionSummary {
         SessionSummary {
+            history: bingo_sdk::SessionHistory {
+                first_ask: None,
+                forked_from: None,
+                messages: Some(0),
+            },
             tools: None,
             system_extra: None,
             driver: Default::default(),
@@ -281,8 +325,6 @@ pub(crate) mod tests {
             usage: Usage::default(),
             busy: false,
             asking: false,
-            // A session as the kernel leaves one: counted, and nothing said yet.
-            messages: Some(0),
         }
     }
 
@@ -702,3 +744,6 @@ mod append_measurement {
         );
     }
 }
+
+#[cfg(test)]
+mod inspection_tests;

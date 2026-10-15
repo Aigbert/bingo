@@ -74,17 +74,6 @@ pub fn span(past: Duration) -> String {
     }
 }
 
-/// The same span behind now. Coarser at the near end: a row that offers a
-/// session to resume has to tell this morning from last week, and a count of
-/// seconds there would be read as precision nobody asked for.
-#[cfg(test)]
-pub fn ago(past: Duration) -> String {
-    match past.as_secs() < MINUTE {
-        true => "just now".to_string(),
-        false => format!("{} ago", span(past)),
-    }
-}
-
 /// `BINGO_MOTION=off` stills everything (design §7). Anything else — unset,
 /// empty, `on` — moves.
 pub fn moves(motion: Option<&str>) -> bool {
@@ -255,7 +244,12 @@ mod tests {
 
     #[test]
     fn how_long_ago_is_said_in_the_largest_unit_that_fits() {
-        let secs = |n| ago(Duration::from_secs(n));
+        let secs = |n| {
+            bingo_sdk::ago(
+                jiff::Timestamp::from_second(n).unwrap(),
+                jiff::Timestamp::UNIX_EPOCH,
+            )
+        };
         assert_eq!(secs(0), "just now");
         assert_eq!(secs(59), "just now");
         assert_eq!(secs(60), "1m ago");
@@ -265,7 +259,7 @@ mod tests {
         assert_eq!(secs(2 * 60 * 60), "2h ago");
         assert_eq!(secs(24 * 60 * 60 - 1), "23h ago");
         assert_eq!(secs(24 * 60 * 60), "1d ago");
-        assert_eq!(secs(45 * 24 * 60 * 60), "45d ago");
+        assert_eq!(secs(45 * 24 * 60 * 60), "1970-01-01");
     }
 
     #[test]

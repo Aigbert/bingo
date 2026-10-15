@@ -40,6 +40,7 @@ pub mod name {
     pub const SESSION_CHILDREN: &str = "session/children";
     pub const SESSION_OPEN: &str = "session/open";
     pub const SESSION_CLOSE: &str = "session/close";
+    pub const SESSION_FORK: &str = "session/fork";
     pub const SESSION_DELETE: &str = "session/delete";
     pub const SESSION_HISTORY: &str = "session/history";
     pub const SESSION_ITEM_PART: &str = "session/itemPart";
@@ -547,6 +548,11 @@ pub static METHODS: &[Method] = &[
         schema_of::<Empty>,
     ),
     (
+        name::SESSION_FORK,
+        schema_of::<ForkParams>,
+        schema_of::<ForkResult>,
+    ),
+    (
         name::SESSION_DELETE,
         schema_of::<SessionParams>,
         schema_of::<Empty>,
@@ -639,7 +645,7 @@ mod tests {
 
     #[test]
     fn the_wire_has_explicit_methods_and_notifications() {
-        assert_eq!(METHODS.len(), 23);
+        assert_eq!(METHODS.len(), 24);
         assert_eq!(NOTIFICATIONS.len(), 4);
     }
 
@@ -668,4 +674,16 @@ mod tests {
                 .contains(&name::EVENT.to_owned())
         );
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ForkParams {
+    pub session: SessionId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<bingo_sdk::TurnId>,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ForkResult {
+    pub session: SessionId,
 }

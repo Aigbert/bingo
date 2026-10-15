@@ -210,3 +210,31 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod fork_contract {
+    #[test]
+    fn fork_is_additive_and_has_request_and_response_fixtures() {
+        use crate::methods::{ForkParams, ForkResult};
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../fixtures/fork.json")).unwrap();
+        let params: ForkParams =
+            serde_json::from_value(fixture["request"]["params"].clone()).unwrap();
+        let result: ForkResult =
+            serde_json::from_value(fixture["response"]["result"].clone()).unwrap();
+        assert_eq!(
+            serde_json::to_value(params).unwrap(),
+            fixture["request"]["params"]
+        );
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            fixture["response"]["result"]
+        );
+        let schema = super::document();
+        assert_eq!(schema["protocol"], 1);
+        assert_eq!(
+            schema["methods"]["session/fork"]["params"]["$ref"],
+            "#/$defs/ForkParams"
+        );
+    }
+}

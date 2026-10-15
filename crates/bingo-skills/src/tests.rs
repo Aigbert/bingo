@@ -182,6 +182,11 @@ pub(crate) struct Asked {
 pub(crate) fn asked(cwd: &Path) -> Asked {
     Asked {
         session: SessionSummary {
+            history: bingo_sdk::SessionHistory {
+                first_ask: None,
+                forked_from: None,
+                messages: None,
+            },
             tools: None,
             system_extra: None,
             driver: Default::default(),
@@ -197,7 +202,6 @@ pub(crate) fn asked(cwd: &Path) -> Asked {
             usage: Usage::default(),
             busy: false,
             asking: false,
-            messages: None,
         },
         turn: TurnId::from_raw("trn_test"),
         items: Vec::new(),

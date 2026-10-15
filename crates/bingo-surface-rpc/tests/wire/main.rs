@@ -226,7 +226,9 @@ fn params_for(method: &str) -> Value {
         name::SESSION_LIST_HEADS => json!({ "filter": {}, "maxBytes": 4096 }),
         name::SESSION_CHILDREN => json!({ "parent": session, "maxBytes": 4096 }),
         name::SESSION_OPEN => json!({ "selector": selector() }),
-        name::SESSION_CLOSE | name::SESSION_DELETE => json!({ "session": session }),
+        name::SESSION_CLOSE | name::SESSION_DELETE | name::SESSION_FORK => {
+            json!({ "session": session })
+        }
         name::SESSION_HISTORY => json!({ "session": session, "page": { "limit": 10 } }),
         name::SESSION_ITEM_PART => json!({ "session":session, "item":"itm_1",
             "generation":3, "token":"fixture-item-token", "offset":0, "maxBytes":4096 }),

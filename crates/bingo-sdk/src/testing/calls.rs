@@ -29,6 +29,19 @@ pub enum HostCall {
         session: SessionId,
         reason: CloseReason,
     },
+    Read {
+        session: SessionId,
+    },
+    Summary {
+        session: SessionId,
+    },
+    CheckDelete {
+        session: SessionId,
+    },
+    Fork {
+        session: SessionId,
+        at: Option<TurnId>,
+    },
     Delete {
         session: SessionId,
     },
@@ -129,6 +142,10 @@ impl std::fmt::Debug for HostCall {
                 .field("session", session)
                 .field("reason", reason)
                 .finish(),
+            Self::Read { session } => fields(f, "SessionRead", &[("session", session)]),
+            Self::Summary { session } => fields(f, "Summary", &[("session", session)]),
+            Self::CheckDelete { session } => fields(f, "CheckDelete", &[("session", session)]),
+            Self::Fork { session, at } => fields(f, "Fork", &[("session", session), ("at", at)]),
             Self::Delete { session } => f.debug_struct("Delete").field("session", session).finish(),
             Self::Deliver {
                 to,

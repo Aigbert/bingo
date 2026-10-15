@@ -22,6 +22,11 @@ pub(crate) fn session() -> SessionId {
 
 pub(crate) fn summary() -> SessionSummary {
     SessionSummary {
+        history: bingo_sdk::SessionHistory {
+            first_ask: None,
+            forked_from: None,
+            messages: None,
+        },
         tools: None,
         system_extra: None,
         id: session(),
@@ -37,7 +42,6 @@ pub(crate) fn summary() -> SessionSummary {
         usage: Usage::default(),
         busy: false,
         asking: false,
-        messages: None,
     }
 }
 

@@ -621,7 +621,6 @@ impl Actor {
         let id = item.id.clone();
         self.publish(Event::ItemCompleted { item }, Some(intent))
             .await?;
-        self.mint_title().await?;
         Ok(id)
     }
 

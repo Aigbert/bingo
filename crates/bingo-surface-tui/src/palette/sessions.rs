@@ -25,6 +25,7 @@ pub fn stored(summary: &SessionSummary) -> PaletteSession {
             "{}{}",
             summary.updated_at,
             summary
+                .history
                 .messages
                 .map(|n| format!(" · {n} messages"))
                 .unwrap_or_default()

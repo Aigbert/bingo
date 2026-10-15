@@ -28,7 +28,6 @@ pub(crate) fn stated(
         cwd: cwd.display().to_string(),
         key: key.clone(),
         parent: parent.clone(),
-        // A rename wins; an absent name never takes back one the actor minted.
         title: title.clone().or(became.title),
         driver: *driver,
         provider: choice.map(|c| c.endpoint.id().to_string()),

@@ -1,0 +1,18 @@
+{
+  "request": {
+    "jsonrpc": "2.0",
+    "id": 7,
+    "method": "session/fork",
+    "params": {
+      "session": "ses_source",
+      "at": "trn_1"
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 7,
+    "result": {
+      "session": "ses_fork"
+    }
+  }
+}

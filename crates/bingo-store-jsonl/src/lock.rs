@@ -34,6 +34,25 @@ impl Locks {
         }
     }
 
+    /// Keep ownership through removal; an unowned journal must first be claimed.
+    pub fn remove(
+        &self,
+        session: &SessionId,
+        path: &Path,
+        remove: impl FnOnce() -> Result<(), KernelError>,
+    ) -> Result<(), KernelError> {
+        let mut held = self.held();
+        let claim = match held.remove(session) {
+            Some(file) => file,
+            None => take(path)?.ok_or_else(|| taken(session))?,
+        };
+        let result = remove();
+        if result.is_err() {
+            held.insert(session.clone(), claim);
+        }
+        result
+    }
+
     /// Closing the file releases the lock; so does exiting, which is why a
     /// crash never leaves a session claimed.
     pub fn release(&self, session: &SessionId) {
@@ -113,5 +132,24 @@ mod tests {
     #[test]
     fn releasing_what_nobody_holds_is_not_an_error() {
         Locks::default().release(&session());
+    }
+}
+
+#[cfg(test)]
+mod removal_tests {
+    use super::*;
+    #[test]
+    fn deletion_cannot_unlink_a_foreign_claim() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".lock");
+        let id = SessionId::from_raw("s");
+        let owner = Locks::default();
+        owner.acquire(&id, &path).unwrap();
+        let other = Locks::default();
+        let error = other
+            .remove(&id, &path, || panic!("must not remove a held directory"))
+            .unwrap_err();
+        assert_eq!(error.code, ErrorCode::SessionLocked);
+        assert!(take(&path).unwrap().is_none(), "the owner still holds it");
     }
 }

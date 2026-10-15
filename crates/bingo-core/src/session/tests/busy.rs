@@ -63,7 +63,7 @@ async fn a_summary_says_busy_while_the_turn_runs_and_idle_once_it_is_over() {
 
 /// A process that died inside a turn left `busy: true` in the head of its
 /// journal. Nothing this process publishes may repeat it: not the head of the
-/// new segment, and not the frame that mints the session's name.
+/// new segment, and not a later reconfiguration.
 #[tokio::test]
 async fn a_resumed_session_publishes_no_busy_it_inherited() {
     let head = SessionSummary {
@@ -84,11 +84,7 @@ async fn a_resumed_session_publishes_no_busy_it_inherited() {
         Input::text("name me", Origin::surface("test")),
     );
     let frames = frames_until(&mut events, &mut state, turn_completed).await;
-    let minted = summaries(&frames);
-    assert_eq!(
-        minted.iter().map(|s| s.title.clone()).collect::<Vec<_>>(),
-        vec![Some("name me".to_string())],
-        "one summary went out, the mint's"
-    );
-    assert!(!minted[0].busy, "the mint lands before the turn opens");
+    assert!(summaries(&frames).iter().all(|summary| !summary.busy));
+    assert_eq!(state.summary.title, None, "auto-title belongs to a mod");
+    assert!(!restated(&mailbox, &mut events, &mut state).await);
 }

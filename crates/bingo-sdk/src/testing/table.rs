@@ -87,6 +87,11 @@ impl Table {
         }
         let id = self.next_id();
         let summary = SessionSummary {
+            history: crate::SessionHistory {
+                first_ask: None,
+                forked_from: None,
+                messages: Some(0),
+            },
             id,
             key: spec.key,
             title: spec.title,
@@ -102,7 +107,6 @@ impl Table {
             usage: Usage::default(),
             busy: false,
             asking: false,
-            messages: Some(0),
         };
         self.sessions.insert(summary.id.clone(), summary.clone());
         Ok(summary)

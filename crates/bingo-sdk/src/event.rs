@@ -672,12 +672,31 @@ pub struct SessionSummary {
     /// An interaction is open; stamped only by the session actor.
     #[serde(default)]
     pub asking: bool,
+    #[serde(flatten)]
+    pub history: SessionHistory,
+}
+
+// Journal facts used to find and describe a conversation without replaying it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionHistory {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_ask: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forked_from: Option<ForkLink>,
     /// How many messages have been said in this session, by
     /// [`Event::completes_a_message`]. `None` is "never counted" — a summary
     /// written before the field existed — and must be shown as nothing rather
     /// than as a `0` it does not mean.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub messages: Option<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ForkLink {
+    pub session: SessionId,
+    pub turn: Option<TurnId>,
 }
 
 /// Configuration as a client sees it: the kernel's keys and each plugin's claimed slice.
@@ -785,6 +804,11 @@ mod tests {
             ],
         };
         let summary = SessionSummary {
+            history: crate::SessionHistory {
+                first_ask: None,
+                forked_from: None,
+                messages: None,
+            },
             id: SessionId::from_raw("ses_1"),
             key: None,
             title: Some("hello".into()),
@@ -800,7 +824,6 @@ mod tests {
             usage: Usage::default(),
             busy: false,
             asking: false,
-            messages: None,
         };
         let frames = vec![
             frame(

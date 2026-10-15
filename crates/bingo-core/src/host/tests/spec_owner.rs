@@ -298,7 +298,12 @@ async fn message_counts_agree_after_retry_compaction_close_and_resume() {
             break;
         }
     }
-    let before = host.session_summary(&a.session).await.unwrap().messages;
+    let before = host
+        .session_summary(&a.session)
+        .await
+        .unwrap()
+        .history
+        .messages;
     host.shutdown().await;
     let frames = store.replay(&a.session, Seq::ZERO).await.unwrap();
     assert!(
@@ -329,12 +334,20 @@ async fn assert_counts(
     store: &crate::journal::MemoryStore,
     id: &SessionId,
 ) -> Option<u64> {
-    let live = host.session_summary(id).await.unwrap().messages;
+    let live = host.session_summary(id).await.unwrap().history.messages;
     let listed = store.list(&SessionFilter::default()).await.unwrap();
     let frames = store.replay(id, Seq::ZERO).await.unwrap();
     let replayed = session::replayed(&frames).unwrap();
-    assert_eq!(live, listed.iter().find(|s| &s.id == id).unwrap().messages);
-    assert_eq!(live, replayed.summary.messages);
+    assert_eq!(
+        live,
+        listed
+            .iter()
+            .find(|s| &s.id == id)
+            .unwrap()
+            .history
+            .messages
+    );
+    assert_eq!(live, replayed.summary.history.messages);
     live
 }
 

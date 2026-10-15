@@ -35,15 +35,13 @@ async fn a_submit_is_recorded_at_once_and_opens_no_turn() {
         Event::ItemCompleted { item }
             if matches!(item.body, ItemBody::User { .. }) && item.turn.is_none()
     ));
-    assert!(
-        matches!(
-            &frames[1].event,
-            Event::SessionUpdated { summary } if summary.title.as_deref() == Some("hello, everyone")
-        ),
-        "the first post names a log nobody named"
+    assert_eq!(state.summary.title, None, "the kernel does not mint titles");
+    assert_eq!(
+        state.summary.history.first_ask.as_deref(),
+        Some("hello, everyone")
     );
     assert!(matches!(
-        &frames[2].event,
+        &frames[1].event,
         Event::IntentAck { intent: i, outcome: IntentOutcome::Applied { result } }
             if i == &intent && result.get("item").is_some()
     ));

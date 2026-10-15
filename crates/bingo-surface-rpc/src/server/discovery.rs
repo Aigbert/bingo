@@ -113,7 +113,7 @@ fn head(summary: &SessionSummary, budget: usize) -> SummaryHead {
         created_at: summary.created_at.to_string(),
         updated_at: summary.updated_at.to_string(),
         busy: summary.busy,
-        messages: summary.messages,
+        messages: summary.history.messages,
         key: preview(summary.key.as_deref(), HeadField::Key, cap, &mut omitted),
         title: preview(
             summary.title.as_deref(),

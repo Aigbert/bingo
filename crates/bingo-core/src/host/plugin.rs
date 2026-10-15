@@ -106,6 +106,26 @@ impl HostApi for PluginHost {
         self.inner().close(session, reason).await
     }
 
+    async fn read(&self, session: &SessionId) -> Result<SessionState, KernelError> {
+        self.inner().read(session).await
+    }
+
+    async fn summary(&self, session: &SessionId) -> Result<SessionSummary, KernelError> {
+        self.inner().summary(session).await
+    }
+
+    async fn check_delete(&self, session: &SessionId) -> Result<(), KernelError> {
+        self.inner().check_delete(session).await
+    }
+
+    async fn fork(
+        &self,
+        session: &SessionId,
+        at: Option<TurnId>,
+    ) -> Result<SessionId, KernelError> {
+        self.inner().fork(session, at).await
+    }
+
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
         self.inner().delete(session).await
     }

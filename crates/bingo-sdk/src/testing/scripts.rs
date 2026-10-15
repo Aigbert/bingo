@@ -27,6 +27,7 @@ pub(super) struct Scripts {
     pub sessions: Option<Script<(SessionFilter,), Vec<SessionSummary>>>,
     pub open: Option<Script<(SessionSelector, ClientIdentity, OpenOptions), Attachment>>,
     pub close: Option<Script<(SessionId, CloseReason), ()>>,
+    pub inspection: InspectionScripts,
     pub delete: Option<Script<(SessionId,), ()>>,
     pub deliver: Option<Script<(SessionId, IntentId, Input, Delivery), ()>>,
     pub extend: Option<Script<(SessionId, String, String, Value), ()>>,
@@ -36,6 +37,14 @@ pub(super) struct Scripts {
     pub withdraw: Option<Script<(SessionId, IntentId, ClientIdentity), Input>>,
     pub reconfigure: Option<Script<(SessionId, SessionChange), ()>>,
     pub catalog: Option<Script<(CatalogKind,), Catalog>>,
+}
+
+#[derive(Default)]
+pub(super) struct InspectionScripts {
+    pub fork: Option<Script<(SessionId, Option<TurnId>), SessionId>>,
+    pub read: Option<Script<(SessionId,), SessionState>>,
+    pub summary: Option<Script<(SessionId,), SessionSummary>>,
+    pub check_delete: Option<Script<(SessionId,), ()>>,
 }
 
 #[derive(Default)]
@@ -54,6 +63,42 @@ pub(super) struct ImmediateScripts {
 }
 
 impl TestHost {
+    pub fn on_read<F, Fut>(&self, script: F)
+    where
+        F: Fn(SessionId) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<SessionState, KernelError>> + Send + 'static,
+    {
+        locked(&self.inner.scripts).inspection.read =
+            Some(Arc::new(move |(session,)| Box::pin(script(session))));
+    }
+
+    pub fn on_summary<F, Fut>(&self, script: F)
+    where
+        F: Fn(SessionId) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<SessionSummary, KernelError>> + Send + 'static,
+    {
+        locked(&self.inner.scripts).inspection.summary =
+            Some(Arc::new(move |(session,)| Box::pin(script(session))));
+    }
+
+    pub fn on_check_delete<F, Fut>(&self, script: F)
+    where
+        F: Fn(SessionId) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<(), KernelError>> + Send + 'static,
+    {
+        locked(&self.inner.scripts).inspection.check_delete =
+            Some(Arc::new(move |(session,)| Box::pin(script(session))));
+    }
+
+    pub fn on_fork<F, Fut>(&self, script: F)
+    where
+        F: Fn(SessionId, Option<TurnId>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<SessionId, KernelError>> + Send + 'static,
+    {
+        locked(&self.inner.scripts).inspection.fork =
+            Some(Arc::new(move |(session, at)| Box::pin(script(session, at))));
+    }
+
     pub fn on_render<F, Fut>(&self, script: F)
     where
         F: Fn(SessionId, crate::render::RenderRequest) -> Fut + Send + Sync + 'static,

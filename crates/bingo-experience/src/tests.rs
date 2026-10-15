@@ -136,6 +136,11 @@ pub(crate) fn said(text: &str, surface: &str) -> Item {
 
 fn summary(cwd: &Path) -> SessionSummary {
     SessionSummary {
+        history: bingo_sdk::SessionHistory {
+            first_ask: None,
+            forked_from: None,
+            messages: None,
+        },
         tools: None,
         system_extra: None,
         id: SessionId::from_raw("ses_test"),
@@ -151,7 +156,6 @@ fn summary(cwd: &Path) -> SessionSummary {
         usage: Usage::default(),
         busy: false,
         asking: false,
-        messages: None,
     }
 }
 

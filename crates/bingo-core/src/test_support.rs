@@ -369,6 +369,11 @@ pub fn seeing() -> ModelCapabilities {
 pub fn summary(id: &str) -> SessionSummary {
     let ts = jiff::Timestamp::from_second(0).unwrap();
     SessionSummary {
+        history: bingo_sdk::SessionHistory {
+            first_ask: None,
+            forked_from: None,
+            messages: None,
+        },
         tools: None,
         system_extra: None,
         driver: Default::default(),
@@ -384,7 +389,6 @@ pub fn summary(id: &str) -> SessionSummary {
         usage: Usage::default(),
         busy: false,
         asking: false,
-        messages: None,
     }
 }
 

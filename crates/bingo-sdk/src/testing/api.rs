@@ -102,6 +102,54 @@ impl HostApi for TestHost {
         NoHost.close(session, reason).await
     }
 
+    async fn read(&self, session: &SessionId) -> Result<SessionState, KernelError> {
+        self.record(HostCall::Read {
+            session: session.clone(),
+        });
+        let script = locked(&self.inner.scripts).inspection.read.clone();
+        if let Some(script) = script {
+            return script((session.clone(),)).await;
+        }
+        NoHost.read(session).await
+    }
+
+    async fn summary(&self, session: &SessionId) -> Result<SessionSummary, KernelError> {
+        self.record(HostCall::Summary {
+            session: session.clone(),
+        });
+        let script = locked(&self.inner.scripts).inspection.summary.clone();
+        if let Some(script) = script {
+            return script((session.clone(),)).await;
+        }
+        NoHost.summary(session).await
+    }
+
+    async fn check_delete(&self, session: &SessionId) -> Result<(), KernelError> {
+        self.record(HostCall::CheckDelete {
+            session: session.clone(),
+        });
+        let script = locked(&self.inner.scripts).inspection.check_delete.clone();
+        if let Some(script) = script {
+            return script((session.clone(),)).await;
+        }
+        NoHost.check_delete(session).await
+    }
+
+    async fn fork(
+        &self,
+        session: &SessionId,
+        at: Option<TurnId>,
+    ) -> Result<SessionId, KernelError> {
+        self.record(HostCall::Fork {
+            session: session.clone(),
+            at: at.clone(),
+        });
+        let script = locked(&self.inner.scripts).inspection.fork.clone();
+        if let Some(script) = script {
+            return script((session.clone(), at)).await;
+        }
+        NoHost.fork(session, at).await
+    }
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
         self.record(HostCall::Delete {
             session: session.clone(),

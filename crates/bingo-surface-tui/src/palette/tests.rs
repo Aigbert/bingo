@@ -207,7 +207,7 @@ fn sessions(ui: &mut Ui, state: &SessionState) {
     let mut other = state.summary.clone();
     other.id = SessionId::from_raw("ses_other");
     other.title = Some("model migration".into());
-    other.messages = Some(12);
+    other.history.messages = Some(12);
     open.sessions = vec![state.summary.clone(), other];
 }
 #[tokio::test]
