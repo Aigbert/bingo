@@ -26,7 +26,7 @@ one conversation with new ids and new costs. Both doors open.
    turn }>` on the summary only; Create cannot claim provenance. On the wire as
    `session/fork` (ADR-0007), not on the plugin bridge.
 3. **An eighth site, `Sessions { query, scope: here | all, limit,
-   sessions, current }`**, owner `bingo-mod-sessions`; terminal, desktop.
+   sessions, session }`** (`session` is the one being viewed), owner `bingo-mod-sessions`; terminal, desktop.
 4. **Auto-title fills an empty title only**, after admission at `prompt.submit`, through
    `SessionChange::Title`, with targeted summary lookup. Errors are logged and do not
    reject admitted input. Any title that exists was somebody's choice.

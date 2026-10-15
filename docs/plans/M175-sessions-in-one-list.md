@@ -28,7 +28,7 @@ One list of every session, found by what was asked. `/sessions` and bare `bingo 
 6. **Fork in core and on the wire.** `crates/bingo-core/src/host.rs` `fork`: refused `NOT_READY` while the source runs a turn; creates the journal through `SessionStore::create` + `append`; children not copied. `crates/bingo-surface-rpc/src/methods.rs` gains `session/fork`. Black-box RPC test: fork, list, the fork is a root with `forkedFrom`.
 7. **Auto-title, pure + link.** Pure `title_from(ask) -> Option<String>` in `crates/bingo-mod-sessions/src/title.rs` (first line, ≤60 chars at a word, `None` for a `/command` or `!shell` line). A `prompt.submit` link in the mod writes `SessionChange::Title` only when the summary's `title` is `None`. Targeted `HostApi::summary` avoids a store scan; lookup/write errors are logged and never reject admission. Tests: titled once, never over `/rename`, failure preserves accepted input.
 8. **Rows, pure.** `crates/bingo-mod-sessions/src/rows.rs::rows(summaries, now, query, current) -> Vec<Row>`: tree by `parent`, keyed sessions grouped by the key's first segment (`schedule/…`, channel adapters) into one collapsed row, filter on title and first ask (case-folded substring), first ask dim only when it differs from the title, `⑂ from <source title>` on forks. Selection stores a Target and each row has a stable control key. Table test per sketch row.
-9. **Props.** `Sessions { session, cwd, query, scope, limit, sessions, current, now, action }` in `crates/bingo-sdk/src/component/{sessions.rs,props.json}` and the `components!` list; golden contract test; schema and TypeScript regenerated. The surface lists with `SessionFilter { cwd (here) or none, limit }`; `more` raises `limit` by 50.
+9. **Props.** `Sessions { session, cwd, query, scope, limit, sessions, now, action }` (`session` is the viewed one) in `crates/bingo-sdk/src/component/{sessions.rs,props.json}` and the `components!` list; golden contract test; schema and TypeScript regenerated. The surface lists with `SessionFilter { cwd (here) or none, limit }`; `more` raises `limit` by 50.
 10. **Keys and verbs.** `crates/bingo-mod-sessions/src/keys.rs` through `onKey`: `↑↓`, `tab`, `⏎` → `{"resume":id}`, `→` → read-only preview (last person line and following answer; the mod holds it, render does no I/O), `r` → inline title input, Enter saves by id, Escape cancels, `d` → confirmation naming children, then one `HostApi::delete` for the root, `f` → `fork` then resume the fork. Table test (row, key) → outcome.
 11. **Drawing.** `crates/bingo-mod-sessions/src/draw.rs`: the sketch, at most the screen's height, one `❯`; snapshots at 108×30 and 80×24.
 12. **Openers.** `/sessions` in the mod; bare `--resume` in `crates/bingo/src/main.rs:127-134` becomes optional-value and opens the site (an error under `--print` or with a positional prompt, black-box tests); remove its empty bootstrap when another session is resumed; the palette's sessions group (`crates/bingo-surface-tui/src/palette/sessions.rs`) ends with `All sessions…` running `/sessions` and its detail uses `ago` instead of raw `updated_at`.
@@ -92,56 +92,34 @@ Review found that revival appended open-hook records and retained locks; stored 
 - Provenance is summary-only; Create cannot supply it. Consolidate remaining age formatters, fix labels, add fork-origin markers, reject bare-resume plus a prompt, and cover the mod in built-in parity tests.
 - Rebuild commits with schema regeneration beside its owning code; verify each build and its golden tests. The UI commit must not change core fork implementation.
 
+## Fix round — 2026-10-15
+
+- One `bingo_sdk::first_ask(&Item)` derives the summary's first ask live, in the journal and on rebuild.
+- `SessionStore::locked` fails closed like `rename`. The jsonl probe takes a shared lock and drops it: it never makes the session look owned. Neither unix nor Windows can ask about a lock without taking one, so a claim that meets a probe's shared lock retries once after 50 ms. std's file locks are cross-platform, so no `cfg` gate is needed.
+- A blank title clears the name, and the row goes back to the first ask. The spec owns the title outright, and stores take `Option<&str>`.
+- `Sessions` props keep one viewed session, `session`.
+- A refused verb closes its sheet and shows why until the next key. A delete with a blocked row says so, has no `⏎` hint, and ignores enter.
+- `HostApi::open_elsewhere` answers from the non-claiming probe (false for this host's own sessions). The drawing link probes only visible rows, once each, off the render path. A fork whose source is not on the page looks the source up the same way and falls back to its id's last 8 characters.
+- A fork's copy runs in its own task: cancellation cannot strand it. An unfinished copy is deleted on that path, and a failed delete is logged. A failed release after the last frame is logged and the fork stands.
+
 ## Verified — 2026-10-15
 
-Contract-first: the original fork fixture failed with six missing field/method errors before implementation; the stored-inspection fixture likewise failed before adding read/summary/rename. Both now pass. Against dev, SessionSpec is unchanged, no summary property is removed, and only optional firstAsk/forkedFrom are added.
+Contract first: the fork and stored-inspection fixtures failed before their implementations. Against dev, `SessionSpec` is unchanged and only the optional `firstAsk`/`forkedFrom` are added.
 
-Rebuilt history: `f87bb19c` independently passed `cargo build --workspace --all-targets --locked` (1m 07s) and `cargo test -p bingo-sdk -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-mods --locked` (all passed). `28f7574a` independently built (2m 43s); its golden tests passed in the full run below. The UI commit has no core changes. The final documentation tree also built (10.93s) and passed the same four-crate golden-test command. Regeneration used `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked`, then the surface-rpc/plugin-rpc/mods library generator tests; TypeScript generators ran with these tests.
-
-Sequential gates, credentials removed, RUST_TEST_THREADS=4; output summaries:
+Fix round gates (sequential, credentials removed, `RUST_TEST_THREADS=4`):
 ```text
 cargo fmt --all -- --check: exit 0
-cargo check --workspace --all-targets --locked: Finished dev in 1m 06s
-cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev in 54.96s
-cargo test --workspace --locked: 175 suites; 5766 passed; 0 failed; 5 ignored
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev in 45.18s
+cargo test --workspace --locked: 175 suites; 5778 passed; 0 failed; 5 ignored
 bash scripts/check_discipline.sh: discipline ok
 bash scripts/budget.sh: dependencies (unique, normal): 415 (max 415); budget ok
 cargo deny check: advisories ok, bans ok, licenses ok, sources ok
-SHELL=/bin/sh bash scripts/tui-smoke.sh: tui-smoke ok
-cd sdk/typescript && npm test: tests 31; pass 31; fail 0
+node --test sdk/typescript/src/*.test.ts: tests 31; pass 31; fail 0
+SHELL=/bin/sh bash scripts/tui-smoke.sh (three runs): tui-smoke ok ×3
+cargo check -p bingo-store-jsonl -p bingo-sdk -p bingo-core -p bingo-mod-sessions --all-targets --locked --target x86_64-pc-windows-msvc: Finished dev in 34.35s
 ```
-Budget reports 14 GB target/debug against its 5 GB soft limit; final cargo clean removes build output. Discipline advisories remain warnings. One earlier full run failed the existing ACP bridge test `a_bridged_call_posts_to_the_parent_and_is_journaled_under_the_turn` on missing “the member spoke” output under load; unchanged isolated rerun passed (1 passed, 0 failed, 0.66s), and subsequent full runs passed. The final run had no failures.
+Mutation checks: without the retry, `a_claim_racing_a_probe_retries_once` fails. With the old fork path, `a_finished_fork_survives_a_failed_release` fails.
 
-Windows: ran `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked` separately for all 20 touched crates. Fifteen passed: agents, checkpoints, context, core, demo-ui, experience, mod-palette, mod-sessions, persona, rooms, sdk, skills, store-jsonl, surface-rpc, tasks (all bingo-prefixed). Five remain deferred: bingo, channel-adapter, mods, surface-print, surface-tui; each failed building aws-lc-sys with `fatal error: 'stdlib.h' file not found` / `'windows.h' file not found`. This machine lacks the Windows C toolchain; the Windows criterion stays unticked.
+Windows, first round: 15 of 20 touched crates pass `cargo check --target x86_64-pc-windows-msvc`. bingo, channel-adapter, mods, surface-print and surface-tui are deferred: aws-lc-sys needs a Windows C toolchain (`stdlib.h`/`windows.h` not found), so that criterion stays unticked.
 
-Isolated tmux, temporary HOME/data, fake provider; captures below show the complete list region. 108×30:
-```text
- sessions · here (tab: all) ·                                                                         5 of 6
-❯ cwd · current                                                                             just now   0 msg
-  fixture for checkpoint v2                                                                 just now   2 msg
-     "can you add a fixture for checkpoint v2?"
-  fix the stale-edit race                                                                   just now   2 msg
-    └ review: action FIFO                                                                   just now   2 msg
-       "review the action FIFO"
-  fix the stale-edit race                                                                   just now   2 msg
-     ⑂ from fix the stale-edit race
-  schedule (1)                                                                                             ▸
-────────────────────────────────────────────────────────────────────────────────────────────────────────────
- ⏎ resume  → preview  r rename  d delete  f fork  tab here/all  esc
-```
-80×24 after inline rename (same selected row, list remains open):
-```text
- sessions · here (tab: all) ·                                             5 of 6
-  cwd · current                                                 just now   0 msg
-❯ renamed inline                                                just now   2 msg
-     "can you add a fixture for checkpoint v2?"
-  fix the stale-edit race                                       just now   2 msg
-    └ review: action FIFO                                       just now   2 msg
-       "review the action FIFO"
-  fix the stale-edit race                                       just now   2 msg
-     ⑂ from fix the stale-edit race
-  schedule (1)                                                                 ▸
-────────────────────────────────────────────────────────────────────────────────
- ⏎ resume  → preview  r rename  d delete  f fork  tab here/all  esc
-```
-Drive assertions: `preview: source bytes and mtimes unchanged`; `rename: one record, mtime unchanged, list stays open`; `resume: empty bootstrap removed`. TestBackend golden captures cover both complete frames; integration tests also pin zero open hooks, released claims, foreign-lock refusal, busy deletion, stable targets, title error admission, built-in parity and NDJSON purity.
+First-round tmux drive (isolated socket, temp HOME, fake provider): three sessions, one child and one fork at 108×30, then an inline rename at 80×24 with the list left open. Preview left the source's bytes and mtimes unchanged. Rename wrote one record without changing the mtime. Resume removed the empty bootstrap. `TestBackend` goldens now pin the directory, refused rename, blocked delete and probed rows at 108×30 and 80×24.
