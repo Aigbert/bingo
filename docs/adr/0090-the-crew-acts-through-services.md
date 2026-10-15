@@ -25,8 +25,9 @@ already enforce caller authority; no kernel feature door is needed.
    strip opens it when installed and the palette's conversation group otherwise.
 4. Stop, dismiss, message, reopen and room close are person-only commands:
    they end work, delete a journal, or speak for the person. Direct pane
-   stop/dismiss/close and model-pick controls require the owning mod's vouch.
-   Dismissal and room close ask for confirmation in place. Enter commits;
+   stop/dismiss/close and model-pick controls require both the owning mod's
+   vouch and the person's `asked()` verdict. Stop, dismissal and room close
+   ask for confirmation in place. Enter commits;
    Escape cancels in place through the root key handler, not slot dismissal.
    Navigation cannot change a pending confirmation's target.
 5. Seat, unseat, purpose and task writes retain existing caller-session
@@ -70,7 +71,12 @@ already enforce caller authority; no kernel feature door is needed.
     and function keys wait in M180 type-ahead; plain typing and exit stay usable.
     Catalogue errors notify and release input, never fail startup.
     Crew uses `]` to cycle its tabs: Tab belongs to M180's shared focus ring.
-13. Keys own navigation and confirmation; rendering merges only follow and
+13. Crew registers/draws `CommandSpec::ui_name("bingo.mod.crew")`; its own
+    handler press is signed as the person by the surface. Other drawers cannot
+    register that handler or the built-in name. Values use `Action::with_value`.
+    Prefills wait for typed submission; agent delivery goes through the ordinary
+    gate and retains its queued prose verdict. There is no crew input queue.
+14. Keys own navigation and confirmation; rendering merges only follow and
     subscription ids under one lock, and reads current UI fields for its view.
     A stale render cannot move selection or restore a cancelled confirmation.
 

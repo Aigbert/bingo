@@ -18,7 +18,7 @@ The three plain tables remain available. Focus comes from the opener receipt.
 4. Pure cards derive names/activity, request, model, tokens and known cost.
 5. Follow only the selected agent with bounded snapshot/history and the one
    event fold; invalidate for changed display facts and relevant journal events.
-6. Pure key routing: view, stop, confirmed dismiss, message prefill and model
+6. Pure key routing: view, confirmed stop/dismiss, message prefill and model
    picker; room edits/confirmed close; task add/status/owner. No view switch on send.
 7. Shared pane drawing, selected card expanded, absent services hide tabs.
 8. Catalogue-based opener and strip fallback; bounded initial bindings retain early shortcuts.
@@ -46,7 +46,9 @@ The three plain tables remain available. Focus comes from the opener receipt.
   handling, held shortcuts, Escape cancellation and own-receipt focus.
 - [x] Isolated fake-provider tmux drive of model picker, dismissal and first ctrl+n.
 - [x] Sequential fmt/check/Clippy/workspace tests, discipline, budget, deny,
-  TypeScript tests and three PTY smoke runs.
+  TypeScript tests and PTY smoke.
+- [x] Autosquash onto dev 7a759d8a; own handler/signature, valued actions,
+  generated-press refusal and every crew verb exercised end to end.
 - [ ] Windows cross-check for each touched crate; known C-toolchain deferrals
   remain recorded rather than marked passed.
 
@@ -68,8 +70,17 @@ modified shortcuts wait in type-ahead, while ordinary typing remains available.
 Catalogue errors notify rather than fail startup. Esc cancels confirmation in
 place. New room names reserve all verbs; existing journals remain addressable
 as explicit arguments, with no rename or deletion. Only own Pane/View receipts
-switch views; all person-only wire writes are unsafe. See ADR-0090 for why.
+switch views; all person-only wire writes are unsafe. On dev 7a759d8a, person
+controls require both asked and the drawer's vouch; the own handler is
+`bingo.mod.crew:ui`, and values use `Action::with_value`. Stop now confirms in
+place as requested; Escape leaves work running. Prefills remain typed input,
+and service delivery uses the gate's retained queue verdict. No private queue,
+name reservation exception or new dependency is needed. See ADR-0090 for why.
 
 ## Verified — 2026-10-15
 
 Round 3 (2026-10-16): sequential fmt/check/Clippy exited 0; `RUST_TEST_THREADS=4 cargo test --workspace --locked`: 6116 passed, 0 failed, 6 ignored; `discipline ok`, `budget ok` (421 dependencies; target size advisory), deny: `advisories ok, bans ok, licenses ok, sources ok`; TypeScript: 33 passed; `tui-smoke ok` ×3. `BINGO_UPDATE_SCHEMA=1` generator tests exited 0, no schema/TypeScript drift. Isolated fake-provider tmux at 108×30/80×24: prompt painted while `command.describe` waited, first Ctrl+N replayed after release; Escape cancelled both confirmations in place, subsequent dismissal succeeded. Windows collab/crew/rooms/services: `Finished dev`; TUI deferred in aws-lc-sys (`stdlib.h`/`windows.h` missing), matching the prior TUI/bin C-toolchain deferral. Fixups remain unsquashed; no rebase, push or merge.
+
+## Verified — 2026-10-16
+
+Ran `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash dev` onto 7a759d8a; all five fixups folded, no merge commits. Sequential `cargo fmt/check/clippy`: exit 0; `RUST_TEST_THREADS=4 cargo test --workspace --locked`: 6180 passed, 0 failed, 6 ignored; `discipline ok`; `budget ok` (421 dependencies, core 0s, relink 0 crates, 9 GB advisory); deny: `advisories ok, bans ok, licenses ok, sources ok`; TypeScript: 33 passed; `tui-smoke ok`. `BINGO_UPDATE_SCHEMA=1` generator tests: exit 0, no drift. Windows all-targets checks: sdk/services/collab/core/agents/rooms/tasks/crew/status finished; TUI/bin exit 101, known aws-lc-sys missing stdlib.h/windows.h and rquickjs-sys MSVC flags rejected by clang. Isolated fake-provider tmux at 108×30 showed a working reviewer and its latest line; Escape cancelled stop and kept the list/work active; Enter confirmed stop and the followed card changed to stopped. Owned tmux/home/data removed; no push or merge.
