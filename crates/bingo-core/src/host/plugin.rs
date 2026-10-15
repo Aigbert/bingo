@@ -118,6 +118,10 @@ impl HostApi for PluginHost {
         self.inner().check_delete(session).await
     }
 
+    async fn open_elsewhere(&self, session: &SessionId) -> Result<bool, KernelError> {
+        self.inner().open_elsewhere(session).await
+    }
+
     async fn fork(
         &self,
         session: &SessionId,

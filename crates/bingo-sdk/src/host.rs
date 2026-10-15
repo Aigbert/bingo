@@ -499,6 +499,15 @@ pub trait HostApi: Send + Sync {
         ))
     }
 
+    /// Whether another process holds the session open, observed without
+    /// claiming it. A session open in this host is not elsewhere.
+    async fn open_elsewhere(&self, _session: &SessionId) -> Result<bool, KernelError> {
+        Err(KernelError::new(
+            ErrorCode::Internal,
+            "this host cannot tell where sessions are open",
+        ))
+    }
+
     /// Copy a durable root journal through a completed turn; no children are copied.
     async fn fork(
         &self,

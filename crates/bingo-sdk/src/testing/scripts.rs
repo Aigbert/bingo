@@ -45,6 +45,7 @@ pub(super) struct InspectionScripts {
     pub read: Option<Script<(SessionId,), SessionState>>,
     pub summary: Option<Script<(SessionId,), SessionSummary>>,
     pub check_delete: Option<Script<(SessionId,), ()>>,
+    pub open_elsewhere: Option<Script<(SessionId,), bool>>,
 }
 
 #[derive(Default)]
@@ -87,6 +88,15 @@ impl TestHost {
         Fut: Future<Output = Result<(), KernelError>> + Send + 'static,
     {
         locked(&self.inner.scripts).inspection.check_delete =
+            Some(Arc::new(move |(session,)| Box::pin(script(session))));
+    }
+
+    pub fn on_open_elsewhere<F, Fut>(&self, script: F)
+    where
+        F: Fn(SessionId) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<bool, KernelError>> + Send + 'static,
+    {
+        locked(&self.inner.scripts).inspection.open_elsewhere =
             Some(Arc::new(move |(session,)| Box::pin(script(session))));
     }
 

@@ -724,6 +724,10 @@ impl HostApi for Host {
         inspection::check_delete(self, session).await
     }
 
+    async fn open_elsewhere(&self, session: &SessionId) -> Result<bool, KernelError> {
+        inspection::open_elsewhere(self, session).await
+    }
+
     async fn fork(
         &self,
         session: &SessionId,

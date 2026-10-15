@@ -239,3 +239,36 @@ async fn foreign_mid_turn_fork_refuses_and_a_crashed_tail_is_excluded() {
     assert_eq!(f.opened.load(Ordering::SeqCst), 0);
     f.host.shutdown().await;
 }
+
+#[tokio::test]
+async fn open_elsewhere_names_only_foreign_holders() {
+    let f = Fixture::new().await;
+    let theirs = f.seed("theirs", None).await;
+    let owner = JsonlStore::new(f.store.root());
+    owner.acquire(&theirs).await.unwrap();
+    let attachment = f
+        .host
+        .open(
+            SessionSelector::Create {
+                spec: SessionSpec {
+                    cwd: "/work".into(),
+                    driver: Driver::Log,
+                    ..Default::default()
+                },
+            },
+            ClientIdentity {
+                name: "harness".into(),
+                surface: "test".into(),
+            },
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap();
+    let mine = attachment.session.clone();
+    assert!(f.store.locked(&mine).await.unwrap(), "this host holds it");
+    assert!(!f.host.open_elsewhere(&mine).await.unwrap());
+    assert!(f.host.open_elsewhere(&theirs).await.unwrap());
+    owner.release(&theirs).await.unwrap();
+    assert!(!f.host.open_elsewhere(&theirs).await.unwrap());
+    f.host.shutdown().await;
+}

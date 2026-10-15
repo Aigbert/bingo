@@ -135,6 +135,20 @@ impl HostApi for TestHost {
         NoHost.check_delete(session).await
     }
 
+    async fn open_elsewhere(&self, session: &SessionId) -> Result<bool, KernelError> {
+        self.record(HostCall::OpenElsewhere {
+            session: session.clone(),
+        });
+        let script = locked(&self.inner.scripts)
+            .inspection
+            .open_elsewhere
+            .clone();
+        if let Some(script) = script {
+            return script((session.clone(),)).await;
+        }
+        NoHost.open_elsewhere(session).await
+    }
+
     async fn fork(
         &self,
         session: &SessionId,

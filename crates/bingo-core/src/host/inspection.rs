@@ -28,6 +28,14 @@ pub(super) async fn read(host: &Host, id: &SessionId) -> Result<SessionState, Ke
     Ok(state)
 }
 
+/// The store's lock answers for every session this host has not opened.
+pub(super) async fn open_elsewhere(host: &Host, id: &SessionId) -> Result<bool, KernelError> {
+    if host.live(id).is_ok() {
+        return Ok(false);
+    }
+    store(host)?.locked(id).await
+}
+
 pub(super) async fn check_delete(host: &Host, id: &SessionId) -> Result<(), KernelError> {
     if let Ok(live) = host.live(id) {
         if live.mailbox.summary().await?.busy {
