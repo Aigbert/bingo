@@ -778,7 +778,7 @@ async fn plugin_switch_redraws_the_toast_and_refreshes_default_keys() {
                 kind: CatalogKind::Commands,
             }) = gateway.next().await
             {
-                run.catalog_changed(CatalogKind::Commands);
+                catalogues::changed(&mut run, CatalogKind::Commands);
                 break;
             }
         }

@@ -17,6 +17,8 @@ use futures::{Stream, StreamExt};
 use serde_json::Value;
 use tokio::sync::mpsc;
 
+/// The catalogues the run reads, read again when the host rebuilds one.
+mod catalogues;
 mod interactions;
 /// The look, following the terminal for as long as the run lasts (M71).
 mod look;
@@ -59,13 +61,6 @@ const TICK: Duration = clock::FRAME;
 /// owned up to once per run (`slow_draw`).
 const SLOW_DRAW: Duration = Duration::from_millis(100);
 
-/// The catalogues whose ids a command's argument may name, by the source name
-/// its `ArgSpec::Catalog` gives.
-const CATALOGUES: &[(&str, CatalogKind)] = &[
-    ("models", CatalogKind::Models),
-    ("providers", CatalogKind::Providers),
-    ("plugins", CatalogKind::Plugins),
-];
 /// What a write says while the mailbox of the session in view is still on its
 /// way: it is refused, never held.
 pub const NOT_YET: &str = "still opening that session — try again";
@@ -252,7 +247,7 @@ pub(crate) async fn drive(
             // does not wait for the storm to end.
             event = next_gateway(&mut gateway) => {
                 match event {
-                    Some(GatewayEvent::CatalogChanged { kind }) => run.catalog_changed(kind),
+                    Some(GatewayEvent::CatalogChanged { kind }) => catalogues::changed(&mut run, kind),
                     Some(GatewayEvent::SessionRemoved { session }) => run.removed(&session),
                     Some(_) => {}
                     None => gateway = None,
@@ -351,7 +346,7 @@ async fn attach(
         .service(&bingo_sdk::command::COMMAND_CATALOG)
         .map(crate::palette::Current);
     run.ui.measure = surface.settings.measure();
-    run.fetch_catalogs();
+    catalogues::fetch_all(&mut run);
     run.ask_for_updates(surface.settings.update.check);
     if let Some(prompt) = opts.prompt {
         run.effect(Effect::Submit(bingo_sdk::Input::text(
@@ -636,7 +631,7 @@ impl Run {
             surface::action(self, action);
         }
         // Acknowledgements refresh the palette alongside asynchronous changes.
-        self.fetch_catalogue("plugins", CatalogKind::Plugins);
+        catalogues::fetch(self, "plugins", CatalogKind::Plugins);
         if result.get("surface").is_none()
             && let Some(message) = result.get("message").and_then(Value::as_str)
         {
@@ -850,51 +845,6 @@ impl Run {
                 .await
                 .map(|a| Reply::Attached(Box::new(a)))
         });
-    }
-
-    /// The catalogues are read at start and again whenever the host says one
-    /// of them was rebuilt: the dropdown follows, it does not poll.
-    fn fetch_catalogs(&mut self) {
-        self.fetch_commands();
-        for (source, kind) in CATALOGUES {
-            self.fetch_catalogue(source, *kind);
-        }
-    }
-
-    fn fetch_commands(&mut self) {
-        let host = self.host.clone();
-        self.spawn(async move {
-            host.catalog(CatalogKind::Commands)
-                .await
-                .map(|c| Reply::Commands(commands::specs_from(&c)))
-        });
-    }
-
-    /// One catalogue's ids, on the loop's own host-call lane.
-    fn fetch_catalogue(&mut self, source: &'static str, kind: CatalogKind) {
-        let host = self.host.clone();
-        self.spawn(async move {
-            host.catalog(kind)
-                .await
-                .map(|c| Reply::Catalogue(source.to_string(), c.entries))
-        });
-    }
-
-    /// A catalogue the host rebuilt — a provider's endpoint answered what it
-    /// serves (ADR-0026 §4) — is read again, and only that one.
-    fn catalog_changed(&mut self, kind: CatalogKind) {
-        if kind == CatalogKind::Plugins && crate::plugins::active(&self.ui) {
-            self.ui.placed.pulled.invalidate();
-        }
-        if kind == CatalogKind::Commands {
-            self.ui.placed.pulled.invalidate();
-            self.fetch_commands();
-            return;
-        }
-        let Some((source, _)) = CATALOGUES.iter().find(|(_, listed)| *listed == kind) else {
-            return;
-        };
-        self.fetch_catalogue(source, kind);
     }
 
     /// Whether a newer release is out — asked once a day, and only by a run

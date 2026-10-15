@@ -353,7 +353,7 @@ async fn a_rebuilt_memo_holds_an_edit_until_its_site_redraws() {
     for letter in "Ad".chars() {
         run.heard(Term::Key(typed(letter)));
     }
-    run.catalog_changed(CatalogKind::Commands);
+    catalogues::changed(&mut run, CatalogKind::Commands);
     acknowledge(&mut run, &session, 0);
     assert_eq!(session.submitted().len(), 1, "the site is still placed");
     assert!(run.ui.actions.deadline().is_some());

@@ -256,7 +256,7 @@ async fn acknowledgements_refetch_only_plugins_and_changes_fetch_only_their_kind
         senders + 1,
         "only Plugins is refreshed"
     );
-    run.catalog_changed(CatalogKind::Commands);
+    catalogues::changed(&mut run, CatalogKind::Commands);
     assert_eq!(
         run.replies.strong_count(),
         senders + 2,
