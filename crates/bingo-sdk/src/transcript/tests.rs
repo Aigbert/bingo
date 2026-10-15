@@ -335,7 +335,10 @@ fn asked_uses_effective_voice_and_borrows_only_the_first_text_part() {
         origin: Origin::surface("command"),
     };
     assert_eq!(crate::asked(&row), None);
-    for surface in ["bash", "agent", "schedule", "room", "wake", "command"] {
+    let legacy: std::collections::BTreeMap<String, Voice> =
+        serde_json::from_str(include_str!("../asked-legacy.json")).unwrap();
+    assert_eq!(legacy.len(), 6);
+    for surface in legacy.into_keys() {
         row.body = ItemBody::User {
             parts: vec![
                 ContentPart::text("first\nsecond"),

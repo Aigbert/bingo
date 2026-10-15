@@ -104,15 +104,15 @@ fn projection_cache_invalidates_on_length_query_and_generation() {
     open(&mut ui, &solo(&state), None, false, now);
     let mut props = props(&ui, &solo(&state)).unwrap();
     props.query = "fork".into();
-    ui.browse.fill(&state, &mut props);
+    ui.placed.browse.fill(&state, &mut props);
     assert_eq!(props.count, 2);
     state.transcript.apply(&Event::ItemCompleted {
         item: assistant("next", "fork", ItemStatus::Completed),
     });
-    ui.browse.fill(&state, &mut props);
+    ui.placed.browse.fill(&state, &mut props);
     assert_eq!(props.count, 3);
     props.query = "second line".into();
-    ui.browse.fill(&state, &mut props);
+    ui.placed.browse.fill(&state, &mut props);
     assert_eq!(props.count, 1);
     state.transcript.apply(&Event::Rewound {
         generation: 1,
@@ -120,18 +120,24 @@ fn projection_cache_invalidates_on_length_query_and_generation() {
         dropped: vec![ItemId::from_raw("i1")],
         files_restored: vec![],
     });
-    ui.browse.fill(&state, &mut props);
+    ui.placed.browse.fill(&state, &mut props);
     assert_eq!(props.count, 0);
     let first = ui
+        .placed
         .browse
         .accepted("test", 1, || Some(props.clone()))
         .unwrap();
     let same = ui
+        .placed
         .browse
         .accepted("test", 1, || panic!("decoded twice"))
         .unwrap();
     assert!(Arc::ptr_eq(&first, &same));
-    let next = ui.browse.accepted("test", 2, || Some(props)).unwrap();
+    let next = ui
+        .placed
+        .browse
+        .accepted("test", 2, || Some(props))
+        .unwrap();
     assert!(!Arc::ptr_eq(&first, &next));
 }
 

@@ -185,6 +185,11 @@ impl Fixture {
         }
     }
 }
+fn disable(state: &mut SessionState) {
+    state.config.kernel["enabledPlugins"] = json!({"bingo.mod.browse":false});
+    // The kernel publishes no placement when this owner is disabled.
+    state.config.kernel["render"] = json!({});
+}
 fn setup(fixture: &Fixture) -> (SessionState, Ui, Now) {
     let mut state = state();
     state.config.kernel["render"] = json!({"Browse":[{}]});
@@ -314,7 +319,7 @@ fn opener_uses_catalogue_and_disabled_falls_back_to_line_search() {
     let (mut state, mut ui, now) = setup(&fixture);
     let effects = crate::input::on_key(&mut ui, &solo(&state), ctrl('f'), now);
     assert!(matches!(&effects[0], Effect::Submit(Input::Text { text, .. }) if text == "/browse"));
-    state.config.kernel["enabledPlugins"] = json!({"bingo.mod.browse":false});
+    disable(&mut state);
     assert!(crate::input::on_key(&mut ui, &solo(&state), ctrl('f'), now).is_empty());
     assert!(ui.focus.search().is_some());
 }
@@ -331,7 +336,7 @@ async fn double_escape_card_confirms_and_disabled_card_submits_directly() {
             .unwrap(),
         );
         if !enabled {
-            state.config.kernel["enabledPlugins"] = json!({"bingo.mod.browse":false});
+            disable(&mut state);
         }
         for _ in 0..2 {
             crate::input::on_key(&mut ui, &solo(&state), key(KeyCode::Esc), now);
@@ -410,7 +415,7 @@ async fn invalidated_drawings_hold_keys_and_switching_off_restores_line_search()
         .invalidated
         .insert(request(&ui).unwrap().to_owned(), 1);
     assert!(waiting(&ui, &solo(&state)));
-    state.config.kernel["enabledPlugins"] = json!({"bingo.mod.browse":false});
+    disable(&mut state);
     state.config.kernel["render"] = json!({});
     draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(!waiting(&ui, &solo(&state)));

@@ -81,9 +81,11 @@ fn handler(ui: &Ui) -> Option<Action> {
 }
 pub fn current(ui: &Ui) -> Option<std::sync::Arc<BrowseProps>> {
     let id = request(ui)?;
-    ui.browse.accepted(id, ui.placed.pulled.version(id), || {
-        serde_json::from_value(handler(ui)?.args["props"].clone()).ok()
-    })
+    ui.placed
+        .browse
+        .accepted(id, ui.placed.pulled.version(id), || {
+            serde_json::from_value(handler(ui)?.args["props"].clone()).ok()
+        })
 }
 fn props(ui: &Ui, tree: &Tree) -> Option<BrowseProps> {
     let open = opened(ui)?;
@@ -107,13 +109,12 @@ fn props(ui: &Ui, tree: &Tree) -> Option<BrowseProps> {
             },
             confirm: open.confirm,
         });
-    ui.browse.fill(tree.viewed(), &mut props);
+    ui.placed.browse.fill(tree.viewed(), &mut props);
     props.confirm = open.confirm;
     Some(props)
 }
 pub fn offered(ui: &Ui, tree: &Tree) -> bool {
-    tree.viewed().config.kernel["enabledPlugins"]["bingo.mod.browse"] != false
-        && tree.viewed().summary.parent.is_none()
+    tree.viewed().summary.parent.is_none()
         && bingo_sdk::render::matched(&tree.viewed().config)
             .0
             .contains_key(&render::Component::Browse)
