@@ -39,16 +39,15 @@ struct Create {
     /// When: `every <n>s|m|h`, `daily at HH:MM` in local time, or `once at
     /// <RFC3339>`. Cron expressions are not a schedule here.
     spec: String,
-    /// What to say when it fires: a prompt, or a `/command` line. It reads
-    /// nothing of this conversation.
+    /// Prose delivered to the model when it fires. Command and shell prefixes
+    /// remain prose; the turn reads nothing of this conversation.
     text: String,
     /// The directory the scheduled turn works in; this session's by default.
     #[serde(default)]
     cwd: Option<PathBuf>,
-    /// What the scheduled turn does when no rule decides: `default`,
-    /// `acceptEdits`, `plan`, `bypassPermissions` or `dontAsk`. Nobody is
-    /// there to answer a prompt, so `default` declines what would have
-    /// asked.
+    /// A mode that may only keep or tighten the session's policy: `default`,
+    /// `acceptEdits`, `plan`, `bypassPermissions` or `dontAsk`. A stored value
+    /// cannot authorize widening; a turn that asks can wait for a person.
     #[serde(default)]
     permission_mode: Option<String>,
 }

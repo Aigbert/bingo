@@ -17,13 +17,14 @@ the usual way to have one.
   `once at <RFC3339>`. Days are not a unit of `every` — a day is what DST
   makes longer or shorter, and `daily at` is where it belongs. **Cron
   expressions are not a schedule here.**
-- `text` — a prompt, or a `/command` line, delivered as the turn. It reads
-  nothing of this conversation and nobody is watching it, so write one that
+- `text` — prose delivered to the model, including lines beginning with `/`
+  or `!`. It reads nothing of this conversation, so write something that
   stands on its own and needs no answer.
 - `cwd` — the directory that turn works in; this session's by default.
 - `permissionMode` — `default`, `acceptEdits`, `plan`, `bypassPermissions` or
-  `dontAsk` for the scheduled turn. Nobody is there to answer a prompt, so
-  `default` declines whatever would have asked.
+  `dontAsk` for the scheduled turn. A stored mode can only keep or tighten
+  the session's permission policy; it cannot grant more authority. Configure
+  any needed permissions yourself; a turn that asks can wait for a person.
 
 The person sees the file the call would write before it is written, and the
 receipt gives the id.

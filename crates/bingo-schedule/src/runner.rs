@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use bingo_sdk::{
-    Attachment, CancellationToken, ClientIdentity, Delivery, ErrorCode, HostHandle, Input,
+    Action, Attachment, CancellationToken, ClientIdentity, Delivery, ErrorCode, HostHandle, Input,
     IntentId, KernelError, OpenOptions, Origin, SessionSelector, SessionSpec,
 };
 use jiff::Zoned;
@@ -199,23 +199,21 @@ impl Runner {
         }
     }
 
-    /// The entry's permission mode, asked for the way a person asks for it.
-    ///
-    /// There is no seam for one at `open`: `SessionSpec` carries no mode,
-    /// and the mode a session runs in belongs to the permissions plugin,
-    /// which this one may not import (ADR-0001). So the mode is set by
-    /// submitting the `/permission` line a person would type, on the
-    /// attachment this fire just opened, before the text is delivered. An
-    /// unknown mode is refused there and the turn runs in the configured
-    /// one — the safe direction, which is why this is a submit and not a
-    /// precondition.
+    /// Stored modes carry no person consent; the command may only tighten
+    /// the current policy. Unknown or widening modes leave it intact.
     fn choose_mode(&self, entry: &Entry, attachment: &Attachment) {
         let Some(mode) = &entry.permission_mode else {
             return;
         };
         attachment.handle.submit(
             IntentId::mint(),
-            Input::text(format!("/permission {mode}"), origin()),
+            Input::action(
+                Action {
+                    name: "permission".into(),
+                    args: serde_json::Value::String(mode.clone()),
+                },
+                origin(),
+            ),
         );
     }
 }
