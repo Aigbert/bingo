@@ -15,6 +15,13 @@ pub fn title_from(ask: &str) -> Option<String> {
         .unwrap_or(head.len());
     Some(format!("{}…", head[..end].trim_end()))
 }
+/// A title only from what the person said, by the same effective voice that
+/// decides a summary's first ask, so the two never disagree.
+fn spoken_title(text: &str, origin: &Origin) -> Option<String> {
+    (effective_voice(origin) == Voice::Said)
+        .then(|| title_from(text))
+        .flatten()
+}
 pub(crate) struct Title;
 #[async_trait::async_trait]
 impl Interceptor for Title {
@@ -32,13 +39,7 @@ impl Interceptor for Title {
     ) -> Result<SubmitResult, KernelError> {
         let result = next.run(input).await?;
         if let SubmitResult::Accepted(Input::Text { text, origin, .. }) = &result
-            && !origin.is_context()
-            && origin.surface != "command"
-            && !matches!(
-                origin.voice,
-                Some(Voice::Note | Voice::Quiet | Voice::Aside)
-            )
-            && let Some(title) = title_from(text)
+            && let Some(title) = spoken_title(text, origin)
             && let Err(error) = title_once(&cx.host, &cx.session, title).await
         {
             tracing::warn!(session = %cx.session, %error, "automatic session title failed");
@@ -70,6 +71,24 @@ mod tests {
         assert!(title.chars().count() <= 60);
         assert!(title.ends_with("word…") || title.ends_with("long…"));
         assert_eq!(title_from(&"字".repeat(100)).unwrap().chars().count(), 60);
+    }
+    #[test]
+    fn only_a_spoken_line_titles_a_session() {
+        for surface in ["command", "wake", "plugin:x", "contributor:git"] {
+            assert_eq!(spoken_title("fix it", &Origin::surface(surface)), None);
+        }
+        assert_eq!(
+            spoken_title("fix it", &Origin::surface("tui")).as_deref(),
+            Some("fix it")
+        );
+        assert_eq!(
+            spoken_title("fix it", &Origin::surface("wake").voiced(Voice::Said)).as_deref(),
+            Some("fix it")
+        );
+        assert_eq!(
+            spoken_title("fix it", &Origin::surface("tui").voiced(Voice::Note)),
+            None
+        );
     }
 }
 
@@ -109,7 +128,7 @@ mod lifecycle_tests {
             Title
                 .prompt_submit(
                     &cx,
-                    Input::text(text, Origin::surface("test")),
+                    Input::text(text, Origin::surface("tui")),
                     Next::new(|input| Box::pin(async move { Ok(SubmitResult::Accepted(input)) })),
                 )
                 .await
@@ -120,7 +139,7 @@ mod lifecycle_tests {
         Title
             .prompt_submit(
                 &cx,
-                Input::text("third ask", Origin::surface("test")),
+                Input::text("third ask", Origin::surface("tui")),
                 Next::new(|input| Box::pin(async move { Ok(SubmitResult::Accepted(input)) })),
             )
             .await
@@ -160,7 +179,7 @@ mod lifecycle_tests {
             let result = Title
                 .prompt_submit(
                     &cx,
-                    Input::text("keep this", Origin::surface("test")),
+                    Input::text("keep this", Origin::surface("tui")),
                     Next::new(|input| Box::pin(async move { Ok(SubmitResult::Accepted(input)) })),
                 )
                 .await

@@ -71,6 +71,13 @@ mod tests {
         }
         assert_eq!(asked(&item), None);
         assert_eq!(first_ask(&item), None);
+        for surface in ["command", "wake", "plugin:x", "contributor:git"] {
+            item.body = ItemBody::User {
+                parts: vec![ContentPart::text("not the person's")],
+                origin: Origin::surface(surface),
+            };
+            assert_eq!(first_ask(&item), None, "{surface}");
+        }
         item.body = ItemBody::Assistant {
             text: "answer".into(),
         };
