@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use bingo_sdk::{HostHandle, ServiceKey, WireService};
 use serde_json::Value;
 mod row;
-pub use row::{Auth, ServerRow, Status, Transport};
+pub use row::{Auth, ServerRow, Status, Transport, redacted_line};
 use std::sync::Arc;
 
 pub static KEY: ServiceKey<dyn Servers> = ServiceKey::new("mcp.servers");

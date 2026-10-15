@@ -404,6 +404,7 @@ mod tests {
             auth,
             latency: None,
             sign_in_from: None,
+            stderr: None,
         }
     }
 

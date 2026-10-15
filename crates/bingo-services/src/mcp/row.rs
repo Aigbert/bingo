@@ -76,6 +76,21 @@ impl Transport {
     }
 }
 const HIDDEN: &str = "…";
+/// A line of free text a server wrote, with what looks like a token cut out:
+/// the word after a credential's name too, since prose has no dashes.
+pub fn redacted_line(line: &str) -> String {
+    let mut shown = Vec::new();
+    let mut hide_next = false;
+    for word in line.split_whitespace() {
+        shown.push(if std::mem::take(&mut hide_next) {
+            HIDDEN.to_string()
+        } else {
+            redacted_arg(word)
+        });
+        hide_next = !word.contains('=') && sensitive(word);
+    }
+    shown.join(" ")
+}
 fn sensitive(name: &str) -> bool {
     let name = name.trim_start_matches('-').to_ascii_lowercase();
     [
@@ -174,6 +189,9 @@ pub struct ServerRow {
     pub auth: Option<Auth>,
     pub latency: Option<u64>,
     pub sign_in_from: Option<String>,
+    /// The last line a failed server wrote to its stderr log, redacted.
+    #[serde(default)]
+    pub stderr: Option<String>,
 }
 impl ServerRow {
     pub fn tools(&self) -> usize {
@@ -225,6 +243,19 @@ mod tests {
         assert_eq!(
             stdio(&["--url", "https://u:s3cret@h.example/x?t=s3cret"]).runs(),
             "npx --url https://h.example/x?t=…"
+        );
+    }
+    #[test]
+    fn a_line_a_server_wrote_never_shows_a_token() {
+        assert_eq!(
+            redacted_line(
+                "error: Authorization: Bearer s3cret refused by https://u:s3cret@h.example/x?k=s3cret API_KEY=s3cret"
+            ),
+            "error: Authorization: … … refused by https://h.example/x?k=… API_KEY=…"
+        );
+        assert_eq!(
+            redacted_line("  cannot find module 'x'  "),
+            "cannot find module 'x'"
         );
     }
     #[test]

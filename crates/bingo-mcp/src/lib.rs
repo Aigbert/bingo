@@ -23,6 +23,7 @@ pub mod manager;
 pub mod rows;
 mod signin;
 pub mod source;
+mod stderr;
 pub mod tool;
 
 use std::sync::{Arc, OnceLock};

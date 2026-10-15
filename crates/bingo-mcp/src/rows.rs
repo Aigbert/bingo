@@ -71,6 +71,7 @@ pub(crate) fn row(
         }),
         latency: None,
         sign_in_from: sign_in_from(server),
+        stderr: None,
     };
     // Only a row somebody may dial carries what dialling needs.
     if !row.forwardable() {

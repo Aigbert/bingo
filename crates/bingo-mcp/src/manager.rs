@@ -32,6 +32,8 @@ enum State {
     },
     Failed {
         why: String,
+        /// The last line its stderr log held when the dial failed.
+        stderr: Option<String>,
     },
     Disabled,
 }
@@ -348,6 +350,11 @@ impl Manager {
                 if let Some(origin) = self.origins.get(name) {
                     row.origin = Some(origin.clone());
                 }
+                if let (Status::Failed { .. }, State::Failed { stderr, .. }) =
+                    (&row.status, &slot.state)
+                {
+                    row.stderr = stderr.clone();
+                }
                 Some(row)
             })
             .collect()
@@ -511,6 +518,7 @@ impl Manager {
     }
 
     async fn file(&self, name: &str, epoch: u64, outcome: Dialled) {
+        let state = self.filed(name, outcome);
         let mut slots = self.slots.write().await;
         let Some(slot) = slots.get_mut(name) else {
             return;
@@ -518,13 +526,29 @@ impl Manager {
         if slot.epoch != epoch {
             return;
         }
-        slot.state = match outcome {
-            Dialled::Connected(connection) => State::Connected(connection),
-            Dialled::Unauthorized { why } => State::NeedsAuth { why },
-            Dialled::Failed { why } => State::Failed { why },
-        };
+        slot.state = state;
         drop(slots);
         self.changed();
+    }
+
+    fn filed(&self, name: &str, outcome: Dialled) -> State {
+        match outcome {
+            Dialled::Connected(connection) => State::Connected(connection),
+            Dialled::Unauthorized { why } => State::NeedsAuth { why },
+            Dialled::Failed { why } => State::Failed {
+                why,
+                stderr: self.stderr(name),
+            },
+        }
+    }
+
+    /// Only a child process has a stderr log; a remote server's words are
+    /// already its `why`.
+    fn stderr(&self, name: &str) -> Option<String> {
+        let Some(Server::Stdio { .. }) = self.servers.get(name) else {
+            return None;
+        };
+        crate::stderr::last_line(&dial::log_path(&self.data_dir, name))
     }
 }
 
@@ -609,7 +633,7 @@ fn status_of(slot: &Slot) -> Status {
             tools: connection.tools.len(),
         },
         State::NeedsAuth { why } => Status::NeedsAuth { why: why.clone() },
-        State::Failed { why } => Status::Failed { why: why.clone() },
+        State::Failed { why, .. } => Status::Failed { why: why.clone() },
         State::Disabled => Status::Disabled,
     }
 }
@@ -774,6 +798,32 @@ mod tests {
             Status::Failed {
                 why: "no such command".to_string()
             }
+        );
+    }
+
+    /// A failed child's card says the last thing it wrote, from its log,
+    /// without the token it wrote.
+    #[tokio::test]
+    async fn a_failed_child_is_filed_with_its_last_stderr_line() {
+        let data = tempfile::tempdir().unwrap();
+        let manager = Arc::new(Manager::new(
+            bingo_http::client(bingo_http::Bounds::CALL).expect("a client"),
+            BTreeMap::from([("files".to_string(), stdio("/bin/echo"))]),
+            &[],
+            data.path().to_path_buf(),
+        ));
+        let log = dial::log_path(data.path(), "files");
+        std::fs::create_dir_all(log.parent().unwrap()).unwrap();
+        std::fs::write(&log, "booting\nfatal: TOKEN=s3cret was refused\n").unwrap();
+        let epoch = manager.pending().await[0].1;
+        let failed = Dialled::Failed {
+            why: "exited".to_string(),
+        };
+        manager.file("files", epoch, failed).await;
+        let rows = manager.rows().await;
+        assert_eq!(
+            rows[0].stderr.as_deref(),
+            Some("fatal: TOKEN=… was refused")
         );
     }
 

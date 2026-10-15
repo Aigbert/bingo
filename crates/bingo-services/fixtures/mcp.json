@@ -23,7 +23,8 @@
         },
         "auth": null,
         "latency": null,
-        "signInFrom": null
+        "signInFrom": null,
+        "stderr": null
       },
       {
         "name": "remote",
@@ -38,7 +39,8 @@
         },
         "auth": null,
         "latency": null,
-        "signInFrom": null
+        "signInFrom": null,
+        "stderr": null
       },
       {
         "name": "switched-off",
@@ -55,7 +57,8 @@
         },
         "auth": null,
         "latency": null,
-        "signInFrom": "TOKEN from settings"
+        "signInFrom": "TOKEN from settings",
+        "stderr": null
       },
       {
         "name": "repo-tool",
@@ -71,7 +74,8 @@
         },
         "auth": null,
         "latency": null,
-        "signInFrom": "Authorization from settings"
+        "signInFrom": "Authorization from settings",
+        "stderr": null
       }
     ]
   }
