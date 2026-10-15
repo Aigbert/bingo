@@ -45,7 +45,8 @@ is informational. Problems appear on their own rows. The feature is the built-in
 - [x] Keys skip spent, dispatch/prefill, preserve drafts, Escape and live selection.
 - [x] Disabled mod and non-interactive callers retain the kernel text table.
 - [x] Empty pull props draw; expired selection resumes; client commands are ignored.
-- [x] Final native gates and isolated tmux drive for fix round 2.
+- [x] Final native gates and isolated tmux drive for fix round 2 and focus repair.
+- [x] Key-only panes regain focus by Tab/click; repeat openers and asks are covered.
 - [ ] Windows checks for every touched crate (native C-toolchain deferrals below).
 
 ## Decisions
@@ -99,6 +100,8 @@ is informational. Problems appear on their own rows. The feature is the built-in
   No docs/guide directory. Desktop drawing and in-card value editing are out of scope.
 - Workspace edges use sdk/services and existing async-trait/serde/serde_json/tokio;
   TUI tests use the mod and existing insta. Combined normal-tree budget is 415.
+- Reopening keeps an already focused pane open: the stable pane ID makes an
+  opener an idempotent focus request; Escape remains the close operation.
 
 ## Non-goals and risks
 
@@ -136,3 +139,12 @@ Final gates ran serially with `RUST_TEST_THREADS=4`; OPENAI_API_KEY/OPENAI_BASE_
 Rebase onto dev af2a1cde: fmt/clippy 0; tests 185 groups, 5991 passed, 0 failed,
 5 ignored; schema regen clean; 32 TS tests; discipline/budget/deny ok; smoke 3/3;
 tmux drive 108x30/80x24: hub and /plugins both show repo waiting for your yes.
+
+## Verified — 2026-10-15
+
+- Focus repair, serial gates with the same four provider variables unset: `cargo fmt --all -- --check` → exit 0; `cargo check --workspace --all-targets --locked` and `cargo clippy --workspace --all-targets --locked -- -D warnings` → Finished `dev` profile; exit 0.
+- `RUST_TEST_THREADS=4 cargo test --workspace --locked` → 185 groups; 5997 passed; 0 failed; 5 ignored; 1082s. `bash scripts/check_discipline.sh` → discipline ok; advisory warnings only. Three focus regressions failed on their pre-fix paths; TUI now 1245 passed, 2 ignored.
+- `bash scripts/budget.sh` → dependencies 419/419; warm core 1s; relink 0; budget ok; 8 GB target soft warning. `cargo deny check` → advisories ok, bans ok, licenses ok, sources ok.
+- `bash scripts/tui-smoke.sh` → tui-smoke ok. Isolated `tmux -L hubfocus -f /dev/null`, temporary HOME/data/cwd, fake provider, 108×30 → Status and Memory: type a, Tab refocus, Escape close with draft intact; repeat opener focuses one pane; Escape closes. Cursor transitions verified; drive passed.
+- `cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc --locked` → deferred in aws-lc-sys: Windows C headers `stdlib.h`/`windows.h` missing; Windows criterion stays unticked.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p <generator crate> --locked` for sdk/plugin-rpc/surface-rpc/store-jsonl/mods → 665 passed, 3 ignored; `git diff --exit-code -- schema/ sdk/typescript/` → exit 0; TypeScript `npm test` → 32 passed, 0 failed. `run.rs`: 955 non-test lines; `impl Run`: two files.
