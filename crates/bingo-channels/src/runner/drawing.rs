@@ -370,17 +370,9 @@ mod tests {
         runner.redraw(&[first.request.request_id]).await;
         assert_eq!(renders(&host), before);
     }
-    #[tokio::test]
-    async fn a_drawn_control_keeps_the_member_who_pressed_it() {
-        let (mut runner, _, _) = runner(true, true).await;
-        let submitted = Arc::new(crate::host::tests::TestSession::default());
-        runner.handle = bingo_sdk::SessionHandle(submitted.clone());
-        answer(&mut runner).await;
+    /// Press `action` on a button the runner's drawing shows, as `member`.
+    async fn press_drawn(runner: &mut Runner, action: Action) {
         let (mut drawing, at) = runner.drawn.front().unwrap().clone();
-        let action = Action {
-            name: "permission".into(),
-            args: json!("bypassPermissions"),
-        };
         drawing.view =
             serde_json::from_value(json!({"kind":"Button","children":["Press"],"onPress":action}))
                 .unwrap();
@@ -395,9 +387,50 @@ mod tests {
                 value: None,
             })
             .await;
+    }
+
+    #[tokio::test]
+    async fn a_drawn_control_keeps_the_member_who_pressed_it() {
+        let (mut runner, _, _) = runner(true, true).await;
+        let submitted = Arc::new(crate::host::tests::TestSession::default());
+        runner.handle = bingo_sdk::SessionHandle(submitted.clone());
+        answer(&mut runner).await;
+        let action = Action {
+            name: "mod:ui".into(),
+            args: json!({"handler":"h","event":"press"}),
+        };
+        press_drawn(&mut runner, action).await;
         assert_eq!(
             submitted.origins(),
             [incoming_origin("member", &runner.key)]
+        );
+    }
+
+    /// A drawn control naming another command than its drawer's handler is
+    /// never sent, whoever pressed it: the chat is told the control is stale.
+    #[tokio::test]
+    async fn a_drawn_control_naming_another_command_is_not_sent() {
+        let (mut runner, _, chat) = runner(true, true).await;
+        let submitted = Arc::new(crate::host::tests::TestSession::default());
+        runner.handle = bingo_sdk::SessionHandle(submitted.clone());
+        answer(&mut runner).await;
+        for (name, args) in [
+            ("permission", "bypassPermissions"),
+            ("plugins", "trust evil full"),
+        ] {
+            let action = Action {
+                name: name.into(),
+                args: json!(args),
+            };
+            press_drawn(&mut runner, action).await;
+        }
+        assert!(submitted.origins().is_empty());
+        assert!(
+            chat.records()
+                .iter()
+                .any(|record| matches!(record, Record::Send { text, .. } if text == bingo_sdk::view::STALE_CONTROL)),
+            "{:?}",
+            chat.records()
         );
     }
 }

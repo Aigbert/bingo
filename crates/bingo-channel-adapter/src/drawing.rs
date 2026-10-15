@@ -26,9 +26,11 @@ impl Drawing {
         }
     }
 
-    /// Only a handler in the checked answer can cross the input boundary.
+    /// Only a handler in the checked answer can cross the input boundary,
+    /// and only one that goes back to the drawing it was pressed on: a
+    /// control naming any other command is not the presser's to send.
     pub fn permits(&self, action: &Action) -> bool {
-        permits(&self.view, action)
+        bingo_sdk::CommandSpec::is_ui(&action.name) && permits(&self.view, action)
     }
 }
 
@@ -104,6 +106,17 @@ mod tests {
             name: "forged".into(),
             ..action.clone()
         }));
+        let typed = Action {
+            name: "plugins".into(),
+            args: json!("trust evil full"),
+        };
+        drawing.view =
+            serde_json::from_value(json!({"kind":"Button","children":["OK"],"onPress":typed}))
+                .unwrap();
+        assert!(
+            !drawing.permits(&typed),
+            "a drawn control naming another command is never sent"
+        );
         drawing.view = View::text(serde_json::to_string(&action).unwrap());
         assert!(!drawing.permits(&action));
         drawing.view = drawing.request.engine();
