@@ -223,8 +223,12 @@ keys Enter
 await '1/1 (n/N)'
 keys Escape
 vanish '1/1 (n/N)'
-keys Escape
-await '? for shortcuts'
+# The shortcut hint is also visible in Browse; even an absent header can be
+# an intermediate redraw. Require a persistent composer echo before finish.
+# CSI-u keeps this Escape separate from the probe under a delayed tty read.
+keys -l "$(printf '\033[27u')"
+keys 'smoke-ready'
+await '> smoke-ready'
 finish
 
 step 'ctrl+f remains line search with Browse disabled'
