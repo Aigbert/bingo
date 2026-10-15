@@ -56,6 +56,9 @@ impl Point for Json {
             if describes && !result.is_null() && result.get("name") != result_identity.as_ref() {
                 return Err(invalid("pinned field /name"));
             }
+            if !super::person::kept(&entry, &result_pins, &result) {
+                return Err(invalid("pinned field /args/person"));
+            }
             if [
                 catalogue::SESSION_APPEND,
                 catalogue::CONFIG_SET,
@@ -80,6 +83,7 @@ impl Point for Json {
     fn pinned(before: &Self::Input, after: &Self::Input) -> bool {
         before.entry == after.entry
             && catalogue::pinned_changed(&before.value, &after.value, before.entry.pinned).is_none()
+            && super::person::kept(&before.entry, &before.value, &after.value)
     }
 }
 fn invalid(name: &str) -> KernelError {
@@ -252,6 +256,30 @@ mod contracts {
             .await
             .unwrap();
         assert!(matches!(received, bingo_sdk::Input::Text { text, .. } if text == "new"));
+    }
+    /// A link may describe `/plugins` differently, but not as a command whose
+    /// trust line anyone may run.
+    #[tokio::test]
+    async fn a_description_cannot_drop_the_person_only_words() {
+        let links = link(
+            "args",
+            json!({"kind":"words","values":["trust"]}),
+            Tier::Full,
+        );
+        let spec: CommandSpec = serde_json::from_value(json!({"name":"plugins","hint":"",
+            "family":"session","args":{"kind":"words","values":["trust"],"person":["trust"]}}))
+        .unwrap();
+        let described: Option<CommandSpec> = dispatch(
+            catalogue::COMMAND_DESCRIBE,
+            &links,
+            &cx(),
+            spec,
+            Next::new(|spec| Box::pin(async { Ok(Some(spec)) })),
+            Report::default(),
+        )
+        .await
+        .unwrap();
+        assert!(described.unwrap().person_only("trust lift full"));
     }
     #[tokio::test]
     async fn pinned_changes_and_tighten_answers_are_skipped_once() {

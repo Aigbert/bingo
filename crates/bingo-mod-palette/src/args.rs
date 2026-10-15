@@ -35,6 +35,7 @@ fn resolve<'a>(args: &'a ArgSpec, text: &'a str, prefix: String) -> (&'a ArgSpec
     match args {
         ArgSpec::Options { args, .. } => resolve(args, text, prefix),
         ArgSpec::Words {
+            person: _,
             values,
             alone,
             then: Some(next),
@@ -59,6 +60,7 @@ fn offered(
 ) -> Vec<Row> {
     match args {
         ArgSpec::Words {
+            person: _,
             values,
             alone,
             then,
@@ -198,12 +200,14 @@ mod tests {
                 hint: "title".into(),
             },
             ArgSpec::Words {
+                person: vec![],
                 values: vec!["low".into()],
                 alone: vec![],
                 then: None,
             },
             ArgSpec::Options {
                 args: Box::new(ArgSpec::Words {
+                    person: vec![],
                     values: vec!["low".into()],
                     alone: vec![],
                     then: None,
@@ -226,6 +230,7 @@ mod tests {
             .is_empty()
         );
         let args = ArgSpec::Words {
+            person: vec![],
             values: vec!["enable".into(), "reload".into()],
             alone: vec!["reload".into()],
             then: Some(Box::new(ArgSpec::Free {

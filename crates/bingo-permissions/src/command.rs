@@ -67,6 +67,7 @@ impl Command for PermissionCommand {
             aliases: vec!["permissions".into()],
             hint: "show or change the permission mode".into(),
             args: ArgSpec::Words {
+                person: vec![],
                 alone: vec![],
                 values: Mode::ALL.map(|mode| mode.as_str().to_string()).to_vec(),
                 then: None,

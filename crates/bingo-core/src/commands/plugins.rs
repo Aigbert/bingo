@@ -33,6 +33,7 @@ impl Command for PluginsCommand {
                 "plugins",
                 "list, trust, approve, reload, enable or disable plugins",
                 ArgSpec::Words {
+                    person: vec!["approve".into(), "trust".into()],
                     alone: vec!["reload".into()],
                     values: vec![
                         ENABLE.into(),
@@ -284,12 +285,14 @@ mod tests {
             values,
             then,
             alone,
+            person,
         } = spec.args
         else {
             panic!("a verb is one of the words");
         };
         assert_eq!(values, [ENABLE, DISABLE, "reload", "approve", "trust"]);
         assert_eq!(alone, ["reload"]);
+        assert_eq!(person, ["approve", "trust"]);
         assert_eq!(
             then.as_deref(),
             Some(&ArgSpec::Catalog {

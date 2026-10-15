@@ -16,8 +16,10 @@ pub(crate) async fn run(
     hook_cx: &HookContext,
     report: Report,
 ) -> Result<Ran, KernelError> {
+    let spec = command.spec();
+    let entry = point(&spec, &args);
     let input = catalogue::CommandRun {
-        name: command.spec().name,
+        name: spec.name,
         args: args.clone(),
     };
     // A link may rewrite the line, but the rewrite is the link's, not the person's.
@@ -25,7 +27,7 @@ pub(crate) async fn run(
     let answered = Arc::new(Mutex::new(None));
     let own = answered.clone();
     let reply: catalogue::CommandReply = json::dispatch(
-        catalogue::COMMAND_RUN,
+        &entry,
         &hooks.links().await,
         hook_cx,
         input,
@@ -50,4 +52,17 @@ pub(crate) async fn run(
         .ok()
         .is_some_and(|answered| answered.as_ref() == Some(&outcome));
     Ok(Ran { outcome, own })
+}
+
+/// A line only the person may run keeps its arguments through every link,
+/// as every line keeps its command.
+fn point(spec: &CommandSpec, args: &str) -> catalogue::Entry {
+    let entry = catalogue::COMMAND_RUN.clone();
+    if !spec.person_only(args) {
+        return entry;
+    }
+    catalogue::Entry {
+        pinned: &["/command", "/args"],
+        ..entry
+    }
 }

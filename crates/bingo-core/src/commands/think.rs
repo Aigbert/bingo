@@ -25,6 +25,7 @@ impl Command for ThinkCommand {
             "think",
             "set the reasoning effort",
             super::keep_args(ArgSpec::Words {
+                person: vec![],
                 alone: vec![],
                 values: Effort::words().map(str::to_string).collect(),
                 then: None,

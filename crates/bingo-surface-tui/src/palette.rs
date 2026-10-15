@@ -228,7 +228,7 @@ pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
 /// is theirs and the history keeps it, as it keeps one sent from the box.
 fn run(ui: &mut Ui, tree: &Tree, line: &str, vouched: bool, now: Now) -> Vec<Effect> {
     close(ui, now);
-    if !vouched && crate::commands::privileged(line) {
+    if !vouched && crate::commands::privileged(&ui.catalogs.commands, line) {
         return refuse(ui, line.into(), now);
     }
     crate::input::typed_line(ui, tree, now, line.into())
@@ -250,7 +250,7 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, vouched: bool, now: Now
     }
     if let Some(key) = value["key"].as_str().and_then(crate::keys::commands::event) {
         close(ui, now);
-        if !vouched && crate::commands::privileged(ui.composer.text()) {
+        if !vouched && crate::commands::privileged(&ui.catalogs.commands, ui.composer.text()) {
             return refuse(ui, ui.composer.text().to_string(), now);
         }
         return crate::input::on_key(ui, tree, key, now);

@@ -78,6 +78,7 @@ impl Command for WakeCommand {
             aliases: Vec::new(),
             hint: "the wake the model set, and `off` to end it".into(),
             args: ArgSpec::Words {
+                person: vec![],
                 alone: vec![],
                 values: vec![OFF.into()],
                 then: None,
@@ -213,6 +214,7 @@ mod tests {
         assert_eq!(
             spec.args,
             ArgSpec::Words {
+                person: vec![],
                 alone: vec![],
                 values: vec![OFF.into()],
                 then: None,

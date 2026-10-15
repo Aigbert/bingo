@@ -209,6 +209,7 @@ fn a_long_load_error_is_cut_inside_the_card() {
 #[test]
 fn a_trust_line_nobody_vouched_for_is_refused() {
     let (mut ui, now) = scene();
+    ui.catalogs.commands = guarded();
     let tree = solo(&state());
     crate::plugins::open(&mut ui, PluginsOpen::Plugins, now);
     let id = crate::plugins::request(&ui).unwrap().to_string();
@@ -248,4 +249,22 @@ fn a_trust_line_nobody_vouched_for_is_refused() {
     assert!(submits(crate::plugins::result(
         &mut ui, &tree, &ordinary, false, now
     )));
+}
+
+/// The three commands that mark words as the person's, as the kernel lists them.
+fn guarded() -> Vec<bingo_sdk::CommandSpec> {
+    [
+        ("plugins", json!(["modules"]), json!(["approve", "trust"])),
+        ("mcp", json!([]), json!(["approve"])),
+        ("acp", json!([]), json!(["approve"])),
+    ]
+    .into_iter()
+    .map(|(name, aliases, person)| {
+        serde_json::from_value(
+            json!({"name":name,"aliases":aliases,"hint":"","family":name,
+            "args":{"kind":"words","values":["tools","approve","trust"],"person":person}}),
+        )
+        .unwrap()
+    })
+    .collect()
 }

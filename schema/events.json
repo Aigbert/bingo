@@ -11077,6 +11077,13 @@
                       "type": "string"
                     }
                   },
+                  "person": {
+                    "description": "Words among `values` only the person may run: they raise trust or\nlet repository code run, so no link rewrites a line that starts\nwith one and no view bingo did not draw may send one.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "then": {
                     "anyOf": [
                       {
@@ -11241,6 +11248,13 @@
                     }
                   },
                   "values": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "person": {
+                    "description": "Words among `values` only the person may run: they raise trust or\nlet repository code run, so no link rewrites a line that starts\nwith one and no view bingo did not draw may send one.",
                     "type": "array",
                     "items": {
                       "type": "string"

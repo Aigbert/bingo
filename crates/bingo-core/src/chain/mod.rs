@@ -320,6 +320,7 @@ pub(crate) mod describe;
 pub(crate) mod complete;
 
 pub(crate) mod command;
+mod person;
 
 pub(crate) mod service;
 

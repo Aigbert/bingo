@@ -78,9 +78,33 @@ pub enum ArgSpec {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         alone: Vec<String>,
         values: Vec<String>,
+        /// Words among `values` only the person may run: they raise trust or
+        /// let repository code run, so no link rewrites a line that starts
+        /// with one and no view bingo did not draw may send one.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        person: Vec<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         then: Option<Box<ArgSpec>>,
     },
+}
+
+impl CommandSpec {
+    /// Whether `args` start with a word only the person may run.
+    pub fn person_only(&self, args: &str) -> bool {
+        let first = args.split_whitespace().next().unwrap_or_default();
+        self.args.person_words().iter().any(|word| word == first)
+    }
+}
+
+impl ArgSpec {
+    /// The words a line only the person may run starts with.
+    pub fn person_words(&self) -> &[String] {
+        match self {
+            ArgSpec::Words { person, .. } => person,
+            ArgSpec::Options { args, .. } => args.person_words(),
+            _ => &[],
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -205,6 +229,7 @@ mod tests {
     #[test]
     fn a_word_list_crosses_the_wire_as_its_kind_and_its_values() {
         let args = ArgSpec::Words {
+            person: vec![],
             alone: vec![],
             values: vec!["off".into(), "low".into()],
             then: None,
@@ -220,6 +245,7 @@ mod tests {
     #[test]
     fn a_verb_carries_the_spec_of_the_word_after_it() {
         let args = ArgSpec::Words {
+            person: vec![],
             alone: vec![],
             values: vec!["enable".into()],
             then: Some(Box::new(ArgSpec::Catalog {

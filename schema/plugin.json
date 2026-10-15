@@ -787,6 +787,13 @@
                 "type": "string"
               }
             },
+            "person": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Words among `values` only the person may run: they raise trust or\nlet repository code run, so no link rewrites a line that starts\nwith one and no view bingo did not draw may send one."
+            },
             "then": {
               "anyOf": [
                 {

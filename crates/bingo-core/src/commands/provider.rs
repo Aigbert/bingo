@@ -17,6 +17,7 @@ impl Command for ProviderCommand {
             "provider",
             "manage named providers",
             ArgSpec::Words {
+                person: vec![],
                 alone: vec![],
                 values: vec!["add".into(), "set".into(), "remove".into()],
                 then: None,

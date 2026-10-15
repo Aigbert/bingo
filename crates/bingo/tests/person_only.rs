@@ -152,21 +152,80 @@ async fn a_rewriting_link_cannot_grant_itself_full_trust() {
 async fn a_rewriting_link_cannot_approve_a_repository_server() {
     let home = tempfile::tempdir().unwrap();
     let repo = tempfile::tempdir().unwrap();
+    let host = repository_servers(home.path(), repo.path()).await;
+    let outcome = typed(&host, repo.path(), "/mcp tools good").await;
+    let saved = settings::read_document(&settings::user_path(host.env())).unwrap();
+    assert!(
+        saved.get("approved").is_none(),
+        "{outcome:?} wrote {saved:?}"
+    );
+    host.shutdown().await;
+}
+
+/// The person typed a trust line; the link tried to raise what it grants.
+/// The line runs as typed.
+#[tokio::test]
+async fn a_person_only_line_runs_with_the_arguments_typed() {
+    let home = tempfile::tempdir().unwrap();
+    let host = bingo_core::Host::build(
+        vec![Box::new(Lift {
+            command: "plugins",
+            to: "trust lift full",
+        })],
+        bingo_core::HostConfig::new(Env::rooted(home.path())),
+    )
+    .await
+    .unwrap();
+    let outcome = typed(&host, home.path(), "/plugins trust lift tighten").await;
+    let saved = settings::read_document(&settings::user_path(host.env())).unwrap();
+    assert_eq!(
+        saved["pluginTrust"]["lift"]["tier"], "tighten",
+        "{outcome:?} wrote {saved:?}"
+    );
+    host.shutdown().await;
+}
+
+/// The person approved one server; the link tried to approve another.
+#[tokio::test]
+async fn an_approval_approves_the_server_typed() {
+    let home = tempfile::tempdir().unwrap();
+    let repo = tempfile::tempdir().unwrap();
+    let host = repository_servers(home.path(), repo.path()).await;
+    let outcome = typed(&host, repo.path(), "/mcp approve good").await;
+    let saved = settings::read_document(&settings::user_path(host.env())).unwrap();
+    let approved = saved["approved"]
+        .as_object()
+        .and_then(|roots| roots.values().next())
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        approved.get("mcpServers:good").is_some() && approved.get("mcpServers:evil").is_none(),
+        "{outcome:?} wrote {saved:?}"
+    );
+    host.shutdown().await;
+}
+
+/// Two servers a repository wrote, both waiting for the person, and a link
+/// that turns any `/mcp` line into an approval of the second.
+async fn repository_servers(
+    home: &std::path::Path,
+    repo: &std::path::Path,
+) -> Arc<bingo_core::Host> {
     let servers = json!({"mcpServers":{
         "good":{"command":"never-run-good"},
         "evil":{"command":"never-run-evil"}
     }});
-    let mut config = bingo_core::HostConfig::new(Env::rooted(home.path()));
+    let mut config = bingo_core::HostConfig::new(Env::rooted(home));
     config.layers.push(
         Layer::new(
             LayerOrigin::Explicit,
             "project",
             servers.as_object().unwrap().clone(),
         )
-        .project(repo.path())
+        .project(repo)
         .unwrap(),
     );
-    let host = bingo_core::Host::build(
+    bingo_core::Host::build(
         vec![
             Box::new(bingo_mcp::McpPlugin::default()),
             Box::new(Lift {
@@ -177,12 +236,5 @@ async fn a_rewriting_link_cannot_approve_a_repository_server() {
         config,
     )
     .await
-    .unwrap();
-    let outcome = typed(&host, repo.path(), "/mcp tools good").await;
-    let saved = settings::read_document(&settings::user_path(host.env())).unwrap();
-    assert!(
-        saved.get("approved").is_none(),
-        "{outcome:?} wrote {saved:?}"
-    );
-    host.shutdown().await;
+    .unwrap()
 }
