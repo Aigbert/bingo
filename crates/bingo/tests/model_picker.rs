@@ -460,3 +460,48 @@ async fn site_commands_keep_their_argument_hints_for_every_surface() {
         assert!(!matches!(spec.args, ArgSpec::None), "{name}");
     }
 }
+#[tokio::test(flavor = "multi_thread")]
+async fn the_picker_opens_while_an_endpoint_has_not_answered() {
+    // Bound and never accepted: the probe's request waits in the backlog for good.
+    let silent = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let home = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
+    std::fs::write(
+        home.path().join(".bingo/settings.toml"),
+        format!(
+            r#"[update]
+check = false
+[openai]
+baseUrl = "http://{}"
+apiKey = "dummy-local-only"
+"#,
+            silent.local_addr().unwrap()
+        ),
+    )
+    .unwrap();
+    let mut server = Server::spawn_at(home, SCRIPT, &[]);
+    let kernel = ready(&mut server).await;
+    let mut session = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    assert!(matches!(
+        command(&mut session, "model", json!("")).await,
+        IntentOutcome::Applied { .. }
+    ));
+    session = reopen(&kernel, &session).await;
+    assert!(picker_open(&session));
+    let req = request(&kernel, &mut session).await;
+    let id = req.request_id;
+    for letter in "gpt".chars() {
+        command(
+            &mut session,
+            "bingo.mod.models:ui",
+            press(&id, &letter.to_string()),
+        )
+        .await;
+    }
+    let req = request(&kernel, &mut session).await;
+    let view = kernel.render(&session.session, req).await.unwrap().fold();
+    assert!(view.contains("openai  ◌ not checked"), "{view}");
+}

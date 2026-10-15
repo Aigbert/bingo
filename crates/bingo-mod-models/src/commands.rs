@@ -33,21 +33,30 @@ impl Interceptor for Commands {
             .map_err(crate::error)?
             .insert(cx.session.clone(), picker.clone());
         crate::state::publish(&cx.host, &cx.session, &picker).await?;
-        for provider in providers
-            .iter()
-            .filter(|p| crate::label::reach(p) == crate::label::Reach::Unchecked)
-        {
-            let _ = crate::bridge::run(
-                &cx.host,
-                &cx.session,
-                "models",
-                &format!("refresh {}", provider.id),
-                None,
-            )
-            .await;
-        }
+        probe(&cx.host, &cx.session, &providers);
         Ok(json!({"kind":"surface","action":{"name":"ModelPicker","args":{}},"fallback":fallback}))
     }
+}
+/// Ask every provider not yet heard from, all at once and after the picker is up: its
+/// rows answer as each probe does, and the command never waits on an endpoint.
+fn probe(host: &HostHandle, session: &SessionId, providers: &[CatalogEntry]) {
+    let refreshes: Vec<String> = providers
+        .iter()
+        .filter(|p| crate::label::reach(p) == crate::label::Reach::Unchecked)
+        .map(|p| format!("refresh {}", p.id))
+        .collect();
+    if refreshes.is_empty() {
+        return;
+    }
+    let (host, session) = (host.clone(), session.clone());
+    tokio::spawn(async move {
+        futures::future::join_all(
+            refreshes
+                .iter()
+                .map(|args| crate::bridge::run(&host, &session, "models", args, None)),
+        )
+        .await;
+    });
 }
 async fn opens(name: &str, args: &str, host: &HostHandle) -> Result<bool, KernelError> {
     match name {
