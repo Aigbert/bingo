@@ -13,7 +13,8 @@ pub(super) async fn render(
         return Ok(request.engine());
     };
     let report = crate::chain::Report::default();
-    let result = crate::chain::render::dispatch(
+    let id = request.request_id.clone();
+    let result = crate::chain::render::drawn(
         &host.hook_set().links().await,
         &host.catalogue_context(Some(session)),
         request,
@@ -23,7 +24,15 @@ pub(super) async fn render(
     for notice in report.take() {
         let _ = mailbox.record(notice).await;
     }
-    result
+    let (view, drawn) = match result {
+        Ok(drawn) => drawn,
+        Err(error) => {
+            live.drawings.record(&id, None);
+            return Err(error);
+        }
+    };
+    live.drawings.record(&id, drawn);
+    Ok(view)
 }
 
 pub(super) async fn invalidate(

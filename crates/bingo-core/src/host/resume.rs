@@ -90,11 +90,13 @@ impl Host {
         let last = replayed.summary;
         let choice = self.model_for(&spec).await?;
         let summary = crate::spec::stated(&spec, choice.as_ref(), last);
+        let drawings = session::Drawings::default();
+        let services = self.services(&drawings);
         let mailbox =
-            session::resume_checkpoint(resumed, Some(store.clone()), self.services(), |mailbox| {
+            session::resume_checkpoint(resumed, Some(store.clone()), services, |mailbox| {
                 Arc::new(self.turn_config(&spec, &summary, choice, mailbox))
             })?;
-        let live = Live::new(mailbox, &summary, spec);
+        let live = Live::new(mailbox, &summary, spec, drawings);
         self.lock().insert(summary.id.clone(), live.clone());
         let _ = self.gateway.send(GatewayEvent::SessionCreated {
             summary: Box::new(summary),

@@ -57,20 +57,24 @@ impl Point for Render {
 fn invalid(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::InvalidInput, error.to_string())
 }
-struct Owner(Link);
+/// A link answering in its plugin's name, writing down what it answered.
+struct Owner {
+    link: Link,
+    trace: drawer::Trace,
+}
 #[async_trait::async_trait]
 impl Interceptor for Owner {
     fn id(&self) -> &str {
-        self.0
+        self.link
             .external
             .as_deref()
-            .unwrap_or_else(|| self.0.interceptor.id())
+            .unwrap_or_else(|| self.link.interceptor.id())
     }
     fn matcher(&self) -> LinkMatcher {
-        self.0.interceptor.matcher()
+        self.link.interceptor.matcher()
     }
     fn owns_deadline(&self) -> bool {
-        self.0.interceptor.owns_deadline()
+        self.link.interceptor.owns_deadline()
     }
     async fn chain(
         &self,
@@ -79,16 +83,48 @@ impl Interceptor for Owner {
         input: serde_json::Value,
         next: Next<'_, serde_json::Value, serde_json::Value>,
     ) -> Result<serde_json::Value, KernelError> {
-        self.0.interceptor.chain(entry, cx, input, next).await
+        let inherited = Arc::new(Mutex::new(None));
+        let seen = inherited.clone();
+        let next = Next::at(next.tier(), move |value| {
+            Box::pin(async move {
+                let answer = next.run(value).await?;
+                if let Ok(mut seen) = seen.lock() {
+                    *seen = Some(answer.clone());
+                }
+                Ok(answer)
+            })
+        });
+        let answer = self.link.interceptor.chain(entry, cx, input, next).await?;
+        self.trace.push(drawer::Answered {
+            plugin: self.id().into(),
+            compiled: self.link.external.is_none(),
+            answer: answer.clone(),
+            inherited: inherited.lock().ok().and_then(|seen| seen.clone()),
+        });
+        Ok(answer)
     }
 }
 
+#[cfg(test)]
 pub(crate) async fn dispatch(
     links: &[Link],
     cx: &HookContext,
     request: RenderRequest,
     report: Report,
 ) -> Result<View, KernelError> {
+    drawn(links, cx, request, report)
+        .await
+        .map(|(view, _)| view)
+}
+
+/// The view, and the built-in that drew it if one did.
+pub(crate) async fn drawn(
+    links: &[Link],
+    cx: &HookContext,
+    request: RenderRequest,
+    report: Report,
+) -> Result<(View, Option<crate::session::Drawn>), KernelError> {
+    let trace = drawer::Trace::default();
     let owned: Vec<_> = links
         .iter()
         .map(|link| Link {
@@ -96,7 +132,10 @@ pub(crate) async fn dispatch(
             placement: link.placement,
             external: link.external.clone(),
             tier: link.tier,
-            interceptor: Arc::new(Owner(link.clone())),
+            interceptor: Arc::new(Owner {
+                link: link.clone(),
+                trace: trace.clone(),
+            }),
         })
         .collect();
     let checked = Report::default();
@@ -115,9 +154,11 @@ pub(crate) async fn dispatch(
         report.push(notice);
     }
     if failed && let Some(engine) = fallback {
-        return Ok(engine);
+        return Ok((engine, None));
     }
-    result
+    let view = result?;
+    let drawn = trace.drawn(&view);
+    Ok((view, drawn))
 }
 
 /// The config is a projection of the currently admitted links, never a registry.
@@ -312,5 +353,6 @@ mod tests {
     }
 }
 
+mod drawer;
 #[cfg(test)]
 mod sealed_tests;

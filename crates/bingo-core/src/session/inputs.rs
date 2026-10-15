@@ -54,35 +54,22 @@ impl Actor {
         if !instant && !queued && (self.busy() || self.queue.ready()) {
             return self.enqueue(intent, input).await;
         }
-        let invocation = commands::Invocation::of(&input, &parsed);
-        let asked = commands::asked(&input);
-        self.run_command(intent, invocation, command, parsed.args, !instant, asked)
-            .await?;
-        Ok(())
+        let run = commands::Run {
+            intent,
+            invocation: commands::Invocation::of(&input, &parsed),
+            command,
+            args: parsed.args,
+            holds: !instant,
+            asked: commands::asked(&input),
+            vouched: self.commands.vouched(&input),
+        };
+        self.run_command(run).await
     }
 
-    async fn run_command(
-        &mut self,
-        intent: IntentId,
-        invocation: commands::Invocation,
-        command: Arc<dyn Command>,
-        args: String,
-        holds: bool,
-        asked: bool,
-    ) -> Result<(), KernelError> {
+    async fn run_command(&mut self, run: commands::Run) -> Result<(), KernelError> {
         let hook_cx = self.hook_context();
-        let spawned = self.commands.spawn(
-            commands::Run {
-                intent: intent.clone(),
-                invocation,
-                command,
-                args,
-                holds,
-                asked,
-            },
-            self.config.hooks.clone(),
-            hook_cx,
-        );
+        let intent = run.intent.clone();
+        let spawned = self.commands.spawn(run, self.config.hooks.clone(), hook_cx);
         if let Err(e) = spawned {
             self.reject(intent, e.code, e.message).await?;
         }
@@ -96,7 +83,12 @@ impl Actor {
         intent: IntentId,
         outcome: Result<CommandOutcome, KernelError>,
     ) -> Result<(), KernelError> {
-        let Some((invocation, held)) = self.commands.finish(&intent) else {
+        let Some(commands::Finished {
+            invocation,
+            held,
+            vouched,
+        }) = self.commands.finish(&intent)
+        else {
             tracing::warn!(session = %self.id, %intent, "completion from a command that is not running");
             return Ok(());
         };
@@ -108,6 +100,11 @@ impl Actor {
                 let mut result = json!({"handled": true, "surface": action});
                 if let Some(message) = fallback {
                     result["message"] = json!(message);
+                }
+                // Only the kernel writes this: the answer to a key a built-in
+                // drew, given by that built-in itself (ADR-0086 §7).
+                if let Some(plugin) = vouched {
+                    result["drawnBy"] = json!(plugin);
                 }
                 self.applied(intent, result).await?;
             }

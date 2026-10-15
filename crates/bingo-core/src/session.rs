@@ -7,6 +7,7 @@ mod catalogue;
 mod checkpoint;
 mod commands;
 mod complete;
+mod drawn;
 mod gate;
 mod history;
 mod inputs;
@@ -33,6 +34,8 @@ use tokio_util::task::TaskTracker;
 
 use commands::Commands;
 pub use commands::Services;
+pub use drawn::Drawings;
+pub(crate) use drawn::Drawn;
 pub(crate) use inputs::user_parts;
 pub use interactions::INTERACTION_GUARD_MS;
 use interactions::Pending;

@@ -207,12 +207,13 @@ impl Host {
 
     /// What a session actor needs from the host: the command table and a
     /// weak way back.
-    fn services(&self) -> session::Services {
+    fn services(&self, drawings: &session::Drawings) -> session::Services {
         let weak = Arc::downgrade(&self.plugin_host.0);
         session::Services {
             commands: Vec::new(),
             command_sources: self.registry.command_sources(),
             host: weak,
+            drawings: drawings.clone(),
         }
     }
 
@@ -528,13 +529,14 @@ impl Host {
             store.create(&summary).await?;
             store.acquire(&summary.id).await?;
         }
+        let drawings = session::Drawings::default();
         let mailbox = session::spawn(
             summary.clone(),
             self.registry.store.clone(),
-            self.services(),
+            self.services(&drawings),
             |mailbox| Arc::new(self.turn_config(&spec, &summary, choice, mailbox)),
         );
-        let live = Live::new(mailbox, &summary, spec);
+        let live = Live::new(mailbox, &summary, spec, drawings);
         self.lock().insert(summary.id.clone(), live.clone());
         let _ = self.gateway.send(GatewayEvent::SessionCreated {
             summary: Box::new(summary),

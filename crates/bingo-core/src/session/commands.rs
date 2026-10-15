@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
 use bingo_sdk::*;
@@ -21,6 +22,8 @@ pub struct Services {
     /// Weak: the host holds every session's mailbox, and a session must not
     /// hold the host.
     pub host: Weak<dyn HostApi>,
+    /// Who drew what, so a key's answer can be vouched for.
+    pub drawings: super::Drawings,
 }
 
 impl Services {
@@ -30,6 +33,7 @@ impl Services {
             commands: Vec::new(),
             command_sources: Vec::new(),
             host: Weak::<Unreachable>::new(),
+            drawings: super::Drawings::default(),
         }
     }
 }
@@ -197,6 +201,18 @@ pub(super) struct Run {
     /// A non-instant run, which the queue waits behind.
     pub holds: bool,
     pub asked: bool,
+    /// The built-in whose own drawing handed out the key this run answers.
+    pub vouched: Option<String>,
+}
+
+/// A run that is over, as the actor turns it into an ack.
+pub(super) struct Finished {
+    pub invocation: Invocation,
+    /// Whether it was the run holding the queue.
+    pub held: bool,
+    /// The built-in vouching for the answer: the drawing was its own, and
+    /// so is the outcome, untouched by any link.
+    pub vouched: Option<String>,
 }
 
 /// The table and the runs in flight.
@@ -210,11 +226,15 @@ pub(super) struct Lookup {
 struct InFlight {
     invocation: Invocation,
     cancel: CancellationToken,
+    vouched: Option<String>,
+    /// Set by the run once its outcome proves to be the command's own.
+    own: Arc<AtomicBool>,
 }
 
 pub(super) struct Commands {
     lookup: Lookup,
     host: Weak<dyn HostApi>,
+    drawings: super::Drawings,
     mailbox: Mailbox,
     session: SessionId,
     tracker: TaskTracker,
@@ -241,6 +261,7 @@ impl Commands {
             tracker,
             cancel,
             host: services.host,
+            drawings: services.drawings,
             session: mailbox.id().clone(),
             mailbox,
             inflight: HashMap::new(),
@@ -250,6 +271,14 @@ impl Commands {
 
     pub(super) fn lookup(&self) -> Lookup {
         self.lookup.clone()
+    }
+
+    /// The built-in that drew the key handler an action presses, if one did.
+    pub(super) fn vouched(&self, input: &Input) -> Option<String> {
+        match input {
+            Input::Action { action } => self.drawings.vouches(action),
+            Input::Text { .. } => None,
+        }
     }
 
     pub(super) fn interrupt(&self) -> Option<IntentId> {
@@ -288,12 +317,16 @@ impl Commands {
             args,
             holds,
             asked,
+            vouched,
         } = run;
+        let own = Arc::new(AtomicBool::new(false));
         self.inflight.insert(
             intent.clone(),
             InFlight {
                 invocation,
                 cancel: cancel.clone(),
+                vouched,
+                own: own.clone(),
             },
         );
         if holds {
@@ -309,7 +342,10 @@ impl Commands {
             let returned = super::running::supervised(future, &cancel).await;
             let outcome = match returned {
                 _ if cancel.is_cancelled() => Err(interrupted()),
-                Some(Ok(outcome)) => outcome,
+                Some(Ok(ran)) => ran.map(|ran| {
+                    own.store(ran.own, Ordering::Release);
+                    ran.outcome
+                }),
                 Some(Err(panic)) => Err(KernelError::new(
                     ErrorCode::Internal,
                     format!("the command panicked: {}", super::panic_message(panic)),
@@ -324,16 +360,17 @@ impl Commands {
         Ok(())
     }
 
-    /// The run is over; how it was invoked comes back for a `Prompt` outcome,
-    /// with whether it was the run holding the queue.
-    pub(super) fn finish(&mut self, intent: &IntentId) -> Option<(Invocation, bool)> {
+    /// The run is over; how it was invoked comes back for a `Prompt` outcome.
+    pub(super) fn finish(&mut self, intent: &IntentId) -> Option<Finished> {
         let held = self.holding.as_ref() == Some(intent);
         if held {
             self.holding = None;
         }
-        self.inflight
-            .remove(intent)
-            .map(|run| (run.invocation, held))
+        self.inflight.remove(intent).map(|run| Finished {
+            invocation: run.invocation,
+            held,
+            vouched: run.vouched.filter(|_| run.own.load(Ordering::Acquire)),
+        })
     }
 }
 

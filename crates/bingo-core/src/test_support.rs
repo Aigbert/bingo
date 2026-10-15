@@ -631,6 +631,7 @@ pub fn services(commands: Vec<Arc<dyn Command>>) -> crate::session::Services {
         commands,
         command_sources: Vec::new(),
         host,
+        drawings: crate::session::Drawings::default(),
     }
 }
 

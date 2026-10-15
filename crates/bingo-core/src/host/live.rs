@@ -12,10 +12,17 @@ pub(super) struct Live {
     /// rewrite it (ADR-0008 §4, ADR-0047 §1), and it is the one holder of
     /// the provider, the model and the level the next turn runs on.
     pub(super) spec: SessionSpec,
+    /// Written as views are drawn; the session's actor reads the same.
+    pub(super) drawings: session::Drawings,
 }
 
 impl Live {
-    pub(super) fn new(mailbox: Mailbox, summary: &SessionSummary, spec: SessionSpec) -> Self {
+    pub(super) fn new(
+        mailbox: Mailbox,
+        summary: &SessionSummary,
+        spec: SessionSpec,
+        drawings: session::Drawings,
+    ) -> Self {
         Self {
             mailbox,
             changing: Arc::new(tokio::sync::Mutex::new(())),
@@ -24,6 +31,7 @@ impl Live {
             invalidations: Arc::default(),
             created_at: summary.created_at,
             spec,
+            drawings,
         }
     }
 }
