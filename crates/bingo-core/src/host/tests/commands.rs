@@ -439,7 +439,7 @@ async fn host_in(home: &std::path::Path, remembered: Option<&str>) -> Arc<Host> 
 }
 
 /// The rows of a `View::Table` outcome.
-fn rows(outcome: &IntentOutcome) -> Vec<Vec<String>> {
+pub(super) fn rows(outcome: &IntentOutcome) -> Vec<Vec<String>> {
     let IntentOutcome::Applied { result } = outcome else {
         panic!("not a view: {outcome:?}");
     };

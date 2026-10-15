@@ -29,6 +29,7 @@ mod routes;
 mod services;
 mod spec_owner;
 mod switch_settings;
+mod switch_turn;
 mod tree;
 mod views;
 
