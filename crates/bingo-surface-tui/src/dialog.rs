@@ -493,7 +493,7 @@ fn option_lines(dialog: &Dialog, index: usize, option: &Opt, secret: bool) -> Ve
             "No, because "
         };
         let text = if secret {
-            "•".repeat(words.text().chars().count())
+            concealed(words.text())
         } else {
             words.text().to_owned()
         };
@@ -517,6 +517,15 @@ fn option_lines(dialog: &Dialog, index: usize, option: &Opt, secret: bool) -> Ve
         )));
     }
     out
+}
+
+/// A secret shows that something was pasted, never how long it is.
+fn concealed(text: &str) -> String {
+    if text.trim().is_empty() {
+        String::new()
+    } else {
+        "••••••••  pasted".into()
+    }
 }
 
 /// One of a set is a box that is ticked or not; one of a choice is neither.
@@ -549,5 +558,32 @@ mod tests {
             let interaction = crate::test_support::permission(None, preview);
             assert_eq!(question(&interaction, "/work").unwrap().to_string().trim(), expected);
         }
+    }
+
+    #[test]
+    fn a_pasted_secret_draws_one_fixed_line_whatever_its_length() {
+        let option = Opt {
+            label: "paste".into(),
+            description: None,
+            choice: Choice::Words,
+        };
+        let drawn = |text: &str| {
+            let mut words = crate::composer::Composer::default();
+            words.insert(text);
+            let dialog = Dialog {
+                words: Some(words),
+                ..Dialog::default()
+            };
+            option_lines(&dialog, 0, &option, true)
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        };
+        let short = drawn("sk-dummy");
+        let huge = drawn(&format!("sk-dummy-{}", "x".repeat(4096)));
+        assert_eq!(short, huge);
+        assert_eq!(huge.len(), 1);
+        assert!(huge[0].contains("••••••••  pasted"), "{huge:?}");
+        assert!(!huge[0].contains("•••••••••") && !huge[0].contains("sk-"));
     }
 }
