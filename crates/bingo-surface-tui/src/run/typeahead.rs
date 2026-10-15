@@ -137,7 +137,18 @@ pub(super) fn blocked(run: &Run) -> bool {
     if drawing(run) || run.typeahead.opening(run.detection.now().instant) {
         return true;
     }
-    !run.typeahead.is_empty() || focus(run).is_some_and(|focus| judging(run, &focus))
+    if focus(run).is_some_and(|focus| judging(run, &focus)) {
+        return true;
+    }
+    !run.typeahead.is_empty() && !catalogue_only(run)
+}
+
+/// Catalogue-held shortcuts do not make ordinary typing depend on a plugin.
+fn catalogue_only(run: &Run) -> bool {
+    run.typeahead.inputs.iter().all(|queued| {
+        matches!(&queued.input, Held::Key(key) if catalogues::waiting(run, *key))
+            && !waiting(run, queued.site.as_deref())
+    })
 }
 
 fn judging(run: &Run, site: &str) -> bool {

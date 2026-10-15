@@ -13,15 +13,12 @@ const CATALOGUES: &[(&str, CatalogKind)] = &[
 // 200 ms lets the usual local catalogue bind the first key without making
 // first paint depend on a plugin's multi-second handshake.
 const INITIAL_WAIT: Duration = Duration::from_millis(200);
+const COMMAND_WAIT: Duration = Duration::from_secs(5);
 
 pub(super) async fn fetch_all(run: &mut Run) {
     run.typeahead.catalogue_pending = true;
     let host = run.host.clone();
-    let mut request = Box::pin(async move {
-        host.catalog(CatalogKind::Commands)
-            .await
-            .map(|c| commands::specs_from(&c))
-    });
+    let mut request = Box::pin(request_commands(host));
     match tokio::time::timeout(INITIAL_WAIT, &mut request).await {
         Ok(result) => received(run, result),
         Err(_) => run.spawn(async move { Ok(Reply::Commands(request.await)) }),
@@ -33,13 +30,16 @@ pub(super) async fn fetch_all(run: &mut Run) {
 
 pub(super) fn fetch_commands(run: &mut Run) {
     let host = run.host.clone();
-    run.spawn(async move {
-        Ok(Reply::Commands(
-            host.catalog(CatalogKind::Commands)
-                .await
-                .map(|c| commands::specs_from(&c)),
-        ))
-    });
+    run.spawn(async move { Ok(Reply::Commands(request_commands(host).await)) });
+}
+
+async fn request_commands(host: HostHandle) -> Result<Vec<CommandSpec>, KernelError> {
+    tokio::time::timeout(COMMAND_WAIT, host.catalog(CatalogKind::Commands))
+        .await
+        .map_err(|_| {
+            KernelError::new(bingo_sdk::ErrorCode::Timeout, "command catalogue timed out")
+        })?
+        .map(|catalog| commands::specs_from(&catalog))
 }
 
 pub(super) fn received(run: &mut Run, result: Result<Vec<CommandSpec>, KernelError>) {

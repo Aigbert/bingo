@@ -65,8 +65,11 @@ in force even after confirmation. Details and scope decisions live in ADR-0090.
 ## Review decisions
 
 Keys own navigation/confirmation; renders merge only follow/subscriptions.
-Allow 200 ms for local bindings, then paint and keep the same request alive;
+Allow 200 ms for local bindings, then paint; a 5 s overall deadline fails a stalled fetch.
+Fetch counters reject superseded replies. This bounds startup without losing early shortcuts;
 modified shortcuts wait in type-ahead, while ordinary typing remains available.
+Only catalogue-held keys let plain keys and ctrl+d pass; other typeahead ordering stays.
+Close and confirmation cancellation require asked input; picker/task authority stays per ADR-0090 §5.
 Catalogue errors notify rather than fail startup. Esc cancels confirmation in
 place. New room names reserve all verbs; existing journals remain addressable
 as explicit arguments, with no rename or deletion. Only own Pane/View receipts

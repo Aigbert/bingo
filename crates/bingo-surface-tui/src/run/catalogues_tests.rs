@@ -115,3 +115,62 @@ async fn a_background_error_releases_held_input_and_allows_a_later_refresh() {
         Some("/review")
     );
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_stalled_initial_catalogue_fails_at_its_overall_deadline() {
+    let mut run = super::super::tests::idle(scene().1.instant);
+    let host = TestHost::default();
+    host.on_catalog(|kind| async move {
+        if kind == CatalogKind::Commands {
+            std::future::pending::<()>().await;
+        }
+        Ok(answer(kind))
+    });
+    run.host = host.handle();
+    let (tx, mut replies) = mpsc::channel(16);
+    run.replies = tx;
+    let start = tokio::time::Instant::now();
+    fetch_all(&mut run).await;
+    run.terminal_event(Term::Key(ctrl('n')));
+    run.terminal_event(Term::Key(typed('a')));
+    assert_eq!(run.ui.composer.text(), "a");
+    assert_eq!(run.typeahead.len(), 1);
+    loop {
+        let reply = replies.recv().await.unwrap();
+        let ready = matches!(reply, Reply::Commands(_));
+        run.reply(reply, &mut None);
+        if ready {
+            break;
+        }
+    }
+    assert_eq!(start.elapsed(), COMMAND_WAIT);
+    assert!(!run.typeahead.catalogue_pending);
+    assert!(run.typeahead.is_empty());
+    assert!(run.ui.notices.iter().any(|n| n.text.contains("timed out")));
+}
+
+#[tokio::test]
+async fn only_catalogue_holds_let_plain_keys_and_exit_pass() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    for key in [
+        ctrl('n'),
+        KeyEvent::new(KeyCode::Char('n'), KeyModifiers::ALT),
+        KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE),
+    ] {
+        let mut run = super::super::tests::idle(scene().1.instant);
+        run.typeahead.catalogue_pending = true;
+        run.terminal_event(Term::Key(key));
+        run.terminal_event(Term::Key(typed('a')));
+        assert_eq!(run.ui.composer.text(), "a");
+        assert_eq!(run.typeahead.len(), 1);
+        run.ui.composer.set("");
+        run.terminal_event(Term::Key(ctrl('d')));
+        assert!(run.exit.is_some());
+        let mut run = super::super::tests::idle(scene().1.instant);
+        run.typeahead.catalogue_pending = true;
+        run.terminal_event(Term::Key(key));
+        typeahead::command_sent(&mut run, IntentId::mint());
+        run.terminal_event(Term::Key(typed('a')));
+        assert_eq!(run.typeahead.len(), 2, "opening still preserves order");
+    }
+}
