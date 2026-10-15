@@ -311,7 +311,11 @@ async fn disabled_picker_keeps_plain_listing_and_switching() {
         panic!("plain listing")
     };
     let view: View = serde_json::from_value(result["view"].clone()).unwrap();
-    assert!(view.fold().contains("fake/fake-1"));
+    assert!(
+        view.fold().starts_with("model: fake/fake-1"),
+        "{}",
+        view.fold()
+    );
     assert!(matches!(
         command(&mut session, "model", json!("fake/other")).await,
         IntentOutcome::Applied { .. }

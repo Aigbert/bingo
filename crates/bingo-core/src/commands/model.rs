@@ -70,22 +70,29 @@ impl Command for ModelCommand {
 
 /// Bare `/model`: what the session runs on — who serves it, which model, and
 /// how hard it is asked to think — read from the resolved choice, which is
-/// what the next turn will actually ask.
+/// what the next turn will actually ask. Then the pins and how many models
+/// there are; `/models` is the listing.
 async fn report(host: &Arc<Host>, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
     let choice = running_on(host, cx).await?;
+    let listed = host.catalog(CatalogKind::Models).await?.entries.len();
     Ok(CommandOutcome::View {
         view: View::text(format!(
             "{}\n{USAGE}\n{}",
             said(&choice),
-            host.catalog(CatalogKind::Models)
-                .await?
-                .entries
-                .into_iter()
-                .map(|entry| entry.id)
-                .collect::<Vec<_>>()
-                .join("\n")
+            landscape(&crate::host::pins::pinned_models(host), listed)
         )),
     })
+}
+
+/// The pins in their order and a count, never every id a provider serves.
+fn landscape(pins: &[String], listed: usize) -> String {
+    let pinned = if pins.is_empty() {
+        "none · /model pin <id> adds one".to_owned()
+    } else {
+        pins.join(", ")
+    };
+    let models = if listed == 1 { "model" } else { "models" };
+    format!("pinned: {pinned}\n{listed} {models} · /models lists them")
 }
 
 async fn target(
@@ -204,7 +211,19 @@ fn split(text: &str, is_provider: impl Fn(&str) -> bool) -> (Option<&str>, &str)
 
 #[cfg(test)]
 mod tests {
-    use super::split;
+    use super::{landscape, split};
+
+    #[test]
+    fn the_report_names_pins_and_counts_the_rest() {
+        assert_eq!(
+            landscape(&[], 1),
+            "pinned: none · /model pin <id> adds one\n1 model · /models lists them"
+        );
+        assert_eq!(
+            landscape(&["b/x".into(), "a/y".into()], 40),
+            "pinned: b/x, a/y\n40 models · /models lists them"
+        );
+    }
 
     #[test]
     fn a_leading_provider_is_taken_only_when_it_is_one() {

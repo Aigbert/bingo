@@ -256,7 +256,7 @@ fn thinking_on_an_unknown_model_is_effective_and_remembered() {
             "model: fake/new-model\nthinking: low\nusage: /model [<provider>/]<model>\n"
         )
     );
-    assert!(listing.lines().any(|id| id == "fake/new-model"));
+    assert!(listing.contains("pinned: none"), "{listing}");
     assert_eq!(std::fs::read_to_string(&path).unwrap(), THINKING_SETTINGS);
     assert_eq!(
         thinking_text(home.path(), "/think high --keep"),
@@ -273,7 +273,7 @@ fn thinking_on_an_unknown_model_is_effective_and_remembered() {
     assert!(listing.starts_with(
         "model: fake/new-model\nthinking: high\nusage: /model [<provider>/]<model>\n"
     ));
-    assert!(listing.lines().any(|id| id == "fake/new-model"));
+    assert!(listing.contains("pinned: none"), "{listing}");
     assert_eq!(
         thinking_text(home.path(), "/think"),
         "thinking: high\nusage: /think <minimal|low|medium|high|xhigh|max|off>\n"
@@ -313,7 +313,7 @@ fn thinking_ignores_false_capability_metadata_without_rewriting_it() {
     assert!(listing.starts_with(
         "model: fake/new-model\nthinking: xhigh\nusage: /model [<provider>/]<model>\n"
     ));
-    assert!(listing.lines().any(|id| id == "fake/new-model"));
+    assert!(listing.contains("pinned: none"), "{listing}");
 }
 
 #[test]
@@ -345,7 +345,7 @@ fn thinking_off_and_invalid_levels_preserve_model_overrides() {
         );
         let listing = thinking_text(home.path(), "/model");
         assert!(listing.starts_with("model: fake/new-model\nusage: /model [<provider>/]<model>\n"));
-        assert!(listing.lines().any(|id| id == "fake/new-model"));
+        assert!(listing.contains("pinned: none"), "{listing}");
         assert_eq!(
             thinking_text(home.path(), "/think"),
             "thinking: off\nusage: /think <minimal|low|medium|high|xhigh|max|off>\n"

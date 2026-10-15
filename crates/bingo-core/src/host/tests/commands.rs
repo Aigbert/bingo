@@ -147,7 +147,8 @@ async fn model_and_think_change_the_next_turn_and_are_announced() {
             "model: scripted/m2\nthinking: high\nusage: /model [<provider>/]<model>\n"
         )
     );
-    assert!(listing.lines().any(|id| id == "scripted/m"));
+    assert!(!listing.lines().any(|id| id == "scripted/m"));
+    assert!(listing.contains(" · /models lists them"), "{listing}");
 
     client.ack("hello").await;
     client.until_turn_completed().await;
@@ -174,7 +175,8 @@ async fn model_and_think_change_the_next_turn_and_are_announced() {
     let (ack, _) = client.ack("/model").await;
     let listing = shown(&ack);
     assert!(listing.starts_with("model: scripted/m2\nusage: /model [<provider>/]<model>\n"));
-    assert!(listing.lines().any(|id| id == "scripted/m"));
+    assert!(!listing.lines().any(|id| id == "scripted/m"));
+    assert!(listing.contains(" · /models lists them"), "{listing}");
 }
 
 /// The text of a `View::Text` outcome.
