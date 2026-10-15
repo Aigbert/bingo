@@ -316,6 +316,9 @@ impl Fixture {
             .snapshot(&session(), &TurnId::from_raw(turn), &path)
             .expect("a snapshot");
         std::fs::write(&path, after).expect("the edit itself");
+        self.store
+            .record_after(&session(), &TurnId::from_raw(turn))
+            .unwrap();
         path
     }
 }

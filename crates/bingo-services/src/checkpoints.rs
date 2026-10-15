@@ -24,6 +24,7 @@ pub enum Fate {
 pub struct File {
     pub path: PathBuf,
     pub fate: Fate,
+    pub changed: bool,
 }
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

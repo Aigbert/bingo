@@ -89,3 +89,6 @@ M177 / ADR-0091 pays the recorded turn-walk debt with `bingo_sdk::transcript::tu
 The read-only checkpoints service previews that same restore plan; `/rewind`
 accepts `both` (the existing default), `conversation`, and `files`. Screens ask
 with a preview sheet; a typed command still applies without confirmation.
+
+M177 records post-turn file hashes; preview marks later edits as "changed since
+the turn". Confirming still restores them; missing old hashes warn conservatively.

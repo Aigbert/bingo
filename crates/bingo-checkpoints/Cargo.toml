@@ -12,6 +12,7 @@ description = "Checkpoints plugin for bingo: a file's bytes before the turn that
 workspace = true
 
 [dependencies]
+bingo-digest.workspace = true
 bingo-services.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true

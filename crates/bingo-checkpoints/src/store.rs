@@ -94,7 +94,7 @@ fn storage(what: String) -> KernelError {
 #[derive(Debug)]
 pub struct Checkpoints {
     root: PathBuf,
-    writing: Mutex<()>,
+    pub(crate) writing: Mutex<()>,
 }
 
 impl Checkpoints {
@@ -109,7 +109,7 @@ impl Checkpoints {
         &self.root
     }
 
-    fn turn_dir(&self, session: &SessionId, turn: &TurnId) -> PathBuf {
+    pub(crate) fn turn_dir(&self, session: &SessionId, turn: &TurnId) -> PathBuf {
         self.root.join(session.as_str()).join(turn.as_str())
     }
 

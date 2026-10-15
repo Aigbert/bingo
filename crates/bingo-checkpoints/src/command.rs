@@ -68,30 +68,22 @@ impl RewindCommand {
                 format!("this session has no turn {wanted}"),
             )
         })?;
-        if mode == "conversation" {
-            let dropped = cx.host.rewind(&cx.session, wanted).await?;
-            return Ok(CommandOutcome::Applied {
-                message: Some(format!("{} dropped; files were kept", items(dropped))),
-            });
+        let plan = if mode == "conversation" {
+            Plan::default()
+        } else {
+            restore::plan(&self.store, &cx.session, &undone)?
+        };
+        if mode != "conversation" {
+            restore::apply(&plan)?;
         }
-        let plan = restore::plan(&self.store, &cx.session, &undone)?;
-        restore::apply(&plan)?;
-        if mode == "files" {
-            return Ok(CommandOutcome::Applied {
-                message: Some(format!(
-                    "files restored; conversation was kept\n{}",
-                    report(None, 0, &plan, &cx.cwd)
-                        .lines()
-                        .skip(1)
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                )),
-            });
-        }
-        let dropped = cx.host.rewind(&cx.session, wanted).await?;
+        let dropped = if mode == "files" {
+            0
+        } else {
+            cx.host.rewind(&cx.session, wanted).await?
+        };
         let to = listed.iter().find(|turn| &turn.id == wanted);
         Ok(CommandOutcome::Applied {
-            message: Some(report(to, dropped, &plan, &cx.cwd)),
+            message: Some(report(mode, to, dropped, &plan, &cx.cwd).join("\n")),
         })
     }
 }
@@ -161,12 +153,18 @@ async fn transcript(cx: &CommandContext) -> Result<SessionState, KernelError> {
 }
 
 /// What was done, in the words of the person who asked for it.
-fn report(to: Option<&Turn>, dropped: u32, plan: &Plan, cwd: &Path) -> String {
+fn report(mode: &str, to: Option<&Turn>, dropped: u32, plan: &Plan, cwd: &Path) -> Vec<String> {
+    if mode == "conversation" {
+        return vec![format!("{} dropped; files were kept", items(dropped))];
+    }
     let mut lines = vec![format!(
         "rewound to {}, {} dropped",
         to.map(Turn::label).unwrap_or_else(|| "the turn".into()),
         items(dropped)
     )];
+    if mode == "files" {
+        lines = vec!["files restored; conversation was kept".into()];
+    }
     if plan.is_empty() {
         lines.push("no file was changed in those turns".into());
     }
@@ -187,7 +185,7 @@ fn report(to: Option<&Turn>, dropped: u32, plan: &Plan, cwd: &Path) -> String {
             named(plan.skipped.iter().map(PathBuf::as_path), cwd)
         ));
     }
-    lines.join("\n")
+    lines
 }
 
 fn items(n: u32) -> String {
@@ -386,7 +384,7 @@ mod tests {
     #[test]
     fn the_reply_says_what_moved_and_what_did_not() {
         assert_eq!(
-            report(Some(&turn()), 4, &plan(), Path::new("/work")),
+            report("both", Some(&turn()), 4, &plan(), Path::new("/work")).join("\n"),
             "rewound to write the note, 4 items dropped\n\
              put back src/lib.rs\n\
              removed notes.md\n\
@@ -395,9 +393,31 @@ mod tests {
     }
 
     #[test]
+    fn reports_name_the_mode_without_dropping_file_results() {
+        let files = report("files", Some(&turn()), 0, &plan(), Path::new("/work"));
+        assert_eq!(files[0], "files restored; conversation was kept");
+        assert_eq!(files[1], "put back src/lib.rs");
+        let conversation = report(
+            "conversation",
+            Some(&turn()),
+            4,
+            &plan(),
+            Path::new("/work"),
+        );
+        assert_eq!(conversation, ["4 items dropped; files were kept"]);
+    }
+
+    #[test]
     fn a_turn_that_touched_no_file_says_so_rather_than_nothing() {
         assert_eq!(
-            report(Some(&turn()), 1, &Plan::default(), Path::new("/work")),
+            report(
+                "both",
+                Some(&turn()),
+                1,
+                &Plan::default(),
+                Path::new("/work")
+            )
+            .join("\n"),
             "rewound to write the note, 1 item dropped\nno file was changed in those turns"
         );
     }

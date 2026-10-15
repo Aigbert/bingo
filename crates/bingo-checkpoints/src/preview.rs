@@ -32,42 +32,35 @@ impl Checkpoints for Preview {
         let turns = transcript::turns(&state.transcript);
         let undone =
             transcript::from(&turns, from).ok_or_else(|| error("this session has no such turn"))?;
-        let plan = crate::restore::plan(&self.store, session, &undone).map_err(error)?;
-        let shell_calls = state
-            .transcript
-            .items()
+        let first = turns
+            .iter()
+            .find(|turn| &turn.id == from)
+            .map_or(0, |turn| turn.first);
+        let shell_calls = state.transcript.items()[first..]
             .iter()
             .filter(|item| {
-                item.turn.as_ref().is_some_and(|id| undone.contains(id))
-                    && matches!(&item.body, ItemBody::ToolCall { name, .. } if name == "Bash")
+                matches!(&item.body, ItemBody::Shell { .. })
+                    || matches!(&item.body, ItemBody::ToolCall { name, .. } if name == "Bash")
             })
             .count();
-        Ok(project(plan, shell_calls))
+        let files = crate::restore::paths(&self.store, session, &undone)
+            .into_iter()
+            .map(|(_, entry)| File {
+                changed: self.store.changed(session, &undone, &entry.path),
+                path: entry.path,
+                fate: match entry.state {
+                    crate::store::State::Present => Fate::Restored,
+                    crate::store::State::Absent => Fate::Removed,
+                    crate::store::State::Skipped => Fate::Skipped,
+                },
+            })
+            .collect();
+        Ok(Touched { files, shell_calls })
     }
 }
 fn error(e: impl std::fmt::Display) -> ServiceError {
     ServiceError(e.to_string())
 }
-fn project(plan: crate::restore::Plan, shell_calls: usize) -> Touched {
-    let mut files: Vec<_> = plan
-        .put_back
-        .into_iter()
-        .map(|(path, _)| File {
-            path,
-            fate: Fate::Restored,
-        })
-        .collect();
-    files.extend(plan.remove.into_iter().map(|path| File {
-        path,
-        fate: Fate::Removed,
-    }));
-    files.extend(plan.skipped.into_iter().map(|path| File {
-        path,
-        fate: Fate::Skipped,
-    }));
-    Touched { files, shell_calls }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,6 +81,23 @@ mod tests {
         state
             .transcript
             .apply(&bingo_sdk::Event::ItemUpdated { item: call });
+        let mut shell = state.transcript.items()[1].as_ref().clone();
+        shell.id = bingo_sdk::ItemId::from_raw("shell");
+        shell.turn = None;
+        shell.body = ItemBody::Shell {
+            command: "echo local".into(),
+            cwd: fixture.cwd.clone(),
+            output: "local".into(),
+            exit: Some(0),
+        };
+        let mut items: Vec<_> = state
+            .transcript
+            .items()
+            .iter()
+            .map(|i| i.as_ref().clone())
+            .collect();
+        items.insert(2, shell);
+        state.transcript = items.into_iter().collect();
         fixture.journal = crate::tests::Journal::holding(state);
         std::fs::write(fixture.cwd.join("old"), "before").unwrap();
         let old = fixture.edit("trn_1", "old", b"first");
@@ -103,21 +113,33 @@ mod tests {
             .touched(&crate::tests::session(), &TurnId::from_raw("trn_1"))
             .await
             .unwrap();
-        assert_eq!(touched.shell_calls, 1);
+        assert_eq!(touched.shell_calls, 2);
         assert_eq!(
             touched.files,
             [
                 File {
                     path: old.clone(),
-                    fate: Fate::Restored
+                    fate: Fate::Restored,
+                    changed: false
                 },
                 File {
                     path: new,
-                    fate: Fate::Removed
+                    fate: Fate::Removed,
+                    changed: false
                 }
             ]
         );
         assert_eq!(std::fs::read(&old).unwrap(), b"second");
+        std::fs::write(&old, "my manual edit").unwrap();
+        std::fs::remove_file(fixture.store.root().join("ses_one/trn_1/1.snap")).unwrap();
+        let changed = preview
+            .touched(&crate::tests::session(), &TurnId::from_raw("trn_1"))
+            .await
+            .unwrap();
+        assert!(
+            changed.files[0].changed,
+            "preview marks edits without reading snapshot bytes"
+        );
         assert!(fixture.journal.rewound().is_empty());
         assert_eq!(
             preview

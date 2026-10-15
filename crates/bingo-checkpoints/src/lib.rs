@@ -15,6 +15,7 @@
 //! path this could read, so its changes are not snapshotted and a rewind does
 //! not claim to undo them (ADR-0045 §2).
 
+mod after;
 pub mod command;
 pub mod guide;
 pub mod hook;

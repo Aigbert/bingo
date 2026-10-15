@@ -75,7 +75,7 @@ impl Hook for SnapshotHook {
     /// that share neither.
     fn matcher(&self) -> HookMatcher {
         HookMatcher {
-            points: vec![HookPoint::BeforeTool],
+            points: vec![HookPoint::BeforeTool, HookPoint::Turn],
             tool: None,
         }
     }
@@ -93,6 +93,19 @@ impl Hook for SnapshotHook {
             }
         }
         HookOutcome::Continue
+    }
+    async fn on_turn(
+        &self,
+        phase: bingo_sdk::Phase,
+        turn: &bingo_sdk::TurnId,
+        _: &[bingo_sdk::Item],
+        cx: &HookContext,
+    ) {
+        if phase == bingo_sdk::Phase::End {
+            if let Err(error) = self.store.record_after(&cx.session, turn) {
+                tracing::warn!(%error, "could not record the post-turn files");
+            }
+        }
     }
 }
 
@@ -177,6 +190,13 @@ mod tests {
         std::fs::write(&file, b"written").expect("the write");
         hook.before_tool(&mut call("Edit", json!({"file_path": "note.md"})), &cx)
             .await;
+
+        let turn = cx.turn.as_ref().unwrap();
+        assert!(hook.matcher().points.contains(&HookPoint::Turn));
+        hook.on_turn(bingo_sdk::Phase::End, turn, &[], &cx).await;
+        assert!(!store.changed(&cx.session, std::slice::from_ref(turn), &file));
+        std::fs::write(&file, "manual edit").unwrap();
+        assert!(store.changed(&cx.session, std::slice::from_ref(turn), &file));
 
         let entries = store.entries(&cx.session, &bingo_sdk::TurnId::from_raw("trn_1"));
         assert_eq!(entries.len(), 1, "one file, one snapshot: {entries:?}");

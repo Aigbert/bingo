@@ -53,12 +53,8 @@ pub fn plan(
     session: &SessionId,
     turns: &[TurnId],
 ) -> Result<Plan, KernelError> {
-    let kept = turns
-        .iter()
-        .map(|turn| (turn.clone(), store.entries(session, turn)))
-        .collect();
     let mut plan = Plan::default();
-    for (turn, entry) in earliest(kept) {
+    for (turn, entry) in paths(store, session, turns) {
         match entry.state {
             State::Present => plan
                 .put_back
@@ -68,6 +64,16 @@ pub fn plan(
         }
     }
     Ok(plan)
+}
+
+/// Snapshot metadata only: preview never loads the saved file contents.
+pub fn paths(store: &Checkpoints, session: &SessionId, turns: &[TurnId]) -> Vec<(TurnId, Entry)> {
+    earliest(
+        turns
+            .iter()
+            .map(|turn| (turn.clone(), store.entries(session, turn)))
+            .collect(),
+    )
 }
 
 fn bytes(

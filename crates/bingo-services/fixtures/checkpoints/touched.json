@@ -8,15 +8,18 @@
     "files": [
       {
         "path": "src/main.rs",
-        "fate": "restored"
+        "fate": "restored",
+        "changed": true
       },
       {
         "path": "new.txt",
-        "fate": "removed"
+        "fate": "removed",
+        "changed": false
       },
       {
         "path": "big.bin",
-        "fate": "skipped"
+        "fate": "skipped",
+        "changed": false
       }
     ],
     "shellCalls": 2
