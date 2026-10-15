@@ -238,7 +238,8 @@ impl SessionState {
             Event::InteractionResolved { id, .. } => self.interaction_closed(id),
             Event::InteractionCancelled { id, .. } => self.interaction_closed(id),
             Event::IntentAck { intent, .. } => Applied::Intent(intent.clone()),
-            Event::Compacted { .. } | Event::Rewound { .. } => applied,
+            Event::Compacted { .. } => applied,
+            Event::Rewound { .. } => self.rewound(applied),
             Event::ConfigChanged { config } => self.config_changed(config),
             Event::CatalogChanged { .. } | Event::Unknown { .. } => Applied::Nothing,
             Event::Notice { .. } => Applied::Notice,
@@ -418,6 +419,21 @@ impl SessionState {
         });
         self.unread = true;
         Applied::Turn
+    }
+
+    /// A rewind cuts whole turns, so the last turn was taken back exactly
+    /// when none of its items is left: its `Worked for` line goes with it.
+    fn rewound(&mut self, applied: Applied) -> Applied {
+        let kept = |turn: &LastTurn| {
+            self.transcript
+                .items()
+                .iter()
+                .any(|item| item.turn.as_ref() == Some(&turn.id))
+        };
+        if self.last_turn.as_ref().is_some_and(|turn| !kept(turn)) {
+            self.last_turn = None;
+        }
+        applied
     }
 
     fn queue_changed(&mut self, entries: &[QueueEntry]) -> Applied {
@@ -992,6 +1008,42 @@ mod tests {
         ));
         assert_eq!(st.transcript.items().len(), 1);
         assert_eq!(st.transcript.generation(), 1);
+    }
+
+    #[test]
+    fn rewinding_the_last_turn_forgets_how_long_it_worked() {
+        let mut st = SessionState::new(summary());
+        for (seq, id, turn) in [(1, "itm_1", "trn_1"), (2, "itm_2", "trn_2")] {
+            st.apply(&frame(
+                seq,
+                Event::ItemCompleted {
+                    item: Item {
+                        turn: Some(TurnId::from_raw(turn)),
+                        ..assistant(id, "said", ItemStatus::Completed)
+                    },
+                },
+            ));
+        }
+        let completed = |turn: &str| Event::TurnCompleted {
+            turn: TurnId::from_raw(turn),
+            status: TurnStatus::Completed,
+            usage: Usage::default(),
+        };
+        st.apply(&frame(3, completed("trn_2")));
+        let rewound = |generation, to: &str, dropped: &str| Event::Rewound {
+            generation,
+            to_turn: TurnId::from_raw(to),
+            dropped: vec![ItemId::from_raw(dropped)],
+            files_restored: vec![],
+        };
+        st.apply(&frame(4, rewound(1, "trn_2", "itm_2")));
+        assert_eq!(st.last_turn, None, "the dropped range held the last turn");
+        st.apply(&frame(5, completed("trn_1")));
+        st.apply(&frame(6, rewound(2, "trn_9", "itm_none")));
+        assert!(
+            st.last_turn.is_some(),
+            "a cut that keeps the turn keeps its line"
+        );
     }
 
     #[test]
