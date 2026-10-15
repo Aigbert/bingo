@@ -1,207 +1,149 @@
 # M170 — The status hub
 
-ADR-0084, ADR-0086. Needs M167 (placement, `onKey`); prices from M164.
-Approved prototype (2026-10-14, "状态 · 插件 · MCP" tab, `/status`
-scenarios): https://claude.ai/artifact/XWoqqyP8Jch6p5889dL1ZB
+ADR-0084, ADR-0086; M167 supplies placement/onKey; M164 supplies prices.
+Approved prototype: 2026-10-14, "状态 · 插件 · MCP", `/status` scenarios.
+https://claude.ai/artifact/XWoqqyP8Jch6p5889dL1ZB
 
 ## Goal
 
-`/status` is one card grown up from the prompt, and every row is a
-door: `⏎` on a row runs its action. Session (prefill rename),
-model (`/model`), context with what fills it (compact now), spent (not
-selectable), permission mode (`/permission`), each rule this session
-accepted (forget it), plugins (`/plugins`), MCP (`/mcp`). Problems are
-written on their row in the colour of the problem: a plugin that failed
-to load, one from this repository waiting, a server that needs sign-in
-or is not running. The feature is the built-in mod `bingo-mod-status`;
-the kernel's `/status` key-value view stays as the plain fallback.
+`/status` opens one live card above the composer. Rows lead to session rename,
+model choice, compaction, permission mode/rule removal, plugins and MCP. Spent
+is informational. Problems appear on their own rows. The feature is the built-in
+`bingo-mod-status`; non-interactive callers retain the kernel's text table.
 
 ## Bricks
 
-1. **What fills the context.** `ContextUsage.parts: Option<[ContextPart; 4]>`
-   (additive; `system`, `tools`, `chat`, `pictures`, each tokens):
-   `turn/measure.rs::context` estimates the system blocks and the
-   messages; it keeps the four sums. Fixture; a test that the parts
-   sum to the local estimate exactly; server anchoring remains independent.
-2. **What it cost.** Pure `spent(usage, price) -> Spent { input, output,
-   cache_share, usd: Option<f64> }`; `usd` is `None` where M164's
-   catalogue has no price. Table test.
-3. **Forget a rule.** `/permission forget <rule>` in `bingo-permissions`
-   (a free rule argument; selectable session rules in the card); answers the rule it
-   dropped. Test over a session with two rules.
-4. **Rows, pure.** `rows(&StatusProps, plugins, servers) -> Vec<Row>`
-   in the mod: label, value spans, tone (`ok`, `warn`, `bad`, `dim`),
-   and the command line `⏎` runs (`None` for spent). Plugins and
-   servers are summarised to one row each: counts, then each problem
-   by name. Deserialize SDK PluginState and match the services MCP State enum; malformed
-   plugin states report unavailable. Table test per prototype scenario.
-5. **Drawing.** `Status` site as a `View` tree: a title line with the
-   hint (`live; ⏎ on a row goes there`) and version · uptime, one `❯`
-   row, the context bar with its parts on a dim second line, the rules
-   indented under permission. At most half the screen; snapshot per
-   scenario at 108×30 and 80×24.
-6. **Live.** The card redraws from frames while open (a turn finishing,
-   a mode change, a server connecting); the cursor stays on its row by
-   label, not index. Registered-hook test asserts Invalidate after ConfigChanged;
-   TestBackend checks the updated drawing and selection.
-7. **Keys.** `↑↓` move over selectable rows; `⏎` closes and runs the row's action
-   (session/permission prefill the composer). Idle `esc` closes; busy Status `esc`
-   ends the turn. Other panes retain dev behavior. Through `onKey` (M167).
+1. `ContextUsage.parts: Option<[ContextPart; 4]>`: system/tools/chat/pictures.
+   Shared estimation partitions local tokens; fixture and independent sum test.
+2. Pure `spent(usage, price)`: charge each used component with a known rate;
+   missing rates for used components make the cost unknown. Table tests.
+3. `/permission forget <rule>` drops one session rule. Two-rule regression.
+4. Pure rows from Status facts, plugin catalogue and live MCP service status.
+   Typed states determine counts and problem tones; prototype scenario tables.
+5. Status View tree: heading, version/uptime, selected row, context bar/parts,
+   indented rules, problem colours. Snapshots at 108×30 and 80×24.
+6. Live invalidation from registered event hook and 1 Hz service/uptime refresh.
+   Keep selection by row ID; test real Invalidate calls and lease recovery.
+7. ↑↓ skip spent; Enter closes and runs the selected action; session/permission
+   prefill editing. Idle Escape closes; busy Status Escape ends the turn.
 
 ## Files
 
-- `crates/bingo-sdk/src/event.rs` (`ContextPart`); `schema/`,
-  `sdk/typescript/`; `crates/bingo-core/src/{turn.rs,turn/measure.rs,context/budget.rs}`.
-- `crates/bingo-permissions/src/command.rs` (`forget`).
-- New `crates/bingo-mod-status/src/{lib.rs,rows.rs,spent.rs,draw.rs,
-  keys.rs,dispatch.rs}`; listed in `crates/bingo/src/main.rs`.
-- Shared changes: sdk tokens/render/component contracts; MCP services/rows;
-  permissions/session; TUI pane drawing/viewport/mouse/tests; bin composition;
-  run/pulling and action tests (draw even while actions are queued);
-  mechanical ContextUsage literal updates; existing generators and fixtures.
-- Reads `catalog(Plugins)` and `bingo_services::mcp::find` (no plugin
-  import).
+- sdk event/origin, catalogue command payload, component/render/slot contracts;
+  schema/ and sdk/typescript through existing generators.
+- core turn/measure.rs, context/budget.rs, model catalogue/snapshot and commands.
+- permissions command/session; services/MCP status projection.
+- new bingo-mod-status: rows/spent/draw/keys/dispatch/live/command and guide page.
+- TUI pulled panes, surface actions, origins and tests; RPC caller projection;
+  binary composition and black-box tests; mechanical Origin/ContextUsage literals.
+- scripts/models_dev.sh preserves cache-write rates; no added external dependency.
 
 ## Exit criteria
 
-- [x] Parts fixture and sum test; spent and rows tables; forget test.
-- [x] Snapshots: overview, long chat with two rules, a failed plugin,
-      a waiting one, an MCP server needing sign-in, at both sizes.
-- [x] `TestBackend`: each row's `⏎` reaches its action; spent is
-      skipped by `↑↓`; esc closes; live redraw keeps the row.
-- [x] `enabledPlugins: {"bingo.mod.status": false}`: `/status` draws the
-      kernel's key-value view.
-- [x] tmux drive in a temp HOME against the fake provider, captured and
-      compared with the prototype; tui-smoke; native gates as M167.
-- [ ] Windows checks for every touched crate (record C-toolchain deferrals).
+- [x] Context fixture/local sum, cost/state tables, embedded prices and forget tests.
+- [x] Prototype scenarios at both sizes, including rules and plugin/MCP problems.
+- [x] Keys skip spent, dispatch/prefill, preserve drafts, Escape and live selection.
+- [x] Disabled mod and non-interactive callers retain the kernel text table.
+- [x] Empty pull props draw; expired selection resumes; client commands are ignored.
+- [x] Final native gates and isolated tmux drive for fix round 2.
+- [ ] Windows checks for every touched crate (native C-toolchain deferrals below).
 
 ## Decisions
 
-- The Status site lives in the existing focused, pulled pane above the composer, capped at
-  half the viewport. Its keys use the existing pane FIFO and escape path. Empty pane titles
-  omit surface chrome so the shared tree owns the single header line. Pane props supply the
-  body height to the pull cache. No palette files or new action queue are needed.
-- Session and permission rows prefill `/rename ` and `/permission ` through the generic
-  Composer surface action; they never submit a bare command or show a usage error.
-- A row command runs through the session handle; its first acknowledgement returns as the
-  original site key result. Otherwise the TUI ignores the view on an intent it did not submit.
-  The instant handler holds no actor queue, so it can await that result while preserving the
-  existing surface FIFO; a Queued acknowledgement returns its position immediately.
-- Pane/status pulls stay live while commands are queued. Queued dispatch returns immediately;
-  stale callback binding is M174's responsibility, not a global redraw guard.
-- CommandRun carries the invoking surface; only terminal/desktop invocations open the card.
-  Print, channel and non-interactive RPC invocations retain the kernel text command on a shared host.
-- StatusProps carry summary/config/context from the asking surface's existing fold. Render
-  and arrow handlers never open a session or subscribe; key arguments carry row targets and the displayed selection.
-- Open cards have a five-second render/key lease; idle invalidation and cursor state stop
-  after disconnect or loss of viewing. A subsequent render renews the lease. The contract
-  has no viewer ID, so simultaneous viewers still share selection within a session.
-- CommandOutcome::Acknowledged forwards an existing result unchanged, including item IDs,
-  surface actions and answers, without repeating a recorded operation.
-- MCP `Servers::servers` returns connection configuration, not live status.
-  Add a default `status` service method and a typed projection of the manager's
-  lines in bingo-services/bingo-mcp; no credentials enter the status projection.
-- Parts sum to the local estimate, not the anchored server count. Scaling estimates
-  to a server count would invent accuracy; the drawing labels them `about`.
-- Cost is an estimate at the current model's catalogue rates, explicitly labelled;
-  a session may have changed models. Preserve M164 catalogue cache-write rates (the old
-  parser/pruner discarded them); only used components without rates make cost unknown.
-- A Vec removed Copy and required edits in M172-owned mods. The four fixed categories instead
-  use an optional array and Copy ContextKind names. JSON remains an additive array; absent
-  means unknown. Consumers need only literal updates. Shared token estimation owns the split.
-- Command::spec and catalog(Commands) are host-wide; command.describe receives session "host",
-  not the asking session. A dynamic rule ArgSpec would list no rules or leak another session's
-  rules. Keep a free rule argument; the card supplies exact session rules. Session-aware
-  completion belongs to a later catalogue contract, outside M168's protected palette files.
-- Guides live in bingo-mod-status/src/guide.md, registered by guide.rs.
-- Workspace edges: the new mod uses sdk/services and existing async-trait,
-  serde/serde_json/tokio; TUI dev-tests use the mod and existing insta.
-  No external dependency is added. Budget counts one new workspace member.
+- Status uses the existing focused pulled pane above the composer, capped at half
+  the viewport. Empty pane titles avoid duplicate chrome. Body height enters pull
+  props. Existing pane FIFO/site keys handle input; no additional ordering queue.
+- Ordinary panes keep dev's Escape behavior. Status follows the existing site
+  convention: idle closes, busy ends the turn. Question/form paths stay intact.
+- Session and permission prefill `/rename ` and `/permission ` via the generic
+  Composer surface action. A nonempty draft is preserved with a short notice;
+  overwriting a draft is not an editing shortcut (fix round 2).
+- Row dispatch uses the session handle and returns its first acknowledgement to
+  the original key action. Queued returns its position immediately; the instant
+  handler holds no actor queue. Pulls continue while actions are queued. Stale
+  callback binding belongs to M174, not a global pull guard.
+- `Acknowledged` forwards the entire existing result (view/message/surface/item/
+  answer) without executing or recording it again.
+- `Origin.render_surface` and `CommandRun.surface` use existing `SurfaceName`.
+  Attribution IDs still match client IDs for queue ownership; renaming TUI's ID
+  cannot change its separately typed interaction family.
+  RPC derives the type from its declared client when input has none. Terminal and
+  desktop callers get the card; plain RPC/print/channels retain the text command.
+- Status props optionally carry summary/config/context from the caller's fold,
+  without transcript bodies. Empty props use the host's 64 KiB-bounded attachment;
+  requiring client-filled facts broke generic desktop/RPC pull clients (fix 2).
+- Key actions carry only a row ID, never a command/list of commands. The host
+  re-derives rows from a bounded attachment before navigation or Enter; unknown
+  IDs are no-ops. This replaces trusting client rows and the old no-read arrow path.
+- Open cards have a five-second render/key lease; unviewed entries stop ticking.
+  A render can restore its supplied selection and renew the entry after expiry.
+  TUI forwards selection from its displayed tree. The contract has no viewer ID,
+  so simultaneous viewers still share a session cursor. Refresh hooks resume too.
+- Plugin states deserialize as SDK PluginState; malformed states say unavailable.
+  Registering is pending; Pending counts its current state and warns of transition.
+  MCP configuration is not live status: use the default `Servers::status` service
+  method and typed services State projection, without credentials or plugin imports.
+- Context parts sum to the local estimate, not the anchored server count; scaling
+  would invent accuracy. Label them `about`. Four fixed categories use an optional
+  array and Copy names, avoiding a Vec-induced loss of Copy in shared consumers.
+- Cost is an estimate at the current model's catalogue rates, not historical bills.
+  Only used components without rates make it unknown. Preserve cache-write rates
+  in parser/pruner and regenerate the embedded snapshot with --preserve-capabilities;
+  never hand-edit prices or change existing request capabilities during refresh.
+- Command specs/catalogues are host-wide and command.describe uses session "host".
+  Keep a free rule argument: dynamic completion would hide or leak session rules.
+  The card provides exact rules; session-aware catalogue completion is out of scope.
+- M168 palette retirement and Plugins refetch remain; M172 live states are preserved.
+  Measurement extraction uses free functions to respect size/impl-spread limits.
+- Guides live in bingo-mod-status/src/guide.md, registered as a Page in guide.rs.
+  No docs/guide directory. Desktop drawing and in-card value editing are out of scope.
+- Workspace edges use sdk/services and existing async-trait/serde/serde_json/tokio;
+  TUI tests use the mod and existing insta. Combined normal-tree budget is 415.
 
-## Non-goals
+## Non-goals and risks
 
-Editing a value in the card itself (each row goes to its own screen);
-a cost history across sessions; the desktop's drawing.
-
-## Risks
-
-- The context split is an estimate and can disagree with the server's
-  count: the bar shows `used` from the server, the parts line says
-  `about`, and the sum test checks the independent local estimate.
-- A summary row that names every failing thing can overflow at 80
-  columns: the row truncates names after the first with `+N`.
+No historical cost ledger or desktop renderer. Estimates can differ from server
+counts. At 80 columns, long problem lists show the first name and `+N`. No viewer
+identity means shared cursors. Missing native C toolchains limit Windows evidence.
 
 ## Verified — 2026-10-15
 
-Gates ran serially. Provider/proxy environment overrides were unset for local/fake-provider tests and isolated tmux runs; no live-provider or credential tests were added.
+History folded here after fix round 2 to keep the plan within 150 lines. Initial
+M170 passed 5719 tests; M168 rebase at c33b0700 passed 5686; first review rebased
+onto dev 222d4c72 without conflicts/squashing and passed 5749 tests (174 groups,
+0 failed, 5 ignored). All native gates and isolated smoke passed in those runs.
+First-review regressions were observed failing before fixes; removing Refresh
+registration failed the invalidation test. Schema generators and 31 TypeScript
+tests passed with no drift. Status drive covered 108×30/80×24, navigation, Escape,
+reopen and both prefills. First implementation had an inherited endpoint auth
+failure and two PTY load flakes; sanitized final runs passed without retries.
+The old Enter usage-error assertion was replaced by composer-prefill assertions.
+
+Previous Windows evidence: core/context/experience/mod-status/persona/sdk/services/
+skills/tasks passed; bin/channel-feishu/mcp/plugin-rpc/print/tui stopped in
+aws-lc-sys (missing Windows headers), permissions in tree-sitter C headers.
+First review rechecked core/mod-status successfully. Windows stays unticked where
+native dependencies stop before Rust checking. No auth or allowlist changes.
+
+Fix round 2: public unauthenticated `bash scripts/models_dev.sh --preserve-capabilities`
+succeeded: `12 providers, 287 models, 127047 bytes`. Snapshot diff is generator-only;
+embedded Anthropic cache-write regression passes. Focused fixes are on the previous
+HEAD, without squashing. Final gate summaries follow.
+
+Final gates ran serially with `RUST_TEST_THREADS=4`; OPENAI_API_KEY/OPENAI_BASE_URL/ANTHROPIC_API_KEY/ANTHROPIC_BASE_URL and provider/proxy overrides unset.
 
 | Command | Output summary |
 | --- | --- |
 | `cargo fmt --all -- --check` | exit 0 |
 | `cargo check --workspace --all-targets --locked` | Finished `dev` profile; exit 0 |
 | `cargo clippy --workspace --all-targets --locked -- -D warnings` | Finished `dev` profile; exit 0 |
-| `cargo test --workspace --locked` | 172 groups; 5719 passed; 0 failed; 5 ignored |
+| `cargo test --workspace --locked` | 174 groups; 5757 passed; 0 failed; 5 ignored; final run 192.0s |
 | `bash scripts/check_discipline.sh` | discipline ok; advisory warnings only |
-| `bash scripts/budget.sh` | dependencies 414/414; warm core 0s; relink 0; budget ok; target/debug 8 GB soft-limit warning |
+| `bash scripts/budget.sh` | dependencies 415/415; warm core 0s; relink 0; budget ok; 17 GB target/debug soft warning |
 | `cargo deny check` | advisories ok, bans ok, licenses ok, sources ok |
-| `bash scripts/tui-smoke.sh` | tui-smoke ok; Counter input persisted at 80/200 columns; question/form cases passed |
-| `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked` | Pass: bingo-context, bingo-core, bingo-experience, bingo-mod-status, bingo-persona, bingo-sdk, bingo-services, bingo-skills, bingo-tasks |
-| Same Windows command, remaining seven crates | Deferred: bingo, bingo-channel-feishu, bingo-mcp, bingo-plugin-rpc, bingo-surface-print, bingo-surface-tui (`aws-lc-sys`: missing Windows C headers); bingo-permissions (`tree-sitter`/`tree-sitter-bash`: missing stdio.h/stdlib.h) |
-| `BINGO_UPDATE_SCHEMA=1 cargo test -p <crate> --locked` generator tests | SDK, plugin-rpc, surface-rpc, store-jsonl and mods generators passed; schema/ and sdk/typescript regenerated |
+| `bash scripts/tui-smoke.sh` | tui-smoke ok; final run 221.8s; isolated socket/temp HOME; counter and question/form cases passed |
+| `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked` | Passed: agents, core, mod-status, rooms, schedule, sdk, surface-rpc |
+| Same Windows command | Deferred: bingo, channels, surface-tui; aws-lc-sys missing Windows C headers (`stdlib.h`); criterion stays unticked |
+| `BINGO_UPDATE_SCHEMA=1 cargo test -p <crate> --locked` generators | SDK/plugin-rpc/surface-rpc/store-jsonl/mods passed after baseline regeneration; `git diff --exit-code -- schema/ sdk/typescript/` exit 0 |
 | `npm test` in sdk/typescript | tests 31; pass 31; fail 0 |
-| Status tests and isolated tmux drive | 10 TestBackend snapshots; 3 RPC tests; 7 mod tests; 108x30/80x24 captures compared with prototype; arrows skip spent, Escape closes, Enter prefills `/rename ` (corrected after review) |
-
-An initial mock CLI test inherited OPENAI_BASE_URL and failed with AUTH_REQUIRED; sanitized runs pass. No auth code changed.
-PTY load flakes: `esc_twice_rewinds_the_turn_and_the_file_it_wrote` and `look::a_terminal_whose_ground_turns_light_is_followed_within_one_focus` each failed once, then passed alone in 3.03s/3.12s; the final full suite passes.
-The original smoke exposed a stale counter callback during queued input. Review removed the global pull guard: it could freeze first drawings behind queued commands. Handler binding belongs to M174; Status returns a queued acknowledgement immediately. Windows remains unticked because seven checks stop in native C dependencies before Rust checking completes.
-
-Rebase onto `dev` at `c33b0700` — 2026-10-15: replayed all six M170 commits without squashing. Kept both Palette and Status contracts, fixtures, crate edges and registrations; no edited file was deleted. M168's `palette::retired` handling and Plugins refetch remain intact. The combined member budget is 415 (ADR-0086 amended; no external dependency). Initial Clippy found M168's new catalogue-test `ContextUsage` literal missing `parts`; added `None`. Existing SDK/plugin-rpc/surface-rpc/store-jsonl/mods generators ran with `BINGO_UPDATE_SCHEMA=1`: all passed; the subsequent full suite and `git diff --exit-code -- schema/ sdk/typescript/` confirmed no drift. Serial gates: `cargo fmt --all -- --check` exit 0; `cargo clippy --workspace --all-targets --locked -- -D warnings` exit 0; `cargo test --workspace --locked` with `RUST_TEST_THREADS=4` and OPENAI_API_KEY/OPENAI_BASE_URL/ANTHROPIC_API_KEY/ANTHROPIC_BASE_URL unset: 174 groups, 5686 passed, 0 failed, 5 ignored, no retries; `bash scripts/check_discipline.sh`: discipline ok; `bash scripts/budget.sh`: 415/415 dependencies, warm core 0s, relink 0, budget ok (11 GB target/debug soft warning); `bash scripts/tui-smoke.sh`: tui-smoke ok (223.4s), isolated socket and temporary HOME. `npm test`: 31 passed. Isolated Status drive: 108x30/80x24, navigation, Escape, reopen and Enter-to-rename usage response passed at rebase; review replaces it with composer prefill. Existing Windows deferrals above remain unchanged.
-
-
-Review verification — 2026-10-15: rebased the focused commits onto current `dev`
-at `222d4c72` (M172), without squashing or conflicts. M168's palette retirement,
-Plugins refetch and M172's registering/pending states are preserved. Pending plugins
-use their current state for counts and show their transition as a warning.
-
-Each review regression was observed failing before its fix: queued acknowledgements
-and first drawings; render without session attachment; shared-host channel/print/RPC
-fallback; ordinary-pane Escape; both editing prefills and the surface composer action;
-registered-hook invalidation; expired viewer leases and resuming a visible selection;
-complete acknowledgement forwarding; cache-write catalogue retention and charging;
-independent context estimates; malformed plugin/MCP states. Removing `live::Refresh`
-registration also made the invalidation test fail, then restoring it passed. The large
-transcript regression supplies a roughly 2 MB transcript but keeps Status props below
-16 KiB without transcript text; render and navigation make no session-open call.
-
-The first full review run passed (5749 tests), then discipline found the combined M170
-and M172 `turn.rs` six production lines over its limit. Extracted the measurement
-into free functions in `turn/measure.rs`, keeping `Turn` within the three-file impl
-limit; reran the native gates after the extraction. No new
-external dependencies or allowlist changes. Viewer identity remains unavailable, so
-simultaneous viewers share the session cursor; inactive render/key leases expire after
-five seconds. The counter stale-edit is assigned to M174; the pull guard stays removed.
-
-
-Final review gates ran serially with `RUST_TEST_THREADS=4` and
-`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `ANTHROPIC_API_KEY`,
-`ANTHROPIC_BASE_URL` unset (also provider auth-token/proxy overrides).
-
-| Command | Output summary |
-| --- | --- |
-| `cargo fmt --all -- --check` | exit 0 |
-| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Finished `dev` profile; exit 0 |
-| `cargo test --workspace --locked` | 174 groups; 5749 passed; 0 failed; 5 ignored; 212.6s; no retries |
-| `bash scripts/check_discipline.sh` | discipline ok; advisory size warnings only |
-| `bash scripts/budget.sh` | dependencies 415/415; warm core 0s; relink 0; budget ok; target/debug 14 GB soft-limit warning |
-| `cargo deny check` | advisories ok, bans ok, licenses ok, sources ok |
-| `bash scripts/tui-smoke.sh` | tui-smoke ok; 227.0s; isolated socket/temp HOME; Counter Input Ada persisted at 80/200 columns; question/form cases passed |
-| `BINGO_UPDATE_SCHEMA=1 cargo test -p <crate> --locked` generator tests | SDK, plugin-rpc, surface-rpc, store-jsonl and mods generators passed after the M172 rebase; no generated drift |
-| `git diff --exit-code -- schema/ sdk/typescript/` | exit 0 |
-| `npm test` in sdk/typescript | tests 31; pass 31; fail 0 |
-| Isolated Status tmux drive | 108x30/80x24; arrows skip spent; Escape closes; reopen resets; Enter prefills `/rename ` and `/permission `; fake provider; exit 0 |
-| `cargo check --workspace --all-targets --locked` | Finished `dev` profile; exit 0 |
-| `cargo check -p bingo-mod-status -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked` | Finished `dev` profile; exit 0; includes the new activity clock and measurement extraction |
-
-The existing seven native C-toolchain deferrals above remain recorded; the all-crate
-Windows criterion stays unticked. Final schema/TypeScript drift and whitespace checks
-pass. No live-provider tests, foreign tmux sockets, pushes or merges were used.
+| Focused tests and isolated Status tmux drive | 18 mod tests; 1160 TUI passed/2 ignored; 6 RPC tests; 108x30/80x24, navigation, Escape, reopen and both prefills passed |

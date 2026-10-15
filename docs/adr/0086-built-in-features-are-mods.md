@@ -97,8 +97,9 @@ external dependency. Its guide is a per-crate Page. The checkpoints preview
 contract lives in `bingo-services`; neither plugin imports the other.
 
 M170 adds `bingo-mod-status` without external dependencies; the normal-tree
-budget counts the workspace member, so 418 → 419. It supplies Status facts
-from the asking surface's fold; drawing never attaches a session.
-`CommandRun.surface` keeps shared-host text callers on their fallback. The
-Composer surface action prefills editing; `Acknowledged` forwards an existing
-command result without repeating its record or action.
+budget counts the workspace member, so 418 → 419. It accepts Status facts from
+the asking surface's fold; generic clients may omit them and use a bounded host
+attachment. Typed `CommandRun.surface` keeps interaction independent of
+attribution IDs and preserves text callers' fallback. The Composer surface
+action prefills editing; `Acknowledged` forwards an existing command result
+without repeating its record or action.
