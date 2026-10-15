@@ -5,6 +5,7 @@ pub use focus::{focusable, keys as focus_keys, tab_control};
 mod mouse;
 mod moved;
 pub(crate) mod readiness;
+pub(crate) mod reply;
 pub mod seat;
 use crate::{composer::Composer, effect::Effect, focus::Focus, theme, ui::Ui};
 use bingo_sdk::{

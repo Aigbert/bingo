@@ -5,6 +5,7 @@ pub(super) struct Pending {
     session: SessionId,
     pub(super) focus: String,
     key: KeyEvent,
+    pane: Option<(String, String)>,
 }
 
 pub(super) struct Opened {
@@ -33,6 +34,10 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
     else {
         return;
     };
+    let pane_id = crate::pane::placed(run.session.tree.viewed())
+        .into_iter()
+        .find(|pane| pane.key == focus)
+        .map(|pane| (pane.plugin, pane.id));
     let handle = run.session.handles.get(&session).cloned();
     let intent = run.mint(None);
     run.site_keys.insert(
@@ -41,6 +46,7 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
             session: session.clone(),
             focus,
             key,
+            pane: pane_id,
         },
     );
     if let Some(handle) = handle {
@@ -204,6 +210,7 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
     if interaction_answer(run, &pending, outcome) || interaction_unhandled(run, &pending, outcome) {
         return;
     }
+    pane_answer(run, &pending, outcome);
     pane_unhandled(run, &pending, outcome);
 }
 
@@ -279,6 +286,31 @@ fn interaction_unhandled(run: &mut Run, pending: &Pending, outcome: &IntentOutco
     );
     run.apply(effects);
     true
+}
+
+fn pane_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
+    let Some((plugin, id)) = &pending.pane else {
+        return;
+    };
+    if pending.session != *run.session.tree.view() {
+        return;
+    }
+    let IntentOutcome::Applied { result } = outcome else {
+        return;
+    };
+    let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone()) else {
+        return;
+    };
+    let effects = crate::pane::reply::result(
+        &mut run.ui,
+        &run.session.tree,
+        &action,
+        plugin,
+        id,
+        vouched(result, plugin),
+        run.detection.now(),
+    );
+    run.apply(effects);
 }
 
 /// A key a pane's site left alone goes to the pane's own keys, while that
