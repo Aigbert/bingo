@@ -2,7 +2,7 @@
 //! what there is, resident in the system prompt, and a recall of what fits
 //! what was just said, appended after the person's turn.
 
-mod index;
+pub(crate) mod index;
 mod recall;
 
 pub use index::IndexContributor;

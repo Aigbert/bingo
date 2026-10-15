@@ -14,7 +14,7 @@ use crate::render;
 use crate::store::Library;
 
 /// Past this the index is a wall of text; the rest is one line saying so.
-const MAX: usize = 10;
+pub(crate) const MAX: usize = 10;
 
 const HEADING: &str = "# Experience";
 

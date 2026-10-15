@@ -12,6 +12,8 @@ description = "Experience plugin for bingo: procedural playbooks as files, recal
 workspace = true
 
 [dependencies]
+# M178: move existing test runtime edge here for blocking filesystem work.
+tokio.workspace = true
 bingo-services.workspace = true
 bingo-shelf.workspace = true
 bingo-sdk.workspace = true
@@ -29,4 +31,3 @@ bingo-sdk = { workspace = true, features = ["testing"] }
 # M14: the tokenizer's contract is a property over arbitrary CJK/ASCII mixes.
 proptest.workspace = true
 tempfile.workspace = true
-tokio.workspace = true

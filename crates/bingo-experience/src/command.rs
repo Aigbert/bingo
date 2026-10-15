@@ -51,7 +51,10 @@ impl Command for ExperienceCommand {
                 ));
             };
             return Ok(CommandOutcome::Applied {
-                message: Some(crate::service::forget(&self.library, &cx.cwd, id)?),
+                message: Some(
+                    crate::service::forget(self.library.clone(), cx.cwd.clone(), (*id).into())
+                        .await?,
+                ),
             });
         }
         let shelf = self.library.load(&cx.cwd);
