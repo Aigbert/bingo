@@ -105,4 +105,75 @@ mod tests {
         assert!(host.calls().is_empty());
         assert!(!selections.lock().unwrap().contains_key(&id));
     }
+    #[tokio::test]
+    async fn rendering_an_expired_card_restores_its_cursor_and_live_ticks() {
+        use serde_json::json;
+        let state = crate::tests::state();
+        let id = state.summary.id.clone();
+        let host = testing::TestHost::default();
+        host.on_catalog(|kind| async move {
+            Ok(Catalog {
+                kind,
+                entries: vec![],
+            })
+        });
+        let selections = Selections::default();
+        let now = std::time::Instant::now();
+        selections.lock().unwrap().insert(
+            id.clone(),
+            crate::Selection {
+                label: "model".into(),
+                seen: now,
+            },
+        );
+        tick(
+            &host.handle(),
+            &selections,
+            now + std::time::Duration::from_secs(6),
+        )
+        .await;
+        assert!(selections.lock().unwrap().is_empty());
+        let drawing = crate::draw::Drawing {
+            selections: selections.clone(),
+            started: now,
+        };
+        let cx = HookContext {
+            session: id.clone(),
+            turn: None,
+            item: None,
+            cwd: "/unused".into(),
+            provider: None,
+            model: None,
+            host: host.handle(),
+        };
+        let mut props = component::StatusProps::from(&state);
+        props.selected = Some("model".into());
+        let input = json!({"component":"Status","requestId":"status","surface":"desktop",
+            "props":props,"viewport":{"columns":80,"rows":12}});
+        let answer = drawing
+            .chain(
+                catalogue::UI_RENDER,
+                &cx,
+                input,
+                Next::new(|_| Box::pin(async { Ok(json!(View::text("fallback"))) })),
+            )
+            .await
+            .unwrap();
+        assert!(
+            serde_json::from_value::<View>(answer)
+                .unwrap()
+                .fold()
+                .contains("❯ model")
+        );
+        let seen = selections.lock().unwrap()[&id].seen;
+        tick(
+            &host.handle(),
+            &selections,
+            seen + std::time::Duration::from_secs(1),
+        )
+        .await;
+        assert!(host.calls().iter().any(|call| matches!(call,
+            testing::HostCall::Invalidate { session, .. } if session == &id)));
+        assert_eq!(selections.lock().unwrap()[&id].label, "model");
+    }
 }

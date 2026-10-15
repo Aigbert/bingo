@@ -24,9 +24,10 @@ pub(super) fn request(run: &mut Run, keys: &[crate::pulled::Key]) -> bool {
         let epoch = run.ui.placed.pulled.epoch();
         let key = key.clone();
         let host = run.host.clone();
+        let request = resume_request(&key, run.ui.placed.pulled.display(&key));
         let mut pending = Box::pin(async move {
             let view = host
-                .render(&key.session, key.request.clone())
+                .render(&key.session, request)
                 .await
                 .unwrap_or_else(|_| key.request.engine());
             Ok(Reply::Rendered(epoch, key, Box::new(view)))
@@ -99,4 +100,50 @@ pub(super) fn paint(
     showing::fit(run);
     showing::read_linked(run);
     Ok(())
+}
+
+fn resume_request(
+    key: &crate::pulled::Key,
+    previous: Option<&bingo_sdk::View>,
+) -> bingo_sdk::render::RenderRequest {
+    let mut request = key.request.clone();
+    if request.component == bingo_sdk::render::Component::Status
+        && let Some(bingo_sdk::View::Box { layout, .. }) = previous
+        && let Some(action) = &layout.on_key
+        && let Some(selected) = action.args["selected"].as_str()
+    {
+        request.props["selected"] = selected.into();
+    }
+    request
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bingo_sdk::render::{Component, RenderRequest, SurfaceName, Viewport};
+    use serde_json::json;
+    #[test]
+    fn a_status_refresh_carries_the_displayed_selection() {
+        let state = crate::test_support::state();
+        let request = RenderRequest {
+            component: Component::Status,
+            request_id: "status".into(),
+            surface: SurfaceName::Terminal,
+            props: json!({}),
+            viewport: Viewport {
+                place: None,
+                columns: 80,
+                rows: 12,
+            },
+        };
+        let key = crate::pulled::Key::new(&state, &request, 80, 12);
+        let view: bingo_sdk::View = serde_json::from_value(json!({"kind":"Box","children":[],
+            "onKey":{"name":"fixture:ui","args":{"selected":"plugins"}}}))
+        .unwrap();
+        assert_eq!(
+            resume_request(&key, Some(&view)).props["selected"],
+            "plugins"
+        );
+        assert_eq!(key.request.props["selected"], serde_json::Value::Null);
+    }
 }

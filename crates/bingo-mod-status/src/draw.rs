@@ -30,13 +30,17 @@ impl Interceptor for Drawing {
         _: Next<'_, Value, Value>,
     ) -> Result<Value, KernelError> {
         let request: render::RenderRequest = serde_json::from_value(input).map_err(error)?;
-        let facts = serde_json::from_value(request.props).map_err(error)?;
+        let props: component::StatusProps = serde_json::from_value(request.props).map_err(error)?;
+        let facts = match props.facts {
+            Some(facts) => facts,
+            None => (&crate::snapshot(&cx.host, &cx.session).await?.snapshot).into(),
+        };
         let rows = read(&cx.host, &facts).await?;
         let selected = {
             let mut selections = self.selections.lock().map_err(error)?;
             let selection = selections
                 .entry(cx.session.clone())
-                .or_insert_with(|| "session".into());
+                .or_insert_with(|| props.selected.as_deref().unwrap_or("session").into());
             selection.seen = Instant::now();
             selection.label.clone()
         };
@@ -52,7 +56,7 @@ impl Interceptor for Drawing {
 }
 pub(crate) async fn read(
     host: &HostHandle,
-    state: &component::StatusProps,
+    state: &component::StatusFacts,
 ) -> Result<Vec<Row>, KernelError> {
     let plugins = host.catalog(CatalogKind::Plugins).await?;
     let models = host.catalog(CatalogKind::Models).await?;
@@ -96,7 +100,7 @@ pub fn tree(rows: &[Row], selected: &str, columns: u16, height: u16, uptime: u64
         layout: Box::new(BoxStyle {
             on_key: Some(Action {
                 name: format!("{ID}:ui"),
-                args: json!({"handler":REQUEST,"event":"press","rows":rows,"selected":rows.get(selected).map(|row| &row.label)}),
+                args: json!({"handler":REQUEST,"event":"press","selected":rows.get(selected).map(|row| &row.label)}),
             }),
             ..Default::default()
         }),

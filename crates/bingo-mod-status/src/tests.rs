@@ -226,3 +226,49 @@ fn malformed_plugin_states_are_reported_as_unavailable() {
             .any(|span| span.text.contains("state unavailable"))
     );
 }
+
+#[tokio::test]
+async fn an_unmodified_pull_slot_renders_from_a_bounded_attachment() {
+    let state = state();
+    let host = testing::TestHost::with_sessions(vec![state.summary.clone()]);
+    host.on_catalog(|kind| async move {
+        Ok(Catalog {
+            kind,
+            entries: vec![],
+        })
+    });
+    let cx = HookContext {
+        session: state.summary.id,
+        turn: None,
+        item: None,
+        cwd: "/unused".into(),
+        provider: None,
+        model: None,
+        host: host.handle(),
+    };
+    let drawing = draw::Drawing {
+        selections: Default::default(),
+        started: Instant::now(),
+    };
+    let input = json!({"component":"Status","requestId":"status","surface":"desktop",
+        "props":{},"viewport":{"columns":80,"rows":12}});
+    let answer = drawing
+        .chain(
+            catalogue::UI_RENDER,
+            &cx,
+            input,
+            Next::new(|_| Box::pin(async { Ok(json!(View::text("fallback"))) })),
+        )
+        .await
+        .unwrap();
+    assert!(
+        serde_json::from_value::<View>(answer)
+            .unwrap()
+            .fold()
+            .contains("❯ session")
+    );
+    assert!(host.calls().iter().any(
+        |call| matches!(call, testing::HostCall::Open { options, .. }
+        if options.max_snapshot_bytes == Some(64 * 1024))
+    ));
+}

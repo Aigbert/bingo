@@ -131,14 +131,29 @@ props!(ToastProps {
 });
 props!(WelcomeProps { session: crate::SessionSummary, effort: Option<crate::Effort>, modes: Vec<String>, update: Option<String>, resume: Option<crate::SessionSummary> });
 
-/// A status drawing needs facts from the caller's fold, never its transcript.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+/// Optional facts supplied by the asking surface, without transcript bodies.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct StatusProps {
+    #[serde(flatten)]
+    pub facts: Option<StatusFacts>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected: Option<String>,
+}
+impl From<&crate::SessionState> for StatusProps {
+    fn from(state: &crate::SessionState) -> Self {
+        Self {
+            facts: Some(state.into()),
+            selected: None,
+        }
+    }
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct StatusFacts {
     pub summary: crate::SessionSummary,
     pub config: crate::ConfigView,
     pub context: Option<crate::ContextUsage>,
 }
-impl From<&crate::SessionState> for StatusProps {
+impl From<&crate::SessionState> for StatusFacts {
     fn from(state: &crate::SessionState) -> Self {
         Self {
             summary: state.summary.clone(),

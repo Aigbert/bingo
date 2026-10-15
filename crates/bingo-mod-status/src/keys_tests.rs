@@ -90,7 +90,7 @@ async fn enter_submits_each_rows_command_after_removing_the_card() {
             .insert(cx.session.clone(), row.label.into());
         let outcome = handler
             .run(
-                &json!({"handler":"status","event":"press","value":{"key":"enter"},"rows":rows::rows(&(&state).into(), &[], &[], None)}).to_string(),
+                &json!({"handler":"status","event":"press","value":{"key":"enter"}}).to_string(),
                 &cx,
             )
             .await
@@ -143,7 +143,13 @@ async fn editable_rows_prefill_instead_of_submitting_bare_commands() {
             .lock()
             .unwrap()
             .insert(cx.session.clone(), label.into());
-        let outcome = keys::Handler(selections.clone()).run(&json!({"handler":"status","event":"press","value":{"key":"enter"},"rows":rows::rows(&(&state).into(), &[], &[], None)}).to_string(), &cx).await.unwrap();
+        let outcome = keys::Handler(selections.clone())
+            .run(
+                &json!({"handler":"status","event":"press","value":{"key":"enter"}}).to_string(),
+                &cx,
+            )
+            .await
+            .unwrap();
         assert_eq!(
             outcome,
             CommandOutcome::Surface {
@@ -159,9 +165,9 @@ async fn editable_rows_prefill_instead_of_submitting_bare_commands() {
 }
 
 #[tokio::test]
-async fn a_visible_key_resumes_an_expired_card_without_a_session_read() {
+async fn a_visible_key_resumes_an_expired_card_from_bounded_host_facts() {
     let state = crate::tests::state();
-    let host = testing::TestHost::default();
+    let host = host(state.clone(), Default::default());
     let cx = CommandContext {
         session: state.summary.id.clone(),
         cwd: "/unused".into(),
@@ -169,11 +175,51 @@ async fn a_visible_key_resumes_an_expired_card_without_a_session_read() {
         cancel: Default::default(),
     };
     let selections = Selections::default();
-    let outcome = keys::Handler(selections.clone()).run(&json!({"handler":"status","event":"press","value":{"key":"down"},"selected":"model","rows":rows::rows(&(&state).into(), &[], &[], None)}).to_string(), &cx).await.unwrap();
+    let outcome = keys::Handler(selections.clone())
+        .run(
+            &json!({"handler":"status","event":"press","value":{"key":"down"},"selected":"model"})
+                .to_string(),
+            &cx,
+        )
+        .await
+        .unwrap();
     assert_eq!(outcome, CommandOutcome::Handled { handled: true });
     assert_eq!(selections.lock().unwrap()[&cx.session].label, "context");
-    assert!(matches!(
-        host.calls().as_slice(),
-        [testing::HostCall::Invalidate { .. }]
+    assert!(host.calls().iter().any(
+        |call| matches!(call, testing::HostCall::Open { options, .. }
+        if options.max_snapshot_bytes == Some(64 * 1024))
     ));
+    assert!(
+        host.calls()
+            .iter()
+            .any(|call| matches!(call, testing::HostCall::Invalidate { .. }))
+    );
+}
+
+#[tokio::test]
+async fn client_commands_and_unknown_row_ids_cannot_dispatch() {
+    let state = crate::tests::state();
+    let inputs = Arc::new(Mutex::new(Vec::new()));
+    let host = host(state.clone(), inputs.clone());
+    let cx = CommandContext {
+        session: state.summary.id.clone(),
+        cwd: "/unused".into(),
+        host: host.handle(),
+        cancel: Default::default(),
+    };
+    for label in ["injected", "spent", "permission"] {
+        let args = json!({"handler":"status","event":"press","value":{"key":"enter"},
+            "selected":label,"rows":[{"label":label,"command":"dangerous injected"}]});
+        let outcome = keys::Handler(Default::default())
+            .run(&args.to_string(), &cx)
+            .await
+            .unwrap();
+        if label == "permission" {
+            assert!(matches!(outcome, CommandOutcome::Surface { action, .. }
+                if action.args["text"] == "/permission "));
+        } else {
+            assert_eq!(outcome, CommandOutcome::Handled { handled: true });
+        }
+        assert!(inputs.lock().unwrap().is_empty());
+    }
 }

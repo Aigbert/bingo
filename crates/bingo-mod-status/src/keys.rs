@@ -46,7 +46,14 @@ impl Command for Handler {
             .get(&cx.session)
             .map(|selection| selection.label.clone())
             .unwrap_or_else(|| args["selected"].as_str().unwrap_or("session").into());
-        let rows: Vec<Row> = serde_json::from_value(args["rows"].clone()).map_err(error)?;
+        let facts = (&crate::snapshot(&cx.host, &cx.session).await?.snapshot).into();
+        let rows = crate::draw::read(&cx.host, &facts).await?;
+        if !rows
+            .iter()
+            .any(|row| row.label == label && row.command.is_some())
+        {
+            return Ok(CommandOutcome::Handled { handled: true });
+        }
         if key == "enter" {
             return enter(&rows, &label, cx, &self.0).await;
         }
@@ -67,7 +74,8 @@ async fn enter(
     selections: &Selections,
 ) -> Result<CommandOutcome, KernelError> {
     let command = rows
-        .get(selected(rows, label))
+        .iter()
+        .find(|row| row.label == label)
         .and_then(|r| r.command.as_ref());
     if let Some(command) = command {
         crate::command::close(&cx.host, &cx.session, selections).await?;
