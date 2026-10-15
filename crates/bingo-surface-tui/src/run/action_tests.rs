@@ -349,9 +349,9 @@ async fn a_surface_action_prefills_the_composer_without_submitting() {
 async fn a_composer_action_preserves_an_existing_draft_and_explains_why() {
     let now = still(scene().1);
     let session = Arc::new(TestSession::default());
-    let mut run = tests::idle_in(state(), session.clone(), now.instant);
-    run.ui.composer.set("my unfinished draft");
     for text in ["/rename ", "/permission "] {
+        let mut run = tests::idle_in(state(), session.clone(), now.instant);
+        run.ui.composer.set("my unfinished draft");
         run.applied(&json!({"surface":{"name":"Composer","args":{"text":text}}}));
         assert_eq!(run.ui.composer.text(), "my unfinished draft");
         assert_eq!(
