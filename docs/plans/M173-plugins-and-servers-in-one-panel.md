@@ -32,7 +32,7 @@ the plain fallback.
    glyph and tag from `PluginState` and `Status`. Table test per
    prototype scenario.
 4. **Cards, pure.** `plugin_card` and `server_card` → fact rows; a
-   chain on its own line under `draws`; a load error in full, wrapped,
+   chain on its own line under `draws`; a load error cut to the card,
    in the error tone; trust with one sentence of what the tier may do.
 5. **Verbs as command lines.** Every key maps to an existing command
    line so the panel holds no second path: `space` → `/plugins enable|
@@ -58,10 +58,8 @@ the plain fallback.
   rows.rs}`; `crates/bingo-provider-acp/src/crossing.rs`.
 - New `crates/bingo-mod-plugins/src/{lib.rs,groups.rs,cards.rs,chain.rs,
   verbs.rs,trust.rs,draw.rs,keys.rs}`; listed in `crates/bingo/src/main.rs`.
-- Core catalogue/commands: link order, owned contributions and person-owned trust.
-- SDK `Plugins` site/props and `PluginSource::contents`; modules/process source projections.
-- TUI site placement/keys/lifecycle, palette exact-line/choice payload integration, binary
-  registration, fixtures, CLI and TestBackend tests.
+- Core catalogue/commands; SDK `Plugins` site and `PluginSource::contents`; source
+  projections; TUI placement/keys, palette integration, fixtures, CLI and TestBackend tests.
 - `crates/bingo-mod-plugins/src/guide.md` registered by `guide.rs`; generated schema/TypeScript.
 
 ## Exit criteria
@@ -87,64 +85,66 @@ panel; per-tool switches inside a server; the desktop's drawing.
 
 ## Risks
 
-- Two owners' verbs in one panel can drift: every key is a command
-  line, and the verbs table test lists each (row kind, key) pair.
-- A server list that changes while the panel is open (a handshake
-  lands) moves rows: the cursor follows the row by name.
+- Two owners' verbs can drift: every key is a command line in the verbs table. A
+  handshake landing while the panel is open moves rows: the cursor follows the name.
 
 ## Decisions
 
-- The prototype's needed examples are illustrative. ADR-0057's existing store/surface rule
-  remains authoritative; permission and filesystem plugins remain switchable.
-- Add `/plugins trust <name> <tier>` and optional approval tier arguments: no command
-  currently writes trust. Both use the user-layer writer; writing every tier also reduces an existing broader grant.
-- Server rows retain typed transport configuration for ACP forwarding. Tool counts and
-  run/address text derive from status/transport instead of duplicating those facts.
-  Origins come from registrar sources, retained after approval; unknown latency stays absent.
-- Guides use the new crate's registered Page (ADR-0054). No docs/guide directory is added.
-- Add only workspace edges for the new mod and its test consumers. The normal dependency
-  count grows 414 → 415 because the budget counts workspace members.
-- The template's registered guide is a typed static `Pages` service. Classifying it as a
-  runtime service pinned every documented mod to next-start. Treat only typed `Pages`
-  as catalogue facts; ordinary services still pin. The live-disable integration test exposed this.
-- Trust changes read fresh user grants at registration and use existing module retirement
-  before reenabling a reloadable generation; process/tool grants apply at next start.
-  Unreadable live settings suspend new admission instead of substituting default grants.
-  Handlers carry opening identity only and reread catalogue facts when pressed.
-- External command ownership is held by each source, not the native registry. Add a
-  default-empty typed `PluginSource::contents` projection, implemented by module and
-  process sources from their live registrations, so cards also name external commands
-  and tools without another cache or a guessed owner.
-- The real terminal exposed two palette integration gaps: an exactly typed command with
-  optional arguments entered completion instead of invoking its default; Enter now runs
-  the exact command/alias and Tab still completes. Palette handlers carry only catalogue
-  ids/labels used by argument choices; full metadata stays in render props. This avoids
-  traversing irrelevant schemas through an outside wrapper's handler tree.
-- The same source projection supplies origin/runtime before admission; these are discovery
-  facts, while a grant remains absent until admission. The tmux capture exposed the gap.
-- Surface-action fallbacks retain Markdown tables so chat keeps its existing table dialect;
-  print receives a plain-text table. The queued `/mcp` channel test caught a lossy fold.
+- The prototype's needed examples are illustrative; ADR-0057's store/surface rule stays
+  authoritative, so permission and filesystem plugins remain switchable.
+- `/plugins trust <name> <tier>` and approval tier arguments write through the user-layer
+  writer for every tier, which also narrows a broader grant.
+- Server rows keep typed transport for ACP forwarding; tools, runs and address derive from
+  status/transport; origins come from registrar sources; unknown latency stays absent.
+- Guides use the crate's registered Page (ADR-0054). Only typed `Pages` are catalogue facts;
+  other services still pin a mod to next start. Workspace edges only: 414 → 415 members.
+- Trust changes reread user grants and retire the module before reenabling; process/tool
+  grants apply at next start. Unreadable settings suspend admission. Handlers carry opening
+  identity only and reread catalogue facts when pressed.
+- External ownership stays with each source: a default-empty `PluginSource::contents`
+  projection names external commands and tools, and supplies origin/runtime before admission.
+- Enter runs an exactly typed command with optional arguments; Tab still completes. Palette
+  handlers carry ids/labels only. Fallback tables stay Markdown for chat, plain for print.
+
+### Review round (2026-10-15)
+
+- A repo server waiting for approval runs nothing on one key: `space`/`r` explain, the
+  first `⏎` reviews, the second approves. Rows nobody may dial carry the program only, so
+  the review names `/bin/sh` and not its arguments (deliberate: args may hold secrets).
+- Privileged panel lines (`/plugins approve|trust`, `/mcp approve`) run only when the kernel
+  vouches: `Drawings` records the compiled-in mod that drew the site; the ack carries
+  `drawnBy` only for its own answer to unrewritten args. A mod drawing over a built-in site
+  disables them (fail closed). Panel keys answer only the drawing pressed on, in this session.
+- An approval writes its trust only once it stands; a reenable that fails says
+  `/plugins enable <name>`; an unreadable trust file is named once. Bare-name trust keys
+  stay as ADR-0087 §5 left them: a residual risk.
+- Errors are cut inside the card, not wrapped; `runs`/`from` are cut in the middle at 38
+  columns. A failed server keeps its last stderr line (4 KiB tail, ANSI stripped, redacted,
+  240 chars). OAuth shows only when in play. The plain-drawing note derives from sites.
+- Lines a panel or key runs are `Effect::Run`: sent, never written to either history.
+  Lines composed in the palette are the person's own and stay in history.
+- A placement is said once, in its status. A switch asked mid-turn lands after it.
 
 ## Verified — 2026-10-15
 
-Verification used isolated HOME/data/config directories and fake/local fixtures; gates ran sequentially.
+First round: fmt, check, clippy, test (5,737), discipline, budget, deny, tui-smoke passed;
+schema/TypeScript regenerated, `node --test` 31 passed; tmux drive 13 captures PASS.
+
+Review round, with the four provider variables unset for every cargo run:
 
 ```text
-cargo fmt --all -- --check                                  exit 0
-cargo check --workspace --all-targets --locked               Finished dev profile; exit 0
+cargo fmt --all -- --check                                      exit 0
 cargo clippy --workspace --all-targets --locked -- -D warnings  exit 0
-cargo test --workspace --locked                             5,737 passed; 5 ignored; 173 suites (aggregate)
-bash scripts/check_discipline.sh                            discipline ok
-bash scripts/budget.sh                                      415/415 dependencies; 0 core recompiles; budget ok
-cargo deny check                                           advisories ok, bans ok, licenses ok, sources ok
-bash scripts/tui-smoke.sh                                   tui-smoke ok
-cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc
-  PASS: bingo-sdk, bingo-services, bingo-core, bingo-provider-acp, bingo-mod-plugins, bingo-mod-palette
-  DEFER: bingo-mcp, bingo-plugin-rpc, bingo-mods, bingo-surface-tui, bingo
-  all five: aws-lc-sys v0.44.0 custom build failed; Windows stdlib.h/windows.h unavailable
-node --test src/*.test.ts (sdk/typescript)                   31 passed; 0 failed
+RUST_TEST_THREADS=4 cargo test --workspace --locked             5,797 passed; 0 failed; 5 ignored
+  after the last fixes: bingo-surface-tui 1,185, bingo-core+tui 1,785, bingo-mod-plugins 25
+bash scripts/check_discipline.sh                                discipline ok
+bash scripts/budget.sh                                          415/415; budget ok
+cargo deny check                                                all four ok
+bash scripts/tui-smoke.sh                                       tui-smoke ok (three runs)
+cargo check --target x86_64-pc-windows-msvc
+  PASS: bingo-mod-plugins, bingo-sdk, bingo-services
+  DEFER: bingo-mcp (aws-lc-sys: stdlib.h unavailable)
 ```
-`BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked`: passed; then `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc -p bingo-surface-rpc -p bingo-mods -p bingo-store-jsonl --lib --locked`: passed; generated schema and TypeScript committed.
-`python3 /tmp/m173-tmux-drive.py`: PASS; 13 captures at 108×30/80×24 compared with the local prototype; approval/full confirmation, user-only trust, disable/enable/reconnect and table fallback checked. Own isolated tmux socket and local echo-server fixture only; temporary HOME/repo removed.
-Twelve TestBackend snapshots cover six scenes at both sizes; key tests cover live/next-start/needed switches, trust and MCP states. Both command fallbacks have integration coverage.
-No timing flake observed; the counter smoke passed on the first final run. Discipline advisories and the budget's 28 GB soft target warning remain; final `cargo clean` removes build artifacts.
+Own tmux (`-L m173fix`), temp HOME, fake provider, at 108×30 and 80×24: a project server
+whose command touches a marker file. Two `space`s, then one `⏎`: notice and review card,
+no marker. Second `⏎`: marker appears, the row connects, the command is cut beside its key.
