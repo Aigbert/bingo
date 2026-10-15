@@ -793,29 +793,64 @@ fn enter(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     submit(ui, tree, now, delivery)
 }
 
-/// What a line does. `/clear` starts a fresh session beside the root's, not
-/// beside whichever child is on screen.
-///
-/// `delivery` is the whole of the difference between the two keys that send:
-/// `⏎` steers a running turn at its next barrier, `tab` waits for it to end.
+/// A line a key or a panel runs for the person: it does what their typed
+/// line would, and their history and their draft stay as they were.
 pub(crate) fn command_line(ui: &mut Ui, tree: &Tree, now: Now, line: String) -> Vec<Effect> {
     if let Some(effects) = crate::palette::command(ui, &line, now) {
         return effects;
     }
-    let composer = std::mem::take(&mut ui.composer);
-    ui.composer.set(&line);
-    let effects = submit(ui, tree, now, Delivery::default());
-    ui.composer = composer;
-    effects
+    send(ui, tree, now, line, Effect::Run)
 }
 
+/// A line the person composed in the palette: theirs, so the history keeps
+/// it as if `⏎` had sent it from the box.
+pub(crate) fn typed_line(ui: &mut Ui, tree: &Tree, now: Now, line: String) -> Vec<Effect> {
+    if let Some(effects) = crate::palette::command(ui, &line, now) {
+        return effects;
+    }
+    ui.history.remember(&line);
+    send(ui, tree, now, line, |text| {
+        own_line(text, Delivery::default())
+    })
+}
+
+/// The person's own line: the one the history keeps.
+///
+/// `delivery` is the whole of the difference between the two keys that send:
+/// `⏎` steers a running turn at its next barrier, `tab` waits for it to end.
 fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect> {
     let text = ui.composer.take();
+    ui.history.remember(&text);
+    ui.edited();
+    send(ui, tree, now, text, |text| own_line(text, delivery))
+}
+
+/// The pictures — the tokens the line still names and the `@word`s in it —
+/// are files, read by the loop, which knows the directory and what is held
+/// (`run::submit`). The loop also writes the line to the history file.
+fn own_line(text: String, delivery: Delivery) -> Effect {
+    Effect::Submit(Input::Text {
+        images: Vec::new(),
+        text,
+        origin: Origin::surface(SURFACE_ID),
+        delivery,
+    })
+}
+
+/// What a line does, whoever wrote it; `line` is how it leaves when it is
+/// neither a palette command nor one this surface answers itself. `/clear`
+/// starts a fresh session beside the root's, not beside whichever child is
+/// on screen.
+fn send(
+    ui: &mut Ui,
+    tree: &Tree,
+    now: Now,
+    text: String,
+    line: impl FnOnce(String) -> Effect,
+) -> Vec<Effect> {
     // The gesture is answered on its own frame, whatever the line turns out
     // to be and whatever the kernel makes of it (§6).
     ui.sent = Some(now.instant);
-    ui.history.remember(&text);
-    ui.edited();
     ui.scroll.end();
     if let Some(effects) = crate::palette::command(ui, &text, now) {
         return effects;
@@ -828,15 +863,7 @@ fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect>
             },
         })],
         Some(Local::Exit) => vec![Effect::Exit],
-        // The pictures — the tokens the line still names and the `@word`s
-        // in it — are files, read by the loop, which knows the directory and
-        // what is held (`run::submit`).
-        None => vec![Effect::Submit(Input::Text {
-            images: Vec::new(),
-            text,
-            origin: Origin::surface(SURFACE_ID),
-            delivery,
-        })],
+        None => vec![line(text)],
     }
 }
 
@@ -1604,6 +1631,25 @@ mod tests {
         assert_eq!(ui.composer.text(), "second");
         press(&mut ui, &state(), key(KeyCode::Down), now);
         assert_eq!(ui.composer.text(), "", "and back to the draft");
+    }
+
+    /// A line a panel ran is not one the person wrote: `↑` never offers it
+    /// back, the loop writes it to no history file, and the draft stays.
+    #[test]
+    fn a_line_a_panel_runs_stays_out_of_the_history() {
+        let (mut ui, now) = scene();
+        line(&mut ui, &state(), "my own ask", now);
+        write(&mut ui, &state(), "a draft", now);
+        let effects = command_line(&mut ui, &solo(&state()), now, "/mcp approve db".into());
+        assert_eq!(effects, vec![Effect::Run("/mcp approve db".into())]);
+        assert_eq!(ui.composer.text(), "a draft");
+        ui.composer.set("");
+        press(&mut ui, &state(), key(KeyCode::Up), now);
+        assert_eq!(
+            ui.composer.text(),
+            "my own ask",
+            "the newest line is theirs"
+        );
     }
 
     #[test]

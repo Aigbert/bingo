@@ -283,7 +283,7 @@ fn help_resume_and_shift_tab_keep_their_own_routes() {
     });
     for (key, line) in [(typed('?'), "/help"), (ctrl('r'), "/resume")] {
         let effects = crate::input::on_key(&mut ui, &tree, key, now);
-        assert!(matches!(&effects[0],Effect::Submit(Input::Text{text,..}) if text==line));
+        assert_eq!(effects[0], Effect::Run(line.into()));
     }
     crate::input::on_key(
         &mut ui,
@@ -366,6 +366,12 @@ async fn tab_does_not_run_arguments_and_escape_leaves_free_text_at_once() {
         .press(&mut ui, &state, key(KeyCode::Enter), now)
         .await;
     assert!(matches!(&effects[0], Effect::Submit(Input::Text {text,..}) if text=="/think high"));
+    assert_eq!(
+        ui.history.older("").as_deref(),
+        Some("/think high"),
+        "a line typed into the palette is the person's own"
+    );
+    ui.history.reset();
     open(&mut ui, PaletteOpen::Commands, now);
     ui.composer.set("/rename several words");
     fixture.paint(&mut ui, &state, now, 80, 24).await;

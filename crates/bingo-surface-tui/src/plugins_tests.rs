@@ -147,7 +147,7 @@ fn client_actions_are_bound_to_the_opening_and_keep_the_panel_for_switches() {
     assert!(
         effects
             .iter()
-            .any(|e| matches!(e, crate::effect::Effect::Submit(_)))
+            .any(|e| matches!(e, crate::effect::Effect::Run(_)))
     );
     assert!(crate::plugins::active(&ui));
 }
@@ -219,7 +219,7 @@ fn a_trust_line_nobody_vouched_for_is_refused() {
     let submits = |effects: Vec<crate::effect::Effect>| {
         effects
             .iter()
-            .any(|e| matches!(e, crate::effect::Effect::Submit(_)))
+            .any(|e| matches!(e, crate::effect::Effect::Run(_)))
     };
     for line in [
         "/plugins trust demo full",

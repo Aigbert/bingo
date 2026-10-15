@@ -9,6 +9,10 @@ use crate::graphics::picture::Source;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Effect {
     Submit(Input),
+    /// A line a key, a panel or a palette row ran for the person. It goes as
+    /// their typed line would, but it is not a line of theirs, so no history
+    /// keeps it.
+    Run(String),
     SiteKey {
         action: bingo_sdk::Action,
         key: crossterm::event::KeyEvent,

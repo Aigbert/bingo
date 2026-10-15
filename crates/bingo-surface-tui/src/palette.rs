@@ -224,6 +224,16 @@ pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     fallback::key(ui, tree, key, now)
 }
 
+/// The palette is where the person composes a command, so the line it runs
+/// is theirs and the history keeps it, as it keeps one sent from the box.
+fn run(ui: &mut Ui, tree: &Tree, line: &str, vouched: bool, now: Now) -> Vec<Effect> {
+    close(ui, now);
+    if !vouched && crate::commands::privileged(line) {
+        return refuse(ui, line.into(), now);
+    }
+    crate::input::typed_line(ui, tree, now, line.into())
+}
+
 /// `vouched`: the kernel says the palette's own built-in drew the keys and
 /// gave this answer, so a line that grants trust may run from it.
 pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, vouched: bool, now: Now) -> Vec<Effect> {
@@ -249,11 +259,7 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, vouched: bool, now: Now
         close(ui, now);
     }
     if let Some(line) = value["run"].as_str() {
-        close(ui, now);
-        if !vouched && crate::commands::privileged(line) {
-            return refuse(ui, line.into(), now);
-        }
-        return crate::input::command_line(ui, tree, now, line.into());
+        return run(ui, tree, line, vouched, now);
     }
     if let Some(id) = value["view"].as_str() {
         close(ui, now);

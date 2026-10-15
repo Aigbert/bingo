@@ -16,7 +16,7 @@ use bingo_sdk::{Delivery, Image, Input, Level, Origin, SessionHandle};
 
 use super::{Reply, Run};
 use crate::pictures::Held;
-use crate::{complete, history};
+use crate::{SURFACE_ID, complete, history};
 
 /// A submitted line waiting on the pictures it named. It carries the mailbox
 /// it was typed at, so a person who switches session while a picture is in
@@ -163,9 +163,8 @@ impl Run {
     ) {
         history::append(&self.data_dir, &text);
         self.ui.pictures.clear();
-        let intent = self.mint(Some(text.clone()));
-        handle.submit(
-            intent,
+        self.send_line(
+            handle,
             Input::Text {
                 text,
                 images,
@@ -173,6 +172,25 @@ impl Run {
                 delivery,
             },
         );
+    }
+
+    /// A line run for the person ([`crate::effect::Effect::Run`]): it names no picture and
+    /// leaves nothing in the history.
+    pub(super) fn run_line(&mut self, text: String) {
+        let Some(handle) = self.session.writer() else {
+            return self.not_yet();
+        };
+        self.send_line(handle, Input::text(text, Origin::surface(SURFACE_ID)));
+    }
+
+    /// A refused line comes back named by its words.
+    fn send_line(&mut self, handle: SessionHandle, input: Input) {
+        let about = match &input {
+            Input::Text { text, .. } => Some(text.clone()),
+            Input::Action { .. } => None,
+        };
+        let intent = self.mint(about);
+        handle.submit(intent, input);
     }
 }
 

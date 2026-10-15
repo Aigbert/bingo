@@ -747,6 +747,7 @@ impl Run {
     fn effect(&mut self, effect: Effect) {
         match effect {
             Effect::Submit(input) => self.submit(input),
+            Effect::Run(line) => self.run_line(line),
             Effect::AwaitSiteKey(key) => site_keys::queue(self, key),
             Effect::SiteKey { action, key } => site_keys::send(self, action, key),
             Effect::Withdraw(intent) => withdraw::ask(self, intent),
@@ -2858,6 +2859,31 @@ mod tests {
             "and still nothing went out: {:?}",
             places(&recorder)
         );
+    }
+
+    /// A line run for the person goes like theirs would, but only their own
+    /// lines reach the history file a later bingo reads back.
+    #[test]
+    fn a_run_line_is_sent_and_never_written_to_the_history_file() {
+        let home = tempfile::tempdir().expect("a home");
+        let session = std::sync::Arc::new(TestSession::default());
+        let mut run = idle_in(state(), session.clone(), Instant::now());
+        run.data_dir = home.path().into();
+        run.effect(Effect::Run("/mcp approve db".into()));
+        run.effect(Effect::Submit(Input::text(
+            "my own ask",
+            bingo_sdk::Origin::surface(crate::SURFACE_ID),
+        )));
+        let sent: Vec<_> = session
+            .submissions()
+            .into_iter()
+            .filter_map(|(_, input)| match input {
+                Input::Text { text, .. } => Some(text),
+                Input::Action { .. } => None,
+            })
+            .collect();
+        assert_eq!(sent, ["/mcp approve db", "my own ask"]);
+        assert_eq!(crate::history::load(home.path()), ["my own ask"]);
     }
 }
 

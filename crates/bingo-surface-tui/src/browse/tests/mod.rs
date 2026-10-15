@@ -271,9 +271,7 @@ async fn walking_searching_and_each_sheet_mode_at_both_sizes() {
         let effects = fixture
             .press(&mut ui, &state, key(KeyCode::Enter), now)
             .await;
-        assert!(
-            matches!(&effects[0], Effect::Submit(Input::Text { text, .. }) if text == "/rewind t2 files")
-        );
+        assert!(matches!(&effects[0], Effect::Run(text) if text == "/rewind t2 files"));
         assert!(ui.folds.is_empty());
     }
 }
@@ -318,7 +316,7 @@ fn opener_uses_catalogue_and_disabled_falls_back_to_line_search() {
     let fixture = Fixture::new();
     let (mut state, mut ui, now) = setup(&fixture);
     let effects = crate::input::on_key(&mut ui, &solo(&state), ctrl('f'), now);
-    assert!(matches!(&effects[0], Effect::Submit(Input::Text { text, .. }) if text == "/browse"));
+    assert!(matches!(&effects[0], Effect::Run(text) if text == "/browse"));
     disable(&mut state);
     assert!(crate::input::on_key(&mut ui, &solo(&state), ctrl('f'), now).is_empty());
     assert!(ui.focus.search().is_some());
