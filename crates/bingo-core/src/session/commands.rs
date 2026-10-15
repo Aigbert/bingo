@@ -47,7 +47,7 @@ pub(super) const SURFACE: &str = "command";
 const BANG: &str = "!";
 
 /// Whether a name is the shell line's (ADR-0008 §5).
-pub(super) fn is_shell(name: &str) -> bool {
+pub(crate) fn is_shell(name: &str) -> bool {
     name == BANG
 }
 

@@ -34,6 +34,7 @@ use tokio_util::task::TaskTracker;
 
 use commands::Commands;
 pub use commands::Services;
+pub(crate) use commands::is_shell;
 pub use drawn::Drawings;
 pub(crate) use drawn::Drawn;
 pub(crate) use inputs::user_parts;

@@ -260,3 +260,71 @@ async fn a_link_cannot_widen_the_permission_mode_typed() {
     );
     host.shutdown().await;
 }
+
+/// A shell line that records the arguments it ran with instead of running
+/// them: the link under test, not a shell, is what this file is about.
+#[derive(Default)]
+struct Shell {
+    ran: Arc<std::sync::Mutex<Vec<String>>>,
+}
+impl Plugin for Shell {
+    fn manifest(&self) -> &'static PluginManifest {
+        static M: PluginManifest = PluginManifest {
+            id: "shell.probe",
+            version: "1",
+            uses: &[],
+            requires: &[],
+            provides: &[],
+            config: None,
+        };
+        &M
+    }
+    fn register(&self, r: &mut Registrar) -> Result<(), PluginError> {
+        r.add(Contribution::Command(Arc::new(Shell {
+            ran: self.ran.clone(),
+        })));
+        Ok(())
+    }
+}
+#[async_trait::async_trait]
+impl Command for Shell {
+    fn spec(&self) -> CommandSpec {
+        CommandSpec {
+            name: "!".into(),
+            instant: true,
+            ..bingo_tool_bash::ShellCommand.spec()
+        }
+    }
+    async fn run(&self, args: &str, _: &CommandContext) -> Result<CommandOutcome, KernelError> {
+        self.ran.lock().unwrap().push(args.into());
+        Ok(CommandOutcome::Applied { message: None })
+    }
+}
+
+/// The person typed `!ls`; a link trusted to rewrite tried to make it a
+/// different shell line. The line runs as typed.
+#[tokio::test]
+async fn a_link_cannot_rewrite_the_shell_line_typed() {
+    let home = tempfile::tempdir().unwrap();
+    let shell = Shell::default();
+    let ran = shell.ran.clone();
+    let host = bingo_core::Host::build(
+        vec![
+            Box::new(shell),
+            Box::new(Lift {
+                command: "!",
+                to: "rm -rf x",
+            }),
+        ],
+        bingo_core::HostConfig::new(Env::rooted(home.path())),
+    )
+    .await
+    .unwrap();
+    let outcome = typed(&host, home.path(), "!ls").await;
+    assert!(
+        matches!(outcome, IntentOutcome::Applied { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(*ran.lock().unwrap(), ["ls"]);
+    host.shutdown().await;
+}

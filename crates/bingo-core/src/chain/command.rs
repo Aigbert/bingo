@@ -55,9 +55,10 @@ pub(crate) async fn run(
 }
 
 /// A line only the person may run keeps its arguments through every link,
-/// as every line keeps its command.
+/// as every line keeps its command. A shell line runs only as the person
+/// typed it, so its arguments are never a link's to choose.
 fn point(spec: &CommandSpec, args: &str) -> catalogue::Entry {
-    if spec.person_only(args) {
+    if crate::session::is_shell(&spec.name) || spec.person_only(args) {
         catalogue::COMMAND_RUN.pinning(&["/command", "/args"])
     } else {
         catalogue::COMMAND_RUN.clone()
