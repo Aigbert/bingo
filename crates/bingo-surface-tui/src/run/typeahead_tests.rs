@@ -139,6 +139,8 @@ async fn keys_typed_behind_a_command_reach_the_site_it_opens() {
         family: "session".into(),
     });
     type_burst(&mut run, "/sessions\nabc");
+    run.terminal_event(Term::Paste("X".into()));
+    type_burst(&mut run, "de");
     play_palette(&mut run, &session, now);
     assert_eq!(
         texts(&session),
@@ -146,7 +148,11 @@ async fn keys_typed_behind_a_command_reach_the_site_it_opens() {
         "the line went to the kernel"
     );
     assert!(!crate::palette::active(&run.ui));
-    assert_eq!(run.typeahead.len(), 3, "abc waits for the command's answer");
+    assert_eq!(
+        run.typeahead.len(),
+        6,
+        "keys and paste wait for the command's answer"
+    );
     assert_eq!(run.ui.composer.text(), "");
     let (intent, _) = session.submissions().last().cloned().unwrap();
     let result = json!({"handled":true,"surface":{"name":"Sessions","args":{}}});
@@ -165,7 +171,10 @@ async fn keys_typed_behind_a_command_reach_the_site_it_opens() {
         let drawn = run.detection.now();
         pull(&mut run, Component::Sessions, drawn);
         let Some((intent, action)) = unanswered(&session, &answered) else {
-            break;
+            if run.typeahead.is_empty() {
+                break;
+            }
+            continue; // A paste edits the filter without a key acknowledgement.
         };
         assert_eq!(
             action.args["query"],
@@ -176,7 +185,11 @@ async fn keys_typed_behind_a_command_reach_the_site_it_opens() {
         let result = json!({"handled":false});
         run.ack(&intent, &IntentOutcome::Applied { result });
     }
-    assert_eq!(run.ui.composer.text(), "abc", "the filter holds every key");
+    assert_eq!(
+        run.ui.composer.text(),
+        "abcXde",
+        "the filter holds every input"
+    );
     assert!(run.typeahead.is_empty());
 }
 
@@ -260,6 +273,7 @@ fn interrupt_command_hold(chord: crossterm::event::KeyEvent) {
     assert!(run.typeahead.deadline().is_none());
     assert!(run.ui.composer.is_empty());
 }
+
 #[tokio::test]
 async fn deadline_release_owes_a_frame_showing_the_keys() {
     let now = still(scene().1);
@@ -276,6 +290,7 @@ async fn deadline_release_owes_a_frame_showing_the_keys() {
         .unwrap();
     assert!(screen.last().contains("zq"), "{}", screen.last());
 }
+
 #[tokio::test]
 async fn pastes_wait_between_the_keys_they_were_typed_between() {
     let now = still(scene().1);
@@ -329,5 +344,51 @@ async fn queued_pastes_are_kept_out_of_asks() {
             assert!(session.submitted().is_empty());
             assert_eq!(run.ui.notices[0].text, typeahead::kept_out_notice(1));
         }
+    }
+}
+
+#[tokio::test]
+async fn a_set_aside_ask_never_receives_keys_held_in_the_composer() {
+    let now = still(scene().1);
+    let (_home, mut run, session) = palette_run(now);
+    run.session
+        .tree
+        .fold
+        .apply(&frame(1, opened(permission(None, None))));
+    run.ui.dialog.aside = true;
+    typeahead::command_sent(&mut run, IntentId::from_raw("slow"));
+    type_burst(&mut run, "y");
+    run.ui.dialog.aside = false;
+    run.typeahead.expire();
+    typeahead::drain(&mut run);
+    assert!(session.answers().is_empty());
+    assert!(run.typeahead.is_empty());
+    assert_eq!(run.ui.notices[0].text, typeahead::kept_out_notice(1));
+}
+
+#[tokio::test]
+async fn an_unknown_command_never_answers_the_ask_it_set_aside() {
+    let now = still(scene().1);
+    for rendered in [false, true] {
+        let (_home, mut run, session) = palette_run(now);
+        if !rendered {
+            run.session = Attached::new(state(), SessionHandle(session.clone()));
+        }
+        run.session
+            .tree
+            .fold
+            .apply(&frame(1, opened(permission(None, None))));
+        type_burst(&mut run, "/");
+        assert!(run.ui.dialog.aside);
+        type_burst(&mut run, "nosuch\ny");
+        if rendered {
+            play_palette(&mut run, &session, now);
+        }
+        run.typeahead.expire();
+        typeahead::drain(&mut run);
+        assert!(session.answers().is_empty(), "y was typed outside the ask");
+        assert!(run.session.tree.open_interaction().is_some());
+        assert!(run.typeahead.is_empty());
+        assert_eq!(run.ui.notices[0].text, typeahead::kept_out_notice(1));
     }
 }

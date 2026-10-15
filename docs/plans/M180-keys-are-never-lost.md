@@ -47,7 +47,9 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
    inputs are dropped with "Kept N queued inputs out of this dialog" (singular:
    "input"). Count each key or paste once; do not expose content. This also covers
    an already open ask regaining focus and a paste queued at that ask. Record
-   actual keyboard ownership, never the identity of an ask set aside. Queued pastes
+   actual keyboard ownership, never the identity of an ask set aside. A command
+   hold also excludes asks: palette close may restore one before the command ack.
+   Queued pastes
    are always excluded from asks, including ones queued at that ask, to protect
    answers and secret fields. This covers every ask, not only the sealed ones
    (permission, sign-in): a `y` meant for a filter must never approve a tool, and a

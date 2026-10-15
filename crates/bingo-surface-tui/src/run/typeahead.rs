@@ -1,12 +1,12 @@
-//! Keys typed ahead of the place that will read them (M180).
+//! Input typed ahead of the place that will read it (M180).
 //!
 //! A key waits here while the site it was typed at is still being drawn or
 //! still judging the key before it, and while a command line that may open a
 //! site is on its way to the kernel. Waiting keys leave in the order they were
 //! typed. A key whose site has gone is addressed again to whatever owns the
 //! keyboard now, so a burst that closes one site and opens the next reaches
-//! the next — except a dialog: no key typed before a dialog opened is typed
-//! into it, and those keys are dropped with a notice that says how many.
+//! the next — except a dialog: input typed elsewhere never enters it. Queued
+//! pastes never enter a dialog. A notice counts the input events kept out.
 use super::*;
 use crossterm::event::KeyEvent;
 
@@ -27,7 +27,7 @@ pub(super) struct Typeahead {
     opening: Option<Opening>,
 }
 
-/// One key and the site it was typed at; `None` is the composer, or whatever
+/// One input event and the site it was typed at; `None` is the composer, or whatever
 /// owns the keyboard with no site open.
 struct Queued {
     site: Option<String>,
@@ -109,16 +109,16 @@ pub(super) fn settled(run: &mut Run, intent: &IntentId) {
 }
 
 fn focus(run: &Run) -> Option<String> {
-    // An unhandled printable key sets the ask aside; finish its already queued
-    // burst in the composer instead of dropping the remaining letters.
     site_keys::target(run)
-        .map(|(_, focus, _)| focus)
-        .or_else(|| {
-            run.session
-                .tree
-                .open_interaction()
-                .map(|(_, open)| open.id.to_string())
+        .filter(|(_, site, _)| {
+            // An open ask may be set aside or covered by another keyboard owner.
+            run.session.tree.open_interaction().is_none_or(|(_, open)| {
+                site != open.id.as_str()
+                    || crate::focus::owner(&run.ui, &run.session.tree)
+                        == crate::focus::Owner::Interaction
+            })
         })
+        .map(|(_, focus, _)| focus)
 }
 
 fn drawing(run: &Run) -> bool {
@@ -142,7 +142,11 @@ fn judging(run: &Run, site: &str) -> bool {
 }
 
 pub(super) fn queue(run: &mut Run, key: KeyEvent) {
-    let site = focus(run);
+    // A closing palette can restore an ask before the command is acknowledged.
+    // Keys still waiting for that command were not addressed to the ask.
+    let site = focus(run).filter(|site| {
+        !run.typeahead.opening(run.detection.now().instant) || !dialog(run, Some(site))
+    });
     run.typeahead.inputs.push_back(Queued {
         site,
         input: Held::Key(key),
