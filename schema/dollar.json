@@ -3420,7 +3420,7 @@
         "keys": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/KeyBinding"
           }
         },
         "hidden": {
@@ -3458,6 +3458,29 @@
         "args",
         "family"
       ]
+    },
+    "KeyBinding": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "chord": {
+              "type": "string"
+            },
+            "args": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "chord",
+            "args"
+          ]
+        }
+      ],
+      "description": "A chord a command declares for itself. A bare chord runs the command\nalone; one with `args` submits the command with them, so a shortcut for\n`/model next` is a binding on `model` and not a second catalogue entry."
     },
     "ArgSpec": {
       "oneOf": [

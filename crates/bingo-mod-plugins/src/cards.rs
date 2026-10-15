@@ -172,7 +172,7 @@ fn contributions(p: &CatalogEntry) -> Vec<Fact> {
         .collect::<Vec<_>>();
     let adds = commands
         .iter()
-        .flat_map(|s| std::iter::once(format!("/{}", s.name)).chain(s.keys.clone()))
+        .flat_map(|s| std::iter::once(format!("/{}", s.name)).chain(s.keys.iter().map(|key| key.chord().to_owned())))
         .collect::<Vec<_>>();
     if !adds.is_empty() {
         rows.push(fact("adds", adds.join(" · ")));

@@ -30,11 +30,12 @@ Keep an inherited `onKey` on the root when wrapping an interactive tree.
 `enabledPlugins: {"hello": false}` removes the fixture's command, default
 binding and link together; the surface still draws its own fallback.
 
-Commands may declare `keys: ["ctrl+x"]`. The `keys` setting maps a chord to a
-command line, including arguments: `{"alt+m": "/model next"}`. Each settings
-layer replaces this map as a whole. An accepted setting for `/hello` removes
-that command's default bindings; defaults otherwise fill unclaimed keys in
-catalogue order. Conflicts report both commands. Static surface keys are
+Commands may declare `keys: ["ctrl+x"]`; a binding that submits arguments
+names them, as `/model` does with `{"chord": "alt+m", "args": "next"}`. The
+`keys` setting maps a chord to a command line, including arguments:
+`{"alt+x": "/model next"}`. Each settings layer replaces this map as a whole.
+An accepted setting for a line removes the default binding of that same line;
+defaults otherwise fill unclaimed keys in catalogue order. Conflicts report both commands. Static surface keys are
 refused. The shortcut panel includes the resulting command bindings.
 
 Chords use lowercase names with `ctrl+`, `alt+`, then `shift+`, for example

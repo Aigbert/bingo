@@ -29,7 +29,7 @@ mod tests {
     fn command_is_visible_and_has_one_default_key() {
         let spec = Hello.spec();
         assert!(!spec.hidden);
-        assert_eq!(spec.keys, ["ctrl+x"]);
+        assert_eq!(spec.keys, [KeyBinding::from("ctrl+x")]);
         assert_eq!(spec.name, "hello");
     }
 }

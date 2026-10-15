@@ -30,14 +30,16 @@ impl Command for ModelCommand {
     }
 
     fn spec(&self) -> CommandSpec {
-        super::spec(
+        let mut spec = super::spec(
             "model",
             "choose the model for this session",
             super::keep_args(ArgSpec::Catalog {
                 source: "models".into(),
             }),
             true,
-        )
+        );
+        spec.keys = vec![super::next_key("alt+m")];
+        spec
     }
 
     async fn is_instant(&self, args: &str, state: &SessionState) -> bool {

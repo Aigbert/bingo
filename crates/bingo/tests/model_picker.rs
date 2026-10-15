@@ -251,6 +251,12 @@ apiKey = "dummy-local-only"
     assert_eq!(keys.commands["alt+m"], "/model next");
     assert_eq!(keys.commands["alt+t"], "/think next");
     assert!(!keys.commands.contains_key("ctrl+p"));
+    // The chords belong to `/model` and `/think`; the catalogue lists each once.
+    let names: Vec<_> = specs.iter().map(|spec| spec.name.as_str()).collect();
+    assert!(
+        !names.contains(&"model next") && !names.contains(&"think next"),
+        "{names:?}"
+    );
     for expected in ["gpt-5", "fake-1"] {
         let result = command(&mut session, "model", json!("next")).await;
         assert!(

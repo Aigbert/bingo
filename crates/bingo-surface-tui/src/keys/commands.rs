@@ -87,13 +87,14 @@ pub fn bindings(ui: &Ui, state: &SessionState) -> Bindings {
         .chain(
             settings
                 .keys()
+                .map(String::as_str)
                 .chain(
                     ui.catalogs
                         .commands
                         .iter()
-                        .flat_map(|command| &command.keys),
+                        .flat_map(|command| &command.keys)
+                        .map(bingo_sdk::KeyBinding::chord),
                 )
-                .map(String::as_str)
                 .filter(|key| editing(key)),
         )
         .collect();

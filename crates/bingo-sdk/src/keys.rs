@@ -1,4 +1,5 @@
 //! Command bindings in declaration order, with the person's settings first.
+//! A setting that binds a command line takes that line's default chord away.
 use crate::CommandSpec;
 use std::collections::BTreeMap;
 
@@ -19,12 +20,11 @@ pub fn bindings(
     }
     let rebound: Vec<_> = result.commands.values().cloned().collect();
     for command in commands.iter().filter(|command| !command.hidden) {
-        let line = format!("/{}", command.name);
-        if rebound.contains(&line) {
-            continue;
-        }
         for key in &command.keys {
-            claim(&mut result, key, &line, static_keys);
+            let line = key.line(&command.name);
+            if !rebound.contains(&line) {
+                claim(&mut result, key.chord(), &line, static_keys);
+            }
         }
     }
     result
@@ -90,5 +90,31 @@ mod tests {
         }
         let result = bindings(&commands, &BTreeMap::new(), &["esc"]);
         assert!(result.notices[1].contains("/hello") && result.notices[1].contains("/other"));
+    }
+    #[test]
+    fn a_binding_with_arguments_submits_them_until_a_setting_takes_the_line() {
+        let mut model = command("model", &["ctrl+o"]);
+        model.keys.push(crate::KeyBinding::WithArgs {
+            chord: "alt+m".into(),
+            args: "next".into(),
+        });
+        let commands = [model];
+        let result = bindings(&commands, &BTreeMap::new(), &[]);
+        assert_eq!(
+            result.commands,
+            BTreeMap::from([
+                ("alt+m".into(), "/model next".into()),
+                ("ctrl+o".into(), "/model".into()),
+            ])
+        );
+        let settings = BTreeMap::from([("alt+x".into(), "/model next".into())]);
+        let result = bindings(&commands, &settings, &[]);
+        assert_eq!(
+            result.commands,
+            BTreeMap::from([
+                ("alt+x".into(), "/model next".into()),
+                ("ctrl+o".into(), "/model".into()),
+            ])
+        );
     }
 }

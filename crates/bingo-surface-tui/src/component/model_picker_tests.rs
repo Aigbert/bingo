@@ -119,15 +119,18 @@ fn scene_ui() -> (crate::ui::Ui, crate::clock::Now) {
 }
 
 #[test]
-fn model_chords_submit_the_catalogued_lines_without_opening() {
+fn model_chords_submit_their_bound_lines_without_opening() {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     let (mut ui, now) = scene_ui();
     let state = state();
-    for (name, chord) in [("model next", "alt+m"), ("think next", "alt+t")] {
+    for (name, chord) in [("model", "alt+m"), ("think", "alt+t")] {
         let mut spec = CommandSpec::ui("fixture");
         spec.name = name.into();
         spec.hidden = false;
-        spec.keys = vec![chord.into()];
+        spec.keys = vec![bingo_sdk::KeyBinding::WithArgs {
+            chord: chord.into(),
+            args: "next".into(),
+        }];
         ui.catalogs.commands.push(spec);
     }
     for (letter, line) in [('m', "/model next"), ('t', "/think next")] {

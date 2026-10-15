@@ -11229,7 +11229,7 @@
           "keys": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/$defs/KeyBinding"
             }
           },
           "hidden": {
@@ -11268,6 +11268,29 @@
           "family"
         ],
         "$defs": {
+          "KeyBinding": {
+            "description": "A chord a command declares for itself. A bare chord runs the command\nalone; one with `args` submits the command with them, so a shortcut for\n`/model next` is a binding on `model` and not a second catalogue entry.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "chord": {
+                    "type": "string"
+                  },
+                  "args": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "chord",
+                  "args"
+                ]
+              }
+            ]
+          },
           "ArgSpec": {
             "oneOf": [
               {
@@ -11405,7 +11428,7 @@
               "keys": {
                 "type": "array",
                 "items": {
-                  "type": "string"
+                  "$ref": "#/$defs/KeyBinding"
                 }
               },
               "hidden": {
@@ -11442,6 +11465,29 @@
               "hint",
               "args",
               "family"
+            ]
+          },
+          "KeyBinding": {
+            "description": "A chord a command declares for itself. A bare chord runs the command\nalone; one with `args` submits the command with them, so a shortcut for\n`/model next` is a binding on `model` and not a second catalogue entry.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "chord": {
+                    "type": "string"
+                  },
+                  "args": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "chord",
+                  "args"
+                ]
+              }
             ]
           },
           "ArgSpec": {

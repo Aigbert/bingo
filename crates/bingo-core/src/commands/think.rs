@@ -21,7 +21,7 @@ impl Command for ThinkCommand {
     }
 
     fn spec(&self) -> CommandSpec {
-        super::spec(
+        let mut spec = super::spec(
             "think",
             "set the reasoning effort",
             super::keep_args(ArgSpec::Words {
@@ -31,7 +31,9 @@ impl Command for ThinkCommand {
                 then: None,
             }),
             true,
-        )
+        );
+        spec.keys = vec![super::next_key("alt+t")];
+        spec
     }
 
     async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {

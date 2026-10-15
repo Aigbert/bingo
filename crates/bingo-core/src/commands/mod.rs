@@ -24,14 +24,6 @@ use crate::host::Host;
 
 pub(crate) fn builtins(host: Weak<Host>) -> Vec<Arc<dyn Command>> {
     vec![
-        Arc::new(next::NextCommand {
-            host: host.clone(),
-            model: true,
-        }),
-        Arc::new(next::NextCommand {
-            host: host.clone(),
-            model: false,
-        }),
         Arc::new(model::ModelCommand { host: host.clone() }),
         Arc::new(models::ModelsCommand { host: host.clone() }),
         Arc::new(think::ThinkCommand { host: host.clone() }),
@@ -71,6 +63,14 @@ fn spec(name: &str, hint: &str, args: ArgSpec, instant: bool) -> CommandSpec {
         args,
         instant,
         family: "session".into(),
+    }
+}
+
+/// The chord that submits `/{name} next`.
+fn next_key(chord: &str) -> KeyBinding {
+    KeyBinding::WithArgs {
+        chord: chord.into(),
+        args: "next".into(),
     }
 }
 

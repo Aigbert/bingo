@@ -20,7 +20,7 @@ use crate::view::View;
 #[serde(rename_all = "camelCase")]
 pub struct CommandSpec {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub keys: Vec<String>,
+    pub keys: Vec<KeyBinding>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hidden: bool,
     pub name: String,
@@ -47,6 +47,38 @@ impl CommandSpec {
             hidden: true,
             family: "ui".into(),
         }
+    }
+}
+
+/// A chord a command declares for itself. A bare chord runs the command
+/// alone; one with `args` submits the command with them, so a shortcut for
+/// `/model next` is a binding on `model` and not a second catalogue entry.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum KeyBinding {
+    Chord(String),
+    WithArgs { chord: String, args: String },
+}
+
+impl KeyBinding {
+    pub fn chord(&self) -> &str {
+        match self {
+            Self::Chord(chord) | Self::WithArgs { chord, .. } => chord,
+        }
+    }
+
+    /// The command line this binding submits for the command called `name`.
+    pub fn line(&self, name: &str) -> String {
+        match self {
+            Self::Chord(_) => format!("/{name}"),
+            Self::WithArgs { args, .. } => format!("/{name} {args}"),
+        }
+    }
+}
+
+impl From<&str> for KeyBinding {
+    fn from(chord: &str) -> Self {
+        Self::Chord(chord.into())
     }
 }
 
@@ -313,8 +345,17 @@ mod key_contract {
         assert!(spec.keys.is_empty());
         assert!(serde_json::to_value(&spec).unwrap().get("keys").is_none());
         spec.keys.push("ctrl+x".into());
+        spec.keys.push(KeyBinding::WithArgs {
+            chord: "alt+n".into(),
+            args: "next".into(),
+        });
+        let written = serde_json::to_value(&spec).unwrap();
         assert_eq!(
-            serde_json::from_value::<CommandSpec>(serde_json::to_value(&spec).unwrap()).unwrap(),
+            written["keys"],
+            json!(["ctrl+x", {"chord":"alt+n","args":"next"}])
+        );
+        assert_eq!(
+            serde_json::from_value::<CommandSpec>(written).unwrap(),
             spec
         );
         let wire = json!({"kind":"handled","handled":false});
