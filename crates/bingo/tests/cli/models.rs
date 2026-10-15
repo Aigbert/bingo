@@ -380,3 +380,24 @@ fn model_and_thinking_are_session_only_unless_kept() {
     assert_eq!(saved["model"], "another");
     assert_eq!(saved["thinking"], "low");
 }
+
+/// `provider/` names no model: print refuses it on stderr instead of setting a
+/// model literally called `provider/`.
+#[test]
+fn a_provider_with_no_model_is_refused() {
+    let home = tempfile::tempdir().unwrap();
+    let script = script(r#"{"responses":[]}"#);
+    let out = run_within(
+        bingo()
+            .envs(home_env(home.path()))
+            .env("BINGO_FAKE_SCRIPT", script.path())
+            .args(["--print", "--cwd"])
+            .arg(home.path())
+            .arg("/model fake/"),
+        std::time::Duration::from_secs(20),
+    );
+    assert_eq!(out.status.code(), Some(1), "stdout: {}", stdout(&out));
+    assert_eq!(stdout(&out), "");
+    let err = stderr(&out);
+    assert!(err.contains("`fake/` names no model"), "{err}");
+}

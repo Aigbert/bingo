@@ -360,6 +360,7 @@ mod tests {
             label: "model".into(),
             meta: serde_json::json!({"name":"model","hint":"choose","family":"session","opens":true,"now":"work/large","args":{"kind":"catalog","source":"models"}}),
         }];
+        // `work/` names no model: run as typed, it opens the picker on that provider.
         let filter = arguments("/model work/", &commands, &catalogs).unwrap();
         assert_eq!(
             filter.rows[filter.selected].target,

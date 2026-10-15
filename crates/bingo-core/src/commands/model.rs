@@ -110,7 +110,7 @@ async fn target(
         wanted
     };
     let known = host.catalog(CatalogKind::Providers).await?.entries;
-    let (provider, model) = split(wanted, |id| known.iter().any(|p| p.id == id));
+    let (provider, model) = split(wanted, |id| known.iter().any(|p| p.id == id))?;
     model_switch::proposed_model(host, session, provider.map(str::to_owned), model.to_owned()).await
 }
 
@@ -201,19 +201,28 @@ fn said(choice: &ModelChoice) -> String {
 }
 
 /// `provider/model` when the first segment names a provider; else the whole
-/// text is the model and the provider stays.
-fn split(text: &str, is_provider: impl Fn(&str) -> bool) -> (Option<&str>, &str) {
-    match text.split_once('/') {
-        Some((provider, model)) if is_provider(provider) && !model.is_empty() => {
-            (Some(provider), model)
-        }
-        _ => (None, text),
+/// text is the model and the provider stays. A path with an empty segment
+/// names no model.
+fn split(
+    text: &str,
+    is_provider: impl Fn(&str) -> bool,
+) -> Result<(Option<&str>, &str), KernelError> {
+    if text.split('/').any(str::is_empty) {
+        return Err(KernelError::new(
+            ErrorCode::InvalidInput,
+            format!("`{text}` names no model; use /model <provider>/<model>"),
+        ));
     }
+    Ok(match text.split_once('/') {
+        Some((provider, model)) if is_provider(provider) => (Some(provider), model),
+        _ => (None, text),
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::{landscape, split};
+    use bingo_sdk::ErrorCode;
 
     #[test]
     fn the_report_names_pins_and_counts_the_rest() {
@@ -230,13 +239,19 @@ mod tests {
     #[test]
     fn a_leading_provider_is_taken_only_when_it_is_one() {
         let known = |id: &str| id == "openai";
-        assert_eq!(split("openai/gpt-5", known), (Some("openai"), "gpt-5"));
         assert_eq!(
-            split("meta/llama-3", known),
+            split("openai/gpt-5", known).unwrap(),
+            (Some("openai"), "gpt-5")
+        );
+        assert_eq!(
+            split("meta/llama-3", known).unwrap(),
             (None, "meta/llama-3"),
             "an unknown first segment is part of the model id"
         );
-        assert_eq!(split("gpt-5", known), (None, "gpt-5"));
-        assert_eq!(split("openai/", known), (None, "openai/"));
+        assert_eq!(split("gpt-5", known).unwrap(), (None, "gpt-5"));
+        for empty in ["openai/", "/gpt-5", "/", "", "a//b"] {
+            let error = split(empty, known).unwrap_err();
+            assert_eq!(error.code, ErrorCode::InvalidInput, "{empty}");
+        }
     }
 }
