@@ -126,9 +126,15 @@ impl InterceptorSource for RegisteredSource {
     }
 }
 
+/// Nothing that waits registers while the trust file cannot be read: no
+/// grant is guessed. The person is told which file, once per thing it says.
 pub(super) async fn register_pending(host: &Host) {
-    let Ok(trust) = host.current_trust() else {
-        return;
+    let trust = match host.current_trust() {
+        Ok(trust) => {
+            told(host, None);
+            trust
+        }
+        Err(error) => return tell_unread_trust(host, &error).await,
     };
     for source in &host.registry.sources.plugins {
         for registration in source.registrations(&trust).await {
@@ -143,6 +149,33 @@ pub(super) async fn register_pending(host: &Host) {
             source.registered(&name, result).await;
         }
     }
+}
+
+async fn tell_unread_trust(host: &Host, error: &crate::settings::SettingsError) {
+    let path = crate::settings::user_path(host.env());
+    let text = format!(
+        "plugins waiting for trust stay off: {} cannot be read ({error}); fix it and they register",
+        path.display()
+    );
+    if told(host, Some(&text)) {
+        return;
+    }
+    // Nobody open to hear it is no telling: the next pass says it again.
+    if host
+        .notice(Level::Warn, "PLUGIN_TRUST_UNREAD", &text)
+        .await
+        .is_err()
+    {
+        told(host, None);
+    }
+}
+
+/// Whether `said` was the last thing told; records it either way.
+fn told(host: &Host, said: Option<&str>) -> bool {
+    let mut last = host.trust_unread.lock().unwrap_or_else(|e| e.into_inner());
+    let same = last.as_deref() == said;
+    *last = said.map(str::to_string);
+    same
 }
 
 async fn registration_links(host: &Host) -> Vec<crate::chain::Link> {
