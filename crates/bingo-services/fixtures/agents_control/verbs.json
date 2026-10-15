@@ -1,0 +1,43 @@
+[
+  {
+    "method": "roster",
+    "params": {
+      "session": "ses_parent"
+    },
+    "answer": []
+  },
+  {
+    "method": "stop",
+    "params": {
+      "session": "ses_parent",
+      "name": "reviewer"
+    },
+    "answer": "stop accepted"
+  },
+  {
+    "method": "dismiss",
+    "params": {
+      "session": "ses_parent",
+      "name": "reviewer"
+    },
+    "answer": "dismiss accepted"
+  },
+  {
+    "method": "message",
+    "params": {
+      "session": "ses_parent",
+      "name": "reviewer",
+      "text": "Review the cut"
+    },
+    "answer": "message accepted"
+  },
+  {
+    "method": "reopen",
+    "params": {
+      "session": "ses_parent",
+      "name": "reviewer",
+      "text": "Continue"
+    },
+    "answer": "reopen accepted"
+  }
+]

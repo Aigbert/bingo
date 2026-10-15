@@ -1,4 +1,4 @@
-use crate::spent::{Price, spent};
+use bingo_sdk::spent::{Price, spent};
 use bingo_sdk::{CatalogEntry, component::StatusFacts};
 use bingo_services::mcp::{ServerRow, Status};
 

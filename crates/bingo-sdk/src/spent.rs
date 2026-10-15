@@ -1,4 +1,4 @@
-use bingo_sdk::Usage;
+use crate::Usage;
 use serde::Deserialize;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize)]

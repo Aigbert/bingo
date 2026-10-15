@@ -1,0 +1,44 @@
+[
+  {
+    "method": "rooms",
+    "params": {
+      "session": "ses_parent"
+    },
+    "answer": []
+  },
+  {
+    "method": "seat",
+    "params": {
+      "session": "ses_parent",
+      "name": "design",
+      "agent": "reviewer"
+    },
+    "answer": "seat accepted"
+  },
+  {
+    "method": "unseat",
+    "params": {
+      "session": "ses_parent",
+      "name": "design",
+      "agent": "reviewer"
+    },
+    "answer": "unseat accepted"
+  },
+  {
+    "method": "set_purpose",
+    "params": {
+      "session": "ses_parent",
+      "name": "design",
+      "text": "Review storage"
+    },
+    "answer": "set_purpose accepted"
+  },
+  {
+    "method": "close",
+    "params": {
+      "session": "ses_parent",
+      "name": "design"
+    },
+    "answer": "close accepted"
+  }
+]

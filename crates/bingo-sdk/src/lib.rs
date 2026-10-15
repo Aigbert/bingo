@@ -97,3 +97,5 @@ pub mod render;
 
 mod approval;
 pub use approval::{APPROVALS, Approval, ApprovalReader, Waiting};
+
+pub mod spent;

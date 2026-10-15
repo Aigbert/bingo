@@ -1,0 +1,36 @@
+[
+  {
+    "method": "board",
+    "params": {
+      "session": "ses_parent"
+    },
+    "answer": []
+  },
+  {
+    "method": "add",
+    "params": {
+      "session": "ses_parent",
+      "subject": "Review storage",
+      "owner": "reviewer"
+    },
+    "answer": "add accepted"
+  },
+  {
+    "method": "set_status",
+    "params": {
+      "session": "ses_parent",
+      "id": 1,
+      "status": "completed"
+    },
+    "answer": "set_status accepted"
+  },
+  {
+    "method": "reassign",
+    "params": {
+      "session": "ses_parent",
+      "id": 1,
+      "owner": "scout"
+    },
+    "answer": "reassign accepted"
+  }
+]

@@ -6,7 +6,6 @@ mod guide;
 mod keys;
 mod live;
 pub mod rows;
-pub mod spent;
 use bingo_sdk::*;
 use std::{
     collections::BTreeMap,
