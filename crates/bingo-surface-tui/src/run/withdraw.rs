@@ -36,6 +36,7 @@ pub(super) fn ask(run: &mut Run, intent: IntentId) {
 pub(super) fn took(run: &mut Run, intent: IntentId, taken: Result<Input, KernelError>) {
     if taken.is_ok() {
         run.mine.remove(&intent);
+        run.rewind_prompts.cancel(&intent);
     }
     match taken {
         Ok(Input::Text { text, images, .. }) => {

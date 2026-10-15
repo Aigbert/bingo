@@ -177,6 +177,7 @@ struct Run {
     /// meant for another client is not reported here and a refusal can name
     /// what was refused.
     mine: HashMap<IntentId, Option<String>>,
+    rewind_prompts: surface::Prompts,
     received_asks: HashMap<bingo_sdk::InteractionId, jiff::Timestamp>,
     site_keys: HashMap<IntentId, site_keys::Pending>,
     site_queue: std::collections::VecDeque<(String, crossterm::event::KeyEvent)>,
@@ -327,6 +328,7 @@ async fn attach(
         session: Attached::new(attachment.snapshot, attachment.handle),
         ui: Ui::new(history::load(&opts.env.data_dir), Instant::now()),
         mine: HashMap::new(),
+        rewind_prompts: Default::default(),
         received_asks: HashMap::new(),
         site_keys: HashMap::new(),
         site_queue: Default::default(),
@@ -605,14 +607,8 @@ impl Run {
         self.ui.actions.acknowledge(intent);
         self.release_actions();
         site_keys::drain(self);
-        if matches!(outcome, IntentOutcome::Queued { .. })
-            && self
-                .mine
-                .get(intent)
-                .and_then(Option::as_deref)
-                .is_some_and(surface::is_rewind)
-        {
-            return;
+        if matches!(outcome, IntentOutcome::Rejected { .. }) {
+            self.rewind_prompts.cancel(intent);
         }
         let Some(about) = self.mine.remove(intent) else {
             return;
@@ -839,6 +835,7 @@ impl Run {
     /// one — which is what a refusal of it says it was about.
     fn mint(&mut self, about: Option<String>) -> IntentId {
         let intent = IntentId::mint();
+        surface::capture(self, &intent, about.as_deref());
         self.mine.insert(intent.clone(), about);
         intent
     }
@@ -1712,6 +1709,7 @@ mod tests {
             session: Attached::new(state, SessionHandle(session)),
             ui: Ui::new(Vec::new(), at),
             mine: HashMap::new(),
+            rewind_prompts: Default::default(),
             received_asks: HashMap::new(),
             site_keys: HashMap::new(),
             site_queue: Default::default(),

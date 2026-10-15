@@ -6,12 +6,6 @@ use bingo_sdk::{ArgSpec, Catalog, CommandSpec};
 
 use crate::matching;
 
-/// The surface a command's own prompt carries (ADR-0008 §3): what re-enters
-/// the session when a `/name` answers with a prompt, rather than the surface
-/// the person typed at. Written down once, because two readers ask about it —
-/// the quiet set in [`crate::transcript`] and [`crate::skill`].
-pub const SURFACE: &str = "command";
-
 /// A command the surface owns. Nothing here reaches the kernel.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Local {

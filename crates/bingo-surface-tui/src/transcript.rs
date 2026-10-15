@@ -1324,12 +1324,16 @@ mod tests {
 
     #[test]
     fn internal_context_does_not_supply_a_session_brief_or_rewind_prompt() {
-        let state = stated(vec![delivered(
+        let mut context = delivered(
             "itm_context",
             "contributor:runtime",
             None,
             "Hidden runtime state",
-        )]);
+        );
+        if let ItemBody::User { origin, .. } = &mut context.body {
+            origin.voice = Some(bingo_sdk::Voice::Quiet);
+        }
+        let state = stated(vec![context]);
         assert_eq!(crate::tree::brief(&state), None);
         assert!(
             bingo_sdk::transcript::turns(&state.transcript)

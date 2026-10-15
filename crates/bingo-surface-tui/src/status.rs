@@ -293,7 +293,7 @@ fn notice(ui: &Ui, now: Now) -> Vec<Span<'static>> {
         return Vec::new();
     };
     let mut spans = vec![Span::styled(
-        notice.text.clone(),
+        notice.text.lines().collect::<Vec<_>>().join(" · "),
         theme::fading(notice.level, strength),
     )];
     // What the refusal was about is the person's own line: it is said after
@@ -754,6 +754,21 @@ mod tests {
 
     /// The whole of a notice's life: the frames it arrives in, its window,
     /// and the frames it leaves in.
+    #[test]
+    fn multiline_notices_separate_report_lines() {
+        let (mut ui, now) = scene();
+        ui.notify(
+            bingo_sdk::Level::Info,
+            "conversation was kept\nput back a.txt",
+            now.instant,
+        );
+        let text = super::notice(&ui, now)
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect::<String>();
+        assert_eq!(text, "conversation was kept · put back a.txt");
+    }
+
     fn notice_life() -> i64 {
         (crate::ui::NOTICE_FADE + crate::ui::NOTICE + crate::ui::NOTICE_FADE).as_millis() as i64
     }

@@ -12,9 +12,7 @@ pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
             if let Some(id) = action.args["item"].as_str() {
                 let id = bingo_sdk::ItemId::from_raw(id);
                 if run.session.tree.viewed().transcript.get(&id).is_some() {
-                    run.ui
-                        .focus
-                        .show(Open::Pager(crate::pager::Pager::open(id)), now.instant);
+                    crate::pager::show(&mut run.ui, id, now);
                 }
             }
         }
@@ -34,30 +32,46 @@ pub(super) fn restore_prompt(run: &mut Run, text: Option<String>) {
     }
 }
 
-pub(super) fn undone(run: &Run, frame: &bingo_sdk::Frame) -> Option<String> {
+#[derive(Default)]
+pub(super) struct Prompts(
+    std::collections::BTreeMap<(SessionId, bingo_sdk::TurnId), (IntentId, String)>,
+);
+impl Prompts {
+    pub fn cancel(&mut self, intent: &IntentId) {
+        self.0.retain(|_, (pending, _)| pending != intent);
+    }
+}
+pub(super) fn capture(run: &mut Run, intent: &IntentId, line: Option<&str>) {
+    let Some(("rewind", args)) = line.and_then(crate::commands::split) else {
+        return;
+    };
+    let mut words = args.split_whitespace();
+    let Some(target) = words.next() else {
+        return;
+    };
+    if words.next() == Some("files") {
+        return;
+    }
+    if let Some(turn) = bingo_sdk::transcript::turns(&run.session.tree.viewed().transcript)
+        .into_iter()
+        .find(|turn| turn.id.as_str() == target)
+        && let Some(text) = turn.asked
+    {
+        run.rewind_prompts.0.insert(
+            (run.session.tree.view().clone(), turn.id),
+            (intent.clone(), text),
+        );
+    }
+}
+pub(super) fn undone(run: &mut Run, frame: &bingo_sdk::Frame) -> Option<String> {
     let Event::Rewound { to_turn, .. } = &frame.event else {
         return None;
     };
-    if &frame.session != run.session.tree.view() {
-        return None;
-    }
-    let own = run.mine.values().flatten().any(|line| {
-        let Some((name, args)) = crate::commands::split(line) else {
-            return false;
-        };
-        name == "rewind" && args.split_whitespace().next() == Some(to_turn.as_str())
-    });
-    if !own {
-        return None;
-    }
-    bingo_sdk::transcript::turns(&run.session.tree.viewed().transcript)
-        .into_iter()
-        .find(|t| &t.id == to_turn)
-        .and_then(|t| t.asked)
-}
-
-pub(super) fn is_rewind(line: &str) -> bool {
-    crate::commands::split(line).is_some_and(|(name, _)| name == "rewind")
+    let (_, text) = run
+        .rewind_prompts
+        .0
+        .remove(&(frame.session.clone(), to_turn.clone()))?;
+    (&frame.session == run.session.tree.view()).then_some(text)
 }
 
 #[cfg(test)]
@@ -87,6 +101,12 @@ mod tests {
                 if queued {
                     run.ack(&intent, &IntentOutcome::Queued { position: 1 });
                 }
+                run.ack(
+                    &intent,
+                    &IntentOutcome::Applied {
+                        result: serde_json::json!({}),
+                    },
+                );
             }
             let event = frame(
                 1,
