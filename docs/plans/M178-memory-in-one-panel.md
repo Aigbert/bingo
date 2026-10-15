@@ -42,8 +42,8 @@ The sketch is the design, at 108×30 and 80×24; there is no prototype.
    Enter reads, d confirms, Escape cancels/closes; instruction deletion is refused.
 8. Pane listings load on open and after forget. Name columns align, estimates stay right,
    separators follow width, instruction titles shorten paths, forget toasts fit 80 columns.
-9. Text pagers fence frontmatter verbatim and render the body as Markdown; returning to a
-   removed pane closes normally. JS closeOnEscape=false remains respected.
+9. `bingo-mod-memory/src/fence.rs` fences frontmatter verbatim; the pager renders the text it
+   is given as Markdown. Returning to a removed pane closes; JS closeOnEscape=false holds.
 10. Per-crate guide.md pages are registered in guide.rs and remain under 200 lines.
 
 ## Files
@@ -68,8 +68,8 @@ The sketch is the design, at 108×30 and 80×24; there is no prototype.
 
 ## Decisions and amendments
 
-- The SDK estimator already exists; no M170 ContextPart is needed. M177 is absent, so the
-  existing item pager gained text support. Its action shape is unchanged in this fix round.
+- The SDK estimator already exists; no M170 ContextPart is needed. After the M177 rebase one
+  typed Pager action reads `{item}` or `{title, text}` plus `return_to`; Browse uses it too.
 - The original whole-body estimates overstated prompt use. Memory rows now measure their
   capped index lines, counting a multi-link line once. Experience uses the capped active index's render::line, also used by recall;
   retired/omitted/unreadable rows count zero. A cwd-only listing cannot infer extra recalled copies.
@@ -141,3 +141,5 @@ Low-finding round (5777 passed, 0 failed, 5 ignored; fmt/clippy/discipline/budge
 3. 858918d1: pager renders text as given; mod-memory fence.rs fences its reads; a_pager_renders_other_text_as_given_without_a_fence.
 4. 7dc08d2b: the fence closes directly after front matter, adding a newline only when it lacks one; expected string updated.
 5. b48d5757: names cut at 24 with …; unreadable experience rows show only their error; malformed goldens at 80×24/108×30.
+
+Rebased onto dev 5329973c (M175+M177): one typed `Pager` action (`{item}` or `{title,text}`, optional `return_to`) serves Browse and memory; fmt, clippy, 5864 tests, schema regen clean, node 32, discipline, budget, deny pass; tui-smoke 5 of 6 (one `/ledger` keystroke drop); 108x30 drive: memory panel ⏎ pager esc panel, browse ⏎ pager esc browse.
