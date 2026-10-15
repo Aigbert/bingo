@@ -207,7 +207,7 @@ struct Run {
 pub(crate) fn identity() -> ClientIdentity {
     ClientIdentity {
         name: SURFACE_ID.into(),
-        surface: "terminal".into(),
+        surface: SURFACE_ID.into(),
     }
 }
 

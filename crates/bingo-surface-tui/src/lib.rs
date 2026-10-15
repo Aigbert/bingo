@@ -416,6 +416,7 @@ mod caller_tests {
     #[test]
     fn a_terminal_origin_keeps_its_kind_when_its_id_changes() {
         let mut origin = super::origin();
+        assert_eq!(super::run::identity().surface, origin.surface);
         origin.surface = "renamed-surface-id".into();
         assert_eq!(
             origin.render_surface,
