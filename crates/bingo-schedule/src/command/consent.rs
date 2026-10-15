@@ -89,11 +89,30 @@ pub fn add(
     written(schedules, &entry, "scheduled")
 }
 
-/// `/schedule confirm <id>`: an entry the person has read, made theirs.
+/// `/schedule confirm <id> [digest]`: an entry the person has read, made theirs.
 pub fn confirm(schedules: &Schedules, args: &str) -> Result<CommandOutcome, KernelError> {
     persons_own(CONFIRM)?;
+    let mut words = args.split_whitespace();
+    let id = words
+        .next()
+        .ok_or_else(|| invalid("expected a schedule id".into()))?;
+    let digest = words.next();
+    if words.next().is_some() {
+        return Err(invalid("usage: /schedule confirm <id> [digest]".into()));
+    }
     let shelf = schedules.store().load();
-    let entry = crate::tools::find(&shelf, args.trim()).map_err(invalid)?;
+    let entry = crate::tools::find(&shelf, id).map_err(invalid)?;
+    if digest.is_some_and(|digest| {
+        digest
+            != bingo_services::schedule::confirmation_digest(
+                &entry.text,
+                entry.permission_mode.as_deref(),
+            )
+    }) {
+        return Err(invalid(
+            "schedule changed since it was shown; read it again before confirming".into(),
+        ));
+    }
     let confirmed = Entry {
         by: Provenance::Person,
         ..entry.clone()

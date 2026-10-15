@@ -133,7 +133,8 @@ fn ownership_confirmation_pins_the_mode_and_only_confirms_once() {
         let shown = cursor.confirming.clone().unwrap();
         assert_eq!(
             press(&mut cursor, rows, Some(&row), Some(&shown), "enter"),
-            json!({"run":"/schedule confirm abcd"})
+            json!({"run":format!("/schedule confirm abcd {}",
+                bingo_services::schedule::confirmation_digest(&row.text, row.mode.as_deref()))})
         );
         assert!(press(&mut cursor, rows, Some(&row), Some(&shown), "enter")["run"].is_null());
     }

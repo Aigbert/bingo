@@ -23,9 +23,44 @@ fn hidden(character: char) -> bool {
         || matches!(character, '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
 }
 
+/// Bind the exact text and optional mode, with length-delimited fields.
+pub fn confirmation_digest(text: &str, mode: Option<&str>) -> String {
+    let mut bytes = b"bingo.schedule.confirm.v1\0".to_vec();
+    bytes.extend_from_slice(&(text.len() as u64).to_be_bytes());
+    bytes.extend_from_slice(text.as_bytes());
+    bytes.push(u8::from(mode.is_some()));
+    if let Some(mode) = mode {
+        bytes.extend_from_slice(mode.as_bytes());
+    }
+    bingo_digest::hex(&bingo_digest::digest(&bytes))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn confirmation_digest_pins_exact_text_and_optional_mode() {
+        assert_eq!(
+            confirmation_digest("hello", None),
+            "c05e7dfa34c3ba8e3a9c414b933f4e4e55919a709ea8c2eb94ac5041dd55f8bc"
+        );
+        let cases = [
+            ("hello", None),
+            ("hello", Some("")),
+            ("hello", Some("plan")),
+            ("hello\n", None),
+            ("hell", Some("o")),
+        ];
+        for (index, (text, mode)) in cases.iter().enumerate() {
+            for (other_text, other_mode) in &cases[index + 1..] {
+                assert_ne!(
+                    confirmation_digest(text, *mode),
+                    confirmation_digest(other_text, *other_mode)
+                );
+            }
+        }
+    }
 
     #[test]
     fn controls_and_direction_marks_are_visible_but_lines_and_tabs_stay() {

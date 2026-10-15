@@ -40,12 +40,24 @@ fn press(
             let Some(confirmation) = cursor.confirming.take() else {
                 return json!({});
             };
-            return run(confirmation.verb(), &row.id);
+            return confirmed(&confirmation);
         }
         return json!({});
     }
     operation(cursor, row, key)
 }
+fn confirmed(confirmation: &Confirmation) -> Value {
+    let row = confirmation.row();
+    let mut operation = run(confirmation.verb(), &row.id);
+    if matches!(confirmation, Confirmation::Confirm(_))
+        && let Some(line) = operation["run"].as_str()
+    {
+        let digest = bingo_services::schedule::confirmation_digest(&row.text, row.mode.as_deref());
+        operation["run"] = json!(format!("{line} {digest}"));
+    }
+    operation
+}
+
 fn operation(cursor: &mut Cursor, row: &Row, key: &str) -> Value {
     match key {
         "space" | " " => run(if row.enabled { "pause" } else { "resume" }, &row.id),

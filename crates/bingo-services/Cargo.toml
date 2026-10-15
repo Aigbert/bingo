@@ -15,6 +15,8 @@ tier = "library"
 workspace = true
 
 [dependencies]
+# M179: bind the text and mode shown by the panel at the command boundary.
+bingo-digest.workspace = true
 # M136: derive the wire faces from their existing Rust payloads.
 schemars.workspace = true
 bingo-sdk.workspace = true

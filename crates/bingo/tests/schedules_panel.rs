@@ -302,6 +302,7 @@ async fn confirm_model_entry(host: &impl HostApi, a: &mut Attachment, home: &std
     let confirm = press(host, a, "enter").await;
     let line = confirm["run"].as_str().unwrap();
     assert!(line.starts_with("/schedule confirm "));
+    reject_changed_confirmation(a, line, &path, &mut entry).await;
     command(a, line).await;
     assert!(
         host.render(&a.session, request())
@@ -312,4 +313,26 @@ async fn confirm_model_entry(host: &impl HostApi, a: &mut Attachment, home: &std
     );
     let entry: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     assert_eq!(entry["by"], "person");
+}
+
+async fn reject_changed_confirmation(
+    a: &mut Attachment,
+    line: &str,
+    path: &std::path::Path,
+    entry: &mut Value,
+) {
+    let original = entry["text"].clone();
+    entry["text"] = json!("changed after Enter");
+    std::fs::write(path, serde_json::to_vec(entry).unwrap()).unwrap();
+    let intent = IntentId::mint();
+    a.handle
+        .submit(intent.clone(), Input::text(line, Origin::surface("tui")));
+    let IntentOutcome::Rejected { error } = ack_for(a, &intent).await else {
+        panic!("a stale confirmation must be refused");
+    };
+    assert!(error.message.contains("changed since it was shown"));
+    let saved: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    assert_eq!(saved["by"], "tool");
+    entry["text"] = original;
+    std::fs::write(path, serde_json::to_vec(entry).unwrap()).unwrap();
 }

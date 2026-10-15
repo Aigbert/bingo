@@ -1,6 +1,6 @@
 //! The owner's schedule listing and session-local pending wake.
 mod text;
-pub use text::visible;
+pub use text::{confirmation_digest, visible};
 
 use async_trait::async_trait;
 use bingo_sdk::{HostHandle, KernelError, ServiceError, ServiceKey, SessionId, WireService};

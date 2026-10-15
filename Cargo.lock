@@ -1060,6 +1060,7 @@ name = "bingo-services"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-digest",
  "bingo-sdk",
  "schemars 1.2.2",
  "serde",

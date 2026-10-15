@@ -55,6 +55,13 @@ same way. The ratchet question does not arise.
 
 ## Consequences
 
+- Panel confirmation carries a SHA-256 digest of the exact text and optional
+  mode. `/schedule confirm <id> [digest]` checks the disk entry before writing
+  consent; a mismatch refuses it. The typed verb accepts the same optional
+  digest, while a bare id explicitly confirms the current disk text/mode.
+  The listing exposes the digest for a typed confirmation. This is a content
+  check, not a lock against another process writing the hand-editable store.
+
 - A person's existing `/command` schedules keep running as commands once
   they are confirmed. Until then the listing and a notice say why not.
 - Provenance is only as trustworthy as the store file. A process that can

@@ -41,6 +41,24 @@ pub fn view(shelf: &Shelf, holder: &str, trouble: Option<&str>, tz: &TimeZone) -
     }));
     parts.extend(unreadable(shelf));
     parts.extend(shelf.entries.iter().filter_map(in_full));
+    parts.extend(
+        shelf
+            .entries
+            .iter()
+            .filter(|entry| !entry.asked())
+            .map(|entry| {
+                let digest = bingo_services::schedule::confirmation_digest(
+                    &entry.text,
+                    entry.permission_mode.as_deref(),
+                );
+                View::text(format!(
+                    "confirm {} (mode {}): /schedule confirm {} {digest}",
+                    entry.id,
+                    visible(entry.permission_mode.as_deref().unwrap_or("the session's")),
+                    entry.id
+                ))
+            }),
+    );
     View::column(parts)
 }
 
@@ -255,7 +273,7 @@ mod tests {
             None,
             &TimeZone::UTC,
         ));
-        assert_eq!(shown.len(), 3, "the short entry needs no second look");
+        assert_eq!(shown.len(), 5, "both entries offer a bound confirmation");
         assert_eq!(
             shown[2],
             View::text("long0001 in full:\n/guard\nrm -rf target")

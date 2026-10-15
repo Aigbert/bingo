@@ -56,8 +56,11 @@ may do:
 `/schedule add <spec> [as <mode>] -- <text>` writes an entry as the
 person's, working in this session's directory: `/schedule add every 30m --
 /wake`, `/schedule add daily at 09:00 as acceptEdits -- tidy the docs`.
-`/schedule confirm <id>` makes an entry the person has read theirs, text
-and mode exactly as listed. Both require the person's asked line. The built-in panel can ask the client
+`/schedule confirm <id> [digest]` makes an entry the person has read theirs.
+The table offers a digest that binds its exact text and mode; a changed entry
+is refused. The panel supplies it automatically. Without it, the typed verb
+confirms the current file. Control and bidi characters are shown as escapes;
+the panel requires typed confirmation for such text. Both verbs require the person's asked line. The built-in panel can ask the client
 to submit a line after the person confirms; a model, a mod acting alone,
 an arbitrary button or a chat correspondent cannot authorize it.
 
