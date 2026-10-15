@@ -63,7 +63,10 @@ impl Command for Handler {
         let props: SessionsProps =
             serde_json::from_value(args["props"].clone()).map_err(crate::error)?;
         let operation = self.press(request, key, &props)?;
-        let outcome = self.act(operation, request, &props, cx).await;
+        let outcome = match self.act(operation, request, &props, cx).await {
+            Err(error) => self.refuse(request, &props, error),
+            outcome => outcome,
+        };
         cx.host
             .invalidate(&cx.session, vec![request.into()])
             .await?;
@@ -118,6 +121,7 @@ impl Handler {
             .entry((props.session.clone(), request.into()))
             .or_default();
         cursor.sync(&props.query);
+        cursor.refusal = None;
         let rows = crate::rows::listed(props, cursor);
         let target = cursor
             .selected
@@ -145,6 +149,23 @@ impl Handler {
                 .remove(&(props.session.clone(), request.into()));
         }
         Ok(operation)
+    }
+    /// A refused verb closes whatever sheet asked for it and says why.
+    fn refuse(
+        &self,
+        request: &str,
+        props: &SessionsProps,
+        error: KernelError,
+    ) -> Result<CommandOutcome, KernelError> {
+        let mut state = self.0.lock().map_err(crate::error)?;
+        if let Some(cursor) = state
+            .cursors
+            .get_mut(&(props.session.clone(), request.into()))
+        {
+            cursor.sheet = Sheet::None;
+            cursor.refusal = Some(error.message);
+        }
+        Ok(CommandOutcome::Handled { handled: true })
     }
     async fn act(
         &self,
@@ -221,7 +242,7 @@ fn operation(
         return escape(cursor, props);
     }
     if let Sheet::Delete(doomed) = &cursor.sheet {
-        return if key == "enter" {
+        return if key == "enter" && crate::verbs::blocked(doomed) == 0 {
             let doomed = doomed.clone();
             cursor.sheet = Sheet::None;
             Operation::Confirm(doomed)

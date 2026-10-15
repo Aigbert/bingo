@@ -1,0 +1,28 @@
+---
+source: crates/bingo-surface-tui/src/sessions/tests.rs
+expression: screen
+---
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+" sessions · here (tab: all) ·                                             3 of 4"
+"❯ fix the stale-edit race                             1h ago   38 msg   ● asking"
+"    └ review: action FIFO                                        1h ago   12 msg"
+"  fixture for checkpoint v2                                      1h ago   38 msg"
+"     "can you add a fixture for checkpoint v2?"                                 "
+"  schedule (1)                                                                 ▸"
+"────────────────────────────────────────────────────────────────────────────────"
+" session is open elsewhere; close it before renaming                            "
+"╭──────────────────────────────────────────────────────────────────────────────╮"
+"│ > ask anything · / for commands · ! for shell                                │"
+"╰──────────────────────────────────────────────────────────────────────────────╯"
+"? for shortcuts                                                      fake/fake-1"

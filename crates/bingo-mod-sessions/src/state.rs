@@ -11,6 +11,8 @@ pub(crate) struct Cursor {
     pub expanded: BTreeSet<String>,
     pub searching: bool,
     pub sheet: Sheet,
+    /// Why the last verb was refused, until the next key.
+    pub refusal: Option<String>,
 }
 #[derive(Default)]
 pub(crate) enum Sheet {

@@ -66,6 +66,10 @@ fn postorder(
         blocked: None,
     });
 }
+/// How many of the doomed sessions cannot go right now.
+pub(crate) fn blocked(doomed: &[Deletion]) -> usize {
+    doomed.iter().filter(|row| row.blocked.is_some()).count()
+}
 pub(crate) async fn delete(host: &HostHandle, doomed: &[Deletion]) -> Result<(), KernelError> {
     if let Some(reason) = doomed.iter().find_map(|row| row.blocked.as_ref()) {
         return Err(KernelError::new(ErrorCode::NotReady, reason.clone()));

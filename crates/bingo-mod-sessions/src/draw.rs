@@ -90,7 +90,10 @@ pub(crate) fn tree(
     };
     children.extend(lines);
     children.push(dim("─".repeat(usize::from(width))));
-    children.push(dim(hint(cursor)));
+    children.push(match &cursor.refusal {
+        Some(refusal) => View::text(format!(" {refusal}")),
+        None => dim(hint(cursor)),
+    });
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
@@ -103,11 +106,12 @@ pub(crate) fn tree(
     }
 }
 fn hint(cursor: &Cursor) -> &'static str {
-    match cursor.sheet {
+    match &cursor.sheet {
         Sheet::None if cursor.searching => {
             " type to filter · esc leave search · ↑↓ choose · ⏎ resume"
         }
         Sheet::None => " ⏎ resume  → preview  r rename  d delete  f fork  tab here/all  esc",
+        Sheet::Delete(doomed) if crate::verbs::blocked(doomed) > 0 => " esc back",
         Sheet::Delete(_) => " ⏎ delete permanently · esc cancel",
         Sheet::Rename { .. } => " ⏎ save title · esc cancel",
         _ => " esc back · ↑↓ choose",
@@ -164,10 +168,15 @@ fn directory(
     lines.into_iter().skip(start).take(room).collect()
 }
 fn confirmation(doomed: &[crate::verbs::Deletion], room: usize) -> Vec<View> {
-    let mut lines = vec![View::text(format!(
-        " Delete {} session(s), children first?",
-        doomed.len()
-    ))];
+    let blocked = crate::verbs::blocked(doomed);
+    let mut lines = vec![View::text(if blocked == 0 {
+        format!(" Delete {} session(s), children first?", doomed.len())
+    } else {
+        format!(
+            " Cannot delete: {blocked} of {} session(s) blocked, reasons below.",
+            doomed.len()
+        )
+    })];
     lines.extend(doomed.iter().take(room.saturating_sub(2)).map(|row| {
         dim(format!(
             "   {}{}",

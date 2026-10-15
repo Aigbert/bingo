@@ -232,6 +232,66 @@ async fn delete_names_children_then_removes_them_first() {
 }
 
 #[tokio::test]
+async fn a_refused_rename_closes_the_editor_and_says_why() {
+    let fixture = Fixture::new(rows());
+    fixture.host.on_reconfigure(|_, _| async {
+        Err(KernelError::new(
+            ErrorCode::SessionLocked,
+            "session is open elsewhere; close it before renaming",
+        ))
+    });
+    for (width, height) in [(108, 30), (80, 24)] {
+        let (mut ui, tree, now) = setup();
+        fixture.paint(&mut ui, &tree, now, width, height).await;
+        fixture.press(&mut ui, &tree, "r", now).await;
+        fixture.paint(&mut ui, &tree, now, width, height).await;
+        assert!(fixture.press(&mut ui, &tree, "enter", now).await.is_empty());
+        let screen = fixture.paint(&mut ui, &tree, now, width, height).await;
+        insta::assert_snapshot!(format!("refused_rename_{width}x{height}"), screen);
+        assert!(!screen.contains("❯ title"), "the editor closed");
+        assert!(screen.contains("open elsewhere; close it before renaming"));
+        fixture.press(&mut ui, &tree, "down", now).await;
+        let screen = fixture.paint(&mut ui, &tree, now, width, height).await;
+        assert!(
+            !screen.contains("close it before renaming"),
+            "one key later"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_blocked_delete_says_why_and_enter_deletes_nothing() {
+    let fixture = Fixture::new(rows());
+    fixture.host.on_check_delete(|id| async move {
+        if id.as_str() == "child" {
+            Err(KernelError::new(ErrorCode::SessionLocked, "open elsewhere"))
+        } else {
+            Ok(())
+        }
+    });
+    for (width, height) in [(108, 30), (80, 24)] {
+        let (mut ui, tree, now) = setup();
+        fixture.paint(&mut ui, &tree, now, width, height).await;
+        fixture.press(&mut ui, &tree, "d", now).await;
+        let screen = fixture.paint(&mut ui, &tree, now, width, height).await;
+        insta::assert_snapshot!(format!("blocked_delete_{width}x{height}"), screen);
+        assert!(screen.contains("Cannot delete: 1 of 2 session(s)"));
+        assert!(screen.contains("review: action FIFO · open elsewhere"));
+        assert!(!screen.contains("delete permanently"));
+        assert!(fixture.press(&mut ui, &tree, "enter", now).await.is_empty());
+        let again = fixture.paint(&mut ui, &tree, now, width, height).await;
+        assert!(again.contains("Cannot delete"), "enter leaves the sheet up");
+    }
+    assert!(
+        !fixture
+            .host
+            .calls()
+            .iter()
+            .any(|call| matches!(call, testing::HostCall::Delete { .. }))
+    );
+}
+
+#[tokio::test]
 async fn more_filter_and_group_expansion_stay_in_the_directory() {
     let fixture = Fixture::new(rows());
     let (mut ui, tree, now) = setup();
