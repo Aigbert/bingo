@@ -50,7 +50,10 @@ impl Checkpoints {
                     .unwrap_or_default();
             return hashes
                 .get(path.to_string_lossy().as_ref())
-                .is_none_or(|kept| kept != &fingerprint(path));
+                .is_none_or(|kept| {
+                    matches!(kept.as_str(), "unreadable" | "untracked")
+                        || kept != &fingerprint(path)
+                });
         }
         false
     }
@@ -77,5 +80,20 @@ mod tests {
         std::fs::write(&path, "my manual edit").unwrap();
         let reopened = Checkpoints::new(dir.path());
         assert!(reopened.changed(&session, &[turn], &path));
+    }
+    #[test]
+    fn an_unhashed_post_turn_file_always_warns() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Checkpoints::new(dir.path());
+        let path = dir.path().join("grown");
+        let session = SessionId::from_raw("s");
+        let turn = TurnId::from_raw("t");
+        store.snapshot(&session, &turn, &path).unwrap();
+        std::fs::File::create(&path)
+            .unwrap()
+            .set_len(MOST + 1)
+            .unwrap();
+        store.record_after(&session, &turn).unwrap();
+        assert!(store.changed(&session, &[turn], &path));
     }
 }

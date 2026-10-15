@@ -101,10 +101,10 @@ impl Hook for SnapshotHook {
         _: &[bingo_sdk::Item],
         cx: &HookContext,
     ) {
-        if phase == bingo_sdk::Phase::End {
-            if let Err(error) = self.store.record_after(&cx.session, turn) {
-                tracing::warn!(%error, "could not record the post-turn files");
-            }
+        if phase == bingo_sdk::Phase::End
+            && let Err(error) = self.store.record_after(&cx.session, turn)
+        {
+            tracing::warn!(%error, "could not record the post-turn files");
         }
     }
 }
