@@ -26,7 +26,7 @@ feature is the built-in mod `bingo-mod-browse`; with it off, `ctrl+f` is the ter
 
 ## Bricks
 
-1. **One turn walk.** `crates/bingo-sdk/src/transcript/turns.rs:: turns(&Transcript) -> Vec<Turn { id, asked, first, last }>` on
+1. **One turn walk.** `crates/bingo-sdk/src/transcript/turns.rs:: turns(&Transcript) -> Vec<Turn { id, headline, first, last }>` on
    `bingo_sdk::asked` (M175). `crates/bingo-checkpoints/src/turns.rs` and `crates/bingo-surface-tui/src/rewind.rs::turns` are deleted and call
    it; their tests move with it (ADR-0045's recorded debt paid).
 2. **Find in items, pure.** `crates/bingo-sdk/src/transcript/find.rs:: find(&Transcript, query) -> Vec<Match { item, turn, line }>` over each
@@ -48,7 +48,7 @@ feature is the built-in mod `bingo-mod-browse`; with it off, `ctrl+f` is the ter
    `touched`, open the sheet; in the sheet `←→` mode, `⏎` submits `/rewind <turn> <mode>`, `esc` back. Table test (state, key) → outcome.
 8. **The card asks too.** `crates/bingo-surface-tui/src/input.rs:464-488`: the `esc esc` card's `⏎` opens the same sheet when the mod is on
    (`Browse` placed); with it off the card submits as today.
-9. **The prompt comes back.** After `Rewound` for this session's own `/rewind`, the surface puts the undone turn's `asked` into the composer
+9. **The prompt comes back.** After `Rewound` for this session's own `/rewind`, the surface puts the undone turn's `asked` (read from the transcript) into the composer
    through the `Composer` action (M170), unless a draft is there (toast).
 10. **Opener.** `/browse` in the mod, `keys: ["ctrl+f"]`; it appears in `?` from the binding table. With the mod off `input.rs::layered` keeps
     `ctrl+f` → `Search::open()`.
@@ -85,21 +85,23 @@ feature is the built-in mod `bingo-mod-browse`; with it off, `ctrl+f` is the ter
 
 ## Decisions (amended after independent review)
 
-- `asked(&Item) -> Option<&str>` borrows the first Text part when the shared effective voice is Said; explicit voice wins over the legacy table.
-  Core titles, TUI voice and turn labels share the SDK bricks. Core stamps generated context Quiet; the full CLI test exposed its unstamped
-  origin becoming a title after removing the duplicate context heuristic. Explicit producer intent replaces special cases.
+- `asked(&Item) -> Option<&str>` borrows the first Text part when the effective voice is Said: an explicit voice wins; unstamped is Said only
+  from `PERSON_SURFACES` (tui, print, rpc, acp, channels) and Quiet from anything else, so an unknown producer fails closed (no legacy table).
+  Core titles, TUI voice and turn labels share the SDK bricks. Core stamps what it adds Quiet (context, length recovery, Stop-hook reasons).
 - M170 is not merged: the TUI carries the generic Composer action; no status/model/plugins-panel crate is edited.
-- Props carry one current hit and count, never all matches. Turns/search cache by session, transcript length and generation, plus query for find.
+- Props carry one current hit and count, never all matches, and each turn's headline (first line, ≤200 chars), never the whole prompt.
+  Turns/search cache by session, length, history generation and the transcript's revision (any folded change, an in-place edit included).
   Accepted props deserialize once per drawing version. Find stops at 1000 and shows `1000+`; Write input preserves logical lines.
 - Enter commits a query and starts at its first hit; empty-query `n` types. Escape clears query/editing first, then closes.
 - A preview pins its turn and transcript length. New items force re-preview; busy sessions refuse. Confirmation is one-shot once the sheet exists.
-  Draw never previews or reads files. Run/close/pager do not invalidate; missing turns produce no sheet, avoiding post-rewind render notices.
+  Draw never previews or reads files; a frame never says busy, only `r`/`⏎` do, once. Run/close/pager do not invalidate; `touched` answers a
+  missing turn with a typed `None` (no sheet), an error stays an error. Rewinding the last turn clears the fold's `last_turn` (its Worked line).
 - `restore::paths` reads metadata only. Post-turn hashes use the existing `bingo-digest` workspace library edge (no external dependency);
   preview marks later edits, missing/unreadable/over-limit hashes warn conservatively, and confirmation still applies. Hash reads retain the
   8 MiB snapshot bound because the existing digest takes a complete byte slice; unknown hashes never count as equal.
 - The checkpoint wire exposes only safe `touched`; no writing service method exists to mark unsafe. `apply` is rejected by a fixture test;
   ADR-0091 requires `unsafe_call: true` for any future wire write. Actual writes remain `/rewind` commands.
-- Mode rows say files kept / no turns undone truthfully. Reports return lines; the TUI status joins them with ` · `.
+- Mode rows say files kept / no turns undone truthfully; the summary row is the drawer's alone. Reports return lines; the TUI status joins them with ` · `.
 - Prompt text is captured at submit, keyed by session/target turn, independently of Applied acknowledgement; rejection/withdrawal retires it.
   This replaces keeping queued intents alive solely for refill. Existing drafts remain intact.
 - Pager `return_to` preserves Browse query/position; one opener handles both entry points. Only Browse uses `whole`; copy uses readable rendering.
@@ -122,29 +124,23 @@ Rewinding a child agent or a room; exporting a transcript; tracking what a shell
 
 ## Verified — 2026-10-15
 
-Final command output summaries (gates run individually; no live tests):
+First round (gates run individually; provider env cleared): fmt/check/clippy exit 0; workspace tests 5759 passed, 0 failed, 5 ignored;
+discipline ok; budget ok (415/415); `cargo deny check` ok; tui-smoke ok; schema regen PASS; TypeScript 31/31. Windows check:
+sdk/core/services/checkpoints/mod-browse exit 0; surface-tui/bingo exit 101 on `aws-lc-sys` `stdlib.h` (accepted C toolchain deferral).
+tmux, temp HOME, fake Write+Bash: six mode/size drives and the disabled drive passed (`undoes turns 2–3 · 8 items`, `restored note.txt ·
+changed since the turn`, `! files a shell command wrote are not tracked (2 Bash calls)`).
+
+Fix round (`m177-fix`): busy said only from keys; unstamped voice fails closed; data-file noun scan; typed `None` for a missing turn;
+rewound last turn clears `last_turn`; one summary row; headline-only turns; transcript revision in the cache key; Quiet stamps pinned.
 ```text
-cargo fmt --all -- --check: exit 0
-cargo check --workspace --all-targets --locked: Finished dev profile in 9.43s
-cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev profile in 12.40s
-cargo test --workspace --locked (provider environment cleared): aggregate 5759 passed; 0 failed; 5 ignored
-bash scripts/check_discipline.sh: discipline ok (existing advisory warnings)
-bash scripts/budget.sh: dependencies 415/415; warm core 0s; TUI relink 0 crates; budget ok
-  target/debug: 8 GB (soft max 5); cleaned after verification
-cargo deny check: advisories ok, bans ok, licenses ok, sources ok
-bash scripts/tui-smoke.sh: tui-smoke ok (includes disabled Browse line search)
-BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-plugin-rpc -p bingo-surface-rpc --locked: PASS
-npm test --prefix sdk/typescript: tests 31, pass 31, fail 0
-cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked:
-  sdk/core/services/checkpoints/mod-browse: Finished dev profile; all exit 0
-  surface-tui/bingo: exit 101, aws-lc-sys: fatal error: 'stdlib.h' file not found (accepted C toolchain deferral)
-Isolated tmux, temp HOME/data, fake Write+Bash: 6 mode/size drives + disabled drive passed; temporary trees removed.
-108×30 and 80×24 capture excerpts:
-  browse · turn 2 of 3  [ ] turn  ⏎ page  y copy  r rewind
-  undoes turns 2–3 · 8 items
-  restored note.txt · changed since the turn
-  ! files a shell command wrote are not tracked (2 Bash calls)
-  conversation: files are kept; files: no turns are undone
+cargo fmt --all -- --check: fmt exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings: clippy exit 0
+RUST_TEST_THREADS=4 cargo test --workspace --locked: test exit 0; 173 suites, 5773 passed, 0 failed, 5 ignored
+scripts/check_discipline.sh: discipline ok · scripts/budget.sh: budget ok (target/debug 12 GB soft warning, cleaned)
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok · node --test: tests 31, pass 31, fail 0
+scripts/tui-smoke.sh ×3: tui-smoke ok, tui-smoke ok, tui-smoke ok
+tmux -L m177r2, temp HOME, fake provider, 108x30 and 80x24, browse open over a 6 s turn:
+  busy notices before a key: 0 · after one r: 1 ("Wait for the running turn before rewinding")
+  "▍ Worked for 6s · done" → rewind turn 2 (sheet: one "undoes turn 2 · 2 items") → worked lines after rewind: 0; composer "> two"
 ```
-The initial context-title regression was fixed at its producer. An inherited provider key caused an unrelated configuration-test failure;
-rerunning with OPENAI/ANTHROPIC key and endpoint variables removed passed. No wall-clock failure occurred in the final run.
+Older journals: unstamped room/wake/`plugin:*` user lines now draw as quiet notices; plugin-host deliveries without a voice are Quiet.
