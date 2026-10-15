@@ -131,7 +131,7 @@ async fn disabling_removes_the_command_binding_and_drawing() {
     assert!(matches!(
         command(
             &mut attachment,
-            Input::text("/hello", Origin::surface("terminal"))
+            Input::text("/hello", Origin::surface("tui"))
         )
         .await,
         IntentOutcome::Rejected { .. }
@@ -381,7 +381,7 @@ async fn live_switch_restores_commands_bindings_and_drawing_even_when_booted_off
             let verb = if enabled { "enable" } else { "disable" };
             let ack = command(
                 &mut attachment,
-                Input::text(format!("/plugins {verb} hello"), Origin::surface("test")),
+                Input::text(format!("/plugins {verb} hello"), Origin::surface("rpc")),
             )
             .await;
             assert!(matches!(ack, IntentOutcome::Applied { .. }), "{ack:?}");
@@ -397,7 +397,7 @@ async fn live_switch_restores_commands_bindings_and_drawing_even_when_booted_off
             assert_eq!(tree.fold().contains("Hello from a built-in mod"), enabled);
             let ack = command(
                 &mut attachment,
-                Input::text("/hello", Origin::surface("test")),
+                Input::text("/hello", Origin::surface("rpc")),
             )
             .await;
             assert_eq!(
@@ -496,7 +496,7 @@ async fn outside_mod_wraps_the_plugins_site_and_disabled_commands_keep_tables() 
     assert!(tree.fold().contains("one list"));
     let opened = command(
         &mut attachment,
-        Input::text("/modules", Origin::surface("test")),
+        Input::text("/modules", Origin::surface("rpc")),
     )
     .await;
     assert!(
@@ -504,15 +504,12 @@ async fn outside_mod_wraps_the_plugins_site_and_disabled_commands_keep_tables() 
     );
     command(
         &mut attachment,
-        Input::text(
-            "/plugins disable bingo.mod.plugins",
-            Origin::surface("test"),
-        ),
+        Input::text("/plugins disable bingo.mod.plugins", Origin::surface("rpc")),
     )
     .await;
     let plain = command(
         &mut attachment,
-        Input::text("/plugins", Origin::surface("test")),
+        Input::text("/plugins", Origin::surface("rpc")),
     )
     .await;
     assert!(

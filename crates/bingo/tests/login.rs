@@ -35,7 +35,7 @@ async fn a_pasted_credential_is_stored_and_the_provider_is_usable_at_once() {
     let login = IntentId::mint();
     session.handle.submit(
         login.clone(),
-        Input::text("/login codex paste", Origin::surface("test")),
+        Input::text("/login codex paste", Origin::surface("rpc")),
     );
     let dialog = {
         let deadline = tokio::time::sleep(LIMIT);
@@ -83,7 +83,7 @@ async fn a_pasted_credential_is_stored_and_the_provider_is_usable_at_once() {
     let switch = IntentId::mint();
     session.handle.submit(
         switch.clone(),
-        Input::text("/model codex/gpt-5.4", Origin::surface("test")),
+        Input::text("/model codex/gpt-5.4", Origin::surface("rpc")),
     );
     let IntentOutcome::Applied { result } = ack_for(&mut session, &switch).await else {
         panic!("the switch is applied");

@@ -56,7 +56,7 @@ async fn a_post_in_a_room_wakes_its_member_and_is_not_fanned_back() {
     let opened = IntentId::mint();
     tree.handle.submit(
         opened.clone(),
-        Input::text(format!("/room design {SEAT}"), Origin::surface("test")),
+        Input::text(format!("/room design {SEAT}"), Origin::surface("rpc")),
     );
     let IntentOutcome::Applied { result } = ack_on_root(&mut tree, &root, &opened).await else {
         panic!("opening a room is applied");
@@ -196,7 +196,7 @@ async fn a_room_member_that_asks_a_person_is_answered_through_the_root() {
     let opened = IntentId::mint();
     tree.handle.submit(
         opened.clone(),
-        Input::text(format!("/room design {SEAT}"), Origin::surface("test")),
+        Input::text(format!("/room design {SEAT}"), Origin::surface("rpc")),
     );
     ack_on_root(&mut tree, &root, &opened).await;
     tree.handle.submit(

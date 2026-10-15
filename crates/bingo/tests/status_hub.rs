@@ -23,10 +23,7 @@ async fn command(attachment: &mut Attachment, text: &str) -> IntentOutcome {
     let intent = IntentId::mint();
     attachment.handle.submit(
         intent.clone(),
-        Input::text(
-            text,
-            Origin::surface("renamed-terminal").on(SurfaceName::Terminal),
-        ),
+        Input::text(text, Origin::surface("rpc").on(SurfaceName::Terminal)),
     );
     ack_for(attachment, &intent).await
 }
@@ -197,7 +194,7 @@ async fn noninteractive_callers_keep_text_status_on_a_shared_host() {
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    for surface in ["channels", "print", "rpc", "tui", "terminal"] {
+    for surface in PERSON_SURFACES {
         let intent = IntentId::mint();
         attachment.handle.submit(
             intent.clone(),

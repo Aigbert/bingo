@@ -492,7 +492,7 @@ async fn a_shell_line_and_a_permission_mode_dispatch_as_commands() {
     let shell = IntentId::mint();
     attachment.handle.submit(
         shell.clone(),
-        Input::text("!echo hi over the wire", Origin::surface("test")),
+        Input::text("!echo hi over the wire", Origin::surface("rpc")),
     );
     let bingo_sdk::IntentOutcome::Applied { result } = ack_for(&mut attachment, &shell).await
     else {
@@ -515,7 +515,7 @@ async fn a_shell_line_and_a_permission_mode_dispatch_as_commands() {
     let mode = IntentId::mint();
     attachment.handle.submit(
         mode.clone(),
-        Input::text("/permission acceptEdits", Origin::surface("test")),
+        Input::text("/permission acceptEdits", Origin::surface("rpc")),
     );
     let ack = ack_for(&mut attachment, &mode).await;
     assert!(
@@ -526,7 +526,7 @@ async fn a_shell_line_and_a_permission_mode_dispatch_as_commands() {
     let unknown = IntentId::mint();
     attachment.handle.submit(
         unknown.clone(),
-        Input::text("/nope", Origin::surface("test")),
+        Input::text("/nope", Origin::surface("rpc")),
     );
     assert!(matches!(
         ack_for(&mut attachment, &unknown).await,

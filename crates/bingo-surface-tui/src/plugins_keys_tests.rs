@@ -164,7 +164,7 @@ async fn panel_keys_drive_live_switches_pending_tools_and_needed_refusal() {
         assert_eq!(operation["run"], format!("/plugins disable {name}"));
         let result = submit(
             &mut attachment,
-            Input::text(operation["run"].as_str().unwrap(), Origin::surface("test")),
+            Input::text(operation["run"].as_str().unwrap(), Origin::surface("tui")),
         )
         .await;
         assert!(

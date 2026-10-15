@@ -147,7 +147,7 @@ async fn disabling_during_a_turn_preserves_its_links_through_completion() {
     let intent = IntentId::mint();
     fixture.attachment.handle.submit(
         intent.clone(),
-        Input::text("/plugins disable fixture", Origin::surface("test")),
+        Input::text("/plugins disable fixture", Origin::surface("rpc")),
     );
     tokio::time::timeout(Duration::from_secs(15), async {
         while let Some(frame) = fixture.attachment.events.next().await {

@@ -34,7 +34,7 @@ async fn command(session: &mut Attachment, text: &str) -> IntentOutcome {
     let intent = IntentId::mint();
     session
         .handle
-        .submit(intent.clone(), Input::text(text, Origin::surface("test")));
+        .submit(intent.clone(), Input::text(text, Origin::surface("rpc")));
     ack_for(session, &intent).await
 }
 async fn applied(session: &mut Attachment, text: &str) {
@@ -63,7 +63,7 @@ async fn login_command(
     let intent = IntentId::mint();
     session
         .handle
-        .submit(intent.clone(), Input::text(text, Origin::surface("test")));
+        .submit(intent.clone(), Input::text(text, Origin::surface("rpc")));
     let dialog = tokio::time::timeout(LIMIT, async {
         loop {
             let frame = session.events.next().await.unwrap();

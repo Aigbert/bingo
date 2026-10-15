@@ -693,7 +693,7 @@ async fn switch(host: &bingo_core::Host, attachment: &mut bingo_sdk::Attachment,
                 "/plugins {} hello",
                 if enabled { "enable" } else { "disable" }
             ),
-            bingo_sdk::Origin::surface("test"),
+            bingo_sdk::Origin::surface("tui"),
         ),
     );
     loop {

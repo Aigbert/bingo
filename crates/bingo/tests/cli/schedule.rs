@@ -110,8 +110,7 @@ impl Running {
         Self::spawn(home, script, &["--dangerously-skip-permissions"])
     }
 
-    /// A process with the gate as it ships and nobody at the keyboard, so
-    /// only the entry's own permission mode can let a scheduled turn write.
+    /// Use the shipped permission policy without an interactive client.
     fn unattended(home: &Path, script: &tempfile::NamedTempFile) -> Self {
         Self::spawn(home, script, &[])
     }
@@ -362,11 +361,8 @@ fn a_once_at_fires_and_then_disables_itself() {
     running.stop();
 }
 
-/// ADR-0019 §4: the scheduled session runs under the entry's
-/// `permission_mode`. Nobody is there to answer a card, so a `Write` that
-/// had to ask would never land; under `acceptEdits` it lands without one.
 #[test]
-fn a_schedule_fires_under_the_permission_mode_its_entry_names() {
+fn a_stored_mode_cannot_grant_permission_to_a_scheduled_turn() {
     let home = tempfile::tempdir().unwrap();
     let target = home.path().join("written-by-a-schedule.txt");
     write_entry(
@@ -389,10 +385,14 @@ fn a_schedule_fires_under_the_permission_mode_its_entry_names() {
     ));
     let running = Running::unattended(home.path(), &script);
 
-    let written = until("the scheduled turn wrote the file", || {
-        std::fs::read_to_string(&target).ok()
+    let journal = until("the scheduled write reached its permission check", || {
+        transcript(home.path(), "schedule/ffff6666")
+            .filter(|text| text.contains("interactionOpened") || target.exists())
     });
-    assert_eq!(written, "a schedule wrote this\n");
+    assert!(
+        !target.exists(),
+        "an unconsented stored mode allowed a write: {journal}"
+    );
     running.stop();
 }
 

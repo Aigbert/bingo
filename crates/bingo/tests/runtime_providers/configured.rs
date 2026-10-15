@@ -6,7 +6,7 @@ async fn cancel_readdress(session: &mut Attachment, url: &str) {
         intent.clone(),
         Input::text(
             format!("/provider set work url {url}"),
-            Origin::surface("test"),
+            Origin::surface("rpc"),
         ),
     );
     let dialog = tokio::time::timeout(LIMIT, async {

@@ -47,7 +47,7 @@ async fn command(attachment: &mut Attachment, text: &str) {
     let intent = IntentId::mint();
     attachment
         .handle
-        .submit(intent.clone(), Input::text(text, Origin::surface("test")));
+        .submit(intent.clone(), Input::text(text, Origin::surface("rpc")));
     let outcome = ack_for(attachment, &intent).await;
     assert!(
         if text.starts_with('/') {

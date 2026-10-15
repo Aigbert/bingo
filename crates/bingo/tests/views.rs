@@ -34,7 +34,7 @@ async fn command(attachment: &mut Attachment, n: u8, text: &str) -> IntentOutcom
     let intent = intent(n);
     attachment
         .handle
-        .submit(intent.clone(), Input::text(text, Origin::surface("test")));
+        .submit(intent.clone(), Input::text(text, Origin::surface("rpc")));
     ack_for(attachment, &intent).await
 }
 

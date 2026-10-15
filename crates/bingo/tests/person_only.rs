@@ -105,7 +105,7 @@ async fn typed(host: &bingo_core::Host, cwd: &std::path::Path, line: &str) -> In
     let intent = IntentId::mint();
     attachment
         .handle
-        .submit(intent.clone(), Input::text(line, Origin::surface("test")));
+        .submit(intent.clone(), Input::text(line, Origin::surface("rpc")));
     tokio::time::timeout(std::time::Duration::from_secs(10), async {
         while let Some(frame) = attachment.events.next().await {
             if let Event::IntentAck {

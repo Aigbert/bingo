@@ -75,7 +75,7 @@ impl Running {
         let intent = IntentId::mint();
         self.attachment
             .handle
-            .submit(intent.clone(), Input::text(line, Origin::surface("test")));
+            .submit(intent.clone(), Input::text(line, Origin::surface("rpc")));
         tokio::time::timeout(Duration::from_secs(15), async {
             while let Some(frame) = self.attachment.events.next().await {
                 if let Event::IntentAck {

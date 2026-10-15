@@ -45,7 +45,7 @@ async fn repository_sign_in_names_destination_before_any_credential() {
         let intent = IntentId::mint();
         session.handle.submit(
             intent.clone(),
-            Input::text("/login work paste", Origin::surface("test")),
+            Input::text("/login work paste", Origin::surface("rpc")),
         );
         let dialog = next_prompt(&mut session).await;
         let InteractionKind::Confirm { detail, .. } = dialog.kind else {

@@ -48,7 +48,7 @@ async fn a_pulled_counter_invalidates_and_renders_after_a_press() {
     let intent = IntentId::mint();
     attachment.handle.submit(
         intent.clone(),
-        Input::text("/counter", Origin::surface("test")),
+        Input::text("/counter", Origin::surface("rpc")),
     );
     assert!(matches!(
         ack_for(&mut attachment, &intent).await,
@@ -265,7 +265,7 @@ async fn a_corner_declares_a_rect_and_fills_its_received_viewport() {
     let intent = IntentId::mint();
     attachment.handle.submit(
         intent.clone(),
-        Input::text("/corner", Origin::surface("test")),
+        Input::text("/corner", Origin::surface("rpc")),
     );
     assert!(matches!(
         ack_for(&mut attachment, &intent).await,
@@ -357,7 +357,7 @@ async fn unrelated_pane_mods_pass_through_each_others_handlers_without_notices()
     let intent = IntentId::mint();
     attachment.handle.submit(
         intent.clone(),
-        Input::text("/counter", Origin::surface("test")),
+        Input::text("/counter", Origin::surface("rpc")),
     );
     assert!(matches!(
         ack_for(&mut attachment, &intent).await,

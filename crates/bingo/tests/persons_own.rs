@@ -49,6 +49,21 @@ impl Probe {
         (intent, outcome)
     }
 
+    async fn busy(&mut self) {
+        self.submit("Keep working.", "rpc").await;
+        tokio::time::timeout(support::LIMIT, async {
+            while let Some(frame) = self.session.events.next().await {
+                self.session.snapshot.apply(&frame);
+                if let Event::ItemCompleted { item } = frame.event
+                    && matches!(item.body, ItemBody::Assistant { ref text } if text == "Holding the turn.")
+                {
+                    return;
+                }
+            }
+            panic!("the provider never started");
+        }).await.unwrap();
+    }
+
     async fn queued(&mut self, text: &str) -> IntentId {
         tokio::time::timeout(support::LIMIT, async {
             while let Some(frame) = self.session.events.next().await {
@@ -83,6 +98,22 @@ impl Probe {
             "{outcome:?}"
         );
         let frames = until_completed(&mut self.session).await;
+        assert!(frames.iter().any(|frame| matches!(
+            frame.event,
+            Event::TurnCompleted {
+                status: TurnStatus::Completed,
+                ..
+            }
+        )));
+        assert!(
+            !self
+                .session
+                .snapshot
+                .transcript
+                .items()
+                .iter()
+                .any(|item| matches!(item.body, ItemBody::Shell { .. }))
+        );
         assert!(
             !frames
                 .iter()
@@ -143,7 +174,7 @@ async fn a_queued_model_wake_cannot_approve_a_server() {
 #[tokio::test]
 async fn a_queued_plugin_line_cannot_run_a_shell() {
     let mut probe = Probe::new(script()).await;
-    probe.submit("Keep working.", "rpc").await;
+    probe.busy().await;
     let intent = IntentId::mint();
     probe
         .kernel
@@ -177,7 +208,7 @@ async fn a_queued_plugin_line_cannot_run_a_shell() {
 #[tokio::test]
 async fn delivered_person_surface_text_stays_prose_when_queued() {
     let mut probe = Probe::new(script()).await;
-    probe.submit("Keep working.", "rpc").await;
+    probe.busy().await;
     let intent = IntentId::mint();
     probe
         .kernel
@@ -226,5 +257,35 @@ async fn every_person_surface_can_run_typed_shell_lines_idle_and_busy() {
         );
         probe.kernel.shutdown().await.unwrap();
         assert!(probe.server.child.wait().await.unwrap().success());
+    }
+}
+
+#[tokio::test]
+async fn submitted_generated_lines_are_prose_idle_and_queued() {
+    for surface in ["plugin:probe", "wake", "scheduler", "hook:probe", "unknown"] {
+        let mut probe = Probe::new(json!({"responses":[
+            {"steps":[{"text":"Read as plain text."}]}, waiting(),
+            {"steps":[{"text":"Read as plain text."}]}
+        ]}))
+        .await;
+        let (_, outcome) = probe.submit("!touch submitted-marker", surface).await;
+        assert!(
+            matches!(outcome, IntentOutcome::TurnStarted { .. }),
+            "{surface}: {outcome:?}"
+        );
+        until_completed(&mut probe.session).await;
+        probe.busy().await;
+        let (intent, outcome) = probe.submit("/mcp approve planted", surface).await;
+        assert!(
+            matches!(outcome, IntentOutcome::Queued { .. }),
+            "{surface}: {outcome:?}"
+        );
+        let outcome = probe.release(&intent).await;
+        let saved =
+            bingo_core::settings::read_document(&probe.server.cwd().join(".bingo/settings.toml"))
+                .unwrap();
+        assert!(saved.get("approved").is_none(), "{surface}: {saved:?}");
+        assert!(!probe.server.cwd().join("project/submitted-marker").exists());
+        probe.finish(outcome).await;
     }
 }
