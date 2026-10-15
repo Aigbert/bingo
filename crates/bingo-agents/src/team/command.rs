@@ -23,6 +23,7 @@ pub struct TeamCommand;
 impl Command for TeamCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: "team".into(),

@@ -466,7 +466,7 @@ async fn keys_act_on_the_drawn_row_and_never_on_a_heading() {
     assert!(!picker_open(&session));
 }
 #[tokio::test(flavor = "multi_thread")]
-async fn site_commands_keep_their_argument_hints_for_every_surface() {
+async fn site_commands_open_their_picker_and_keep_their_argument_hints() {
     let mut server = Server::spawn(SCRIPT);
     let kernel = ready(&mut server).await;
     let specs = kernel
@@ -480,7 +480,10 @@ async fn site_commands_keep_their_argument_hints_for_every_surface() {
     for name in ["model", "think", "models", "login", "logout"] {
         let spec = specs.iter().find(|s| s.name == name).unwrap();
         assert!(!matches!(spec.args, ArgSpec::None), "{name}");
+        assert!(spec.opens, "{name}: a palette runs it into the picker");
     }
+    let rename = specs.iter().find(|s| s.name == "rename").unwrap();
+    assert!(!rename.opens);
 }
 #[tokio::test(flavor = "multi_thread")]
 async fn the_picker_opens_while_an_endpoint_has_not_answered() {

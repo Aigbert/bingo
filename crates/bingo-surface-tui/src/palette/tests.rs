@@ -278,6 +278,7 @@ fn help_resume_and_shift_tab_keep_their_own_routes() {
     let (state, mut ui, now) = setup();
     let tree = solo(&state);
     ui.catalogs.commands.push(CommandSpec {
+        opens: false,
         name: "help".into(),
         ..crate::commands::local_specs()[0].clone()
     });

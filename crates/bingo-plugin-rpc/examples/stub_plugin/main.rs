@@ -192,6 +192,7 @@ fn handshake(options: &Options) -> Value {
             meta: serde_json::Map::new(),
         }],
         commands: vec![CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: "stub".into(),

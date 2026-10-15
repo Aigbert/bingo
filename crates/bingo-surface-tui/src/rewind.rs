@@ -103,6 +103,7 @@ mod tests {
 
     fn spec(name: &str) -> CommandSpec {
         CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: name.into(),

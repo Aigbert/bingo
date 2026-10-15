@@ -1068,6 +1068,7 @@ mod tests {
 
     fn catalogue() -> Vec<CommandSpec> {
         vec![CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: "guide".into(),

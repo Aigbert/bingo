@@ -11235,6 +11235,10 @@
           "hidden": {
             "type": "boolean"
           },
+          "opens": {
+            "description": "Run bare, it opens the place where its argument is chosen, so a\npalette runs it rather than listing `args`; `args` stays for every\nsurface that completes it.",
+            "type": "boolean"
+          },
           "name": {
             "type": "string"
           },
@@ -11432,6 +11436,10 @@
                 }
               },
               "hidden": {
+                "type": "boolean"
+              },
+              "opens": {
+                "description": "Run bare, it opens the place where its argument is chosen, so a\npalette runs it rather than listing `args`; `args` stays for every\nsurface that completes it.",
                 "type": "boolean"
               },
               "name": {

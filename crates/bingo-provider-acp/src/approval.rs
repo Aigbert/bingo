@@ -29,6 +29,7 @@ impl PluginSource for WaitingAdapters {
 impl Command for WaitingAdapters {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            opens: false,
             name: "acp".into(),
             hint: "approve a repository adapter for the next start".into(),
             args: ArgSpec::Words {

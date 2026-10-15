@@ -1201,6 +1201,7 @@ mod tests {
         let state = state();
         let (mut ui, now) = scene();
         ui.catalogs.commands = vec![bingo_sdk::CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: "model".into(),

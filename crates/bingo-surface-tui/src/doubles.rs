@@ -268,6 +268,7 @@ impl TestHost {
                         id: "model".into(),
                         label: "model".into(),
                         meta: serde_json::to_value(CommandSpec {
+                            opens: false,
                             keys: vec![],
                             hidden: false,
                             name: "model".into(),

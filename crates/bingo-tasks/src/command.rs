@@ -20,6 +20,7 @@ pub struct TasksCommand;
 impl Command for TasksCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: "tasks".into(),

@@ -1082,6 +1082,7 @@ mod tests {
             // The spec `bingo-checkpoints` registers (ADR-0045 §3): a
             // surface offers what the catalogue says is there.
             vec![bingo_sdk::CommandSpec {
+                opens: false,
                 keys: vec![],
                 hidden: false,
                 name: "rewind".into(),
@@ -3041,6 +3042,7 @@ mod tests {
     fn tab_completes_before_it_queues_and_queues_only_while_a_turn_runs() {
         let (mut ui, now) = scene();
         ui.catalogs.commands = vec![bingo_sdk::CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: "compact".into(),

@@ -278,6 +278,7 @@ fn strip_scopes_overflows_finishes_and_clicks() {
     let mut tree = crew();
     let (mut ui, now) = scene();
     ui.catalogs.commands.push(bingo_sdk::CommandSpec {
+        opens: false,
         name: "resume".into(),
         keys: vec!["ctrl+r".into()],
         aliases: vec![],

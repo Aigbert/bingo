@@ -5,6 +5,7 @@ pub struct Hello;
 impl Command for Hello {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            opens: false,
             name: "hello".into(),
             keys: vec!["ctrl+x".into()],
             hint: "Open the built-in fixture".into(),

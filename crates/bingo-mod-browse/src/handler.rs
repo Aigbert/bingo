@@ -9,6 +9,7 @@ pub struct Open;
 impl Command for Open {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            opens: false,
             name: "browse".into(),
             aliases: vec![],
             hint: "read and search conversation turns".into(),

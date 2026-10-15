@@ -53,7 +53,12 @@ pub fn arguments(
     };
     let rows = option_rows(&spec.args, text, &format!("/{name} "), &offer)
         .unwrap_or_else(|| offered(args, &prefix, query, &offer));
-    let selected = rows.iter().position(|row| row.now == "now").unwrap_or(0);
+    let (rows, selected) = if spec.opens {
+        typed_first(rows, &prefix, query)
+    } else {
+        let selected = rows.iter().position(|row| row.now == "now").unwrap_or(0);
+        (rows, selected)
+    };
     Some(Arguments {
         title: format!("/{name}  {}", spec.hint),
         rows,
@@ -194,6 +199,29 @@ fn option_rows(args: &ArgSpec, text: &str, prefix: &str, offer: &Offer) -> Optio
     )
 }
 
+/// A command that opens its own chooser runs the line as typed, so a filter
+/// reaches that chooser; its hints stay listed one arrow away.
+fn typed_first(mut rows: Vec<Row>, prefix: &str, query: &str) -> (Vec<Row>, usize) {
+    let line = format!("{prefix}{query}").trim_end().to_string();
+    let target = Target::Run(line.clone());
+    if let Some(at) = rows.iter().position(|row| row.target == target) {
+        return (rows, at);
+    }
+    rows.insert(
+        0,
+        Row {
+            label: format!("⏎ runs {line}"),
+            hint: String::new(),
+            now: String::new(),
+            alert: None,
+            marks: vec![],
+            hint_marks: vec![],
+            target,
+        },
+    );
+    (rows, 0)
+}
+
 fn preview(prefix: &str, query: &str) -> String {
     match prefix {
         "/rename " => format!("⏎ names this session “{query}”"),
@@ -316,5 +344,41 @@ mod tests {
         );
         assert_eq!(parent("/rename several words", &commands), Some("/".into()));
         assert_eq!(parent("/", &commands), None);
+    }
+    #[test]
+    fn a_command_that_opens_runs_a_typed_filter_and_keeps_its_hints() {
+        let catalogs = BTreeMap::from([(
+            "models".into(),
+            vec![CatalogEntry {
+                id: "work/large".into(),
+                label: "large".into(),
+                meta: serde_json::Value::Null,
+            }],
+        )]);
+        let commands = vec![CatalogEntry {
+            id: "model".into(),
+            label: "model".into(),
+            meta: serde_json::json!({"name":"model","hint":"choose","family":"session","opens":true,"now":"work/large","args":{"kind":"catalog","source":"models"}}),
+        }];
+        let filter = arguments("/model work/", &commands, &catalogs).unwrap();
+        assert_eq!(
+            filter.rows[filter.selected].target,
+            Target::Run("/model work/".into())
+        );
+        assert_eq!(
+            filter.rows[1].target,
+            Target::Run("/model work/large".into())
+        );
+        let exact = arguments("/model work/large", &commands, &catalogs).unwrap();
+        assert_eq!(exact.rows.len(), 1);
+        assert_eq!(
+            exact.rows[exact.selected].target,
+            Target::Run("/model work/large".into())
+        );
+        let bare = arguments("/model ", &commands, &catalogs).unwrap();
+        assert_eq!(
+            bare.rows[bare.selected].target,
+            Target::Run("/model".into())
+        );
     }
 }

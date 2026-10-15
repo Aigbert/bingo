@@ -29,6 +29,7 @@ impl ExperienceCommand {
 impl Command for ExperienceCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: "experience".into(),

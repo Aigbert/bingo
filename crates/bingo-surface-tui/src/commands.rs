@@ -24,6 +24,7 @@ pub fn local_specs() -> Vec<CommandSpec> {
     LOCAL
         .iter()
         .map(|(name, hint)| CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: (*name).to_string(),

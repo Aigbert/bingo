@@ -528,6 +528,7 @@ impl ScriptedCommand {
 impl Command for ScriptedCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: self.name.into(),

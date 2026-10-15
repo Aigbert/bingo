@@ -10,6 +10,7 @@ pub(crate) struct Open;
 impl Command for Open {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            opens: false,
             name: "sessions".into(),
             aliases: vec![],
             hint: "find every session".into(),

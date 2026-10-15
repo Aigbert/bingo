@@ -1812,6 +1812,10 @@
         "hidden": {
           "type": "boolean"
         },
+        "opens": {
+          "type": "boolean",
+          "description": "Run bare, it opens the place where its argument is chosen, so a\npalette runs it rather than listing `args`; `args` stays for every\nsurface that completes it."
+        },
         "name": {
           "type": "string"
         },

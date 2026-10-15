@@ -6,6 +6,7 @@ pub struct Open(pub &'static str);
 impl Command for Open {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            opens: false,
             name: self.0.into(),
             aliases: vec![],
             hint: if self.0 == "help" {
@@ -145,7 +146,7 @@ fn activate(target: Target, props: &PaletteProps) -> Value {
                         .as_ref()
                         .is_some_and(|spec| spec.aliases.iter().any(|alias| alias == query))
             });
-            if !exact && spec.is_some_and(|spec| !matches!(spec.args, ArgSpec::None)) {
+            if !exact && spec.is_some_and(|spec| !spec.opens && !matches!(spec.args, ArgSpec::None)) {
                 json!({"edit":format!("/{name} ")})
             } else {
                 json!({"run":format!("/{name}")})
@@ -442,5 +443,25 @@ mod review_tests {
             assert!(crate::args::person_only(line, &commands), "{line:?}");
         }
         assert!(!crate::args::person_only("/plugins\tlist", &commands));
+    }
+    #[test]
+    fn enter_runs_a_command_that_opens_and_lists_the_arguments_of_one_that_does_not() {
+        let mut props = props();
+        for opens in [true, false] {
+            let name = if opens { "model" } else { "permission" };
+            props.commands.push(CatalogEntry {
+                id: name.into(),
+                label: String::new(),
+                meta: json!({"name":name,"hint":"","family":"session","opens":opens,"args":{"kind":"catalog","source":"models"}}),
+            });
+        }
+        assert_eq!(
+            activate(Target::Command("model".into()), &props),
+            json!({"run":"/model"})
+        );
+        assert_eq!(
+            activate(Target::Command("permission".into()), &props),
+            json!({"edit":"/permission "})
+        );
     }
 }

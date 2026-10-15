@@ -34,6 +34,7 @@ pub struct RoomCommand;
 impl Command for RoomCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: "room".into(),

@@ -28,6 +28,7 @@ pub struct ShellCommand;
 impl Command for ShellCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
+            opens: false,
             keys: vec![],
             hidden: false,
             name: "!".into(),

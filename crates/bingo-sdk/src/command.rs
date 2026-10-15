@@ -23,6 +23,11 @@ pub struct CommandSpec {
     pub keys: Vec<KeyBinding>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hidden: bool,
+    /// Run bare, it opens the place where its argument is chosen, so a
+    /// palette runs it rather than listing `args`; `args` stays for every
+    /// surface that completes it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub opens: bool,
     pub name: String,
     #[serde(default)]
     pub aliases: Vec<String>,
@@ -45,6 +50,7 @@ impl CommandSpec {
             args: ArgSpec::None,
             instant: true,
             hidden: true,
+            opens: false,
             family: "ui".into(),
         }
     }
