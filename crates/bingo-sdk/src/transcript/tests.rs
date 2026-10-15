@@ -321,7 +321,7 @@ fn search_reads_full_results_reasoning_and_only_retained_items() {
     assert_eq!(find(&transcript, "fork").len(), 2);
 }
 #[test]
-fn asked_ignores_shells_and_injected_context_but_keeps_commands() {
+fn asked_uses_effective_voice_and_borrows_only_the_first_text_part() {
     let mut row = item(1, String::new());
     row.body = ItemBody::Shell {
         command: "echo no".into(),
@@ -334,7 +334,22 @@ fn asked_ignores_shells_and_injected_context_but_keeps_commands() {
         parts: vec![ContentPart::text("/guide the wire\nexpanded prompt")],
         origin: Origin::surface("command"),
     };
-    assert_eq!(crate::asked(&row).as_deref(), Some("/guide the wire"));
+    assert_eq!(crate::asked(&row), None);
+    for surface in ["bash", "agent", "schedule", "room", "wake", "command"] {
+        row.body = ItemBody::User {
+            parts: vec![
+                ContentPart::text("first\nsecond"),
+                ContentPart::text("ignored"),
+            ],
+            origin: Origin::surface(surface).voiced(Voice::Said),
+        };
+        assert_eq!(crate::asked(&row), Some("first\nsecond"));
+        assert_eq!(crate::first_ask(&row).as_deref(), Some("first"));
+        if let ItemBody::User { origin, .. } = &mut row.body {
+            origin.voice = None;
+        }
+        assert!(crate::asked(&row).is_none());
+    }
     for voice in [Voice::Note, Voice::Quiet, Voice::Aside] {
         row.body = ItemBody::User {
             parts: vec![ContentPart::text("injected text")],

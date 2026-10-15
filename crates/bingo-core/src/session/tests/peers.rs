@@ -17,6 +17,10 @@ async fn a_wake_delivery_to_an_idle_session_opens_a_peer_turn_that_says_who_spok
         &labels[..3],
         ["completed:user/completed", "turnStarted", "ack:TurnStarted"]
     );
+    assert!(
+        state.summary.title.is_none(),
+        "producer text does not name the session"
+    );
     let ItemBody::User { origin, .. } = &state.transcript.items()[0].body else {
         panic!("a user item first");
     };

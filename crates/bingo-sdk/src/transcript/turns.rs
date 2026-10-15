@@ -13,7 +13,7 @@ impl Turn {
     pub fn label(&self) -> String {
         self.asked
             .as_deref()
-            .and_then(|s| s.lines().next())
+            .and_then(crate::first_line)
             .map(str::trim)
             .map(str::to_owned)
             .unwrap_or_else(|| self.id.to_string())

@@ -15,25 +15,7 @@ use super::{OUTPUT_ROWS, Rows, bullet_style, kept, plain, returns, speaks, under
 use crate::fold::Fold;
 use crate::{seats, theme};
 
-/// Frozen compatibility for origins recorded before producers stamped voices.
-const LEGACY_VOICES: &[(&str, bingo_sdk::Voice)] = &[
-    ("agent", bingo_sdk::Voice::Quiet),
-    ("bash", bingo_sdk::Voice::Quiet),
-    (crate::commands::SURFACE, bingo_sdk::Voice::Quiet),
-    ("schedule", bingo_sdk::Voice::Quiet),
-    ("room", bingo_sdk::Voice::Aside),
-    ("wake", bingo_sdk::Voice::Note),
-];
-
-pub(crate) fn voice(origin: &Origin) -> bingo_sdk::Voice {
-    origin.voice.unwrap_or_else(|| {
-        LEGACY_VOICES
-            .iter()
-            .find(|(surface, _)| *surface == origin.surface)
-            .map(|(_, voice)| *voice)
-            .unwrap_or(bingo_sdk::Voice::Said)
-    })
-}
+pub(crate) use bingo_sdk::effective_voice as voice;
 
 /// What a `User` item draws, which is a different thing in each of the two
 /// places one is read.
