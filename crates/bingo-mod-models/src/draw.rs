@@ -134,9 +134,8 @@ impl List<'_> {
             width.saturating_mul(2) / 5
         };
         let mut children = vec![dim(format!(
-            "   {} models · {} providers    ★ pinned · ∴ thinks · ▣ sees images",
-            self.models.len(),
-            self.providers.len()
+            "   {}    ★ pinned · ∴ thinks · ▣ sees images",
+            header(self.rows, &picker.props.filter, self.providers.len())
         ))];
         let room = usize::from(height).saturating_sub(4).max(1);
         children.extend((0..room).map(|i| {
@@ -186,6 +185,16 @@ impl List<'_> {
                 ..Default::default()
             }),
         }
+    }
+}
+/// What the list holds now: matches for a filter, else models and providers.
+pub fn header(rows: &[Row], filter: &str, providers: usize) -> String {
+    let models = rows.iter().filter(|r| matches!(r, Row::Model(_))).count();
+    if filter.is_empty() {
+        format!("{models} models · {providers} providers")
+    } else {
+        let matches = if models == 1 { "match" } else { "matches" };
+        format!("{models} {matches} for “{filter}”")
     }
 }
 fn key_hint(label: &str, keep: bool) -> View {
@@ -364,5 +373,22 @@ fn action_label(
         Some(Row::Hidden(..)) => "show hidden".into(),
         Some(Row::Add) => "add".into(),
         _ => String::new(),
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn the_header_counts_what_the_list_holds() {
+        let rows = [
+            Row::Heading,
+            Row::Pinned("fake/a".into()),
+            Row::Provider("fake".into()),
+            Row::Model("fake/a".into()),
+            Row::Model("fake/b".into()),
+        ];
+        assert_eq!(header(&rows, "", 3), "2 models · 3 providers");
+        assert_eq!(header(&rows, "a", 3), "2 matches for “a”");
+        assert_eq!(header(&rows[..4], "a", 3), "1 match for “a”");
     }
 }
