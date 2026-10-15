@@ -33,7 +33,7 @@ async fn commands_and_service_forget_the_same_file_with_the_same_reply() {
     assert_reads(&service, &cwd, &user).await;
     let reply = service.forget(request).await.unwrap();
     seed();
-    let outcome = MemoryCommand::new(data)
+    let outcome = MemoryCommand::new(data, home.path().join("config"))
         .run("forget user rule", &cx)
         .await
         .unwrap();
@@ -90,11 +90,44 @@ async fn an_unscoped_name_in_both_scopes_names_both_and_deletes_neither() {
         host: bingo_sdk::testing::NoHost::handle(),
         cancel: Default::default(),
     };
-    let error = MemoryCommand::new(data)
+    let error = MemoryCommand::new(data, home.path().join("config"))
         .run("forget rule", &cx)
         .await
         .unwrap_err();
     assert_eq!(error.code, ErrorCode::InvalidInput);
     assert!(error.message.contains("user") && error.message.contains("project"));
     assert!(user.join("rule.md").exists() && project.join("rule.md").exists());
+}
+
+#[tokio::test]
+async fn only_carried_index_lines_count_not_the_body_or_omitted_lines() {
+    let home = tempfile::tempdir().unwrap();
+    let data = home.path().join("data");
+    let user = dir::user(&data);
+    std::fs::create_dir_all(&user).unwrap();
+    let line = "[rule](./rule.md#fact)\n";
+    std::fs::write(user.join("MEMORY.md"), line).unwrap();
+    std::fs::write(user.join("rule.md"), "short").unwrap();
+    let service = Memories {
+        data,
+        config: home.path().join("config"),
+    };
+    let list = || List {
+        cwd: home.path().into(),
+    };
+    assert_eq!(
+        service.list(list()).await.unwrap().memories[0].tokens,
+        bingo_sdk::tokens::text(line)
+    );
+    std::fs::write(user.join("rule.md"), "long body ".repeat(10000)).unwrap();
+    assert_eq!(
+        service.list(list()).await.unwrap().memories[0].tokens,
+        bingo_sdk::tokens::text(line)
+    );
+    std::fs::write(
+        user.join("MEMORY.md"),
+        format!("{line}{}", "other\n".repeat(INDEX_LINES)),
+    )
+    .unwrap();
+    assert_eq!(service.list(list()).await.unwrap().memories[0].tokens, 0);
 }

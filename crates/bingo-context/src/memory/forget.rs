@@ -35,70 +35,98 @@ pub fn io(error: std::io::Error) -> KernelError {
 }
 
 pub fn forget(scope: &Path, name: &str) -> Result<(), KernelError> {
-    valid_name(name)?;
-    let index = super::dir::index(scope);
-    let text = match std::fs::read_to_string(&index) {
-        Ok(text) => text,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(error) => return Err(io(error)),
-    };
-    let next = super::index::unlink(&text, &format!("{name}.md"));
-    std::fs::remove_file(scope.join(format!("{name}.md"))).map_err(io)?;
-    replace(&index, &next).map_err(io)
+    forget_with(scope, name, temporary, |_| {})
 }
 
-fn replace(path: &Path, text: &str) -> std::io::Result<()> {
+fn temporary(scope: &Path) -> std::path::PathBuf {
     static NEXT: AtomicU64 = AtomicU64::new(0);
-    let temp = path.with_file_name(format!(
+    scope.join(format!(
         ".MEMORY-{}-{}.tmp",
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
-    ));
+    ))
+}
+
+fn forget_with(
+    scope: &Path,
+    name: &str,
+    mut temporary: impl FnMut(&Path) -> std::path::PathBuf,
+    mut before_swap: impl FnMut(usize),
+) -> Result<(), KernelError> {
+    valid_name(name)?;
+    let file = scope.join(format!("{name}.md"));
+    std::fs::symlink_metadata(&file).map_err(io)?;
+    let index = super::dir::index(scope);
+    for attempt in 0..2 {
+        let original = read_index(&index).map_err(io)?;
+        let next = super::index::unlink(
+            original.as_deref().unwrap_or_default(),
+            &format!("{name}.md"),
+        );
+        let temp = temporary(scope);
+        if replace(&index, original.as_deref(), &next, &temp, || {
+            before_swap(attempt)
+        })
+        .map_err(io)?
+        {
+            return std::fs::remove_file(file).map_err(io);
+        }
+    }
+    Err(KernelError::new(
+        ErrorCode::InvalidInput,
+        "memory index changed twice; nothing forgotten; try again",
+    ))
+}
+
+fn read_index(path: &Path) -> std::io::Result<Option<String>> {
+    match std::fs::read_to_string(path) {
+        Ok(text) => Ok(Some(text)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+fn replace(
+    path: &Path,
+    original: Option<&str>,
+    text: &str,
+    temp: &Path,
+    before_swap: impl FnOnce(),
+) -> std::io::Result<bool> {
     let mut file = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(&temp)?;
+        .open(temp)?;
     let result = (|| {
         file.write_all(text.as_bytes())?;
         file.sync_all()?;
         drop(file);
-        std::fs::rename(&temp, path)
+        before_swap();
+        if read_index(path)?.as_deref() != original {
+            return Ok(false);
+        }
+        std::fs::rename(temp, path)?;
+        sync_directory(
+            path.parent()
+                .ok_or_else(|| std::io::Error::other("index has no directory"))?,
+        )?;
+        Ok(true)
     })();
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temp);
+    if !matches!(result, Ok(true)) {
+        let _ = std::fs::remove_file(temp);
     }
     result
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn forgetting_replaces_an_existing_index_and_cleans_its_temp() {
-        let home = tempfile::tempdir().unwrap();
-        let scope = home.path().join("memory");
-        std::fs::create_dir(&scope).unwrap();
-        std::fs::write(scope.join("rule.md"), "fact").unwrap();
-        std::fs::write(
-            scope.join("MEMORY.md"),
-            "# Memory\r\n[rule](rule.md)\r\n\r\nkeep\n",
-        )
-        .unwrap();
-        forget(&scope, "rule").unwrap();
-        assert_eq!(
-            std::fs::read_to_string(scope.join("MEMORY.md")).unwrap(),
-            "# Memory\r\n\r\nkeep\n"
-        );
-        assert_eq!(std::fs::read_dir(&scope).unwrap().count(), 1);
-        assert_eq!(
-            forget(&scope, "rule").unwrap_err().code,
-            ErrorCode::NotFound
-        );
-        for name in ["../rule", "MEMORY", "a/b", "a\\b", "", "a:", "rule."] {
-            assert_eq!(
-                forget(&scope, name).unwrap_err().code,
-                ErrorCode::InvalidInput
-            );
-        }
-    }
+#[cfg(unix)]
+fn sync_directory(path: &Path) -> std::io::Result<()> {
+    std::fs::File::open(path)?.sync_all()
 }
+#[cfg(not(unix))]
+fn sync_directory(_: &Path) -> std::io::Result<()> {
+    // Windows has no portable directory fsync; the replacement file is already synced.
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests;

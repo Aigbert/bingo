@@ -79,9 +79,10 @@ impl Plugin for ContextPlugin {
         registrar.add(Contribution::Context(
             Arc::new(MemoryContributor::new(data_dir.clone())) as Arc<dyn ContextContributor>,
         ));
-        registrar.add(Contribution::Command(
-            Arc::new(MemoryCommand::new(data_dir.clone())) as Arc<dyn Command>,
-        ));
+        registrar.add(Contribution::Command(Arc::new(MemoryCommand::new(
+            data_dir.clone(),
+            config_dir.clone(),
+        )) as Arc<dyn Command>));
         registrar.add(Contribution::Hook(Arc::new(baseline::BaselineHook::new(
             data_dir.clone(),
         ))));

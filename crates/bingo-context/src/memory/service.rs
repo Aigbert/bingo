@@ -1,7 +1,7 @@
 use super::{dir, file, forget, project_dir, store};
 use async_trait::async_trait;
 use bingo_sdk::{Contribution, ErrorCode, KernelError};
-use bingo_services::memory::{self, Forget, List, Listing, MemoryRow, Read, Scope, Service};
+use bingo_services::memory::{self, Forget, Kind, List, Listing, MemoryRow, Read, Scope, Service};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -23,16 +23,20 @@ impl Memories {
         if let Some(scope) = &input.scope {
             return Ok(scope.clone());
         }
-        let user = self
-            .scope(&input.cwd, &Scope::User)
-            .await
-            .join(format!("{}.md", input.name))
-            .exists();
-        let project = self
-            .scope(&input.cwd, &Scope::Project)
-            .await
-            .join(format!("{}.md", input.name))
-            .exists();
+        let user = tokio::fs::try_exists(
+            self.scope(&input.cwd, &Scope::User)
+                .await
+                .join(format!("{}.md", input.name)),
+        )
+        .await
+        .map_err(forget::io)?;
+        let project = tokio::fs::try_exists(
+            self.scope(&input.cwd, &Scope::Project)
+                .await
+                .join(format!("{}.md", input.name)),
+        )
+        .await
+        .map_err(forget::io)?;
         match (user, project) {
             (true, true) => Err(KernelError::new(
                 ErrorCode::InvalidInput,
@@ -67,7 +71,11 @@ impl Service for Memories {
     }
     async fn forget(&self, input: Forget) -> Result<String, KernelError> {
         let scope = self.resolve(&input).await?;
-        store::forget(&self.scope(&input.cwd, &scope).await, &input.name)?;
+        let directory = self.scope(&input.cwd, &scope).await;
+        let name = input.name.clone();
+        tokio::task::spawn_blocking(move || store::forget(&directory, &name))
+            .await
+            .map_err(|error| KernelError::new(ErrorCode::Internal, error.to_string()))??;
         Ok(format!(
             "forgot {} memory \"{}\"; this session's prompt may keep it until next composed. Say so in chat if it should not be learned again.",
             scope.as_str(),
@@ -98,6 +106,8 @@ async fn list_scope(path: &Path, scope: Scope) -> Result<Vec<MemoryRow>, KernelE
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
         Err(error) => return Err(forget::io(error)),
     };
+    let index = store::index_text(path).await;
+    let (carried, _) = crate::files::capped(&index, super::INDEX_LINES, crate::files::MAX_BYTES);
     let mut rows = Vec::new();
     while let Some(entry) = entries.next_entry().await.map_err(forget::io)? {
         let path = entry.path();
@@ -109,28 +119,38 @@ async fn list_scope(path: &Path, scope: Scope) -> Result<Vec<MemoryRow>, KernelE
         if !entry.file_type().await.map_err(forget::io)?.is_file() {
             continue;
         }
-        rows.push(row(path, scope.clone()).await);
+        rows.push(row(path, scope.clone(), &carried).await);
     }
     rows.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(rows)
 }
-async fn row(path: PathBuf, scope: Scope) -> MemoryRow {
+async fn row(path: PathBuf, scope: Scope, carried: &str) -> MemoryRow {
     let name = path
         .file_stem()
         .unwrap_or_default()
         .to_string_lossy()
         .into_owned();
     let read = tokio::fs::read_to_string(&path).await;
-    let tokens = read
-        .as_ref()
-        .map(|text| bingo_sdk::tokens::text(text))
-        .unwrap_or(0);
+    let tokens = carried
+        .split_inclusive('\n')
+        .filter(|line| super::index::targets(line, &format!("{name}.md")))
+        .map(bingo_sdk::tokens::text)
+        .sum();
     let parsed = read
         .map_err(|e| e.to_string())
         .and_then(|text| file::parse(&name, &text).map_err(|e| e.to_string()));
     let (kind, description, error) = match parsed {
-        Ok(memory) => (memory.kind.as_str().into(), memory.description, None),
-        Err(error) => ("malformed".into(), String::new(), Some(error)),
+        Ok(memory) => (
+            match memory.kind {
+                file::Kind::User => Kind::User,
+                file::Kind::Feedback => Kind::Feedback,
+                file::Kind::Project => Kind::Project,
+                file::Kind::Reference => Kind::Reference,
+            },
+            memory.description,
+            None,
+        ),
+        Err(error) => (Kind::Malformed, String::new(), Some(error)),
     };
     MemoryRow {
         scope,

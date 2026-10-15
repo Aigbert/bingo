@@ -17,11 +17,12 @@ const HEADERS: [&str; 4] = ["scope", "name", "type", "description"];
 #[derive(Debug, Clone)]
 pub struct MemoryCommand {
     data_dir: PathBuf,
+    config: PathBuf,
 }
 
 impl MemoryCommand {
-    pub fn new(data_dir: PathBuf) -> Self {
-        Self { data_dir }
+    pub fn new(data_dir: PathBuf, config: PathBuf) -> Self {
+        Self { data_dir, config }
     }
 }
 
@@ -47,7 +48,7 @@ impl Command for MemoryCommand {
             use bingo_services::memory::Service;
             let message = super::service::Memories {
                 data: self.data_dir.clone(),
-                config: PathBuf::new(),
+                config: self.config.clone(),
             }
             .forget(bingo_services::memory::Forget {
                 cwd: cx.cwd.clone(),
@@ -166,16 +167,19 @@ mod tests {
         }
 
         async fn run(&self) -> CommandOutcome {
-            MemoryCommand::new(self.data.path().to_path_buf())
-                .run("", &self.context())
-                .await
-                .expect("a listing")
+            MemoryCommand::new(
+                self.data.path().to_path_buf(),
+                self.data.path().join("config"),
+            )
+            .run("", &self.context())
+            .await
+            .expect("a listing")
         }
     }
 
     #[test]
     fn the_spec_runs_now_and_takes_nothing() {
-        let spec = MemoryCommand::new(PathBuf::from("/data")).spec();
+        let spec = MemoryCommand::new(PathBuf::from("/data"), PathBuf::from("/config")).spec();
         assert_eq!(spec.name, "memory");
         assert_eq!(spec.args, ArgSpec::None);
         assert!(spec.instant, "reading two directories never waits");
