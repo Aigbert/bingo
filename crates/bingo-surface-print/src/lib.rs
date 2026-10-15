@@ -1963,3 +1963,12 @@ pub(crate) mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod person_surface {
+    /// An unstamped line from here is the person's only if the sdk says so.
+    #[test]
+    fn this_surface_is_one_a_person_types_through() {
+        assert!(bingo_sdk::PERSON_SURFACES.contains(&super::SURFACE_ID));
+    }
+}

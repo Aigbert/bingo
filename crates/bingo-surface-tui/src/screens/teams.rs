@@ -50,12 +50,15 @@ fn a_room_post_in_a_member_s_own_transcript() {
     let state = folded(vec![
         item(
             1,
-            delivered(
-                "itm_1",
-                "room",
-                None,
-                "#design has posts you have not read. Post in #design if any of \
-                 it falls to you.",
+            voiced(
+                delivered(
+                    "itm_1",
+                    "room",
+                    None,
+                    "#design has posts you have not read. Post in #design if any of \
+                     it falls to you.",
+                ),
+                bingo_sdk::Voice::Aside,
             ),
         ),
         item(
@@ -67,7 +70,13 @@ fn a_room_post_in_a_member_s_own_transcript() {
                 "[#design, since you last read]\nreviewer: the plan is thin on tests",
             ),
         ),
-        item(3, post("itm_3", "reviewer", "the plan is thin on tests")),
+        item(
+            3,
+            voiced(
+                post("itm_3", "reviewer", "the plan is thin on tests"),
+                bingo_sdk::Voice::Aside,
+            ),
+        ),
         item(
             4,
             delivered("itm_4", "agent", Some("scout"), "Two nits, else fine."),

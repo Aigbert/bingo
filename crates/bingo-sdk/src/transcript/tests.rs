@@ -273,7 +273,7 @@ fn turns_keep_full_prompts_and_share_the_cut_boundaries() {
     first.turn = Some(TurnId::from_raw("t1"));
     first.body = ItemBody::User {
         parts: vec![ContentPart::text("first\nsecond")],
-        origin: Origin::surface("terminal"),
+        origin: Origin::surface("tui"),
     };
     let between = item(2, "notice".into());
     let mut last = item(3, "automatic".into());
@@ -335,23 +335,16 @@ fn asked_uses_effective_voice_and_borrows_only_the_first_text_part() {
         origin: Origin::surface("command"),
     };
     assert_eq!(crate::asked(&row), None);
-    let legacy: std::collections::BTreeMap<String, Voice> =
-        serde_json::from_str(include_str!("../asked-legacy.json")).unwrap();
-    assert_eq!(legacy.len(), 6);
-    for surface in legacy.into_keys() {
+    for surface in crate::PERSON_SURFACES {
         row.body = ItemBody::User {
             parts: vec![
                 ContentPart::text("first\nsecond"),
                 ContentPart::text("ignored"),
             ],
-            origin: Origin::surface(surface).voiced(Voice::Said),
+            origin: Origin::surface(surface),
         };
-        assert_eq!(crate::asked(&row), Some("first\nsecond"));
+        assert_eq!(crate::asked(&row), Some("first\nsecond"), "{surface}");
         assert_eq!(crate::first_ask(&row).as_deref(), Some("first"));
-        if let ItemBody::User { origin, .. } = &mut row.body {
-            origin.voice = None;
-        }
-        assert!(crate::asked(&row).is_none());
     }
     for voice in [Voice::Note, Voice::Quiet, Voice::Aside] {
         row.body = ItemBody::User {
@@ -360,6 +353,44 @@ fn asked_uses_effective_voice_and_borrows_only_the_first_text_part() {
         };
         assert!(crate::asked(&row).is_none());
     }
+}
+
+#[test]
+fn an_unstamped_origin_is_the_persons_only_from_a_person_surface() {
+    let spoken = |surface: &str, voice: Option<Voice>| {
+        let mut row = item(1, String::new());
+        row.body = ItemBody::User {
+            parts: vec![ContentPart::text("carry on")],
+            origin: Origin {
+                voice,
+                ..Origin::surface(surface)
+            },
+        };
+        crate::asked(&row).map(str::to_owned)
+    };
+    for surface in crate::PERSON_SURFACES {
+        assert_eq!(
+            spoken(surface, None).as_deref(),
+            Some("carry on"),
+            "{surface}"
+        );
+    }
+    for surface in [
+        "contributor:runtime",
+        "kernel",
+        "hook:guard",
+        "plugin:notes",
+        "brand-new",
+        "",
+    ] {
+        assert_eq!(spoken(surface, None), None, "{surface}");
+    }
+    assert_eq!(spoken("tui", Some(Voice::Quiet)), None);
+    assert_eq!(
+        spoken("contributor:runtime", Some(Voice::Said)).as_deref(),
+        Some("carry on"),
+        "an explicit voice wins"
+    );
 }
 
 #[test]
@@ -377,7 +408,7 @@ fn shell_lines_neither_open_turns_nor_replace_the_asked_prompt() {
     shell.turn = user.turn.clone();
     user.body = ItemBody::User {
         parts: vec![ContentPart::text("why is the build red?")],
-        origin: Origin::surface("terminal"),
+        origin: Origin::surface("tui"),
     };
     let rows = turns(&[user, shell].into_iter().collect());
     assert_eq!(rows.len(), 1);

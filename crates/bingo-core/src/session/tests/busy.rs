@@ -81,7 +81,7 @@ async fn a_resumed_session_publishes_no_busy_it_inherited() {
 
     mailbox.submit(
         IntentId::mint(),
-        Input::text("name me", Origin::surface("test")),
+        Input::text("name me", Origin::surface("tui")),
     );
     let frames = frames_until(&mut events, &mut state, turn_completed).await;
     assert!(summaries(&frames).iter().all(|summary| !summary.busy));

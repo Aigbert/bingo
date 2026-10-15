@@ -1,28 +1,26 @@
 //! Person-authored text shared by history projections.
 use crate::{ContentPart, Item, ItemBody, Origin, Voice};
-use std::{collections::BTreeMap, sync::OnceLock};
 
-/// Explicit producer intent wins over the frozen compatibility data.
+/// The surfaces a person types through. Before producers stamped a voice,
+/// these were the only ones whose lines were the person's own.
+pub const PERSON_SURFACES: [&str; 5] = ["tui", "print", "rpc", "acp", "channels"];
+
+/// An explicit voice wins. An unstamped origin fails closed: it is the
+/// person's only from a person surface, and anything else — generated
+/// context, a kernel prompt, a name this list has never heard — is quiet.
 pub fn effective_voice(origin: &Origin) -> Voice {
-    static LEGACY: OnceLock<BTreeMap<String, Voice>> = OnceLock::new();
-    origin.voice.unwrap_or_else(|| {
-        LEGACY
-            .get_or_init(|| {
-                serde_json::from_str(include_str!("asked-legacy.json")).unwrap_or_default()
-            })
-            .get(&origin.surface)
-            .copied()
-            .unwrap_or(Voice::Said)
-    })
+    match origin.voice {
+        Some(voice) => voice,
+        None if PERSON_SURFACES.contains(&origin.surface.as_str()) => Voice::Said,
+        None => Voice::Quiet,
+    }
 }
 
 /// The first text part spoken by the person, borrowed without joining parts.
 /// `first_ask` is the first line of this text, not the whole ask.
 pub fn asked(item: &Item) -> Option<&str> {
     match &item.body {
-        ItemBody::User { parts, origin }
-            if !origin.is_context() && effective_voice(origin) == Voice::Said =>
-        {
+        ItemBody::User { parts, origin } if effective_voice(origin) == Voice::Said => {
             parts.iter().find_map(ContentPart::as_text)
         }
         _ => None,

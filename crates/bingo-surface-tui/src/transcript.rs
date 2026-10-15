@@ -997,7 +997,7 @@ mod tests {
     use super::*;
     use crate::test_support::{
         agent_call, assistant, completed, delivered, extended, folded, frame, item, post,
-        receipt_item, running_tool, scene, started, started_tool, tool, ts, user as person,
+        receipt_item, running_tool, scene, started, started_tool, tool, ts, user as person, voiced,
     };
     use bingo_sdk::{Event, ItemId};
 
@@ -1238,11 +1238,14 @@ mod tests {
     fn a_members_transcript_draws_none_of_its_rooms_machinery() {
         assert_eq!(
             drawn(vec![
-                delivered(
-                    "itm_1",
-                    "room",
-                    None,
-                    "#design has posts you have not read."
+                voiced(
+                    delivered(
+                        "itm_1",
+                        "room",
+                        None,
+                        "#design has posts you have not read."
+                    ),
+                    bingo_sdk::Voice::Aside
                 ),
                 delivered(
                     "itm_2",
@@ -1250,7 +1253,10 @@ mod tests {
                     None,
                     "[#design, since you last read]\nscout: found it",
                 ),
-                post("itm_3", "reviewer", "two nits, otherwise fine"),
+                voiced(
+                    post("itm_3", "reviewer", "two nits, otherwise fine"),
+                    bingo_sdk::Voice::Aside
+                ),
                 person("itm_4", "thanks"),
             ]),
             vec!["> thanks".to_string()],
@@ -1324,15 +1330,12 @@ mod tests {
 
     #[test]
     fn internal_context_does_not_supply_a_session_brief_or_rewind_prompt() {
-        let mut context = delivered(
+        let context = delivered(
             "itm_context",
             "contributor:runtime",
             None,
             "Hidden runtime state",
         );
-        if let ItemBody::User { origin, .. } = &mut context.body {
-            origin.voice = Some(bingo_sdk::Voice::Quiet);
-        }
         let state = stated(vec![context]);
         assert_eq!(crate::tree::brief(&state), None);
         assert!(
@@ -1380,13 +1383,21 @@ mod tests {
         );
     }
 
-    /// The whole of the closed set, read from the list itself, and a handful
-    /// of surfaces outside it — the ones that exist and one that never will.
-    /// The room's own is quieter still — it is read in the room and nowhere
-    /// else — so it is the one member of the set that draws no row here.
+    /// Only a person surface speaks unstamped: every other origin an older
+    /// journal carries without a voice — the subsystems that exist, the room's,
+    /// and one that never will — is a marked line, never the person's bar. A
+    /// room's stamped aside is read in the room and draws no row here.
     #[test]
-    fn every_quiet_surface_is_a_marked_line_and_nothing_else_is() {
-        for surface in ["agent", "bash", "command", "schedule"] {
+    fn every_unstamped_origin_but_a_persons_is_a_marked_line() {
+        for surface in [
+            "agent",
+            "bash",
+            "command",
+            "schedule",
+            "room",
+            "wake",
+            "brand-new",
+        ] {
             assert_eq!(
                 drawn(vec![delivered("itm_1", surface, None, "it ended")]),
                 vec!["⏺ it ended".to_string()],
@@ -1394,14 +1405,18 @@ mod tests {
             );
         }
         assert!(
-            drawn(vec![delivered("itm_1", "room", None, "it ended")]).is_empty(),
+            drawn(vec![voiced(
+                delivered("itm_1", "room", None, "it ended"),
+                bingo_sdk::Voice::Aside
+            )])
+            .is_empty(),
             "and the room's own is not drawn in a member at all"
         );
-        for loud in ["tui", "print", "rpc", "acp", "channels", "brand-new"] {
+        for loud in bingo_sdk::PERSON_SURFACES {
             assert_eq!(
                 drawn(vec![delivered("itm_1", loud, None, "it ended")]),
                 vec!["> it ended".to_string()],
-                "{loud} is not in the set, so it stays loud"
+                "{loud} is a person surface"
             );
         }
     }
@@ -1412,11 +1427,14 @@ mod tests {
     #[test]
     fn a_wake_is_a_line_on_the_bar_under_a_word_of_its_own() {
         assert_eq!(
-            drawn(vec![delivered(
-                "itm_1",
-                "wake",
-                None,
-                "check the build again\nand say what you find",
+            drawn(vec![voiced(
+                delivered(
+                    "itm_1",
+                    "wake",
+                    None,
+                    "check the build again\nand say what you find",
+                ),
+                bingo_sdk::Voice::Note
             )]),
             vec![
                 "wake check the build again".to_string(),

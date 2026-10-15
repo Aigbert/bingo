@@ -117,7 +117,7 @@ async fn submit_starts_a_turn_and_streams_it_to_the_end() {
     );
 
     let intent = IntentId::mint();
-    mailbox.submit(intent.clone(), Input::text("hi", Origin::surface("test")));
+    mailbox.submit(intent.clone(), Input::text("hi", Origin::surface("tui")));
     let labels = drive(&mut events, &mut state, turn_completed).await;
     assert_eq!(
         labels,

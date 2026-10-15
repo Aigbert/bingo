@@ -62,7 +62,7 @@ fn item(id: &str, turn: &str, body: ItemBody) -> Item {
 fn user(text: &str) -> ItemBody {
     ItemBody::User {
         parts: vec![ContentPart::text(text)],
-        origin: Origin::surface("test"),
+        origin: Origin::surface("tui"),
     }
 }
 

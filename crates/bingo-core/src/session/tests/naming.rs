@@ -39,7 +39,7 @@ async fn ask(
     state: &mut SessionState,
     said: &str,
 ) -> Vec<Frame> {
-    mailbox.submit(IntentId::mint(), Input::text(said, Origin::surface("test")));
+    mailbox.submit(IntentId::mint(), Input::text(said, Origin::surface("tui")));
     frames_until(events, state, turn_completed).await
 }
 
@@ -74,7 +74,7 @@ async fn a_name_that_landed_after_the_first_ask_wins_on_resume() {
         intent: None,
         body: ItemBody::User {
             parts: vec![ContentPart::text("fix the parser")],
-            origin: Origin::surface("test"),
+            origin: Origin::surface("tui"),
         },
         meta: Default::default(),
     };

@@ -304,16 +304,13 @@ mod voice_contract {
     use bingo_sdk::Voice;
 
     #[test]
-    fn stamped_voice_wins_and_legacy_words_are_frozen() {
-        for (surface, legacy) in [
-            ("agent", Voice::Quiet),
-            ("bash", Voice::Quiet),
-            ("command", Voice::Quiet),
-            ("schedule", Voice::Quiet),
-            ("room", Voice::Aside),
-            ("wake", Voice::Note),
-            ("stranger", Voice::Said),
-        ] {
+    fn stamped_voice_wins_and_unstamped_fails_closed() {
+        let quiet = ["agent", "bash", "command", "room", "wake", "stranger"];
+        let unstamped = quiet
+            .map(|surface| (surface, Voice::Quiet))
+            .into_iter()
+            .chain(bingo_sdk::PERSON_SURFACES.map(|surface| (surface, Voice::Said)));
+        for (surface, legacy) in unstamped {
             let origin = Origin::surface(surface);
             assert_eq!(voice(&origin), legacy);
             for stamped in [Voice::Said, Voice::Note, Voice::Quiet, Voice::Aside] {

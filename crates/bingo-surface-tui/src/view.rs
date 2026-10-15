@@ -1293,8 +1293,8 @@ mod tests {
 
     /// ADR-0028: the pending area is the person's own queue and nothing else.
     /// A subsystem's entry is a steer in flight — it is drawn nowhere, and the
-    /// transcript shows it as a quiet notice once the turn absorbs it — while a
-    /// surface the quiet set has never heard of stays on the person's side.
+    /// transcript shows it as a quiet notice once the turn absorbs it — and so
+    /// is an unstamped entry from any surface a person does not type through.
     #[test]
     fn the_pending_area_draws_only_what_the_person_queued() {
         let mine = band(&[("tui", "also fix the docs", true)]);
@@ -1315,10 +1315,10 @@ mod tests {
         assert!(both.contains("> also fix the docs"), "{both}");
         assert!(!both.contains("the build is green"), "{both}");
 
-        let unknown = band(&[("brand-new", "who knows", true)]);
-        assert!(
-            unknown.contains("> who knows"),
-            "a surface nobody has judged is the person's: {unknown}"
+        assert_eq!(
+            band(&[("brand-new", "who knows", true)]),
+            band(&[]),
+            "a surface nobody has judged is not the person's"
         );
     }
 

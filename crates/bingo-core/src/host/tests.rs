@@ -112,7 +112,7 @@ async fn host_on(store: Arc<dyn SessionStore>, provider: Arc<ScriptedProvider>) 
 async fn one_turn(attachment: &mut Attachment, prompt: &str) -> Seq {
     attachment.handle.submit(
         IntentId::mint(),
-        Input::text(prompt, Origin::surface("test")),
+        Input::text(prompt, Origin::surface("tui")),
     );
     while let Some(frame) = attachment.events.next().await {
         if matches!(frame.event, Event::TurnCompleted { .. }) {

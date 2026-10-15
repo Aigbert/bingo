@@ -336,6 +336,14 @@ pub fn delivered(id: &str, surface: &str, principal: Option<&str>, text: &str) -
     )
 }
 
+/// The same item as its producer stamps it today, with a voice of its own.
+pub fn voiced(mut item: Item, voice: bingo_sdk::Voice) -> Item {
+    if let ItemBody::User { origin, .. } = &mut item.body {
+        origin.voice = Some(voice);
+    }
+    item
+}
+
 /// What a member posted into a room: a user item that names who wrote it and
 /// where, as the room plugin's fan-out stamps it.
 pub fn post(id: &str, principal: &str, text: &str) -> Item {
