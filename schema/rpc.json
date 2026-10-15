@@ -3642,6 +3642,17 @@
     "Origin": {
       "type": "object",
       "properties": {
+        "renderSurface": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SurfaceName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Drawing family of the caller, independent of its attribution identifier."
+        },
         "voice": {
           "anyOf": [
             {
@@ -5845,13 +5856,15 @@
               "type": "null"
             }
           ]
+        },
+        "selected": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
-      "required": [
-        "summary",
-        "config"
-      ],
-      "description": "A status drawing needs facts from the caller's fold, never its transcript."
+      "description": "Optional facts supplied by the asking surface, without transcript bodies."
     },
     "SubmitParams": {
       "type": "object",

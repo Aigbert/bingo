@@ -2339,6 +2339,17 @@
     "Origin": {
       "type": "object",
       "properties": {
+        "renderSurface": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SurfaceName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Drawing family of the caller, independent of its attribution identifier."
+        },
         "voice": {
           "anyOf": [
             {
@@ -2369,6 +2380,15 @@
         "surface"
       ],
       "description": "Who submitted the input, as every surface records it."
+    },
+    "SurfaceName": {
+      "type": "string",
+      "enum": [
+        "terminal",
+        "desktop",
+        "text",
+        "chat"
+      ]
     },
     "Voice": {
       "type": "string",

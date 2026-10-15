@@ -4242,6 +4242,17 @@
     "Origin": {
       "type": "object",
       "properties": {
+        "renderSurface": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SurfaceName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Drawing family of the caller, independent of its attribution identifier."
+        },
         "voice": {
           "anyOf": [
             {
@@ -7292,7 +7303,8 @@
       "enum": [
         "terminal",
         "desktop",
-        "text"
+        "text",
+        "chat"
       ]
     },
     "Viewport": {
@@ -7514,9 +7526,13 @@
       "type": "object",
       "properties": {
         "surface": {
-          "type": [
-            "string",
-            "null"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SurfaceName"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "command": {

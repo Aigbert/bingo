@@ -73,7 +73,8 @@ export namespace PromptSubmitInput {
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
 export type Delivery = ("wake" | "hold");
 export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
 }
@@ -85,8 +86,9 @@ export type ErrorCode = (("SESSION_NOT_FOUND" | "SESSION_LOCKED" | "SESSION_CLOS
 export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
 export type Input = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
 export type KernelError = { "code": ErrorCode; "message": string; [key: string]: unknown; };
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
 export type SessionId = string;
+export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export type Payload = ({ "accepted": Input; } | { "rejected": KernelError; } | { "redirect": { "input": Input; "session": SessionId; [key: string]: unknown; }; });
 }
@@ -221,10 +223,11 @@ export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | 
 export type Level = ("info" | "warn" | "error");
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
 export type ModelRequest = { "maxTokens": number; "messages": Array<Message>; "model": string; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "reasoning"?: (Effort | null); "session"?: (SessionId | null); "system": Array<SystemBlock>; "tools": Array<ToolSpec>; [key: string]: unknown; };
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
 export type Role = ("user" | "assistant");
 export type SelectOption = { "label": string; "value": string; [key: string]: unknown; };
 export type SessionId = string;
+export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
 export type TextChild = (string | View);
 export type Tone = (("neutral" | "good" | "bad") | "attention");
@@ -286,8 +289,9 @@ export type Action = { "args"?: unknown; "name": string; [key: string]: unknown;
 export type Delivery = ("wake" | "hold");
 export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
 export type Input = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
 export type SessionId = string;
+export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export type Payload = { "delivery": Delivery; "input": Input; "to": SessionId; [key: string]: unknown; };
 }
@@ -301,7 +305,8 @@ export namespace SessionReceiveInput {
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
 export type Delivery = ("wake" | "hold");
 export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
 }
@@ -310,7 +315,8 @@ export namespace SessionReceiveResult {
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
 export type Delivery = ("wake" | "hold");
 export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
 }
@@ -341,7 +347,8 @@ export type Payload = (string | null);
 export type TurnComplete = TurnCompleteInput.Payload;
 export namespace CommandRunInput {
 // Generated from JSON Schema. Do not edit.
-export type Payload = { "args": string; "command": string; "surface"?: (string | null); [key: string]: unknown; };
+export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+export type Payload = { "args": string; "command": string; "surface"?: (SurfaceName | null); [key: string]: unknown; };
 }
 export namespace CommandRunResult {
 // Generated from JSON Schema. Do not edit.
@@ -360,8 +367,9 @@ export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<Conte
 export type ItemId = string;
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
 export type Level = ("info" | "warn" | "error");
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
 export type SelectOption = { "label": string; "value": string; [key: string]: unknown; };
+export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 export type TextChild = (string | View);
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 export type ToolOutput = { "display"?: (View | null); "isError"?: boolean; "parts": Array<ContentPart>; [key: string]: unknown; };
