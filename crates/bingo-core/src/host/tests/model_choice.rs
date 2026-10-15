@@ -308,3 +308,21 @@ async fn a_small_summary_cannot_hide_a_retained_tail_that_still_overflows() {
     assert!(client.state.context.unwrap().used > 6300);
     host.shutdown().await;
 }
+
+#[tokio::test]
+async fn catalogue_switch_threshold_uses_the_resolved_output_budget() {
+    let home = tempfile::tempdir().unwrap();
+    let (host, _) = setup(home.path(), vec![], None).await;
+    host.refresh_models().await;
+    let catalog = host.catalog(CatalogKind::Models).await.unwrap();
+    let small = catalog
+        .entries
+        .iter()
+        .find(|e| e.id == "scripted/small")
+        .unwrap();
+    assert_eq!(small.meta["context"], 8000);
+    assert_eq!(small.meta["switchAt"], 6300);
+    assert_eq!(small.meta["images"], false);
+    assert_eq!(small.meta["limitsSource"], "configured");
+    host.shutdown().await;
+}

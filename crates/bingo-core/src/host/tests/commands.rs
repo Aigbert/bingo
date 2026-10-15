@@ -141,11 +141,13 @@ async fn model_and_think_change_the_next_turn_and_are_announced() {
     assert_eq!(client.state.config.kernel, json!({ "thinking": "high" }));
 
     let (ack, _) = client.ack("/model").await;
-    assert_eq!(
-        shown(&ack),
-        "model: scripted/m2\nthinking: high\nusage: /model [<provider>/]<model>",
-        "bare /model says who serves it, which model, and how hard it thinks"
+    let listing = shown(&ack);
+    assert!(
+        listing.starts_with(
+            "model: scripted/m2\nthinking: high\nusage: /model [<provider>/]<model>\n"
+        )
     );
+    assert!(listing.lines().any(|id| id == "scripted/m"));
 
     client.ack("hello").await;
     client.until_turn_completed().await;
@@ -170,11 +172,9 @@ async fn model_and_think_change_the_next_turn_and_are_announced() {
     );
 
     let (ack, _) = client.ack("/model").await;
-    assert_eq!(
-        shown(&ack),
-        "model: scripted/m2\nusage: /model [<provider>/]<model>",
-        "a turn that asks for no effort reports none"
-    );
+    let listing = shown(&ack);
+    assert!(listing.starts_with("model: scripted/m2\nusage: /model [<provider>/]<model>\n"));
+    assert!(listing.lines().any(|id| id == "scripted/m"));
 }
 
 /// The text of a `View::Text` outcome.

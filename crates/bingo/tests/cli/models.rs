@@ -250,10 +250,13 @@ fn thinking_text(home: &std::path::Path, prompt: &str) -> String {
 fn thinking_on_an_unknown_model_is_effective_and_remembered() {
     let home = thinking_home("");
     let path = home.path().join(".bingo/settings.toml");
-    assert_eq!(
-        thinking_text(home.path(), "/model"),
-        "model: fake/new-model\nthinking: low\nusage: /model [<provider>/]<model>\n"
+    let listing = thinking_text(home.path(), "/model");
+    assert!(
+        listing.starts_with(
+            "model: fake/new-model\nthinking: low\nusage: /model [<provider>/]<model>\n"
+        )
     );
+    assert!(listing.lines().any(|id| id == "fake/new-model"));
     assert_eq!(std::fs::read_to_string(&path).unwrap(), THINKING_SETTINGS);
     assert_eq!(
         thinking_text(home.path(), "/think high --keep"),
@@ -266,10 +269,11 @@ fn thinking_on_an_unknown_model_is_effective_and_remembered() {
     let saved = super::settings::read(&path);
     assert_eq!(saved["thinking"], "high");
     assert!(saved["models"].get("fake/new-model").is_none());
-    assert_eq!(
-        thinking_text(home.path(), "/model"),
+    let listing = thinking_text(home.path(), "/model");
+    assert!(listing.starts_with(
         "model: fake/new-model\nthinking: high\nusage: /model [<provider>/]<model>\n"
-    );
+    ));
+    assert!(listing.lines().any(|id| id == "fake/new-model"));
     assert_eq!(
         thinking_text(home.path(), "/think"),
         "thinking: high\nusage: /think <minimal|low|medium|high|xhigh|max|off>\n"
@@ -305,10 +309,11 @@ fn thinking_ignores_false_capability_metadata_without_rewriting_it() {
     let saved = super::settings::read(&path);
     assert_eq!(saved["thinking"], "xHigh");
     assert_eq!(saved["models"]["fake/new-model"]["reasoning"], false);
-    assert_eq!(
-        thinking_text(home.path(), "/model"),
+    let listing = thinking_text(home.path(), "/model");
+    assert!(listing.starts_with(
         "model: fake/new-model\nthinking: xhigh\nusage: /model [<provider>/]<model>\n"
-    );
+    ));
+    assert!(listing.lines().any(|id| id == "fake/new-model"));
 }
 
 #[test]
@@ -338,10 +343,9 @@ fn thinking_off_and_invalid_levels_preserve_model_overrides() {
             super::settings::read(&path)["thinking"],
             serde_json::Value::Null
         );
-        assert_eq!(
-            thinking_text(home.path(), "/model"),
-            "model: fake/new-model\nusage: /model [<provider>/]<model>\n"
-        );
+        let listing = thinking_text(home.path(), "/model");
+        assert!(listing.starts_with("model: fake/new-model\nusage: /model [<provider>/]<model>\n"));
+        assert!(listing.lines().any(|id| id == "fake/new-model"));
         assert_eq!(
             thinking_text(home.path(), "/think"),
             "thinking: off\nusage: /think <minimal|low|medium|high|xhigh|max|off>\n"

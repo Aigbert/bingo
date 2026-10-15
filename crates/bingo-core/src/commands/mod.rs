@@ -7,6 +7,7 @@ mod compact;
 mod login;
 mod model;
 mod models;
+mod next;
 mod pin;
 mod plugin_trust;
 mod plugins;
@@ -23,6 +24,14 @@ use crate::host::Host;
 
 pub(crate) fn builtins(host: Weak<Host>) -> Vec<Arc<dyn Command>> {
     vec![
+        Arc::new(next::NextCommand {
+            host: host.clone(),
+            model: true,
+        }),
+        Arc::new(next::NextCommand {
+            host: host.clone(),
+            model: false,
+        }),
         Arc::new(model::ModelCommand { host: host.clone() }),
         Arc::new(models::ModelsCommand { host: host.clone() }),
         Arc::new(think::ThinkCommand { host: host.clone() }),

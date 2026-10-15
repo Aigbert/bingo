@@ -58,6 +58,33 @@ async fn set(
     wanted: &str,
 ) -> Result<CommandOutcome, KernelError> {
     let (wanted, keep) = super::choice_args(wanted)?;
+    let next;
+    let wanted = if wanted == "next" {
+        let choice = host.session_model(&cx.session).await?.ok_or_else(|| {
+            KernelError::new(ErrorCode::InvalidInput, "a log session has no model")
+        })?;
+        let id = format!("{}/{}", choice.endpoint.id(), choice.id);
+        let entry = host
+            .catalog(CatalogKind::Models)
+            .await?
+            .entries
+            .into_iter()
+            .find(|entry| entry.id == id);
+        let efforts: Vec<String> = entry
+            .and_then(|entry| serde_json::from_value(entry.meta["efforts"].clone()).ok())
+            .unwrap_or_default();
+        next = super::next::after(&efforts, Effort::word(host.session_thinking(&cx.session)?))
+            .ok_or_else(|| {
+                KernelError::new(
+                    ErrorCode::InvalidInput,
+                    "This model has no reasoning effort dial.",
+                )
+            })?
+            .to_owned();
+        &next
+    } else {
+        wanted
+    };
     let level = Effort::spoken(wanted).ok_or_else(|| {
         KernelError::new(
             ErrorCode::InvalidInput,

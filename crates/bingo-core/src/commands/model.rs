@@ -74,7 +74,17 @@ impl Command for ModelCommand {
 async fn report(host: &Arc<Host>, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
     let choice = running_on(host, cx).await?;
     Ok(CommandOutcome::View {
-        view: View::text(format!("{}\n{USAGE}", said(&choice))),
+        view: View::text(format!(
+            "{}\n{USAGE}\n{}",
+            said(&choice),
+            host.catalog(CatalogKind::Models)
+                .await?
+                .entries
+                .into_iter()
+                .map(|entry| entry.id)
+                .collect::<Vec<_>>()
+                .join("\n")
+        )),
     })
 }
 
@@ -83,6 +93,32 @@ async fn target(
     session: &SessionId,
     wanted: &str,
 ) -> Result<ModelChoice, KernelError> {
+    let next;
+    let wanted = if wanted == "next" {
+        let choice = host.session_model(session).await?.ok_or_else(|| {
+            KernelError::new(ErrorCode::InvalidInput, "a log session has no model")
+        })?;
+        let current = format!("{}/{}", choice.endpoint.id(), choice.id);
+        let pins = host
+            .catalog(CatalogKind::Models)
+            .await?
+            .entries
+            .into_iter()
+            .filter(|entry| entry.meta["pinned"] == true)
+            .map(|entry| entry.id)
+            .collect::<Vec<_>>();
+        next = super::next::after(&pins, &current)
+            .ok_or_else(|| {
+                KernelError::new(
+                    ErrorCode::InvalidInput,
+                    "No pinned models; use /model pin <id> first.",
+                )
+            })?
+            .to_owned();
+        &next
+    } else {
+        wanted
+    };
     let known = host.catalog(CatalogKind::Providers).await?.entries;
     let (provider, model) = split(wanted, |id| known.iter().any(|p| p.id == id));
     model_switch::proposed_model(host, session, provider.map(str::to_owned), model.to_owned()).await
