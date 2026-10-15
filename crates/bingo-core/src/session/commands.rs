@@ -319,6 +319,7 @@ impl Commands {
             asked,
             vouched,
         } = run;
+        let pressed = vouched.is_some();
         let own = Arc::new(AtomicBool::new(false));
         self.inflight.insert(
             intent.clone(),
@@ -337,6 +338,7 @@ impl Commands {
             let report = crate::chain::Report::default();
             let work =
                 crate::chain::command::run(command, args, &cx, &hooks, &hook_cx, report.clone());
+            let work = bingo_sdk::render::under_press(pressed, work);
             let future =
                 AssertUnwindSafe(bingo_sdk::render::under_input(asked, work)).catch_unwind();
             let returned = super::running::supervised(future, &cancel).await;

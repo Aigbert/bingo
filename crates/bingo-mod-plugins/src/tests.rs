@@ -390,6 +390,7 @@ fn pressed_on(
         request,
         key,
         row,
+        vouched: true,
     };
     keys::Handler(state.clone())
         .press(&at, props, servers)

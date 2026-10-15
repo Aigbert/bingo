@@ -28,6 +28,7 @@ impl Command for Handler {
             request,
             key,
             row: args["row"].as_str(),
+            vouched: render::vouched(),
         };
         let value = self.press(&at, &props, &servers)?;
         cx.host
@@ -42,12 +43,14 @@ impl Command for Handler {
     }
 }
 /// One key press: the session the kernel says it came from, the drawing it
-/// answers, and the row that drawing showed selected.
+/// answers, the row that drawing showed selected, and whether the kernel
+/// vouches that this panel drew it and the press reached it as pressed.
 pub(crate) struct Press<'a> {
     pub session: &'a SessionId,
     pub request: &'a str,
     pub key: &'a str,
     pub row: Option<&'a str>,
+    pub vouched: bool,
 }
 impl Handler {
     pub(crate) fn press(
@@ -56,6 +59,9 @@ impl Handler {
         props: &PluginsProps,
         servers: &[bingo_services::mcp::ServerRow],
     ) -> Result<Value, KernelError> {
+        if !at.vouched {
+            return Ok(unvouched());
+        }
         let key = at.key;
         let mut state = self.0.lock().map_err(crate::error)?;
         let identity = (at.session.clone(), at.request.into());
@@ -123,6 +129,11 @@ impl Handler {
 /// cursor's acts on nothing; the redraw shows the person what is there now.
 fn stale() -> Value {
     json!({"message":"the list changed; look again and press once more"})
+}
+/// A key the kernel does not vouch for, drawn by someone else or changed on
+/// its way here, moves no cursor, opens no review and runs nothing.
+fn unvouched() -> Value {
+    json!({"message":"that key did not come from this panel as pressed; nothing changed"})
 }
 fn operation(verb: Verb) -> Value {
     match verb {

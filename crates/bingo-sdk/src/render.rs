@@ -255,6 +255,17 @@ pub async fn under_input<T>(asked: bool, future: impl std::future::Future<Output
     PERSON_INPUT.scope(asked, future).await
 }
 
+tokio::task_local! { static VOUCHED_PRESS: bool; }
+/// Whether the key this run answers was pressed on a drawing the running
+/// built-in drew itself and reached it as pressed. The core binds this; a
+/// mod cannot set it through JSON.
+pub fn vouched() -> bool {
+    VOUCHED_PRESS.try_with(|vouched| *vouched).unwrap_or(false)
+}
+pub async fn under_press<T>(vouched: bool, future: impl std::future::Future<Output = T>) -> T {
+    VOUCHED_PRESS.scope(vouched, future).await
+}
+
 /// A placement has no asking surface until a client pulls it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
