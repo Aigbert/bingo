@@ -144,3 +144,4 @@ tmux -L m177r2, temp HOME, fake provider, 108x30 and 80x24, browse open over a 6
   "▍ Worked for 6s · done" → rewind turn 2 (sheet: one "undoes turn 2 · 2 items") → worked lines after rewind: 0; composer "> two"
 ```
 Older journals: unstamped room/wake/`plugin:*` user lines now draw as quiet notices; plugin-host deliveries without a voice are Quiet.
+Rebased onto M175 (dev 4f13c12e), one effective voice shared by `asked`/`first_ask` and the sessions auto-title: fmt, clippy, test (177 suites, 5817 passed, 0 failed, 5 ignored), schema regen clean, node 31/31, discipline, budget (416/416), deny, tui-smoke ×3 all ok.
