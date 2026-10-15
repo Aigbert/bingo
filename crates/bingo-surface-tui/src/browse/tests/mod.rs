@@ -3,23 +3,29 @@ use crate::test_support::key;
 use crate::test_support::*;
 use bingo_services::checkpoints::{Checkpoints, Fate, File, Touched};
 use std::sync::Arc;
-struct Preview;
+use std::sync::atomic::{AtomicUsize, Ordering};
+mod regressions;
+struct Preview(Arc<AtomicUsize>);
 #[async_trait::async_trait]
 impl Checkpoints for Preview {
     async fn touched(&self, _: &SessionId, _: &TurnId) -> Result<Touched, ServiceError> {
+        self.0.fetch_add(1, Ordering::SeqCst);
         Ok(Touched {
             files: vec![
                 File {
                     path: "crates/bingo-core/src/fork.rs".into(),
                     fate: Fate::Restored,
+                    changed: false,
                 },
                 File {
                     path: "crates/bingo-core/src/fork/tests.rs".into(),
                     fate: Fate::Removed,
+                    changed: false,
                 },
                 File {
                     path: "assets/big.bin".into(),
                     fate: Fate::Skipped,
+                    changed: false,
                 },
             ],
             shell_calls: 2,
@@ -31,6 +37,7 @@ struct Fixture {
     handler: Arc<dyn Command>,
     host: HostHandle,
     commands: Vec<CommandSpec>,
+    calls: Arc<AtomicUsize>,
     _home: tempfile::TempDir,
 }
 impl Fixture {
@@ -76,13 +83,15 @@ impl Fixture {
                 }
             })
             .collect();
-        let preview: Arc<dyn Checkpoints> = Arc::new(Preview);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let preview: Arc<dyn Checkpoints> = Arc::new(Preview(calls.clone()));
         let host = testing::ServiceHost::holding(&bingo_services::checkpoints::KEY, preview);
         Self {
             link,
             handler,
             host,
             commands,
+            calls,
             _home: home,
         }
     }
@@ -94,7 +103,7 @@ impl Fixture {
         width: u16,
         height: u16,
     ) -> String {
-        for _ in 0..3 {
+        for _ in 0..6 {
             draw_tree(width, height, &solo(state), ui, now);
             let key = ui
                 .shown
@@ -133,6 +142,9 @@ impl Fixture {
             .unwrap();
             ui.placed.pulled.request(&key);
             ui.placed.pulled.answer(key, view);
+            draw_tree(width, height, &solo(state), ui, now);
+            let effects = preview(ui, &solo(state), now);
+            self.perform(ui, state, effects, now).await;
         }
         draw_tree(width, height, &solo(state), ui, now)
     }
@@ -144,6 +156,15 @@ impl Fixture {
         now: Now,
     ) -> Vec<Effect> {
         let effects = crate::input::on_key(ui, &solo(state), key, now);
+        self.perform(ui, state, effects, now).await
+    }
+    async fn perform(
+        &self,
+        ui: &mut Ui,
+        state: &SessionState,
+        effects: Vec<Effect>,
+        now: Now,
+    ) -> Vec<Effect> {
         let Some(Effect::SiteKey { action, .. }) = effects.first() else {
             return effects;
         };
@@ -290,10 +311,10 @@ async fn copy_page_escape_and_card_use_the_current_drawing() {
 #[test]
 fn opener_uses_catalogue_and_disabled_falls_back_to_line_search() {
     let fixture = Fixture::new();
-    let (state, mut ui, now) = setup(&fixture);
+    let (mut state, mut ui, now) = setup(&fixture);
     let effects = crate::input::on_key(&mut ui, &solo(&state), ctrl('f'), now);
     assert!(matches!(&effects[0], Effect::Submit(Input::Text { text, .. }) if text == "/browse"));
-    ui.catalogs.commands.clear();
+    state.config.kernel["enabledPlugins"] = json!({"bingo.mod.browse":false});
     assert!(crate::input::on_key(&mut ui, &solo(&state), ctrl('f'), now).is_empty());
     assert!(ui.focus.search().is_some());
 }
@@ -302,7 +323,7 @@ fn opener_uses_catalogue_and_disabled_falls_back_to_line_search() {
 async fn double_escape_card_confirms_and_disabled_card_submits_directly() {
     for enabled in [true, false] {
         let fixture = Fixture::new();
-        let (state, mut ui, now) = setup(&fixture);
+        let (mut state, mut ui, now) = setup(&fixture);
         ui.catalogs.commands.push(
             serde_json::from_value(
                 json!({"name":"rewind","hint":"rewind","args":{"kind":"none"},"family":"session"}),
@@ -310,7 +331,7 @@ async fn double_escape_card_confirms_and_disabled_card_submits_directly() {
             .unwrap(),
         );
         if !enabled {
-            ui.catalogs.commands.retain(|s| s.name != "browse");
+            state.config.kernel["enabledPlugins"] = json!({"bingo.mod.browse":false});
         }
         for _ in 0..2 {
             crate::input::on_key(&mut ui, &solo(&state), key(KeyCode::Esc), now);
@@ -389,7 +410,7 @@ async fn invalidated_drawings_hold_keys_and_switching_off_restores_line_search()
         .invalidated
         .insert(request(&ui).unwrap().to_owned(), 1);
     assert!(waiting(&ui, &solo(&state)));
-    ui.catalogs.commands.clear();
+    state.config.kernel["enabledPlugins"] = json!({"bingo.mod.browse":false});
     state.config.kernel["render"] = json!({});
     draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(!waiting(&ui, &solo(&state)));

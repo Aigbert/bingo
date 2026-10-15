@@ -100,6 +100,12 @@ fn composer_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effec
     if matches!(key.code, KeyCode::Char(_)) && (key.modifiers - KeyModifiers::SHIFT).is_empty() {
         ui.last_typed = Some(now.wall);
     }
+    if key == KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL)
+        && !crate::browse::offered(ui, tree)
+    {
+        ui.focus = crate::focus::Focus::Search(Search::open());
+        return Vec::new();
+    }
     if let Some(line) = keys::commands::line(ui, tree.viewed(), key) {
         return command_line(ui, tree, now, line);
     }

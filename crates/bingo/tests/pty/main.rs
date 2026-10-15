@@ -45,7 +45,8 @@ const READS_A_PICTURE: &str = r#"{"responses":[
 /// put back as well as a conversation (M67).
 const WRITES_A_NOTE: &str = r#"{"responses":[
   {"steps":[{"toolCall":{"name":"Write","input":{"file_path":"note.md","content":"written by the turn\n"}}}]},
-  {"steps":[{"text":"Wrote the note."}]}]}"#;
+  {"steps":[{"text":"Wrote the note."}]},
+  {"steps":[{"text":"Next turn is clean."}]}]}"#;
 
 /// An answer that names a picture in its own words and calls nothing: the
 /// path by which a picture reaches the transcript without a tool at all
@@ -615,7 +616,12 @@ fn esc_twice_confirms_then_rewinds_the_turn_and_file() {
     // And the turn is out of the transcript.
     terminal.wait_gone("Wrote the note.");
     terminal.wait_for("> write me a note");
-    terminal.send(&[0x15, 0x04]);
+    assert!(!terminal.screen().contains("no such turn"));
+    terminal.send(b"\x15next turn\r");
+    terminal.wait_for("Next turn is clean.");
+    assert!(!terminal.screen().contains("browse (ui.render)"));
+    assert!(!terminal.screen().contains("no such turn"));
+    terminal.send(&[0x04]);
     terminal.leave();
 }
 

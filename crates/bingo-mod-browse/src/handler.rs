@@ -54,11 +54,11 @@ impl Command for Handler {
             .unwrap_or_else(|| initial(&props));
         let operation = keys::press(&mut cursor, &props, key);
         if operation == Operation::Preview {
-            cursor.sheet = Some(preview(&cx.host, &props, &cx.cwd).await?);
-            cursor.mode = Default::default();
+            load_preview(&mut cursor, &props, cx).await?;
         }
         let value = match operation {
             Operation::Close => json!({"close":true}),
+            Operation::Notice(message) => json!({"notice":message}),
             Operation::Run(line) => json!({"run":line}),
             Operation::Pager(item) => json!({"pager":item}),
             Operation::Copy(item) => json!({"copy":item}),
@@ -66,28 +66,47 @@ impl Command for Handler {
         };
         {
             let mut state = self.0.lock().map_err(crate::error)?;
-            if value.get("close").is_some()
-                || value.get("run").is_some()
-                || value.get("pager").is_some()
-            {
+            if value.get("close").is_some() || value.get("run").is_some() {
                 state.remove(&id);
             } else {
                 state.insert(id, cursor);
             }
         }
+        outcome(props.action, value, request, cx).await
+    }
+}
+async fn load_preview(
+    cursor: &mut Cursor,
+    props: &BrowseProps,
+    cx: &CommandContext,
+) -> Result<(), KernelError> {
+    let mut target = props.clone();
+    target.selected = cursor
+        .sheet
+        .as_ref()
+        .and_then(|sheet| sheet.turns.first().map(|turn| turn.id.clone()))
+        .or_else(|| cursor.selected.clone());
+    cursor.sheet = preview(&cx.host, &target, &cx.cwd).await?;
+    cursor.sheet_top = 0;
+    Ok(())
+}
+async fn outcome(
+    mut action: Action,
+    value: Value,
+    request: &str,
+    cx: &CommandContext,
+) -> Result<CommandOutcome, KernelError> {
+    if value.is_null() {
         cx.host
             .invalidate(&cx.session, vec![request.into()])
             .await?;
-        if value.is_null() {
-            return Ok(CommandOutcome::Handled { handled: true });
-        }
-        let mut action = props.action;
-        action.args["value"] = value;
-        Ok(CommandOutcome::Surface {
-            action,
-            fallback: None,
-        })
+        return Ok(CommandOutcome::Handled { handled: true });
     }
+    action.args["value"] = value;
+    Ok(CommandOutcome::Surface {
+        action,
+        fallback: None,
+    })
 }
 pub(crate) fn initial(props: &BrowseProps) -> Cursor {
     Cursor {
@@ -101,22 +120,33 @@ pub(crate) async fn preview(
     host: &HostHandle,
     props: &BrowseProps,
     cwd: &std::path::Path,
-) -> Result<bingo_services::checkpoints::Touched, KernelError> {
-    let turn = props
-        .selected
-        .as_ref()
-        .ok_or_else(|| KernelError::new(ErrorCode::InvalidInput, "there is no turn to rewind"))?;
+) -> Result<Option<crate::Preview>, KernelError> {
+    if props.busy {
+        return Ok(None);
+    }
+    let Some(at) = props
+        .turns
+        .iter()
+        .position(|turn| Some(&turn.id) == props.selected.as_ref())
+    else {
+        return Ok(None);
+    };
     let service = bingo_services::checkpoints::find(host).ok_or_else(|| {
         KernelError::new(ErrorCode::NotReady, "checkpoint preview is unavailable")
     })?;
-    let mut touched = service
-        .touched(&props.session, turn)
-        .await
-        .map_err(crate::error)?;
+    let mut touched = match service.touched(&props.session, &props.turns[at].id).await {
+        Ok(touched) => touched,
+        Err(error) if error.0.contains("no such turn") => return Ok(None),
+        Err(error) => return Err(crate::error(error)),
+    };
     for file in &mut touched.files {
         if let Ok(relative) = file.path.strip_prefix(cwd) {
             file.path = relative.to_path_buf();
         }
     }
-    Ok(touched)
+    Ok(Some(crate::Preview {
+        turns: props.turns[at..].to_vec(),
+        length: props.length,
+        touched,
+    }))
 }

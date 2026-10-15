@@ -48,6 +48,12 @@ pub(super) fn ctrl_c(run: &mut Run, key: crossterm::event::KeyEvent) -> bool {
     true
 }
 
+/// Whether a drawing belongs to the site still open. Browse keeps its state
+/// while its pager is up, so its drawing stays current while it is kept.
+fn current(ui: &Ui, id: &str) -> bool {
+    (open(ui) && request(ui) == Some(id)) || crate::browse::request(ui) == Some(id)
+}
+
 /// An in-flight drawing can finish after close and allocate its cursor then.
 pub(super) fn retired(run: &mut Run, key: &crate::pulled::Key, view: &View) -> bool {
     if !matches!(
@@ -55,7 +61,7 @@ pub(super) fn retired(run: &mut Run, key: &crate::pulled::Key, view: &View) -> b
         bingo_sdk::render::Component::Palette
             | bingo_sdk::render::Component::Sessions
             | bingo_sdk::render::Component::Browse
-    ) || (open(&run.ui) && request(&run.ui) == Some(key.request.request_id.as_str()))
+    ) || current(&run.ui, &key.request.request_id)
     {
         return false;
     }

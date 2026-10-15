@@ -259,6 +259,7 @@ pub struct Placed {
 #[derive(Debug)]
 pub struct Ui {
     pub placed: Placed,
+    pub browse: crate::browse::cache::Cache,
     pub(crate) controls: controls::Controls,
     pub scroll: Scroll,
     pub notices: Vec<Notice>,
@@ -317,6 +318,7 @@ impl Ui {
         Self {
             controls: controls::Controls::new(history),
             placed: Placed::default(),
+            browse: Default::default(),
             scroll: Scroll::default(),
             notices: Vec::new(),
             block: None,

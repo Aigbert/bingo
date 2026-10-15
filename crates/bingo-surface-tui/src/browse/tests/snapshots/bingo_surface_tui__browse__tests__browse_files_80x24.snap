@@ -14,7 +14,7 @@ expression: screen
 "⏺ Read(example.rs)                                                              "
 "┌──────────────────────────────────────────────────────────────────────────────┐"
 "│ rewind to turn 2                                                             │"
-"│ undoes turns 2–2 · 2 items                                                   │"
+"│ no turns are undone                                                          │"
 "│ restored crates/bingo-core/src/fork.rs                                       │"
 "│ removed  crates/bingo-core/src/fork/tests.rs                                 │"
 "│ skipped  assets/big.bin (too large or not a file)                            │"

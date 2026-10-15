@@ -11,6 +11,7 @@ where you are, the window used against the whole, and the model.
 
 ## The keys
 
+- `ctrl+f` — Browse by turns; line search when the Browse mod is disabled.
 - `enter` — send the message, or open the focused block.
 - `shift+enter` — a newline. `ctrl+j`, `alt+enter` and `\` then `enter` do the
   same, for terminals that cannot tell the first one apart from `enter`.

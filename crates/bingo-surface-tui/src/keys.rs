@@ -13,6 +13,11 @@ pub struct Binding {
 /// In the order the panel lists them.
 pub const BINDINGS: &[Binding] = &[
     Binding {
+        keys: "ctrl+f",
+        group: "move",
+        description: "line search / browse",
+    },
+    Binding {
         keys: "/",
         group: "sessions",
         description: "commands in the palette",

@@ -2,7 +2,7 @@
 source: crates/bingo-surface-tui/src/browse/tests/mod.rs
 expression: screen
 ---
-"browse · turn 1 of 2 · "" 0/0 (n/N)  [ ] turn  ⏎ page  y copy  r rewind         "
+"browse · turn 1 of 2  [ ] turn  ⏎ page  y copy  r rewind                        "
 "                                                                                "
 "                                                                                "
 "> inspect the fork                                                              "

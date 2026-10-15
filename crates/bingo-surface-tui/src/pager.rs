@@ -35,6 +35,7 @@ pub struct Pager {
     pub top: usize,
     /// `/` within the sheet, while one is open.
     pub search: Option<Search>,
+    pub return_to: Option<Box<Open>>,
 }
 
 impl Pager {
@@ -43,6 +44,7 @@ impl Pager {
             item,
             top: 0,
             search: None,
+            return_to: None,
         }
     }
 
@@ -72,6 +74,26 @@ impl Pager {
         } else if line >= self.top + window.rows {
             self.top = (line + 1).saturating_sub(window.rows).min(window.last());
         }
+    }
+}
+
+pub fn show(ui: &mut Ui, item: ItemId, now: Now) {
+    let mut pager = Pager::open(item);
+    if matches!(ui.focus.open(), Open::Browse(_)) {
+        pager.return_to = Some(Box::new(ui.focus.open().clone()));
+    }
+    ui.focus.show(Open::Pager(pager), now.instant);
+}
+pub fn content(
+    state: &SessionState,
+    item: &Item,
+    width: usize,
+    pager: &Pager,
+) -> Vec<Line<'static>> {
+    if matches!(pager.return_to.as_deref(), Some(Open::Browse(_))) {
+        whole(state, item, width)
+    } else {
+        lines(state, item, width)
     }
 }
 
@@ -279,7 +301,7 @@ fn content_of(ui: &Ui, tree: &Tree) -> Vec<Line<'static>> {
     };
     let width = width_of(ui);
     source(tree, &open.item)
-        .map(|(state, item)| whole(state, item, width))
+        .map(|(state, item)| content(state, item, width, open))
         .unwrap_or_default()
 }
 
@@ -325,6 +347,12 @@ fn moved(open: &mut Pager, key: KeyEvent, window: Window) {
 /// in. Forgetting the entry *is* the fold: the start is written in one place
 /// ([`crate::fold`]) and never copied here.
 fn closed(ui: &mut Ui, now: Now) {
+    if let Some(Open::Pager(pager)) = ui.focus.open_mut()
+        && let Some(previous) = pager.return_to.take()
+    {
+        ui.focus.show(*previous, now.instant);
+        return;
+    }
     let opened = match ui.focus.open() {
         Open::Pager(open) => Some(open.item.clone()),
         _ => None,

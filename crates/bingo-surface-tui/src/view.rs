@@ -297,7 +297,7 @@ fn paged(
     let Some((state, item)) = pager::source(tree, &open.item) else {
         return;
     };
-    let content = pager::whole(state, item, above.width as usize);
+    let content = pager::content(state, item, above.width as usize, open);
     let window = pager::Window {
         height: content.len(),
         rows: usize::from(above.height).saturating_sub(pager::HEAD),

@@ -23,32 +23,37 @@ impl Interceptor for Drawing {
         let request: render::RenderRequest = serde_json::from_value(value).map_err(crate::error)?;
         let mut props: BrowseProps = serde_json::from_value(request.props).map_err(crate::error)?;
         let id = (cx.session.clone(), request.request_id.clone());
-        let existing = self.0.lock().map_err(crate::error)?.get(&id).cloned();
-        let mut cursor = existing
-            .clone()
+        let mut cursor = self
+            .0
+            .lock()
+            .map_err(crate::error)?
+            .get(&id)
+            .cloned()
             .unwrap_or_else(|| crate::handler::initial(&props));
-        if existing.is_none() && props.confirm {
-            cursor.sheet = Some(crate::handler::preview(&cx.host, &props, &cx.cwd).await?);
-        }
         if !props
             .turns
             .iter()
-            .any(|t| Some(&t.id) == cursor.selected.as_ref())
+            .any(|turn| Some(&turn.id) == cursor.selected.as_ref())
         {
-            cursor.selected = props.turns.last().map(|t| t.id.clone());
+            cursor.selected = props.turns.last().map(|turn| turn.id.clone());
             cursor.sheet = None;
         }
-        if props.query == cursor.query {
-            cursor.current = cursor.current.min(props.matches.len().saturating_sub(1));
-        }
-        if props.query == cursor.query
-            && let Some(hit) = props.matches.get(cursor.current)
-        {
-            cursor.selected = hit.turn.clone().or(cursor.selected);
+        if cursor.sheet.is_none() && props.query == cursor.query {
+            cursor.current = cursor.current.min(props.count.saturating_sub(1));
+            if cursor.current == props.current
+                && let Some(hit) = &props.hit
+            {
+                cursor.selected = hit.turn.clone().or(cursor.selected);
+            }
         }
         props.selected = cursor.selected.clone();
         props.query = cursor.query.clone();
         props.current = cursor.current;
+        props.refresh = cursor
+            .sheet
+            .as_ref()
+            .is_some_and(|sheet| sheet.length != props.length);
+        props.previewed = cursor.sheet.is_some() && !props.refresh;
         let view = tree(&props, &cursor, &request.request_id, request.viewport.rows);
         self.0.lock().map_err(crate::error)?.insert(id, cursor);
         serde_json::to_value(view).map_err(crate::error)
@@ -61,26 +66,35 @@ fn tree(props: &BrowseProps, cursor: &Cursor, request: &str, height: u16) -> Vie
         .position(|t| Some(&t.id) == props.selected.as_ref());
     let query = cursor.editing.as_ref().unwrap_or(&props.query);
     let hint = if cursor.editing.is_some() {
-        "⏎ search · esc close"
+        "⏎ search · esc clear"
     } else {
         "[ ] turn  ⏎ page  y copy  r rewind"
     };
-    let mut children = vec![View::text(format!(
-        "browse · turn {} of {} · {:?} {}/{} (n/N)  {hint}",
+    let position = format!(
+        "browse · turn {} of {}",
         at.map_or(0, |a| a + 1),
-        props.turns.len(),
-        query,
-        if props.matches.is_empty() {
-            0
-        } else {
-            props.current + 1
-        },
-        props.matches.len()
-    ))];
-    if let Some(touched) = &cursor.sheet
+        props.turns.len()
+    );
+    let search = if query.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " · {query:?} {}/{}{} (n/N)",
+            if props.count == 0 {
+                0
+            } else {
+                props.current + 1
+            },
+            props.count,
+            if props.count == 1000 { "+" } else { "" }
+        )
+    };
+    let mut children = vec![View::text(format!("{position}{search}  {hint}"))];
+    if let Some(shown) = &cursor.sheet
         && let Some(at) = at
+        && !props.refresh
     {
-        children.push(sheet(props, cursor, touched, at, height));
+        children.push(sheet(cursor, shown, at, height));
     }
     View::Box {
         children,
@@ -93,43 +107,28 @@ fn tree(props: &BrowseProps, cursor: &Cursor, request: &str, height: u16) -> Vie
         }),
     }
 }
-fn sheet(
-    props: &BrowseProps,
-    cursor: &Cursor,
-    touched: &bingo_services::checkpoints::Touched,
-    at: usize,
-    height: u16,
-) -> View {
-    let Some(sheet) = crate::sheet::sheet(&props.turns[at..], touched, cursor.mode) else {
+fn sheet(cursor: &Cursor, shown: &crate::Preview, at: usize, height: u16) -> View {
+    let Some(sheet) = crate::sheet::sheet(&shown.turns, &shown.touched, cursor.mode) else {
         return View::text("no turn to rewind");
+    };
+    let range = if shown.turns.len() == 1 {
+        format!("turn {}", at + 1)
+    } else {
+        format!("turns {}–{}", at + 1, at + shown.turns.len())
+    };
+    let summary = if cursor.mode == crate::sheet::Mode::Files {
+        "no turns are undone".into()
+    } else {
+        format!(
+            "undoes {range} · {} items",
+            shown.turns.last().map_or(0, |t| t.last + 1) - shown.turns[0].first
+        )
     };
     let mut children = vec![
         View::text(format!("rewind to turn {}", at + 1)),
-        View::text(format!(
-            "undoes turns {}–{} · {} items",
-            at + 1,
-            props.turns.len(),
-            props.turns.last().map_or(0, |t| t.last + 1) - props.turns[at].first
-        )),
+        View::text(summary),
     ];
-    let files = touched.files.len().max(1);
-    let room = usize::from(height).saturating_sub(9).max(1);
-    children.extend(
-        sheet
-            .rows
-            .iter()
-            .skip(1 + cursor.sheet_top)
-            .take(files.saturating_sub(cursor.sheet_top).min(room))
-            .map(View::text),
-    );
-    if files > room {
-        children.push(View::text(format!(
-            "↑↓ files {}–{} of {files}",
-            cursor.sheet_top + 1,
-            (cursor.sheet_top + room).min(files)
-        )));
-    }
-    children.extend(sheet.rows.iter().skip(1 + files).map(View::text));
+    file_rows(&mut children, &sheet, shown, cursor, height);
     children.push(View::text(format!(
         "{}    ⏎ rewind  esc",
         [
@@ -151,4 +150,35 @@ fn sheet(
             ..Default::default()
         }),
     }
+}
+
+fn file_rows(
+    children: &mut Vec<View>,
+    sheet: &crate::sheet::Sheet,
+    shown: &crate::Preview,
+    cursor: &Cursor,
+    height: u16,
+) {
+    let files = if cursor.mode == crate::sheet::Mode::Conversation {
+        1
+    } else {
+        shown.touched.files.len().max(1)
+    };
+    let room = usize::from(height).saturating_sub(9).max(1);
+    children.extend(
+        sheet
+            .rows
+            .iter()
+            .skip(1 + cursor.sheet_top)
+            .take(files.saturating_sub(cursor.sheet_top).min(room))
+            .map(View::text),
+    );
+    if files > room {
+        children.push(View::text(format!(
+            "↑↓ files {}–{} of {files}",
+            cursor.sheet_top + 1,
+            (cursor.sheet_top + room).min(files)
+        )));
+    }
+    children.extend(sheet.rows.iter().skip(1 + files).map(View::text));
 }

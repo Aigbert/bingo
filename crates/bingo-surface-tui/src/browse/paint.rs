@@ -4,7 +4,7 @@ pub fn folds(ui: &Ui, tree: &Tree) -> Folds {
     let mut folds = ui.folds.clone();
     if active(ui)
         && let Some(props) = current(ui)
-        && let Some(hit) = props.matches.get(props.current)
+        && let Some(hit) = props.hit.as_ref()
     {
         folds.insert(anchor(tree.viewed(), &hit.item), Fold::Open);
     }
@@ -20,30 +20,25 @@ pub fn top(ui: &Ui, tree: &Tree, frame: &crate::layout::Layout, rows: usize) -> 
         return None;
     }
     let props = current(ui)?;
-    let item = props
-        .matches
-        .get(props.current)
-        .map(|m| m.item.clone())
-        .or_else(|| {
-            let turn = props
-                .turns
-                .iter()
-                .find(|t| Some(&t.id) == props.selected.as_ref())?;
-            tree.viewed()
-                .transcript
-                .items()
-                .get(turn.first)
-                .map(|i| i.id.clone())
-        })?;
+    let item = props.hit.as_ref().map(|m| m.item.clone()).or_else(|| {
+        let turn = props
+            .turns
+            .iter()
+            .find(|t| Some(&t.id) == props.selected.as_ref())?;
+        tree.viewed()
+            .transcript
+            .items()
+            .get(turn.first)
+            .map(|i| i.id.clone())
+    })?;
     let item = anchor(tree.viewed(), &item);
     let (start, end) = frame.blocks.span(&item)?;
-    let offset = matching_line(&props, tree.viewed(), &item, frame, start, end);
+    let offset = matching_line(&props, tree.viewed(), frame, start, end);
     Some((start + offset).min(frame.height.saturating_sub(rows)))
 }
 fn matching_line(
     props: &BrowseProps,
     state: &SessionState,
-    item: &ItemId,
     frame: &crate::layout::Layout,
     start: usize,
     end: usize,
@@ -52,11 +47,18 @@ fn matching_line(
         return 0;
     }
     let ordinal = props
-        .matches
-        .iter()
-        .take(props.current)
-        .filter(|m| &anchor(state, &m.item) == item)
-        .count();
+        .hit
+        .as_ref()
+        .and_then(|hit| {
+            state.transcript.get(&hit.item).map(|item| {
+                transcript::text(item)
+                    .lines()
+                    .take(hit.line)
+                    .filter(|line| line.to_lowercase().contains(&props.query.to_lowercase()))
+                    .count()
+            })
+        })
+        .unwrap_or(0);
     let query = props.query.to_lowercase();
     frame
         .blocks

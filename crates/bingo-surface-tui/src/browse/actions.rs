@@ -4,10 +4,21 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect
         return vec![];
     }
     let value = &action.args["value"];
+    if let Some(message) = value["notice"].as_str() {
+        ui.notify(Level::Warn, message, now.instant);
+    }
     if value["close"] == true {
         ui.focus.close(now.instant);
     }
     if let Some(line) = value["run"].as_str() {
+        if tree.viewed().busy() {
+            ui.notify(
+                Level::Warn,
+                "Wait for the running turn before rewinding",
+                now.instant,
+            );
+            return vec![];
+        }
         ui.focus.close(now.instant);
         return crate::input::command_line(ui, tree, now, line.into());
     }
@@ -16,12 +27,19 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect
             && let Some(item) = selected_item(ui, tree, value)
         {
             if name == "copy" {
-                return vec![Effect::Copy(transcript::text(item))];
+                return vec![Effect::Copy(
+                    crate::pager::whole(
+                        tree.viewed(),
+                        item,
+                        usize::from(ui.shown.canvas.area().width),
+                    )
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                )];
             }
-            ui.focus.show(
-                Open::Pager(crate::pager::Pager::open(item.id.clone())),
-                now.instant,
-            );
+            crate::pager::show(ui, item.id.clone(), now);
         }
     }
     Vec::new()

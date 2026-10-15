@@ -213,8 +213,22 @@ await 'line 42'
 keys Enter
 await '1/1 (n/N)'
 keys Escape
+vanish '1/1 (n/N)'
+keys Escape
 await '? for shortcuts'
 finish
+
+step 'ctrl+f remains line search with Browse disabled'
+printf '{"update":{"check":false},"enabledPlugins":{"bingo.mod.browse":false}}' >"$WORK/home/.bingo/settings.json"
+start "$(long_reply)"
+keys 'say a lot' Enter
+await ' line 80'
+keys C-f 'line 79' Enter
+await '1/1'
+vanish 'browse · turn'
+keys Escape
+finish
+printf '{"update":{"check":false}}' >"$WORK/home/.bingo/settings.json"
 
 step 'a focused block opens whole in the pager and gives the frame back'
 start "$(long_reply)"

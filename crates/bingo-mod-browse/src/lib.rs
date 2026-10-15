@@ -18,8 +18,14 @@ pub(crate) struct Cursor {
     pub current: usize,
     pub editing: Option<String>,
     pub sheet_top: usize,
-    pub sheet: Option<bingo_services::checkpoints::Touched>,
+    pub sheet: Option<Preview>,
     pub mode: sheet::Mode,
+}
+#[derive(Clone, Default)]
+pub(crate) struct Preview {
+    pub turns: Vec<transcript::Turn>,
+    pub length: usize,
+    pub touched: bingo_services::checkpoints::Touched,
 }
 type Shared = Arc<Mutex<BTreeMap<(SessionId, String), Cursor>>>;
 static MANIFEST: PluginManifest = PluginManifest {

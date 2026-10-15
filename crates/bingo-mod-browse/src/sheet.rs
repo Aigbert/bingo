@@ -34,10 +34,15 @@ pub fn sheet(turns: &[Turn], touched: &Touched, mode: Mode) -> Option<Sheet> {
     let first = turns.first()?;
     let items = turns.last()?.last - first.first + 1;
     let mut rows = vec![format!("undoes {} turns · {items} items", turns.len())];
-    if touched.files.is_empty() {
+    if mode == Mode::Files {
+        rows[0] = "no turns are undone".into();
+    }
+    if mode == Mode::Conversation {
+        rows.push("files are kept".into());
+    } else if touched.files.is_empty() {
         rows.push("no tracked files".into());
     }
-    for file in &touched.files {
+    for file in touched.files.iter().filter(|_| mode != Mode::Conversation) {
         let fate = match file.fate {
             Fate::Restored => "restored",
             Fate::Removed => "removed",
@@ -48,7 +53,12 @@ pub fn sheet(turns: &[Turn], touched: &Touched, mode: Mode) -> Option<Sheet> {
         } else {
             ""
         };
-        rows.push(format!("{fate:8} {}{why}", file.path.display()));
+        let changed = if file.changed {
+            " · changed since the turn"
+        } else {
+            ""
+        };
+        rows.push(format!("{fate:8} {}{why}{changed}", file.path.display()));
     }
     if touched.shell_calls > 0 {
         rows.push(format!(
@@ -89,7 +99,12 @@ mod tests {
                 };
                 let sheet = sheet(&turns, &touched, mode).unwrap();
                 assert_eq!(sheet.line, format!("/rewind t {}", mode.name()));
-                assert!(sheet.rows.iter().any(|r| r == "no tracked files"));
+                assert!(sheet.rows.iter().any(|r| r
+                    == if mode == Mode::Conversation {
+                        "files are kept"
+                    } else {
+                        "no tracked files"
+                    }));
                 assert_eq!(sheet.rows.iter().any(|r| r.contains("Bash")), calls > 0);
             }
         }
@@ -97,10 +112,20 @@ mod tests {
             files: vec![bingo_services::checkpoints::File {
                 path: "big".into(),
                 fate: Fate::Skipped,
+                changed: true,
             }],
             shell_calls: 0,
         };
         assert!(sheet(&turns, &touched, Mode::Both).unwrap().rows[1].contains("skipped"));
+        assert!(
+            sheet(&turns, &touched, Mode::Both).unwrap().rows[1].contains("changed since the turn")
+        );
+        let conversation = sheet(&turns, &touched, Mode::Conversation).unwrap();
+        assert!(!conversation.rows.iter().any(|row| row.contains("big")));
+        assert_eq!(
+            sheet(&turns, &touched, Mode::Files).unwrap().rows[0],
+            "no turns are undone"
+        );
         assert!(sheet(&[], &touched, Mode::Both).is_none());
     }
 }

@@ -1,5 +1,6 @@
 //! Placement and client projection of the Browse owner's drawing.
 mod actions;
+pub mod cache;
 mod paint;
 use crate::{
     clock::Now,
@@ -49,17 +50,22 @@ pub fn open(ui: &mut Ui, tree: &Tree, selected: Option<TurnId>, confirm: bool, n
 pub fn active(ui: &Ui) -> bool {
     ui.focus.showing() && matches!(ui.focus.open(), Open::Browse(_))
 }
-pub fn request(ui: &Ui) -> Option<&str> {
-    if let Open::Browse(open) = ui.focus.open() {
-        Some(&open.id)
-    } else {
-        None
+fn opened(ui: &Ui) -> Option<&Opened> {
+    match ui.focus.open() {
+        Open::Browse(open) => Some(open),
+        Open::Pager(pager) => match pager.return_to.as_deref() {
+            Some(Open::Browse(open)) => Some(open),
+            _ => None,
+        },
+        _ => None,
     }
 }
+pub fn request(ui: &Ui) -> Option<&str> {
+    opened(ui).map(|open| open.id.as_str())
+}
+
 fn answer(ui: &Ui) -> Option<&View> {
-    let Open::Browse(open) = ui.focus.open() else {
-        return None;
-    };
+    let open = opened(ui)?;
     ui.placed
         .pulled
         .drawings(&open.session)
@@ -73,32 +79,41 @@ fn handler(ui: &Ui) -> Option<Action> {
         None
     }
 }
-pub fn current(ui: &Ui) -> Option<BrowseProps> {
-    serde_json::from_value(handler(ui)?.args["props"].clone()).ok()
+pub fn current(ui: &Ui) -> Option<std::sync::Arc<BrowseProps>> {
+    let id = request(ui)?;
+    ui.browse.accepted(id, ui.placed.pulled.version(id), || {
+        serde_json::from_value(handler(ui)?.args["props"].clone()).ok()
+    })
 }
 fn props(ui: &Ui, tree: &Tree) -> Option<BrowseProps> {
-    let Open::Browse(open) = ui.focus.open() else {
-        return None;
-    };
-    let mut props = current(ui).unwrap_or_else(|| BrowseProps {
-        session: tree.view().clone(),
-        selected: open.selected.clone(),
-        query: String::new(),
-        matches: vec![],
-        turns: vec![],
-        current: 0,
-        action: Action {
-            name: "surface:browse".into(),
-            args: json!({"handler":open.id}),
-        },
-        confirm: open.confirm,
-    });
-    props.turns = transcript::turns(&tree.viewed().transcript);
-    props.matches = transcript::find(&tree.viewed().transcript, &props.query);
+    let open = opened(ui)?;
+    let mut props = current(ui)
+        .map(|props| (*props).clone())
+        .unwrap_or_else(|| BrowseProps {
+            session: tree.view().clone(),
+            selected: open.selected.clone(),
+            query: String::new(),
+            hit: None,
+            count: 0,
+            length: 0,
+            busy: false,
+            previewed: false,
+            refresh: false,
+            turns: vec![],
+            current: 0,
+            action: Action {
+                name: "surface:browse".into(),
+                args: json!({"handler":open.id}),
+            },
+            confirm: open.confirm,
+        });
+    ui.browse.fill(tree.viewed(), &mut props);
+    props.confirm = open.confirm;
     Some(props)
 }
 pub fn offered(ui: &Ui, tree: &Tree) -> bool {
-    tree.viewed().summary.parent.is_none()
+    tree.viewed().config.kernel["enabledPlugins"]["bingo.mod.browse"] != false
+        && tree.viewed().summary.parent.is_none()
         && bingo_sdk::render::matched(&tree.viewed().config)
             .0
             .contains_key(&render::Component::Browse)
@@ -196,3 +211,40 @@ pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
 
 #[cfg(test)]
 mod tests;
+
+pub fn preview(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+    if !active(ui) || waiting(ui, tree) {
+        return vec![];
+    }
+    let Some(props) = current(ui) else {
+        return vec![];
+    };
+    let requested = opened(ui).is_some_and(|open| open.confirm) || props.refresh;
+    if !requested {
+        return vec![];
+    }
+    if (props.previewed || tree.viewed().busy() || props.selected.is_none())
+        && let Some(Open::Browse(open)) = ui.focus.open_mut()
+    {
+        open.confirm = false;
+    }
+    if props.previewed || props.selected.is_none() {
+        return vec![];
+    }
+    if tree.viewed().busy() {
+        ui.notify(
+            Level::Warn,
+            "Wait for the running turn before rewinding",
+            now.instant,
+        );
+        return vec![];
+    }
+    let Some(mut action) = handler(ui) else {
+        return vec![];
+    };
+    action.args["value"] = json!({"key":"preview"});
+    vec![Effect::SiteKey {
+        action,
+        key: KeyEvent::new(KeyCode::Char('r'), crossterm::event::KeyModifiers::NONE),
+    }]
+}

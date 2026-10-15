@@ -823,7 +823,7 @@ async fn a_synchronous_browse_projection_owes_the_frame_with_its_matches() {
         Ok(View::Box {
             children: vec![View::text(format!(
                 "matches: {}",
-                props["matches"].as_array().unwrap().len()
+                props["count"].as_u64().unwrap()
             ))],
             layout: Box::new(bingo_sdk::view::BoxStyle {
                 on_key: Some(bingo_sdk::Action {
