@@ -55,8 +55,11 @@ pub fn active(ui: &Ui) -> bool {
 fn opened(ui: &Ui) -> Option<&Opened> {
     match ui.focus.open() {
         Open::Browse(open) => Some(open),
-        Open::Pager(pager) => match pager.return_to.as_deref() {
-            Some(Open::Browse(open)) => Some(open),
+        Open::Pager(pager) => match &pager.return_to {
+            Some(crate::pager::Return::Layer(open)) => match &**open {
+                Open::Browse(open) => Some(open),
+                _ => None,
+            },
             _ => None,
         },
         _ => None,

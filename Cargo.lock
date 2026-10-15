@@ -266,6 +266,7 @@ dependencies = [
  "bingo-mcp",
  "bingo-mod-ask",
  "bingo-mod-browse",
+ "bingo-mod-memory",
  "bingo-mod-palette",
  "bingo-mod-sessions",
  "bingo-mods",
@@ -662,6 +663,18 @@ dependencies = [
  "async-trait",
  "bingo-sdk",
  "serde_json",
+]
+
+[[package]]
+name = "bingo-mod-memory"
+version = "0.6.6"
+dependencies = [
+ "async-trait",
+ "bingo-sdk",
+ "bingo-services",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -1069,12 +1082,15 @@ dependencies = [
  "async-trait",
  "base64 0.23.1",
  "bingo-collab",
+ "bingo-context",
  "bingo-core",
+ "bingo-experience",
  "bingo-http",
  "bingo-loopback",
  "bingo-mod-ask",
  "bingo-mod-browse",
  "bingo-mod-hello",
+ "bingo-mod-memory",
  "bingo-mod-palette",
  "bingo-mod-sessions",
  "bingo-pictures",

@@ -30,22 +30,62 @@ const HINT: &str = "j/k · pgup/pgdn · g/G · / to search · esc";
 /// The block a person opened, and where they are in it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pager {
-    pub item: ItemId,
+    pub source: Source,
     /// The first line of the content the sheet shows.
     pub top: usize,
     /// `/` within the sheet, while one is open.
     pub search: Option<Search>,
-    pub return_to: Option<Box<Open>>,
+    /// The site the sheet was opened over, given back by `esc`.
+    pub return_to: Option<Return>,
+}
+
+/// What the sheet reads: a transcript block, or text a command handed over.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Source {
+    Item(ItemId),
+    Text { title: String, text: String },
+}
+
+/// Where closing the sheet goes back to.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Return {
+    /// A layer, as it was left: Browse keeps its query and its place.
+    Layer(Box<Open>),
+    /// A placed pane, by its key.
+    Pane(String),
 }
 
 impl Pager {
     pub fn open(item: ItemId) -> Self {
         Self {
-            item,
+            source: Source::Item(item),
             top: 0,
             search: None,
             return_to: None,
         }
+    }
+
+    pub fn text(title: String, text: String, return_to: Option<Return>) -> Self {
+        Self {
+            source: Source::Text { title, text },
+            top: 0,
+            search: None,
+            return_to,
+        }
+    }
+
+    pub fn content(&self, tree: &Tree, width: usize) -> (String, Vec<Line<'static>>) {
+        match &self.source {
+            Source::Item(id) => source(tree, id)
+                .map(|(state, item)| (title(item, state), content(state, item, width, self)))
+                .unwrap_or_default(),
+            Source::Text { title, text } => (title.clone(), markdown::render(text, width)),
+        }
+    }
+
+    /// Opened from Browse, where a block is read whole even when it fits.
+    pub fn over_browse(&self) -> bool {
+        matches!(&self.return_to, Some(Return::Layer(open)) if matches!(**open, Open::Browse(_)))
     }
 
     /// Move by lines, never past either end of the content.
@@ -80,7 +120,7 @@ impl Pager {
 pub fn show(ui: &mut Ui, item: ItemId, now: Now) {
     let mut pager = Pager::open(item);
     if matches!(ui.focus.open(), Open::Browse(_)) {
-        pager.return_to = Some(Box::new(ui.focus.open().clone()));
+        pager.return_to = Some(Return::Layer(Box::new(ui.focus.open().clone())));
     }
     ui.focus.show(Open::Pager(pager), now.instant);
 }
@@ -90,7 +130,7 @@ pub fn content(
     width: usize,
     pager: &Pager,
 ) -> Vec<Line<'static>> {
-    if matches!(pager.return_to.as_deref(), Some(Open::Browse(_))) {
+    if pager.over_browse() {
         whole(state, item, width)
     } else {
         lines(state, item, width)
@@ -300,9 +340,7 @@ fn content_of(ui: &Ui, tree: &Tree) -> Vec<Line<'static>> {
         return Vec::new();
     };
     let width = width_of(ui);
-    source(tree, &open.item)
-        .map(|(state, item)| content(state, item, width, open))
-        .unwrap_or_default()
+    open.content(tree, width).1
 }
 
 /// The pager owns the keyboard while it is up: `j/k` and the page keys move
@@ -347,20 +385,20 @@ fn moved(open: &mut Pager, key: KeyEvent, window: Window) {
 /// in. Forgetting the entry *is* the fold: the start is written in one place
 /// ([`crate::fold`]) and never copied here.
 fn closed(ui: &mut Ui, now: Now) {
-    if let Some(Open::Pager(pager)) = ui.focus.open_mut()
-        && let Some(previous) = pager.return_to.take()
-    {
-        ui.focus.show(*previous, now.instant);
-        return;
-    }
-    let opened = match ui.focus.open() {
-        Open::Pager(open) => Some(open.item.clone()),
-        _ => None,
+    let Open::Pager(open) = ui.focus.open() else {
+        return ui.focus.close(now.instant);
     };
-    if let Some(item) = opened {
+    let (source, return_to) = (open.source.clone(), open.return_to.clone());
+    if let Some(Return::Layer(previous)) = return_to {
+        return ui.focus.show(*previous, now.instant);
+    }
+    if let Source::Item(item) = source {
         ui.folds.remove(&item);
     }
-    ui.focus.close(now.instant);
+    match return_to {
+        Some(Return::Pane(key)) => ui.focus = crate::focus::Focus::Pane(key),
+        _ => ui.focus.close(now.instant),
+    }
 }
 
 /// `/` inside the sheet: the same query row as `ctrl+f`, over this block alone.

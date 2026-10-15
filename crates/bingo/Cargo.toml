@@ -46,6 +46,7 @@ bingo-mod-ask.workspace = true
 bingo-mod-palette.workspace = true
 bingo-mod-sessions.workspace = true
 bingo-mod-browse.workspace = true
+bingo-mod-memory.workspace = true
 bingo-agents.workspace = true
 bingo-rooms.workspace = true
 bingo-tasks.workspace = true

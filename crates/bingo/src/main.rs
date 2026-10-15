@@ -715,6 +715,7 @@ fn plugins(
         Box::new(bingo_mod_palette::Palette),
         Box::new(bingo_mod_sessions::Sessions),
         Box::new(bingo_mod_browse::Browse),
+        Box::new(bingo_mod_memory::MemoryPanel),
         Box::new(ShellHooksPlugin),
         Box::new(JsonlStorePlugin::default()),
         Box::new(ContextPlugin),

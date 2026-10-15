@@ -109,6 +109,7 @@
 # M167 (ADR-0086): bingo-mod-hello adds one fixture member, no external crate.
 # M175 (ADR-0089): bingo-mod-sessions adds one member, no external crate.
 # M177: bingo-mod-browse adds one member, no external crate.
-max_dependencies = 416
+# M178: bingo-mod-memory adds one member, no external crate.
+max_dependencies = 417
 max_core_check_seconds = 20
 max_target_gb = 5

@@ -270,9 +270,7 @@ fn caret(editor: Option<&Composer>, value: &str) -> String {
     lines.join("\n")
 }
 pub fn key_handler(ui: &Ui, state: &SessionState, key: KeyEvent) -> Option<Action> {
-    if key.code == KeyCode::Esc
-        || (key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL))
-    {
+    if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
         return None;
     }
     let Focus::Pane(focused) = &ui.focus else {
@@ -281,6 +279,9 @@ pub fn key_handler(ui: &Ui, state: &SessionState, key: KeyEvent) -> Option<Actio
     let pane = placed(state)
         .into_iter()
         .find(|pane| &pane.key == focused)?;
+    if key.code == KeyCode::Esc && pane.close {
+        return None;
+    }
     let seated = ui
         .shown
         .seating

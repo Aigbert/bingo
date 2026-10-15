@@ -174,12 +174,14 @@ fn ordinary_pagers_keep_their_existing_content_projection() {
     let row = user("user", "already visible");
     let mut pager = crate::pager::Pager::open(row.id.clone());
     assert!(crate::pager::content(&state, &row, 80, &pager).is_empty());
-    pager.return_to = Some(Box::new(Open::Browse(Opened {
-        session: state.summary.id.clone(),
-        id: "test".into(),
-        selected: None,
-        confirm: false,
-    })));
+    pager.return_to = Some(crate::pager::Return::Layer(Box::new(Open::Browse(
+        Opened {
+            session: state.summary.id.clone(),
+            id: "test".into(),
+            selected: None,
+            confirm: false,
+        },
+    ))));
     assert_eq!(
         crate::pager::content(&state, &row, 80, &pager)[0].to_string(),
         "already visible"

@@ -844,3 +844,4 @@ fn provider_endpoints_are_not_inherited_by_cli_fixtures() {
         );
     }
 }
+mod memory;

@@ -294,15 +294,12 @@ fn paged(
     open: &crate::pager::Pager,
     reveal: layers::Reveal,
 ) {
-    let Some((state, item)) = pager::source(tree, &open.item) else {
-        return;
-    };
-    let content = pager::content(state, item, above.width as usize, open);
+    let (title, content) = open.content(tree, above.width as usize);
     let window = pager::Window {
         height: content.len(),
         rows: usize::from(above.height).saturating_sub(pager::HEAD),
     };
-    let lines = pager::sheet(&pager::title(item, state), &content, open, window);
+    let lines = pager::sheet(&title, &content, open, window);
     sheet(frame, above, lines, reveal);
     marked(frame, above, open, window, reveal);
 }

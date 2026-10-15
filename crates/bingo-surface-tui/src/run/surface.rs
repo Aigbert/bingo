@@ -1,3 +1,4 @@
+//! Client actions returned in command receipts.
 use super::*;
 pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
     let now = run.detection.now();
@@ -8,15 +9,39 @@ pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
                 crate::browse::composer(&mut run.ui, text, now);
             }
         }
-        "Pager" => {
-            if let Some(id) = action.args["item"].as_str() {
-                let id = bingo_sdk::ItemId::from_raw(id);
-                if run.session.tree.viewed().transcript.get(&id).is_some() {
-                    crate::pager::show(&mut run.ui, id, now);
-                }
-            }
-        }
+        "Pager" => page(run, &action.args, now),
+        "Pane" => focus(run, &action.args),
         _ => palette::surface_action(run, action),
+    }
+}
+
+fn page(run: &mut Run, args: &Value, now: crate::clock::Now) {
+    if let Some(id) = args["item"].as_str() {
+        let id = bingo_sdk::ItemId::from_raw(id);
+        if run.session.tree.viewed().transcript.get(&id).is_some() {
+            crate::pager::show(&mut run.ui, id, now);
+        }
+        return;
+    }
+    let (Some(title), Some(text)) = (args["title"].as_str(), args["text"].as_str()) else {
+        return;
+    };
+    let return_to = match &run.ui.focus {
+        crate::focus::Focus::Pane(key) => Some(crate::pager::Return::Pane(key.clone())),
+        _ => None,
+    };
+    let pager = crate::pager::Pager::text(title.into(), text.into(), return_to);
+    run.ui.focus.show(Open::Pager(pager), now.instant);
+}
+fn focus(run: &mut Run, args: &Value) {
+    let (Some(plugin), Some(id)) = (args["plugin"].as_str(), args["id"].as_str()) else {
+        return;
+    };
+    if let Some(pane) = crate::pane::placed(run.session.tree.viewed())
+        .into_iter()
+        .find(|pane| pane.plugin == plugin && pane.id == id && pane.asked)
+    {
+        run.ui.focus = crate::focus::Focus::Pane(pane.key);
     }
 }
 

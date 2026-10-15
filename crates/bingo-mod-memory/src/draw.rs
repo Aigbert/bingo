@@ -1,0 +1,157 @@
+use crate::{
+    Shared,
+    rows::{Group, Target},
+};
+use bingo_sdk::*;
+use serde_json::{Value, json};
+
+pub(crate) struct Drawing(pub Shared, pub std::path::PathBuf);
+#[async_trait::async_trait]
+impl Interceptor for Drawing {
+    fn id(&self) -> &str {
+        "memory"
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher {
+            prefilter: json!({"component":"Pane","props":{"owner":crate::ID}}),
+            ..LinkMatcher::at(catalogue::UI_RENDER)
+        }
+    }
+    async fn chain(
+        &self,
+        _: &catalogue::Entry,
+        cx: &HookContext,
+        value: Value,
+        next: Next<'_, Value, Value>,
+    ) -> Result<Value, KernelError> {
+        let request: render::RenderRequest =
+            serde_json::from_value(value.clone()).map_err(crate::error)?;
+        if request.props["owner"] != crate::ID {
+            return next.run(value).await;
+        }
+        let mut groups = crate::panel::groups(&cx.host, &cx.cwd).await?;
+        for row in groups.iter_mut().flat_map(|group| &mut group.rows) {
+            if let Target::Instruction(path) = &row.target {
+                row.label = crate::rows::path_label(path, &self.1, &cx.cwd);
+            }
+        }
+        let mut shared = self.0.lock().map_err(crate::error)?;
+        let cursor = shared.entry(cx.session.clone()).or_default();
+        let count = groups.iter().map(|g| g.rows.len()).sum::<usize>();
+        cursor.selected = cursor.selected.min(count.saturating_sub(1));
+        if cursor.confirming.as_ref().is_some_and(|target| {
+            !groups
+                .iter()
+                .flat_map(|g| &g.rows)
+                .any(|r| &r.target == target)
+        }) {
+            cursor.confirming = None;
+        }
+        serde_json::to_value(tree(
+            &groups,
+            cursor.selected,
+            cursor.confirming.as_ref(),
+            request.viewport.rows,
+        ))
+        .map_err(crate::error)
+    }
+}
+pub fn tree(groups: &[Group], selected: usize, confirming: Option<&Target>, height: u16) -> View {
+    let (lines, at) = group_lines(groups, selected);
+    let room = usize::from(height).saturating_sub(4).max(1);
+    let start = at
+        .saturating_sub(room / 2)
+        .min(lines.len().saturating_sub(room));
+    let mut children = vec![pair(
+        format!(
+            " memory · {} tokens carried",
+            crate::rows::about(crate::rows::total(groups))
+        ),
+        "⏎ read  d forget".into(),
+    )];
+    children.extend(lines.into_iter().skip(start).take(room));
+    children.push(dim(
+        " ──────────────────────────────────────────────────────────────────────",
+    ));
+    children.push(dim(match confirming {
+        Some(Target::Memory { name, .. }) => {
+            format!(" forget \"{name}\"? the file and its index line go.  ⏎ yes  esc")
+        }
+        Some(target) => format!(" forget \"{}\"? the entry goes.  ⏎ yes  esc", target.name()),
+        None => " ↑↓ choose · ⏎ read · d forget · esc close".into(),
+    }));
+    let target = groups
+        .iter()
+        .flat_map(|g| &g.rows)
+        .nth(selected)
+        .map(|r| &r.target);
+    View::Box {
+        children,
+        layout: Box::new(view::BoxStyle {
+            on_key: Some(Action {
+                name: "memory:ui".into(),
+                args: json!({"handler":crate::REQUEST,"event":"press","target":target,"confirming":confirming}),
+            }),
+            ..Default::default()
+        }),
+    }
+}
+fn group_lines(groups: &[Group], selected: usize) -> (Vec<View>, usize) {
+    let mut lines = Vec::new();
+    let mut index = 0;
+    let mut at = 0;
+    for group in groups {
+        lines.push(dim(format!(" {} ({})", group.name, group.rows.len())));
+        for row in &group.rows {
+            if index == selected {
+                at = lines.len();
+            }
+            lines.push(pair(
+                format!(
+                    "{}{}",
+                    if index == selected { "❯ " } else { "  " },
+                    row.label
+                ),
+                crate::rows::about(row.tokens),
+            ));
+            index += 1;
+        }
+    }
+    (lines, at)
+}
+fn pair(label: String, value: String) -> View {
+    View::Box {
+        children: vec![
+            View::Box {
+                children: vec![View::Text {
+                    children: vec![view::TextChild::String(label)],
+                    style: view::TextStyle {
+                        ..Default::default()
+                    },
+                }],
+                layout: Box::new(view::BoxStyle {
+                    flex_grow: Some(1),
+                    width: Some(0),
+                    ..Default::default()
+                }),
+            },
+            dim(value),
+        ],
+        layout: Box::new(view::BoxStyle {
+            flex_direction: Some(view::Direction::Row),
+            gap: Some(1),
+            justify_content: Some(view::Justify::SpaceBetween),
+            height: Some(1),
+            ..Default::default()
+        }),
+    }
+}
+fn dim(text: impl Into<String>) -> View {
+    View::Text {
+        children: vec![view::TextChild::String(text.into())],
+        style: view::TextStyle {
+            dim_color: Some(true),
+            ..Default::default()
+        },
+    }
+}
