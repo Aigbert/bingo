@@ -56,20 +56,15 @@ fn join_error(error: tokio::task::JoinError) -> KernelError {
 fn listing(library: &Library, cwd: &Path) -> Listing {
     use crate::store::ExperienceShelf;
     let shelf = library.load(cwd);
-    let carried = crate::render::by_worth(shelf.active());
+    let carried: std::collections::HashMap<&str, u64> =
+        crate::contributor::index::carried_lines(shelf.active())
+            .map(|(entry, line)| (entry.id.as_str(), bingo_sdk::tokens::text(&line)))
+            .collect();
     let mut rows = shelf
         .entries
         .iter()
         .map(|entry| {
-            let tokens = if carried
-                .iter()
-                .take(crate::contributor::index::MAX)
-                .any(|other| other.id == entry.id)
-            {
-                bingo_sdk::tokens::text(&format!("- {}", crate::render::line(entry)))
-            } else {
-                0
-            };
+            let tokens = carried.get(entry.id.as_str()).copied().unwrap_or(0);
             EntryRow {
                 id: entry.id.clone(),
                 status: match entry.status {
@@ -219,5 +214,50 @@ mod measurement_tests {
         assert_eq!(rows[1].status, Status::Unreadable);
         assert!(rows[1].error.as_ref().unwrap().contains("frontmatter"));
         assert_eq!(rows[1].tokens, 0);
+    }
+
+    #[tokio::test]
+    async fn the_listing_counts_exactly_the_lines_the_index_carries() {
+        use bingo_sdk::ContextContributor;
+        let fixture = crate::tests::Fixture::new();
+        for n in 0..13 {
+            let entry = crate::entry::Entry {
+                id: format!("aaaa{n:04}"),
+                summary: format!("playbook {}", "word ".repeat(n)),
+                ..crate::entry::tests::entry()
+            };
+            fixture.library.save(&fixture.cwd(), &entry).unwrap();
+        }
+        let rows = Experiences(fixture.library.clone())
+            .list(List { cwd: fixture.cwd() })
+            .await
+            .unwrap();
+        let asked = fixture.asked(Vec::new());
+        let pieces = crate::contributor::index::IndexContributor::new(fixture.library.clone())
+            .contribute(asked.query())
+            .await
+            .unwrap();
+        let bingo_sdk::ContextPiece::User { parts, .. } = &pieces[0] else {
+            panic!("the index is a user snapshot");
+        };
+        let bingo_sdk::ContentPart::Text { text } = &parts[0] else {
+            panic!("the index is text");
+        };
+        let carried: Vec<&str> = text
+            .lines()
+            .filter(|line| line.starts_with("- ") && !line.starts_with("- … "))
+            .collect();
+        assert_eq!(carried.len(), crate::contributor::index::MAX);
+        assert_eq!(
+            rows.iter().filter(|row| row.tokens > 0).count(),
+            carried.len()
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.tokens).sum::<u64>(),
+            carried
+                .iter()
+                .map(|line| bingo_sdk::tokens::text(line))
+                .sum::<u64>()
+        );
     }
 }

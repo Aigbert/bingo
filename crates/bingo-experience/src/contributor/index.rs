@@ -48,11 +48,14 @@ impl ContextContributor for IndexContributor {
 
     async fn contribute(&self, query: ContextQuery<'_>) -> Result<Vec<ContextPiece>, ContextError> {
         let shelf = self.library.load(query.cwd);
-        let active = render::by_worth(shelf.active());
-        let text = if active.is_empty() {
+        let carried: Vec<String> = carried_lines(shelf.active())
+            .map(|(_, line)| line)
+            .collect();
+        let text = if carried.is_empty() {
             format!("{HEADING}\n\nNo active playbooks.")
         } else {
-            format!("{HEADING}\n\n{PREAMBLE}\n\n{}", listing(&active))
+            let listing = listing(carried, shelf.active().count());
+            format!("{HEADING}\n\n{PREAMBLE}\n\n{listing}")
         };
         Ok(ContextPiece::snapshot(self.id(), text, query.items)
             .into_iter()
@@ -60,13 +63,19 @@ impl ContextContributor for IndexContributor {
     }
 }
 
-fn listing(active: &[&Entry]) -> String {
-    let mut lines: Vec<String> = active
-        .iter()
+/// What the index carries of the shelf: the `MAX` most useful active entries, one
+/// line each. The panel's estimates measure these same lines.
+pub(crate) fn carried_lines<'a>(
+    shelf: impl Iterator<Item = &'a Entry>,
+) -> impl Iterator<Item = (&'a Entry, String)> {
+    render::by_worth(shelf)
+        .into_iter()
         .take(MAX)
-        .map(|entry| format!("- {}", render::line(entry)))
-        .collect();
-    if let Some(rest) = active.len().checked_sub(MAX).filter(|rest| *rest > 0) {
+        .map(|entry| (entry, format!("- {}", render::line(entry))))
+}
+
+fn listing(mut lines: Vec<String>, active: usize) -> String {
+    if let Some(rest) = active.checked_sub(MAX).filter(|rest| *rest > 0) {
         lines.push(format!("- … {rest} more — ExperienceQuery searches"));
     }
     lines.join("\n")
