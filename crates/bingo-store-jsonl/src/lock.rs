@@ -4,9 +4,10 @@
 //! copyable while a process owns it.
 
 use std::collections::BTreeMap;
-use std::fs::File;
+use std::fs::{File, TryLockError};
 use std::path::Path;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use bingo_sdk::{ErrorCode, KernelError, SessionId};
 
@@ -65,10 +66,44 @@ impl Locks {
     }
 }
 
+/// How long a claim waits before its one retry: longer than any probe holds
+/// its shared lock, short enough that a real holder is reported at once.
+const RETRY: Duration = Duration::from_millis(50);
+
 /// Try the exclusive lock: `None` when another holder — in this process or
 /// another — has it. The caller owns the returned file and, with it, the lock.
+/// A refusal is tried once more after [`RETRY`], because a [`held`] probe
+/// briefly holds a shared lock and must not turn a claim away.
 pub fn take(path: &Path) -> Result<Option<File>, KernelError> {
+    match try_take(path)? {
+        Some(file) => Ok(Some(file)),
+        None => {
+            std::thread::sleep(RETRY);
+            try_take(path)
+        }
+    }
+}
+
+fn try_take(path: &Path) -> Result<Option<File>, KernelError> {
     bingo_claim::lock(path).map_err(|e| storage(format!("lock {}: {e}", path.display())))
+}
+
+/// Whether anybody holds the exclusive lock, without creating the file or
+/// claiming the session. The OS has no lock query that takes nothing, on
+/// unix or Windows, so this takes a shared lock for an instant: two probes
+/// never refuse each other, and a claim racing a probe retries in [`take`].
+pub fn held(path: &Path) -> Result<bool, KernelError> {
+    let failed = |e: std::io::Error| storage(format!("probe {}: {e}", path.display()));
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(failed(e)),
+    };
+    match file.try_lock_shared() {
+        Ok(()) => Ok(false),
+        Err(TryLockError::WouldBlock) => Ok(true),
+        Err(TryLockError::Error(e)) => Err(failed(e)),
+    }
 }
 
 fn taken(session: &SessionId) -> KernelError {
@@ -127,6 +162,39 @@ mod tests {
         assert!(take(&path).expect("no error").is_none(), "held");
         drop(file);
         assert!(take(&path).expect("no error").is_some(), "free again");
+    }
+
+    #[test]
+    fn a_probe_sees_a_holder_and_claims_nothing() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join(".lock");
+        assert!(!held(&path).expect("probe"), "no file is no holder");
+        assert!(!path.exists(), "a probe creates nothing");
+        let claim = take(&path).expect("no error").expect("free");
+        assert!(held(&path).expect("probe"));
+        drop(claim);
+        assert!(!held(&path).expect("probe"));
+        let _shared = File::open(&path).expect("open");
+        _shared.try_lock_shared().expect("a probe in flight");
+        assert!(!held(&path).expect("probe"), "probes never refuse probes");
+    }
+
+    /// A claim that lands while a probe holds its instant of shared lock is
+    /// not refused; it waits once and takes the session.
+    #[test]
+    fn a_claim_racing_a_probe_retries_once() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join(".lock");
+        drop(take(&path).expect("no error").expect("create it"));
+        let probe = File::open(&path).expect("open");
+        probe.try_lock_shared().expect("a probe in flight");
+        let releasing = std::thread::spawn(move || {
+            std::thread::sleep(RETRY / 5);
+            drop(probe);
+        });
+        let claim = Locks::default().acquire(&session(), &path);
+        releasing.join().expect("the probe ends");
+        claim.expect("the claim retried past the probe");
     }
 
     #[test]

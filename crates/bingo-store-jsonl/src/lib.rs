@@ -175,14 +175,7 @@ impl SessionStore for JsonlStore {
     async fn locked(&self, session: &SessionId) -> Result<bool, KernelError> {
         let store = self.clone();
         let session = session.clone();
-        off_runtime(move || {
-            let path = layout::lock(&store.existing(&session)?);
-            if !path.exists() {
-                return Ok(false);
-            }
-            Ok(lock::take(&path)?.is_none())
-        })
-        .await
+        off_runtime(move || lock::held(&layout::lock(&store.existing(&session)?))).await
     }
 
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
