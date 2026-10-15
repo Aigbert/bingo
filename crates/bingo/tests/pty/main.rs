@@ -583,7 +583,7 @@ fn every_frame_is_written_inside_a_synchronized_update() {
 /// dropped (M67, ADR-0045). The picker itself is M11e's and unchanged — what
 /// is new is that a `rewind` is in the catalogue for it to offer.
 #[test]
-fn esc_twice_rewinds_the_turn_and_the_file_it_wrote() {
+fn esc_twice_confirms_then_rewinds_the_turn_and_file() {
     let mut terminal = Terminal::opened(
         &["--allowed-tools", "Write"],
         WRITES_A_NOTE,
@@ -602,6 +602,9 @@ fn esc_twice_rewinds_the_turn_and_the_file_it_wrote() {
     terminal.send(b"\x1b");
     terminal.wait_for("Rewind to");
     terminal.send(b"\r");
+    terminal.wait_for("rewind to turn 1");
+    assert!(note.is_file(), "preview leaves files alone");
+    terminal.send(b"\r");
     terminal.wait_for("rewound,");
 
     assert!(
@@ -611,7 +614,8 @@ fn esc_twice_rewinds_the_turn_and_the_file_it_wrote() {
     );
     // And the turn is out of the transcript.
     terminal.wait_gone("Wrote the note.");
-    terminal.send(&[0x04]);
+    terminal.wait_for("> write me a note");
+    terminal.send(&[0x15, 0x04]);
     terminal.leave();
 }
 

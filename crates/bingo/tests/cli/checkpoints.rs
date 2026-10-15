@@ -156,6 +156,16 @@ fn explicit_modes_keep_the_other_half_and_json_stdout_stays_pure() {
             "write one",
         );
         assert!(first.status.success(), "{}", stderr(&first));
+        let shell = script(
+            r#"{"responses":[{"steps":[{"toolCall":{"name":"Bash","input":{"command":"echo untracked-shell-call"}}}]},{"steps":[{"text":"Shell done."}]}]}"#,
+        );
+        let second = print_in(
+            home.path(),
+            &shell,
+            &["--continue", "--allowed-tools", "Bash"],
+            "run the shell",
+        );
+        assert!(second.status.success(), "{}", stderr(&second));
         let table = print_in(home.path(), &idle(), &["--continue"], "/rewind");
         let turn = listed(&table).pop().unwrap();
         let back = print_in(
@@ -179,6 +189,6 @@ fn explicit_modes_keep_the_other_half_and_json_stdout_stays_pure() {
             }
         );
         let after = print_in(home.path(), &idle(), &["--continue"], "/rewind");
-        assert_eq!(listed(&after).len(), usize::from(mode == "files"));
+        assert_eq!(listed(&after).len(), 2 * usize::from(mode == "files"));
     }
 }

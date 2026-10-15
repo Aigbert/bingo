@@ -1,0 +1,28 @@
+---
+source: crates/bingo-surface-tui/src/browse/tests/mod.rs
+expression: screen
+---
+"browse · turn 2 of 2 · "hidden" 1/1 (n/N)  [ ] turn  ⏎ page  y copy  r rewind   "
+"                                                                                "
+"> inspect the fork                                                              "
+"  keep this second line                                                         "
+"                                                                                "
+"▍ First reply                                                                   "
+"                                                                                "
+"> read another file                                                             "
+"                                                                                "
+"⏺ Read(example.rs)                                                              "
+"  ⎿  one                                                                        "
+"     two                                                                        "
+"     three                                                                      "
+"     four                                                                       "
+"     five                                                                       "
+"     six                                                                        "
+"     hidden FORK                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"╭──────────────────────────────────────────────────────────────────────────────╮"
+"│ > ask anything · / for commands · ! for shell                                │"
+"╰──────────────────────────────────────────────────────────────────────────────╯"
+"? for shortcuts                                                      fake/fake-1"

@@ -26,14 +26,17 @@ pub(super) fn ask(run: &mut Run, intent: IntentId) {
     let host = run.host.clone();
     run.spawn(async move {
         let taken = host.withdraw(&session, &intent, identity()).await;
-        Ok(Reply::Withdrawn(Box::new(taken)))
+        Ok(Reply::Withdrawn(intent, Box::new(taken)))
     });
 }
 
 /// The line is the person's again: its words go back in the box and the
 /// pictures it carried go back under the tokens that name them, so `⏎` or
 /// `tab` sends exactly what was queued.
-pub(super) fn took(run: &mut Run, taken: Result<Input, KernelError>) {
+pub(super) fn took(run: &mut Run, intent: IntentId, taken: Result<Input, KernelError>) {
+    if taken.is_ok() {
+        run.mine.remove(&intent);
+    }
     match taken {
         Ok(Input::Text { text, images, .. }) => {
             run.ui.pictures.restore(&text, images);

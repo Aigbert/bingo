@@ -1332,7 +1332,7 @@ mod tests {
         )]);
         assert_eq!(crate::tree::brief(&state), None);
         assert!(
-            crate::rewind::turns(&state)
+            bingo_sdk::transcript::turns(&state.transcript)
                 .iter()
                 .all(|turn| turn.asked.is_none())
         );

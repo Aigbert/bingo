@@ -92,7 +92,7 @@ picture() { printf '%s' "$SHOT" | base64 -d >"$WORK/cwd/shot.png"; }
 # `$2` is any extra environment the step wants, `$3` any extra flags.
 start() {
   printf '%s' "$1" >"$WORK/script.json"
-  keys "HOME=$WORK/home ${2:-} BINGO_FAKE_SCRIPT=$WORK/script.json $BIN --cwd $WORK/cwd ${3:-}" Enter
+  keys "HOME=$WORK/home XDG_DATA_HOME=$WORK/data ${2:-} BINGO_FAKE_SCRIPT=$WORK/script.json $BIN --cwd $WORK/cwd ${3:-}" Enter
   await '? for shortcuts'
 }
 
@@ -202,15 +202,16 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do mouse 64 10 5; done
 vanish ' line 80'
 finish
 
-step 'ctrl+f searches the transcript and esc gives the status line back'
+step 'ctrl+f browses full blocks and esc gives the composer back'
 start "$(long_reply)"
 keys 'say a lot' Enter
 await ' line 80'
 keys C-f
+await 'browse · turn'
 keys 'line 42'
-await '/line 42'
+await 'line 42'
 keys Enter
-await '1/1 · n/N · esc'
+await '1/1 (n/N)'
 keys Escape
 await '? for shortcuts'
 finish

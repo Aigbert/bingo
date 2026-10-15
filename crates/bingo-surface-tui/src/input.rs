@@ -48,6 +48,9 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if crate::sessions::active(ui) {
         return crate::sessions::key(ui, tree, key, now);
     }
+    if crate::browse::active(ui) {
+        return crate::browse::key(ui, tree, key, now);
+    }
     if crate::palette::active(ui) {
         return crate::palette::key(ui, tree, key, now);
     }
@@ -457,7 +460,7 @@ fn twice(ui: &mut Ui, tree: &Tree, now: Now) {
     if !rewind::offered(&ui.commands()) {
         return;
     }
-    let turns = rewind::turns(tree.viewed());
+    let turns = bingo_sdk::transcript::turns(&tree.viewed().transcript);
     if turns.is_empty() {
         return;
     }
@@ -466,7 +469,7 @@ fn twice(ui: &mut Ui, tree: &Tree, now: Now) {
 
 /// The rewind card answers its own keys, as every list does.
 fn rewind_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
-    let turns = rewind::turns(tree.viewed());
+    let turns = bingo_sdk::transcript::turns(&tree.viewed().transcript);
     let rows = rewind::rows(&turns);
     let Some(Open::Rewind(card)) = ui.focus.open_mut() else {
         return Vec::new();
@@ -476,7 +479,12 @@ fn rewind_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect>
         KeyCode::Down => card.selected = (card.selected + 1).min(rows.saturating_sub(1)),
         KeyCode::Esc => ui.focus.close(now.instant),
         KeyCode::Enter => {
-            let chosen = turns.get(card.selected).map(rewind::line);
+            let selected = turns.iter().rev().nth(card.selected).map(|t| t.id.clone());
+            let chosen = turns.iter().rev().nth(card.selected).map(rewind::line);
+            if crate::browse::offered(ui, tree) {
+                crate::browse::open(ui, tree, selected, true, now);
+                return Vec::new();
+            }
             ui.focus.close(now.instant);
             return chosen
                 .map(|line| {

@@ -50,6 +50,7 @@ mod actions;
 mod activity;
 mod ask;
 mod blocks;
+mod browse;
 mod clipboard;
 mod clock;
 mod commands;

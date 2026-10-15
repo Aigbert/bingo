@@ -1,0 +1,23 @@
+[package]
+name = "bingo-mod-browse"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Read and rewind a conversation by turns"
+
+[lints]
+workspace = true
+
+[dependencies]
+bingo-sdk.workspace = true
+bingo-services.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+bingo-sdk = { workspace = true, features = ["testing"] }
+tempfile.workspace = true

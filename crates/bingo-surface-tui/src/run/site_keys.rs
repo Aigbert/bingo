@@ -48,6 +48,10 @@ fn target(run: &Run) -> Option<(SessionId, String, bool)> {
         return crate::sessions::request(&run.ui)
             .map(|id| (run.session.tree.view().clone(), id.into(), true));
     }
+    if crate::browse::active(&run.ui) {
+        return crate::browse::request(&run.ui)
+            .map(|id| (run.session.tree.view().clone(), id.into(), false));
+    }
     if crate::palette::active(&run.ui) {
         return crate::palette::request(&run.ui).map(|id| {
             (
@@ -139,6 +143,12 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
         && crate::sessions::request(&run.ui) == Some(pending.focus.as_str())
     {
         directory_answer(run, &pending, outcome);
+        return;
+    }
+    if crate::browse::active(&run.ui)
+        && crate::browse::request(&run.ui) == Some(pending.focus.as_str())
+    {
+        browse_answer(run, outcome);
         return;
     }
     if crate::palette::active(&run.ui)
@@ -242,6 +252,17 @@ fn unhandled(outcome: &IntentOutcome) -> bool {
     matches!(outcome, IntentOutcome::Applied { result } if result["handled"] == false)
 }
 
+/// The browse site's answer names the surface action it chose.
+fn browse_answer(run: &mut Run, outcome: &IntentOutcome) {
+    if let IntentOutcome::Applied { result } = outcome
+        && let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
+    {
+        let effects =
+            crate::browse::result(&mut run.ui, &run.session.tree, &action, run.detection.now());
+        run.apply(effects);
+    }
+}
+
 pub(super) fn notices(run: &mut Run) {
     for notice in crate::keys::commands::bindings(&run.ui, run.session.tree.viewed()).notices {
         run.ui.notify(Level::Warn, notice, Instant::now());
@@ -259,7 +280,8 @@ fn focus(run: &Run) -> Option<String> {
     })
 }
 fn palette_waiting(run: &Run) -> bool {
-    crate::palette::waiting(&run.ui, &run.session.tree, run.detection.now())
+    crate::browse::waiting(&run.ui, &run.session.tree)
+        || crate::palette::waiting(&run.ui, &run.session.tree, run.detection.now())
 }
 pub(super) fn blocked(run: &Run) -> bool {
     if palette_waiting(run)

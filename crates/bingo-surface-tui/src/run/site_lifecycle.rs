@@ -1,11 +1,18 @@
 use super::*;
 fn request(ui: &Ui) -> Option<&str> {
-    crate::sessions::request(ui).or_else(|| crate::palette::request(ui))
+    crate::sessions::request(ui)
+        .or_else(|| crate::browse::request(ui))
+        .or_else(|| crate::palette::request(ui))
+}
+
+/// Whether one of the drawn sites that Ctrl+C closes is open; Esc is its own.
+pub(super) fn open(ui: &Ui) -> bool {
+    crate::palette::active(ui) || crate::sessions::active(ui) || crate::browse::active(ui)
 }
 
 /// Closing consumes Ctrl+C at idle; a running turn still gets its interrupt.
 pub(super) fn ctrl_c(run: &mut Run, key: crossterm::event::KeyEvent) -> bool {
-    if !crate::palette::active(&run.ui) && !crate::sessions::active(&run.ui) {
+    if !open(&run.ui) {
         return false;
     }
     let close = run
@@ -25,6 +32,8 @@ pub(super) fn ctrl_c(run: &mut Run, key: crossterm::event::KeyEvent) -> bool {
     let now = run.detection.now();
     if crate::sessions::active(&run.ui) {
         crate::sessions::close(&mut run.ui, now);
+    } else if crate::browse::active(&run.ui) {
+        run.ui.focus.close(now.instant);
     } else {
         crate::palette::close(&mut run.ui, now);
     }
@@ -43,9 +52,10 @@ pub(super) fn ctrl_c(run: &mut Run, key: crossterm::event::KeyEvent) -> bool {
 pub(super) fn retired(run: &mut Run, key: &crate::pulled::Key, view: &View) -> bool {
     if !matches!(
         key.request.component,
-        bingo_sdk::render::Component::Palette | bingo_sdk::render::Component::Sessions
-    ) || ((crate::palette::active(&run.ui) || crate::sessions::active(&run.ui))
-        && request(&run.ui) == Some(key.request.request_id.as_str()))
+        bingo_sdk::render::Component::Palette
+            | bingo_sdk::render::Component::Sessions
+            | bingo_sdk::render::Component::Browse
+    ) || (open(&run.ui) && request(&run.ui) == Some(key.request.request_id.as_str()))
     {
         return false;
     }

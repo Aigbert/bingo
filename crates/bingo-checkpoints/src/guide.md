@@ -33,13 +33,17 @@ makes an edit undoable, not what makes it allowed.
 Bare, it is a table of this session's turns, newest first: the turn's id, the
 line that opened it, and the files that turn touched.
 
-`/rewind <turn>` takes an id from that table and goes back to it:
+`/rewind <turn>` takes an id from that table and goes back to it immediately,
+without confirmation. The optional mode defaults to `both`:
 
 1. The files of that turn **and of every turn after it** go back to what they
    were before the first of them — the oldest snapshot per file wins — and a
    file those turns created is removed.
 2. Only then the conversation: that turn's first item and every item after it
    in transcript order are dropped, a notice recorded between turns included.
+
+Append `conversation` to rewind only the journal and keep the files, or `files`
+to restore only the files and keep the journal. An unknown mode is refused.
 
 The reply is `rewound to <the line that opened it>, N items dropped`, then
 `put back <files>`, `removed <files>`, and `left as it is, never kept (over
@@ -68,5 +72,7 @@ had is refused, and nothing moves.
 ## From the terminal
 
 `esc esc` on an empty composer opens the same turns as a card, newest first;
-`⏎` on a row submits `/rewind <turn>` for it. The card is offered wherever a
-`rewind` command is registered, and nowhere else.
+`⏎` on a row opens Browse's preview sheet, listing file fates and untracked
+shell calls before choosing `both`, `conversation`, or `files`. With
+`bingo.mod.browse` disabled the card submits `/rewind <turn>` directly.
+The card is offered wherever a `rewind` command is registered.

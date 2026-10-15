@@ -108,6 +108,7 @@
 # M139 (ADR-0078 §5): dunce adds one normal edge for Windows-safe canonicalization; zero dependencies.
 # M167 (ADR-0086): bingo-mod-hello adds one fixture member, no external crate.
 # M175 (ADR-0089): bingo-mod-sessions adds one member, no external crate.
-max_dependencies = 415
+# M177: bingo-mod-browse adds one member, no external crate.
+max_dependencies = 416
 max_core_check_seconds = 20
 max_target_gb = 5

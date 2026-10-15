@@ -265,6 +265,7 @@ dependencies = [
  "bingo-http",
  "bingo-mcp",
  "bingo-mod-ask",
+ "bingo-mod-browse",
  "bingo-mod-palette",
  "bingo-mod-sessions",
  "bingo-mods",
@@ -637,6 +638,18 @@ dependencies = [
  "async-trait",
  "bingo-sdk",
  "serde_json",
+]
+
+[[package]]
+name = "bingo-mod-browse"
+version = "0.6.6"
+dependencies = [
+ "async-trait",
+ "bingo-sdk",
+ "bingo-services",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -1057,11 +1070,13 @@ dependencies = [
  "bingo-http",
  "bingo-loopback",
  "bingo-mod-ask",
+ "bingo-mod-browse",
  "bingo-mod-hello",
  "bingo-mod-palette",
  "bingo-mod-sessions",
  "bingo-pictures",
  "bingo-sdk",
+ "bingo-services",
  "bingo-update",
  "crossterm",
  "futures",

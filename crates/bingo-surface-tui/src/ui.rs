@@ -152,6 +152,7 @@ pub enum Open {
     Nothing,
     Palette(crate::palette::Opened),
     Sessions(crate::sessions::Opened),
+    Browse(crate::browse::Opened),
     /// One block, whole, as a sheet.
     Pager(Pager),
     /// The turns of this transcript, as a card above the input box.
@@ -164,7 +165,11 @@ impl Open {
     pub fn captures(&self) -> bool {
         matches!(
             self,
-            Open::Sessions(_) | Open::Palette(_) | Open::Pager(_) | Open::Rewind(_)
+            Open::Sessions(_)
+                | Open::Browse(_)
+                | Open::Palette(_)
+                | Open::Pager(_)
+                | Open::Rewind(_)
         )
     }
 

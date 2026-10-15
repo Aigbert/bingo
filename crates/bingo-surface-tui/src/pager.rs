@@ -129,6 +129,19 @@ pub fn lines(state: &SessionState, item: &Item, width: usize) -> Vec<Line<'stati
     wrap::wrap_all(&body, width)
 }
 
+/// Explicit item actions can page blocks that already fit in the transcript.
+pub fn whole(state: &SessionState, item: &Item, width: usize) -> Vec<Line<'static>> {
+    let lines = lines(state, item, width);
+    if !lines.is_empty() {
+        return lines;
+    }
+    let text = bingo_sdk::transcript::text(item)
+        .lines()
+        .map(|line| Line::from(line.to_owned()))
+        .collect::<Vec<_>>();
+    wrap::wrap_all(&text, width)
+}
+
 /// What a reasoning item opens on: what came back from one of the agent's own
 /// calls (ADR-0035 §4), else what the run it belongs to thought — every
 /// thought of it, as the block a person clicked showed them all together. A
@@ -266,7 +279,7 @@ fn content_of(ui: &Ui, tree: &Tree) -> Vec<Line<'static>> {
     };
     let width = width_of(ui);
     source(tree, &open.item)
-        .map(|(state, item)| lines(state, item, width))
+        .map(|(state, item)| whole(state, item, width))
         .unwrap_or_default()
 }
 

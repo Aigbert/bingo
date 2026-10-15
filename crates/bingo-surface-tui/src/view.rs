@@ -41,15 +41,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let band_offset = activity.len();
     let band = crate::component::band::draw(state, ui, frame);
     activity.extend(band.lines.iter().cloned());
-    let toasts = ui.placed.toasts.components(
-        now,
-        &mut crate::component::Site {
-            state,
-            memo: &ui.placed.pulled,
-            width: usize::from(area.width),
-            pulls: &mut frame.pulls,
-        },
-    );
+    let toasts = toast_lines(ui, state, frame, now);
     let toast_rows = (toasts.len() as u16).min(area.height / 3);
     let reduced = Rect::new(
         area.x,
@@ -83,6 +75,11 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
             }
         }
     }
+    let layer_regions = regions;
+    if crate::browse::active(ui) && regions.transcript.height > 0 {
+        regions.transcript.y += 1;
+        regions.transcript.height -= 1;
+    }
     frame.regions = regions;
     render_transcript(tree, ui, frame, regions.transcript, now);
     render_activity(ui, frame, regions.activity, activity);
@@ -94,8 +91,21 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     if matches!(ui.focus, crate::focus::Focus::Pane(_)) {
         frame.cursor = None;
     }
-    layers(tree, ui, frame, regions, now);
+    layers(tree, ui, frame, layer_regions, now);
     frame.render_widget(Paragraph::new(toasts), toast_area);
+}
+
+fn toast_lines(ui: &Ui, state: &SessionState, frame: &mut Layout, now: Now) -> Vec<Line<'static>> {
+    let area = frame.area();
+    ui.placed.toasts.components(
+        now,
+        &mut crate::component::Site {
+            state,
+            memo: &ui.placed.pulled,
+            width: usize::from(area.width),
+            pulls: &mut frame.pulls,
+        },
+    )
 }
 
 /// What the frame must make room for before the transcript is given the rest.
@@ -232,6 +242,23 @@ fn layer(
             let lines = crate::sessions::draw(ui, tree, frame, above.width, above.height, _now);
             over(frame, above, lines);
         }
+        Open::Browse(_) => {
+            let lines = crate::browse::draw(
+                ui,
+                tree,
+                frame,
+                above.width,
+                above.height.min(frame.canvas.area().height / 2),
+            );
+            let bar = ratatui::layout::Rect { height: 1, ..above };
+            frame.render_widget(
+                Paragraph::new(lines.first().cloned().unwrap_or_default()),
+                bar,
+            );
+            if lines.len() > 1 {
+                over(frame, above, lines.into_iter().skip(1).collect());
+            }
+        }
         Open::Palette(_) => {
             let lines = crate::palette::draw(
                 ui,
@@ -248,7 +275,11 @@ fn layer(
         Open::Rewind(card) => over(
             frame,
             above,
-            rewind::lines(&rewind::turns(tree.viewed()), card.selected, rows),
+            rewind::lines(
+                &bingo_sdk::transcript::turns(&tree.viewed().transcript),
+                card.selected,
+                rows,
+            ),
         ),
     }
 }
@@ -266,7 +297,7 @@ fn paged(
     let Some((state, item)) = pager::source(tree, &open.item) else {
         return;
     };
-    let content = pager::lines(state, item, above.width as usize);
+    let content = pager::whole(state, item, above.width as usize);
     let window = pager::Window {
         height: content.len(),
         rows: usize::from(above.height).saturating_sub(pager::HEAD),
@@ -477,10 +508,11 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     }
     let rows = area.height as usize;
     let state = tree.viewed();
+    let browse_folds = crate::browse::folds(ui, tree);
     let rows_config = transcript::Rows::of(
         state,
         area.width as usize,
-        &ui.folds,
+        &browse_folds,
         &ui.catalogs.commands,
         &frame.measurements,
         &ui.linked,
@@ -506,6 +538,9 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     if let Some((at, _, drawing)) = &inline {
         frame.top = (at + drawing.rows.len()).saturating_sub(rows);
     }
+    if let Some(top) = crate::browse::top(ui, tree, frame, rows.saturating_sub(1)) {
+        frame.top = top;
+    }
     component_requests(state, ui, frame, area);
     crate::component::closing::requests(state, ui, frame, area.width, area.height, now);
     let mut shown = if let Some((at, removed, drawing)) = &inline {
@@ -518,10 +553,7 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     } else {
         frame.blocks.window(frame.top, rows)
     };
-    mark_row(ui, frame, &mut shown);
-    // A short transcript hangs from the composer, not from the top of the screen.
-    let padding = frame.padding();
-    shown.splice(..0, std::iter::repeat_n(Line::default(), padding));
+    let padding = prepare_lines(ui, tree, frame, &mut shown);
     // Where the pictures among those lines landed, for a click on one (M56).
     frame.cells = graphics::placed::cells(&shown, area);
     frame.render_widget(Paragraph::new(shown), area);
@@ -529,6 +561,15 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
         crate::ask::drawing::place(frame, drawing, at, area);
     }
     mark_transcript(ui, frame, area, padding, now);
+}
+
+fn prepare_lines(ui: &Ui, tree: &Tree, frame: &Layout, shown: &mut Vec<Line<'static>>) -> usize {
+    crate::browse::mark(ui, tree, frame, shown);
+    mark_row(ui, frame, shown);
+    // A short transcript hangs from the composer, not from the top of the screen.
+    let padding = frame.padding();
+    shown.splice(..0, std::iter::repeat_n(Line::default(), padding));
+    padding
 }
 
 fn mark_transcript(ui: &Ui, frame: &mut Layout, area: Rect, padding: usize, now: Now) {

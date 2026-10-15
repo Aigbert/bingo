@@ -91,3 +91,7 @@ existing supervised action mailbox; ready render answers need no channel hop.
   current values do not trigger I/O or select a hidden active session.
 
 Refs: ADR-0057, ADR-0074, ADR-0079, ADR-0082, ADR-0084, ADR-0085.
+
+M177 adds `bingo-mod-browse`: the member budget grows 414 → 415 with no
+external dependency. Its guide is a per-crate Page. The checkpoints preview
+contract lives in `bingo-services`; neither plugin imports the other.

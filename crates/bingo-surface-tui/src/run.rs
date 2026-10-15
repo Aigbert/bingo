@@ -34,6 +34,7 @@ mod site_keys;
 mod site_lifecycle;
 /// A line on its way out of the composer, and the pictures it named.
 mod submit;
+mod surface;
 /// Whether a newer release is out, asked once at start (M63).
 mod updates;
 /// A line on its way back out of the queue and into the composer (M68).
@@ -103,7 +104,7 @@ enum Reply {
     /// The line the queue gave back, or why it did not (M68). It is carried
     /// whole rather than through `Failed`, because a line the turn took first
     /// is a note about a race and not a refusal of anything.
-    Withdrawn(Box<Result<Input, KernelError>>),
+    Withdrawn(IntentId, Box<Result<Input, KernelError>>),
     Failed(KernelError),
 }
 
@@ -489,9 +490,11 @@ impl Run {
         frame: &bingo_sdk::Frame,
         screen: &mut dyn Screen,
     ) -> Result<(), KernelError> {
+        let undone = surface::undone(self, frame);
         if !self.fold(frame) {
             return Ok(());
         }
+        surface::restore_prompt(self, undone);
         interactions::refocus(self);
         match &frame.event {
             Event::InteractionOpened { .. } => {
@@ -602,6 +605,15 @@ impl Run {
         self.ui.actions.acknowledge(intent);
         self.release_actions();
         site_keys::drain(self);
+        if matches!(outcome, IntentOutcome::Queued { .. })
+            && self
+                .mine
+                .get(intent)
+                .and_then(Option::as_deref)
+                .is_some_and(surface::is_rewind)
+        {
+            return;
+        }
         let Some(about) = self.mine.remove(intent) else {
             return;
         };
@@ -625,7 +637,7 @@ impl Run {
     fn applied(&mut self, result: &Value) {
         if let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone()) {
             sessions::surface_action(self, &action);
-            palette::surface_action(self, action);
+            surface::action(self, action);
         }
         // Acknowledgements refresh the palette alongside asynchronous changes.
         self.fetch_catalogue("plugins", CatalogKind::Plugins);
@@ -690,9 +702,7 @@ impl Run {
             Term::Key(key) => {
                 let chord = crate::keys::commands::chord(key);
                 if chord.as_deref() == Some("ctrl+c")
-                    || (chord.as_deref() == Some("esc")
-                        && !crate::palette::active(&self.ui)
-                        && !crate::sessions::active(&self.ui))
+                    || (chord.as_deref() == Some("esc") && !site_lifecycle::open(&self.ui))
                 {
                     self.site_keys.clear();
                     self.site_queue.clear();
@@ -943,7 +953,7 @@ impl Run {
             Reply::Linked(answer) => self.ui.linked.answered(*answer),
             Reply::Fitted(fitted) => self.ui.decoded.answered(*fitted),
             Reply::Update(version) => self.told_of(version),
-            Reply::Withdrawn(taken) => withdraw::took(self, *taken),
+            Reply::Withdrawn(intent, taken) => withdraw::took(self, intent, *taken),
             Reply::Failed(error) => {
                 self.ui.opening = false;
                 self.ui.notify(Level::Error, error.message, Instant::now());
@@ -1743,18 +1753,24 @@ mod tests {
     #[test]
     fn a_withdrawn_line_comes_back_to_the_composer_with_its_pictures() {
         let mut run = idle(Instant::now());
+        run.mine
+            .insert(IntentId::from_raw("req_1"), Some("/rewind turn_1".into()));
         let image = Image::from_bytes("image/png", b"png")
             .expect("a small picture")
             .at("/pasted/a.png");
         run.reply(
-            Reply::Withdrawn(Box::new(Ok(Input::Text {
-                text: "look at [image 1]".into(),
-                images: vec![image],
-                origin: bingo_sdk::Origin::surface(SURFACE_ID),
-                delivery: bingo_sdk::Delivery::Hold,
-            }))),
+            Reply::Withdrawn(
+                IntentId::from_raw("req_1"),
+                Box::new(Ok(Input::Text {
+                    text: "look at [image 1]".into(),
+                    images: vec![image],
+                    origin: bingo_sdk::Origin::surface(SURFACE_ID),
+                    delivery: bingo_sdk::Delivery::Hold,
+                })),
+            ),
             &mut None,
         );
+        assert!(!run.mine.contains_key(&IntentId::from_raw("req_1")));
         assert_eq!(run.ui.composer.text(), "look at [image 1]");
         assert_eq!(
             run.ui.pictures.carried(run.ui.composer.text()),
@@ -1768,13 +1784,19 @@ mod tests {
     #[test]
     fn a_line_the_turn_took_first_leaves_the_box_empty_and_says_so() {
         let mut run = idle(Instant::now());
+        run.mine
+            .insert(IntentId::from_raw("req_1"), Some("/rewind turn_1".into()));
         run.reply(
-            Reply::Withdrawn(Box::new(Err(KernelError::new(
-                bingo_sdk::ErrorCode::NotFound,
-                "no line of req_1 is waiting in this queue",
-            )))),
+            Reply::Withdrawn(
+                IntentId::from_raw("req_1"),
+                Box::new(Err(KernelError::new(
+                    bingo_sdk::ErrorCode::NotFound,
+                    "no line of req_1 is waiting in this queue",
+                ))),
+            ),
             &mut None,
         );
+        assert!(run.mine.contains_key(&IntentId::from_raw("req_1")));
         assert!(run.ui.composer.is_empty());
         assert_eq!(
             run.ui.notices.last().map(|notice| notice.text.clone()),

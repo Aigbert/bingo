@@ -11,7 +11,7 @@
 //! ADR-0045) and the chord is live; nothing here changed for it, which was
 //! the point of asking the catalogue rather than assuming.
 
-use bingo_sdk::{CommandSpec, SessionState, TurnId, asked};
+use bingo_sdk::CommandSpec;
 use ratatui::text::{Line, Span};
 
 use crate::{theme, window};
@@ -29,56 +29,7 @@ pub struct Rewind {
     pub selected: usize,
 }
 
-/// One turn of a transcript, as a person would recognise it.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Turn {
-    pub id: TurnId,
-    /// What was asked, when the turn opened with a line of yours.
-    pub asked: Option<String>,
-    /// How many items it left behind, which is what going back would drop.
-    pub items: usize,
-}
-
-impl Turn {
-    /// What the row says: the line that started the turn, else the turn's own
-    /// name for one nobody opened by typing.
-    fn label(&self) -> String {
-        match &self.asked {
-            Some(asked) => asked.clone(),
-            None => self.id.as_str().to_string(),
-        }
-    }
-}
-
-/// The turns of this transcript, newest first.
-pub fn turns(state: &SessionState) -> Vec<Turn> {
-    let mut out: Vec<Turn> = Vec::new();
-    for item in state.transcript.items() {
-        let Some(id) = item.turn.clone() else {
-            continue;
-        };
-        match out.last_mut() {
-            Some(turn) if turn.id == id => turn.items += 1,
-            _ => out.push(Turn {
-                id,
-                asked: None,
-                items: 1,
-            }),
-        }
-        if let (Some(turn), Some(asked)) = (
-            out.last_mut(),
-            asked(item)
-                .and_then(|text| text.lines().next())
-                .map(str::trim)
-                .filter(|line| !line.is_empty()),
-        ) {
-            turn.asked.get_or_insert_with(|| asked.to_owned());
-        }
-    }
-    out.reverse();
-    out
-}
-
+pub use bingo_sdk::transcript::Turn;
 /// Whether this session has a `/rewind` to run. Nothing is offered that could
 /// not be done.
 pub fn offered(commands: &[CommandSpec]) -> bool {
@@ -103,6 +54,7 @@ pub fn lines(turns: &[Turn], selected: usize, room: usize) -> Vec<Line<'static>>
     ))];
     let rows = turns
         .iter()
+        .rev()
         .enumerate()
         .map(|(at, turn)| row(turn, at == selected))
         .collect();
@@ -124,7 +76,7 @@ fn row(turn: &Turn, focused: bool) -> Line<'static> {
     Line::from(vec![
         theme::cursor_span(focused),
         Span::styled(turn.label(), style),
-        Span::styled(dropped(turn.items), theme::dim()),
+        Span::styled(dropped(turn.items()), theme::dim()),
     ])
 }
 
@@ -146,7 +98,8 @@ pub fn rows(turns: &[Turn]) -> usize {
 mod tests {
     use super::*;
     use crate::test_support::*;
-    use bingo_sdk::{ArgSpec, ItemStatus};
+    use bingo_sdk::transcript::turns;
+    use bingo_sdk::{ArgSpec, ItemStatus, SessionState, TurnId};
 
     fn spec(name: &str) -> CommandSpec {
         CommandSpec {
@@ -189,90 +142,8 @@ mod tests {
     }
 
     #[test]
-    fn the_turns_are_the_transcripts_own_boundaries_newest_first() {
-        let turns = turns(&transcript());
-        assert_eq!(
-            turns
-                .iter()
-                .map(|turn| (turn.id.as_str().to_string(), turn.items))
-                .collect::<Vec<_>>(),
-            vec![("trn_2".to_string(), 1), ("trn_1".to_string(), 2)],
-        );
-        assert_eq!(turns[0].asked.as_deref(), Some("write me a note"));
-        assert_eq!(
-            turns[1].asked.as_deref(),
-            Some("what is in this workspace?"),
-        );
-    }
-
-    /// A turn a command opened goes back to the line that opened it. The
-    /// kernel leads such a prompt with `/name args`, so the row is the two
-    /// words a person would recognise rather than the page they expanded to.
-    #[test]
-    fn a_turn_a_command_opened_is_named_by_the_line_that_was_typed() {
-        let mut state = state();
-        state.transcript = vec![in_turn(
-            "itm_1",
-            "trn_1",
-            delivered(
-                "itm_1",
-                "command",
-                None,
-                "/guide the wire format\n\nRead this before answering about bingo itself.",
-            ),
-        )]
-        .into_iter()
-        .collect();
-        assert_eq!(turns(&state)[0].label(), "/guide the wire format");
-    }
-
-    /// A shell line runs beside a turn without opening one, so the row a
-    /// rewind offers is still the prose that opened it (M65). A `!` in the
-    /// middle of a turn is not the prompt the model answered.
-    #[test]
-    fn a_shell_line_is_not_the_prompt_a_turn_answered() {
-        let mut state = state();
-        state.transcript = vec![
-            in_turn("itm_1", "trn_1", user("itm_1", "why is the build red?")),
-            in_turn(
-                "itm_2",
-                "trn_1",
-                shell("itm_2", "cargo build", "error[E0004]\n", Some(101)),
-            ),
-        ]
-        .into_iter()
-        .collect();
-        let turns = turns(&state);
-        assert_eq!(turns.len(), 1);
-        assert_eq!(turns[0].label(), "why is the build red?");
-    }
-
-    /// One outside every turn is not a turn at all: nothing to go back to.
-    #[test]
-    fn a_shell_line_between_turns_opens_no_row_of_its_own() {
-        let mut state = state();
-        state.transcript = vec![shell("itm_1", "ls", "a\nb\n", Some(0))]
-            .into_iter()
-            .collect();
-        assert!(turns(&state).is_empty());
-    }
-
-    #[test]
-    fn a_turn_nobody_opened_by_typing_is_named_by_its_own_id() {
-        let mut state = state();
-        state.transcript = vec![in_turn(
-            "itm_1",
-            "trn_9",
-            assistant("itm_1", "on my own", ItemStatus::Completed),
-        )]
-        .into_iter()
-        .collect();
-        assert_eq!(turns(&state)[0].label(), "trn_9");
-    }
-
-    #[test]
     fn the_card_marks_the_row_the_keyboard_is_on() {
-        let turns = turns(&transcript());
+        let turns = turns(&transcript().transcript);
         let drawn: Vec<String> = lines(&turns, 1, 20)
             .iter()
             .map(|line| line.to_string())
@@ -301,6 +172,6 @@ mod tests {
 
     #[test]
     fn a_chosen_row_runs_the_command_on_its_own_turn() {
-        assert_eq!(line(&turns(&transcript())[0]), "/rewind trn_2");
+        assert_eq!(line(&turns(&transcript().transcript)[1]), "/rewind trn_2");
     }
 }
