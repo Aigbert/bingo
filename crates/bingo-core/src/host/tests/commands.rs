@@ -543,6 +543,22 @@ async fn rename_names_the_session_and_announces_it() {
     );
 }
 
+/// A blank title clears the name on a live session, so its row goes back
+/// to the first ask instead of showing an empty name.
+#[tokio::test]
+async fn a_blank_title_clears_a_live_name() {
+    let (host, _) = host_for(vec![], None).await;
+    let mut client = Client::open(&host).await;
+    client.ack("/rename the release").await;
+    let id = client.state.summary.id.clone();
+    host.reconfigure(&id, SessionChange::Title("  ".into()))
+        .await
+        .unwrap();
+    let (ack, _) = client.ack("/rename").await;
+    assert!(shown(&ack).starts_with("name: none yet"), "{}", shown(&ack));
+    assert_eq!(client.state.summary.title, None);
+}
+
 struct DiscoveredApproval(bingo_sdk::Approval);
 #[async_trait]
 impl bingo_sdk::PluginSource for DiscoveredApproval {

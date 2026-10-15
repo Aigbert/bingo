@@ -30,7 +30,11 @@ fn folded(dir: &Path) -> Result<bingo_sdk::SessionState, KernelError> {
     Ok(state)
 }
 
-pub(super) fn rename(store: &JsonlStore, id: &SessionId, title: &str) -> Result<(), KernelError> {
+pub(super) fn rename(
+    store: &JsonlStore,
+    id: &SessionId,
+    title: Option<String>,
+) -> Result<(), KernelError> {
     let dir = store.existing(id)?;
     let _claim = lock::take(&layout::lock(&dir))?.ok_or_else(|| {
         KernelError::new(
@@ -47,7 +51,7 @@ pub(super) fn rename(store: &JsonlStore, id: &SessionId, title: &str) -> Result<
         .and_then(|metadata| metadata.modified())
         .map_err(|e| storage(e.to_string()))?;
     let mut state = folded(&dir)?;
-    state.summary.title = Some(title.to_owned());
+    state.summary.title = title;
     state.summary.updated_at = Timestamp::try_from(modified).map_err(|e| storage(e.to_string()))?;
     let frame = Frame {
         seq: Seq(state.seq.0 + 1),

@@ -28,7 +28,7 @@ pub(crate) fn stated(
         cwd: cwd.display().to_string(),
         key: key.clone(),
         parent: parent.clone(),
-        title: title.clone().or(became.title),
+        title: title.clone(),
         driver: *driver,
         provider: choice.map(|c| c.endpoint.id().to_string()),
         model: choice.map(|c| c.id.clone()),
@@ -36,6 +36,13 @@ pub(crate) fn stated(
         tools: tools.clone(),
         ..became
     }
+}
+
+/// A blank title is no title: the session goes back to being named by
+/// its first ask.
+pub(crate) fn titled(title: &str) -> Option<String> {
+    let title = title.trim();
+    (!title.is_empty()).then(|| title.to_owned())
 }
 
 /// Last, not first: the journal's fold includes every change to the spec.

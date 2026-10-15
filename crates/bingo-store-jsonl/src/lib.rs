@@ -165,11 +165,11 @@ impl SessionStore for JsonlStore {
         off_runtime(move || inspection::summary(&store, &session)).await
     }
 
-    async fn rename(&self, session: &SessionId, title: &str) -> Result<(), KernelError> {
+    async fn rename(&self, session: &SessionId, title: Option<&str>) -> Result<(), KernelError> {
         let store = self.clone();
         let session = session.clone();
-        let title = title.to_owned();
-        off_runtime(move || inspection::rename(&store, &session, &title)).await
+        let title = title.map(str::to_owned);
+        off_runtime(move || inspection::rename(&store, &session, title)).await
     }
 
     async fn locked(&self, session: &SessionId) -> Result<bool, KernelError> {

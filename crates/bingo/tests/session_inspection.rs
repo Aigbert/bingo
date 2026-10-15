@@ -156,6 +156,11 @@ async fn stored_preview_fork_and_rename_never_revive_the_source() {
         f.store.summary(&id).await.unwrap().title.as_deref(),
         Some("changed")
     );
+    f.host
+        .reconfigure(&id, SessionChange::Title(" ".into()))
+        .await
+        .unwrap();
+    assert_eq!(f.store.summary(&id).await.unwrap().title, None);
     assert!(!f.store.locked(&id).await.unwrap());
     assert_eq!(f.opened.load(Ordering::SeqCst), 0);
     f.host.shutdown().await;

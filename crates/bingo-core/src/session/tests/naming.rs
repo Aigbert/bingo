@@ -11,9 +11,16 @@ fn named(title: Option<&str>) -> Mailbox {
         Script::Events(text("one")),
         Script::Events(text("two")),
     ]);
-    spawn(head, None, Services::none(), |_| {
-        Arc::new(config(provider, vec![], Arc::new(NoHost)))
-    })
+    spawn(head, None, Services::none(), |_| titled(provider, title))
+}
+
+/// The spec carries the name, as the host's fold of the journal does.
+fn titled(provider: Arc<ScriptedProvider>, title: Option<&str>) -> Arc<TurnConfig> {
+    let mut config = config(provider, vec![], Arc::new(NoHost));
+    let mut spec = (*config.spec).clone();
+    spec.title = title.map(Into::into);
+    config.spec = Arc::new(spec);
+    Arc::new(config)
 }
 
 fn renames(frames: &[Frame]) -> Vec<Option<String>> {
@@ -95,7 +102,7 @@ async fn a_name_that_landed_after_the_first_ask_wins_on_resume() {
     ];
     let provider = ScriptedProvider::new(vec![Script::Events(text("ok"))]);
     let mailbox = resume(frames, None, Services::none(), |_| {
-        Arc::new(config(provider, vec![], Arc::new(NoHost)))
+        titled(provider, Some("reviewer"))
     })
     .unwrap();
     let (mut state, mut events) = mailbox.attach().await.unwrap();

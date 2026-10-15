@@ -106,12 +106,12 @@ impl SessionStore for MemoryStore {
             .ok_or_else(|| Self::missing(session))
     }
 
-    async fn rename(&self, session: &SessionId, title: &str) -> Result<(), KernelError> {
+    async fn rename(&self, session: &SessionId, title: Option<&str>) -> Result<(), KernelError> {
         let mut sessions = self.lock();
         let entry = sessions
             .get_mut(session)
             .ok_or_else(|| Self::missing(session))?;
-        entry.summary.title = Some(title.to_owned());
+        entry.summary.title = title.map(str::to_owned);
         entry.frames.push(Frame {
             seq: Seq(entry.frames.last().map_or(1, |frame| frame.seq.0 + 1)),
             ts: entry.summary.updated_at,

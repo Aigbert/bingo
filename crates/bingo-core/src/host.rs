@@ -111,7 +111,7 @@ fn apply(change: SessionChange, spec: &mut SessionSpec) {
             spec.model = Some(model);
         }
         SessionChange::Thinking(level) => spec.thinking = Some(level),
-        SessionChange::Title(title) => spec.title = Some(title),
+        SessionChange::Title(title) => spec.title = crate::spec::titled(&title),
     }
 }
 
@@ -881,7 +881,10 @@ impl HostApi for Host {
         if let SessionChange::Title(title) = &change {
             let _guard = self.reopening.lock().await;
             if self.live(session).is_err() {
-                return inspection::store(self)?.rename(session, title).await;
+                let title = crate::spec::titled(title);
+                return inspection::store(self)?
+                    .rename(session, title.as_deref())
+                    .await;
             }
         }
         let change = crate::config::change(self, session, change).await?;

@@ -88,7 +88,8 @@ pub enum SessionChange {
         model: String,
     },
     Thinking(Option<Effort>),
-    /// What the session is called from now on.
+    /// What the session is called from now on. A blank title clears the
+    /// name, and lists fall back to the session's first ask.
     Title(String),
 }
 

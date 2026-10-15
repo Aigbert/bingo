@@ -23,7 +23,7 @@ async fn stored_read_and_title_preserve_activity_and_release_the_claim() {
     let bytes = std::fs::read(&path).unwrap();
     let before = store.summary(&before.id).await.unwrap();
     assert_eq!(std::fs::read(&path).unwrap(), bytes);
-    store.rename(&before.id, "changed").await.unwrap();
+    store.rename(&before.id, Some("changed")).await.unwrap();
     let after = store.summary(&before.id).await.unwrap();
     assert_eq!(after.title.as_deref(), Some("changed"));
     assert_eq!(after.updated_at, before.updated_at);
@@ -35,7 +35,11 @@ async fn stored_read_and_title_preserve_activity_and_release_the_claim() {
     let other = JsonlStore::new(store.root());
     other.acquire(&before.id).await.unwrap();
     assert_eq!(
-        store.rename(&before.id, "stolen").await.unwrap_err().code,
+        store
+            .rename(&before.id, Some("stolen"))
+            .await
+            .unwrap_err()
+            .code,
         ErrorCode::SessionLocked
     );
     assert_eq!(store.replay(&before.id, Seq::ZERO).await.unwrap().len(), 2);

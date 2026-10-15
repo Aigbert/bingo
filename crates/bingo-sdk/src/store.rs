@@ -59,8 +59,9 @@ pub trait SessionStore: Send + Sync {
         Ok(state.summary)
     }
 
-    /// Change only the title under a temporary exclusive claim, preserving activity time.
-    async fn rename(&self, _session: &SessionId, _title: &str) -> Result<(), KernelError> {
+    /// Change only the title under a temporary exclusive claim, preserving
+    /// activity time. `None` clears it, so lists fall back to the first ask.
+    async fn rename(&self, _session: &SessionId, _title: Option<&str>) -> Result<(), KernelError> {
         Err(KernelError::new(
             crate::ErrorCode::Internal,
             "this store cannot rename sessions",
@@ -119,7 +120,7 @@ mod tests {
     async fn a_store_that_cannot_tell_refuses_like_rename() {
         let id = SessionId::from_raw("ses_any");
         let locked = Minimal.locked(&id).await.expect_err("unknown is not free");
-        let renamed = Minimal.rename(&id, "x").await.expect_err("refused");
+        let renamed = Minimal.rename(&id, Some("x")).await.expect_err("refused");
         assert_eq!(locked.code, renamed.code);
     }
 }
