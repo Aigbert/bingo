@@ -153,9 +153,11 @@ fn memory_and_experience_frontmatter_stays_verbatim_in_the_pager() {
             let (mut ui, now) = scene();
             let now = still(now);
             ui.focus.show(
-                Open::Pager(Pager::text(
-                    "file.md".into(),
-                    bingo_mod_memory::fence::document(text),
+                Open::Pager(Pager::new(
+                    crate::pager::Source::Text {
+                        title: "file.md".into(),
+                        text: bingo_mod_memory::fence::document(text),
+                    },
                     None,
                 )),
                 now.instant,
@@ -181,9 +183,11 @@ fn a_pager_renders_other_text_as_given_without_a_fence() {
     let (mut ui, now) = scene();
     let now = still(now);
     ui.focus.show(
-        Open::Pager(Pager::text(
-            "notes".into(),
-            "---\ntitle: plain notes\n---\n\n**Body**".into(),
+        Open::Pager(Pager::new(
+            crate::pager::Source::Text {
+                title: "notes".into(),
+                text: "---\ntitle: plain notes\n---\n\n**Body**".into(),
+            },
             None,
         )),
         now.instant,
@@ -203,9 +207,11 @@ fn a_pager_does_not_return_focus_to_a_removed_pane() {
     let tree = solo(&state());
     let (mut ui, now) = scene();
     ui.focus.show(
-        Open::Pager(Pager::text(
-            "file".into(),
-            "text".into(),
+        Open::Pager(Pager::new(
+            crate::pager::Source::Text {
+                title: "file".into(),
+                text: "text".into(),
+            },
             Some(crate::pager::Return::Pane("removed".into())),
         )),
         now.instant,

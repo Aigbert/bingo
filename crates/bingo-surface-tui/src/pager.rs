@@ -9,6 +9,8 @@
 //! from the item every frame, so a block that is still arriving grows under the
 //! sheet rather than being copied into it.
 
+pub mod page;
+
 use bingo_sdk::{Item, ItemBody, ItemId, SessionState};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::text::{Line, Span};
@@ -40,7 +42,8 @@ pub struct Pager {
 }
 
 /// What the sheet reads: a transcript block, or text a command handed over.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize)]
+#[serde(from = "page::Wire")]
 pub enum Source {
     Item(ItemId),
     Text { title: String, text: String },
@@ -57,17 +60,12 @@ pub enum Return {
 
 impl Pager {
     pub fn open(item: ItemId) -> Self {
-        Self {
-            source: Source::Item(item),
-            top: 0,
-            search: None,
-            return_to: None,
-        }
+        Self::new(Source::Item(item), None)
     }
 
-    pub fn text(title: String, text: String, return_to: Option<Return>) -> Self {
+    pub fn new(source: Source, return_to: Option<Return>) -> Self {
         Self {
-            source: Source::Text { title, text },
+            source,
             top: 0,
             search: None,
             return_to,
@@ -117,13 +115,6 @@ impl Pager {
     }
 }
 
-pub fn show(ui: &mut Ui, item: ItemId, now: Now) {
-    let mut pager = Pager::open(item);
-    if matches!(ui.focus.open(), Open::Browse(_)) {
-        pager.return_to = Some(Return::Layer(Box::new(ui.focus.open().clone())));
-    }
-    ui.focus.show(Open::Pager(pager), now.instant);
-}
 pub fn content(
     state: &SessionState,
     item: &Item,

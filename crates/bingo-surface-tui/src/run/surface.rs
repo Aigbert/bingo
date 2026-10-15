@@ -16,22 +16,9 @@ pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
 }
 
 fn page(run: &mut Run, args: &Value, now: crate::clock::Now) {
-    if let Some(id) = args["item"].as_str() {
-        let id = bingo_sdk::ItemId::from_raw(id);
-        if run.session.tree.viewed().transcript.get(&id).is_some() {
-            crate::pager::show(&mut run.ui, id, now);
-        }
-        return;
+    if let Ok(page) = serde_json::from_value(args.clone()) {
+        crate::pager::page::open(&mut run.ui, &run.session.tree, page, now);
     }
-    let (Some(title), Some(text)) = (args["title"].as_str(), args["text"].as_str()) else {
-        return;
-    };
-    let return_to = match &run.ui.focus {
-        crate::focus::Focus::Pane(key) => Some(crate::pager::Return::Pane(key.clone())),
-        _ => None,
-    };
-    let pager = crate::pager::Pager::text(title.into(), text.into(), return_to);
-    run.ui.focus.show(Open::Pager(pager), now.instant);
 }
 fn focus(run: &mut Run, args: &Value) {
     let (Some(plugin), Some(id)) = (args["plugin"].as_str(), args["id"].as_str()) else {

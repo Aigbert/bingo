@@ -159,6 +159,7 @@ impl Handler {
                         args: json!({
                             "title": self.title(&target, cx),
                             "text": crate::fence::document(&text),
+                            "return_to": {"plugin": crate::ID, "id": crate::REQUEST},
                         }),
                     },
                     fallback: Some(text),

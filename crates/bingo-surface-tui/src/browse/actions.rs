@@ -35,7 +35,8 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect
                     .join("\n"),
                 )];
             }
-            crate::pager::show(ui, item.id.clone(), now);
+            let page = crate::pager::page::Page::item(item.id.clone());
+            crate::pager::page::open(ui, tree, page, now);
         }
     }
     Vec::new()
