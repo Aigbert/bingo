@@ -106,3 +106,15 @@ async fn trust_that_cannot_be_saved_is_said_after_the_approval() {
     assert!(saved["approved"].is_object());
     assert!(saved.get("pluginTrust").is_none());
 }
+
+/// The verb is read the way its guard reads it: a tab or a doubled space
+/// still approves, rather than falling through to a switch.
+#[tokio::test]
+async fn an_approval_reads_its_verb_at_any_whitespace() {
+    let (home, repo) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let host = scene(home.path(), repo.path(), true, true).await;
+    let mut client = Client::open(&host).await;
+    let (ack, _) = client.ack("/plugins approve\tp  full").await;
+    assert!(message(&ack).contains("trust: full"), "{ack:?}");
+    assert_eq!(saved(home.path())["pluginTrust"]["p"]["tier"], "full");
+}

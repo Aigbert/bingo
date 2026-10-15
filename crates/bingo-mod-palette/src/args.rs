@@ -28,7 +28,7 @@ fn named<'a>(name: &str, commands: &'a [CatalogEntry]) -> Option<(&'a CatalogEnt
 pub fn person_only(line: &str, commands: &[CatalogEntry]) -> bool {
     line.strip_prefix('/')
         .and_then(|rest| {
-            let (name, args) = rest.split_once(' ').unwrap_or((rest, ""));
+            let (name, args) = bingo_sdk::split_verb(rest);
             named(name, commands).map(|(_, spec)| spec.person_only(args))
         })
         .unwrap_or(false)

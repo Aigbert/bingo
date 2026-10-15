@@ -65,11 +65,10 @@ impl Command for PluginsCommand {
                 message: Some(report.message()),
             });
         }
-        if let Some(args) = args.trim().strip_prefix("trust ") {
-            return super::plugin_trust::run(&host, args).await;
-        }
-        if let Some(name) = args.trim().strip_prefix("approve ") {
-            return approve(&host, name.trim()).await;
+        match self.spec().person_verb(args) {
+            Some(("trust", rest)) => return super::plugin_trust::run(&host, rest).await,
+            Some(("approve", rest)) => return approve(&host, rest).await,
+            _ => {}
         }
         let listed = listing(host.registry()).await;
         match parse(args)? {

@@ -56,7 +56,10 @@ impl Command for WaitingAdapters {
                 "approval requires person input",
             ));
         }
-        let name = args.trim().strip_prefix("approve ").map(str::trim);
+        let name = match self.spec().person_verb(args) {
+            Some(("approve", name)) => Some(name),
+            _ => None,
+        };
         let entry = self
             .0
             .iter()

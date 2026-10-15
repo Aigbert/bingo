@@ -91,9 +91,26 @@ pub enum ArgSpec {
 impl CommandSpec {
     /// Whether `args` start with a word only the person may run.
     pub fn person_only(&self, args: &str) -> bool {
-        let first = args.split_whitespace().next().unwrap_or_default();
-        self.args.person_words().iter().any(|word| word == first)
+        self.person_verb(args).is_some()
     }
+
+    /// The word only the person may run that `args` start with, and the
+    /// arguments after it: the one reading every owner of such a line uses,
+    /// so what is guarded and what runs cannot part.
+    pub fn person_verb<'a>(&self, args: &'a str) -> Option<(&'a str, &'a str)> {
+        let (verb, rest) = split_verb(args);
+        let person = self.args.person_words().iter().any(|word| word == verb);
+        person.then_some((verb, rest))
+    }
+}
+
+/// The first word of `text` and what follows it, split at any whitespace and
+/// trimmed: `/name args` read as a name and its arguments, `args` as a verb
+/// and the rest.
+pub fn split_verb(text: &str) -> (&str, &str) {
+    let text = text.trim_start();
+    let end = text.find(char::is_whitespace).unwrap_or(text.len());
+    (&text[..end], text[end..].trim())
 }
 
 impl ArgSpec {
@@ -337,4 +354,38 @@ mod surface_contract {
 pub struct SessionView<'a> {
     pub state: &'a crate::SessionState,
     pub providers: &'a [crate::AuthStatus],
+}
+
+#[cfg(test)]
+mod person_contract {
+    use super::*;
+    /// A tab or a doubled space reads the same verb and arguments as one
+    /// space: what is guarded is what runs.
+    #[test]
+    fn a_person_verb_reads_the_same_at_any_whitespace() {
+        let spec: CommandSpec = serde_json::from_value(serde_json::json!({
+            "name":"plugins","hint":"","family":"t",
+            "args":{"kind":"words","values":["trust","reload"],"person":["trust"]}
+        }))
+        .unwrap();
+        for args in [
+            "trust lift full",
+            "trust\tlift full",
+            "  trust  lift full ",
+            "trust\t\tlift full",
+        ] {
+            assert_eq!(
+                spec.person_verb(args),
+                Some(("trust", "lift full")),
+                "{args:?}"
+            );
+        }
+        assert_eq!(spec.person_verb("trust"), Some(("trust", "")));
+        assert_eq!(spec.person_verb("reload"), None);
+        assert_eq!(spec.person_verb("trustx lift"), None);
+        assert_eq!(
+            split_verb("/plugins\tapprove  x"),
+            ("/plugins", "approve  x")
+        );
+    }
 }
