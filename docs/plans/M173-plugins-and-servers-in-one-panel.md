@@ -44,8 +44,8 @@ the plain fallback.
    ADR-0057 §3's reason. Table test from (row, key) to line.
 6. **Trust list.** `t` (and `⏎` on a waiting plugin) opens tighten /
    rewrite / full (and `not now` while waiting), one sentence each;
-   `full` needs a second `⏎`; the pick runs `/plugins approve` and
-   writes `pluginTrust` for rewrite and full. The footer says `kept in
+   `full` needs a second `⏎`; the pick runs `/plugins approve` while waiting, otherwise `/plugins trust`,
+   and writes `pluginTrust` for every tier. The footer says `kept in
    ~/.bingo/settings.toml, never the repo`.
 7. **Drawing and keys.** `Plugins` site: header line with counts and
    the legend, two panes split at the prototype's ratio, one `❯` row;
@@ -60,22 +60,25 @@ the plain fallback.
   verbs.rs,trust.rs,draw.rs,keys.rs}`; listed in `crates/bingo/src/main.rs`.
 - Core catalogue/commands: link order, owned contributions and person-owned trust.
 - SDK `Plugins` site/props and `PluginSource::contents`; modules/process source projections.
-- TUI site placement/keys/lifecycle, binary registration, fixtures, CLI and TestBackend tests.
+- TUI site placement/keys/lifecycle, palette exact-line/choice payload integration, binary
+  registration, fixtures, CLI and TestBackend tests.
 - `crates/bingo-mod-plugins/src/guide.md` registered by `guide.rs`; generated schema/TypeScript.
 
 ## Exit criteria
 
-- [ ] Row fixture; chain, groups, cards and verbs tables.
-- [ ] Snapshots: `/plugins`, a failed plugin, a waiting one with the
+- [x] Row fixture; chain, groups, cards and verbs tables.
+- [x] Snapshots: `/plugins`, a failed plugin, a waiting one with the
       trust list, a built-in drawn over, `/mcp`, sign-in, both sizes.
-- [ ] `TestBackend`: opener order; `space` on a draw-only mod (now), a
+- [x] `TestBackend`: opener order; `space` on a draw-only mod (now), a
       tool plugin (`off at next start`), a needed one (refused); trust
       `full` needs two `⏎`; MCP `⏎` per state; `r` refused while
       signing in.
-- [ ] `bingo-mod-plugins` switched off: both commands draw their tables.
-- [ ] tmux drive in a temp HOME with a temp repo plugin and a fake MCP
+- [x] `bingo-mod-plugins` switched off: both commands draw their tables.
+- [x] tmux drive in a temp HOME with a temp repo plugin and a fake MCP
       server, captured and compared with the prototype; tui-smoke;
-      gates as M167.
+      local gates as M167.
+- [ ] Complete Windows checks for the five C-dependent crates listed below;
+      the accepted Windows C-toolchain deferral applies.
 
 ## Non-goals
 
@@ -94,23 +97,54 @@ panel; per-tool switches inside a server; the desktop's drawing.
 - The prototype's needed examples are illustrative. ADR-0057's existing store/surface rule
   remains authoritative; permission and filesystem plugins remain switchable.
 - Add `/plugins trust <name> <tier>` and optional approval tier arguments: no command
-  currently writes trust. Both use the user-layer writer; the panel only dispatches lines.
+  currently writes trust. Both use the user-layer writer; writing every tier also reduces an existing broader grant.
 - Server rows retain typed transport configuration for ACP forwarding. Tool counts and
   run/address text derive from status/transport instead of duplicating those facts.
   Origins come from registrar sources, retained after approval; unknown latency stays absent.
 - Guides use the new crate's registered Page (ADR-0054). No docs/guide directory is added.
 - Add only workspace edges for the new mod and its test consumers. The normal dependency
   count grows 414 → 415 because the budget counts workspace members.
-
 - The template's registered guide is a typed static `Pages` service. Classifying it as a
   runtime service pinned every documented mod to next-start. Treat only typed `Pages`
-  as catalogue facts; ordinary services still pin. The disable/fallback integration
-  test exposed this and now checks a live panel disable.
+  as catalogue facts; ordinary services still pin. The live-disable integration test exposed this.
 - Trust changes read fresh user grants at registration and use existing module retirement
   before reenabling a reloadable generation; process/tool grants apply at next start.
+  Unreadable live settings suspend new admission instead of substituting default grants.
   Handlers carry opening identity only and reread catalogue facts when pressed.
-
 - External command ownership is held by each source, not the native registry. Add a
   default-empty typed `PluginSource::contents` projection, implemented by module and
   process sources from their live registrations, so cards also name external commands
   and tools without another cache or a guessed owner.
+- The real terminal exposed two palette integration gaps: an exactly typed command with
+  optional arguments entered completion instead of invoking its default; Enter now runs
+  the exact command/alias and Tab still completes. Palette handlers carry only catalogue
+  ids/labels used by argument choices; full metadata stays in render props. This avoids
+  traversing irrelevant schemas through an outside wrapper's handler tree.
+- The same source projection supplies origin/runtime before admission; these are discovery
+  facts, while a grant remains absent until admission. The tmux capture exposed the gap.
+- Surface-action fallbacks retain Markdown tables so chat keeps its existing table dialect;
+  print receives a plain-text table. The queued `/mcp` channel test caught a lossy fold.
+
+## Verified — 2026-10-15
+
+Verification used isolated HOME/data/config directories and fake/local fixtures; gates ran sequentially.
+
+```text
+cargo fmt --all -- --check                                  exit 0
+cargo check --workspace --all-targets --locked               Finished dev profile; exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings  exit 0
+cargo test --workspace --locked                             5,737 passed; 5 ignored; 173 suites (aggregate)
+bash scripts/check_discipline.sh                            discipline ok
+bash scripts/budget.sh                                      415/415 dependencies; 0 core recompiles; budget ok
+cargo deny check                                           advisories ok, bans ok, licenses ok, sources ok
+bash scripts/tui-smoke.sh                                   tui-smoke ok
+cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc
+  PASS: bingo-sdk, bingo-services, bingo-core, bingo-provider-acp, bingo-mod-plugins, bingo-mod-palette
+  DEFER: bingo-mcp, bingo-plugin-rpc, bingo-mods, bingo-surface-tui, bingo
+  all five: aws-lc-sys v0.44.0 custom build failed; Windows stdlib.h/windows.h unavailable
+node --test src/*.test.ts (sdk/typescript)                   31 passed; 0 failed
+```
+`BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked`: passed; then `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc -p bingo-surface-rpc -p bingo-mods -p bingo-store-jsonl --lib --locked`: passed; generated schema and TypeScript committed.
+`python3 /tmp/m173-tmux-drive.py`: PASS; 13 captures at 108×30/80×24 compared with the local prototype; approval/full confirmation, user-only trust, disable/enable/reconnect and table fallback checked. Own isolated tmux socket and local echo-server fixture only; temporary HOME/repo removed.
+Twelve TestBackend snapshots cover six scenes at both sizes; key tests cover live/next-start/needed switches, trust and MCP states. Both command fallbacks have integration coverage.
+No timing flake observed; the counter smoke passed on the first final run. Discipline advisories and the budget's 28 GB soft target warning remain; final `cargo clean` removes build artifacts.
