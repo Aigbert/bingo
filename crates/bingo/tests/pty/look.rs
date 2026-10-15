@@ -62,6 +62,21 @@ impl Terminal {
         );
     }
 
+    /// Streaming text has a coloured tail; wait for the completed row's ink.
+    fn wait_own_ink(&self, needle: &str) {
+        let deadline = Instant::now() + LIMIT;
+        while Instant::now() < deadline {
+            if self.own_ink(needle) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        panic!(
+            "timed out waiting for terminal foreground on {needle:?}\n{}",
+            self.screen()
+        );
+    }
+
     /// Whether every cell of the row carrying `needle` is written in the
     /// terminal's own foreground — SGR 39 and no colour of bingo's, which is
     /// what body text is drawn in since M73, in every look.
@@ -104,10 +119,8 @@ const FOCUS_GAINED: &[u8] = b"\x1b[I";
 /// then its ground turns light under the running surface, and the question a
 /// person's return to the window puts brings the other palette back with it.
 ///
-/// The answer's own words are the terminal's ink throughout, in both palettes
-/// and at every step between them (M73) — nothing of bingo's is spent on prose,
-/// which is why a scheme flip reaches the words before the question is even
-/// asked.
+/// The completed answer uses the terminal's ink in both palettes. Its streaming
+/// tail can still be coloured when the words first appear, so check after it settles.
 #[test]
 fn a_terminal_whose_ground_turns_light_is_followed_within_one_focus() {
     let mut terminal = Terminal::under(&[], SCRIPT, Answers::Da1Only, Ground::Answered);
@@ -120,10 +133,7 @@ fn a_terminal_whose_ground_turns_light_is_followed_within_one_focus() {
         line.contains("hello"),
         "and that band is their line: {line:?}"
     );
-    assert!(
-        terminal.own_ink("Hello from the pty."),
-        "the answer is written in the terminal's own foreground"
-    );
+    terminal.wait_own_ink("Hello from the pty.");
 
     terminal.turn_light();
     terminal.send(FOCUS_GAINED);
@@ -132,10 +142,7 @@ fn a_terminal_whose_ground_turns_light_is_followed_within_one_focus() {
         counted(&terminal.written(), GROUND_QUERY) > 1,
         "the question was put again"
     );
-    assert!(
-        terminal.own_ink("Hello from the pty."),
-        "and the words never changed hands: the terminal remapped them itself"
-    );
+    terminal.wait_own_ink("Hello from the pty.");
 
     // And back: the same window, the same run, the ground dark again.
     terminal.light.store(false, Ordering::SeqCst);
