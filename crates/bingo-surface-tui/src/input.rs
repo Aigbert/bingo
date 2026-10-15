@@ -488,6 +488,9 @@ fn rewind_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect>
             let selected = turns.iter().rev().nth(card.selected).map(|t| t.id.clone());
             let chosen = turns.iter().rev().nth(card.selected).map(rewind::line);
             if crate::browse::offered(ui, tree) {
+                if tree.viewed().busy() {
+                    ui.notify(Level::Warn, crate::browse::BUSY, now.instant);
+                }
                 crate::browse::open(ui, tree, selected, true, now);
                 return Vec::new();
             }

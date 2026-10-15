@@ -143,7 +143,7 @@ impl Fixture {
             ui.placed.pulled.request(&key);
             ui.placed.pulled.answer(key, view);
             draw_tree(width, height, &solo(state), ui, now);
-            let effects = preview(ui, &solo(state), now);
+            let effects = preview(ui, &solo(state));
             self.perform(ui, state, effects, now).await;
         }
         draw_tree(width, height, &solo(state), ui, now)

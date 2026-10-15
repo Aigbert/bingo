@@ -92,7 +92,7 @@ pub(super) fn paint(
     run.ui.shown = layout;
     run.release_actions_at(now.instant);
     site_keys::drain(run);
-    let preview = crate::browse::preview(&mut run.ui, &run.session.tree, now);
+    let preview = crate::browse::preview(&mut run.ui, &run.session.tree);
     run.apply(preview);
     run.grumble(began.elapsed());
     showing::hand(run, screen)?;

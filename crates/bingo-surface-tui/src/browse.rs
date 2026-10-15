@@ -16,6 +16,8 @@ use bingo_sdk::{
 use crossterm::event::{KeyCode, KeyEvent};
 pub use paint::{folds, mark, top};
 use serde_json::json;
+/// What a key that asks to rewind is told while a turn runs.
+pub const BUSY: &str = "Wait for the running turn before rewinding";
 #[derive(Clone, Debug, PartialEq)]
 pub struct Opened {
     pub session: SessionId,
@@ -213,7 +215,7 @@ pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
 #[cfg(test)]
 mod tests;
 
-pub fn preview(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+pub fn preview(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
     if !active(ui) || waiting(ui, tree) {
         return vec![];
     }
@@ -229,15 +231,9 @@ pub fn preview(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     {
         open.confirm = false;
     }
-    if props.previewed || props.selected.is_none() {
-        return vec![];
-    }
-    if tree.viewed().busy() {
-        ui.notify(
-            Level::Warn,
-            "Wait for the running turn before rewinding",
-            now.instant,
-        );
+    // Busy is said by the key that asked (`r`, `⏎`); a frame only waits, or
+    // every frame of a running turn would queue the same notice.
+    if props.previewed || props.selected.is_none() || tree.viewed().busy() {
         return vec![];
     }
     let Some(mut action) = handler(ui) else {

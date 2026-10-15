@@ -12,11 +12,7 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect
     }
     if let Some(line) = value["run"].as_str() {
         if tree.viewed().busy() {
-            ui.notify(
-                Level::Warn,
-                "Wait for the running turn before rewinding",
-                now.instant,
-            );
+            ui.notify(Level::Warn, BUSY, now.instant);
             return vec![];
         }
         ui.focus.close(now.instant);

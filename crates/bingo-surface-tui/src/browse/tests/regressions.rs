@@ -159,11 +159,36 @@ fn ordinary_pagers_keep_their_existing_content_projection() {
     );
 }
 
+fn busy_notices(ui: &Ui) -> usize {
+    ui.notices.iter().filter(|n| n.text == BUSY).count()
+}
+
 #[tokio::test]
 async fn busy_card_refuses_preview_without_reading_files() {
     let fixture = Fixture::new();
     let (mut state, mut ui, now) = setup(&fixture);
+    ui.catalogs.commands.push(
+        serde_json::from_value(
+            json!({"name":"rewind","hint":"rewind","args":{"kind":"none"},"family":"session"}),
+        )
+        .unwrap(),
+    );
     state.apply(&frame(1, started("running")));
+    ui.focus
+        .show(Open::Rewind(crate::rewind::Rewind::default()), now.instant);
+    crate::input::on_key(&mut ui, &solo(&state), key(KeyCode::Enter), now);
+    assert_eq!(busy_notices(&ui), 1);
+    let screen = fixture.paint(&mut ui, &state, now, 80, 24).await;
+    assert!(!screen.contains("rewind to turn"));
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+    assert!(!super::super::opened(&ui).unwrap().confirm);
+    assert_eq!(busy_notices(&ui), 1);
+}
+
+#[tokio::test]
+async fn a_running_turn_under_an_open_sheet_says_busy_once_per_key() {
+    let fixture = Fixture::new();
+    let (mut state, mut ui, now) = setup(&fixture);
     open(
         &mut ui,
         &solo(&state),
@@ -172,8 +197,19 @@ async fn busy_card_refuses_preview_without_reading_files() {
         now,
     );
     let screen = fixture.paint(&mut ui, &state, now, 80, 24).await;
-    assert!(!screen.contains("rewind to turn"));
-    assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
-    assert!(!super::super::opened(&ui).unwrap().confirm);
-    assert!(screen.contains("Wait for the running turn"), "{screen}");
+    assert!(screen.contains("undoes turn 2"), "{screen}");
+    state.apply(&frame(1, started("wake")));
+    state.transcript.apply(&Event::ItemCompleted {
+        item: assistant("woken", "a background job finished", ItemStatus::Completed),
+    });
+    for _ in 0..20 {
+        fixture.paint(&mut ui, &state, now, 80, 24).await;
+    }
+    assert_eq!(busy_notices(&ui), 0);
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
+    fixture
+        .press(&mut ui, &state, key(KeyCode::Enter), now)
+        .await;
+    fixture.paint(&mut ui, &state, now, 80, 24).await;
+    assert_eq!(busy_notices(&ui), 1);
 }
