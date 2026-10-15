@@ -41,10 +41,14 @@ pub struct CommandSpec {
 }
 
 impl CommandSpec {
+    /// The suffix that names a plugin's drawing handler: a press on what a
+    /// plugin drew goes back to that plugin under this name.
+    pub const UI_SUFFIX: &'static str = ":ui";
+
     pub fn ui(plugin: &str) -> Self {
         Self {
             keys: vec![],
-            name: format!("{plugin}:ui"),
+            name: Self::ui_name(plugin),
             aliases: vec![],
             hint: String::new(),
             args: ArgSpec::None,
@@ -53,6 +57,18 @@ impl CommandSpec {
             opens: false,
             family: "ui".into(),
         }
+    }
+
+    /// The name of `plugin`'s drawing handler.
+    pub fn ui_name(plugin: &str) -> String {
+        format!("{plugin}{}", Self::UI_SUFFIX)
+    }
+
+    /// Whether `name` is some plugin's drawing handler rather than a command
+    /// a person could type.
+    pub fn is_ui(name: &str) -> bool {
+        name.strip_suffix(Self::UI_SUFFIX)
+            .is_some_and(|plugin| !plugin.is_empty())
     }
 }
 
@@ -440,3 +456,20 @@ mod person_contract {
         );
     }
 }
+
+#[cfg(test)]
+mod ui_name_tests {
+    use super::CommandSpec;
+
+    #[test]
+    fn a_drawing_handler_is_named_after_its_plugin() {
+        assert_eq!(CommandSpec::ui("browse").name, "browse:ui");
+        assert!(CommandSpec::is_ui(&CommandSpec::ui_name(
+            "bingo.mod.status"
+        )));
+        for typed in ["plugins", "permission", ":ui", "plugins:uix", "ui"] {
+            assert!(!CommandSpec::is_ui(typed), "{typed}");
+        }
+    }
+}
+

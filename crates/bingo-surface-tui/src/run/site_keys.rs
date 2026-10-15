@@ -13,8 +13,24 @@ pub(super) struct Opened {
     handle: Result<SessionHandle, KernelError>,
 }
 
+/// The site a key reaches, as [`target`] chose it.
+pub(super) struct Site {
+    pub(super) session: SessionId,
+    pub(super) focus: String,
+    asked: bool,
+    /// The focused pane's drawing, rather than one of this surface's own
+    /// sites, answers the key.
+    pane: bool,
+}
+
 pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
-    let Some((session, focus, asked)) = target(run) else {
+    let Some(Site {
+        session,
+        focus,
+        asked,
+        pane,
+    }) = target(run)
+    else {
         return;
     };
     let handle = run.session.handles.get(&session).cloned();
@@ -28,7 +44,8 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
         },
     );
     if let Some(handle) = handle {
-        submit(run, session, handle, intent, action, asked);
+        let origin = signature(run, &session, pane, &action.name);
+        submit(run, session, handle, intent, (action, origin), asked);
     } else {
         open(run, session, intent, action);
     }
@@ -39,34 +56,54 @@ fn submit(
     session: SessionId,
     handle: SessionHandle,
     intent: IntentId,
-    action: bingo_sdk::Action,
+    (action, origin): (bingo_sdk::Action, Option<bingo_sdk::Origin>),
     asked: bool,
 ) {
     if asked {
         // The action asking this question may still hold the shared queue.
         // Interaction keys already wait for their own site's acknowledgement.
-        handle.submit(intent, crate::acted(action));
+        handle.submit(intent, bingo_sdk::Input::Action { action, origin });
     } else {
-        run.enqueue_action(session, handle, intent, action);
+        run.enqueue_action(session, handle, intent, (action, origin));
     }
 }
 
-pub(super) fn target(run: &Run) -> Option<(SessionId, String, bool)> {
+/// A key the focused pane answers is a press on that pane's drawing; every
+/// other site a key reaches is this surface's own, whatever holds focus.
+fn signature(run: &Run, session: &SessionId, pane: bool, name: &str) -> Option<bingo_sdk::Origin> {
+    let focus = match &run.ui.focus {
+        crate::focus::Focus::Pane(focus) if pane => focus,
+        _ => return Some(bingo_sdk::Origin::surface(crate::SURFACE_ID)),
+    };
+    let state = run.session.tree.state(session)?;
+    crate::pane::placed(state)
+        .into_iter()
+        .find(|pane| &pane.key == focus)
+        .and_then(|pane| pane.signature(name))
+}
+
+pub(super) fn target(run: &Run) -> Option<Site> {
+    let surface = |session: SessionId, focus: String, asked: bool| Site {
+        session,
+        focus,
+        asked,
+        pane: false,
+    };
     if crate::sessions::active(&run.ui) {
         return crate::sessions::request(&run.ui)
-            .map(|id| (run.session.tree.view().clone(), id.into(), true));
+            .map(|id| surface(run.session.tree.view().clone(), id.into(), true));
     }
     if crate::browse::active(&run.ui) {
         return crate::browse::request(&run.ui)
-            .map(|id| (run.session.tree.view().clone(), id.into(), false));
+            .map(|id| surface(run.session.tree.view().clone(), id.into(), false));
     }
     if crate::plugins::active(&run.ui) {
         return crate::plugins::request(&run.ui)
-            .map(|id| (run.session.tree.view().clone(), id.into(), false));
+            .map(|id| surface(run.session.tree.view().clone(), id.into(), false));
     }
     if crate::palette::active(&run.ui) {
         return crate::palette::request(&run.ui).map(|id| {
-            (
+            surface(
                 run.session.tree.viewed().summary.id.clone(),
                 id.into(),
                 false,
@@ -79,14 +116,15 @@ pub(super) fn target(run: &Run) -> Option<(SessionId, String, bool)> {
         .open_interaction()
         .filter(|_| !run.ui.dialog.aside)
     {
-        return Some((owner.summary.id.clone(), open.id.to_string(), true));
+        return Some(surface(owner.summary.id.clone(), open.id.to_string(), true));
     }
     if let crate::focus::Focus::Pane(focus) = &run.ui.focus {
-        return Some((
-            run.session.tree.viewed().summary.id.clone(),
-            focus.clone(),
-            false,
-        ));
+        return Some(Site {
+            session: run.session.tree.viewed().summary.id.clone(),
+            focus: focus.clone(),
+            asked: false,
+            pane: true,
+        });
     }
     None
 }
@@ -117,13 +155,15 @@ pub(super) fn opened(run: &mut Run, opened: Opened) {
     };
     let session = pending.session.clone();
     run.ui.sync_panes(run.session.tree.viewed());
-    let current = target(run)
-        .filter(|(session, focus, _)| session == &pending.session && focus == &pending.focus);
+    let current =
+        target(run).filter(|site| site.session == pending.session && site.focus == pending.focus);
     match opened.handle {
         Ok(handle) => {
             run.session.handles.insert(session, handle.clone());
-            if let Some((session, _, asked)) = current {
-                submit(run, session, handle, opened.intent, opened.action, asked);
+            if let Some(site) = current {
+                let origin = signature(run, &site.session, site.pane, &opened.action.name);
+                let action = (opened.action, origin);
+                submit(run, site.session, handle, opened.intent, action, site.asked);
             } else if let Some(pending) = run.site_keys.remove(&opened.intent) {
                 run.mine.remove(&opened.intent);
                 super::typeahead::retry(run, pending.focus, pending.key);

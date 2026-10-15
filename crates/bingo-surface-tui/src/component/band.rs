@@ -78,7 +78,7 @@ pub fn press(
         .map(fire)
 }
 fn fire(mark: &crate::views::targets::Target) -> Vec<crate::effect::Effect> {
-    vec![crate::effect::Effect::Submit(crate::acted(
+    vec![crate::effect::Effect::Submit(crate::pulled(
         mark.item.action.clone(),
     ))]
 }

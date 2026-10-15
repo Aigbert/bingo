@@ -41,6 +41,21 @@ pub struct Pane {
     pub size: bingo_sdk::slot::PaneSize,
     pub view: Shown,
 }
+impl Pane {
+    /// Who signs a press on this pane. A view the plugin published itself was
+    /// held to nothing, so only the plugin's own handler is the person's.
+    pub fn signature(&self, name: &str) -> Option<bingo_sdk::Origin> {
+        match &self.view {
+            Shown::Pull { .. } => crate::pulled_signature(name),
+            Shown::View(_) => crate::drawer_signature(&self.plugin, name),
+        }
+    }
+
+    pub fn pressed(&self, action: Action) -> bingo_sdk::Input {
+        let origin = self.signature(&action.name);
+        bingo_sdk::Input::Action { action, origin }
+    }
+}
 pub fn heading_rows(pane: &Pane) -> u16 {
     u16::from(!pane.title.is_empty())
 }
@@ -329,8 +344,9 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
         ui.placed.panes.selection = None;
         if pane.close {
             return submit(
+                &pane,
                 Action {
-                    name: format!("{}:ui", pane.plugin),
+                    name: bingo_sdk::CommandSpec::ui_name(&pane.plugin),
                     args: serde_json::json!({"handler":pane.id,"event":"close"}),
                 },
                 None,
@@ -379,10 +395,12 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
             .iter()
             .find(|item| matches!(item,Control::Button(Some(hotkey),_) if *hotkey==letter))
     {
-        return submit(action.clone(), None);
+        return submit(&pane, action.clone(), None);
     }
     match &items[index] {
-        Control::Button(_, action) if key.code == KeyCode::Enter => submit(action.clone(), None),
+        Control::Button(_, action) if key.code == KeyCode::Enter => {
+            submit(&pane, action.clone(), None)
+        }
         Control::Input(input) => {
             let editor = ui
                 .placed
@@ -394,18 +412,18 @@ pub fn key(ui: &mut Ui, state: &SessionState, key: KeyEvent) -> Vec<Effect> {
                     editor.set(input.value.as_deref().unwrap_or_default());
                     editor
                 });
-            input_key(editor, input, key)
+            input_key(&pane, editor, input, key)
         }
-        Control::Select(select) => select_key(select, key),
+        Control::Select(select) => select_key(&pane, select, key),
         _ => Vec::new(),
     }
 }
-fn input_key(editor: &mut Composer, input: &InputProps, key: KeyEvent) -> Vec<Effect> {
+fn input_key(pane: &Pane, editor: &mut Composer, input: &InputProps, key: KeyEvent) -> Vec<Effect> {
     if key.code == KeyCode::Enter {
         return input
             .on_submit
             .clone()
-            .map(|action| submit(action, Some(editor.text().into())))
+            .map(|action| submit(pane, action, Some(editor.text().into())))
             .unwrap_or_default();
     }
     let before = editor.text().to_owned();
@@ -432,10 +450,10 @@ fn input_key(editor: &mut Composer, input: &InputProps, key: KeyEvent) -> Vec<Ef
     input
         .on_input
         .clone()
-        .map(|action| submit(action, Some(editor.text().into())))
+        .map(|action| submit(pane, action, Some(editor.text().into())))
         .unwrap_or_default()
 }
-fn select_key(select: &SelectProps, key: KeyEvent) -> Vec<Effect> {
+fn select_key(pane: &Pane, select: &SelectProps, key: KeyEvent) -> Vec<Effect> {
     let options = select.options.as_deref().unwrap_or_default();
     if options.is_empty() {
         return Vec::new();
@@ -453,16 +471,16 @@ fn select_key(select: &SelectProps, key: KeyEvent) -> Vec<Effect> {
     select
         .on_select
         .clone()
-        .map(|action| submit(action, Some(options[index].value.clone())))
+        .map(|action| submit(pane, action, Some(options[index].value.clone())))
         .unwrap_or_default()
 }
-fn submit(action: Action, value: Option<String>) -> Vec<Effect> {
+fn submit(pane: &Pane, action: Action, value: Option<String>) -> Vec<Effect> {
     let action = match value {
         Some(value) => action.with_value(value.into()),
         None => Some(action),
     };
     action
-        .map(|action| vec![Effect::Submit(crate::acted(action))])
+        .map(|action| vec![Effect::Submit(pane.pressed(action))])
         .unwrap_or_default()
 }
 

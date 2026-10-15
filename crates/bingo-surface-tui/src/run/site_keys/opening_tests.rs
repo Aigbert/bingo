@@ -67,6 +67,32 @@ async fn a_directory_request_survives_opening_its_handle() {
     );
 }
 
+/// A key the open ask answers is this surface's own press, though a pane a
+/// plugin drew still holds focus under the dialog.
+#[tokio::test]
+async fn a_key_routed_past_a_focused_pane_is_signed_by_its_own_site() {
+    let (mut run, session, mut replies) = pane_run();
+    run.session.tree.fold.apply(&frame(
+        1,
+        crate::test_support::opened(permission(None, None)),
+    ));
+    send(
+        &mut run,
+        bingo_sdk::Action {
+            name: "ask:ui".into(),
+            args: json!({"value":{"key":"x"}}),
+        },
+        typed('x'),
+    );
+    run.reply(replies.recv().await.unwrap(), &mut None);
+    let submitted = session.submissions();
+    assert!(
+        matches!(&submitted[..], [(_, Input::Action { origin, .. })]
+            if origin == &Some(bingo_sdk::Origin::surface(crate::SURFACE_ID))),
+        "{submitted:?}"
+    );
+}
+
 #[tokio::test]
 async fn a_pane_closing_before_its_handle_returns_readdresses_in_typed_order() {
     delayed_handoff(false).await;

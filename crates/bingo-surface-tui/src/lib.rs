@@ -143,10 +143,41 @@ pub use theme::PROBE_THROUGH;
 /// The surface id, and the origin every input it submits carries.
 pub const SURFACE_ID: &str = "tui";
 
-/// An action fired here, signed with this surface: the kernel takes an
-/// unsigned action as nobody's (fail closed).
+/// An action pressed here and signed with this surface.
+#[cfg(test)]
 pub(crate) fn acted(action: bingo_sdk::Action) -> bingo_sdk::Input {
     bingo_sdk::Input::action(action, bingo_sdk::Origin::surface(SURFACE_ID))
+}
+
+/// Who signs a press on a drawing the kernel pulled for this surface. Each
+/// handler in it was held to the link that drew it when the answer was taken,
+/// so a `<plugin>:ui` press reaches only its drawer and is the person's;
+/// anything else is nobody's (fail closed).
+pub(crate) fn pulled_signature(name: &str) -> Option<bingo_sdk::Origin> {
+    bingo_sdk::CommandSpec::is_ui(name).then(|| bingo_sdk::Origin::surface(SURFACE_ID))
+}
+
+/// A press on a pulled drawing, signed by [`pulled_signature`].
+pub(crate) fn pulled(action: bingo_sdk::Action) -> bingo_sdk::Input {
+    let origin = pulled_signature(&action.name);
+    bingo_sdk::Input::Action { action, origin }
+}
+
+/// Who signs a press on a control `drawer` published: the person, only when
+/// it goes back to the drawer's own handler. Any other command it names is
+/// the drawer's word, signed as the drawer, so a drawn button cannot speak
+/// for the person to someone else (fail closed).
+pub(crate) fn drawer_signature(drawer: &str, name: &str) -> Option<bingo_sdk::Origin> {
+    Some(match name == bingo_sdk::CommandSpec::ui_name(drawer) {
+        true => bingo_sdk::Origin::surface(SURFACE_ID),
+        false => bingo_sdk::Origin::surface(format!("plugin:{drawer}")),
+    })
+}
+
+/// A press on a control `drawer` published, signed by [`drawer_signature`].
+pub(crate) fn pressed(drawer: &str, action: bingo_sdk::Action) -> bingo_sdk::Input {
+    let origin = drawer_signature(drawer, &action.name);
+    bingo_sdk::Input::Action { action, origin }
 }
 
 #[derive(Debug, Default, Clone, Copy)]

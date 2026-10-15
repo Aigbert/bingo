@@ -54,13 +54,13 @@ impl Run {
                 origin,
                 delivery,
             } => self.submit_text(handle, text, images, origin, delivery),
-            Input::Action { action, .. } => {
+            Input::Action { action, origin } => {
                 let intent = self.mint(None);
                 self.enqueue_action(
                     self.session.tree.viewed().summary.id.clone(),
                     handle,
                     intent,
-                    action,
+                    (action, origin),
                 );
             }
         }
@@ -71,14 +71,14 @@ impl Run {
         session: bingo_sdk::SessionId,
         handle: SessionHandle,
         intent: bingo_sdk::IntentId,
-        action: bingo_sdk::Action,
+        signed: (bingo_sdk::Action, Option<bingo_sdk::Origin>),
     ) {
         let binding = self.session.tree.state(&session).and_then(|state| {
-            crate::actions::Binding::capture(state, &self.ui.placed.pulled, &action)
+            crate::actions::Binding::capture(state, &self.ui.placed.pulled, &signed.0)
         });
         self.ui
             .actions
-            .push(session, handle, intent, action, binding);
+            .push(session, handle, intent, signed, binding);
         self.release_actions();
     }
 

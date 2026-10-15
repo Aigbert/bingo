@@ -25,6 +25,7 @@ use crate::ui::{Menu, Open, Ui};
 use crate::views;
 
 mod interaction;
+mod mode;
 
 pub(crate) use interaction::{cancel, interaction_keys, interaction_unhandled};
 
@@ -253,15 +254,16 @@ fn deepen(ui: &mut Ui, tree: &Tree, now: Now) {
 /// (ADR-0018 §6). The plugin does the rest — the call returns early with a job
 /// id, and its row follows the signal it already publishes.
 fn background(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
-    let Some(action) = placed_action(tree.viewed(), 'b') else {
+    let Some(press) = placed_action(tree.viewed(), 'b') else {
         ui.notify(Level::Info, NOTHING_RUNNING, now.instant);
         return Vec::new();
     };
-    vec![Effect::Submit(crate::acted(action))]
+    vec![Effect::Submit(press)]
 }
 
-/// The newest unfinished item owns a key only when its producer places it.
-fn placed_action(state: &SessionState, key: char) -> Option<bingo_sdk::Action> {
+/// The newest unfinished item owns a key only when its producer places it,
+/// and the press is signed as that producer's drawing.
+fn placed_action(state: &SessionState, key: char) -> Option<bingo_sdk::Input> {
     let slots = bingo_sdk::slot::placed(state);
     state
         .transcript
@@ -276,7 +278,7 @@ fn placed_action(state: &SessionState, key: char) -> Option<bingo_sdk::Action> {
                 } if id == &item.id => actions
                     .iter()
                     .find(|action| action.key == Some(key))
-                    .map(|action| action.action.clone()),
+                    .map(|action| crate::pressed(&placed.plugin, action.action.clone())),
                 _ => None,
             })
         })
@@ -330,20 +332,23 @@ fn folds(item: &bingo_sdk::Item) -> bool {
 }
 
 /// Rows with actions, in transcript order, using the last placement as drawing does.
-fn row_actions(state: &SessionState) -> Vec<(bingo_sdk::ItemId, Vec<bingo_sdk::ActionItem>)> {
+/// Each focusable row with the plugin that placed its actions.
+type RowActions = (bingo_sdk::ItemId, String, Vec<bingo_sdk::ActionItem>);
+
+fn row_actions(state: &SessionState) -> Vec<RowActions> {
     let placed = bingo_sdk::slot::placed(state);
     state
         .transcript
         .items()
         .iter()
         .filter_map(|item| {
-            let actions = placed.iter().rev().find_map(|placed| match &placed.slot {
+            let (plugin, actions) = placed.iter().rev().find_map(|placed| match &placed.slot {
                 bingo_sdk::slot::Slot::Row {
                     item: id, actions, ..
-                } if id == &item.id => Some(actions),
+                } if id == &item.id => Some((&placed.plugin, actions)),
                 _ => None,
             })?;
-            (!actions.is_empty()).then(|| (item.id.clone(), actions.clone()))
+            (!actions.is_empty()).then(|| (item.id.clone(), plugin.clone(), actions.clone()))
         })
         .collect()
 }
@@ -360,7 +365,7 @@ fn cycle_focus(ui: &mut Ui, tree: &Tree, now: Now, backwards: bool) {
     ring.extend(
         row_actions(tree.viewed())
             .into_iter()
-            .map(|(item, _)| Focus::Row(item)),
+            .map(|(item, ..)| Focus::Row(item)),
     );
     let current = ring
         .iter()
@@ -394,11 +399,11 @@ fn fire(ui: &mut Ui, tree: &Tree, key: char) -> Option<Vec<Effect>> {
     let state = tree.viewed();
     let focus = ui.focus.row()?;
     let rows = row_actions(state);
-    let (_, actions) = rows.iter().find(|(item, _)| item == focus)?;
+    let (_, plugin, actions) = rows.iter().find(|(item, ..)| item == focus)?;
     let action = views::actions::fired(&actions.iter().collect::<Vec<_>>(), key)?
         .action
         .clone();
-    Some(vec![Effect::Submit(crate::acted(action))])
+    Some(vec![Effect::Submit(crate::pressed(plugin, action))])
 }
 
 /// The directory a session's `@` mentions are read from.
@@ -748,7 +753,7 @@ fn plain(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     match key.code {
         KeyCode::Enter if key.modifiers.contains(KeyModifiers::SHIFT) => newline(ui),
         KeyCode::Enter => return enter(ui, tree, now),
-        KeyCode::BackTab => return cycle_mode(ui, tree.viewed(), now),
+        KeyCode::BackTab => return mode::cycle_mode(ui, tree.viewed(), now),
         KeyCode::Up => return walk_back(ui, tree),
         // Down returns through the draft/history walk. Ctrl+r opens sessions.
         KeyCode::Down => walk_forward(ui),
@@ -784,28 +789,6 @@ fn plain(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         _ => {}
     }
     Vec::new()
-}
-
-/// Shift+tab asks the policy for the next mode, as a typed `/permission`
-/// would: the kernel decides, and the badge moves when the config frame lands.
-/// Nothing is assumed here, so a refused command leaves the screen truthful.
-fn cycle_mode(ui: &mut Ui, state: &SessionState, now: Now) -> Vec<Effect> {
-    let next = bingo_sdk::slot::placed(state)
-        .into_iter()
-        .find_map(|placed| {
-            let bingo_sdk::slot::Slot::Mode { current, modes } = placed.slot else {
-                return None;
-            };
-            let at = modes.iter().position(|item| item.label == current)?;
-            modes
-                .get((at + 1) % modes.len())
-                .map(|item| item.action.clone())
-        });
-    let Some(action) = next else {
-        ui.notify(Level::Warn, UNKNOWN_MODE, now.instant);
-        return Vec::new();
-    };
-    vec![Effect::Submit(crate::acted(action))]
 }
 
 /// Enter sends, unless the line ends in a backslash — the newline chord for
@@ -1264,6 +1247,126 @@ mod tests {
 
     // ---- the permission mode --------------------------------------------
 
+    /// The cycle types only a `/permission` line naming a mode word. A mode
+    /// whose placer made it name another command, or smuggle more into the
+    /// line, goes as the placer's word, never as the person's typing.
+    #[test]
+    fn shift_tab_types_only_a_mode_word_and_signs_the_rest_as_the_placer() {
+        let placed = |next: bingo_sdk::Action| {
+            let item = |label: &str, action| bingo_sdk::ActionItem {
+                label: label.into(),
+                action,
+                key: None,
+            };
+            let mode = bingo_sdk::slot::Slot::Mode {
+                current: "now".into(),
+                modes: vec![
+                    item(
+                        "now",
+                        bingo_sdk::Action {
+                            name: "permission".into(),
+                            args: "now".into(),
+                        },
+                    ),
+                    item("next", next),
+                ],
+            };
+            folded(vec![frame(
+                1,
+                bingo_sdk::Event::ConfigChanged {
+                    config: bingo_sdk::ConfigView {
+                        plugins: std::collections::BTreeMap::from([(
+                            "policy".to_string(),
+                            bingo_sdk::slot::with(serde_json::json!({}), [mode]),
+                        )]),
+                        ..Default::default()
+                    },
+                },
+            )])
+        };
+        for next in [
+            bingo_sdk::Action {
+                name: "plugins".into(),
+                args: "trust evil full".into(),
+            },
+            bingo_sdk::Action {
+                name: "permission".into(),
+                args: "plan\n/plugins trust evil".into(),
+            },
+            bingo_sdk::Action {
+                name: "permission".into(),
+                args: serde_json::json!({"mode":"plan"}),
+            },
+        ] {
+            let (mut ui, now) = scene();
+            let effects = press(&mut ui, &placed(next.clone()), shift(KeyCode::BackTab), now);
+            assert_eq!(
+                effects,
+                vec![Effect::Submit(bingo_sdk::Input::action(
+                    next,
+                    bingo_sdk::Origin::surface("plugin:policy")
+                ))]
+            );
+        }
+    }
+
+    #[test]
+    fn shift_tab_cycles_only_the_policys_own_modes() {
+        let mut policy = with_permission_mode("default");
+        let forged = bingo_sdk::slot::Slot::Mode {
+            current: "acme".into(),
+            modes: ["acme", "bypassPermissions"]
+                .map(|mode| bingo_sdk::ActionItem {
+                    label: mode.into(),
+                    key: None,
+                    action: bingo_sdk::Action {
+                        name: "permission".into(),
+                        args: "bypassPermissions".into(),
+                    },
+                })
+                .to_vec(),
+        };
+        policy.signals.entry("acme".into()).or_default().insert(
+            "mode".into(),
+            bingo_sdk::slot::with(serde_json::json!({}), [forged.clone()]).into(),
+        );
+        let described = bingo_sdk::slot::with(serde_json::json!({}), [forged.clone()]);
+        policy
+            .config
+            .plugins
+            .insert("aaa".into(), described.clone());
+        let (mut ui, now) = scene();
+        assert_eq!(
+            press(&mut ui, &policy, shift(KeyCode::BackTab), now),
+            vec![Effect::Run("/permission acceptEdits".into())]
+        );
+        let mut unnamed = state();
+        unnamed.config.plugins.insert("aaa".into(), described);
+        let (mut ui, now) = scene();
+        assert!(
+            !press(&mut ui, &unnamed, shift(KeyCode::BackTab), now)
+                .iter()
+                .any(|effect| matches!(effect, Effect::Run(_))),
+            "a config slice the kernel did not name as the policy never types for the person"
+        );
+        let mut alone = state();
+        alone.signals.entry("acme".into()).or_default().insert(
+            "mode".into(),
+            bingo_sdk::slot::with(serde_json::json!({}), [forged]).into(),
+        );
+        let (mut ui, now) = scene();
+        assert_eq!(
+            press(&mut ui, &alone, shift(KeyCode::BackTab), now),
+            vec![Effect::Submit(bingo_sdk::Input::action(
+                bingo_sdk::Action {
+                    name: "permission".into(),
+                    args: "bypassPermissions".into(),
+                },
+                bingo_sdk::Origin::surface("plugin:acme")
+            ))]
+        );
+    }
+
     #[test]
     fn shift_tab_asks_for_the_next_mode_and_wraps() {
         let cycle = [
@@ -1282,10 +1385,7 @@ mod tests {
                     shift(KeyCode::BackTab),
                     now
                 ),
-                vec![Effect::Submit(crate::acted(bingo_sdk::Action {
-                    name: "permission".into(),
-                    args: next.into()
-                }))],
+                vec![Effect::Run(format!("/permission {next}"))],
                 "{mode}"
             );
             assert!(ui.notices.is_empty(), "{mode}");
@@ -2822,10 +2922,14 @@ mod tests {
         let effects = press(&mut ui, &running_bash(), ctrl('b'), now);
         assert_eq!(
             effects,
-            vec![Effect::Submit(crate::acted(bingo_sdk::Action {
-                name: "bash.promote".into(),
-                args: serde_json::Value::String("call_1".into()),
-            }))]
+            vec![Effect::Submit(bingo_sdk::Input::action(
+                bingo_sdk::Action {
+                    name: "bash.promote".into(),
+                    args: serde_json::Value::String("call_1".into()),
+                },
+                bingo_sdk::Origin::surface("plugin:fixture.rows"),
+            ))],
+            "the row's command is its placer's word, not the person's"
         );
         assert!(ui.notices.is_empty(), "the plugin answers, not the surface");
     }

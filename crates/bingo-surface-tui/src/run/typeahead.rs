@@ -110,15 +110,15 @@ pub(super) fn settled(run: &mut Run, intent: &IntentId) {
 
 fn focus(run: &Run) -> Option<String> {
     site_keys::target(run)
-        .filter(|(_, site, _)| {
+        .filter(|site| {
             // An open ask may be set aside or covered by another keyboard owner.
             run.session.tree.open_interaction().is_none_or(|(_, open)| {
-                site != open.id.as_str()
+                site.focus != open.id.as_str()
                     || crate::focus::owner(&run.ui, &run.session.tree)
                         == crate::focus::Owner::Interaction
             })
         })
-        .map(|(_, focus, _)| focus)
+        .map(|site| site.focus)
 }
 
 fn drawing(run: &Run) -> bool {

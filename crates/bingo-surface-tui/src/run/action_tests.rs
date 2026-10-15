@@ -166,10 +166,13 @@ fn removing_a_session_releases_the_next_action_to_its_original_mailbox() {
             SessionId::from_raw(session),
             SessionHandle(handle),
             IntentId::from_raw(session),
-            bingo_sdk::Action {
-                name: "counter:ui".into(),
-                args: json!({"value":session}),
-            },
+            (
+                bingo_sdk::Action {
+                    name: "counter:ui".into(),
+                    args: json!({"value":session}),
+                },
+                Some(bingo_sdk::Origin::surface(crate::SURFACE_ID)),
+            ),
             None,
         );
     }

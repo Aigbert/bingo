@@ -32,13 +32,11 @@ pub fn mouse(
                 .into_iter()
                 .find(|pane| pane.key == key)
                 .map(|pane| {
-                    super::submit(
-                        bingo_sdk::Action {
-                            name: format!("{}:ui", pane.plugin),
-                            args: serde_json::json!({"handler":pane.id,"event":"open"}),
-                        },
-                        None,
-                    )
+                    let open = bingo_sdk::Action {
+                        name: bingo_sdk::CommandSpec::ui_name(&pane.plugin),
+                        args: serde_json::json!({"handler":pane.id,"event":"open"}),
+                    };
+                    super::submit(&pane, open, None)
                 })
                 .unwrap_or_default(),
         );

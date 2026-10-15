@@ -57,6 +57,7 @@ impl Point for Json {
         before.entry == after.entry
             && catalogue::pinned_changed(&before.value, &after.value, before.entry.pinned).is_none()
             && super::person::kept(&before.entry, &before.value, &after.value)
+            && super::config::kept(&before.entry, &before.value, &after.value)
     }
 }
 /// A link's answer, held to what the point pins of the input it was given.
@@ -67,6 +68,9 @@ fn checked(entry: &catalogue::Entry, before: &Value, result: Value) -> Result<Va
     }
     if !super::person::kept(entry, before, &result) {
         return Err(invalid("pinned field /args/person"));
+    }
+    if !super::config::kept(entry, before, &result) {
+        return Err(invalid("pinned field /plugins/<policy>"));
     }
     if [
         catalogue::SESSION_APPEND,

@@ -761,6 +761,22 @@ pub struct ConfigView {
     pub plugins: BTreeMap<String, Value>,
 }
 
+impl ConfigView {
+    /// Where the kernel names the session's policy: `kernel.policy` holds its
+    /// id, and `plugins[id]` what it says of itself (ADR-0009 §5). Both are
+    /// the kernel's to write; no hook may move them.
+    pub const POLICY: &str = "policy";
+
+    /// The session's policy and its own description, and no other plugin's
+    /// slice, however it sorts or whatever it claims to be.
+    pub fn policy(&self) -> Option<(&str, &Value)> {
+        let id = self.kernel.get(Self::POLICY)?.as_str()?;
+        self.plugins
+            .get_key_value(id)
+            .map(|(id, value)| (id.as_str(), value))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

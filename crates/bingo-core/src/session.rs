@@ -428,6 +428,7 @@ impl Actor {
         }
         let mut kernel =
             json!({ "thinking": self.config.model.as_ref().and_then(|m| m.reasoning) });
+        kernel[ConfigView::POLICY] = json!(policy.id());
         if !self.config.keys.is_empty() {
             kernel["keys"] = json!(self.config.keys);
         }

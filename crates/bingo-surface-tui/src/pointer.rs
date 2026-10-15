@@ -44,7 +44,7 @@ pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Ef
                     .iter()
                     .find(|target| target.area.contains(Position::new(mouse.column, mouse.row)))
                 {
-                    return vec![Effect::Submit(crate::acted(target.item.action.clone()))];
+                    return vec![Effect::Submit(crate::pulled(target.item.action.clone()))];
                 }
                 card_option(ui, mouse)
                     .map(|index| answer(ui, tree, index, now))

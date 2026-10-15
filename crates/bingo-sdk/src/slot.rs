@@ -163,24 +163,42 @@ pub fn placed(state: &SessionState) -> Vec<Placed> {
     payloads.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
     payloads
         .into_iter()
-        .flat_map(|(plugin, kind, payload)| {
-            payload
-                .get("slots")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(move |value| {
-                    serde_json::from_value::<Slot>(value.clone())
-                        .ok()
-                        .filter(Slot::published_ok)
-                        .map(|slot| Placed {
-                            plugin: plugin.into(),
-                            kind: kind.into(),
-                            slot,
-                        })
+        .flat_map(|(plugin, kind, payload)| read(plugin, kind, payload))
+        .collect()
+}
+
+/// The slots the session's policy placed in its own description
+/// (ADR-0009 §5), and nothing a signal or an extension placed: what only
+/// the policy may say, such as the mode a person cycles, is read here.
+pub fn described(state: &SessionState) -> Vec<Placed> {
+    state
+        .config
+        .policy()
+        .into_iter()
+        .flat_map(|(plugin, payload)| read(plugin, "", payload))
+        .collect()
+}
+
+fn read<'a>(
+    plugin: &'a str,
+    kind: &'a str,
+    payload: &'a Value,
+) -> impl Iterator<Item = Placed> + 'a {
+    payload
+        .get("slots")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(move |value| {
+            serde_json::from_value::<Slot>(value.clone())
+                .ok()
+                .filter(Slot::published_ok)
+                .map(|slot| Placed {
+                    plugin: plugin.into(),
+                    kind: kind.into(),
+                    slot,
                 })
         })
-        .collect()
 }
 
 #[cfg(test)]
@@ -193,7 +211,7 @@ mod tests {
         serde_json::from_str(include_str!("../fixtures/slots/all.json")).unwrap()
     }
 
-    fn state() -> SessionState {
+    pub(super) fn state() -> SessionState {
         let Event::SessionUpdated { summary } =
             serde_json::from_str(include_str!("../fixtures/record/event/sessionUpdated.json"))
                 .unwrap()
@@ -295,6 +313,35 @@ mod tests {
             [("a", ""), ("a", "b"), ("a", "z"), ("z", "a")]
                 .map(|(p, k)| (p.to_owned(), k.to_owned()))
         );
+    }
+}
+
+#[cfg(test)]
+mod described_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn state() -> SessionState {
+        tests::state()
+    }
+
+    fn mode(label: &str) -> Value {
+        json!({"slots":[{"kind":"mode","current":label,
+            "modes":[{"label":label,"action":{"name":"permission","args":label}}]}]})
+    }
+
+    #[test]
+    fn only_the_named_policy_describes_and_a_stranger_sorting_first_does_not() {
+        let mut state = state();
+        state.config.plugins.insert("aaa".into(), mode("wide"));
+        state
+            .config
+            .plugins
+            .insert("bingo.permissions".into(), mode("default"));
+        assert!(described(&state).is_empty(), "no policy named, none read");
+        state.config.kernel = json!({ "policy": "bingo.permissions" });
+        let found: Vec<_> = described(&state).into_iter().map(|p| p.plugin).collect();
+        assert_eq!(found, ["bingo.permissions"]);
     }
 }
 

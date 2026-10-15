@@ -385,10 +385,14 @@ pub fn plugin_view(plugin: &str, value: Value) -> Event {
     } else {
         value
     };
+    let mut kernel = Value::Null;
+    if plugin == "bingo.permissions" {
+        kernel[bingo_sdk::ConfigView::POLICY] = plugin.into();
+    }
     Event::ConfigChanged {
         config: bingo_sdk::ConfigView {
+            kernel,
             plugins: std::collections::BTreeMap::from([(plugin.to_string(), value)]),
-            ..Default::default()
         },
     }
 }

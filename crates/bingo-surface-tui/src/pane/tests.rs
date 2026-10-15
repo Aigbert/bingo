@@ -135,6 +135,56 @@ fn pressed_on(control: View, key: crossterm::event::KeyCode) -> Vec<crate::effec
     crate::input::on_key(&mut ui, &tree, key, now)
 }
 
+fn button(action: bingo_sdk::Action) -> View {
+    View::Button {
+        children: vec![],
+        button: bingo_sdk::view::ButtonProps {
+            on_press: Some(action),
+            ..Default::default()
+        }
+        .into(),
+    }
+}
+
+/// A plugin's own pane may draw a button naming any command; one Enter on it
+/// is the plugin's word, so a person-only verb or a wider mode is refused by
+/// the kernel rather than granted as the person's.
+#[test]
+fn a_pane_button_naming_another_command_is_signed_as_its_drawer() {
+    use bingo_sdk::{Action, Input, Origin};
+    use serde_json::json;
+    let drawer = Some(Origin::surface("plugin:counter"));
+    let person = Some(Origin::surface(crate::SURFACE_ID));
+    for (name, args, signed) in [
+        ("plugins", json!("trust evil full"), &drawer),
+        ("permission", json!("bypassPermissions"), &drawer),
+        (
+            "plugins:ui",
+            json!({"handler":"h","event":"press"}),
+            &drawer,
+        ),
+        (
+            "counter:ui",
+            json!({"handler":"h","event":"press"}),
+            &person,
+        ),
+    ] {
+        let action = Action {
+            name: name.into(),
+            args,
+        };
+        let effects = pressed_on(button(action.clone()), crossterm::event::KeyCode::Enter);
+        assert_eq!(
+            effects,
+            vec![crate::effect::Effect::Submit(Input::Action {
+                action,
+                origin: signed.clone(),
+            })],
+            "{name}"
+        );
+    }
+}
+
 /// A control whose arguments are not an object cannot carry the value typed
 /// or chosen: nothing is sent, and nothing panics.
 #[test]

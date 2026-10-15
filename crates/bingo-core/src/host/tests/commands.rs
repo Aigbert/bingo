@@ -115,7 +115,11 @@ async fn model_and_think_change_the_next_turn_and_are_announced() {
     )
     .await;
     let mut client = Client::open(&host).await;
-    assert_eq!(client.state.config.kernel, json!({ "thinking": null }));
+    assert_eq!(client.state.config.kernel["thinking"], json!(null));
+    assert!(
+        client.state.config.kernel["policy"].is_string(),
+        "the kernel names the policy whose slice a client reads"
+    );
 
     let (ack, before) = client.ack("/model m2").await;
     assert_eq!(
@@ -138,7 +142,7 @@ async fn model_and_think_change_the_next_turn_and_are_announced() {
 
     let (ack, _) = client.ack("/think high").await;
     assert_eq!(message(&ack), "thinking: high · this session");
-    assert_eq!(client.state.config.kernel, json!({ "thinking": "high" }));
+    assert_eq!(client.state.config.kernel["thinking"], json!("high"));
 
     let (ack, _) = client.ack("/model").await;
     let listing = shown(&ack);
@@ -158,7 +162,7 @@ async fn model_and_think_change_the_next_turn_and_are_announced() {
 
     let (ack, _) = client.ack("/think off").await;
     assert_eq!(message(&ack), "thinking: off · this session");
-    assert_eq!(client.state.config.kernel, json!({ "thinking": null }));
+    assert_eq!(client.state.config.kernel["thinking"], json!(null));
     client.ack("and again").await;
     client.until_turn_completed().await;
     assert_eq!(
@@ -208,7 +212,7 @@ async fn think_reaches_an_unknown_model_at_every_level_and_off_omits_it() {
         let level = Effort::spoken(word).expect("a level");
         let (ack, _) = client.ack(&format!("/think {word}")).await;
         assert_eq!(message(&ack), format!("thinking: {word} · this session"));
-        assert_eq!(client.state.config.kernel, json!({ "thinking": level }));
+        assert_eq!(client.state.config.kernel["thinking"], json!(level));
         let (ack, _) = client.ack("/think").await;
         assert!(shown(&ack).starts_with(&format!("thinking: {word}\nusage:")));
 
@@ -392,7 +396,7 @@ async fn thinking_is_remembered_in_the_user_settings() {
 
     let next = host_in(home.path(), None).await;
     let opened = Client::open(&next).await;
-    assert_eq!(opened.state.config.kernel, json!({ "thinking": "xHigh" }));
+    assert_eq!(opened.state.config.kernel["thinking"], json!("xHigh"));
 
     let (ack, _) = client.ack("/think off --keep").await;
     assert_eq!(message(&ack), "thinking: off · kept for new sessions");

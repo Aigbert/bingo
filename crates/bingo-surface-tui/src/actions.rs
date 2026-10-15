@@ -2,7 +2,7 @@
 mod binding;
 mod control;
 pub use binding::{Binding, Resolution};
-use bingo_sdk::{Action, IntentId, SessionHandle, SessionId};
+use bingo_sdk::{Action, IntentId, Origin, SessionHandle, SessionId};
 use std::{
     collections::VecDeque,
     time::{Duration, Instant},
@@ -25,6 +25,9 @@ struct Pending {
     handle: SessionHandle,
     intent: IntentId,
     target: Target,
+    /// Who signed the gesture when it was made; the drawing it is re-addressed
+    /// to later never changes that.
+    origin: Option<Origin>,
     sent: bool,
     deadline: Option<Instant>,
 }
@@ -40,7 +43,7 @@ impl Queue {
         session: SessionId,
         handle: SessionHandle,
         intent: IntentId,
-        action: Action,
+        (action, origin): (Action, Option<Origin>),
         binding: Option<Binding>,
     ) {
         let target = match binding {
@@ -52,6 +55,7 @@ impl Queue {
             handle,
             intent,
             target,
+            origin,
             sent: false,
             deadline: None,
         });
@@ -134,7 +138,10 @@ impl Pending {
         if resolution.waiting && now < *self.deadline.get_or_insert(now + REDRAW_WAIT) {
             return Addressed::Held;
         }
-        match resolution.action {
+        match resolution
+            .action
+            .filter(|action| action.name == gesture.name)
+        {
             Some(action) => match valued(action, gesture) {
                 Some(action) => Addressed::Ready(action),
                 None => Addressed::Stale(binding.notice()),
@@ -144,8 +151,11 @@ impl Pending {
     }
 
     fn send(&mut self, action: Action) {
-        self.handle
-            .submit(self.intent.clone(), crate::acted(action.clone()));
+        let input = bingo_sdk::Input::Action {
+            action: action.clone(),
+            origin: self.origin.clone(),
+        };
+        self.handle.submit(self.intent.clone(), input);
         self.target = Target::Action(action);
         self.sent = true;
         self.deadline = None;
