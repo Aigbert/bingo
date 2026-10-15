@@ -4,7 +4,7 @@ pub(crate) mod checkpoint;
 mod find;
 mod turns;
 pub use find::{Match, find, text};
-pub use turns::{Turn, from, turns};
+pub use turns::{HEADLINE_CHARS, Turn, from, turns};
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

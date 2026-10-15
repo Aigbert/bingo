@@ -52,10 +52,11 @@ pub(super) fn capture(run: &mut Run, intent: &IntentId, line: Option<&str>) {
     if words.next() == Some("files") {
         return;
     }
-    if let Some(turn) = bingo_sdk::transcript::turns(&run.session.tree.viewed().transcript)
+    let transcript = &run.session.tree.viewed().transcript;
+    if let Some(turn) = bingo_sdk::transcript::turns(transcript)
         .into_iter()
         .find(|turn| turn.id.as_str() == target)
-        && let Some(text) = turn.asked
+        && let Some(text) = turn.asked(transcript).map(str::to_owned)
     {
         run.rewind_prompts.0.insert(
             (run.session.tree.view().clone(), turn.id),

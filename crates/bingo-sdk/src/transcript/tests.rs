@@ -268,7 +268,7 @@ fn checkpoint_window_can_restore_full_client_order_without_losing_live_bodies() 
 }
 
 #[test]
-fn turns_keep_full_prompts_and_share_the_cut_boundaries() {
+fn turns_carry_headlines_and_read_whole_prompts_from_the_transcript() {
     let mut first = item(1, String::new());
     first.turn = Some(TurnId::from_raw("t1"));
     first.body = ItemBody::User {
@@ -280,7 +280,9 @@ fn turns_keep_full_prompts_and_share_the_cut_boundaries() {
     last.turn = Some(TurnId::from_raw("t2"));
     let transcript: Transcript = [first, between, last].into_iter().collect();
     let rows = turns(&transcript);
-    assert_eq!(rows[0].asked.as_deref(), Some("first\nsecond"));
+    assert_eq!(rows[0].headline.as_deref(), Some("first"));
+    assert_eq!(rows[0].asked(&transcript), Some("first\nsecond"));
+    assert_eq!(rows[1].asked(&transcript), None);
     assert_eq!(rows[0].label(), "first");
     assert_eq!((rows[0].first, rows[0].last, rows[0].items()), (0, 1, 2));
     assert_eq!(rows[1].label(), "t2");
@@ -432,4 +434,20 @@ fn search_caps_results_and_reads_tool_input_as_lines() {
     assert_eq!(hits.iter().map(|hit| hit.line).collect::<Vec<_>>(), [2, 3]);
     let transcript = [item(2, "needle\n".repeat(1001))].into_iter().collect();
     assert_eq!(find(&transcript, "needle").len(), 1000);
+}
+
+#[test]
+fn a_turn_headline_is_one_capped_line() {
+    let mut long = item(1, String::new());
+    long.turn = Some(TurnId::from_raw("t1"));
+    let line = "x".repeat(HEADLINE_CHARS * 3);
+    long.body = ItemBody::User {
+        parts: vec![ContentPart::text(format!("  {line}\n{line}"))],
+        origin: Origin::surface("tui"),
+    };
+    let transcript: Transcript = [long].into_iter().collect();
+    let rows = turns(&transcript);
+    let headline = rows[0].headline.as_deref().unwrap();
+    assert_eq!(headline.chars().count(), HEADLINE_CHARS);
+    assert!(rows[0].asked(&transcript).unwrap().len() > 2 * line.len());
 }

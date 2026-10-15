@@ -10040,7 +10040,7 @@
         "id": {
           "$ref": "#/$defs/TurnId"
         },
-        "asked": {
+        "headline": {
           "type": [
             "string",
             "null"
@@ -10061,7 +10061,8 @@
         "id",
         "first",
         "last"
-      ]
+      ],
+      "description": "One turn as a row: its headline only. The whole prompt stays in the\ntranscript, where `asked` reads it."
     },
     "TurnDurationProps": {
       "type": "object",

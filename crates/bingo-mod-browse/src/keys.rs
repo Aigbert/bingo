@@ -155,7 +155,7 @@ pub(crate) mod tests {
             turns: ["t1", "t2"]
                 .map(|id| Turn {
                     id: TurnId::from_raw(id),
-                    asked: None,
+                    headline: None,
                     first: 0,
                     last: 1,
                 })

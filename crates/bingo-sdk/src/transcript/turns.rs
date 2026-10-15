@@ -2,25 +2,42 @@ use crate::{Transcript, TurnId};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// The most of a prompt's first line a turn carries; a row is narrower still.
+pub const HEADLINE_CHARS: usize = 200;
+
+/// One turn as a row: its headline only. The whole prompt stays in the
+/// transcript, where `asked` reads it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Turn {
     pub id: TurnId,
-    pub asked: Option<String>,
+    pub headline: Option<String>,
     pub first: usize,
     pub last: usize,
 }
 impl Turn {
     pub fn label(&self) -> String {
-        self.asked
-            .as_deref()
-            .and_then(crate::first_line)
-            .map(str::trim)
-            .map(str::to_owned)
-            .unwrap_or_else(|| self.id.to_string())
+        self.headline.clone().unwrap_or_else(|| self.id.to_string())
     }
     pub fn items(&self) -> usize {
         self.last - self.first + 1
     }
+    /// The person's whole prompt for this turn, borrowed from the transcript.
+    pub fn asked<'a>(&self, transcript: &'a Transcript) -> Option<&'a str> {
+        let items = transcript.items().get(self.first..=self.last)?;
+        items
+            .iter()
+            .filter(|item| item.turn.as_ref() == Some(&self.id))
+            .find_map(|item| crate::asked(item))
+    }
+}
+
+fn headline(asked: &str) -> String {
+    crate::first_line(asked)
+        .unwrap_or_default()
+        .trim()
+        .chars()
+        .take(HEADLINE_CHARS)
+        .collect()
 }
 
 /// Visible turns in transcript order; interstitial items belong to the preceding cut.
@@ -31,13 +48,13 @@ pub fn turns(transcript: &Transcript) -> Vec<Turn> {
             if out.last().is_none_or(|turn| &turn.id != id) {
                 out.push(Turn {
                     id: id.clone(),
-                    asked: None,
+                    headline: None,
                     first: at,
                     last: at,
                 });
             }
             if let (Some(turn), Some(asked)) = (out.last_mut(), crate::asked(item)) {
-                turn.asked.get_or_insert_with(|| asked.to_owned());
+                turn.headline.get_or_insert_with(|| headline(asked));
             }
         }
         if let Some(turn) = out.last_mut() {

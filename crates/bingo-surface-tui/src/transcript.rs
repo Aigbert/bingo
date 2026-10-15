@@ -1341,7 +1341,7 @@ mod tests {
         assert!(
             bingo_sdk::transcript::turns(&state.transcript)
                 .iter()
-                .all(|turn| turn.asked.is_none())
+                .all(|turn| turn.headline.is_none())
         );
     }
 

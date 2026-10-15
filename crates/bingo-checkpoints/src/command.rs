@@ -375,7 +375,7 @@ mod tests {
     fn turn() -> Turn {
         Turn {
             id: TurnId::from_raw("trn_1"),
-            asked: Some("write the note".into()),
+            headline: Some("write the note".into()),
             first: 0,
             last: 1,
         }

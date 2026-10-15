@@ -84,7 +84,7 @@ mod tests {
     fn sheet_names_each_mode_and_untracked_changes() {
         let turns = vec![Turn {
             id: bingo_sdk::TurnId::from_raw("t"),
-            asked: None,
+            headline: None,
             first: 0,
             last: 3,
         }];
