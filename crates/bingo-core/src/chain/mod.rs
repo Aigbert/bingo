@@ -303,6 +303,9 @@ impl<'a, P: Point> Hop<'a, P> {
                 }
                 true
             }
+            Err(error) if baseline.is_some_and(|result| result.as_ref().err() == Some(error)) => {
+                true
+            }
             Err(error)
                 if error.code == ErrorCode::PermissionDenied
                     && entry.acts.deny

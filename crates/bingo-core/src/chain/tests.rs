@@ -305,3 +305,20 @@ async fn a_json_deny_only_answer_never_runs_the_tool() {
         assert_eq!(error.message, "protected by guard");
     }
 }
+
+#[tokio::test]
+async fn a_forwarded_terminal_error_does_not_blame_the_link() {
+    let expected = KernelError::new(ErrorCode::InvalidInput, "invalid command argument");
+    let kernel = Next::new(|_| Box::pin(async { Err(expected.clone()) }));
+    let report = Report::default();
+    let result = run::<tool::Call>(
+        &[link("forward", Tier::Full)],
+        kernel,
+        &cx(),
+        call(),
+        report.clone(),
+    )
+    .await;
+    assert_eq!(result, Err(expected));
+    assert!(report.take().is_empty());
+}
