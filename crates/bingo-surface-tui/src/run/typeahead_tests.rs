@@ -506,3 +506,115 @@ async fn a_surface_run_line_holds_keys_until_its_status_pane_opens() {
     assert_eq!(run.ui.composer.text(), "xy");
     assert!(run.typeahead.is_empty());
 }
+
+fn publish_status(run: &mut Run, pulled: bool) -> View {
+    let mut state = state();
+    status_pane(&mut state);
+    let mut payload = state.signals["bingo.mod.status"]["status"]
+        .payload()
+        .clone();
+    let view = serde_json::from_value(payload["slots"][0]["view"].clone()).unwrap();
+    if pulled {
+        payload["slots"][0]["view"] = json!({"request":{
+            "component":"Status", "requestId":"status", "props":{},
+            "viewport":{"columns":0,"rows":0}
+        }});
+        state.config.kernel["render"] = json!({"Status":[{}]});
+        run.session.tree.fold.apply(&frame(
+            1,
+            Event::ConfigChanged {
+                config: state.config,
+            },
+        ));
+    }
+    run.session.tree.fold.apply(&frame(
+        2,
+        Event::Signal {
+            generation: None,
+            plugin: "bingo.mod.status".into(),
+            kind: "status".into(),
+            payload,
+        },
+    ));
+    view
+}
+
+fn answer_status_drawing(run: &mut Run, view: View) {
+    let key = run
+        .ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == Component::Status)
+        .unwrap()
+        .clone();
+    run.ui.placed.pulled.request(&key);
+    run.reply(
+        Reply::Rendered(run.ui.placed.pulled.epoch(), key, Box::new(view)),
+        &mut None,
+    );
+}
+
+#[tokio::test]
+async fn status_receipt_before_paint_keeps_keys_until_the_pane_can_read_them() {
+    let now = still(scene().1);
+    for pulled in [false, true] {
+        let (_home, mut run, session) = palette_run(now);
+        run.effect(Effect::Run("/status".into()));
+        type_burst(&mut run, "x");
+        let intent = session.submissions()[0].0.clone();
+        let view = publish_status(&mut run, pulled);
+        run.ack(&intent, &IntentOutcome::Applied {
+            result: json!({"surface":{"name":"Pane","args":{"plugin":"bingo.mod.status","id":"status"}}}),
+        });
+        assert_eq!(
+            run.typeahead.len(),
+            1,
+            "the receipt precedes the pane's first drawing"
+        );
+        draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
+        typeahead::drain(&mut run);
+        if pulled {
+            assert_eq!(
+                run.typeahead.len(),
+                1,
+                "the pane is seated but its view is still out"
+            );
+            answer_status_drawing(&mut run, view);
+        }
+        let (key_intent, action) = unanswered(&session, &[]).unwrap();
+        assert_eq!(action.name, "bingo.mod.status:ui");
+        assert_eq!(action.args["value"]["key"], "x");
+        run.ack(
+            &key_intent,
+            &IntentOutcome::Applied {
+                result: json!({"handled":false}),
+            },
+        );
+        assert_eq!(run.ui.composer.text(), "x");
+        assert!(run.typeahead.is_empty());
+    }
+}
+
+#[tokio::test]
+async fn interrupts_do_not_wait_for_a_status_panes_first_drawing() {
+    let now = still(scene().1);
+    for chord in [key(KeyCode::Esc), ctrl('c')] {
+        let (_home, mut run, session) = palette_run(now);
+        publish_status(&mut run, true);
+        run.session.tree.fold.apply(&frame(3, started("busy")));
+        surface::action(
+            &mut run,
+            Action {
+                name: "Pane".into(),
+                args: json!({"plugin":"bingo.mod.status","id":"status"}),
+            },
+        );
+        typeahead::command_sent(&mut run, IntentId::from_raw("slow"));
+        type_burst(&mut run, "zq");
+        run.terminal_event(Term::Key(chord));
+        assert_eq!(session.interrupts(), 1);
+        assert!(run.typeahead.is_empty());
+        assert!(run.typeahead.deadline().is_none());
+    }
+}

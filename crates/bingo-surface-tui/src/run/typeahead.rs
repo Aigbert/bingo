@@ -122,7 +122,9 @@ fn focus(run: &Run) -> Option<String> {
 }
 
 fn drawing(run: &Run) -> bool {
-    crate::browse::waiting(&run.ui, &run.session.tree)
+    (crate::focus::owner(&run.ui, &run.session.tree) == crate::focus::Owner::Pane
+        && crate::pane::readiness::waiting(&run.ui, run.session.tree.viewed()))
+        || crate::browse::waiting(&run.ui, &run.session.tree)
         || crate::plugins::waiting(&run.ui)
         || crate::palette::waiting(&run.ui, &run.session.tree, run.detection.now())
         || crate::sessions::waiting(&run.ui, &run.session.tree, run.detection.now())

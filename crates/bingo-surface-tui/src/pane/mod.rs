@@ -2,6 +2,7 @@
 mod draw;
 mod mouse;
 mod moved;
+pub(crate) mod readiness;
 pub mod seat;
 use crate::{composer::Composer, effect::Effect, focus::Focus, theme, ui::Ui};
 use bingo_sdk::{

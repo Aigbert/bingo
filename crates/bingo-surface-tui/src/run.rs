@@ -674,16 +674,16 @@ impl Run {
         match event {
             Term::Key(key) => {
                 let chord = crate::keys::commands::chord(key);
-                if chord.as_deref() == Some("ctrl+c")
-                    || (chord.as_deref() == Some("esc") && !site_lifecycle::open(&self.ui))
-                {
+                let interrupt = chord.as_deref() == Some("ctrl+c")
+                    || (chord.as_deref() == Some("esc") && !site_lifecycle::open(&self.ui));
+                if interrupt {
                     self.site_keys.clear();
                     self.typeahead.clear();
                     if chord.as_deref() == Some("ctrl+c") && site_lifecycle::ctrl_c(self, key) {
                         return;
                     }
                 }
-                if typeahead::blocked(self) {
+                if !interrupt && typeahead::blocked(self) {
                     typeahead::queue(self, key);
                     return;
                 }
