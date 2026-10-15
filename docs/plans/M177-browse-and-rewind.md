@@ -64,23 +64,23 @@ feature is the built-in mod `bingo-mod-browse`; with it off, `ctrl+f` is the ter
 - `crates/bingo-checkpoints/src/{lib.rs,command.rs,turns.rs (deleted)}`.
 - TUI: `rewind.rs`, `input.rs`, `browse/{paint,actions}.rs`, `pager.rs`, `run/surface.rs` (`Pager` action), site placement for `Browse`.
 - New `crates/bingo-mod-browse/src/{lib.rs,sheet.rs,keys.rs,draw.rs, guide.rs,guide.md}`; listed in `crates/bingo/src/main.rs`; +1 member in
-  `scripts/budget.toml`, no dependency. ADR-0045 and ADR-0084 gain their amendment lines.
+  `scripts/budget.toml`, no dependency. ADR-0045, ADR-0084 and ADR-0086 gain their amendment lines.
 
 ## Exit criteria
 
-- [ ] `turns`, `find`, `sheet` and keys tables; checkpoints fixtures.
-- [ ] Mode test: `conversation` keeps the file, `files` keeps the journal, `both` restores then rewinds; a failing write stops before the journal
+- [x] `turns`, `find`, `sheet` and keys tables; checkpoints fixtures.
+- [x] Mode test: `conversation` keeps the file, `files` keeps the journal, `both` restores then rewinds; a failing write stops before the journal
       (ADR-0045 §3, existing test still green).
-- [ ] `TestBackend`: `ctrl+f` opens Browse; `]` lands on the next turn; a match inside a folded block is peeked and folded again on `esc`; `r`
+- [x] `TestBackend`: `ctrl+f` opens Browse; `]` lands on the next turn; a match inside a folded block is peeked and folded again on `esc`; `r`
       shows the Bash line; `⏎` in the sheet rewinds and the composer holds the prompt; `esc esc` card shows the sheet.
-- [ ] `enabledPlugins: {"bingo.mod.browse": false}`: `ctrl+f` is line search, the card submits directly.
-- [ ] tmux drive on an isolated socket, temp HOME, fake provider scripted to `Write` a file and run `Bash` over three turns; rewind each mode;
+- [x] `enabledPlugins: {"bingo.mod.browse": false}`: `ctrl+f` is line search, the card submits directly.
+- [x] tmux drive on an isolated socket, temp HOME, fake provider scripted to `Write` a file and run `Bash` over three turns; rewind each mode;
       captures pasted.
-- [ ] `bash scripts/tui-smoke.sh`; `cargo fmt --all -- --check`; `cargo check --workspace --all-targets --locked`; `cargo clippy --workspace
+- [x] `bash scripts/tui-smoke.sh`; `cargo fmt --all -- --check`; `cargo check --workspace --all-targets --locked`; `cargo clippy --workspace
       --all-targets --locked -- -D warnings`; `cargo test --workspace --locked`; `scripts/check_discipline.sh`; `scripts/budget.sh`; `cargo deny
       check`.
-- [ ] `cargo check -p bingo-checkpoints -p bingo-mod-browse -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc --locked`
-      (clipboard and path display).
+- [ ] For each touched crate (`bingo-sdk`, `bingo-services`, `bingo-checkpoints`, `bingo-mod-browse`, `bingo-surface-tui`, `bingo`):
+      `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked`: four pass; TUI/bin deferred by the C toolchain below.
 
 ## Decisions
 
@@ -101,16 +101,9 @@ feature is the built-in mod `bingo-mod-browse`; with it off, `ctrl+f` is the ter
 - A queued rewind keeps its own intent until completion, so its prompt returns even when it waited behind a running turn. Withdrawing it retires
   that intent only after a successful withdrawal; a failed withdrawal leaves the running rewind identifiable.
 - Guides use `crates/bingo-mod-browse/src/guide.md` and its registered Page. Only existing workspace edges are added; the member budget grows 414
-  → 415.
+  → 415. The checkpoints service makes its switch take effect at next start (M173); no M166 or M173 crate changes are needed.
 - A synchronous answer after drawing schedules another frame: the smoke exposed a committed query whose second projection otherwise stayed invisible.
 - Key waiting uses the same render predicate as placement; switching off or narrowing a replacement cannot strand queued keys.
-
-## In-flight dependencies
-
-- M166: none.
-- M170: the `Composer` action in `run/surface.rs`; `Pager` joins beside it.
-- M173: the mod switches now; `bingo-checkpoints` gains a service, so its switch says `off at next start`.
-- M174: `r` and the sheet's `⏎` resolve against the current drawing; a rewind queued behind a running turn waits in the queue (not `instant`).
 
 ## Non-goals
 
@@ -121,3 +114,37 @@ Rewinding a child agent or a room; exporting a transcript; tracking what a shell
 - `conversation` mode leaves files the transcript no longer explains; the sheet names it and the `Rewind` item's reply says so.
 - Searching full item text of a long session on each keystroke can lag: Browse commits search on `⏎`.
 - Peeking a folded block shifts the scroll; the selection is kept by item id, never by row.
+
+## Verified — 2026-10-15
+
+All runtime tests used local/fake fixtures with provider credentials removed. Gates ran sequentially; no wall-clock flake occurred. Initial failures were fixed: legacy one-Enter PTY expectation, discipline layout, and the synchronous search redraw (regression red → green).
+
+```text
+cargo fmt --all -- --check → exit 0
+cargo check --workspace --all-targets --locked → Finished dev in 4.76s
+cargo clippy --workspace --all-targets --locked -- -D warnings → Finished dev in 5.13s
+RUST_TEST_THREADS=4 cargo test --workspace --locked → 5746 passed; 0 failed; 5 ignored (173 suites)
+bash scripts/check_discipline.sh → discipline ok (existing advisory warnings)
+bash scripts/budget.sh → dependencies 415/415; warm core check 1s; TUI→core recompiles 0; budget ok
+cargo deny check → advisories ok, bans ok, licenses ok, sources ok
+bash scripts/tui-smoke.sh → tui-smoke ok
+(cd sdk/typescript && npm test) → tests 31; pass 31; fail 0
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-plugin-rpc -p bingo-surface-rpc -p bingo-store-jsonl -p bingo-mods --locked --lib → 467 passed; 0 failed; 1 ignored
+cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked:
+  bingo-sdk / bingo-services / bingo-checkpoints / bingo-mod-browse → Finished dev (each exit 0)
+  bingo-surface-tui → aws-lc-sys: stdlib.h / windows.h not found (exit 101)
+  bingo → rquickjs-sys: host clang rejects MSVC flags; aws-lc-sys: Windows headers missing (exit 101)
+```
+
+Isolated tmux: seven scenarios passed, 20 captures; three Write+Bash turns, all modes at 108×30 and 80×24, plus disabled-mod line search/direct rewind.
+Both/files left `note.txt` at `edit 1`; conversation kept `edit 3`; both/conversation restored `prompt 2`. Cropped capture excerpts (same rows at both sizes):
+```text
+browse · turn 2 of 3 · "" 0/0 (n/N)  [ ] turn  ⏎ page  y copy  r rewind
+│ undoes turns 2–3 · 8 items
+│ restored note.txt
+│ ! files a shell command wrote are not tracked (2 Bash calls)
+│ ❯ both    conversation    files    ⏎ rewind  esc
+│ both    ❯ conversation    files    ⏎ rewind  esc
+│ both    conversation    ❯ files    ⏎ rewind  esc
+```
+The budget's 10 GB debug tree exceeded its 5 GB soft limit; the final `cargo clean` removes this worktree's build artifacts.
