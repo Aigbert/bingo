@@ -153,19 +153,7 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
     if crate::plugins::active(&run.ui)
         && crate::plugins::request(&run.ui) == Some(pending.focus.as_str())
     {
-        if let IntentOutcome::Applied { result } = outcome
-            && let Ok(action) =
-                serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
-        {
-            let effects = crate::plugins::result(
-                &mut run.ui,
-                &run.session.tree,
-                &action,
-                vouched(result, PLUGINS),
-                run.detection.now(),
-            );
-            run.apply(effects);
-        }
+        plugins_answer(run, outcome);
         return;
     }
     if crate::palette::active(&run.ui)
@@ -280,15 +268,30 @@ fn browse_answer(run: &mut Run, outcome: &IntentOutcome) {
     if let IntentOutcome::Applied { result } = outcome
         && let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
     {
-        let effects =
-            crate::browse::result(&mut run.ui, &run.session.tree, &action, run.detection.now());
+        let vouched = vouched(result, BROWSE);
+        let now = run.detection.now();
+        let effects = crate::browse::result(&mut run.ui, &run.session.tree, &action, vouched, now);
         run.apply(effects);
     }
 }
 
-/// The built-ins that draw the plugin panel and the palette.
+/// The plugin panel's answer names the surface action it chose.
+fn plugins_answer(run: &mut Run, outcome: &IntentOutcome) {
+    if let IntentOutcome::Applied { result } = outcome
+        && let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
+    {
+        let vouched = vouched(result, PLUGINS);
+        let now = run.detection.now();
+        let effects = crate::plugins::result(&mut run.ui, &run.session.tree, &action, vouched, now);
+        run.apply(effects);
+    }
+}
+
+/// The built-ins that draw the plugin panel, the palette and browse. The
+/// sessions directory runs no line, so it needs no word from the kernel.
 const PLUGINS: &str = "plugins";
 const PALETTE: &str = "palette";
+const BROWSE: &str = "browse";
 
 /// Only the kernel writes `drawnBy` into an ack, never a mod's answer: the
 /// answer itself sits under `surface`. It vouches for a site only when it
@@ -390,6 +393,7 @@ mod tests {
         let palette = json!({"drawnBy": PALETTE});
         assert!(vouched(&palette, PALETTE));
         assert!(!vouched(&palette, PLUGINS));
+        assert!(!vouched(&palette, BROWSE));
         assert!(!vouched(&json!({"drawnBy": "rogue"}), PLUGINS));
         assert!(!vouched(&json!({}), PALETTE));
     }

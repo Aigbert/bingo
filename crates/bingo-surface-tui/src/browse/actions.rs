@@ -1,5 +1,7 @@
 use super::*;
-pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect> {
+/// `vouched`: the kernel says browse's own built-in drew the keys and gave
+/// this answer, so a line only the person may write may run from it.
+pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, vouched: bool, now: Now) -> Vec<Effect> {
     if action.name != "surface:browse" || action.args["handler"].as_str() != request(ui) {
         return vec![];
     }
@@ -16,6 +18,10 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect
             return vec![];
         }
         ui.focus.close(now.instant);
+        if !vouched && crate::commands::privileged(&ui.catalogs.commands, line) {
+            ui.notify(Level::Warn, crate::commands::unvouched(line), now.instant);
+            return vec![];
+        }
         return crate::input::command_line(ui, tree, now, line.into());
     }
     for name in ["pager", "copy"] {
