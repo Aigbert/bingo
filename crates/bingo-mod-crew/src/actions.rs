@@ -17,6 +17,7 @@ impl Command for Handler {
             return Ok(handled());
         }
         if args["event"] == "close" {
+            asked()?;
             crate::command::close(cx, &self.0).await?;
             return Ok(handled());
         }
@@ -68,10 +69,12 @@ async fn act(
     shared: &crate::Shared,
 ) -> Result<CommandOutcome, KernelError> {
     match op {
-        Operation::Close if panel.confirm.is_some() => {
-            panel.confirm = None;
+        Operation::Close => {
+            asked()?;
+            if panel.confirm.take().is_none() {
+                crate::command::close(cx, shared).await?;
+            }
         }
-        Operation::Close => crate::command::close(cx, shared).await?,
         Operation::Tab => next_tab(panel, rows),
         Operation::Move(down) => move_row(panel, rows, down),
         Operation::Model => panel.model = !panel.model,
@@ -120,6 +123,16 @@ fn move_row(panel: &mut Panel, rows: &Rows, down: bool) {
     };
     panel.model = false;
     panel.follow = None;
+}
+
+fn asked() -> Result<(), KernelError> {
+    if render::asked() {
+        Ok(())
+    } else {
+        Err(crate::error(
+            "Only the person's input can close the crew pane or cancel confirmation.",
+        ))
+    }
 }
 
 fn person() -> Result<(), KernelError> {
@@ -186,6 +199,46 @@ fn surface(name: &str, args: Value) -> CommandOutcome {
 mod tests {
     use super::*;
     #[tokio::test]
+    async fn unasked_close_preserves_the_pane_and_pending_confirmation() {
+        let host = testing::TestHost::default();
+        let cx = CommandContext {
+            session: SessionId::from_raw("ses_parent"),
+            cwd: "/unused".into(),
+            host: host.handle(),
+            cancel: Default::default(),
+        };
+        let shared = crate::Shared::default();
+        for confirm in [
+            None,
+            Some(crate::state::Confirmation::Dismiss("reviewer".into())),
+        ] {
+            let mut panel = Panel {
+                confirm: confirm.clone(),
+                ..Default::default()
+            };
+            shared
+                .lock()
+                .unwrap()
+                .insert(cx.session.clone(), panel.clone());
+            assert!(
+                act(Operation::Close, &mut panel, &Rows::default(), &cx, &shared)
+                    .await
+                    .is_err()
+            );
+            assert_eq!(panel.confirm, confirm);
+            let close = json!({"handler":crate::REQUEST,"event":"close"});
+            assert!(
+                Handler(shared.clone())
+                    .run(&close.to_string(), &cx)
+                    .await
+                    .is_err()
+            );
+            assert!(shared.lock().unwrap().contains_key(&cx.session));
+            assert!(host.calls().is_empty());
+        }
+    }
+
+    #[tokio::test]
     async fn person_controls_require_both_asked_and_the_owners_drawing() {
         let host = testing::TestHost::default();
         let cx = CommandContext {
@@ -250,12 +303,15 @@ mod tests {
         .unwrap();
         assert_eq!(panel.confirm, Some(confirm));
         assert!(host.calls().is_empty());
-        act(
-            Operation::Close,
-            &mut panel,
-            &Rows::default(),
-            &cx,
-            &crate::Shared::default(),
+        render::under_input(
+            true,
+            act(
+                Operation::Close,
+                &mut panel,
+                &Rows::default(),
+                &cx,
+                &crate::Shared::default(),
+            ),
         )
         .await
         .unwrap();

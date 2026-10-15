@@ -175,7 +175,7 @@ async fn an_inflight_render_cannot_resurrect_a_cancelled_confirmation() {
             .unwrap();
         release.notify_one();
     };
-    let (view, ()) = tokio::join!(render, key);
+    let (view, ()) = tokio::join!(render, bingo_sdk::render::under_input(true, key));
     assert!(shared.lock().unwrap()[&session].confirm.is_none());
     let view: View = serde_json::from_value(view.unwrap()).unwrap();
     assert!(!view.fold().contains("delete its journal"));
