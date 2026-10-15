@@ -142,6 +142,33 @@ fn projection_cache_invalidates_on_length_query_and_generation() {
 }
 
 #[test]
+fn projection_cache_sees_a_streamed_or_rewritten_item() {
+    let fixture = Fixture::new();
+    let (mut state, mut ui, now) = setup(&fixture);
+    open(&mut ui, &solo(&state), None, false, now);
+    let mut props = props(&ui, &solo(&state)).unwrap();
+    props.query = "needle".into();
+    state.transcript.apply(&Event::ItemStarted {
+        item: assistant("live", "hay", ItemStatus::Running),
+    });
+    ui.placed.browse.fill(&state, &mut props);
+    assert_eq!(props.count, 0);
+    state.transcript.apply(&Event::ItemDelta {
+        item: ItemId::from_raw("live"),
+        n: 1,
+        kind: bingo_sdk::DeltaKind::Text,
+        data: " needle".into(),
+    });
+    ui.placed.browse.fill(&state, &mut props);
+    assert_eq!(props.count, 1, "a delta grows the item in place");
+    state.transcript.apply(&Event::ItemUpdated {
+        item: assistant("live", "hay again", ItemStatus::Running),
+    });
+    ui.placed.browse.fill(&state, &mut props);
+    assert_eq!(props.count, 0, "an update rewrites the item in place");
+}
+
+#[test]
 fn ordinary_pagers_keep_their_existing_content_projection() {
     let state = state();
     let row = user("user", "already visible");

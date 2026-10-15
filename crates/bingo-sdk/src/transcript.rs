@@ -33,6 +33,18 @@ pub struct Transcript {
     cut: Option<ItemId>,
     #[schemars(skip)]
     has_more: bool,
+    #[schemars(skip)]
+    revision: Revision,
+}
+
+/// How many changes this copy has folded in: a key for caches derived from
+/// the items, not content, so it never makes two transcripts unequal.
+#[derive(Clone, Copy, Debug, Default)]
+struct Revision(u64);
+impl PartialEq for Revision {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
 }
 
 impl Transcript {
@@ -96,7 +108,21 @@ impl Transcript {
         self.model_order.iter().filter_map(|id| self.get(id))
     }
 
+    /// Bumped by every change the fold makes, an in-place edit included,
+    /// where the length and the history generation stay put.
+    pub fn revision(&self) -> u64 {
+        self.revision.0
+    }
+
     pub fn apply(&mut self, event: &Event) -> Applied {
+        let applied = self.change(event);
+        if !matches!(applied, Applied::Nothing) {
+            self.revision.0 = self.revision.0.wrapping_add(1);
+        }
+        applied
+    }
+
+    fn change(&mut self, event: &Event) -> Applied {
         match event {
             Event::ItemStarted { item }
             | Event::ItemUpdated { item }
@@ -155,6 +181,7 @@ impl Transcript {
             hidden: 0,
             cut: None,
             has_more: self.has_more || start > 0,
+            revision: self.revision,
         }
     }
 
@@ -172,6 +199,7 @@ impl Transcript {
         history.cut = self.cut.clone();
         history.hidden = 0;
         history.has_more = false;
+        history.revision = self.revision;
         history
     }
 

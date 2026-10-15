@@ -55,6 +55,7 @@ impl Stored {
             hidden: self.hidden,
             cut: self.cut,
             has_more: self.has_more,
+            revision: Default::default(),
         })
     }
 }

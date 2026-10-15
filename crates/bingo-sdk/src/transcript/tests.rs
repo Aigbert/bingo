@@ -451,3 +451,33 @@ fn a_turn_headline_is_one_capped_line() {
     assert_eq!(headline.chars().count(), HEADLINE_CHARS);
     assert!(rows[0].asked(&transcript).unwrap().len() > 2 * line.len());
 }
+
+#[test]
+fn every_folded_change_moves_the_revision_and_nothing_else_does() {
+    let mut transcript = Transcript::new();
+    let mut live = item(1, "hay".into());
+    live.status = ItemStatus::Running;
+    transcript.apply(&Event::ItemStarted { item: live.clone() });
+    let started = transcript.revision();
+    transcript.apply(&Event::ItemDelta {
+        item: live.id.clone(),
+        n: 1,
+        kind: DeltaKind::Text,
+        data: "!".into(),
+    });
+    assert!(transcript.revision() > started, "an edit in place counts");
+    let edited = transcript.revision();
+    transcript.apply(&Event::ItemDelta {
+        item: ItemId::from_raw("missing"),
+        n: 1,
+        kind: DeltaKind::Text,
+        data: "!".into(),
+    });
+    assert_eq!(
+        transcript.revision(),
+        edited,
+        "a dropped delta changes nothing"
+    );
+    let copy: Transcript = transcript.items().iter().map(|i| (**i).clone()).collect();
+    assert_eq!(copy, transcript, "the count is not content");
+}

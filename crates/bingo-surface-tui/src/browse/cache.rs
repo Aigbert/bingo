@@ -12,7 +12,7 @@ pub struct Cache {
 }
 #[derive(Debug, Default)]
 struct Projection {
-    key: Option<(SessionId, usize, u64)>,
+    key: Option<(SessionId, usize, u64, u64)>,
     turns: Vec<Turn>,
     query: String,
     matches: Vec<Match>,
@@ -41,6 +41,7 @@ impl Cache {
             state.summary.id.clone(),
             state.transcript.items().len(),
             state.transcript.history().generation,
+            state.transcript.revision(),
         );
         let changed = data.key.as_ref() != Some(&key);
         if changed {
