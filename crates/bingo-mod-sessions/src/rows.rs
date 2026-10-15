@@ -209,7 +209,7 @@ pub(crate) fn listed(props: &component::SessionsProps, cursor: &crate::state::Cu
         &props.sessions[..end],
         props.now,
         &props.query,
-        &props.current,
+        &props.session,
         &cursor.expanded,
     );
     if props.sessions.len() > props.limit {

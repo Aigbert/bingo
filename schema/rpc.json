@@ -5412,7 +5412,8 @@
       "type": "object",
       "properties": {
         "session": {
-          "$ref": "#/$defs/SessionId"
+          "$ref": "#/$defs/SessionId",
+          "description": "The viewed session: it owns the opening and is the row marked current."
         },
         "cwd": {
           "type": "string"
@@ -5435,9 +5436,6 @@
           },
           "description": "One extra summary is the sentinel for the next page."
         },
-        "current": {
-          "$ref": "#/$defs/SessionId"
-        },
         "now": {
           "type": "string"
         },
@@ -5452,7 +5450,6 @@
         "scope",
         "limit",
         "sessions",
-        "current",
         "now",
         "action"
       ]

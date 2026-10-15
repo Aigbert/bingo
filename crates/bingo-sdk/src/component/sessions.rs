@@ -12,6 +12,7 @@ pub enum SessionsScope {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionsProps {
+    /// The viewed session: it owns the opening and is the row marked current.
     pub session: SessionId,
     pub cwd: String,
     pub query: String,
@@ -19,7 +20,6 @@ pub struct SessionsProps {
     pub limit: usize,
     /// One extra summary is the sentinel for the next page.
     pub sessions: Vec<SessionSummary>,
-    pub current: SessionId,
     #[schemars(with = "String")]
     pub now: jiff::Timestamp,
     pub action: Action,

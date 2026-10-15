@@ -64,7 +64,6 @@ fn props(ui: &Ui, tree: &Tree, now: Now) -> Option<SessionsProps> {
         scope: open.scope,
         limit: open.limit,
         sessions: open.sessions.clone(),
-        current: tree.view().clone(),
         now: jiff::Timestamp::from_second(now.wall.as_second() / 60 * 60).unwrap_or(now.wall),
         action: Action {
             name: "surface:sessions".into(),

@@ -296,7 +296,6 @@
       "scope": "here",
       "limit": 50,
       "sessions": [],
-      "current": "ses_1",
       "now": "2026-10-15T12:00:00Z",
       "action": {
         "name": "surface:sessions",

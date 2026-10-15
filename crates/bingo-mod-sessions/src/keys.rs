@@ -182,7 +182,7 @@ impl Handler {
             }
             Operation::Fork(id) => json!({"resume":cx.host.fork(&id, None).await?}),
             Operation::Delete(id) => {
-                let doomed = crate::verbs::descendants(&cx.host, &id, &props.current).await?;
+                let doomed = crate::verbs::descendants(&cx.host, &id, &props.session).await?;
                 if let Some(cursor) = self
                     .0
                     .lock()

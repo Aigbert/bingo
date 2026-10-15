@@ -401,7 +401,7 @@ async fn sessions_obeys_the_same_switch_for_commands_and_rendering() {
         let request: render::RenderRequest = serde_json::from_value(json!({
             "component":"Sessions", "requestId":"sessions", "surface":"terminal",
             "viewport":{"columns":80,"rows":20},
-            "props":{"session":attachment.session,"current":attachment.session,"cwd":home.path(),
+            "props":{"session":attachment.session,"cwd":home.path(),
                 "query":"","scope":"here","limit":50,"sessions":[],"now":"2026-10-15T12:00:00Z",
                 "action":{"name":"surface:sessions","args":{}}}
         }))
