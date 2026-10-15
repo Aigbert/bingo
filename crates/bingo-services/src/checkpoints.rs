@@ -34,7 +34,12 @@ pub struct Touched {
 }
 #[async_trait]
 pub trait Checkpoints: Send + Sync {
-    async fn touched(&self, session: &SessionId, from: &TurnId) -> Result<Touched, ServiceError>;
+    /// `None` when the session has no such turn: nothing would be undone.
+    async fn touched(
+        &self,
+        session: &SessionId,
+        from: &TurnId,
+    ) -> Result<Option<Touched>, ServiceError>;
 }
 pub fn find(host: &HostHandle) -> Option<Arc<dyn Checkpoints>> {
     host.service(&KEY).or_else(|| {
@@ -53,7 +58,10 @@ fn error(e: impl std::fmt::Display) -> ServiceError {
 #[async_trait]
 impl WireService for ToWire {
     fn face(&self) -> Option<bingo_sdk::Face> {
-        Some(bingo_sdk::Face::new("checkpoints").method::<Request, Touched>("touched", false))
+        Some(
+            bingo_sdk::Face::new("checkpoints")
+                .method::<Request, Option<Touched>>("touched", false),
+        )
     }
     async fn call(&self, method: &str, params: Value) -> Result<Value, ServiceError> {
         if method != "touched" {
@@ -65,7 +73,11 @@ impl WireService for ToWire {
 }
 #[async_trait]
 impl Checkpoints for FromWire {
-    async fn touched(&self, session: &SessionId, from: &TurnId) -> Result<Touched, ServiceError> {
+    async fn touched(
+        &self,
+        session: &SessionId,
+        from: &TurnId,
+    ) -> Result<Option<Touched>, ServiceError> {
         let value = self
             .0
             .call(
@@ -86,6 +98,9 @@ mod tests {
     fn fixture() -> Value {
         serde_json::from_str(include_str!("../fixtures/checkpoints/touched.json")).unwrap()
     }
+    fn missing() -> Value {
+        serde_json::from_str(include_str!("../fixtures/checkpoints/missing.json")).unwrap()
+    }
     struct Preview;
     #[async_trait]
     impl Checkpoints for Preview {
@@ -93,10 +108,12 @@ mod tests {
             &self,
             session: &SessionId,
             from: &TurnId,
-        ) -> Result<Touched, ServiceError> {
+        ) -> Result<Option<Touched>, ServiceError> {
             assert_eq!(session.as_str(), "ses_1");
-            assert_eq!(from.as_str(), "trn_1");
-            Ok(serde_json::from_value(fixture()["answer"].clone()).unwrap())
+            Ok(match from.as_str() {
+                "trn_1" => Some(serde_json::from_value(fixture()["answer"].clone()).unwrap()),
+                _ => None,
+            })
         }
     }
     #[tokio::test]
@@ -128,5 +145,25 @@ mod tests {
             fixture["answer"]
         );
         assert!(find(&ServiceHost::handle()).is_none());
+    }
+    #[tokio::test]
+    async fn a_missing_turn_is_none_native_and_wire() {
+        let missing = missing();
+        let service: Arc<dyn Checkpoints> = Arc::new(Preview);
+        let face = wire(service);
+        assert_eq!(
+            face.call("touched", missing["params"].clone())
+                .await
+                .unwrap(),
+            missing["answer"]
+        );
+        let host = ServiceHost::handle();
+        host.open_service(KEY.name(), face).unwrap();
+        let answer = find(&host)
+            .unwrap()
+            .touched(&SessionId::from_raw("ses_1"), &TurnId::from_raw("trn_9"))
+            .await
+            .unwrap();
+        assert_eq!(answer, None);
     }
 }

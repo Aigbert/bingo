@@ -8,9 +8,9 @@ mod regressions;
 struct Preview(Arc<AtomicUsize>);
 #[async_trait::async_trait]
 impl Checkpoints for Preview {
-    async fn touched(&self, _: &SessionId, _: &TurnId) -> Result<Touched, ServiceError> {
+    async fn touched(&self, _: &SessionId, _: &TurnId) -> Result<Option<Touched>, ServiceError> {
         self.0.fetch_add(1, Ordering::SeqCst);
-        Ok(Touched {
+        Ok(Some(Touched {
             files: vec![
                 File {
                     path: "crates/bingo-core/src/fork.rs".into(),
@@ -29,7 +29,7 @@ impl Checkpoints for Preview {
                 },
             ],
             shell_calls: 2,
-        })
+        }))
     }
 }
 struct Fixture {

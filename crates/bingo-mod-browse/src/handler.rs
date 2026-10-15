@@ -134,10 +134,12 @@ pub(crate) async fn preview(
     let service = bingo_services::checkpoints::find(host).ok_or_else(|| {
         KernelError::new(ErrorCode::NotReady, "checkpoint preview is unavailable")
     })?;
-    let mut touched = match service.touched(&props.session, &props.turns[at].id).await {
-        Ok(touched) => touched,
-        Err(error) if error.0.contains("no such turn") => return Ok(None),
-        Err(error) => return Err(crate::error(error)),
+    let Some(mut touched) = service
+        .touched(&props.session, &props.turns[at].id)
+        .await
+        .map_err(crate::error)?
+    else {
+        return Ok(None);
     };
     for file in &mut touched.files {
         if let Ok(relative) = file.path.strip_prefix(cwd) {
@@ -149,4 +151,43 @@ pub(crate) async fn preview(
         length: props.length,
         touched,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bingo_services::checkpoints::{Checkpoints, KEY, Touched};
+    use std::{future::Future, sync::Arc, task};
+
+    struct Answer(Result<Option<Touched>, String>);
+    #[async_trait::async_trait]
+    impl Checkpoints for Answer {
+        async fn touched(
+            &self,
+            _: &SessionId,
+            _: &TurnId,
+        ) -> Result<Option<Touched>, ServiceError> {
+            self.0.clone().map_err(ServiceError)
+        }
+    }
+
+    /// The double answers at once, so one poll finishes the preview.
+    fn previewed(answer: Result<Option<Touched>, String>) -> Result<bool, KernelError> {
+        let service: Arc<dyn Checkpoints> = Arc::new(Answer(answer));
+        let host = bingo_sdk::testing::ServiceHost::holding(&KEY, service);
+        let props = crate::keys::tests::props();
+        let mut future = Box::pin(preview(&host, &props, std::path::Path::new("/")));
+        let mut cx = task::Context::from_waker(task::Waker::noop());
+        match future.as_mut().poll(&mut cx) {
+            task::Poll::Ready(sheet) => sheet.map(|sheet| sheet.is_some()),
+            task::Poll::Pending => panic!("the double answers at once"),
+        }
+    }
+
+    #[test]
+    fn a_missing_turn_is_no_sheet_and_a_failure_is_an_error() {
+        assert!(previewed(Ok(Some(Touched::default()))).unwrap());
+        assert!(!previewed(Ok(None)).unwrap());
+        assert!(previewed(Err("no such turn".into())).is_err());
+    }
 }

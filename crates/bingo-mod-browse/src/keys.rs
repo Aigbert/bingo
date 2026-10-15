@@ -141,13 +141,13 @@ fn sheet(cursor: &mut Cursor, props: &BrowseProps, key: &str) -> Operation {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use bingo_sdk::{
         Action, SessionId, TurnId,
         transcript::{Match, Turn},
     };
-    fn props() -> BrowseProps {
+    pub(crate) fn props() -> BrowseProps {
         BrowseProps {
             session: SessionId::from_raw("s"),
             selected: Some(TurnId::from_raw("t1")),

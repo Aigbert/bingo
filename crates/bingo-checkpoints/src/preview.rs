@@ -10,7 +10,11 @@ pub struct Preview {
 }
 #[async_trait::async_trait]
 impl Checkpoints for Preview {
-    async fn touched(&self, session: &SessionId, from: &TurnId) -> Result<Touched, ServiceError> {
+    async fn touched(
+        &self,
+        session: &SessionId,
+        from: &TurnId,
+    ) -> Result<Option<Touched>, ServiceError> {
         let host = self
             .host
             .get()
@@ -30,8 +34,9 @@ impl Checkpoints for Preview {
             .map_err(error)?;
         let state = attachment.snapshot;
         let turns = transcript::turns(&state.transcript);
-        let undone =
-            transcript::from(&turns, from).ok_or_else(|| error("this session has no such turn"))?;
+        let Some(undone) = transcript::from(&turns, from) else {
+            return Ok(None);
+        };
         let first = turns
             .iter()
             .find(|turn| &turn.id == from)
@@ -55,7 +60,7 @@ impl Checkpoints for Preview {
                 },
             })
             .collect();
-        Ok(Touched { files, shell_calls })
+        Ok(Some(Touched { files, shell_calls }))
     }
 }
 fn error(e: impl std::fmt::Display) -> ServiceError {
@@ -112,6 +117,7 @@ mod tests {
         let touched = preview
             .touched(&crate::tests::session(), &TurnId::from_raw("trn_1"))
             .await
+            .unwrap()
             .unwrap();
         assert_eq!(touched.shell_calls, 2);
         assert_eq!(
@@ -135,6 +141,7 @@ mod tests {
         let changed = preview
             .touched(&crate::tests::session(), &TurnId::from_raw("trn_1"))
             .await
+            .unwrap()
             .unwrap();
         assert!(
             changed.files[0].changed,
@@ -146,14 +153,17 @@ mod tests {
                 .touched(&crate::tests::session(), &TurnId::from_raw("trn_2"))
                 .await
                 .unwrap()
+                .unwrap()
                 .shell_calls,
             0
         );
-        assert!(
+        assert_eq!(
             preview
                 .touched(&crate::tests::session(), &TurnId::from_raw("missing"))
                 .await
-                .is_err()
+                .unwrap(),
+            None,
+            "a turn the session lacks is an answer, not an error"
         );
     }
 }

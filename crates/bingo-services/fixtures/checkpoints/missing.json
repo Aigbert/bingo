@@ -1,0 +1,8 @@
+{
+  "method": "touched",
+  "params": {
+    "session": "ses_1",
+    "from": "trn_9"
+  },
+  "answer": null
+}
