@@ -81,11 +81,13 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
 - [x] Isolated tmux drive of `/sessions⏎abc`, before and after.
 - [x] Gates and ten smoke runs, five or more beside a parallel cargo build.
 
-- [ ] Esc and ctrl+c during a busy command hold interrupt now and leave no queue.
-- [ ] Deadline release during paint schedules a following frame showing `zq`.
-- [ ] Held `ab`, paste `X`, `cd` arrive as `abXcd`; asks reject queued pastes.
-- [ ] Permission ask, `/nosuch⏎y`: the ask remains unanswered, with a truthful count.
-- [ ] Review gates, regenerated schemas/TypeScript, and three isolated smoke runs.
+- [x] Esc and ctrl+c during a busy command hold interrupt now and leave no queue.
+- [x] Deadline release during paint schedules a following frame showing `zq`.
+- [x] Held `ab`, paste `X`, `cd` arrive as `abXcd`; asks reject queued pastes.
+- [x] Permission ask, `/nosuch⏎y`: the ask remains unanswered, with a truthful count.
+- [x] Review native non-smoke gates and regenerated schemas/TypeScript.
+- [ ] Three passing isolated smoke runs: 1/3; runs 1 and 3 hit the browse-close timeout.
+- [ ] Windows cross-check: known missing MSVC C toolchain; see below.
 
 ## Non-goals
 
@@ -125,3 +127,23 @@ load averages 20–270 throughout, so "unloaded" below means only no build of ou
 - `cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc`:
   stops in `aws-lc-sys` v0.44.0's build script (no MSVC toolchain here), the known
   deferral; CI's windows job is the check.
+
+## Verified — 2026-10-15
+
+- Before fixes, `cargo test -p bingo-surface-tui typeahead_tests --locked`: `4 passed; 7 failed`; all seven new regressions failed at their intended assertions.
+- After fixes, the same command: `11 passed; 0 failed`; includes busy Esc/ctrl+c, TestBackend redraw, ordered paste into composer/directory, three ask kinds, and both palette paths.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk -p bingo-plugin-rpc -p bingo-surface-rpc committed --locked`: `7 passed; 0 failed`; no generated diff.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods schema_and_types_are_generated_from_the_same_rows --locked`: `1 passed; 0 failed`; no generated diff.
+- `cargo fmt --all -- --check`: exit 0.
+- `cargo check --workspace --all-targets --locked`: `Finished dev profile` (32.58s), exit 0.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile` (17.56s), exit 0.
+- Initial workspace tests failed at OpenAI's fixture key-source assertion (inherited environment); after removing provider env, a scheduler shutdown lock reacquisition failed (`WouldBlock`). Neither is changed here.
+- `env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_BASE_URL RUST_TEST_THREADS=4 cargo test --workspace --locked`: `5875 passed; 0 failed; 5 ignored`, exit 0; both earlier failures passed.
+- `bash scripts/check_discipline.sh`: `discipline ok`; run.rs 982 non-test lines; `impl Run` in 2 files. Existing advisory warnings remain.
+- `bash scripts/budget.sh`: `417` dependencies, warm core `1s`, relink `0`, `budget ok`; target/debug `8 GB` exceeds the soft 5 GB limit, to be cleaned at the end.
+- `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
+- `bash scripts/tui-smoke.sh` run 1: exit 1, `timed out waiting for: press ctrl+c again to exit`, after browse close, matching the earlier recorded intermittent failure.
+- `bash scripts/tui-smoke.sh` run 2: exit 0, `tui-smoke ok`.
+- `bash scripts/tui-smoke.sh` run 3: exit 1, same browse-close timeout. All three used separate own sockets (`-f /dev/null`), temporary HOME/data, fake provider, and the four provider env variables unset; timeouts unchanged.
+- `cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc`: exit 101 in `aws-lc-sys v0.44.0`.
+  `fatal error: 'windows.h' file not found` (also `stdlib.h`): known C toolchain deferral; Windows CI remains required.
