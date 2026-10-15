@@ -2874,6 +2874,6 @@ mod palette_close_tests;
 mod rebinding_tests;
 
 #[cfg(test)]
-mod memory_scenes;
+mod memory_scene_tests;
 #[cfg(test)]
 mod memory_tests;

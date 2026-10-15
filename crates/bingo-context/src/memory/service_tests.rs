@@ -30,28 +30,7 @@ async fn commands_and_service_forget_the_same_file_with_the_same_reply() {
         std::fs::write(user.join("MEMORY.md"), "[rule](rule.md)\nkeep\n").unwrap();
     };
     seed();
-    let rows = service.list(List { cwd: cwd.clone() }).await.unwrap();
-    assert_eq!(rows.memories.len(), 1);
-    assert!(rows.memories[0].error.is_some());
-    assert_eq!(
-        service
-            .read(Read {
-                cwd: cwd.clone(),
-                path: user.join("rule.md")
-            })
-            .await
-            .unwrap(),
-        "malformed but removable"
-    );
-    assert!(
-        service
-            .read(Read {
-                cwd: cwd.clone(),
-                path: home.path().join("outside")
-            })
-            .await
-            .is_err()
-    );
+    assert_reads(&service, &cwd, &user).await;
     let reply = service.forget(request).await.unwrap();
     seed();
     let outcome = MemoryCommand::new(data)
@@ -68,6 +47,30 @@ async fn commands_and_service_forget_the_same_file_with_the_same_reply() {
     assert_eq!(
         std::fs::read_to_string(user.join("MEMORY.md")).unwrap(),
         "keep\n"
+    );
+}
+async fn assert_reads(service: &Memories, cwd: &std::path::Path, user: &std::path::Path) {
+    let rows = service.list(List { cwd: cwd.into() }).await.unwrap();
+    assert_eq!(rows.memories.len(), 1);
+    assert!(rows.memories[0].error.is_some());
+    assert_eq!(
+        service
+            .read(Read {
+                cwd: cwd.into(),
+                path: user.join("rule.md")
+            })
+            .await
+            .unwrap(),
+        "malformed but removable"
+    );
+    assert!(
+        service
+            .read(Read {
+                cwd: cwd.into(),
+                path: cwd.join("outside")
+            })
+            .await
+            .is_err()
     );
 }
 #[tokio::test]

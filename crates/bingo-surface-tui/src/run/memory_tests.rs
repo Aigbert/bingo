@@ -62,7 +62,7 @@ impl MemoryFixture {
             async { Ok(()) }
         });
         let mut registrar = Registrar::new(
-            "bingo.mod.memory",
+            bingo_mod_memory::MemoryPanel.manifest().id,
             json!({}),
             env.clone(),
             Default::default(),

@@ -1,5 +1,5 @@
 ---
-source: crates/bingo-surface-tui/src/run/memory_scenes.rs
+source: crates/bingo-surface-tui/src/run/memory_scene_tests.rs
 expression: "snapshot(width, height, scene)"
 ---
  memory · about 6.1k tokens carried                                                         ⏎ read  d forget

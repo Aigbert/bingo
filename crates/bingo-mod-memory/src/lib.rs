@@ -23,7 +23,10 @@ const REQUEST: &str = "memory";
 static MANIFEST: PluginManifest = PluginManifest {
     id: ID,
     version: env!("CARGO_PKG_VERSION"),
-    uses: &[],
+    uses: &[
+        bingo_services::memory::KEY.name(),
+        bingo_services::experience::KEY.name(),
+    ],
     requires: &[],
     provides: &["command:memory:ui", "service:bingo.mod.memory.pages"],
     config: None,
