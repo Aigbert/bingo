@@ -227,7 +227,8 @@ impl PluginSource for Facts {
             version: "1".into(),
             state: PluginState::Waiting { changed: false },
             from: "fixture".into(),
-            execution: None,
+            placement: None,
+            grant: None,
         }]
     }
 }

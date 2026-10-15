@@ -18,11 +18,7 @@ pub(super) async fn model_granted(host: &super::Host, plugin: &str) -> bool {
         .await
         .into_iter()
         .find(|status| status.id == plugin);
-    match status.and_then(|status| {
-        status
-            .execution
-            .map(|execution| (status.state.is_on(), execution.grant))
-    }) {
+    match status.and_then(|status| status.grant.map(|grant| (status.state.is_on(), grant))) {
         Some((enabled, grant)) => {
             enabled && grant.tier != Tier::Tighten && grant.uses.contains("model")
         }
@@ -246,10 +242,10 @@ async fn plugins(registry: &Registry) -> Vec<CatalogEntry> {
 /// listing it came from — the row `/plugins` draws, in a catalogue's shape.
 pub(super) fn plugin_entry(status: &PluginStatus) -> CatalogEntry {
     let mut meta = json!({ "state": status.state, "from": status.from, "version": status.version });
-    if let (Some(execution), Some(meta)) = (&status.execution, meta.as_object_mut())
-        && let Ok(Value::Object(fields)) = serde_json::to_value(execution)
-    {
-        meta.extend(fields);
+    for part in [json!(status.placement), json!(status.grant)] {
+        if let (Value::Object(fields), Some(meta)) = (part, meta.as_object_mut()) {
+            meta.extend(fields);
+        }
     }
     CatalogEntry {
         id: status.id.clone(),
@@ -525,7 +521,8 @@ mod tests {
                 state: bingo_sdk::PluginState::Off {
                     why: "switched off in the settings".into(),
                 },
-                execution: None,
+                placement: None,
+                grant: None,
                 from: "bridge".into(),
             }]
         }
@@ -536,7 +533,8 @@ mod tests {
             id: id.into(),
             version: "1.0.0".into(),
             state: bingo_sdk::PluginState::On,
-            execution: None,
+            placement: None,
+            grant: None,
             from: BUILT_IN.into(),
         }
     }
@@ -544,6 +542,35 @@ mod tests {
     /// ADR-0008 §6a: a person completes the name `/plugins` lists, so the
     /// catalogue is that same listing — this build's, then every source's,
     /// in that order.
+    /// Where a plugin came from is said once, by its listing: a repository's
+    /// plugin still waiting for a yes is placed before any grant exists.
+    #[test]
+    fn a_plugin_entry_places_a_waiting_plugin_from_its_status_alone() {
+        let waiting = PluginStatus {
+            id: "plugins:p".into(),
+            version: "1".into(),
+            state: PluginState::Waiting { changed: false },
+            from: "bingo.mods".into(),
+            placement: Some(PluginPlacement {
+                origin: PluginOrigin::Project,
+                runtime: PluginRuntime::Module,
+            }),
+            grant: None,
+        };
+        let entry = plugin_entry(&waiting);
+        assert_eq!(entry.meta["origin"], "project");
+        assert_eq!(entry.meta["runtime"], "module");
+        assert!(entry.meta.get("tier").is_none());
+        let granted = PluginStatus {
+            grant: Some(PluginGrant {
+                tier: Tier::Rewrite,
+                uses: Default::default(),
+            }),
+            ..waiting
+        };
+        assert_eq!(plugin_entry(&granted).meta["tier"], "rewrite");
+    }
+
     #[tokio::test]
     async fn the_plugins_catalogue_lists_the_sources_after_the_registry() {
         let registry = Registry {

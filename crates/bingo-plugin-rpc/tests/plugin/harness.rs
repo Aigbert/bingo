@@ -172,14 +172,10 @@ pub async fn publish(manager: &Arc<Manager>, listener: &Listening) {
                 register(&manager).await;
                 for status in manager.plugins().await {
                     let mut meta = json!({"state":status.state});
-                    if let Some(execution) = status.execution {
-                        meta.as_object_mut().unwrap().extend(
-                            serde_json::to_value(execution)
-                                .unwrap()
-                                .as_object()
-                                .unwrap()
-                                .clone(),
-                        );
+                    for part in [json!(status.placement), json!(status.grant)] {
+                        if let serde_json::Value::Object(fields) = part {
+                            meta.as_object_mut().unwrap().extend(fields);
+                        }
                     }
                     entries.push(bingo_sdk::CatalogEntry {
                         id: status.id.clone(),

@@ -25,14 +25,11 @@ impl bingo_sdk::PluginSource for Waiting {
             version: "1".into(),
             state: PluginState::Waiting { changed: false },
             from: "discovered".into(),
-            execution: Some(bingo_sdk::plugin::PluginExecution {
-                origin: bingo_sdk::plugin::PluginOrigin::Project,
-                runtime: bingo_sdk::plugin::PluginRuntime::Module,
-                grant: PluginGrant {
-                    tier: Tier::Tighten,
-                    uses: Default::default(),
-                },
+            placement: Some(PluginPlacement {
+                origin: PluginOrigin::Project,
+                runtime: PluginRuntime::Module,
             }),
+            grant: None,
         }]
     }
     async fn approval(&self, name: &str) -> Option<bingo_sdk::Approval> {

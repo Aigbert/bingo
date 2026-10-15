@@ -113,6 +113,16 @@ pub enum PluginDecision {
     Denied { reason: String },
 }
 
+/// Where an external plugin came from and how it runs: known as soon as a
+/// source finds it, before any grant is decided.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+pub struct PluginPlacement {
+    pub origin: PluginOrigin,
+    pub runtime: PluginRuntime,
+}
+
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
@@ -216,7 +226,10 @@ pub struct PluginStatus {
     pub state: PluginState,
     /// [`BUILT_IN`], or the id of the source that listed it.
     pub from: String,
-    pub execution: Option<PluginExecution>,
+    /// Absent for a plugin this build ships.
+    pub placement: Option<PluginPlacement>,
+    /// What the registration chain granted; absent until it has.
+    pub grant: Option<PluginGrant>,
 }
 
 impl PluginStatus {
@@ -227,7 +240,8 @@ impl PluginStatus {
             version: manifest.version.to_string(),
             state: PluginState::On,
             from: BUILT_IN.to_string(),
-            execution: None,
+            placement: None,
+            grant: None,
         }
     }
 

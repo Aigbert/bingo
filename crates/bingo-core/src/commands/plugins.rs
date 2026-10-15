@@ -267,7 +267,8 @@ mod tests {
                     why: reason.unwrap_or_default().into(),
                 }
             },
-            execution: None,
+            placement: None,
+            grant: None,
             from: BUILT_IN.into(),
         }
     }

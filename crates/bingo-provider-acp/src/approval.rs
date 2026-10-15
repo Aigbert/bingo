@@ -18,7 +18,8 @@ impl PluginSource for WaitingAdapters {
                     changed: entry.changed,
                 },
                 from: "bingo.acp".into(),
-                execution: None,
+                placement: None,
+                grant: None,
             })
             .collect()
     }

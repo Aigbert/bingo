@@ -192,11 +192,7 @@ impl Manager {
         else {
             return Default::default();
         };
-        let mut contents = bingo_sdk::plugin::PluginContents {
-            origin: Some(installed.registration.origin),
-            runtime: Some(bingo_sdk::PluginRuntime::Process),
-            ..Default::default()
-        };
+        let mut contents = bingo_sdk::plugin::PluginContents::default();
         if installed.registration.admission.allowed()
             && let Some(bridge) = &installed.bridge
         {

@@ -324,23 +324,20 @@ impl PluginSource for Manager {
     }
 
     async fn contents(&self, name: &str) -> plugin::PluginContents {
-        let Some(module) = self.modules().into_iter().find(|module| {
+        let listed = self.modules().into_iter().any(|module| {
             module
                 .admission
                 .status(&module.found, PluginRuntime::Module, "bingo.mods")
                 .id
                 == name
-        }) else {
+        });
+        if !listed {
             return Default::default();
-        };
-        let mut contents = self
-            .dollar
+        }
+        self.dollar
             .get()
             .map(|dollar| dollar.contents(name))
-            .unwrap_or_default();
-        contents.origin = Some(module.found.origin);
-        contents.runtime = Some(PluginRuntime::Module);
-        contents
+            .unwrap_or_default()
     }
     async fn registrations(
         &self,

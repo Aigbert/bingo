@@ -121,8 +121,8 @@ impl InterceptorSource for RegisteredSource {
             .await
             .into_iter()
             .find(|status| status.id == name)?
-            .execution
-            .map(|execution| execution.grant.tier)
+            .grant
+            .map(|grant| grant.tier)
     }
 }
 
@@ -168,8 +168,8 @@ async fn registration_links(host: &Host) -> Vec<crate::chain::Link> {
                 continue;
             }
             let tier = status
-                .and_then(|status| status.execution.as_ref())
-                .map(|execution| execution.grant.tier)
+                .and_then(|status| status.grant.as_ref())
+                .map(|grant| grant.tier)
                 .or_else(|| {
                     host.settings
                         .kernel

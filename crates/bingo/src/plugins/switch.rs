@@ -107,14 +107,14 @@ pub fn run(
 
 fn apply_trust(listed: &mut [PluginStatus], trust: &BTreeMap<String, bingo_sdk::PluginTrust>) {
     for status in listed {
-        if let Some(execution) = &mut status.execution
+        if let (Some(placement), Some(grant)) = (status.placement, &mut status.grant)
             && let Some(trust) = trust.get(&status.id)
         {
-            execution.grant = bingo_plugin_host::grant::grant(
-                execution.runtime,
-                execution.origin,
+            *grant = bingo_plugin_host::grant::grant(
+                placement.runtime,
+                placement.origin,
                 Some(trust),
-                &execution.grant.uses.iter().cloned().collect::<Vec<_>>(),
+                &grant.uses.iter().cloned().collect::<Vec<_>>(),
             );
         }
     }
@@ -209,11 +209,11 @@ fn installed(found: Found, switched_off: &BTreeSet<String>) -> PluginStatus {
         } else {
             bingo_sdk::PluginState::On
         },
-        execution: Some(bingo_sdk::PluginExecution {
+        placement: Some(bingo_sdk::PluginPlacement {
             origin: found.origin,
             runtime,
-            grant,
         }),
+        grant: Some(grant),
         from: match runtime {
             bingo_sdk::PluginRuntime::Process => bingo_plugin_rpc::ID,
             bingo_sdk::PluginRuntime::Module => "bingo.mods",
@@ -253,8 +253,8 @@ fn list_with_uses(
             }
             let tier = if status.from == bingo_sdk::BUILT_IN {
                 bingo_sdk::Tier::Full
-            } else if let Some(execution) = &status.execution {
-                execution.grant.tier
+            } else if let Some(grant) = &status.grant {
+                grant.tier
             } else {
                 trust
                     .get(&status.id)
@@ -268,14 +268,12 @@ fn list_with_uses(
                     bingo_sdk::Tier::Full => "full",
                 }
             ));
-            let runtime =
-                status
-                    .execution
-                    .as_ref()
-                    .map_or("native", |execution| match execution.runtime {
-                        bingo_sdk::PluginRuntime::Process => "process",
-                        bingo_sdk::PluginRuntime::Module => "module",
-                    });
+            let runtime = status
+                .placement
+                .map_or("native", |placement| match placement.runtime {
+                    bingo_sdk::PluginRuntime::Process => "process",
+                    bingo_sdk::PluginRuntime::Module => "module",
+                });
             line.push_str(&format!("\t{runtime}"));
             line
         })
@@ -369,7 +367,8 @@ mod tests {
                     why: reason.unwrap_or_default().into(),
                 }
             },
-            execution: None,
+            placement: None,
+            grant: None,
             from: bingo_sdk::BUILT_IN.into(),
         }
     }

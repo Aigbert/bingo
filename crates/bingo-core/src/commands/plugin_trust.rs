@@ -107,13 +107,13 @@ mod tests {
                 version: "1".into(),
                 state: PluginState::On,
                 from: "fixture".into(),
-                execution: Some(plugin::PluginExecution {
+                placement: Some(plugin::PluginPlacement {
                     origin: plugin::PluginOrigin::User,
                     runtime: plugin::PluginRuntime::Module,
-                    grant: PluginGrant {
-                        tier: Tier::Tighten,
-                        uses: Default::default(),
-                    },
+                }),
+                grant: Some(PluginGrant {
+                    tier: Tier::Tighten,
+                    uses: Default::default(),
                 }),
             }]
         }

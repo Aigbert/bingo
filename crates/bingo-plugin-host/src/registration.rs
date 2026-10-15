@@ -68,11 +68,11 @@ impl Registration {
                 .clone(),
             state: self.admission.state(),
             from: from.into(),
-            execution: grant.map(|grant| PluginExecution {
+            placement: Some(PluginPlacement {
                 origin: self.origin,
                 runtime: self.runtime,
-                grant,
             }),
+            grant,
         }
     }
 }

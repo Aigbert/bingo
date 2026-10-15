@@ -632,7 +632,8 @@ impl bingo_sdk::PluginSource for Manager {
                     version: String::new(),
                     state: bingo_sdk::PluginState::Waiting { changed },
                     from: "bingo.mcp".into(),
-                    execution: None,
+                    placement: None,
+                    grant: None,
                 })
             })
             .collect()

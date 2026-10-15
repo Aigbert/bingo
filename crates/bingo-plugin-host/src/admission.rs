@@ -96,11 +96,11 @@ impl Admission {
             version: found.manifest.version.clone(),
             state: self.state(),
             from: from.into(),
-            execution: grant.map(|grant| PluginExecution {
+            placement: Some(PluginPlacement {
                 origin: found.origin,
                 runtime,
-                grant,
             }),
+            grant,
         }
     }
 }

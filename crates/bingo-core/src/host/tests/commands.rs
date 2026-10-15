@@ -831,7 +831,8 @@ impl PluginSource for SlowSwitch {
             version: "0".into(),
             state: PluginState::On,
             from: "slow".into(),
-            execution: None,
+            placement: None,
+            grant: None,
         }]
     }
     async fn switch_kind(&self, _: &str) -> bingo_sdk::plugin::PluginSwitch {
