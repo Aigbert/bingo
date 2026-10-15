@@ -169,7 +169,7 @@ fn file_rows(
         sheet
             .rows
             .iter()
-            .skip(1 + cursor.sheet_top)
+            .skip(cursor.sheet_top)
             .take(files.saturating_sub(cursor.sheet_top).min(room))
             .map(View::text),
     );
@@ -180,5 +180,5 @@ fn file_rows(
             (cursor.sheet_top + room).min(files)
         )));
     }
-    children.extend(sheet.rows.iter().skip(1 + files).map(View::text));
+    children.extend(sheet.rows.iter().skip(files).map(View::text));
 }

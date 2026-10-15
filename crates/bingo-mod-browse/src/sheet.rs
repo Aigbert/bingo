@@ -32,11 +32,8 @@ pub struct Sheet {
 }
 pub fn sheet(turns: &[Turn], touched: &Touched, mode: Mode) -> Option<Sheet> {
     let first = turns.first()?;
-    let items = turns.last()?.last - first.first + 1;
-    let mut rows = vec![format!("undoes {} turns · {items} items", turns.len())];
-    if mode == Mode::Files {
-        rows[0] = "no turns are undone".into();
-    }
+    // The range and item count are the drawer's: it numbers turns by position.
+    let mut rows = Vec::new();
     if mode == Mode::Conversation {
         rows.push("files are kept".into());
     } else if touched.files.is_empty() {
@@ -116,16 +113,19 @@ mod tests {
             }],
             shell_calls: 0,
         };
-        assert!(sheet(&turns, &touched, Mode::Both).unwrap().rows[1].contains("skipped"));
+        assert!(sheet(&turns, &touched, Mode::Both).unwrap().rows[0].contains("skipped"));
         assert!(
-            sheet(&turns, &touched, Mode::Both).unwrap().rows[1].contains("changed since the turn")
+            sheet(&turns, &touched, Mode::Both).unwrap().rows[0].contains("changed since the turn")
         );
         let conversation = sheet(&turns, &touched, Mode::Conversation).unwrap();
         assert!(!conversation.rows.iter().any(|row| row.contains("big")));
-        assert_eq!(
-            sheet(&turns, &touched, Mode::Files).unwrap().rows[0],
-            "no turns are undone"
-        );
+        for mode in [Mode::Both, Mode::Conversation, Mode::Files] {
+            let rows = sheet(&turns, &touched, mode).unwrap().rows;
+            assert!(
+                !rows.iter().any(|row| row.contains("undo")),
+                "the drawer owns the summary line: {rows:?}"
+            );
+        }
         assert!(sheet(&[], &touched, Mode::Both).is_none());
     }
 }
