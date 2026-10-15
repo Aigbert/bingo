@@ -165,6 +165,15 @@ if pane | grep -Eq '# (Tasks|Experience|Memories)|Context injection|context:memo
 fi
 finish
 
+step 'the model picker opens and gives the composer back'
+start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
+keys '/model' Enter
+await '↑↓ pick'
+await 'rect ▾'
+keys Escape
+vanish '↑↓ pick'
+finish
+
 step 'esc interrupts a turn that is still waiting'
 start '{"responses":[{"steps":[{"delay":{"ms":60000}},{"text":"too late"}]}]}'
 keys 'wait for it' Enter

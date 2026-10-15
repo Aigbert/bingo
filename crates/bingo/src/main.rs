@@ -718,6 +718,7 @@ fn plugins(
         Box::new(bingo_mod_memory::MemoryPanel),
         Box::new(bingo_mod_plugins::Plugins),
         Box::new(bingo_mod_status::Status::default()),
+        Box::new(bingo_mod_models::Models),
         Box::new(ShellHooksPlugin),
         Box::new(JsonlStorePlugin::default()),
         Box::new(ContextPlugin),

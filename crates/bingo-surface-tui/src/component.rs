@@ -245,3 +245,6 @@ pub fn has_engine(view: &View, component: bingo_sdk::render::Component) -> bool 
         _ => false,
     }
 }
+
+#[cfg(test)]
+mod model_picker_tests;

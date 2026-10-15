@@ -18,7 +18,7 @@ pub fn span(text: &str, tone: Tone) -> Span<'static> {
     Span::styled(format!("[ {text} ]"), style(tone))
 }
 
-fn style(tone: Tone) -> Style {
+pub(super) fn style(tone: Tone) -> Style {
     match tone {
         Tone::Neutral => theme::dim(),
         Tone::Good => theme::good(),

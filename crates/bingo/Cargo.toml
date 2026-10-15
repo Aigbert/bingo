@@ -49,6 +49,7 @@ bingo-mod-browse.workspace = true
 bingo-mod-memory.workspace = true
 bingo-mod-plugins.workspace = true
 bingo-mod-status.workspace = true
+bingo-mod-models.workspace = true
 bingo-agents.workspace = true
 bingo-rooms.workspace = true
 bingo-tasks.workspace = true

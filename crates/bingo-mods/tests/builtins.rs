@@ -12,6 +12,7 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
         Box::new(bingo_mod_palette::Palette),
         Box::new(bingo_mod_sessions::Sessions),
         Box::new(bingo_mod_plugins::Plugins),
+        Box::new(bingo_mod_models::Models),
     ];
     if let Some(source) = source {
         let root = home.join("outside");
@@ -35,6 +36,7 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
         "bingo.mod.palette",
         "bingo.mod.sessions",
         "bingo.mod.plugins",
+        "bingo.mod.models",
     ] {
         bingo_core::plugins::switch(&env, name, !disabled).unwrap();
     }
@@ -152,7 +154,7 @@ async fn rust_render_is_ready_on_the_calling_thread_and_handler_results_round_tr
         let mut action = layout.on_key.clone().unwrap();
         action.args["value"] = json!({"key":key});
         assert!(
-            matches!(command(&mut attachment, Input::action(action, Origin::surface("tui"))).await, IntentOutcome::Applied { result } if result == json!({"handled":expected}))
+            matches!(command(&mut attachment, Input::action(action, Origin::surface("tui").on(render::SurfaceName::Terminal))).await, IntentOutcome::Applied { result } if result == json!({"handled":expected}))
         );
     }
     host.shutdown().await;
@@ -171,7 +173,7 @@ async fn javascript_key_handler_preserves_handled_false() {
         action.args["value"] = json!({"key":key});
         let outcome = command(
             &mut attachment,
-            Input::action(action, Origin::surface("tui")),
+            Input::action(action, Origin::surface("tui").on(render::SurfaceName::Terminal)),
         )
         .await;
         assert!(
@@ -232,7 +234,7 @@ async fn the_ask_handler_returns_an_answer_for_the_surface_to_send() {
     action.args["value"] = json!({"key":"2"});
     let outcome = command(
         &mut attachment,
-        Input::action(action, Origin::surface("tui")),
+        Input::action(action, Origin::surface("tui").on(render::SurfaceName::Terminal)),
     )
     .await;
     let IntentOutcome::Applied { result } = outcome else {
@@ -510,6 +512,156 @@ async fn outside_mod_wraps_the_plugins_site_and_disabled_commands_keep_tables() 
     assert!(
         matches!(plain,IntentOutcome::Applied {ref result} if result["view"]["kind"]=="table"),
         "{plain:?}"
+    );
+    host.shutdown().await;
+}
+
+#[tokio::test]
+async fn outside_wraps_model_picker_and_disabled_uses_engine() {
+    let home = tempfile::tempdir().unwrap();
+    let source = "export function register(on) { on('ui.render',{component:'ModelPicker'},async ($,e,next)=>{const tree=await next(e);return {...tree,children:[h('Text',{},'Outside picker'),...tree.children]};}); }";
+    let (host, mut attachment) = start(home.path(), Some(source), false).await;
+    assert!(matches!(
+        command(
+            &mut attachment,
+            Input::text("/model", Origin::surface("tui").on(render::SurfaceName::Terminal))
+        )
+        .await,
+        IntentOutcome::Applied { .. }
+    ));
+    let attached = host
+        .open(
+            SessionSelector::ById {
+                id: attachment.session.clone(),
+            },
+            who_for_models(),
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap();
+    let pull = slot::placed(&attached.snapshot)
+        .into_iter()
+        .find_map(|p| match p.slot {
+            slot::Slot::Pane {
+                view: slot::Shown::Pull { request },
+                ..
+            } if request.component == render::Component::ModelPicker => Some(request),
+            _ => None,
+        })
+        .unwrap();
+    let request = pull.on(render::SurfaceName::Terminal);
+    let tree = host
+        .render(&attachment.session, request.clone())
+        .await
+        .unwrap();
+    assert!(tree.fold().contains("Outside picker"));
+    assert!(tree.fold().contains("+ add a provider"), "{}", tree.fold());
+    host.shutdown().await;
+    let other = tempfile::tempdir().unwrap();
+    let (host, attachment) = start(other.path(), None, true).await;
+    assert_eq!(
+        host.render(&attachment.session, request.clone())
+            .await
+            .unwrap(),
+        request.engine()
+    );
+    host.shutdown().await;
+}
+fn who_for_models() -> ClientIdentity {
+    ClientIdentity {
+        name: "test".into(),
+        surface: "terminal".into(),
+    }
+}
+
+struct CountedProvider(Arc<std::sync::atomic::AtomicUsize>);
+#[async_trait::async_trait]
+impl Provider for CountedProvider {
+    fn id(&self) -> &str {
+        "counted"
+    }
+    fn endpoint(&self, _: &str) -> EndpointCapabilities {
+        EndpointCapabilities::default()
+    }
+    async fn stream(
+        &self,
+        _: ModelRequest,
+        _: CancellationToken,
+    ) -> Result<ModelStream, ProviderError> {
+        unreachable!("the picker never asks a model")
+    }
+    async fn models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(vec![ModelInfo {
+            id: "one".into(),
+            display: None,
+        }])
+    }
+}
+struct Counted(Arc<std::sync::atomic::AtomicUsize>);
+impl Plugin for Counted {
+    fn manifest(&self) -> &'static PluginManifest {
+        &PluginManifest {
+            id: "counted",
+            version: "1",
+            uses: &[],
+            requires: &[],
+            provides: &["provider:counted"],
+            config: None,
+        }
+    }
+    fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+        registrar.add(Contribution::Provider(Arc::new(CountedProvider(
+            self.0.clone(),
+        ))));
+        Ok(())
+    }
+}
+#[tokio::test]
+async fn opening_checks_an_unchecked_provider_once_and_refreshes_the_tree() {
+    let home = tempfile::tempdir().unwrap();
+    let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let host = Host::build(
+        vec![
+            Box::new(Counted(count.clone())),
+            Box::new(bingo_mod_models::Models),
+        ],
+        HostConfig::new(Env::rooted(home.path())),
+    )
+    .await
+    .unwrap();
+    let mut attachment = host
+        .open(
+            SessionSelector::Create {
+                spec: SessionSpec {
+                    cwd: home.path().into(),
+                    driver: Driver::Log,
+                    ..Default::default()
+                },
+            },
+            who_for_models(),
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap();
+    for _ in 0..2 {
+        assert!(matches!(
+            command(
+                &mut attachment,
+                Input::text("/model", Origin::surface("tui").on(render::SurfaceName::Terminal))
+            )
+            .await,
+            IntentOutcome::Applied { .. }
+        ));
+    }
+    assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert!(
+        host.catalog(CatalogKind::Models)
+            .await
+            .unwrap()
+            .entries
+            .iter()
+            .any(|m| m.id == "counted/one")
     );
     host.shutdown().await;
 }

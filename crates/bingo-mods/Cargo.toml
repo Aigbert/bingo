@@ -52,6 +52,7 @@ bingo-mod-hello.workspace = true
 bingo-mod-palette.workspace = true
 bingo-mod-sessions.workspace = true
 bingo-mod-plugins.workspace = true
+bingo-mod-models.workspace = true
 # M137: exercise source registration against the real offline kernel.
 bingo-core.workspace = true
 bingo-sdk = { workspace = true, features = ["testing"] }

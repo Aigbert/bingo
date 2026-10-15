@@ -123,8 +123,9 @@ wheel scrolling and drag-to-copy selection.
 
 ## Choosing a model
 
-Choose `/model` in the palette to list models, with the current one selected.
-Its row shows the current provider/model; `/think` shows the requested effort.
+Submit `/model` to open the model picker with the current model selected.
+↑↓ selects, ←→ sets effort, * pins, Tab keeps, Enter uses, and Escape backs out.
+Alt+M cycles pins; Alt+T cycles efforts. `/guide models` explains provider setup.
 Use `/model openai/gpt-5.4` to try a model in this session, or
 `/model openai/gpt-5.4 --keep` to also save the provider and model for new
 sessions. Project and command-line settings still take precedence at startup.

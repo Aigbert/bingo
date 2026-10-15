@@ -1,0 +1,28 @@
+---
+source: crates/bingo-surface-tui/src/component/model_picker_tests.rs
+expression: screen
+---
+"model                                                                           "
+"   6 models · 4 providers    ★ pinned · ∴ thinks · ▣ sees images                "
+"   pinned · alt+m cycles them   │ claude-sonnet-5-5                             "
+" ❯ ★ ● claude-sonnet-5-5 128k ∴▣│                                               "
+"   ★   gpt-6 128k ∴▣            │ context   ▰▱▱▱▱▱▱▱▱▱ 128k · this chat 14k     "
+"   ★   claude-opus-5-5 128k ∴▣  │ output    32k per answer                      "
+"   anthropic  ● store  84 ms    │ price     $3 in · $15 out per M tokens        "
+"   ★ ● claude-sonnet-5-5 128k ∴▣│ images    reads them                          "
+"   ★   claude-opus-5-5 128k ∴▣  │ source    models.dev                          "
+"       claude-sonnet-5-5-202610…│                                               "
+"   openai  ● store  84 ms       │ thinking  low [medium] high                   "
+"   ★   gpt-6 128k ∴▣            │ applies   ● here   ○ here and new sessions    "
+"   work  ✗ connection refused   │                                               "
+"       qwen3-coder-30b 128k     │                                               "
+"   codex  ○ not signed in       │                                               "
+"   ↓ 2 more                     │                                               "
+" ↑↓ pick  ←→ effort  * pin  tab keep  ⏎ use here  esc close                     "
+"   /model                                                                       "
+"                                                                                "
+"                                                                                "
+"╭──────────────────────────────────────────────────────────────────────────────╮"
+"│ > ask anything · / for commands · ! for shell                                │"
+"╰──────────────────────────────────────────────────────────────────────────────╯"
+"? for shortcuts                                                      fake/fake-1"
