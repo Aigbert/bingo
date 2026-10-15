@@ -135,3 +135,9 @@ original-table fallback. Captures show whole-file bodies no longer inflate the 6
 After both forgets: about 30 tokens carried; memories (1); experience (0).
 ```
 Eight full/empty/confirming/malformed goldens and both frontmatter TestBackend sizes passed.
+Low-finding round (5777 passed, 0 failed, 5 ignored; fmt/clippy/discipline/budget/deny clean; tui-smoke ok ×3):
+1. 9751a3e3: post-rename directory fsync is best-effort (warn), unlink still runs; a_failed_directory_sync_still_removes_the_file.
+2. 529bdfaf/75aa8ca6: `carried_lines` in experience index and memory mod feeds contributor and listing; two parity tests.
+3. 858918d1: pager renders text as given; mod-memory fence.rs fences its reads; a_pager_renders_other_text_as_given_without_a_fence.
+4. 7dc08d2b: the fence closes directly after front matter, adding a newline only when it lacks one; expected string updated.
+5. b48d5757: names cut at 24 with …; unreadable experience rows show only their error; malformed goldens at 80×24/108×30.
