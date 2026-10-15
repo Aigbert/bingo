@@ -124,6 +124,14 @@ impl SessionStore for MemoryStore {
         Ok(())
     }
 
+    /// Memory belongs to this process alone; no other one can hold it.
+    async fn locked(&self, session: &SessionId) -> Result<bool, KernelError> {
+        self.lock()
+            .get(session)
+            .map(|_| false)
+            .ok_or_else(|| Self::missing(session))
+    }
+
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError> {
         self.lock()
             .remove(session)

@@ -67,9 +67,13 @@ pub trait SessionStore: Send + Sync {
         ))
     }
 
-    /// Observe ownership without claiming an unowned session.
+    /// Observe ownership without claiming an unowned session. A store that
+    /// cannot tell refuses, so no caller mistakes "unknown" for "free".
     async fn locked(&self, _session: &SessionId) -> Result<bool, KernelError> {
-        Ok(false)
+        Err(KernelError::new(
+            crate::ErrorCode::Internal,
+            "this store cannot tell whether a session is open elsewhere",
+        ))
     }
 
     async fn delete(&self, session: &SessionId) -> Result<(), KernelError>;
@@ -82,5 +86,40 @@ pub trait SessionStore: Send + Sync {
 
     async fn release(&self, _session: &SessionId) -> Result<(), KernelError> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Only what a store must write; every optional verb is left defaulted.
+    struct Minimal;
+
+    #[async_trait]
+    impl SessionStore for Minimal {
+        async fn create(&self, _: &SessionSummary) -> Result<(), KernelError> {
+            Ok(())
+        }
+        async fn append(&self, _: &SessionId, _: &Frame) -> Result<(), KernelError> {
+            Ok(())
+        }
+        async fn replay(&self, _: &SessionId, _: Seq) -> Result<Vec<Frame>, KernelError> {
+            Ok(vec![])
+        }
+        async fn list(&self, _: &SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
+            Ok(vec![])
+        }
+        async fn delete(&self, _: &SessionId) -> Result<(), KernelError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn a_store_that_cannot_tell_refuses_like_rename() {
+        let id = SessionId::from_raw("ses_any");
+        let locked = Minimal.locked(&id).await.expect_err("unknown is not free");
+        let renamed = Minimal.rename(&id, "x").await.expect_err("refused");
+        assert_eq!(locked.code, renamed.code);
     }
 }
